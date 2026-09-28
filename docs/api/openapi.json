@@ -2370,6 +2370,9 @@
                         },
                         "approvals": {
                           "type": "number"
+                        },
+                        "biometricPrints": {
+                          "type": "number"
                         }
                       },
                       "required": [
@@ -2385,7 +2388,8 @@
                         "entities",
                         "relationships",
                         "grants",
-                        "approvals"
+                        "approvals",
+                        "biometricPrints"
                       ]
                     }
                   },
@@ -18671,6 +18675,346 @@
           },
           "404": {
             "description": "No such grant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/biometric-prints": {
+      "get": {
+        "tags": [
+          "Biometric prints"
+        ],
+        "summary": "A person's enrolled biometric prints (metadata only, never the embedding)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "personId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One row per accepted enrollment sample.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "person_id": {
+                        "type": "string"
+                      },
+                      "modality": {
+                        "type": "string",
+                        "enum": [
+                          "face",
+                          "voice"
+                        ]
+                      },
+                      "model_id": {
+                        "type": "string"
+                      },
+                      "model_sha256": {
+                        "type": "string"
+                      },
+                      "dim": {
+                        "type": "number"
+                      },
+                      "captured_by": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "consent_at": {
+                        "type": "string"
+                      },
+                      "consented_by_person_id": {
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "type": "string"
+                      },
+                      "deleted_at": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "hlc": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "person_id",
+                      "modality",
+                      "model_id",
+                      "model_sha256",
+                      "dim",
+                      "captured_by",
+                      "consent_at",
+                      "consented_by_person_id",
+                      "created_at",
+                      "updated_at",
+                      "deleted_at",
+                      "hlc"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No such person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to see this person's biometric prints",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Biometric prints"
+        ],
+        "summary": "Enroll one biometric sample for a person, consented by the signed-in actor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "person_id": {
+                    "type": "string"
+                  },
+                  "model_id": {
+                    "type": "string"
+                  },
+                  "embedding": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 1
+                  },
+                  "captured_by": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "person_id",
+                  "model_id",
+                  "embedding"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Enrolled. consent_at/consented_by_person_id are the signed-in actor's, right now - never client-supplied.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "person_id": {
+                      "type": "string"
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "face",
+                        "voice"
+                      ]
+                    },
+                    "model_id": {
+                      "type": "string"
+                    },
+                    "model_sha256": {
+                      "type": "string"
+                    },
+                    "dim": {
+                      "type": "number"
+                    },
+                    "captured_by": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "consent_at": {
+                      "type": "string"
+                    },
+                    "consented_by_person_id": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string"
+                    },
+                    "deleted_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "hlc": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "modality",
+                    "model_id",
+                    "model_sha256",
+                    "dim",
+                    "captured_by",
+                    "consent_at",
+                    "consented_by_person_id",
+                    "created_at",
+                    "updated_at",
+                    "deleted_at",
+                    "hlc"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown model, wrong dimension, or no such person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to consent for this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/biometric-prints/{id}": {
+      "delete": {
+        "tags": [
+          "Biometric prints"
+        ],
+        "summary": "Revoke one biometric sample",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "print-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tombstoned: the embedding is scrubbed, the row's metadata stays as evidence a consent once existed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to revoke this print",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such biometric print",
             "content": {
               "application/json": {
                 "schema": {

@@ -4,8 +4,8 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { sqlite, db } from "@/db";
-import { passkeyCredentials, devices, deviceTokens, totpSecrets, people } from "@/db/schema";
-import { newPersonId } from "@/lib/id";
+import { passkeyCredentials, devices, deviceTokens, totpSecrets, people, biometricPrints } from "@/db/schema";
+import { newPersonId, newBiometricPrintId } from "@/lib/id";
 import { remember } from "@/lib/memory";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { setValue } from "@/lib/settings";
@@ -883,6 +883,27 @@ describe("deleting a person erases what the household held about them", () => {
       .run();
     db.insert(totpSecrets).values({ personId: person.id, secretEncrypted: "enc", enabled: true, createdAt: now, updatedAt: now }).run();
 
+    // FACE-01: biometric_prints was entirely unexercised by this test
+    // too, the same trivial-pass gap the comments above call out for
+    // every other table added since this test was written.
+    const ownerRow = sqlite.query("SELECT id FROM people WHERE role = 'owner'").get() as { id: string };
+    db.insert(biometricPrints)
+      .values({
+        id: newBiometricPrintId(),
+        personId: person.id,
+        modality: "face",
+        modelId: "sface-r100",
+        modelSha256: "a".repeat(64),
+        dim: 128,
+        embeddingEncrypted: "enc-embedding",
+        consentAt: now,
+        consentedByPersonId: ownerRow.id,
+        createdAt: now,
+        updatedAt: now,
+        hlc: now,
+      })
+      .run();
+
     await owner.request(`/api/people/${person.id}`, { method: "DELETE" });
 
     const tables = sqlite
@@ -895,7 +916,10 @@ describe("deleting a person erases what the household held about them", () => {
       // from one it was never told about, so a hard delete would undo
       // itself on the next sync. What's checked instead, right below, is
       // that the tombstoned row's own CONTENT is actually gone.
-      if (name === "people" || name === "memory_records" || name.startsWith("__drizzle")) continue;
+      // `biometric_prints` is the same shape (FACE-01's own design: the
+      // print's metadata is evidence a real consent happened and
+      // outlives the person; only the embedding itself is scrubbed).
+      if (name === "people" || name === "memory_records" || name === "biometric_prints" || name.startsWith("__drizzle")) continue;
       const columns = sqlite.query(`PRAGMA table_info(${name})`).all() as Array<{ name: string }>;
       for (const col of columns) {
         const isPersonColumn = col.name === "person_id" || col.name === "person" || col.name === "creator_id";
@@ -917,6 +941,15 @@ describe("deleting a person erases what the household held about them", () => {
     expect(tombstone.text).toBe("[forgotten]");
     expect(tombstone.embedding_space).toBeNull();
     expect(tombstone.deleted_at).not.toBeNull();
+
+    const printTombstone = sqlite.query("SELECT embedding_encrypted, deleted_at, consented_by_person_id FROM biometric_prints WHERE person_id = ?").get(person.id) as {
+      embedding_encrypted: string | null;
+      deleted_at: string | null;
+      consented_by_person_id: string;
+    };
+    expect(printTombstone.embedding_encrypted).toBeNull();
+    expect(printTombstone.deleted_at).not.toBeNull();
+    expect(printTombstone.consented_by_person_id).toBe(ownerRow.id);
   });
 });
 

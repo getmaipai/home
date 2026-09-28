@@ -1084,6 +1084,50 @@ export const totpSecrets = sqliteTable("totp_secrets", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// FACE-01: mirrors spec/schemas/biometric-print.schema.json. One row per
+// accepted enrollment sample (a coverage-grid enrollment makes several:
+// frontal, left, right, up, down), never one row per person with an array
+// inside it, so a single bad sample can be revoked without touching the
+// rest. Enrollment is always hub-owned (CLAUDE.md-level product decision,
+// 2026-09-28): a bot or browser capture surface sends the embedding here,
+// it never creates its own print. embeddingEncrypted is AES-256-GCM via
+// lib/secrets.ts (the reversible module, not lib/secret.ts's one-way
+// hash - matching needs the plaintext vector back), holding the
+// JSON-stringified number[]; modelId/modelSha256 let a matcher refuse a
+// foreign-model print outright instead of comparing incompatible
+// embedding spaces. Tombstoned on person deletion (deletedAt set,
+// embeddingEncrypted scrubbed to NULL), never hard-deleted, the same
+// shape memory_records uses and for the same reason: the print's
+// metadata (which modality, when consented, by whom) stays as evidence
+// consent existed even after the biometric data itself is gone. See
+// personLifecycle.ts's erasePersonData() and
+// tests/people.test.ts's schema-walking erasure test, which excludes
+// this table by name for exactly that reason.
+export const biometricPrints = sqliteTable(
+  "biometric_prints",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    modality: text("modality").notNull(), // "face" | "voice"
+    modelId: text("model_id").notNull(),
+    modelSha256: text("model_sha256").notNull(),
+    dim: integer("dim").notNull(),
+    embeddingEncrypted: text("embedding_encrypted"), // NULL once tombstoned
+    capturedBy: text("captured_by"), // device/session that captured the sample, nullable
+    consentAt: text("consent_at").notNull(),
+    consentedByPersonId: text("consented_by_person_id")
+      .notNull()
+      .references(() => people.id),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    deletedAt: text("deleted_at"),
+    hlc: text("hlc").notNull(),
+  },
+  (table) => [index("biometric_prints_person_id_idx").on(table.personId)],
+);
+
 // --- Session F, step 7: entities, relationships, grants, approvals ---
 //
 // Mirrors spec/schemas/entity.schema.json. aliases is JSON text (sqlite

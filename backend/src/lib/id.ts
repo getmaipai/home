@@ -9,6 +9,11 @@ export function newPersonId(): string {
   return `person-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/biometric-print.schema.json's `^print-[a-z0-9]{6,}$`. */
+export function newBiometricPrintId(): string {
+  return `print-${randomSuffix(10)}`;
+}
+
 // Not a spec-shaped id (scheduled jobs aren't a spec 3.1 record type,
 // see lib/scheduler.ts's header comment for why), so no schema pattern
 // to match: just a stable, collision-resistant local id.

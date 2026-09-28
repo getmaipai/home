@@ -473,6 +473,7 @@ const deleteRoute = createRoute({
               relationships: z.number(),
               grants: z.number(),
               approvals: z.number(),
+              biometricPrints: z.number(),
             }),
           }),
         },

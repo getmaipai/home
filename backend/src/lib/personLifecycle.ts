@@ -252,6 +252,9 @@ export interface ErasureCounts {
   grants: number;
   approvals: number;
   attachments: number;
+  /** FACE-01: prints tombstoned (embedding scrubbed), not hard-deleted -
+   * see erasePersonData()'s own comment on why. */
+  biometricPrints: number;
 }
 
 /** Everything the household holds about one person, deleted for real.
@@ -314,6 +317,23 @@ export function erasePersonData(personId: string): ErasureCounts {
       .run(TOMBSTONE_TEXT, tombstonedAt, nextHlc(), row.id);
   }
   const memories = memoryIds.length;
+  // FACE-01: biometric prints are tombstoned the same way, for the same
+  // reason (docs/dev.md's own design record): the print's metadata (which
+  // modality, when consented, by whom) is evidence a real consent
+  // happened and stays; the embedding itself is the sensitive payload and
+  // is scrubbed. Only consentedByPersonId gets left alone here on
+  // purpose, matching relationships.confirmed_by_person_id above - it
+  // records who consented, not data belonging to the deleted person, and
+  // `people` rows are never hard-deleted so the reference stays valid.
+  const printIds = sqlite
+    .query("SELECT id FROM biometric_prints WHERE person_id = ? AND deleted_at IS NULL")
+    .all(personId) as { id: string }[];
+  for (const row of printIds) {
+    sqlite
+      .query("UPDATE biometric_prints SET embedding_encrypted = NULL, deleted_at = ?, updated_at = ?, hlc = ? WHERE id = ?")
+      .run(tombstonedAt, tombstonedAt, nextHlc(), row.id);
+  }
+  const biometricPrintRows = printIds.length;
   // MEM-03: a person's verbatim episodes carry a real FK to their turns
   // (and their embeddings to the episodes), so they go first, through the
   // same helper forget() uses. Really gone, not tombstoned: the turns
@@ -419,6 +439,7 @@ export function erasePersonData(personId: string): ErasureCounts {
     grants: grantRows,
     approvals: approvalRows,
     attachments,
+    biometricPrints: biometricPrintRows,
   };
 }
 

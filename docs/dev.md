@@ -31243,3 +31243,115 @@ future reader wonders why the code does not simply check
 
 Out of scope, as the backlog specified: the voice adapter (untouched,
 content-preserving by construction) and the old path (frozen).
+
+## FACE-01: the hub's own biometric print store and enrollment API (Sonnet, 2026-09-28)
+
+Facial recognition's foundation, decided across `bot`, `commons` and this
+repo in one session: an iOS-Face-ID-style guided multi-pose enrollment
+(frontal/left/right/up/down), SFace (face, 128-d, OpenCV Zoo, Apache-2.0)
+and CAM++ (voice, 512-d, hub-side, not yet built) as the chosen models.
+
+**The one invariant, confirmed explicitly with Jesse and non-negotiable:
+enrollment is always hub-owned, bot or no bot.** A robot's camera or a
+browser's is a capture surface, never a creator of its own print - it
+sends an embedding here and the hub decides whether to keep it. This is
+why the print store lives in `home`, not `bot`, even though `bot`'s own
+offline pipeline (FACE-01's bench work, `bot` repo) can produce SFace
+embeddings standalone for matching against prints synced down from here.
+
+**One row per accepted sample, never one row per person with an array
+inside it** (`spec/schemas/biometric-print.schema.json`, `spec-v0.1.54`,
+commons commit `d7e9f7e`): a coverage-grid enrollment makes several rows,
+so a single bad sample (someone squinted on "look up") can be revoked
+alone without touching the rest. `model_id`/`model_sha256` on every row
+so a matcher refuses a foreign-model print outright rather than silently
+comparing incompatible embedding spaces - the same reasoning
+`wakewordAssets.ts`'s checksum pins exist for, applied to what a print is
+allowed to claim about the model that made it.
+
+**Storage** (`backend/src/db/schema.ts`'s `biometricPrints`,
+migration `0073_brainy_onslaught.sql`): the embedding is AES-256-GCM via
+`lib/secrets.ts` (the reversible module - a credential hash's one-way
+`lib/secret.ts` is the wrong tool here, matching needs the plaintext
+vector back), and it never appears in any API response, the same
+treatment a password hash gets - `lib/biometricPrints.ts`'s own
+`BiometricPrintSummary` type omits the field entirely rather than
+trusting every call site to remember not to serialize it.
+
+**Consent, the actual design work here**: reused
+`personLifecycle.ts`'s existing `MANAGEABLE_BY` ladder (owner manages
+everyone, admin manages adult/teen/child/guest, nobody else manages
+anyone) rather than inventing a second authorization table, plus one
+absolute on top that ladder alone doesn't express - a child never
+consents for themself, full stop, even though `MANAGEABLE_BY`'s normal
+self-case would otherwise allow it. Revocation is the mirror image and
+deliberately NOT gated the same way: anyone, including a child, can
+revoke their own print regardless of role, because withdrawing consent
+is safety-positive, not a new capability being granted.
+
+**Erasure**: tombstoned on person deletion
+(`personLifecycle.ts`'s `erasePersonData()`), not hard-deleted, mirroring
+`memory_records`'s own precedent exactly - the embedding is scrubbed to
+NULL but the row's metadata (which modality, when consented, by whom)
+survives as evidence a real consent existed. `tests/people.test.ts`'s
+schema-walking erasure test excludes `biometric_prints` by name for
+exactly this reason, the same way it already excludes `memory_records`.
+Found live while wiring this up: `biometric_prints` also needed adding
+to `lib/hlc.ts`'s `HLC_BEARING_TABLES` (caught by
+`hlc.test.ts`'s own schema-walking test) - missing it would have meant
+the clock never seeds from this table's rows at boot, a real regression
+this session would have shipped without that second generic test.
+
+**Routes** (`routes/biometricPrints.ts`, mounted at
+`/api/biometric-prints`): list (metadata only), create (consent stamped
+from the signed-in actor, never client-supplied), delete (revoke one
+sample). No route nests under `/api/people/:id/...` - this repo has no
+such nesting pattern anywhere else (checked `app.ts`'s full mount list
+first), so this follows `relationships.ts`/`grants.ts`'s existing shape
+instead: a flat resource with the target `person_id` in the body/query.
+
+**Known models allow-list** (`lib/biometricPrints.ts`'s
+`KNOWN_MODELS`): only `sface-2021dec` today, sha256 pinned from `bot`'s
+own verified `body/maipai_body/vision/models.py` (`SFACE.sha256`,
+independently re-verified against the OpenCV Zoo commit's own file
+during that session) rather than re-trusting an unverified claim a
+second time. CAM++ has no entry yet - add one the day its hash is
+actually pinned somewhere, never assumed.
+
+**Verified**: full backend suite green (4389/4389, including this
+route's own tests - confirmed 4375/4375 before them too, which is what
+established that two unrelated flaky failures on the first `check.sh`
+run - a sidecar spawn-timing test and a fake-SSH fixture test - were
+pre-existing environment noise, not a regression, before any of this
+file's own tests existed to blame). `bun run lint` (tsc --noEmit) clean,
+API docs regenerated (`gen:api-docs`, 151 paths).
+
+**The pre-commit review (medium, 8 finder angles) earned its keep**:
+`GET /api/biometric-prints` had `middleware: [requireAuth]` and nothing
+else - the handler read `personId` straight off the query string and
+never checked whether the signed-in actor had any right to see that
+person's enrollment metadata. Any signed-in household member, including
+a guest or a teen, could ask whether/when/by-whom another person -
+including a child - had been biometrically enrolled. The embedding
+itself never leaked (`toSummary`/`listBiometricPrints` never touch
+`embeddingEncrypted`), but the metadata did. Fixed before this ever
+reached `main`: `listBiometricPrints()` now takes the actor and is
+gated the same way create/delete already were (self, or
+`personLifecycle.ts`'s `canManage()` - no child carve-out here, since
+reading one's own metadata is fine regardless of role, unlike
+consenting to create it). The review's second finding - `canConsentFor`
+and `deleteBiometricPrint` each hand-reimplementing `canManage`'s own
+self-or-MANAGEABLE_BY expression instead of importing and calling it -
+was fixed the same pass, so the rule now lives in exactly one place.
+Four new regression tests (`biometricPrints.test.ts`: an unrelated
+guest refused, a child reading their own list, owner/admin reading
+anyone's, an unknown person refused) - 18/18. Full write-up of what
+survived the review clean (the child-never-self-consents invariant, the
+allow-list, erasure completeness, HLC wiring) is in `code-review-3`'s
+own report, not repeated here.
+
+Out of scope, filed as BACKLOG items instead: the actual client-side
+capture UI (browser camera, onnxruntime-web inference, the guided
+multi-pose flow with quality gating ported from the legacy
+`EnrollmentSession`), and wiring `bot`'s real construction path to
+match against prints synced down from here.
