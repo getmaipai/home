@@ -21,7 +21,7 @@ import { getEngineStatus } from "@/lib/llmSupervisor";
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import { __setSamplingSeedForBench } from "@/lib/benchSampling";
 import { visibleText, extractReasoningText } from "@/lib/wellFormed";
-import { buildStages4, buildCeilingGapStages, QUESTION, BENCHMARKING_QUESTION, type Stage4 } from "./parity-bisect4-stages";
+import { buildStages4, buildCeilingGapStages, ENGINE_DEFAULT_TEMPERATURE, QUESTION, BENCHMARKING_QUESTION, type Stage4 } from "./parity-bisect4-stages";
 
 const REPS = Number(process.env.MAIPAI_BENCH_REPEATS ?? 5);
 const SEEDS = Array.from({ length: REPS }, (_, i) => i + 1);
@@ -108,7 +108,7 @@ async function runQuestion(persona: ReturnType<typeof resolvePersona>, question:
 // historical PARITY-BISECT-04 stages remain the default invocation.
 async function runCeilingGapQuestion(persona: ReturnType<typeof resolvePersona>, question: string, label: string): Promise<StageResult[]> {
   const stages: Stage4[] = [
-    { name: "floor-bare-thinking-off", messages: [{ role: "user", content: question }], opts: { temperature: 0.8, thinking: false } },
+    { name: "floor-bare-thinking-off", messages: [{ role: "user", content: question }], opts: { temperature: ENGINE_DEFAULT_TEMPERATURE, thinking: false } },
     ...buildCeilingGapStages(persona, question),
   ];
   const results: StageResult[] = [];
@@ -160,8 +160,12 @@ async function main() {
   const persona = resolvePersona(getHouseholdSettingValue("persona.active_id"));
 
   if (process.argv.includes("--ceiling-gap")) {
-    const primary = await runCeilingGapQuestion(persona, QUESTION, "prompt-cache");
-    const benchmarking = await runCeilingGapQuestion(persona, BENCHMARKING_QUESTION, "benchmarking-words");
+    // A non-default display name makes the verbatim MaiPai identity
+    // sentence a real wording ablation instead of a no-op on fresh data.
+    const ceilingGapPersona = resolvePersona("buddy");
+    console.log(`CEILING-GAP-01 persona: ${ceilingGapPersona.id} (${ceilingGapPersona.display_name})`);
+    const primary = await runCeilingGapQuestion(ceilingGapPersona, QUESTION, "prompt-cache");
+    const benchmarking = await runCeilingGapQuestion(ceilingGapPersona, BENCHMARKING_QUESTION, "benchmarking-words");
     printTable("CEILING-GAP-01 prompt-cache", primary);
     printTable("CEILING-GAP-01 benchmarking-words", benchmarking);
     console.log("\n=== CEILING-GAP-01 benchmarking-words replies, every seed ===");

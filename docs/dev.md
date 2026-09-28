@@ -30946,7 +30946,7 @@ numbers. All replies stopped normally; no tool calls were made.
 | arm 1 (shipped shape) | 297, 335, 358, 335, 435 | 352.0 | 0.44x | no | yes | 0/5 |
 | arm 2 (without tools) | 274, 452, 322, 534, 253 | 367.0 | 0.45x | yes | yes | 0/5 |
 | arm 3 (without profile/roster) | 234, 211, 327, 305, 354 | 286.2 | 0.35x | no | yes | 0/5 |
-| arm 4 (ceiling identity sentence) | 284, 335, 358, 335, 435 | 349.4 | 0.43x | no | yes | 0/5 |
+| arm 4 (first run; invalid no-op) | same prompt as arm 1 | n/a | n/a | n/a | n/a | n/a |
 
 **Table: benchmarking-words question**
 
@@ -30956,23 +30956,44 @@ numbers. All replies stopped normally; no tool calls were made.
 | arm 1 (shipped shape) | 234, 227, 226, 204, 95 | 197.2 | 0.31x | no | yes | 0/5 |
 | arm 2 (without tools) | 290, 347, 246, 239, 319 | 288.2 | 0.46x | no | yes | 0/5 |
 | arm 3 (without profile/roster) | 255, 229, 226, 207, 238 | 231.0 | 0.36x | no | yes | 0/5 |
-| arm 4 (ceiling identity sentence) | 234, 227, 226, 204, 95 | 197.2 | 0.31x | no | yes | 0/5 |
+| arm 4 (first run; invalid no-op) | same prompt as arm 1 | n/a | n/a | n/a | n/a | n/a |
 
-Arm 2 recovers the most of the gap in both questions: removing tools
-adds 15 tokens (0.02x of the floor) over arm 1 on prompt-cache and 91
-tokens (0.14x) on benchmarking-words. Removing profile/roster instead
-reduces prompt-cache by 65 tokens and raises benchmarking-words by 34;
-the identity swap changes neither result materially. This **partly
-confirms and narrows** the 2026-09-23 record's attribution of the
-isolated-ceiling gap to the tool block: tools lower both replies in this
-matched run, substantially for benchmarking-words, but barely for
-prompt-cache. The earlier attribution overstates a single common cause;
-the tool block alone does not explain both gaps. Since the historical
-shipped measurement had no profile/roster context, these controlled
-synthetic-context results do not directly partition its exact
-0.30x/0.26x figures.
+The first run's identity comparison was invalid: its fresh bench
+database selected the default companion, MaiPai, whose `identityLine()`
+is already the exact ceiling sentence, so the replacement made no
+prompt change. The old arm-4 token rows are therefore removed as
+identity evidence. The arm-1 through arm-3 comparisons remain valid for
+that run because each pair differed only by the named ablation.
+
+**Corrected rerun with Buddy** (same engine, questions, seeds and metric
+set; all four arms rerun so the identity contrast has a matched arm 1):
+
+| question | stage | predicted tokens (seed 1-5) | avg | vs floor | headings | lists | lowercase |
+|---|---|---|---:|---:|---|---|---|
+| prompt-cache | floor | 798, 848, 845, 758, 785 | 806.8 | 1.00x | yes | yes | 0/5 |
+| prompt-cache | arm 1 (Buddy identity) | 246, 382, 320, 162, 263 | 274.6 | 0.34x | no | yes | 0/5 |
+| prompt-cache | arm 2 (without tools) | 324, 465, 399, 609, 320 | 423.4 | 0.52x | yes | yes | 0/5 |
+| prompt-cache | arm 3 (without profile/roster) | 303, 210, 320, 357, 298 | 297.6 | 0.37x | no | yes | 0/5 |
+| prompt-cache | arm 4 (MaiPai ceiling identity) | 297, 335, 358, 335, 435 | 352.0 | 0.44x | no | yes | 0/5 |
+| benchmarking-words | floor | 659, 692, 680, 562, 572 | 633.0 | 1.00x | yes | yes | 0/5 |
+| benchmarking-words | arm 1 (Buddy identity) | 234, 247, 230, 239, 240 | 238.0 | 0.38x | no | yes | 0/5 |
+| benchmarking-words | arm 2 (without tools) | 318, 272, 362, 289, 396 | 327.4 | 0.52x | no | yes | 0/5 |
+| benchmarking-words | arm 3 (without profile/roster) | 245, 210, 228, 202, 229 | 222.8 | 0.35x | no | yes | 0/5 |
+| benchmarking-words | arm 4 (MaiPai ceiling identity) | 234, 227, 226, 204, 95 | 197.2 | 0.31x | no | yes | 0/5 |
+
+With Buddy, arm 4 changes the output by +77 tokens on prompt-cache
+(0.10x of the floor) and -40.8 on benchmarking-words (-0.06x), so the
+identity wording's effect depends on the question. Arm 2 is still the
+largest upward change in the corrected run: +148.8 tokens (+0.18x) and
++89.4 tokens (+0.14x), respectively. This **partly confirms and
+narrows** the 2026-09-23 record's attribution of the isolated-ceiling
+gap to the tool block. Removing tools raises replies on both questions
+in both persona runs, though the size varies. Profile/roster removal
+has mixed direction by question. The historical shipped measurement
+had empty context, so these controlled synthetic-context runs do not
+directly partition its exact 0.30x/0.26x figures.
 
 The reusable entry point is `bun run scripts/bench/parity-bisect4.ts
---ceiling-gap`; without the flag, the original PARITY-BISECT-04 run
-still runs unchanged. The normal gate and code review results follow
-after verification.
+--ceiling-gap`; it now selects Buddy explicitly so arm 4 remains a real
+identity ablation even in a fresh database. Without the flag, the
+original PARITY-BISECT-04 run still runs unchanged.

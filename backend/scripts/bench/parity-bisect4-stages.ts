@@ -322,7 +322,7 @@ function ceilingGapMessages(persona: Persona, question: string, context: readonl
     if (!stable || stable.role !== "system") throw new Error("ceiling-gap expected contextToMessages() to begin with its stable system message");
     const identity = identityLine(persona);
     if (!stable.content.startsWith(identity)) throw new Error("ceiling-gap could not find identityLine() at the start of the real stable message");
-    messages[0] = { ...stable, content: CEILING_IDENTITY + stable.content.slice(identity.length) };
+    return [{ ...stable, content: CEILING_IDENTITY + stable.content.slice(identity.length) }, ...messages.slice(1)];
   }
   return messages;
 }
