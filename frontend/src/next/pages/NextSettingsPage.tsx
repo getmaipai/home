@@ -123,6 +123,16 @@ export function NextSettingsPage({ person }: { person: Roster }) {
           </CardHeader>
         </Card>
       </Link>
+      {/* Privacy explains data flows for every signed-in person. Keep it
+          outside both role tabs, like Storage, so the link is always visible. */}
+      <Link to="/next/privacy" className="block">
+        <Card className="py-4 transition-colors hover:bg-accent">
+          <CardHeader>
+            <CardTitle>Privacy</CardTitle>
+            <CardDescription>See what connects to the internet and what stays here.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
     </div>
   );
 }

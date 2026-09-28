@@ -6,6 +6,8 @@ import { List } from "@maipai/ui/src/primitives/List";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type PrivacyConnection } from "@/lib/api";
+import { joinNames, sourceName } from "@/apps/privacy/privacyCopy";
+export { joinNames, sourceName } from "@/apps/privacy/privacyCopy";
 
 // The privacy page every MaiPai product has to keep
 // (getmaipai/.github/CLAUDE.md > Privacy architecture: "every product
@@ -18,22 +20,6 @@ import { api, ApiError, type PrivacyConnection } from "@/lib/api";
 // downloads, so adding a package that reaches the network adds a row
 // here without anyone remembering to. A page with a hand-maintained
 // copy of that list would be wrong within a release.
-/** "Remember and Recall", "Remember, Recall, and Notes". A plain join
- * reads as "A and B and C" the moment a third offline package exists,
- * on a page held to the dad test (code review, 2026-09-05). */
-export function joinNames(names: string[]): string {
-  if (names.length <= 1) return names[0] ?? "";
-  if (names.length === 2) return `${names[0]} and ${names[1]}`;
-  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
-}
-
-/** Just the name, no noun. "The Weather skill" would now be wrong (a
- * `skill` is a different package kind since the 2026-09-05 rename) and
- * "plugin" is jargon on a page written for a parent. */
-function sourceName(row: PrivacyConnection): string {
-  return row.sourceKind === "platform" ? "MaiPai Home itself" : row.source;
-}
-
 /** One connection row's own four-question disclosure (destination, when,
  * what, who, retention) - shared by every group below so the org's own
  * "each outbound connection... when it happens, what it carries, and who

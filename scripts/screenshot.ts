@@ -242,6 +242,7 @@ const nextProfileSheetReview = process.argv.includes("--next-profile-sheet-revie
 const nextTableRolloutReview = process.argv.includes("--next-table-rollout-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextPersonalManagementReview = process.argv.includes("--next-personal-management-review");
+const nextPrivacyReview = process.argv.includes("--next-privacy-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
@@ -3093,6 +3094,45 @@ async function captureNextPersonalManagementReview(browser: Browser, sessionValu
   }
 }
 
+/** Lane B-14 review: seeded API data has real platform/package outbound
+ * disclosures and the token-authenticated inbound API row. */
+async function captureNextPrivacyReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextPrivacyReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+  const privacyResponse = await fetch(`${BASE_URL}/api/privacy`, { headers: { Cookie: `session=${sessionValue}` } });
+  if (!privacyResponse.ok) throw new Error(`captureNextPrivacyReview: GET /api/privacy failed: ${privacyResponse.status}`);
+  const data = await privacyResponse.json() as { connections: Array<{ direction: string }>; offlinePlugins: string[] };
+  if (!data.connections.some((row) => row.direction === "inbound") || !data.connections.some((row) => row.direction === "outbound")) {
+    throw new Error("captureNextPrivacyReview: seeded API must include inbound and outbound disclosure rows");
+  }
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/privacy`);
+        await page.getByText("What leaves your house", { exact: false }).waitFor({ timeout: 15000 });
+        await page.getByRole("list", { name: "Inbound connections" }).waitFor({ timeout: 15000 });
+        await page.getByRole("list", { name: "Outbound connections" }).waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const screenshotPath = join(outDir, `next-privacy-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path: screenshotPath, fullPage: slug === "phone" });
+        console.log(`Wrote ${screenshotPath}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** SHELL-06's own acceptance ("1440 and 390... captures"): both
  * viewports, both themes, of `/next/engines`. This seeded demo
  * household has no Stack configured (the same state the acceptance
@@ -4065,6 +4105,11 @@ async function main() {
     if (nextPersonalManagementReview) {
       await captureNextPersonalManagementReview(browser, sessionValue);
       console.log("completed named review: --next-personal-management-review");
+      return;
+    }
+    if (nextPrivacyReview) {
+      await captureNextPrivacyReview(browser, sessionValue);
+      console.log("completed named review: --next-privacy-review");
       return;
     }
     if (nextTableRolloutReview) {
