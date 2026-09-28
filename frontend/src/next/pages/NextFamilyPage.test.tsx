@@ -177,6 +177,24 @@ describe("NextFamilyPage", () => {
     } finally { restore(); }
   });
 
+  test("tab badges show the fetched household counts", async () => {
+    const restore = mockFamilyFetch(
+      [makeRosterEntry({ id: "p1" }), makeRosterEntry({ id: "p2", display_name: "Marlow", role: "teen" })],
+      [
+        { id: "ent-cat001", kind: "pet", name: "Miso", description: null, source: "hub", confirmed_by_person_id: "p1" },
+        { id: "ent-dog001", kind: "pet", name: "Pip", description: null, source: "hub", confirmed_by_person_id: "p1" },
+      ],
+      [],
+      [{ id: "robot-1", kind: "robot", name: "Bramble", area: "Kitchen", capabilities: [] }],
+    );
+    try {
+      const view = renderFamilyPage(makePerson());
+      await waitFor(() => expect(view.getByRole("tab", { name: /Pets\s*2/ })).toBeTruthy());
+      expect(view.getByRole("tab", { name: /People\s*2/ })).toBeTruthy();
+      expect(view.getByRole("tab", { name: /Bots\s*1/ })).toBeTruthy();
+    } finally { restore(); }
+  });
+
   test("Pets shows the shared empty state when no pets exist", async () => {
     const restore = mockFamilyFetch([], []);
     try {

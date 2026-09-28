@@ -5,6 +5,7 @@ import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
+import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { getIcon } from "@maipai/ui/src/icons";
 import type { Icon } from "@maipai/ui/src/icons";
 import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
@@ -80,8 +81,8 @@ export function NextFamilyPage({ person }: { person: Roster }) {
   const requestedTab = params.get("tab");
   const activeTab = requestedTab === "pets" ? "pets" : requestedTab === "bots" && isOwnerOrAdminRole(person.role) ? "bots" : "people";
   const query = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
-  const petsQuery = useQuery<Entity[]>({ queryKey: ["entities", "pet"], queryFn: () => api.entities("pet"), enabled: activeTab === "pets" });
-  const botsQuery = useQuery<DeviceInfo[]>({ queryKey: ["robots", person.id, person.role], queryFn: () => fetchFamilyBots(person), enabled: activeTab === "bots" });
+  const petsQuery = useQuery<Entity[]>({ queryKey: ["entities", "pet"], queryFn: () => api.entities("pet") });
+  const botsQuery = useQuery<DeviceInfo[]>({ queryKey: ["robots", person.id, person.role], queryFn: () => fetchFamilyBots(person), enabled: isOwnerOrAdminRole(person.role) });
 
   function onTabChange(value: string) {
     setParams((previous) => {
@@ -95,9 +96,9 @@ export function NextFamilyPage({ person }: { person: Roster }) {
   return (
     <Tabs value={activeTab} onValueChange={onTabChange}>
       <TabsList className="h-auto min-h-14 p-1">
-        <TabsTrigger value="people" className="min-h-12 min-w-12">People</TabsTrigger>
-        <TabsTrigger value="pets" className="min-h-12 min-w-12">Pets</TabsTrigger>
-        {isOwnerOrAdminRole(person.role) ? <TabsTrigger value="bots" className="min-h-12 min-w-12">Bots</TabsTrigger> : null}
+        <TabsTrigger value="people" className="min-h-12 min-w-12">People{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
+        <TabsTrigger value="pets" className="min-h-12 min-w-12">Pets{petsQuery.data ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
+        {isOwnerOrAdminRole(person.role) ? <TabsTrigger value="bots" className="min-h-12 min-w-12">Bots{botsQuery.data ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger> : null}
       </TabsList>
       <TabsContent value="people">
     <AsyncState
