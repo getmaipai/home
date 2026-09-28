@@ -30505,3 +30505,420 @@ harness could not start because this environment refused local TCP binds
 (`Bun.serve(0)` returned `EADDRINUSE`; Node's equivalent returned `EPERM`).
 The page itself is built and covered by the a11y route matrix. The Chat guide's
 eight state-specific captures remain the follow-up recorded above.
+
+## EVAL-03 design pass: a companion's voice is a per-companion style adapter, selected per request, never prompt prose and never a process-wide control vector (Fable, 2026-09-28)
+
+EVAL-03's own exit criterion was "a design note in dev.md naming the
+mechanism and the file/API surface, before any code." This is that
+note. It closes the pass that PERSONA-STEER-01 opened on 2026-09-23
+("The written prompt on tier 1, decided"), reads the 2026-09-16
+review's section 4.1 and the 2026-09-06 steering spike as the evidence
+they are, and adds the one thing both left unverified: what the pinned
+engine can actually do per request. Everything below is decided, not
+offered; the two findings parked on this item get a home each; the
+build is chunked into BACKLOG rows a Sonnet session or Codex can take
+without another design call.
+
+**Why this exists (the mess below, the thing above that must not see
+it).** Below: a companion's voice on tier 1 is off on every typed
+reply (`WRITTEN_VOICE_PROSE = false`, `persona.ts`), because every
+prose shape that carried it measured 0.12x to 0.48x of the bare reply
+floor, and on spoken replies it still rides four dial sentences, a
+policy paragraph and a few-shot block that cost prompt tokens every
+turn and decay within a handful of rounds on an 8B (review section
+2.6). Above: a household where each person picks their own companion
+(`persona.active_id` is a per-person key) and several of them chat at
+once through one shared engine process, plus the robot, which keeps no
+personality of its own and takes a permitted expression style through
+the binding contract (`bot/docs/dev.md`). The failure this prevents: a
+voice mechanism that works for one companion per process, which would
+quietly make "your own companion" a household-wide setting the day a
+second person picked a different one.
+
+### The engine facts, verified in the pinned build (b10797), not the README
+
+Read in `tools/server/README.md` and `tools/server/server-context.cpp`
+at tag `b10797`, and in the binary's own `--help`
+(`stack/data/engines/llama-server/b10797-macos-arm64/llama-server`,
+"version: 0.3.0-dev (build 10797, commit 832fd6f17)"):
+
+- **Control vectors are process-wide, full stop.** `--control-vector
+  FNAME`, `--control-vector-scaled FNAME:SCALE,...` and
+  `--control-vector-layer-range START END` are launch flags. The server
+  source has no per-request control-vector handling of any kind (no
+  `cvec`, no `control_vector` in the request or the slot). The review's
+  `[unverified beyond the README]` on "a scaling trick" resolves as
+  negative: there is no runtime API to scale, swap or clear a vector
+  per request or per slot in this build. A vector can carry one voice
+  per process, which is one voice per household.
+- **LoRA adapters are per request, natively.** `--lora FNAME,...` and
+  `--lora-scaled FNAME:SCALE,...` load adapters at launch;
+  `--lora-init-without-apply` loads them at scale 0; the completion
+  request's `lora` field (`[{"id": 0, "scale": 1.0}, ...]`) selects and
+  scales them for that request, an unlisted adapter defaulting to 0;
+  `GET /lora-adapters` lists what loaded, in id order, which is
+  `--lora` order.
+- **Mixed adapters never share a batch.** `server_slot::can_batch_with`
+  requires `are_lora_equal(lora, other_slot.lora)`; the README says the
+  same in plain words ("requests with different LoRA configurations
+  will not be batched together, which may result in performance
+  degradation"). Two concurrent turns on different companions decode in
+  alternating batches, so each runs at roughly the pace of two
+  sequential turns; two turns on the same companion batch as usual.
+- **An adapter switch on a slot drops that slot's prompt cache.**
+  `launch_slot_with_task`: when the task's adapter set is not equal to
+  the slot's and `lora_should_clear_cache` says so, `slot.prompt.clear()`.
+  So the first turn after a companion change on a slot pays a full
+  prefix re-evaluation, the same class of cost ROUTE-01 measured for a
+  tool-set switch (about half a second to a second to first token on
+  tier 1). Within one turn, every generation must carry the same
+  adapter set or PHRASE-01's own cache reuse between the forced round
+  and the phrasing round is lost.
+
+### The decision
+
+**Mechanism: one style adapter per companion, a LoRA in llama.cpp's
+own GGUF adapter format, trained on content-preserving voice rewrites,
+loaded for every installed companion at engine launch and selected per
+request by the turn's own persona.** Not a control vector, not a
+paragraph, not a settings key. The reasoning, in order of weight:
+
+1. The household requirement is per-person companions on a shared
+   process; the only per-request mechanism the mandated engine has is
+   the adapter. A vector would need a process per companion (an 8B's
+   weights once per companion, absurd on tier 1 and silly on the
+   Studio) or an engine restart per companion switch (seconds, and the
+   prefix cache gone). Neither is a design; both are workarounds around
+   the wrong primitive.
+2. The spike already showed the vector's ceiling: it wins on cost and
+   ties or edges the paragraph on a crude register proxy, and it does
+   not carry the companion's own markers. Read its training pairs
+   (`scripts/bench/steering/positive.txt`): they are Buddy's four
+   example lines, Pal's four and seven more in the same key, all
+   against formal rewrites. That is not "generic"; it is two
+   companions' voices blended into one casual direction, which is
+   exactly what a single vector can hold and exactly what makes it the
+   wrong unit for several companions. A vector is a direction; a
+   companion is a speaker.
+3. An adapter is trained on the companion's own material at whatever
+   scale the fidelity needs (hundreds of rewritten replies, not fifteen
+   lines), it holds lexical habits ("honestly", "I mean") that a
+   residual-stream bias measurably did not, and it stacks with the
+   plan line exactly as prose did. The review's section 4.1 already
+   named it as the answer for "a household with several companions
+   live at once" and section 11 as the candidate "if activation
+   steering is shown unable to make a companion distinct." The spike
+   was that test; the answer was no.
+4. The safety finding the review flags (warmth fine-tunes raised error
+   rates 10 to 30 points and sycophancy, worst when the user sounded
+   sad, [125]) is answered structurally, not by hoping: every training
+   pair holds the substance fixed (same facts, same structure, same
+   length within a band) and changes only the surface, the validator
+   drops any pair that moves a number or a name, and the bench that
+   gates a shipped adapter measures substance parity against the bare
+   floor row by row. The adapter is trained on voice, never on "be
+   warmer". Warmth, care and follow-ups stay in the plan line
+   (`register.ts`), which is where the reply-floor rule already put
+   them.
+5. Cost is bounded and measured, not assumed: the review's figure is
+   about 2 ms per token of adapter overhead; a rank-16 adapter on the
+   attention projections of a 36-layer 8B is on the order of 40 MB in
+   f16, so four bundled companions are well under 200 MB of resident
+   memory, declared to the governor like any other resident piece. The
+   bench records decode tokens per second with and without the adapter
+   and the companion-switch cost on one slot.
+
+**What a control vector is still good for here: nothing that ships.**
+The item's original text kept a vector as a replacement for
+`NATURALNESS_POLICY` (spoken class, household-wide, so a process-wide
+vector would fit). Not built: once the spoken class moves onto the
+adapter (STYLE-ADAPTER-02 below), the spoken rewrites in each
+companion's corpus already carry "the way a person talks out loud",
+and a second mechanism for the same job is the second copy principle 1
+forbids. `steering-spike.ts` and its pairs stay as a historical
+measurement fixture and supply one informational arm of the new bench
+(a companion-only vector against neutral rewrites, the experiment the
+spike named), never a gate. The one future in which a vector returns
+is an upstream llama-server change adding a per-request
+`control_vector` field split by batch the way `lora` already is; that
+is a possible PR, recorded, and nothing here depends on it.
+
+**Engine portability, so the Studio does not undo this.** The tier-3
+candidates (llama-server, oMLX, mlx-serve, Splash; STUDIO-EVAL-01) do
+not all take a GGUF LoRA per request. The Stack's engine contract
+therefore gains one capability row, `style_adapter: per_request |
+none`, reported by the engine adapter module, and Home asks for it the
+way it asks for everything else about an engine: by role, never by
+binary. An engine that reports `none` gets today's exact behavior (no
+voice on the written class, prose on the spoken class until it too
+retires), never a stub and never a silent fallback to prose on the
+written class. The adapter artifact carries its `format` (`gguf-lora`
+first; an MLX adapter format only when a tier-3 engine that takes one
+per request is pinned and the same bench passes on it).
+
+### The concurrency resolution, stated plainly
+
+One shared process. At launch, `llmSupervisor.ts` (and the Stack's
+launcher once Home runs on it) passes `--lora` with every installed
+companion's adapter for the running base model, in a fixed sorted
+order, plus `--lora-init-without-apply`, then confirms the loaded list
+and its ids against `GET /lora-adapters` before the engine is declared
+healthy. Every completion of a turn carries `lora: [{id, scale: 1.0}]`
+for the turn's persona (the same set on the tool-decision round, the
+forced round and the phrasing round, or the phrasing round loses its
+prefix), and `lora: []` when the persona has no adapter for this model.
+Two people on different companions at once decode in alternating
+batches; the CONC-01 acceptance ("each reply under 1.5 times its solo
+latency") holds for same-companion pairs and is measured separately
+for mixed pairs, with the honest expectation of about 2x, until an
+engine build batches mixed adapters. CONC-01 assigns slots by person,
+which on this design is by companion, so a slot rarely switches
+adapters; tier 1's single slot pays the prefix re-evaluation on every
+alternation and the bench records that number beside the rest. No
+process per companion, no restart per switch, no scaling trick.
+
+### The schema mapping: the four dials, `examples`, and one new field
+
+The dials stay declared once, in the companion manifest, and each is
+read by exactly the layer that can honor it:
+
+| field | read by, after this design | not read by |
+|---|---|---|
+| `formality`, `filler_density` | the corpus builder's rewrite brief (the voice the frontier rewriter is asked for), the bench's deterministic checks (formal: zero contractions; frequent: a marker on most turns), the spoken prose composer until STYLE-ADAPTER-02 retires it | any runtime prompt on the written class; the adapter's runtime scale (fixed at 1.0; a strength sweep is an informational bench arm, never a knob) |
+| `complexity` | the plan line already (`register.ts` line 179, `vocabulary`, with the child and teen bands overriding it), plus the rewrite brief and the bench (a reading-grade check on `simple`) | a runtime prompt on the written class |
+| `engagement` | the plan line already (`register.ts` lines 160 to 162, `ask_back` allowed or forbidden), nothing else | the corpus, the adapter, any prompt: whether to ask back is a move, not a voice |
+| `examples` | the rewrite brief's few-shot (the companion's own lines, verbatim), the bench's marker list (tokens present in the companion's examples and absent from the default's), the spoken few-shot block until STYLE-ADAPTER-02 | the written prompt (unchanged, spoken-only today) |
+| `backstory`, `tagline`, `interests` | the rewrite brief, as the description of who is speaking | any prompt (unchanged) |
+
+**One new manifest field, spec first (`commons/spec/schemas/manifest.schema.json`,
+`companion.style_adapters`, optional):** an array (at most 8) of
+`{ base_model, format, url, sha256, approx_bytes, corpus_sha256 }`,
+where `base_model` is the model package id the adapter was trained
+against (`qwen3-8b-instruct-q4-k-m` first), `format` is `gguf-lora`
+(the only value until a second engine format is pinned), and `url`,
+`sha256`, `approx_bytes` mirror `modelCatalog.ts`'s own `download`
+shape exactly (pinned URL, checksum verified, the self-healing download
+path, a clear failure when offline). `corpus_sha256` is the provenance
+line no-data-debt asks for: the corpus that produced this artifact,
+so a retrain is a new entry, never a silent overwrite. A companion
+with no entry for the running model has no adapter and gets today's
+behavior. The adapter file is a release asset of the companion's
+package (org rule: our own large artifacts ship as release assets,
+never tracked files); the four bundled companions' assets attach to
+`home`'s release until they live in the catalog.
+
+**`persona.ts`:** `Persona` gains `style_adapters?` read straight off
+the manifest like every other field; one new export,
+`styleAdapterFor(persona, modelId)`, returns the matching entry or
+`undefined`. `WRITTEN_VOICE_PROSE` and the `_WRITTEN` twins stay
+exactly as they are through STYLE-ADAPTER-01: the adapter does not
+compose into the prompt, so there is nothing for the constant to
+switch; it retires with WRITTEN-VOICE-TIER-01's own re-scoped
+measurement (below), never before. The spoken branch of
+`composePersonaPrompt` changes only in STYLE-ADAPTER-02.
+
+**`llm.ts`:** `LlmCompleteOptions` gains `lora?: { id: number; scale:
+number }[]`; `chatRequestBody` already spreads the rest of the options
+into the body, so the field reaches both the local client and the
+Stack-routed twin with no second code path, and a test pins that it
+does. **`llmSupervisor.ts`:** the launch args above, and a small
+adapter registry (companion id to loaded adapter id, filled from
+`--lora` order and confirmed against `GET /lora-adapters`). **The
+turn machine:** `turnNext.ts` resolves the persona's adapter once
+where it resolves the persona (line 254), onto the turn state;
+`nodes/model.ts` passes it on every `startCompleteStream` of that turn
+(line 262). **The Stack:** the chat role passes `lora` through, its
+launcher takes the adapter list, and the engine contract reports the
+capability; filed in `stack` when STYLE-ADAPTER-01 starts, never
+assumed. **Bot:** nothing; the binding contract's "permitted
+expression style" is the companion id, and the hub runs the turn.
+
+### The fidelity experiment, specified so it needs no further judgment
+
+This is the spike's own named next step, made the gate. **It runs and
+is read before any adapter reaches a household turn**; the existing
+spike result is not sufficient to build on, because it measured a
+blended vector on a register proxy and the question now is whether a
+per-companion adapter carries a specific voice without moving the
+substance. The order is corpus, train, bench, then wiring, and the
+wiring row does not start until the bench row's table is in this file.
+
+**Corpus (STYLE-CORPUS-01).** One JSONL per companion, built by
+`backend/scripts/voice/corpus.ts`, development-only (EVAL-05's own
+"never runs in a household turn" pattern):
+
+- The question list: the written set's five kinds (fact, how-to,
+  comparison, list, small talk), the naturalness corpus's shapes
+  (`spec/llm/naturalness-corpus.json`), and the replay set's rows that
+  carry no household fact, expanded by the builder to about 400 typed
+  and 200 spoken prompts using only roster names and documentation
+  ranges. The steering spike's thirty utterances and the written set's
+  twenty-two rows are held out: never in any corpus, they are the
+  bench.
+- The neutral reply: the bare local model (Qwen3-8B, thinking off, the
+  identity line only, `CHAT_SAMPLING`), which is the reply floor by
+  definition. Written prompts get the written-class shape (headings
+  and lists where the model chose them), spoken prompts the spoken.
+- The rewrite: a frontier model through its API, called from the dev
+  machine with synthetic content only (no household data exists in
+  this pipeline, so nothing about the home leaves it), given the
+  companion's `display_name`, `tagline`, `backstory`, `interests`, the
+  four dials in words, the `examples` verbatim as few-shot, and one
+  fixed brief: same facts, same numbers and names, same structure on a
+  typed reply, same length within 15 percent, the voice and only the
+  voice changes.
+- The validator, deterministic: length within the band; the set of
+  digit runs identical; the set of capitalized tokens (after the first
+  word of each sentence) identical; headings and list markers present
+  on the rewrite where present on the neutral reply; no forbidden
+  phrase (the persona bench's own list). A failing pair is dropped and
+  counted; the builder prints the drop rate per companion, and a rate
+  above 20 percent is a finding about the brief, not a reason to relax
+  the validator.
+- Tool rows: fifty of the tool-calling bench's own fixtures (the exact
+  request and the exact native tool-call reply) are included unchanged
+  in every companion's corpus, so the adapter learns that a tool call
+  is not a voice.
+- Output: `data-scratch/voice/<companion>/corpus.jsonl` (git-ignored),
+  plus a committed 20-row sample per companion under
+  `backend/scripts/voice/fixtures/` for the builder's own tests and
+  the sha256 the manifest entry will carry.
+
+**Training (STYLE-TRAIN-01).** PEFT with TRL's SFT trainer against the
+Hugging Face `Qwen/Qwen3-8B` base (the checkpoint the pinned GGUF was
+quantized from), rank 16, alpha 32, attention projections only,
+three epochs, sequence length 1024, then llama.cpp's own
+`convert_lora_to_gguf.py` at the pinned tag, producing
+`<companion>-qwen3-8b-instruct-q4-k-m.gguf` and its sha256. Runs on
+the tier-2 bench laptop (CUDA, an 8 GB card takes an 8B in 4-bit for
+this rank), or on the Studio once pinned; an MLX training path is
+allowed only if a maintained tool exports its adapter in the layout
+the converter reads, verified in that row, never a hand-written
+key-renaming script. Pal first (the strongest lexical markers, the
+hardest case for the spike's vector), then The Tutor (the formality
+case), then Buddy, then default. The runbook is
+`backend/scripts/voice/train.md`; the exact commands live there, not
+in a session's memory.
+
+**Bench (STYLE-BENCH-01, the gate), `backend/scripts/bench/style-adapter.ts`,
+built on `steering-spike.ts`'s runner and `written-set.ts`'s rows and
+scorer, live on tier 1, three seeded runs per arm, per companion:**
+
+| arm | prompt | engine | purpose |
+|---|---|---|---|
+| A, floor | identity line only | no adapter | the bare reply floor, per row |
+| B, shipped | the real `contextToMessages()` composition of today (no voice on written, prose on spoken) | no adapter | what the household has now |
+| C, adapter | B's prompt, byte-identical | `lora: [{id, scale: 1.0}]` | the candidate |
+| D, vector (informational) | the spike's identity-only prompt | `--control-vector` trained on this companion's own examples against neutral rewrites, `llama-cvector-generator` | the spike's own named experiment, closed for the record |
+| E, strength (informational) | as C | scale 0.5 and 1.5 | whether strength is a future dial, never a knob now |
+
+Rows: the steering spike's thirty spoken turns (spoken class, one
+conversation, so drift by turn thirty is measured) and the written
+set's twenty-two rows (written class). Recorded per row and arm:
+predicted tokens, headings and lists present, lowercase, the
+self-description check, contraction count, the companion's marker
+count, the five fact rows' answers, decode tokens per second,
+`cached_tokens`, and on the spoken set the persona judge's relative
+score (a trend line, never a gate, per the review's own reading of 7B
+judges).
+
+**Pass bar, per companion, all of these on the adapter arm C:**
+
+1. Substance parity: predicted tokens within 0.85x to 1.15x of arm B
+   on at least 18 of 22 written rows, headings and lists present
+   wherever B has them, 0 of 5 lowercase, 0 self-description on every
+   row, and each of the five written fact rows still states the fact
+   (212 F, 27 bones, Canberra, about 239,000 miles, 1989).
+2. Voice: `formality: formal` gives zero contractions across all
+   fifty-two rows; `formality: casual` gives a contraction on at least
+   24 of 30 spoken turns (above the spike's 23); `filler_density:
+   frequent` gives one of the companion's own markers on at least 18
+   of 30 spoken turns and 11 of 22 written rows; `filler_density:
+   none` gives none of another companion's markers; every companion's
+   marker count on the written rows is above arm B's (which is zero by
+   construction) and on the spoken rows at or above B's prose.
+3. Drift: turns 21 to 30 hold the voice checks at the same rate as
+   turns 1 to 10 (within two turns).
+4. Tools: `scripts/bench/tool-calling.ts` at 10 repeats with the
+   adapter on holds every positive and every negative the no-adapter
+   run holds (the existing 0 false calls bar).
+5. Cost: decode tokens per second at or above 0.9x of arm B; the
+   companion-switch prefix re-evaluation on one slot recorded as a
+   number.
+
+A companion that clears the bar ships its adapter; one that does not
+ships without one and keeps today's behavior, and the miss is a
+finding about its corpus or brief, never a reason to lower a line
+above. Arm D's result is written down beside C for the record and
+closes the spike's own open question either way.
+
+### The two parked findings, each given a home
+
+**The isolated-ceiling gap (0.51x/0.53x against the real path's
+0.30x/0.26x): moves out of EVAL-03 into its own S bench row,
+CEILING-GAP-01.** Reasoning: the gap is a cost of the real prompt's
+composition (the five-tool block, the profile and roster lines,
+`identityLine`'s wording) on a model with no voice at all; it exists
+on arm B and arm C alike, the adapter cannot add or remove a tool
+block, and the bench above measures the adapter against B, so the gap
+cannot confound the adapter's verdict either way. It was parked here
+because "this design pass is where it gets a real answer, not a
+further tier-1 measurement", and the real answer is that it is a
+measurement: three arms through the real `contextToMessages()` (the
+shipped shape; the same with `tools` withheld; the same with the
+profile and roster lines withheld), plus one with `identityLine`
+swapped for the ceiling's exact identity sentence, five seeds, both
+questions, one table, the candidate that carries the gap named. The
+design record of 2026-09-23 already attributed it to the tool block on
+the arm-e-versus-ceiling comparison; that comparison confounds voice
+prose with tools, so the attribution is a hypothesis until this row
+isolates it.
+
+**The profile-paragraph leak (a bare "wrong" volunteering the
+profile's own event fact, `conv-19awhetzdf`, not reproduced
+synthetically): moves out of EVAL-03 into a memory row,
+PROFILE-CHANNEL-01.** Reasoning: the adapter is trained
+content-preserving by construction and gated on substance parity, so
+it cannot change which facts the model volunteers, and it must not: a
+steering mechanism that shaped what a reply says about a person's
+stored facts would be a learned component in the memory and privacy
+path, which the org's rules forbid. The leak is the profile channel's
+content question, which the coordinator's own 2026-09-24 note already
+named and set aside: what `memoryJudge.ts`'s consolidation writes into
+the always-on paragraph. An event-like fact ("wrong" pulled out the
+profile's event) does not belong beside identity facts in a channel
+with no relevance gate; it belongs in episodes, where MEM-ELIG-01's
+eligibility gate now decides whether a topic-free remark can recall it
+at all. The row: the consolidator classifies each consolidated fact as
+identity or event, event facts go to episodes and never into the
+paragraph, and the reproduction gains the shape the synthetic attempt
+lacked (a longer surrounding conversation before the bare "wrong",
+roster content), added to the replay set as a control that must stay
+clean. Voice work never touches it again.
+
+### What changes in the standing rules, and what does not
+
+`.github/docs/RULES-AND-LEARNED-COMPONENTS.md` says "a measured
+steering vector per dial"; the mechanism is now a measured style
+adapter per companion, with the dials read by the plan line and the
+corpus rather than by a vector each. The spirit (a real trained
+technique, never prose) is unchanged; the wording needs a one-line
+amendment in that repo, flagged for the coordinator rather than edited
+from here. Org principle 6 holds exactly: the adapter, the trainer, the
+converter and the per-request field are all the engine's and the
+ecosystem's own maintained parts; the only code Home writes is the
+corpus builder, the bench, the download entry, the registry and one
+option passed through. The org's safety, consent and privacy rules
+hold: the adapter is voice only, it never sits in the safety path,
+child profiles keep their restrictions regardless of companion, and
+the corpus contains no household data.
+
+**WRITTEN-VOICE-TIER-01 is re-scoped, not retired:** its tier-3
+measurement now compares the written voice twins (prose) against the
+same companion's adapter on the Studio with the bench above, and the
+loser retires there, so a bigger model does not reopen the prose
+question by default. **EVAL-03 itself closes on this note** (its exit
+was the note); the build is STYLE-SPEC-01, STYLE-CORPUS-01,
+STYLE-TRAIN-01, STYLE-BENCH-01, STYLE-ADAPTER-01 and STYLE-ADAPTER-02,
+in that order, with CEILING-GAP-01 and PROFILE-CHANNEL-01 beside them,
+all in BACKLOG.md.
