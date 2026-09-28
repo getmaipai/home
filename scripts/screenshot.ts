@@ -241,6 +241,7 @@ const nextAppsReview = process.argv.includes("--next-apps-review");
 const nextProfileSheetReview = process.argv.includes("--next-profile-sheet-review");
 const nextTableRolloutReview = process.argv.includes("--next-table-rollout-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
+const nextPersonalManagementReview = process.argv.includes("--next-personal-management-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
@@ -3054,6 +3055,44 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
   }
 }
 
+/** Lane B-13 review: each newly migrated personal management page and
+ * Settings > Me at 1440/390 in both themes. Output stays in data-scratch. */
+async function captureNextPersonalManagementReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const setShellNext = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "ui.shell.next", value: true }),
+  });
+  if (!setShellNext.ok) throw new Error(`captureNextPersonalManagementReview: seeding ui.shell.next=true failed: ${setShellNext.status}`);
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        for (const [name, path, readyText] of [
+          ["voices", "/next/voices", "Cloned voices"],
+          ["commands", "/next/commands", "Commands"],
+          ["devices", "/next/devices", "Signed-in sessions"],
+          ["settings-me", "/next/settings?tab=me", "Voices"],
+        ] as const) {
+          await page.goto(`${BASE_URL}${path}`);
+          await page.getByText(readyText, { exact: false }).first().waitFor({ timeout: 15000 });
+          await settleAnimations(page);
+          const screenshotPath = join(outDir, `next-${name}-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path: screenshotPath, fullPage: slug === "phone" });
+          console.log(`Wrote ${screenshotPath}`);
+        }
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** SHELL-06's own acceptance ("1440 and 390... captures"): both
  * viewports, both themes, of `/next/engines`. This seeded demo
  * household has no Stack configured (the same state the acceptance
@@ -4021,6 +4060,11 @@ async function main() {
     if (nextProfileSheetReview) {
       await captureNextProfileSheetReview(browser, sessionValue);
       console.log("completed named review: --next-profile-sheet-review");
+      return;
+    }
+    if (nextPersonalManagementReview) {
+      await captureNextPersonalManagementReview(browser, sessionValue);
+      console.log("completed named review: --next-personal-management-review");
       return;
     }
     if (nextTableRolloutReview) {

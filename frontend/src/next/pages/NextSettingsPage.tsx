@@ -28,18 +28,16 @@ export const SettingsIcon = getIcon("settings");
  * to switch to, per that page's own comment, since household-scope
  * writes 403 for anyone else).
  *
- * Out of scope, named here rather than silently dropped: the retired
- * "one section tree" redesign (docs/dev/session-a-settings-rulings-
- * 2026-09-21.md) - link-out cards to Users/Models/Voices/Commands/
- * Devices, the Privacy things-table, Voice's top-choices row,
- * `@modified`/search filtering. This row is the registry-driven keys
- * only, the same ones `SettingsRenderer.tsx` already draws inline on
- * the old page; every dedicated management page (VOICE-BROWSER-01
- * among them) stays reachable only from the old shell until its own
- * row moves it - Backups/Repairs/Updates/Engines are the one exception
- * (`NextManageSection`, below): ui-v0.5.23's rail restructuring dropped
- * their permanent nav entry, so the Household tab's own bottom section
- * is now their real way back, not a settings key at all. */
+ * The retired "one section tree" redesign (docs/dev/session-a-settings-
+ * rulings-2026-09-21.md) is still out of scope, as are the Privacy
+ * things-table, Voice's top-choices row, and `@modified`/search
+ * filtering. This row remains the registry-driven keys only, the same
+ * ones `SettingsRenderer.tsx` already draws inline on the old page.
+ * Voices, Commands, and Devices now have their own routes and link-out
+ * cards under Me below. Backups/Repairs/Updates/Engines remain in
+ * `NextManageSection`: ui-v0.5.23's rail restructuring dropped their
+ * permanent nav entry, so the Household tab's bottom section is their
+ * real way back, not a settings key at all. */
 export function NextSettingsPage({ person }: { person: Roster }) {
   useDocumentTitle("Settings");
   const canManageHousehold = isOwnerOrAdminRole(person.role);
@@ -95,6 +93,7 @@ export function NextSettingsPage({ person }: { person: Roster }) {
           ) : null}
           <TabsContent value="me" className="flex flex-col gap-4">
             <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
+            <PersonalManagementLinks />
           </TabsContent>
           {showDeviceSettings ? (
             <TabsContent value="device" className="flex flex-col gap-4">
@@ -106,7 +105,10 @@ export function NextSettingsPage({ person }: { person: Roster }) {
         // No tab bar to render for one destination (SettingsPage.tsx's
         // own comment): a non-admin has only their own settings to see,
         // household-scope writes 403 for anyone else.
-        <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
+        <div className="flex flex-col gap-4">
+          <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
+          <PersonalManagementLinks />
+        </div>
       )}
       {/* STORE-PAGE-01: unlike NextManageSection's owner/admin-only links
           above, Storage is reachable by everyone regardless of tab - a
@@ -121,6 +123,28 @@ export function NextSettingsPage({ person }: { person: Roster }) {
           </CardHeader>
         </Card>
       </Link>
+    </div>
+  );
+}
+
+function PersonalManagementLinks() {
+  const links = [
+    ["Voices", "Browse voices and manage your voice recordings.", "/next/voices"],
+    ["Commands", "View and manage household commands.", "/next/commands"],
+    ["Devices", "Review your signed-in devices and sessions.", "/next/devices"],
+  ] as const;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {links.map(([title, description, to]) => (
+        <Link key={to} to={to} className="block">
+          <Card className="h-full py-4 transition-colors hover:bg-accent">
+            <CardHeader>
+              <CardTitle>{title}</CardTitle>
+              <CardDescription>{description}</CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+      ))}
     </div>
   );
 }

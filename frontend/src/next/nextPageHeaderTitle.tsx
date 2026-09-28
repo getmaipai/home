@@ -27,6 +27,9 @@ import { UpdatesIcon } from "@/next/pages/NextUpdatesPage";
 import { RepairsIcon } from "@/next/pages/NextRepairsPage";
 import { BackupsIcon } from "@/next/pages/NextBackupsPage";
 import { StorageIcon } from "@/next/pages/NextStoragePage";
+import { VoicesIcon } from "@/next/pages/NextVoicesPage";
+import { CommandsIcon } from "@/next/pages/NextCommandsPage";
+import { DevicesIcon } from "@/next/pages/NextDevicesPage";
 
 interface PageHeaderEntry {
   icon: Icon;
@@ -48,6 +51,9 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/next/updates": { icon: UpdatesIcon, label: "Updates" },
   "/next/repairs": { icon: RepairsIcon, label: "Repairs" },
   "/next/backups": { icon: BackupsIcon, label: "Backups" },
+  "/next/voices": { icon: VoicesIcon, label: "Voices" },
+  "/next/commands": { icon: CommandsIcon, label: "Commands" },
+  "/next/devices": { icon: DevicesIcon, label: "Devices" },
 };
 
 function entryFor(pathname: string): PageHeaderEntry | undefined {

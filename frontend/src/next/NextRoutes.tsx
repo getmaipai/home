@@ -22,6 +22,9 @@ import { NextPerformancePage } from "@/next/pages/NextPerformancePage";
 import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
+import { NextVoicesPage } from "@/next/pages/NextVoicesPage";
+import { NextCommandsPage } from "@/next/pages/NextCommandsPage";
+import { NextDevicesPage } from "@/next/pages/NextDevicesPage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { api, type Roster } from "@/lib/api";
@@ -171,6 +174,9 @@ function NextRoutesWithIncognito({ person }: { person: Roster }) {
             <Route path="updates" element={<NextUpdatesPage person={person} />} />
             <Route path="repairs" element={<NextRepairsPage person={person} />} />
             <Route path="backups" element={<NextBackupsPage person={person} />} />
+            <Route path="voices" element={<NextVoicesPage person={person} />} />
+            <Route path="commands" element={<NextCommandsPage person={person} />} />
+            <Route path="devices" element={<NextDevicesPage />} />
           </Route>
         </Route>
       </Routes>
