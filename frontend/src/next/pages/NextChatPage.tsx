@@ -136,6 +136,24 @@ function StructuredResultTools() {
 // artifact before the card is ever clicked.
 const ArtifactOpenContext = createContext<(id: string) => void>(() => {});
 
+// Jesse, live-found 2026-09-27: "the canvas shows, and its about 3-5
+// seconds until you change the message to 'Bedtime storybook is
+// ready.' - that should happen exactly with the canvas opening - same
+// event." Before this, the two updates rode two entirely different
+// polls: ProjectFinishedArtifact's own live poll (2s, PROJECT_POLL_MS)
+// opened the canvas the moment it saw a posted artifact, while the
+// surrounding reply text only ever corrected once ProjectResultReload's
+// SEPARATE notification poll (up to 15s) caught up and reloaded the
+// thread - two events, not one, for what reads as a single "it's done"
+// moment. `ProjectFinishedArtifact` now triggers the same reload right
+// where it opens the canvas, so both come from the identical poll tick.
+// The same "useAui() inside a tool-call renderer resolves to that
+// message's own part-scoped client, not the thread-level one" gotcha
+// `ConfirmAskAnswerContext` below already exists for - a plain function,
+// never a raw `aui` handle, provided from the root by
+// ReloadMainThreadProvider below.
+const ReloadMainThreadContext = createContext<() => void>(() => {});
+
 // APPROVE-CARD-01: the same lifted-context shape as `ArtifactOpenContext`
 // above - `ConfirmToolRender` (below) needs a way to send the tapped
 // answer, and a bare `ComponentType` slot with no props of its own
@@ -440,6 +458,7 @@ const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, never>, { p
 // ever fetches the identical id.
 function ProjectFinishedArtifact({ id }: { id: string }) {
   const openArtifact = useContext(ArtifactOpenContext);
+  const reloadMainThread = useContext(ReloadMainThreadContext);
   const query = useQuery({ queryKey: ["artifact-current", id], queryFn: () => api.artifactCurrent(id) });
   const data = query.data;
   const meta = data ? `${data.kind} · v${data.version}` : query.isError ? "Not available right now" : "Loading…";
@@ -452,9 +471,20 @@ function ProjectFinishedArtifact({ id }: { id: string }) {
   // chatModelAdapter.ts's own onArtifactReady comment has to - every
   // mount of this component genuinely means the artifact just became
   // available in front of whoever has this thread open right now.
+  //
+  // `reloadMainThread()` rides the SAME effect (Jesse, live-found the
+  // same day): without it, the surrounding reply text stayed on its own
+  // stream-time "Creating…" wording until ProjectResultReload's own,
+  // separate notification poll (up to 15s later) happened to catch up -
+  // two different events, on two different timers, for what reads as
+  // one "it's done" moment. This reload picks up post.ts's own corrected
+  // replyText ("<title> is ready.") the moment the SAME poll tick that
+  // opens the canvas sees the project is done, not on a second, slower
+  // poll's own schedule.
   useEffect(() => {
     openArtifact(id);
-  }, [id, openArtifact]);
+    reloadMainThread();
+  }, [id, openArtifact, reloadMainThread]);
   return <ArtifactCard title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onClick={() => openArtifact(id)} />;
 }
 
@@ -596,6 +626,26 @@ function ConfirmAskAnswerProvider({ askAnswerRef, children }: { askAnswerRef: Mu
     [aui, askAnswerRef],
   );
   return <ConfirmAskAnswerContext.Provider value={respond}>{children}</ConfirmAskAnswerContext.Provider>;
+}
+
+// ReloadMainThreadContext's own provider - the same "call useAui() once,
+// correctly scoped, hand the closure down" shape as ConfirmAskAnswerProvider
+// above. `void` on the returned promise: ProjectFinishedArtifact's own
+// effect (the one caller) fires this alongside openArtifact(), not
+// something that needs awaiting there.
+function ReloadMainThreadProvider({ children }: { children: ReactNode }) {
+  const aui = useAui();
+  const reload = useCallback(() => {
+    // A background refresh's own failure (a transient network error, a
+    // thread switched away from before this lands) is never worth
+    // surfacing - the live poll driving ProjectFinishedArtifact already
+    // has the canvas open and correct; this is only ever a courtesy
+    // resync of the surrounding text, not something anything else here
+    // waits on. Caught, not left to become an unhandled rejection: `void`
+    // alone discards the reference but not a real rejection.
+    aui.threads.reloadMainThread().catch(() => {});
+  }, [aui]);
+  return <ReloadMainThreadContext.Provider value={reload}>{children}</ReloadMainThreadContext.Provider>;
 }
 
 function ProjectTool() {
@@ -1970,7 +2020,19 @@ function ProjectResultReload() {
     // reload) on every later effect run until it happened to come first.
     // One reload already refetches every turn in this thread, so at most
     // one call goes out per pass regardless of how many notifications
-    // matched.
+    // matched. A code review's own finding (2026-09-27): when the thread
+    // is open live, ProjectFinishedArtifact's own mount effect already
+    // fired a reload for this exact project the moment its own poll saw
+    // it finish (its own comment on why); this notification, arriving
+    // later for the identical event, can trigger a second one here with
+    // no way for either side to know the other already ran. Left as is
+    // on purpose - both calls are individually idempotent and
+    // error-swallowed, so the cost is one redundant refetch, never a
+    // wrong result, and the alternative (some shared "already reloaded
+    // this project" state between two otherwise-unrelated component
+    // instances) is real complexity for a network call that was already
+    // going to happen eventually for the "nobody was watching" case this
+    // component exists for.
     let shouldReload = false;
     for (const n of notifications) {
       if (seen.current.ids.has(n.id)) continue;
@@ -2547,6 +2609,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ArtifactOpenContext.Provider value={setOpenArtifactId}>
+      <ReloadMainThreadProvider>
       <ConfirmAskAnswerProvider askAnswerRef={askAnswerRef}>
       <AdminContext.Provider value={isOwnerOrAdminRole(person.role)}>
       <CompareOpenContext.Provider value={setCompareTarget}>
@@ -2884,6 +2947,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </CompareOpenContext.Provider>
       </AdminContext.Provider>
       </ConfirmAskAnswerProvider>
+      </ReloadMainThreadProvider>
       </ArtifactOpenContext.Provider>
     </AssistantRuntimeProvider>
   );

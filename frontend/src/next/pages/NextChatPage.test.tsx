@@ -1425,6 +1425,40 @@ describe("NextChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-project123", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations/conv-project123/turns")) {
+        // Jesse, live-found 2026-09-27: "the canvas shows... that should
+        // happen exactly with the canvas opening - same event."
+        // ProjectFinishedArtifact's own reload (chatModelAdapter.ts's
+        // comment above it) fires the moment the poll below first sees
+        // `projectDone()` - before that, this thread's own turns were
+        // never fetched at all, so `projectPolls < 2` here can never be
+        // reached by that reload; once it does land, the row already
+        // carries post.ts's own corrected replyText and artifact.
+        const row =
+          projectPolls < 2
+            ? []
+            : [
+                {
+                  id: "turn-project123",
+                  personId: "person-abc123",
+                  surface: "chat",
+                  conversationId: "conv-project123",
+                  userText: "write me a bedtime storybook",
+                  replyText: "A bedtime storybook is ready.",
+                  source: "plugin",
+                  pluginId: "start_project",
+                  commandId: null,
+                  safetyFlagged: false,
+                  safetyAction: "allow",
+                  bare: false,
+                  minorSpeaker: false,
+                  createdAt: "2026-09-27T00:00:00.000Z",
+                  artifact: { id: PROJECT_ARTIFACT.id, version: PROJECT_ARTIFACT.version },
+                  memory_ids: [],
+                },
+              ];
+        return Promise.resolve(new Response(JSON.stringify(row), { status: 200 }));
+      }
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
       if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
       if (url.includes(`/api/projects/${projectRunning().id}/cancel`)) {
@@ -1448,7 +1482,7 @@ describe("NextChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
     fireEvent.click(send);
   }
 
-  test("a start_project turn shows live step progress that updates via polling, then shows the posted artifact once the project finishes - no reload needed", async () => {
+  test("a start_project turn shows live step progress that updates via polling, then shows the posted artifact once the project finishes - no reload needed from the person", async () => {
     const { restore } = stubProjectTurnFetch(
       ndjsonStream([
         { type: "delta", text: "Starting a bedtime storybook now - 3 steps, about 1 minute." },
@@ -1492,6 +1526,16 @@ describe("NextChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
       // screen (via a real api.artifactCurrent() round trip), proving
       // the canvas is genuinely open, not just that the card rendered.
       expect(await view.findByText(PROJECT_ARTIFACT.body)).toBeVisible();
+      // Jesse, live-found the same day: "that should happen exactly
+      // with the canvas opening - same event" - the surrounding reply
+      // text used to only correct once ProjectResultReload's own,
+      // separate notification poll (up to 15s later) caught up.
+      // ProjectFinishedArtifact's own reload (fired in the identical
+      // effect that just opened the canvas above) is what turns this
+      // stub's own stream-time "Starting..." text into post.ts's real,
+      // corrected one - proving both come from the one poll tick, not
+      // two different timers.
+      expect(await view.findByText("A bedtime storybook is ready.")).toBeVisible();
     } finally {
       restore();
     }
