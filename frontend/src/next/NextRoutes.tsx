@@ -24,6 +24,7 @@ import { NextDevicesPage } from "@/next/pages/NextDevicesPage";
 import { NextPrivacyPage } from "@/next/pages/NextPrivacyPage";
 import { NextUsersPage } from "@/next/pages/NextUsersPage";
 import { NextModelsPage } from "@/next/pages/NextModelsPage";
+import { NextFilesPage } from "@/next/pages/NextFilesPage";
 import { NextPersonProfilePage } from "@/next/pages/NextPersonProfilePage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
@@ -80,6 +81,7 @@ function NextPageHeaderLayout() {
     "/privacy": "Privacy",
     "/users": "Users",
     "/models": "Models",
+    "/files": "Library",
   };
   const title = titleByPath[pathname.replace(/\/$/, "") || "/"];
   return (
@@ -193,6 +195,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
             <Route path="privacy" element={<NextPrivacyPage />} />
             <Route path="users" element={<NextUsersPage person={person} />} />
             <Route path="models" element={<NextModelsPage person={person} />} />
+            <Route path="files" element={<NextFilesPage person={person} />} />
           </Route>
         </Route>
       </Routes>

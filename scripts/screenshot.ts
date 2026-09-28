@@ -303,6 +303,7 @@ const ROUTES: RouteSpec[] = [
   // rather than leaving Users permanently unchecked by the matrix.
   { slug: "settings-users", path: "/users" },
   { slug: "settings-devices", path: "/devices" },
+  { slug: "files", path: "/files" },
   { slug: "settings-repairs", path: "/repairs" },
   { slug: "settings-updates", path: "/updates" },
 ];

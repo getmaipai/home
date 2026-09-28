@@ -164,7 +164,7 @@ type ProfileEntry = PersonRosterEntry | Roster;
  * STORE-SHARE-01's own visibility rule (`lib/shares.ts`'s
  * `listPersonFilesVisibleToActor`) server-side, so this component does
  * no filtering of its own: nothing appears here that the viewer
- * couldn't already see in their own Library (FilesPage.tsx), and the
+ * couldn't already see in their own Library (NextFilesPage.tsx), and the
  * exact same rule applies whether the viewer is a supervised (child)
  * role or not - the design record's own "not a new rule invented for
  * profiles, it's STORE-SHARE-01's own disclosure filter read from a

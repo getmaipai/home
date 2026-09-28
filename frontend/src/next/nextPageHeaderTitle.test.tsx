@@ -44,6 +44,7 @@ describe("NextPageHeaderTitle", () => {
     ["/backups", "Backups", "lucide-archive"],
     ["/users", "Users", "lucide-users"],
     ["/models", "AI models", "lucide-cpu"],
+    ["/files", "Library", "lucide-folder"],
   ];
 
   for (const [pathname, label, iconClass] of cases) {
