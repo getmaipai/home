@@ -259,6 +259,11 @@ const nextChatComposerReview = process.argv.includes("--next-chat-composer-revie
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
 const peopleProfileMediaReview = process.argv.includes("--people-profile-media-review");
+// SHELL-09 Phase 5: capture every migrated route at the accepted
+// desktop/phone sizes in both themes. Keep these real seeded captures in
+// data-scratch for visual comparison before any docs image is replaced;
+// Chat uses its existing route-level capture helper, with no chat source edits.
+const shell09DocsMatrixReview = process.argv.includes("--shell-09-docs-matrix");
 
 interface RouteSpec {
   slug: string;
@@ -3196,6 +3201,28 @@ async function captureNextPersonProfileReview(browser: Browser, sessionValue: st
   }
 }
 
+async function captureShell09DocsMatrixReview(browser: Browser, sessionValue: string): Promise<void> {
+  await captureNextDashboardReview(browser, sessionValue);
+  await captureNextAppsReview(browser, sessionValue);
+  await captureNextPeopleReview(browser, sessionValue);
+  await captureNextLaneA13Review(browser, sessionValue);
+  // Lane A13 also captures Settings while checking its Users/Models links;
+  // capture the viewport-height Settings image last so that full-page
+  // overview does not replace the canonical route-matrix shot.
+  await captureNextSettingsReview(browser, sessionValue);
+  await captureNextPersonalManagementReview(browser, sessionValue);
+  await captureNextPrivacyReview(browser, sessionValue);
+  await captureNextPersonProfileReview(browser, sessionValue);
+  await captureNextEnginesReview(browser, sessionValue);
+  await captureNextPerformanceReview(browser, sessionValue);
+  await captureNextStorageReview(browser, sessionValue);
+  await captureNextRepairsReview(browser, sessionValue);
+  await captureNextBackupsReview(browser, sessionValue);
+  await captureNextUpdatesReview(browser, sessionValue);
+  await captureNextChatReview(browser, sessionValue);
+  console.log("completed SHELL-09 Phase 5 docs screenshot matrix");
+}
+
 /** SHELL-06's own acceptance ("1440 and 390... captures"): both
  * viewports, both themes, of `/engines`. This seeded demo
  * household has no Stack configured (the same state the acceptance
@@ -3957,6 +3984,11 @@ async function main() {
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
   let backend: ReturnType<typeof Bun.spawn>;
   try {
+    // KIWIX-SIDECAR-01 binds a fixed default port (8790) on the household
+    // backend. The screenshot backend has its own throwaway data directory;
+    // it must also have its own port so sidecars.freePort() never mistakes
+    // the running hub's Kiwix process for an orphan and kills it.
+    const screenshotKiwixPort = reserveFreePort();
     backend = Bun.spawn({
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
@@ -3972,7 +4004,7 @@ async function main() {
       // depends on the box being empty." This matrix never needs real
       // speech, so the engine should never spawn at all, not just not
       // collide.
-      env: { ...process.env, PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
+      env: { ...process.env, PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
       stdout: "pipe",
       stderr: "inherit",
     });
@@ -4034,6 +4066,10 @@ async function main() {
 
     const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
+    if (shell09DocsMatrixReview) {
+      await captureShell09DocsMatrixReview(browser, sessionValue);
+      return;
+    }
     if (nextLaneA13Review) {
       await captureNextLaneA13Review(browser, sessionValue);
       console.log("completed named review: --next-lane-a-13-review");

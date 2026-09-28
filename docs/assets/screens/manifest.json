@@ -10,15 +10,15 @@
     "route": "home",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "chat-phone-light.png": {
     "route": "chat",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --next-chat-review"
   },
   "conversations-phone-light.png": {
     "route": "conversations",
@@ -45,78 +45,78 @@
     "route": "people",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "memory-phone-light.png": {
-    "route": "memory",
+    "route": "people/:id?tab=memories",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-20T19:02:56.540Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "privacy-phone-light.png": {
     "route": "privacy",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-phone-light.png": {
     "route": "settings",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-models-phone-light.png": {
     "route": "settings-models",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-backups-phone-light.png": {
     "route": "settings-backups",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-voices-phone-light.png": {
     "route": "settings-voices",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-commands-phone-light.png": {
     "route": "settings-commands",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-users-phone-light.png": {
     "route": "settings-users",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-devices-phone-light.png": {
     "route": "settings-devices",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-repairs-phone-light.png": {
     "route": "settings-repairs",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "setup-phone-dark.png": {
     "route": "setup",
@@ -129,15 +129,15 @@
     "route": "home",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "chat-phone-dark.png": {
     "route": "chat",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --next-chat-review"
   },
   "conversations-phone-dark.png": {
     "route": "conversations",
@@ -164,78 +164,78 @@
     "route": "people",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "memory-phone-dark.png": {
-    "route": "memory",
+    "route": "people/:id?tab=memories",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-20T19:02:56.540Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "privacy-phone-dark.png": {
     "route": "privacy",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-phone-dark.png": {
     "route": "settings",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-models-phone-dark.png": {
     "route": "settings-models",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-backups-phone-dark.png": {
     "route": "settings-backups",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-voices-phone-dark.png": {
     "route": "settings-voices",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-commands-phone-dark.png": {
     "route": "settings-commands",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-users-phone-dark.png": {
     "route": "settings-users",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-devices-phone-dark.png": {
     "route": "settings-devices",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-repairs-phone-dark.png": {
     "route": "settings-repairs",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "setup-tablet-light.png": {
     "route": "setup",
@@ -486,15 +486,15 @@
     "route": "home",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "chat-desktop-light.png": {
     "route": "chat",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --next-chat-review"
   },
   "conversations-desktop-light.png": {
     "route": "conversations",
@@ -521,78 +521,78 @@
     "route": "people",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "memory-desktop-light.png": {
-    "route": "memory",
+    "route": "people/:id?tab=memories",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-20T19:02:56.540Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "privacy-desktop-light.png": {
     "route": "privacy",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-desktop-light.png": {
     "route": "settings",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-models-desktop-light.png": {
     "route": "settings-models",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-backups-desktop-light.png": {
     "route": "settings-backups",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-voices-desktop-light.png": {
     "route": "settings-voices",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-commands-desktop-light.png": {
     "route": "settings-commands",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-users-desktop-light.png": {
     "route": "settings-users",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-devices-desktop-light.png": {
     "route": "settings-devices",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-repairs-desktop-light.png": {
     "route": "settings-repairs",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "setup-desktop-dark.png": {
     "route": "setup",
@@ -605,15 +605,15 @@
     "route": "home",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "chat-desktop-dark.png": {
     "route": "chat",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --next-chat-review"
   },
   "conversations-desktop-dark.png": {
     "route": "conversations",
@@ -640,78 +640,78 @@
     "route": "people",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "memory-desktop-dark.png": {
-    "route": "memory",
+    "route": "people/:id?tab=memories",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-20T19:02:56.540Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "privacy-desktop-dark.png": {
     "route": "privacy",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-desktop-dark.png": {
     "route": "settings",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-models-desktop-dark.png": {
     "route": "settings-models",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-backups-desktop-dark.png": {
     "route": "settings-backups",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-voices-desktop-dark.png": {
     "route": "settings-voices",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-commands-desktop-dark.png": {
     "route": "settings-commands",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-users-desktop-dark.png": {
     "route": "settings-users",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-devices-desktop-dark.png": {
     "route": "settings-devices",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-repairs-desktop-dark.png": {
     "route": "settings-repairs",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "setup-far-light.png": {
     "route": "setup",
@@ -1109,15 +1109,15 @@
     "route": "apps",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "apps-phone-dark.png": {
     "route": "apps",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "apps-tablet-light.png": {
     "route": "apps",
@@ -1137,15 +1137,15 @@
     "route": "apps",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "apps-desktop-dark.png": {
     "route": "apps",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "apps-far-light.png": {
     "route": "apps",
@@ -1529,15 +1529,15 @@
     "route": "settings-updates",
     "viewport": "phone",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-updates-phone-dark.png": {
     "route": "settings-updates",
     "viewport": "phone",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-updates-tablet-light.png": {
     "route": "settings-updates",
@@ -1571,15 +1571,15 @@
     "route": "settings-updates",
     "viewport": "desktop",
     "theme": "light",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-updates-desktop-dark.png": {
     "route": "settings-updates",
     "viewport": "desktop",
     "theme": "dark",
-    "capturedAt": "2026-09-21T04:35:14.286Z",
-    "captureScript": "scripts/screenshot.ts"
+    "capturedAt": "2026-09-28T04:34:14.433Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   },
   "settings-updates-far-light.png": {
     "route": "settings-updates",
@@ -1594,5 +1594,145 @@
     "theme": "dark",
     "capturedAt": "2026-09-21T04:35:14.286Z",
     "captureScript": "scripts/screenshot.ts"
+  },
+  "engines-desktop-light.png": {
+    "route": "engines",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-table-rollout-review"
+  },
+  "engines-desktop-dark.png": {
+    "route": "engines",
+    "viewport": "desktop",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-table-rollout-review"
+  },
+  "engines-phone-light.png": {
+    "route": "engines",
+    "viewport": "phone",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-table-rollout-review"
+  },
+  "engines-phone-dark.png": {
+    "route": "engines",
+    "viewport": "phone",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-table-rollout-review"
+  },
+  "performance-desktop-light.png": {
+    "route": "performance",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-table-rollout-review"
+  },
+  "performance-desktop-dark.png": {
+    "route": "performance",
+    "viewport": "desktop",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-table-rollout-review"
+  },
+  "performance-phone-light.png": {
+    "route": "performance",
+    "viewport": "phone",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-table-rollout-review"
+  },
+  "performance-phone-dark.png": {
+    "route": "performance",
+    "viewport": "phone",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-table-rollout-review"
+  },
+  "storage-desktop-light.png": {
+    "route": "storage",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-storage-review"
+  },
+  "storage-desktop-dark.png": {
+    "route": "storage",
+    "viewport": "desktop",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-storage-review"
+  },
+  "storage-phone-light.png": {
+    "route": "storage",
+    "viewport": "phone",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-storage-review"
+  },
+  "storage-phone-dark.png": {
+    "route": "storage",
+    "viewport": "phone",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:39:37.405Z",
+    "captureScript": "scripts/screenshot.ts --next-storage-review"
+  },
+  "profile-desktop-light.png": {
+    "route": "people/:id",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:40:13.545Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
+  },
+  "profile-desktop-dark.png": {
+    "route": "people/:id",
+    "viewport": "desktop",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:40:13.545Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
+  },
+  "profile-phone-light.png": {
+    "route": "people/:id",
+    "viewport": "phone",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:40:13.545Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
+  },
+  "profile-phone-dark.png": {
+    "route": "people/:id",
+    "viewport": "phone",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:40:13.545Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
+  },
+  "profile-other-desktop-light.png": {
+    "route": "people/:id",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:40:13.545Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
+  },
+  "profile-other-desktop-dark.png": {
+    "route": "people/:id",
+    "viewport": "desktop",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:40:13.545Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
+  },
+  "profile-other-phone-light.png": {
+    "route": "people/:id",
+    "viewport": "phone",
+    "theme": "light",
+    "capturedAt": "2026-09-28T04:40:13.545Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
+  },
+  "profile-other-phone-dark.png": {
+    "route": "people/:id",
+    "viewport": "phone",
+    "theme": "dark",
+    "capturedAt": "2026-09-28T04:40:13.545Z",
+    "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
   }
 }

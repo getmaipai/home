@@ -5,9 +5,9 @@ description: What to check first when something isn't working right.
 
 ## Start here
 
-Open **Settings**, then **Repairs** (under Household). MaiPai checks its own health here. It lists anything that needs attention, each with a button to fix it. This is the fastest way to find out what's wrong.
+Open **Settings**, then **Repairs** under Manage. MaiPai lists anything that needs attention, its status, and the available action. This is the fastest way to find out what's wrong.
 
-![The Repairs page, showing an example of something it caught, with a Dismiss button](../assets/screens/settings-repairs-desktop-light.png)
+![The Repairs page, showing an issue MaiPai detected and its status](../assets/screens/settings-repairs-desktop-light.png)
 
 ## If MaiPai won't load at all
 

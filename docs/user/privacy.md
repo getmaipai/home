@@ -7,7 +7,7 @@ Your conversations, memories, and household profiles stay on this computer. MaiP
 
 ## See what leaves your house
 
-Open **Privacy** in the sidebar. It lists every outbound connection MaiPai can make. For each one, you'll see:
+Open **Settings**, then **Privacy**. It lists the connections MaiPai can make, including outbound services and inbound token access. For each one, you'll see:
 
 - **When** it happens
 - **What it sends**
@@ -26,7 +26,7 @@ Adults can mark one chat as temporary. We do not add its turns to normal history
 
 When a child's conversation seems to weigh on them, the adults get a note saying so, with the child's name only, never what was said. This notice cannot be turned off.
 
-![The Privacy page, listing every outbound connection MaiPai can make](../assets/screens/privacy-desktop-light.png)
+![The Privacy page, listing connections and what information they send](../assets/screens/privacy-desktop-light.png)
 
 ## Still need help?
 

@@ -30472,3 +30472,7 @@ Thinking is still sent with the next turn. Lane B-10 adds model save,
 reload, and per-conversation selection coverage. Commons and Home full
 gates passed before landing. The read-aloud extension also closes
 HANDSFREE-01(a)'s stated persist-across-reload acceptance.
+
+## SHELL-09 Phase 5 known follow-up
+
+The Chat guide's preview-toggle directions and its eight feature-specific screenshots remain until Lane A's chat-doc pass can replace the feedback reasons, document pane, turn stats, conversation list, Research mode, model picker, temporary mode, and Continue states with matching current captures; the refreshed route captures do not show those exact states.

@@ -1,3 +1,5 @@
+> **Superseded:** this was the preview-shell design record. The SHELL-09 cutover began at home commit [`6bed798c`](https://github.com/getmaipai/home/commit/6bed798c) on 2026-09-27/28 and made the migrated pages the root-mounted app. The final cutover range remains open while Phase 2–5 finishes; see [`docs/BACKLOG.md`](../BACKLOG.md#shell-09-the-cutover-then-the-old-interface-is-deleted) for its status.
+
 ## Home's pages under the kit (added 2026-09-20)
 
 The owner's ruling (2026-09-20): MaiPai Home follows this
