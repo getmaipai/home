@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { tier1PackageDataDir, installedPackageVersionDir, installStagingDir } from "@/lib/paths";
 
 // A Tier 1 package's Deno sandbox gets --allow-read on its own source
@@ -36,5 +39,45 @@ describe("data/packages/<id>/ subdirectories never nest inside one another", () 
     const staging = installStagingDir(id);
     expect(source.startsWith(`${staging}/`)).toBe(false);
     expect(staging.startsWith(`${source}/`)).toBe(false);
+  });
+});
+
+// SINGLE-INSTANCE-01 (#194): a hub started by hand from the repo root
+// (`bun backend/src/index.ts`) resolved `../data` against the shell's
+// cwd and silently became a brand-new hub in the org folder. The default
+// data directory is anchored to the source file, never the cwd.
+describe("the default data directory does not depend on the working directory", () => {
+  const pathsFile = join(import.meta.dir, "../src/lib/paths.ts");
+  const repoData = resolve(import.meta.dir, "../../data");
+
+  async function dataDirFrom(cwd: string, env: Record<string, string | undefined>): Promise<string> {
+    const child = Bun.spawn(
+      [process.execPath, "-e", `import { dataDir } from ${JSON.stringify(pathsFile)}; console.log(dataDir);`],
+      { cwd, env: { ...process.env, MAIPAI_DATA_DIR: undefined, ...env }, stdout: "pipe", stderr: "pipe" },
+    );
+    const out = await new Response(child.stdout).text();
+    await child.exited;
+    return out.trim();
+  }
+
+  test("repo root, backend, and an unrelated directory all resolve to <repo>/data", async () => {
+    const elsewhere = mkdtempSync(join(tmpdir(), "maipai-cwd-"));
+    try {
+      for (const cwd of [resolve(import.meta.dir, "../.."), resolve(import.meta.dir, ".."), elsewhere]) {
+        expect(await dataDirFrom(cwd, {})).toBe(repoData);
+      }
+    } finally {
+      rmSync(elsewhere, { recursive: true, force: true });
+    }
+  });
+
+  test("MAIPAI_DATA_DIR still overrides, and an empty value is treated as unset", async () => {
+    const elsewhere = mkdtempSync(join(tmpdir(), "maipai-cwd-"));
+    try {
+      expect(await dataDirFrom(elsewhere, { MAIPAI_DATA_DIR: "/tmp/maipai-explicit" })).toBe("/tmp/maipai-explicit");
+      expect(await dataDirFrom(elsewhere, { MAIPAI_DATA_DIR: "" })).toBe(repoData);
+    } finally {
+      rmSync(elsewhere, { recursive: true, force: true });
+    }
   });
 });

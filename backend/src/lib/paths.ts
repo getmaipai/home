@@ -36,8 +36,17 @@ export function isValidPackageId(id: string): boolean {
 // `data/` lives at the repo root (gitignored there, see .gitignore), the
 // same place the legacy hub kept it. `MAIPAI_DATA_DIR` overrides it, used by
 // tests to point at a throwaway directory instead of the real one.
-export const dataDir =
-  process.env.MAIPAI_DATA_DIR ?? resolve(process.cwd(), "../data");
+//
+// SINGLE-INSTANCE-01 (#194): the default is anchored to this source
+// file (backend/src/lib -> the repo root), never to the process's
+// working directory. It used to be `resolve(process.cwd(), "../data")`,
+// so a hub started by hand from the repo root silently became a new,
+// empty hub in the org folder. An empty MAIPAI_DATA_DIR counts as unset
+// (an empty string would otherwise resolve against the cwd again).
+export const repoRoot = resolve(import.meta.dir, "..", "..", "..");
+export const defaultDataDir = join(repoRoot, "data");
+export const dataDirIsExplicit = Boolean(process.env.MAIPAI_DATA_DIR);
+export const dataDir = process.env.MAIPAI_DATA_DIR || defaultDataDir;
 
 // Backups (2.5) land in a sibling of data/, not inside it: the whole
 // point of a backup target is to be somewhere a lost or corrupted data/
