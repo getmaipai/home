@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { downloadUrl } from "@/lib/modelDownload";
 import { visionDir } from "@/lib/paths";
 import { singleflight } from "@maipai/core/src/singleflight";
+import { SFACE_SHA256 } from "@/lib/faceModelPins";
 
 export interface VisionAsset {
   file: string;
@@ -19,7 +20,7 @@ export const VISION_FACE_DETECTOR: VisionAsset = {
 export const VISION_FACE_EMBEDDER: VisionAsset = {
   file: "face_recognition_sface_2021dec.onnx",
   url: "https://media.githubusercontent.com/media/opencv/opencv_zoo/ba91a3b91d00d76e86540d4013f944bd6b514e39/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
-  sha256: "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79",
+  sha256: SFACE_SHA256,
 };
 
 export const VISION_ALL_ASSETS: VisionAsset[] = [VISION_FACE_DETECTOR, VISION_FACE_EMBEDDER];
