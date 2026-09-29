@@ -177,6 +177,28 @@ function crossSiteRejected(c: Context<AppEnv>): boolean {
 export const ROLE_LADDER = Person.shape.role.options;
 export type Role = (typeof ROLE_LADDER)[number];
 
+// ROBOT-ROUTES-01: a robot's session is a real cookie session for the person
+// who paired it, so without a scope it could call every route that person
+// can (/api/people, /api/settings, ...). Deny by default: a session tied to a
+// `robot` device reaches only the routes a robot has a reason to call, and
+// everything else, including any route added later, is 403. Method plus
+// exact path, no prefix match, so a new sibling route is never admitted by
+// accident. Other device kinds are not scoped here.
+const ROBOT_SESSION_ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
+  ["POST", /^\/api\/turn\/?$/],
+  ["POST", /^\/api\/turn\/stream\/?$/],
+  ["POST", /^\/api\/turn\/[^/]+\/cancel\/?$/],
+  ["POST", /^\/api\/stt\/transcribe\/?$/],
+  ["GET", /^\/api\/stt\/stream\/?$/],
+  ["POST", /^\/api\/tts\/?$/],
+  ["PUT", /^\/api\/devices\/me\/state\/?$/],
+  ["GET", /^\/api\/biometric-prints\/sync\/?$/],
+];
+
+export function robotSessionMayReach(method: string, path: string): boolean {
+  return ROBOT_SESSION_ROUTES.some(([m, pattern]) => m === method && pattern.test(path));
+}
+
 // requireAuth and requireRole used to duplicate this whole sequence
 // (found by a code review, 2026-09-04): now both call it once.
 function authenticate(c: Context<AppEnv>): PersonRow | Response {
@@ -186,6 +208,16 @@ function authenticate(c: Context<AppEnv>): PersonRow | Response {
 
   const person = resolveSession(token);
   if (!person) return c.json({ error: "Unauthorized" }, 401);
+
+  const deviceId = resolveSessionDeviceId(token);
+  const device = deviceId ? getDeviceById(deviceId) : null;
+  // A session naming a device whose row is gone fails closed too: it cannot
+  // happen today (the FK and deleteDevice()), but it must never read as an
+  // unscoped person session if it ever does.
+  if (deviceId && !device) return c.json({ error: "Unauthorized" }, 401);
+  if (device?.kind === "robot" && !robotSessionMayReach(c.req.method, c.req.path)) {
+    return c.json({ error: "Forbidden" }, 403);
+  }
   return person;
 }
 
