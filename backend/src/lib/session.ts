@@ -29,7 +29,7 @@ export function pruneExpiredSessions() {
   return db.delete(sessions).where(lt(sessions.expiresAt, new Date().toISOString()));
 }
 
-export function issueSession(c: Context<AppEnv>, personId: string): void {
+export function issueSession(c: Context<AppEnv>, personId: string, deviceId?: string | null): void {
   const token = generateSessionToken();
   const expiresAt = sessionExpiresAt();
 
@@ -41,6 +41,10 @@ export function issueSession(c: Context<AppEnv>, personId: string): void {
       userAgent: c.req.header("user-agent") ?? null,
       expiresAt: expiresAt.toISOString(),
       createdAt: new Date().toISOString(),
+      // FACE-03: set only when this session came from a device-token
+      // redeem (routes/deviceAuth.ts) - null for a plain PIN/password/
+      // passkey sign-in, same as the column's own default.
+      deviceId: deviceId ?? null,
     })
     .run();
 

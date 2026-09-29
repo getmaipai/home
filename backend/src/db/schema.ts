@@ -77,6 +77,14 @@ export const sessions = sqliteTable("sessions", {
   userAgent: text("user_agent"),
   expiresAt: text("expires_at").notNull(),
   createdAt: text("created_at").notNull(),
+  // FACE-03: which device this session was issued to at redeem time
+  // (routes/deviceAuth.ts, lib/session.ts's issueSession()), so a
+  // robot's session is distinguishable from its pairing admin's
+  // (middleware/auth.ts's requireDeviceSession()) - a route that hands
+  // out plaintext biometric embeddings needs to know the caller is
+  // really the paired device, not just any signed-in person. Null for
+  // an ordinary PIN/password/passkey sign-in with no device involved.
+  deviceId: text("device_id").references(() => devices.id),
 });
 
 // Session C step 8 (session-c-brain-and-voice.md): "authenticated by a

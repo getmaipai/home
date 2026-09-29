@@ -8,9 +8,14 @@
 //
 // The embedding never leaves this module in the clear: encrypted at
 // rest (lib/secrets.ts, the reversible module - matching needs the
-// plaintext vector back) and never included in any API response, the
-// same treatment a credential hash gets. Only a matcher running
-// server-side ever calls decryptSecret() on it.
+// plaintext vector back), the same treatment a credential hash gets.
+// Never included in the ordinary list/create/delete responses below -
+// FACE-03 (2026-09-28) adds the one sanctioned exception: GET
+// /api/biometric-prints/sync (routes/biometricPrints.ts), gated by
+// requireDeviceSession("robot") (middleware/auth.ts) so only a paired
+// robot device's own session, never a plain person session, can read it.
+// Everywhere else, only a matcher running server-side ever calls
+// decryptSecret() on it.
 //
 // Consent: a child never consents for themself (the design's own
 // invariant). Self-enrollment is open to anyone else on the ladder;
@@ -199,4 +204,50 @@ export function deleteBiometricPrint(actor: PersonRow, printId: string): OpResul
   const now = new Date().toISOString();
   db.update(biometricPrints).set({ embeddingEncrypted: null, deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(biometricPrints.id, printId)).run();
   return { ok: true, status: 200, value: { success: true } };
+}
+
+/** FACE-03: every live face print, decrypted, as full spec records - the
+ * one sanctioned exit for the plaintext embedding this file's own header
+ * names, called only from GET /api/biometric-prints/sync
+ * (routes/biometricPrints.ts) behind requireDeviceSession("robot"), never
+ * reachable from a plain person session. A wholesale snapshot (every live
+ * print, not a delta), per the FACE-03 design record: the payload is
+ * tiny, and wholesale replacement makes revocation complete by
+ * construction (a revoked print is simply absent).
+ *
+ * Voice prints are filtered out explicitly, not just left for the caller
+ * to ignore: `bot`'s own design docs are explicit that a Reachy Mini or a
+ * browser never receives one (models design §5), and this is the only
+ * hub-side route that could ever leak one to a device - the filter is a
+ * real privacy invariant, not an arbitrary scope cut. A tombstoned print
+ * (deletedAt set, embeddingEncrypted scrubbed to null) is excluded by the
+ * same isNull(deletedAt) filter every other live-print read in this file
+ * already uses; because of that, every row this query returns is
+ * guaranteed to still have an embedding to decrypt. */
+export function listPrintsForSync(): BiometricPrintT[] {
+  const rows = db
+    .select()
+    .from(biometricPrints)
+    .where(and(eq(biometricPrints.modality, "face"), isNull(biometricPrints.deletedAt)))
+    .all() as PrintRow[];
+
+  return rows.map((row) => ({
+    id: row.id,
+    person_id: row.personId,
+    modality: row.modality as "face" | "voice",
+    model_id: row.modelId,
+    model_sha256: row.modelSha256,
+    dim: row.dim,
+    // Safe: a live (deletedAt IS NULL) row always still has its embedding -
+    // only the tombstone path (above) ever nulls embeddingEncrypted, and
+    // it sets deletedAt in the same write.
+    embedding: JSON.parse(decryptSecret(row.embeddingEncrypted!)) as number[],
+    captured_by: row.capturedBy,
+    consent_at: row.consentAt,
+    consented_by_person_id: row.consentedByPersonId,
+    created_at: row.createdAt,
+    updated_at: row.updatedAt,
+    deleted_at: row.deletedAt,
+    hlc: row.hlc,
+  }));
 }

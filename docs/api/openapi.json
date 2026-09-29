@@ -19150,6 +19150,130 @@
         }
       }
     },
+    "/api/biometric-prints/sync": {
+      "get": {
+        "tags": [
+          "Biometric prints"
+        ],
+        "summary": "Every live face print, full records including the embedding - a paired robot device only",
+        "responses": {
+          "200": {
+            "description": "A wholesale snapshot of every live (non-tombstoned) face print, decrypted. Voice prints are never included.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "as_of": {
+                      "type": "string"
+                    },
+                    "prints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "person_id": {
+                            "type": "string"
+                          },
+                          "modality": {
+                            "type": "string",
+                            "enum": [
+                              "face",
+                              "voice"
+                            ]
+                          },
+                          "model_id": {
+                            "type": "string"
+                          },
+                          "model_sha256": {
+                            "type": "string"
+                          },
+                          "dim": {
+                            "type": "number"
+                          },
+                          "captured_by": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "consent_at": {
+                            "type": "string"
+                          },
+                          "consented_by_person_id": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "deleted_at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "hlc": {
+                            "type": "string"
+                          },
+                          "embedding": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "person_id",
+                          "modality",
+                          "model_id",
+                          "model_sha256",
+                          "dim",
+                          "captured_by",
+                          "consent_at",
+                          "consented_by_person_id",
+                          "created_at",
+                          "updated_at",
+                          "deleted_at",
+                          "hlc",
+                          "embedding"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "as_of",
+                    "prints"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in at all (including a revoked device's session)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not a robot device with the camera capability - an ordinary person session included",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/approvals": {
       "post": {
         "tags": [

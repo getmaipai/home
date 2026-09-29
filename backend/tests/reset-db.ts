@@ -110,6 +110,13 @@ export function resetDb(): void {
   db.delete(backupTargets).run();
   db.delete(nasMounts).run();
   db.delete(appUpdateState).run();
+  // FACE-03: sessions.device_id now references devices.id, so sessions
+  // must be deleted before devices below - moved up from its old spot
+  // beside personCredentials/people at the bottom of this function,
+  // which is still correct for THAT reference but is after devices, and
+  // a table can only be safely deleted before every table it references,
+  // not just one of them.
+  db.delete(sessions).run();
   db.delete(deviceTokens).run();
   db.delete(robotCredentials).run();
   db.delete(devices).run();
@@ -181,7 +188,6 @@ export function resetDb(): void {
   __resetOrdinaryToolSetForTests();
   __resetOutputNotificationsForTests(); // CHAT-02: once-per-turn notification keys
   db.delete(idSequences).run();
-  db.delete(sessions).run();
   db.delete(personApiTokens).run();
   db.delete(personCredentials).run();
   db.delete(people).run();

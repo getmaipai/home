@@ -2,6 +2,14 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { decryptBiometricPrintEmbedding } from "@/lib/biometricPrints";
+import { db } from "@/db";
+import { people, biometricPrints } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { issueDeviceToken } from "@/lib/deviceTokens";
+import { storeRobotCredential } from "@/lib/robotCredentials";
+import type { DeviceKind } from "@/lib/devices";
+import { encryptSecret } from "@/lib/secrets";
+import { newBiometricPrintId } from "@/lib/id";
 
 beforeEach(() => resetDb());
 
@@ -211,5 +219,108 @@ describe("DELETE /api/biometric-prints/:id", () => {
     const owner = await ownerSession();
     const res = await owner.request("/api/biometric-prints/print-nonexistent", { method: "DELETE" });
     expect(res.status).toBe(404);
+  });
+});
+
+// FACE-03: the device-gated sync route - see middleware/auth.ts's
+// requireDeviceSession() and lib/biometricPrints.ts's listPrintsForSync()
+// for the reasoning this exercises end to end.
+describe("GET /api/biometric-prints/sync", () => {
+  async function ownerPersonId(): Promise<{ owner: TestClient; personId: string }> {
+    const owner = await ownerSession();
+    const person = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    return { owner, personId: person.id };
+  }
+
+  async function deviceSession(personId: string, kind: DeviceKind, capabilities: string[] = []): Promise<TestClient> {
+    const { token, deviceId } = issueDeviceToken(personId, kind, "Test device", capabilities);
+    if (kind === "robot") storeRobotCredential(deviceId, "192.0.2.10", "pollen", "a-freshly-rotated-password");
+    const client = new TestClient();
+    const res = await client.post("/api/auth/devices/redeem", { token });
+    expect(res.status).toBe(200);
+    return client;
+  }
+
+  // Bypasses createBiometricPrint()'s KNOWN_MODELS gate (no voice model is
+  // pinned yet - this file's own header comment on KNOWN_MODELS says so)
+  // to construct a raw row directly, the only way to exercise the voice
+  // filter and the tombstone filter against a real row.
+  function insertRawPrint(personId: string, modality: "face" | "voice", opts: { deletedAt?: string } = {}): string {
+    const id = newBiometricPrintId();
+    const now = new Date().toISOString();
+    db.insert(biometricPrints)
+      .values({
+        id,
+        personId,
+        modality,
+        modelId: "sface-2021dec",
+        modelSha256: "test-sha256",
+        dim: SFACE_EMBEDDING.length,
+        embeddingEncrypted: opts.deletedAt ? null : encryptSecret(JSON.stringify(SFACE_EMBEDDING)),
+        capturedBy: null,
+        consentAt: now,
+        consentedByPersonId: personId,
+        createdAt: now,
+        updatedAt: now,
+        deletedAt: opts.deletedAt ?? null,
+        hlc: "1700000000000:0:testfix",
+      })
+      .run();
+    return id;
+  }
+
+  test("a household admin's own (non-device) session gets 403", async () => {
+    const { owner } = await ownerPersonId();
+    const res = await owner.get("/api/biometric-prints/sync");
+    expect(res.status).toBe(403);
+  });
+
+  test("a session tied to a non-robot device gets 403", async () => {
+    const { personId } = await ownerPersonId();
+    const phone = await deviceSession(personId, "phone", ["camera"]);
+    const res = await phone.get("/api/biometric-prints/sync");
+    expect(res.status).toBe(403);
+  });
+
+  test("a robot device session without the camera capability gets 403", async () => {
+    const { personId } = await ownerPersonId();
+    const robot = await deviceSession(personId, "robot", []);
+    const res = await robot.get("/api/biometric-prints/sync");
+    expect(res.status).toBe(403);
+  });
+
+  test("a robot device session with the camera capability gets 200 with the full record, embedding included", async () => {
+    const { personId } = await ownerPersonId();
+    insertRawPrint(personId, "face");
+    const robot = await deviceSession(personId, "robot", ["camera"]);
+
+    const res = await robot.get("/api/biometric-prints/sync");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { as_of: string; prints: Array<{ embedding: number[]; modality: string }> };
+    expect(typeof body.as_of).toBe("string");
+    expect(body.prints).toHaveLength(1);
+    expect(body.prints[0]!.modality).toBe("face");
+    expect(body.prints[0]!.embedding).toEqual(SFACE_EMBEDDING);
+  });
+
+  test("a voice print never appears in the response even when one exists", async () => {
+    const { personId } = await ownerPersonId();
+    insertRawPrint(personId, "face");
+    insertRawPrint(personId, "voice");
+    const robot = await deviceSession(personId, "robot", ["camera"]);
+
+    const body = (await (await robot.get("/api/biometric-prints/sync")).json()) as { prints: Array<{ modality: string }> };
+    expect(body.prints).toHaveLength(1);
+    expect(body.prints.every((p) => p.modality === "face")).toBe(true);
+  });
+
+  test("a deleted/tombstoned face print never appears", async () => {
+    const { personId } = await ownerPersonId();
+    const liveId = insertRawPrint(personId, "face");
+    insertRawPrint(personId, "face", { deletedAt: new Date().toISOString() });
+    const robot = await deviceSession(personId, "robot", ["camera"]);
+
+    const body = (await (await robot.get("/api/biometric-prints/sync")).json()) as { prints: Array<{ id: string }> };
+    expect(body.prints.map((p) => p.id)).toEqual([liveId]);
   });
 });
