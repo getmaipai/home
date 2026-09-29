@@ -85,6 +85,8 @@ describe("the hub's own connections", () => {
     expect(byId.get("platform:language-models")?.destination).toContain("huggingface.co");
     expect(byId.get("platform:engine")?.destination).toContain("github.com");
     expect(byId.get("platform:wake-word-models")?.destination).toContain("github.com");
+    expect(byId.get("platform:face-vision-models")?.destination).toContain("huggingface.co");
+    expect(byId.get("platform:face-vision-models")?.destination).toContain("githubusercontent.com");
     expect(byId.get("platform:text-embedding-model")?.destination).toContain("huggingface.co");
   });
 

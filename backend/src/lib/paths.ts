@@ -113,6 +113,9 @@ export const logsDir = resolve(dataDir, "logs");
 // legacy-specific.
 export const wakewordDir = resolve(dataDir, "voice", "wakewords");
 
+// Downloaded face detection and embedding models, served to browser clients.
+export const visionDir = resolve(dataDir, "vision", "models");
+
 // Session C step 5 (session-c-brain-and-voice.md): the STT program's own
 // re-downloadable models - the Silero VAD onnx file (utterance
 // endpointing, lib/sttSession.ts) and the Moonshine tiny-en archive
