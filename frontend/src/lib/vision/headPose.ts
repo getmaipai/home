@@ -4,15 +4,17 @@ import { TEMPLATE } from "@/lib/vision/faceAlign";
 /**
  * Estimate yaw and pitch from YuNet's five pixel-space landmarks.
  *
- * These scale constants are uncalibrated starting values for UI guidance,
- * not a calibrated 3D pose solve. They need tuning with a live camera and a
- * real face. This estimate does not correct head roll. Pose does not
- * participate in identity matching, which uses only the face embedding.
+ * Yaw remains an uncalibrated starting value for UI guidance. Pitch reflects
+ * one real live-camera measurement: an exaggerated chin-up tilt measured
+ * 9.4 degrees at scale 70, corrected to scale 200. That value is still
+ * approximate and may need further tuning. This is not a calibrated 3D pose
+ * solve and does not correct head roll. Pose does not participate in identity
+ * matching, which uses only the face embedding.
  */
 // A normalized displacement near one is a near-profile cue, so 70 degrees
 // puts it inside the expected 60–90 degree neighborhood as a starting point.
 const YAW_SCALE_DEG = 70;
-const PITCH_SCALE_DEG = 70;
+const PITCH_SCALE_DEG = 200;
 
 // YuNet landmarks closer than a few pixels are too noisy for stable
 // normalization, especially during near-profile turns.
