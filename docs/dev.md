@@ -32315,3 +32315,160 @@ name in TXT; a rival holding both names raises the Repairs issue and
 leaves the hub not advertising. The discovery test's hub name is now
 "Marlow Hub", so it no longer clashes with a running hub named "Test Hub"
 (the #160 flake on the dev machine).
+
+## STYLE-TRAIN-01: four adapters trained, converted, and live-verified against the pinned engine (Sonnet, 2026-09-29)
+
+Closes STYLE-TRAIN-01. `backend/scripts/voice/train.sh` (the training
+and conversion script) and `backend/scripts/voice/train.md` (the
+runbook, exact commands and sources for every parameter this session
+chose beyond the row's own) are committed. Machine: the tier-2 bench
+laptop (`docs/plans/hardware-tiers-2026-09-23.md`'s own description -
+Linux, two 8 GB CUDA cards, one internal (Turing, compute capability
+7.5), one external over Thunderbolt (Ampere, compute capability 8.6),
+driver reporting CUDA 13.2), never named by hostname here.
+
+**The Python ML stack didn't exist on this machine before tonight** -
+no `pip`, `uv`, or venv anywhere in `$PATH`. Built entirely at user
+level, no `sudo apt` needed in the end: `python3 -m venv` plus `pip`
+worked for the initial install (`torch==2.14.0+cu130`, CUDA available,
+both cards visible), but even a CPU-only smoke test of the training
+code failed - `trl`'s chunked cross-entropy path reaches for a Triton-
+compiled CUDA kernel whenever CUDA is visible on the machine at all,
+and Triton's JIT needs `gcc` plus `Python.h`, which the OS's
+`/usr/bin/python3.12` doesn't ship (`python3.12-dev` not installed,
+installing it needs `sudo apt`, outside this item's four pre-granted
+NOPASSWD commands). Fixed by rebuilding the venv on `uv python
+install`'s own standalone CPython instead (`~/.local/share/uv/python/
+cpython-3.12.14-linux-x86_64-gnu/include/python3.12/Python.h` exists,
+confirmed before relying on it) - genuinely user-level, no system
+package touched. Full stack verified working after: `torch==2.14.0
++cu130`, `transformers==5.17.0`, `accelerate==1.15.0`, `peft==0.21.1`,
+`trl==1.14.0`, `bitsandbytes==0.50.2`, `datasets==5.0.1`. Full account
+in `train.md`'s "The `python3.12-dev` finding".
+
+**The corpus scale was reduced from the row's own 400 typed/200
+spoken default, reported honestly, not padded.** The real full-scale
+run was started first and was healthy - 2.1 hours in, still not
+finished with the first of four companions - because
+`corpus.ts` regenerates the neutral reply per companion (each
+companion's own identity/system-prompt framing), not once and shared,
+so the real cost is 4 x (typed + spoken) neutral calls plus 4 x (typed
++ spoken) teacher calls, not 1x + 4x. Measured rate: about 9 seconds
+per call end to end (local neutral reply plus the LAN round trip to
+the household's own Qwen3.8-27B teacher). Projected full-scale total:
+roughly 10-12 hours across all four companions - and that whole window
+needs `maipai-chat.service` (the teacher, port 8791) running, while
+GPU training needs that same service *stopped* to free the card, so
+the two phases cannot overlap and a 10-12 hour corpus phase would have
+meant a 10-12 hour wait before training could even start. Killed the
+full run and restarted at `MAIPAI_VOICE_TYPED_COUNT=50
+MAIPAI_VOICE_SPOKEN_COUNT=25` (tool rows unchanged at 50, shared across
+companions) - about 90 minutes for all four, a real increase in
+rigor over STYLE-CORPUS-02's own last validation run (`n=45/15`)
+without the impractical wall time. `docs/BACKLOG.md`'s STYLE-TRAIN-01
+row change asked for exactly this honesty when the full default isn't
+practical; this is that report, not a silent substitution.
+
+**Corpus, per companion (reduced scale; sha256 per file, all
+git-ignored under `data-scratch/voice/<companion>/corpus.jsonl`):**
+
+| companion | kept (voice+tool) | drop rate | document-shaped typed drop | full-rewrite drop | class:shape counts |
+|---|---|---|---|---|---|
+| pal | 54+50=104 | 28.0% | 37.5% | 20.9% | typed:document=20, typed:conversational=9, spoken:conversational=25, tool:tool=50 |
+| tutor | 36+50=86 | 52.0% | 51.6% | 52.3% | typed:document=15, typed:conversational=8, spoken:conversational=13, tool:tool=50 |
+| buddy | 45+50=95 | 40.0% | 35.5% | 43.2% | typed:conversational=5, typed:document=20, spoken:conversational=20, tool:tool=50 |
+| default | 35+50=85 | 53.3% | 41.4% | 60.9% | typed:document=17, spoken:conversational=18, tool:tool=50 (0 typed:conversational rows kept) |
+
+Same shape of finding as STYLE-CORPUS-02's own small-scale run: the
+20 percent acceptance bar is not met at this scale either. Not
+relaxed, not re-litigated here - VOICE-CLASS-01 and STYLE-CORPUS-02
+already named this a finding about the training target and the brief,
+left to STYLE-BENCH-01 (the actual gate before an adapter reaches a
+turn) to prove whether it matters in practice.
+
+**Dataset construction** (`train.sh`'s own comments cite the exact
+lines): a voice row's `system_prompt` (always present) plus `prompt`
+become the `"prompt"` messages, `rewrite` the `"completion"` message -
+`trl`'s own prompt-completion conversational format, `completion_only_
+loss` auto-enabled (masks the loss to the rewrite, never the prompt),
+both verified against the installed `trl` source. A tool row has no
+`system_prompt` field at all, reproduced exactly rather than given a
+fallback - `corpus.ts`'s own tool-row collection calls the engine with
+a bare `[{role: "user", ...}]`, no system message. A tool row's
+`tool_calls` translate to the wire shape `llm.ts`'s own
+`toolCallFromWire()` reads (`{id, type: "function", function: {name,
+arguments}}`), verified against the real downloaded `Qwen/Qwen3-8B`
+tokenizer's `apply_chat_template`: it renders `<tool_call>{"name":
+..., "arguments": {...}}</tool_call>`, the tag llama.cpp's own tool-
+call parser recognizes.
+
+**Training, all four in the row's own order (pal, tutor, buddy,
+default), on the internal-numbered `cuda:0`** (torch's own device 0,
+which this run's `bitsandbytes` capability check showed was the
+Ampere card, not the physical-bus-order card `nvidia-smi` calls index
+0 - both cards were fully free by the time training ran, so this
+never mattered in practice, noted for the next session that it isn't
+`nvidia-smi`'s own ordering):
+
+| companion | rows | final train loss | mean token accuracy | wall time |
+|---|---|---|---|---|
+| pal | 104 | 2.5938 | 0.7323 | 175.0s |
+| tutor | 86 | 2.7979 | 0.6990 | 156.3s |
+| buddy | 95 | 2.5179 | 0.7210 | 169.3s |
+| default | 85 | 2.4624 | 0.7511 | 152.0s |
+
+One real bug found and fixed live, not designed around in advance:
+the installed `transformers` (5.17.0) removed `TrainingArguments.
+warmup_ratio` entirely (`SFTConfig.__init__() got an unexpected
+keyword argument 'warmup_ratio'`, thrown on the very first real
+training attempt) - only `warmup_steps` remains, confirmed by
+inspecting the installed signature. Fixed by computing warmup steps
+from the real step count in `train.sh` itself (3 percent, rounded, at
+least 1) instead of the ratio field. `train.md`'s parameter table
+carries this.
+
+**Conversion**, `convert_lora_to_gguf.py` from a shallow clone of
+`ggml-org/llama.cpp` at tag `b10797` (never vendored into this repo;
+confirmed the clone's `HEAD` (`832fd6f17`) matches this machine's own
+pinned `llama-server --version` exactly), `--outtype f16` (this
+session's choice - a rank-16 attention-only LoRA delta is small enough
+that `f32`'s extra precision over the converter's own default isn't
+worth double the file size). All four converted cleanly against the
+real `Qwen/Qwen3-8B` base config (`base_model_name_or_path` resolved
+automatically from the saved adapter, no `--base`/`--base-model-id`
+needed) - 288 tensors each (36 layers x 4 projections x 2 LoRA
+matrices), confirming the real architecture shape, not a stand-in.
+
+| companion | file | sha256 | size |
+|---|---|---|---|
+| pal | `pal-qwen3-8b-instruct-q4-k-m.gguf` | `f3d009ad678b540b766b988973b3bbeacf75652615debd7832579903cf64e878` | 30,691,104 bytes (29.3 MiB) |
+| tutor | `tutor-qwen3-8b-instruct-q4-k-m.gguf` | `10df35a9b81bfd2e762f2a2402774a992dba04a6dd61a2e9be44caf0fc875d2c` | 30,691,104 bytes (29.3 MiB) |
+| buddy | `buddy-qwen3-8b-instruct-q4-k-m.gguf` | `fdd9ea1888ad2eff4a8e3309df11400bfceb267f89c7609e29534ae5620c5008` | 30,691,104 bytes (29.3 MiB) |
+| default | `default-qwen3-8b-instruct-q4-k-m.gguf` | `0c05477f28dee720601092ff32306f0a1c5c8411dc8b95fdca909f1e5859cc1a` | 30,691,104 bytes (29.3 MiB) |
+
+**Verification, live, not assumed from the conversion step exiting
+zero.** A throwaway instance of the pinned `llama-server`
+(`/opt/llama/bin/llama-server`, confirmed `build 10797, commit
+832fd6f17`) loaded the real production base GGUF
+(`qwen3-8b-instruct-q4-k-m.gguf`) plus all four adapters at once on a
+spare port, never the laptop's live `maipai-chat` unit. `GET
+/lora-adapters` listed all four by id and path. The throwaway instance
+was stopped immediately after.
+
+**The household's coding-lane engine (`maipai-chat.service`, the same
+service that's this corpus's own teacher) was down for training,
+authorized by Jesse via the coordinator.** Corpus generation needs
+that service *up* (it's the teacher at :8791); training needs the same
+card *free*, so the two windows cannot overlap regardless of GPU
+memory - this ordering (corpus first, fully, then stop-train-verify-
+restart as one block) is why. Stopped 14:24:33, restarted 14:40:23
+(`journalctl -u maipai-chat.service`) - 15 minutes 50 seconds total,
+covering all four companions' training, conversion, and the live
+multi-adapter verification load. Confirmed healthy after restart
+(`GET :8791/health` green, both cards back to their normal resident
+usage).
+
+Out of scope here, per the row: STYLE-BENCH-01 (the actual fidelity
+gate), any hub runtime code, release assets. The four adapter files
+and their PEFT source directories live under `data-scratch/voice/
+adapters/` (git-ignored), never committed - this table is the record.
