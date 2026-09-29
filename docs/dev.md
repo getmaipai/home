@@ -32062,3 +32062,82 @@ postures for what would otherwise be a real, unconsented person's
 likeness held only for a throwaway test. This is a real human's
 turn: open `/people/:id/enroll-face` in an ordinary browser, allow the
 camera, and cycle through the five poses.
+
+## Robot device state (2026-09-29, design-resolver, G10/ROBOT-CARD-01)
+
+The robot's own device card (ROBOT-CARD-01, Devices page) needs to
+show a live state frame (listening, thinking, speaking, muted,
+tracking, battery, "unreachable since") for a body with no screen or
+light ring of its own - `bot`'s `design-reachy-mini-2026-09-27.md`
+section 5 is explicit that "the states live in Home's shell." No
+transport existed for it: the funnel states (`ConversationLoop`'s
+`FunnelState`) live only inside the bot process, never reported
+anywhere. Resolved by tracing the actual constraint (only the robot
+holds a hub credential; the turn stream exists only during a turn,
+never while idle) rather than inventing a shape.
+
+**The decision:** the robot pushes, the hub never polls. A new route,
+`PUT /api/devices/me/state`, gated by `requireDeviceSession("robot")`
+(FACE-03's own middleware, `requireDeviceSession` gains a `c.set(
+"device", device)` this route needs - today it only sets `person`).
+The wire shape is a new commons spec schema,
+`spec/schemas/robot-state.schema.json`: `activity` (including
+`starting`, covering the gap between pairing and the conversation
+loop's build - the first-boot model download can take minutes, and
+without this value the card would wrongly read "unreachable" the whole
+time), `muted`, `tracking`, `on_battery`/`battery_level` (nullable -
+Reachy Mini cannot read either, per the design's own section 7),
+`daemon_version`. Sent on every state change and a 15s heartbeat
+otherwise, from `bot`'s own `link/state.py` (`StateReporter`, modelled
+directly on tonight's `link/prints.py` `PrintSync`).
+
+**Storage: a new hub-local table, `device_states`** (one row per
+device, `device_id` FK `ON DELETE CASCADE`, `reported_at` stamped by
+the hub on receipt, the robot's own clock never trusted) - deliberately
+NOT columns on `devices` itself, since `Device` is a spec record
+carrying `hlc`/`watermarks` reserved for the future link replication;
+writing telemetry every 15s would churn and later replicate a field
+that should never leave this hub. `device_states` is the "state
+projection" this repo's own comments already named ahead of a
+mechanism existing for it - hub-local, never synced, the same posture
+`sessions` already has.
+
+**Unreachable, computed on read, in one place:** `reachable = now -
+reported_at <= 45s` (three missed heartbeats). `GET /api/devices` and
+`GET /api/devices/robots` gain a derived `state` field (`null` until
+the robot's first report) carrying `reachable`/`unreachableSince`
+alongside the raw frame. The frontend polls with react-query's
+`refetchInterval` (5s), the existing pattern `NotificationBell.tsx`/
+`NextChatPage.tsx` already use - no SSE, no WebSocket, matching this
+codebase's own existing push-vs-poll posture.
+
+**Deliberately out of scope, filed separately:** `present` (identity
+data with its own reader/retention rules, dev.md's own §6 privacy
+rules - a later field, not blocking this one) and the mute command
+itself (hub to robot - see ROBOT-MUTE-01 below; G9's own BACKLOG
+wording in `bot`, "the trigger is G10's own device-state frame," was
+wrong and has been corrected there - this frame is read-only
+telemetry, never a command channel, and putting a command in a route
+whose reply can lag 15s behind a heartbeat is the wrong shape for a
+privacy control regardless).
+
+Full work orders: this repo's own BACKLOG (`ROBOT-CARD-01`, hub half),
+`bot`'s `docs/BACKLOG.md` (`G10-BODY`), `commons`'s own spec item
+(`ROBOT-STATE-SPEC-01`). `bot`'s own `docs/dev.md` carries the
+bot-side pointer to this record, not a duplicate.
+
+## ROBOT-MUTE-01: the mute command needs its own channel (filed 2026-09-29)
+
+Surfaced while resolving ROBOT-CARD-01's state transport: `bot`'s
+`ConversationLoop.set_muted()` and its edge-triggered mute state are
+real and tested, but nothing calls it yet - `bot`'s own BACKLOG
+previously (wrongly) named the device-state frame above as the future
+trigger. It isn't: that frame is one-directional, robot to hub, and a
+mute control needs the opposite direction with much lower latency than
+a 15s heartbeat can honestly offer. This needs its own design pass:
+whether mute is a settings key (`commons/spec/settings/keys.json` has
+no entry for it yet) the robot polls, a dedicated low-latency command
+channel (a long-poll `GET /api/devices/me/commands`, sketched but not
+decided), and - separately - whether Home should offer a mute button
+on the robot's card at all, which may be Jesse's own product call
+rather than an engineering one. Not started.
