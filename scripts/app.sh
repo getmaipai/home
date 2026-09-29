@@ -28,11 +28,36 @@ running() {
 # or left over from another checkout) can hold the port. Without this,
 # stop said "already stopped" and start launched a copy that could not
 # bind. Report the holder plainly so nobody has to hunt for it.
+#
+# SINGLE-INSTANCE-02 (#196): at most one hub per machine, whatever its data
+# directory or port. The hub records itself in a machine-wide lock file
+# (backend/src/lib/instanceLock.ts, hubLockPath), so a hub on another port or
+# another data directory is found there first; the port check stays as the
+# fallback for a hub old enough to predate the lock.
 port="${PORT:-8787}"
+lock_file="${MAIPAI_HUB_LOCK_PATH:-$HOME/.maipai/home/hub.lock}"
+lock_num() { grep -o "\"$1\":[0-9]*" "$lock_file" 2>/dev/null | head -n 1 | sed 's/^[^:]*://' || true; }
+lock_str() { grep -o "\"$1\":\"[^\"]*\"" "$lock_file" 2>/dev/null | head -n 1 | sed 's/^[^:]*:"//; s/"$//' || true; }
+
+lock_holder() {
+  [ -f "$lock_file" ] || return 1
+  local lpid lcommand
+  lpid="$(lock_num pid)"
+  case "$lpid" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$lpid" -gt 1 ] || return 1
+  kill -0 "$lpid" 2>/dev/null || return 1
+  # A reused pid belonging to something that is not a hub is not a holder.
+  lcommand="$(ps -p "$lpid" -o command= 2>/dev/null || true)"
+  [[ "$lcommand" == *bun* && "$lcommand" == *index.ts* ]] || return 1
+  holder="$lpid"
+  return 0
+}
+
 foreign_hub() {
+  holder=""
+  lock_holder && return 0
   # Not `lsof -i`: it scans every open file on the machine and can hang for
   # minutes. netstat (macOS) and ss (Linux) answer from the socket table.
-  holder=""
   if [ "$(uname -s)" = "Darwin" ]; then
     holder="$(netstat -anv -p tcp 2>/dev/null | awk -v p="$port" '
       $6 == "LISTEN" && $4 ~ ("[.:]" p "$") { n = split($11, a, ":"); print a[n]; exit }' || true)"
@@ -44,15 +69,28 @@ foreign_hub() {
 }
 
 report_foreign_hub() {
-  local cwd command data
+  local cwd command data hub_port
+  hub_port="$port"
   cwd="$(lsof -a -p "$holder" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1 || true)"
   command="$(ps -p "$holder" -o command= 2>/dev/null || true)"
   data="$(ps eww -p "$holder" -o command= 2>/dev/null | grep -o 'MAIPAI_DATA_DIR=[^ ]*' | head -n 1 | sed 's/^MAIPAI_DATA_DIR=//' || true)"
   if [ -z "$data" ] && [ -f "$root/data/hub.lock" ] && grep -q "\"pid\":$holder[,}]" "$root/data/hub.lock"; then
     data="$root/data"
   fi
+  # The machine lock, when it names this pid, is the authority: it records
+  # the port and data directory the hub actually booted with.
+  if [ "$(lock_num pid)" = "$holder" ]; then
+    hub_port="$(lock_num port)"
+    data="$(lock_str dataDir)"
+    cwd="$(lock_str cwd)"
+  fi
   [ -n "$data" ] || data="not set in its environment (an older hub uses <its working directory>/../data)"
-  echo "Port $port is held by PID $holder, which this script did not start." >&2
+  if [ "$(lock_num pid)" = "$holder" ]; then
+    echo "A Home hub is already running as PID $holder (port $hub_port), which this script did not start." >&2
+    echo "Only one hub runs per machine, whatever its data directory or port." >&2
+  else
+    echo "Port $port is held by PID $holder, which this script did not start." >&2
+  fi
   echo "  command:           ${command:-unknown}" >&2
   echo "  working directory: ${cwd:-unknown}" >&2
   echo "  data directory:    $data" >&2

@@ -9,7 +9,7 @@ describe("local app commands", () => {
     const root = await mkdtemp(join(tmpdir(), "home-lifecycle-"));
     // SINGLE-INSTANCE-01: app.sh looks at PORT for a hub it does not manage;
     // a free port keeps the family's real hub on 8787 out of this test.
-    const env = { ...process.env, PORT: String(reserveFreePort()) };
+    const env = { ...process.env, PORT: String(reserveFreePort()), MAIPAI_HUB_LOCK_PATH: join(root, "no-hub.lock") };
     const run = async (command: string) => {
       const child = Bun.spawn([process.execPath, command], { cwd: root, env, stdout: "pipe", stderr: "pipe" });
       const [out, err, code] = await Promise.all([
@@ -79,7 +79,7 @@ describe("local app commands", () => {
     );
     const run = async (command: string) => {
       const child = Bun.spawn([process.execPath, command], {
-        cwd: root, env: { ...process.env, PORT: String(port) }, stdout: "pipe", stderr: "pipe",
+        cwd: root, env: { ...process.env, PORT: String(port), MAIPAI_HUB_LOCK_PATH: join(root, "no-hub.lock") }, stdout: "pipe", stderr: "pipe",
       });
       const [out, err, code] = await Promise.all([
         new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
@@ -104,6 +104,57 @@ describe("local app commands", () => {
         expect(result.code).not.toBe(0);
         expect(result.text).toContain(`PID ${foreign.pid}`);
         expect(result.text).toContain("did not start");
+        expect(result.text).toContain(`kill ${foreign.pid}`);
+        expect(result.text).not.toContain("already stopped");
+      }
+      expect(process.kill(foreign.pid, 0)).toBe(true);
+    } finally {
+      foreign.kill();
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 20000);
+
+  // SINGLE-INSTANCE-02 (#196): the machine lock finds a hub on a different
+  // port and data directory than this checkout's, which the port check
+  // alone would miss.
+  test("stop, start and restart name a hub found through the machine lock, whatever its port or data directory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "home-lifecycle-lock-"));
+    const hubPort = reserveFreePort();
+    const lockPath = join(root, "state", "hub.lock");
+    await mkdir(join(root, "state"), { recursive: true });
+    await mkdir(join(root, "other/backend/src"), { recursive: true });
+    await writeFile(join(root, "other/backend/src/index.ts"), `Bun.serve({ port: ${hubPort}, fetch: () => new Response("x") }); setTimeout(() => {}, 60000);`);
+    const foreign = Bun.spawn([process.execPath, join(root, "other/backend/src/index.ts")], { cwd: join(root, "other/backend"), stdout: "ignore", stderr: "ignore" });
+    const run = async (command: string) => {
+      // PORT names a different, unused port: only the lock can reveal the hub.
+      const child = Bun.spawn([process.execPath, command], {
+        cwd: root, env: { ...process.env, PORT: String(reserveFreePort()), MAIPAI_HUB_LOCK_PATH: lockPath }, stdout: "pipe", stderr: "pipe",
+      });
+      const [out, err, code] = await Promise.all([
+        new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+      ]);
+      return { text: out + err, code };
+    };
+    try {
+      await mkdir(join(root, "scripts"), { recursive: true });
+      await mkdir(join(root, "frontend"));
+      await mkdir(join(root, "backend/src"), { recursive: true });
+      await cp(join(import.meta.dir, "../../scripts/app.sh"), join(root, "scripts/app.sh"));
+      const pkg = await Bun.file(join(import.meta.dir, "../../package.json")).json();
+      await writeFile(join(root, "package.json"), JSON.stringify({ scripts: pkg.scripts }));
+      await writeFile(join(root, "frontend/package.json"), JSON.stringify({ scripts: { build: "bun -e 'process.exit(0)'" } }));
+      await writeFile(join(root, "backend/src/index.ts"), "throw new Error('must not start');");
+      await writeFile(lockPath, JSON.stringify({
+        pid: foreign.pid, startedAt: Date.now(), port: hubPort, dataDir: "/stray/data", cwd: join(root, "other/backend"),
+      }));
+      for (const command of ["stop", "start", "restart"]) {
+        const result = await run(command);
+        expect(result.code).not.toBe(0);
+        expect(result.text).toContain(`PID ${foreign.pid}`);
+        expect(result.text).toContain("did not start");
+        expect(result.text).toContain(`${hubPort}`);
+        expect(result.text).toContain("/stray/data");
+        expect(result.text).toContain(join(root, "other/backend"));
         expect(result.text).toContain(`kill ${foreign.pid}`);
         expect(result.text).not.toContain("already stopped");
       }
