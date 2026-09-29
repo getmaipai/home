@@ -13,7 +13,7 @@ companion's voice. That call is the one thing standing between "built" and
 The household already runs a genuinely bigger local model for exactly this
 kind of "smarter model helps a smaller one" role: Qwen3.8-27B, served by
 `maipai-chat.service` on the `maipai-home` laptop
-(`172.19.210.52:8791`, OpenAI-compatible `/v1/chat/completions`, confirmed
+(`192.0.2.52:8791`, OpenAI-compatible `/v1/chat/completions`, confirmed
 live tonight after fixing an eGPU binding issue - see the coordinator's own
 session for that history, not relevant to this item). Using it instead:
 keeps the whole pipeline local (matches the product's own "nothing leaves
@@ -55,7 +55,7 @@ Nothing else.
    `complete()` for the house style, mirror it rather than inventing a new
    HTTP call shape) against an OpenAI-compatible `/v1/chat/completions`
    endpoint:
-   - URL: `process.env.MAIPAI_VOICE_TEACHER_URL ?? "http://172.19.210.52:8791"`
+   - URL: `process.env.MAIPAI_VOICE_TEACHER_URL ?? "http://192.0.2.52:8791"`
      (an env var, not a hardcoded LAN address baked into the script -
      someone else's household will have a different one; document the
      default in a comment as "this household's local 27B lane", never as a
@@ -145,7 +145,7 @@ Ready, then wait for start. Done: commit hash(es), check.sh pass line, the
 real drop rates per companion, whether all four completed or the eGPU
 interrupted it (and where). Blocked: exact error - if the teacher endpoint
 is unreachable when you start, confirm with `curl -sf -m 5
-http://172.19.210.52:8791/health` before reporting blocked, since this
+http://192.0.2.52:8791/health` before reporting blocked, since this
 laptop's eGPU is known to be flaky and may need another wake cycle (ask the
 coordinator, don't try to SSH into laptop infrastructure yourself - that's
 homelab access, out of scope for this item). Question: only if the
