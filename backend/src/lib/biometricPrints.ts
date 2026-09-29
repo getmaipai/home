@@ -25,6 +25,7 @@ import { newBiometricPrintId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
 import { canManage } from "@/lib/personLifecycle";
+import { SFACE_DIM, SFACE_MODEL_ID, SFACE_SHA256 } from "@/lib/faceModelPins";
 import type { PersonRow } from "@/types";
 import { validateBiometricPrint } from "@maipai/spec/records/ts/validate.js";
 import { BiometricPrint } from "@maipai/spec/gen/ts/biometric-print.js";
@@ -44,7 +45,7 @@ export type BiometricPrintSummary = Omit<BiometricPrintT, "embedding">;
 // (CAM++, hub-side per the design record) has no verified pin yet -
 // added here the day that lands, never assumed.
 const KNOWN_MODELS: Record<string, { modality: "face" | "voice"; sha256: string; dim: number }> = {
-  "sface-2021dec": { modality: "face", sha256: "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79", dim: 128 },
+  [SFACE_MODEL_ID]: { modality: "face", sha256: SFACE_SHA256, dim: SFACE_DIM },
 };
 
 function toSummary(row: PrintRow): BiometricPrintSummary {
