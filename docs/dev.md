@@ -31441,3 +31441,69 @@ Full reasoning, confidence levels, and the wire shape: BACKLOG's own
 FACE-03 entries (hub half here, bot half in `bot`'s `docs/BACKLOG.md`)
 carry the acceptance criteria; this section is the record of why the
 shape is what it is, not a duplicate of the checklist.
+
+## FACE-02E: a linear-ratio heuristic for head pose, not a PnP solve (2026-09-28)
+
+`frontend/src/lib/vision/headPose.ts` turns YuNet's five detected
+landmarks into the `yawDeg`/`pitchDeg` numbers `enrollmentSession.ts`'s
+`bucketPose()` already consumes (it has always taken them as an
+external input - the legacy code this repo ported from got them from a
+hardware pipeline never ported here, so there was nothing to port for
+this piece; see FACE-02A's own entry). This is the record a review
+correctly asked for: why a normalized 2D displacement heuristic, not a
+proper PnP (perspective-n-point) pose solve against a canonical 3D face
+model.
+
+**The decision:** a linear-ratio heuristic (nose displacement from the
+eye midpoint, normalized by inter-eye distance for yaw; nose
+displacement from the eye line, normalized by eye-to-mouth span, for
+pitch), with scale constants stated as uncalibrated starting values
+needing live-camera tuning - not a calibrated pose solve. **This is a
+UI guidance signal only, never a matching input**: identity matching
+uses exclusively the SFace embedding (FACE-02D), so a wrong pose bucket
+costs a re-prompt during enrollment, never a false match. That asymmetry
+is why the heuristic's simplicity is an acceptable starting point rather
+than a defect to fix before shipping: a PnP solve needs a canonical 3D
+face model and a real solver dependency for a guidance signal this
+tolerant of error, the same "a maintained library for a solved
+problem, never for a guidance nicety" reasoning CLAUDE.md's own
+platform principle 6 already applies elsewhere.
+
+**Known, named limitation (found by review, not covered by the
+function's original "not a calibrated 3D pose solve" caveat, which was
+too vague to warn against this specific failure): no roll correction.**
+The heuristic assumes the eye line is horizontal in the image. A person
+who tilts their head sideways while turning (roll, distinct from yaw or
+pitch) gets displacement mixed across both axes, since "nose above/below
+the eye line" and "nose left/right of eye midpoint" are no longer the
+right questions once the eye line itself is tilted. `faceAlign.ts`'s own
+`similarityTransform` already computes a rotation angle from these exact
+same five points for a different purpose (the alignment warp) - a
+follow-up could de-rotate by that angle before computing yaw/pitch,
+removing roll's contribution, but that is real added complexity this
+item did not attempt; the function's header comment now names roll
+explicitly as an unaddressed case, not a silently-covered one.
+
+**Also found by review and fixed in the same pass:** the two
+degenerate-input guards (`interEyeDist`, `eyeToMouth`) checked exact
+equality to zero, not a minimum magnitude - a near-degenerate detection
+(eyes a fraction of a pixel apart, plausible from a poor-quality
+in-progress capture during a near-profile turn, exactly where 5-point
+landmarks are least reliable) produced an unbounded, silently-accepted
+yaw or pitch instead of the intended error. Both guards now check a
+minimum-magnitude epsilon, not exact zero. The frontal template
+literals were also being hand-copied in three places (`faceAlign.ts`'s
+own `TEMPLATE`, `headPose.ts`'s `FRONTAL_NOSE_RATIO` derivation, and the
+test fixture); `TEMPLATE` is now exported from `faceAlign.ts` and
+imported by both, so a future recalibration of the template can't drift
+between copies unnoticed.
+
+**Out of scope, left for a live-camera tuning pass**: the scale
+constants' actual calibrated values (this item's own honest framing);
+roll correction (above); and per-person proportion variance (a child's
+face proportions differ from `faceAlign.ts`'s SFace template, which was
+built from adult reference data - a person whose proportions diverge
+enough from the template could see a nonzero `pitchDeg` while looking
+dead-on at the camera; real tuning against real faces, not just the
+synthetic template, is the fix, and it's the same live-camera work the
+scale constants already need).
