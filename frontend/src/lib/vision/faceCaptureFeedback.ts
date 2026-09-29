@@ -14,6 +14,7 @@ const REASON_TEXT: Record<string, string> = {
   off_target: "Not that way yet. Follow the step above.",
   bucket_full: "Got that one, hold on.",
   no_pose: "Hold still for a moment.",
+  turned_too_far: "Turn back a little.",
   calibrating: "Look straight at the screen and hold still.",
   no_face: "We can't see your face. Move into the frame.",
 };

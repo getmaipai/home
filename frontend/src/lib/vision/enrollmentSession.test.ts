@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { WEBCAM_ROWS } from "@/lib/vision/webcamMeasurements.fixture";
+import { RIGHT_TURN_ROWS } from "@/lib/vision/webcamRightTurn.fixture";
 import {
   assessQuality,
   bucketPose,
@@ -20,17 +21,23 @@ const good = (overrides: Parameters<typeof createFaceSample>[1] = {}) =>
   createFaceSample([1, 0], { boxFrac: 0.2, sharpness: 100, brightness: 128, ...overrides });
 
 describe("bucketPose", () => {
-  test("assigns the five guided poses and gives pitch priority over yaw", () => {
+  // FACE-02P: a turn decides from yaw alone; pitch only counts near frontal.
+  test("assigns the five guided poses and lets a turn decide from yaw, ignoring pitch", () => {
     expect(bucketPose(0, 0, cfg)).toBe("frontal");
     expect(bucketPose(20, 0, cfg)).toBe("left");
     expect(bucketPose(-20, 0, cfg)).toBe("right");
     expect(bucketPose(0, 16, cfg)).toBe("up");
     expect(bucketPose(0, -16, cfg)).toBe("down");
-    expect(bucketPose(20, -16, cfg)).toBe("down");
+    expect(bucketPose(20, -16, cfg)).toBe("left");
+    expect(bucketPose(-20, 16, cfg)).toBe("right");
+    expect(bucketPose(5, 16, cfg)).toBe("up");
+    expect(bucketPose(-5, -16, cfg)).toBe("down");
   });
 
-  test("leaves the gap between frontal and turn angles unbucketed", () => {
+  test("leaves the gap between frontal and turn angles unbucketed, tilted or not", () => {
     expect(bucketPose(15, 0, cfg)).toBeNull();
+    // FACE-02P: real row (yaw -13.8, pitch +16 over baseline): mid-turn, not an Up.
+    expect(bucketPose(-13.8, 16, cfg)).toBeNull();
   });
 });
 
@@ -236,12 +243,14 @@ describe("FACE-02K: the quality bar against real webcam frames", () => {
 });
 
 describe("FACE-02K: junk poses are no pose", () => {
-  const junk = WEBCAM_ROWS.filter((row) => Math.abs(row.yawDeg) > 90);
+  // FACE-02P: the three run-1 yaws (-208.6, -347, -649.9) are a head turned
+  // too far round, not junk; they get their own reason, never register.
+  const tooFarRound = WEBCAM_ROWS.filter((row) => Math.abs(row.yawDeg) > 90);
 
-  test("the three absurd-yaw rows are rejected as no_pose and never counted", () => {
-    expect(junk).toHaveLength(3);
+  test("the three huge-yaw rows are turned_too_far (not no_pose) and never counted", () => {
+    expect(tooFarRound).toHaveLength(3);
     const session = new EnrollmentSession("iris", spec({ shotsPerPose: 1 }));
-    for (const row of junk) expect(session.offer(asSample({ ...row, boxFrac: 0.12 }))).toMatchObject({ accepted: false, reason: "no_pose" });
+    for (const row of tooFarRound) expect(session.offer(asSample({ ...row, boxFrac: 0.12 }))).toMatchObject({ accepted: false, reason: "turned_too_far" });
     expect(session.status().shots).toBe(0);
     expect(session.status().pitchBaselineDeg).toBeNull();
   });
@@ -251,14 +260,16 @@ describe("FACE-02K: junk poses are no pose", () => {
     expect(session.offer(good({ pitchDeg: 75 })).reason).toBe("no_pose");
     expect(session.offer(good({ pitchDeg: -61 })).reason).toBe("no_pose");
     expect(session.offer(good({ yawDeg: Number.NaN })).reason).toBe("no_pose");
-    expect(session.offer(good({ yawDeg: 91 })).reason).toBe("no_pose");
+    expect(session.offer(good({ yawDeg: 1500 })).reason).toBe("no_pose");
+    expect(session.offer(good({ yawDeg: -1500 })).reason).toBe("no_pose");
+    expect(session.offer(good({ yawDeg: Number.POSITIVE_INFINITY })).reason).toBe("no_pose");
     expect(session.status().shots).toBe(0);
   });
 
-  test("a junk frame never reaches a later step either", () => {
+  test("a frame turned too far round never reaches a later step either", () => {
     const session = new EnrollmentSession("iris", spec({ shotsPerPose: 1 }));
     for (const s of [good(), good({ yawDeg: 20 }), good({ yawDeg: -20 })]) session.offer(s);
-    expect(session.offer(good({ yawDeg: -347, pitchDeg: 12 })).reason).toBe("no_pose");
+    expect(session.offer(good({ yawDeg: -347, pitchDeg: 12 })).reason).toBe("turned_too_far");
     expect(session.currentTarget()).toBe("up");
   });
 });
@@ -335,5 +346,113 @@ describe("FACE-02K: up and down are judged against the person's own straight ahe
       expect(session.offer(good({ pitchDeg: height + 10 })).accepted).toBe(false);
       expect(session.offer(good({ pitchDeg: height + 12 })).accepted).toBe(true);
     }
+  });
+});
+
+// FACE-02P: Jesse's second real run (webcamRightTurn.fixture.ts). Turning
+// right raised the estimated pitch by 10 to 25 degrees over the baseline,
+// FACE-02K's precedence checked pitch first, so every real right turn was
+// bucketed "up" and dropped as off_target.
+describe("FACE-02P: a turn is decided from yaw, whatever the pitch does", () => {
+  const BASELINE = -14.8;
+  const row = (index: number) => RIGHT_TURN_ROWS[index]!;
+  const asRight = (r: (typeof RIGHT_TURN_ROWS)[number]) =>
+    createFaceSample([1, 0], {
+      yawDeg: r.yawDeg, pitchDeg: r.pitchDeg, boxFrac: r.boxFrac, sharpness: r.sharpness, brightness: r.brightness,
+    });
+  // A session with the baseline at -14.8 (five straight frames at that
+  // pitch) and the given turns done, so the step after them is current.
+  const atStep = (turns: number[] = [25]) => {
+    const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+    for (let i = 0; i < 5; i += 1) session.offer(good({ pitchDeg: BASELINE }));
+    for (const yawDeg of turns) session.offer(good({ yawDeg, pitchDeg: BASELINE }));
+    return session;
+  };
+  const genuineRight = [10, 22, 24, 15, 17];
+
+  test("the five genuine right-turn rows register as Right (they were all off_target before)", () => {
+    for (const index of genuineRight) {
+      const session = atStep();
+      expect(session.currentTarget()).toBe("right");
+      expect(session.status().pitchBaselineDeg).toBe(BASELINE);
+      expect(row(index).reason).toBe("off_target");
+      expect(session.offer(asRight(row(index)))).toMatchObject({ accepted: true, reason: "ok" });
+      expect(session.status().buckets[2]).toMatchObject({ pose: "right", count: 1 });
+    }
+    // the coupling is real: every one sits 13 to 30 degrees over the
+    // baseline, past the 11 that used to mean Up
+    for (const i of genuineRight) {
+      const over = row(i).pitchDeg - BASELINE;
+      expect(over).toBeGreaterThan(cfg.updownMinPitch);
+      expect(over).toBeLessThan(30);
+    }
+  });
+
+  test("a Left turn with the same pitch coupling registers Left", () => {
+    for (const index of genuineRight) {
+      const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+      for (let i = 0; i < 5; i += 1) session.offer(good({ pitchDeg: BASELINE }));
+      expect(session.currentTarget()).toBe("left");
+      const mirrored = createFaceSample([1, 0], { ...asRight(row(index)), yawDeg: -row(index).yawDeg });
+      expect(session.offer(mirrored)).toMatchObject({ accepted: true, reason: "ok" });
+      expect(session.currentTarget()).toBe("right");
+    }
+  });
+
+  test("an Up tilt with a little yaw wobble still registers Up, a Down tilt Down", () => {
+    for (const yawDeg of [-11, -5, 0, 6, 11]) {
+      const session = atStep([25, -25]);
+      expect(session.currentTarget()).toBe("up");
+      expect(session.offer(good({ yawDeg, pitchDeg: BASELINE + 12 }))).toMatchObject({ accepted: true, reason: "ok" });
+      expect(session.currentTarget()).toBe("down");
+      expect(session.offer(good({ yawDeg, pitchDeg: BASELINE - 12 }))).toMatchObject({ accepted: true, reason: "ok" });
+    }
+  });
+
+  test("a mid-turn frame between 12 and 18 degrees of yaw is never an Up", () => {
+    const session = atStep([25, -25]);
+    expect(session.currentTarget()).toBe("up");
+    // real row 13: yaw -13.8, pitch +1.3, 16 degrees over the baseline
+    expect(session.offer(asRight(row(13)))).toMatchObject({ accepted: false, reason: "between_angles" });
+  });
+
+  test("the calibration frames do not register", () => {
+    const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+    expect(session.offer(asRight(row(0)))).toMatchObject({ accepted: false, reason: "calibrating" });
+    expect(session.offer(asRight(row(1)))).toMatchObject({ accepted: false, reason: "calibrating" });
+    expect(session.status().shots).toBe(0);
+  });
+
+  test("replaying the whole run at the Right step: too-far-round frames never register, the first real turn does", () => {
+    const session = atStep();
+    const log = RIGHT_TURN_ROWS.slice(2).map((r) => ({ r, out: session.offer(asRight(r)) }));
+    const tooFar = log.filter(({ r }) => r.reason === "no_pose");
+    expect(tooFar.map(({ r }) => r.yawDeg)).toEqual([-168, -383.2, -100.6, -229.2, -111.4, -101.7]);
+    for (const { out } of tooFar) expect(out).toMatchObject({ accepted: false, reason: "turned_too_far" });
+    const accepted = log.filter(({ out }) => out.accepted);
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]!.r).toBe(row(10));
+    // a leftward row stays off target at the Right step, the in-between one stays in between
+    expect(log.find(({ r }) => r.yawDeg === 27)!.out.reason).toBe("off_target");
+    expect(log.find(({ r }) => r.yawDeg === -15.7)!.out.reason).toBe("between_angles");
+    // a real turn whose face box shrank is a distance problem, said as such
+    expect(log.find(({ r }) => r.yawDeg === -65.1)!.out.reason).toBe("too_far");
+  });
+
+  test("the baseline from five straight frames is close to the median of every straight frame in the run", () => {
+    const straight = RIGHT_TURN_ROWS.filter((r) => Math.abs(r.yawDeg) <= 12 && assessQuality(asRight(r), cfg).ok);
+    expect(Math.abs(median(straight.map((r) => r.pitchDeg)) - BASELINE)).toBeLessThan(2);
+  });
+});
+
+describe("FACE-02P: turned too far round is its own reason, junk stays no_pose", () => {
+  test("the bound is 90 degrees for 'too far round' and 1000 for junk", () => {
+    expect(cfg.maxYaw).toBe(90);
+    expect(cfg.junkYaw).toBe(1000);
+    const session = new EnrollmentSession("iris", spec());
+    expect(session.offer(good({ yawDeg: 90 })).reason).not.toBe("turned_too_far");
+    expect(session.offer(good({ yawDeg: 90.1 })).reason).toBe("turned_too_far");
+    expect(session.offer(good({ yawDeg: -1000 })).reason).toBe("turned_too_far");
+    expect(session.offer(good({ yawDeg: -1000.1 })).reason).toBe("no_pose");
   });
 });

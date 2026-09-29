@@ -13,8 +13,15 @@ export interface QualityConfig {
   /** Before the baseline exists: the generous absolute pitch window inside
    * which a frontal-yaw frame counts as looking straight ahead. */
   frontalWindowPitch: number;
-  /** A yaw or pitch beyond these is not a pose at all (a landmark glitch). */
+  /** Beyond this yaw the head is turned too far round: a real pose the
+   * person should back off from (turned_too_far), never registered. The
+   * yaw estimate divides by the inter-eye distance, which collapses toward
+   * profile, so a real turn past profile reads -100 to -650. */
   maxYaw: number;
+  /** Beyond this yaw (or a non-finite value) the input is unusable
+   * (no_pose): about 1.5x the largest real profile reading (-649.9). */
+  junkYaw: number;
+  /** A pitch beyond this is not a pose at all (a landmark glitch). */
   maxPitch: number;
 }
 
@@ -38,6 +45,7 @@ export const DEFAULT_QUALITY_CONFIG: Readonly<QualityConfig> = Object.freeze({
   updownMinPitch: 11,
   frontalWindowPitch: 35,
   maxYaw: 90,
+  junkYaw: 1000,
   maxPitch: 60,
 });
 
@@ -86,12 +94,17 @@ export function createFaceSample(
   };
 }
 
-/** `pitchDeg` is relative to the person's own straight ahead once known. */
+/** `pitchDeg` is relative to the person's own straight ahead once known.
+ * FACE-02P: yaw decides first. Under a turn the pitch estimate is not
+ * trustworthy (the nose landmark shifts as the head turns, docs/dev.md), so
+ * a turn is left or right whatever the pitch says. Pitch counts only near
+ * frontal (|yaw| within frontalMaxYaw); the band between frontal and a turn
+ * is between_angles, tilted or not. */
 export function bucketPose(yawDeg: number, pitchDeg: number, cfg: QualityConfig): Pose | null {
-  if (Math.abs(pitchDeg) >= cfg.updownMinPitch) return pitchDeg > 0 ? "up" : "down";
-  if (Math.abs(yawDeg) <= cfg.frontalMaxYaw) return "frontal";
   if (Math.abs(yawDeg) >= cfg.turnMinYaw) return yawDeg > 0 ? "left" : "right";
-  return null;
+  if (Math.abs(yawDeg) > cfg.frontalMaxYaw) return null;
+  if (Math.abs(pitchDeg) >= cfg.updownMinPitch) return pitchDeg > 0 ? "up" : "down";
+  return "frontal";
 }
 
 export interface QualityAssessment {
@@ -178,6 +191,9 @@ export class EnrollmentSession {
     // An absurd yaw or pitch (a landmark glitch mid-motion) is no pose at
     // all: never bucketed, never a baseline sample, never accepted.
     if (!hasUsablePose(sample, this.spec.quality)) return this.result(false, "no_pose");
+    // FACE-02P: a head turned too far round is a pose, not junk: it gets its
+    // own reason ("Turn back a little.") and never registers.
+    if (Math.abs(sample.yawDeg) > this.spec.quality.maxYaw) return this.result(false, "turned_too_far");
     const quality = assessQuality(sample, this.spec.quality);
     if (!quality.ok) return this.result(false, quality.reason);
 
@@ -321,7 +337,7 @@ export class EnrollmentSession {
 
 function hasUsablePose(sample: FaceSample, cfg: QualityConfig): boolean {
   return Number.isFinite(sample.yawDeg) && Number.isFinite(sample.pitchDeg)
-    && Math.abs(sample.yawDeg) <= cfg.maxYaw && Math.abs(sample.pitchDeg) <= cfg.maxPitch;
+    && Math.abs(sample.yawDeg) <= cfg.junkYaw && Math.abs(sample.pitchDeg) <= cfg.maxPitch;
 }
 
 function median(values: readonly number[]): number {

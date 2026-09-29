@@ -26,6 +26,13 @@ describe("captureFeedbackText", () => {
     expect(captureRing("no_pose")).toBe("yellow");
   });
 
+  // FACE-02P: a head turned too far round is told to come back, not "hold still".
+  test("turned_too_far says to turn back a little, and the ring stays yellow", () => {
+    expect(captureFeedbackText("turned_too_far")).toBe("Turn back a little.");
+    expect(captureFeedbackText("turned_too_far", "right")).toBe("Turn back a little.");
+    expect(captureRing("turned_too_far")).toBe("yellow");
+  });
+
   test("falls back to a generic instruction for an unknown reason", () => {
     expect(captureFeedbackText("something_new")).toBe("Hold still.");
   });

@@ -32445,7 +32445,8 @@ degrade. `EnrollmentSession` now keeps a per-enrollment baseline:
   their own median is +7.5, so none would register a false Up).
   Left and right are unchanged in meaning: pitch still has priority, so a
   turn with more than 11 degrees of pitch scatter is dropped as off target,
-  which costs a frame, never a wrong shot.
+  which costs a frame, never a wrong shot. (Wrong: FACE-02P found this
+  dropped every real right turn, and made yaw decide first.)
 - This is a calibration by measurement, not a word rule: one median and
   one threshold, in `EnrollmentSession.judgePose`.
 
@@ -32453,6 +32454,8 @@ degrade. `EnrollmentSession` now keeps a per-enrollment baseline:
 or a non-finite value returns `no_pose` before anything else is looked at:
 never bucketed, never a baseline sample, never accepted, so it cannot enter
 the accepted-shot averages either. Feedback: "Hold still for a moment."
+(FACE-02P: the bound for yaw moved from 90 to 1000; 90 to 1000 is now
+`turned_too_far`, "Turn back a little.")
 
 **The bar (one bar, no second tier).**
 
@@ -32527,7 +32530,7 @@ scale, one set, no volume control.
 | none (no face yet) | scanning tick, repeats | sine | 700 Hz | 0.02 | 35 ms blip every 1400 ms |
 | yellow (seen, below the bar) | soft pulse, repeats | triangle | 880 Hz | 0.05 | 110 ms blip every 550 ms |
 | green (clears the bar) | held ready tone | sine | 1175 Hz | 0.05 | 80 ms fade in, held while green, 120 ms fade out |
-| shot registered | chime, once | sine x2 | 1568 Hz and 2349 Hz (a fifth) | 0.12 and 0.04 | 5 ms attack, exponential decay over 700 ms |
+| shot registered | chime, once | sine x2 | 1568 Hz and 2349 Hz (a fifth) | 0.12 and 0.04 | 5 ms attack, exponential decay over 260 ms (700 ms until FACE-02P) |
 
 Each blip is one oscillator through its own gain node (0 to peak in 8 ms,
 linear back to 0). Every oscillator and gain node is disconnected in
@@ -32545,7 +32548,7 @@ then keeps sounding for the 1.2 s hold the ring holds green.
   ends where it began gives nothing.
 - The scanning tick stops when a face is found; leaving green fades the
   held tone.
-- The chime never overlaps itself (a second one inside 700 ms is dropped).
+- The chime never overlaps itself (a second one inside 260 ms is dropped).
 - Autoplay: there is no separate start button (adding one would be a
   hand-built control), so the context is created and resumed when the page
   mounts, which works after the "Enroll" click because a client-side route
@@ -32602,6 +32605,153 @@ registered shot and none for a rejected frame, unmount, hidden tab, sounds
 off means zero contexts and zero nodes, ring motion per state),
 `faceCaptureFeedback.test.ts` (`captureMotion`, nothing animates without
 `motion-safe:`).
+
+## FACE-02P: a turn is decided from yaw; too far round is its own reason; a shorter chime (2026-09-29, #200)
+
+Jesse's second real enrollment (same laptop webcam, on FACE-02K plus
+FACE-02M): the frontal and Left steps completed, the Right step never
+registered, and the chime was too long. The 28 console rows of the Right
+step are kept as `frontend/src/lib/vision/webcamRightTurn.fixture.ts` and
+replayed by the tests. The bug shipped in FACE-02K's precedence (pitch
+checked before yaw). It was not caught because the 46 measured frames of
+FACE-02K held no deliberate turn or tilt, so nothing exercised the order
+of the checks; the FACE-02K-2 follow-up now also asks for a deliberate
+motion capture set as a fixture.
+
+**Why the Right step failed.** With the baseline at -14.8, every genuine
+right turn read 13 to 30 degrees ABOVE it, past `updownMinPitch` (11), and
+`bucketPose` checked pitch first, so the frame was bucketed "up" and
+dropped as `off_target`:
+
+| yaw | pitch | over the -14.8 baseline | boxFrac | sharpness |
+|---|---|---|---|---|
+| -49 | +9.8 | +24.6 | 0.121 | 504 |
+| -36.4 | +14.6 | +29.4 | 0.092 | 494 |
+| -31.8 | +11.7 | +26.5 | 0.080 | 305 |
+| -31.3 | +6.6 | +21.4 | 0.107 | 291 |
+| -23.5 | -0.9 | +13.9 | 0.149 | 592 |
+
+All five clear the quality bar and were judged `off_target`. The Left turn
+had the same shape in the first run (a yaw 53.8 row read pitch +1.0, about
+15 over a baseline of this size) and registered only through a milder row
+(yaw 22.8, pitch -7.7); the same coupling is expected on both sides, and
+the Left test mirrors the right rows.
+
+**Why pitch moves with yaw (what is confirmed and what is not).** In
+`headPose.ts`, `yawDeg` is the nose's horizontal offset from the eye
+midpoint divided by the inter-eye distance, and `pitchDeg` is the nose's
+vertical distance below the eye line divided by the eye-to-mouth span,
+minus the template's ratio. Both come from the same nose landmark and
+neither has a term for the other angle. So anything that moves the nose
+landmark vertically while the head turns lands directly in pitch, and the
+turn itself does: the nose tip sits in front of the face plane, the
+detector places the far-side eye and the nose from a foreshortened face,
+and the camera sits below eye level. The formula and the rows confirm the
+pathway (between yaw -23 and -49 the pitch sat 14 to 29 degrees over the
+baseline, and the too-far-round rows past profile sat 15 to 26 over it). The exact cause of the
+vertical shift (landmark placement versus perspective) was NOT isolated
+from these rows, and it does not need to be: the rule below does not depend
+on it.
+
+**The order change.** `bucketPose` now decides in this order:
+
+1. `|yaw| >= turnMinYaw` (18): left (yaw positive) or right (negative),
+   pitch ignored. Under a turn the pitch estimate is not trustworthy.
+2. `|yaw| > frontalMaxYaw` (12): no pose (`between_angles`), tilted or not.
+3. Only now, with the head near frontal: `|pitch| >= updownMinPitch` is up
+   or down.
+4. Otherwise frontal.
+
+One deliberate choice beyond the brief's wording: pitch is trusted only for
+`|yaw| <= 12`, not for `|yaw| < 18`. The run shows the coupling already at
+small yaws (yaw -8 read pitch -3.7 and yaw -13.8 read +1.3, 11 and 16 over
+the baseline), so a mid-turn frame in the 12 to 18 band must not become an
+Up. It costs a frame, never a wrong shot. An Up or Down tilt with a yaw
+wobble under 12 still buckets by pitch (tested at -11, -5, 0, 6 and 11).
+The strict per-step rule (FACE-02I) is unchanged.
+
+**The pitch baseline, checked against the data.** The run-2 baseline of
+-14.8 came from the five frontal frames the session took (the tail of the
+run holds two of them, -17.7 and -13.5). The median of every straight
+frame in the CSV that clears the bar (|yaw| within 12) is -13.65, 1.2
+degrees from -14.8, and their scatter is about 4 degrees, so a five-frame
+median has an error of about 1.8. That is stable enough and no change was
+made. One caution kept in the record: the coupling appears already at yaw
+8 to 10 in a few rows (one at yaw -8 read -3.7 against a straight median of
+-13.6), so a baseline window of 12 degrees can take one contaminated frame;
+the median of five absorbs one outlier, and tightening the window would be
+fitted to four or five rows, which is not enough data.
+
+**Turned too far round.** The yaw estimate divides by the inter-eye
+distance, which collapses toward profile, so a head that goes a little too
+far produces -100.6, -101.7, -111.4, -168, -229.2 and -383.2 here, and
+-208.6, -347 and -649.9 in the first run. Those are real turns, not
+glitches. FACE-02K's junk bound (90) wrongly reported them as `no_pose`
+("Hold still for a moment.").
+
+| Range of \|yaw\| | Reason | Words | Registers |
+|---|---|---|---|
+| up to 90 | judged normally | | as before |
+| over 90, up to 1000 | `turned_too_far` (new) | "Turn back a little." | never |
+| over 1000, non-finite, or \|pitch\| over 60 | `no_pose` | "Hold still for a moment." | never |
+
+`maxYaw` (90) is now the too-far-round bound and the new `junkYaw` (1000)
+is the junk bound: about 1.5 times the largest real profile reading in the
+two runs (-649.9). The head-pose code clamps the inter-eye distance at 3 px
+and a face box is around 100 px wide, so an honest reading cannot exceed
+about 2300; 1000 is a measured-range number, not a derived limit. The
+reason is checked right after the junk check and before the quality bar,
+as `no_pose` always was, so a turned face whose box shrank still says to
+turn back. The ring is yellow for it (`captureRing`'s default), the sound
+cue is the yellow soft pulse (`cueForRing`), and it is never a baseline
+sample.
+
+Two rows are left as they were: yaw -65.1 and -47.2 with a shrunken box
+(0.063 and 0.076) are `too_far` (distance), which is what the box says.
+
+**The chime, shorter** (`CHIME` in `faceCaptureSounds.ts`; the other three
+cues are untouched):
+
+| | Was | Now |
+|---|---|---|
+| partials | 1568 Hz (gain 0.12), 2349 Hz (0.04) | unchanged |
+| attack | 5 ms | 5 ms |
+| decay | exponential, 700 ms | exponential, 260 ms |
+| voice stop | 720 ms | 280 ms |
+| overlap guard | 700 ms | 260 ms |
+
+Nobody who worked on this can hear it. The test proves the numbers (the
+duration is 250 to 300 ms, the attack at most 10 ms, the two pitches
+unchanged, every voice stopped by 320 ms). Whether 260 ms sounds crisp is
+Jesse's call.
+
+**Tests changed, and why.** `bucketPose`'s "pitch has priority over yaw"
+test now says the opposite for the turn cases (yaw 20 with pitch -16 is
+left, not down) and adds the in-between band. The FACE-02K junk tests: the
+three huge-yaw rows of run 1 are now `turned_too_far`, and the absurd-yaw
+cases use 1500 and infinity for `no_pose` (the old 91 is now too far
+round). The chime overlap test follows `CHIME.durationMs`. New: the five
+genuine right rows each register Right at a -14.8 baseline, the same rows
+mirrored register Left, an Up and a Down with yaw wobble still register,
+the yaw -13.8 mid-turn row is `between_angles`, the calibrating rows do
+not register, the whole run replayed at the Right step accepts exactly one
+frame (the first genuine turn) and gives all six too-far-round rows the
+new reason, and the feedback wording and ring.
+
+**Not measured.**
+
+- A deliberate Up and a deliberate Down tilt: STILL unmeasured. Jesse has
+  not reached those steps since the calibration change, so 11 relative is
+  a human-range figure.
+- The coupling of pitch to yaw at small yaws when a person returns from a
+  turn to the Up step: a frame at yaw -8 with pitch 11 over the baseline
+  would still register Up. Not fixed, because the correction would be fitted
+  to a handful of rows; the deliberate-motion capture set in FACE-02K-2
+  should settle it.
+- Any other camera or person.
+- How the shortened chime sounds.
+
+Follow-up wording added to FACE-02K-2 in `docs/BACKLOG.md`.
 
 ## MDNS-COLLISION-01 landed (#193)
 
