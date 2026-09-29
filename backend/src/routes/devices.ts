@@ -6,8 +6,10 @@
 // feature; nothing in this wave's contract asks for one).
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { requireAuth, requireRole } from "@/middleware/auth";
+import { requireAuth, requireRole, requireDeviceSession } from "@/middleware/auth";
 import { listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById } from "@/lib/devices";
+import { getDeviceState, resolveRequestDevice, upsertDeviceState } from "@/lib/deviceStates";
+import { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import { discoverRobots } from "@/lib/robotDiscovery";
 import { rotateRobotPassword, RobotPasswordRotationError } from "@/lib/robotSsh";
 import { storeRobotCredential, hasRotatedRobotCredential, getRobotCredential, getMostRecentRobotCredentialForHost } from "@/lib/robotCredentials";
@@ -26,6 +28,16 @@ const DeviceSchema = z.object({
   // renders it; carried here so that page has something to read once it
   // exists.
   capabilities: z.array(z.string()),
+  state: z.object({
+    activity: z.enum(["starting", "idle", "listening", "thinking", "speaking"]),
+    muted: z.boolean(),
+    tracking: z.boolean(),
+    on_battery: z.boolean().nullable(),
+    battery_level: z.number().nullable(),
+    daemon_version: z.string().nullable(),
+    reachable: z.boolean(),
+    unreachableSince: z.string().nullable(),
+  }).nullable(),
 });
 
 const listRoute = createRoute({
@@ -42,7 +54,7 @@ devicesRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
   const devices = listDevicesForPerson(actor.id);
   return c.json(
-    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities })),
+    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, state: d.kind === "robot" ? getDeviceState(d.id) : null })),
     200,
   );
 });
@@ -63,9 +75,28 @@ const listRobotsRoute = createRoute({
 devicesRoutes.openapi(listRobotsRoute, (c) => {
   const robots = listDevicesByKind("robot");
   return c.json(
-    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities })),
+    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, state: getDeviceState(d.id) })),
     200,
   );
+});
+
+const updateMyStateRoute = createRoute({
+  method: "put",
+  path: "/me/state",
+  tags: ["Devices"],
+  summary: "Report the current state of this paired robot",
+  middleware: [requireDeviceSession("robot")] as const,
+  request: { body: { content: { "application/json": { schema: RobotState } } } },
+  responses: {
+    204: { description: "State frame accepted." },
+    ...errorResponses({ 400: "Malformed state frame", 401: "Not signed in at all", 403: "Signed in, but not a robot device" }),
+  },
+});
+devicesRoutes.openapi(updateMyStateRoute, (c) => {
+  const device = resolveRequestDevice(c);
+  if (!device) return c.json({ error: "Not signed in" }, 401);
+  upsertDeviceState(device.id, c.req.valid("json"));
+  return c.body(null, 204);
 });
 
 const deleteRoute = createRoute({

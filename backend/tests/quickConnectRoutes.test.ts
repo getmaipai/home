@@ -3,6 +3,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetQuickConnectForTests } from "@/lib/quickConnect";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import type { DeviceState } from "@/lib/deviceStates";
 
 beforeEach(() => {
   resetDb();
@@ -43,9 +44,18 @@ describe("Quick Connect end to end", () => {
 
     // A device row now shows up under the approving person's own list.
     const devicesRes = await phone.get("/api/devices");
-    const devices = (await devicesRes.json()) as Array<{ id: string; name: string; kind: string; area: string | null; lastSeenAt: string | null; createdAt: string; capabilities: string[] }>;
+    const devices = (await devicesRes.json()) as Array<{
+      id: string;
+      name: string;
+      kind: string;
+      area: string | null;
+      lastSeenAt: string | null;
+      createdAt: string;
+      capabilities: string[];
+      state: DeviceState | null;
+    }>;
     expect(devices).toEqual([
-      { id: expect.any(String), name: "Living room TV", kind: "tv", area: null, lastSeenAt: expect.any(String), createdAt: expect.any(String), capabilities: [] },
+      { id: expect.any(String), name: "Living room TV", kind: "tv", area: null, lastSeenAt: expect.any(String), createdAt: expect.any(String), capabilities: [], state: null },
     ]);
   });
 

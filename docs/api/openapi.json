@@ -12085,6 +12085,57 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "state": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "activity": {
+                            "type": "string",
+                            "enum": [
+                              "starting",
+                              "idle",
+                              "listening",
+                              "thinking",
+                              "speaking"
+                            ]
+                          },
+                          "muted": {
+                            "type": "boolean"
+                          },
+                          "tracking": {
+                            "type": "boolean"
+                          },
+                          "on_battery": {
+                            "type": "boolean",
+                            "nullable": true
+                          },
+                          "battery_level": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "daemon_version": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reachable": {
+                            "type": "boolean"
+                          },
+                          "unreachableSince": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "activity",
+                          "muted",
+                          "tracking",
+                          "on_battery",
+                          "battery_level",
+                          "daemon_version",
+                          "reachable",
+                          "unreachableSince"
+                        ]
                       }
                     },
                     "required": [
@@ -12094,7 +12145,8 @@
                       "area",
                       "lastSeenAt",
                       "createdAt",
-                      "capabilities"
+                      "capabilities",
+                      "state"
                     ]
                   }
                 }
@@ -12153,6 +12205,57 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "state": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "activity": {
+                            "type": "string",
+                            "enum": [
+                              "starting",
+                              "idle",
+                              "listening",
+                              "thinking",
+                              "speaking"
+                            ]
+                          },
+                          "muted": {
+                            "type": "boolean"
+                          },
+                          "tracking": {
+                            "type": "boolean"
+                          },
+                          "on_battery": {
+                            "type": "boolean",
+                            "nullable": true
+                          },
+                          "battery_level": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "daemon_version": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reachable": {
+                            "type": "boolean"
+                          },
+                          "unreachableSince": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "activity",
+                          "muted",
+                          "tracking",
+                          "on_battery",
+                          "battery_level",
+                          "daemon_version",
+                          "reachable",
+                          "unreachableSince"
+                        ]
                       }
                     },
                     "required": [
@@ -12162,9 +12265,140 @@
                       "area",
                       "lastSeenAt",
                       "createdAt",
-                      "capabilities"
+                      "capabilities",
+                      "state"
                     ]
                   }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/me/state": {
+      "put": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Report the current state of this paired robot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "activity": {
+                    "type": "string",
+                    "enum": [
+                      "starting",
+                      "idle",
+                      "listening",
+                      "thinking",
+                      "speaking"
+                    ],
+                    "description": "The robot's current interaction phase, so the hub can show an accurate Devices-page card, including the distinct startup state."
+                  },
+                  "muted": {
+                    "type": "boolean",
+                    "description": "Whether the robot's microphone is muted, so the card can show when it cannot hear the household."
+                  },
+                  "tracking": {
+                    "type": "boolean",
+                    "description": "Whether the robot's tracking behavior is active, so the card can expose that live device state."
+                  },
+                  "on_battery": {
+                    "anyOf": [
+                      {
+                        "type": "boolean",
+                        "description": "Whether the robot is running on battery power. Null means its body cannot tell; Reachy Mini always sends null per section 7 of the design record. Omission means the producer does not yet report this field."
+                      },
+                      {
+                        "nullable": true,
+                        "description": "Whether the robot is running on battery power. Null means its body cannot tell; Reachy Mini always sends null per section 7 of the design record. Omission means the producer does not yet report this field."
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "description": "Whether the robot is running on battery power. Null means its body cannot tell; Reachy Mini always sends null per section 7 of the design record. Omission means the producer does not yet report this field."
+                  },
+                  "battery_level": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1,
+                        "description": "The available battery fraction from 0 to 1, allowing the Devices-page card to show charge when the robot reports it. Null means no level is currently known; omission means the producer does not yet report this field."
+                      },
+                      {
+                        "nullable": true,
+                        "description": "The available battery fraction from 0 to 1, allowing the Devices-page card to show charge when the robot reports it. Null means no level is currently known; omission means the producer does not yet report this field."
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "description": "The available battery fraction from 0 to 1, allowing the Devices-page card to show charge when the robot reports it. Null means no level is currently known; omission means the producer does not yet report this field."
+                  },
+                  "daemon_version": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "description": "The robot daemon version, when available, so the hub can display which software is running. Null means no version is currently known; omission means the producer does not yet report this field."
+                      },
+                      {
+                        "nullable": true,
+                        "description": "The robot daemon version, when available, so the hub can display which software is running. Null means no version is currently known; omission means the producer does not yet report this field."
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "description": "The robot daemon version, when available, so the hub can display which software is running. Null means no version is currently known; omission means the producer does not yet report this field."
+                  }
+                },
+                "required": [
+                  "activity",
+                  "muted",
+                  "tracking"
+                ],
+                "additionalProperties": false,
+                "description": "A hub-local projection of a paired robot's current state, keyed externally by device_id and never synced or given its own record identity (home docs/dev.md, ‘Robot device state’; bot docs/dev.md, ‘Robot device state’ pointer). It deliberately has no id, timestamps, or hlc. Battery and daemon fields may be omitted by producers that do not report them yet; explicit null means the body cannot tell or has no version to report. Reachy Mini always sends null for on_battery per section 7 of the design record."
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "State frame accepted."
+          },
+          "400": {
+            "description": "Malformed state frame",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in at all",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Signed in, but not a robot device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

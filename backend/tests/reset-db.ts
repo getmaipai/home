@@ -44,6 +44,7 @@ import {
   passkeyCredentials,
   totpSecrets,
   biometricPrints,
+  deviceStates,
   relationships,
   entities,
   openQuestions,
@@ -119,6 +120,7 @@ export function resetDb(): void {
   db.delete(sessions).run();
   db.delete(deviceTokens).run();
   db.delete(robotCredentials).run();
+  db.delete(deviceStates).run();
   db.delete(devices).run();
   db.delete(passkeyCredentials).run();
   db.delete(totpSecrets).run();
