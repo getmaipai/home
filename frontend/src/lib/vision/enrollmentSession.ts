@@ -8,30 +8,46 @@ export interface QualityConfig {
   maxBrightness: number;
   frontalMaxYaw: number;
   turnMinYaw: number;
+  /** Degrees ABOVE or BELOW the person's own straight-ahead pitch (FACE-02K). */
   updownMinPitch: number;
+  /** Before the baseline exists: the generous absolute pitch window inside
+   * which a frontal-yaw frame counts as looking straight ahead. */
+  frontalWindowPitch: number;
+  /** A yaw or pitch beyond these is not a pose at all (a landmark glitch). */
+  maxYaw: number;
+  maxPitch: number;
 }
 
-// FACE-02J: one quality bar. A frame is green (accepted) only if it clears
-// minBoxFrac, minSharpness and the brightness range; nothing below it is
-// ever accepted. minBoxFrac and minSharpness are PROVISIONAL: the old
-// accept bar (0.10, 40) that demonstrably registered shots on a real laptop
-// webcam. Green therefore means "clears the old accept bar" until FACE-02K
-// sets a measured bar from real console numbers; raising it is that item's
-// job, not this one's (docs/dev.md, FACE-02J).
+// One quality bar (FACE-02J), set from a real webcam run (FACE-02K,
+// docs/dev.md): a frame is green (accepted) only if it clears minBoxFrac,
+// minSharpness and the brightness range. Only one camera has been
+// measured; other cameras are a FACE-02K follow-up in BACKLOG.md.
+//   minBoxFrac 0.08: leaning back read 0.05 to 0.06 (fails), ordinary
+//     seating 0.09 to 0.12 (passes).
+//   minSharpness 90: that camera reads 228 to 822, so a blurry frame stays
+//     yellow and its own frames clear the bar by 2.5x.
+//   updownMinPitch 11: degrees relative to the person's own straight ahead
+//     (the camera height varies, so an absolute pitch cannot be right).
 export const DEFAULT_QUALITY_CONFIG: Readonly<QualityConfig> = Object.freeze({
-  minBoxFrac: 0.1,
-  minSharpness: 40,
+  minBoxFrac: 0.08,
+  minSharpness: 90,
   minBrightness: 40,
   maxBrightness: 220,
   frontalMaxYaw: 12,
   turnMinYaw: 18,
-  updownMinPitch: 15,
+  updownMinPitch: 11,
+  frontalWindowPitch: 35,
+  maxYaw: 90,
+  maxPitch: 60,
 });
 
 export interface EnrollmentSpec {
   shotsPerPose: number;
   wearsGlasses: boolean;
   glassesShots: number;
+  /** Frontal frames that clear the bar before the frontal shot registers,
+   * so the pitch baseline is a median of several frames, not one. */
+  baselineFrames: number;
   quality: QualityConfig;
 }
 
@@ -40,6 +56,7 @@ export function createEnrollmentSpec(overrides: Partial<EnrollmentSpec> = {}): E
     shotsPerPose: overrides.shotsPerPose ?? 2,
     wearsGlasses: overrides.wearsGlasses ?? false,
     glassesShots: overrides.glassesShots ?? 2,
+    baselineFrames: overrides.baselineFrames ?? 5,
     quality: { ...DEFAULT_QUALITY_CONFIG, ...overrides.quality },
   };
 }
@@ -69,6 +86,7 @@ export function createFaceSample(
   };
 }
 
+/** `pitchDeg` is relative to the person's own straight ahead once known. */
 export function bucketPose(yawDeg: number, pitchDeg: number, cfg: QualityConfig): Pose | null {
   if (Math.abs(pitchDeg) >= cfg.updownMinPitch) return pitchDeg > 0 ? "up" : "down";
   if (Math.abs(yawDeg) <= cfg.frontalMaxYaw) return "frontal";
@@ -118,6 +136,9 @@ export interface PersonStatus {
   wearsGlasses: boolean;
   glassesOn: number;
   glassesOff: number;
+  /** The person's own straight-ahead pitch, fixed when the frontal step is
+   * complete; null until then. For the console diagnostics. */
+  pitchBaselineDeg: number | null;
 }
 
 // Exported (FACE-02) so the guided capture UI can show a pose's
@@ -139,6 +160,10 @@ export class EnrollmentSession {
   private readonly poseCounts: Record<Pose, number> = { frontal: 0, left: 0, right: 0, up: 0, down: 0 };
   private readonly glassesCounts: Record<"true" | "false", number> = { true: 0, false: 0 };
   private readonly acceptedEmbeddings: number[][] = [];
+  // FACE-02K: pitch of frontal frames that cleared the bar, gathered only
+  // while the frontal step is open; the median becomes the fixed baseline.
+  private readonly baselineSamples: number[] = [];
+  private pitchBaseline: number | null = null;
   private readonly poseQuality: Record<Pose, Array<[number, number]>> = {
     frontal: [], left: [], right: [], up: [], down: [],
   };
@@ -150,10 +175,13 @@ export class EnrollmentSession {
   }
 
   offer(sample: FaceSample): OfferResult {
+    // An absurd yaw or pitch (a landmark glitch mid-motion) is no pose at
+    // all: never bucketed, never a baseline sample, never accepted.
+    if (!hasUsablePose(sample, this.spec.quality)) return this.result(false, "no_pose");
     const quality = assessQuality(sample, this.spec.quality);
     if (!quality.ok) return this.result(false, quality.reason);
 
-    const pose = bucketPose(sample.yawDeg, sample.pitchDeg, this.spec.quality);
+    const pose = this.judgePose(sample);
     if (pose === null) return this.result(false, "between_angles");
     // FACE-02I: strict per-step capture. Only the pose being asked for
     // right now counts, so a transitional frame swinging past another
@@ -161,13 +189,32 @@ export class EnrollmentSession {
     if (pose !== this.currentTarget()) return this.result(false, "off_target");
     if (!this.needs(pose, sample.glasses)) return this.result(false, "bucket_full");
 
+    if (this.pitchBaseline === null) {
+      this.baselineSamples.push(sample.pitchDeg);
+      if (this.baselineSamples.length < this.spec.baselineFrames) return this.result(false, "calibrating");
+    }
+
     this.poseCounts[pose] += 1;
     this.poseQuality[pose].push([sample.sharpness, sample.boxFrac]);
     if (this.spec.wearsGlasses && pose === "frontal" && sample.glasses !== null) {
       this.glassesCounts[String(sample.glasses) as "true" | "false"] += 1;
     }
     this.acceptedEmbeddings.push(sample.embedding);
+    // No drift: the baseline is fixed the moment the frontal step is done.
+    if (this.pitchBaseline === null && this.poseCounts.frontal >= this.spec.shotsPerPose) {
+      this.pitchBaseline = median(this.baselineSamples);
+    }
     return this.result(true, "ok");
+  }
+
+  /** Up and down are judged against the person's own straight ahead (the
+   * camera is rarely at eye level). Before the baseline exists, a generous
+   * absolute window lets the frontal step complete. */
+  private judgePose(sample: FaceSample): Pose | null {
+    const cfg = this.spec.quality;
+    if (this.pitchBaseline !== null) return bucketPose(sample.yawDeg, sample.pitchDeg - this.pitchBaseline, cfg);
+    if (Math.abs(sample.yawDeg) <= cfg.frontalMaxYaw && Math.abs(sample.pitchDeg) <= cfg.frontalWindowPitch) return "frontal";
+    return bucketPose(sample.yawDeg, sample.pitchDeg, cfg);
   }
 
   embeddings(): number[][] {
@@ -211,6 +258,7 @@ export class EnrollmentSession {
       wearsGlasses: this.spec.wearsGlasses,
       glassesOn: this.glassesCounts.true,
       glassesOff: this.glassesCounts.false,
+      pitchBaselineDeg: this.pitchBaseline === null ? null : round(this.pitchBaseline, 1),
     };
   }
 
@@ -269,6 +317,17 @@ export class EnrollmentSession {
       nextInstruction: complete ? "all set, thanks" : this.nextInstruction(),
     };
   }
+}
+
+function hasUsablePose(sample: FaceSample, cfg: QualityConfig): boolean {
+  return Number.isFinite(sample.yawDeg) && Number.isFinite(sample.pitchDeg)
+    && Math.abs(sample.yawDeg) <= cfg.maxYaw && Math.abs(sample.pitchDeg) <= cfg.maxPitch;
+}
+
+function median(values: readonly number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
 function round(value: number, digits: number): number {
@@ -333,6 +392,7 @@ export class FaceGallery {
       wearsGlasses: false,
       glassesOn: 0,
       glassesOff: 0,
+      pitchBaselineDeg: null,
     });
   }
 

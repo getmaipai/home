@@ -25,7 +25,7 @@ describe("createFrameLogger", () => {
     createFrameLogger(sink, () => 1)(frame);
     const [label, payload] = sink.mock.calls[0]!;
     expect(String(label)).toContain("face capture");
-    expect(payload).toEqual({ sharpness: 61.2, boxFrac: 0.087, brightness: 118.5, yawDeg: 1.2, pitchDeg: -0.5, color: "yellow", reason: "blurry" });
+    expect(payload).toEqual({ sharpness: 61.2, boxFrac: 0.087, brightness: 118.5, yawDeg: 1.2, pitchDeg: -0.5, color: "yellow", reason: "blurry", pitchBaselineDeg: null });
   });
 });
 

@@ -32333,7 +32333,7 @@ carries the same verdict in words with an icon, and the ring exposes
 
 No new UI, nothing sent, nothing stored.
 
-**The bar is PROVISIONAL.** The numbers are the old accept bar (0.10 and
+**The bar was PROVISIONAL (set by FACE-02K, see below).** The numbers are the old accept bar (0.10 and
 40), nothing was raised, and the former solid numbers (0.14 and 90) are
 gone, not carried. Green therefore means "clears the old accept bar", not
 "a good enrollment shot", until FACE-02K sets a measured bar from Jesse's
@@ -32381,6 +32381,125 @@ next pose, soft is yellow with "a bit soft" and registers nothing, far is
 yellow with "closer", no face is neutral, the debug line appears, and a full
 five-pose walk saves five prints, logs five summary lines and never shows
 the "soft or far" text.
+
+## FACE-02K: the quality bar and the pitch baseline, set from a real webcam (2026-09-29, #199)
+
+Jesse ran a real enrollment on his laptop webcam (browser page, 4:3
+request) with FACE-02J's console line on. The frontal, left and right
+steps passed, then the Up step never registered and the ring sat on
+"move closer" for many frames. The tail of that run, 46 judged frames, is
+kept as `frontend/src/lib/vision/webcamMeasurements.fixture.ts` and the
+new tests replay it row by row. One camera, one person: everything below
+is a fact about that camera and is labelled as such.
+
+**What the 46 frames show.**
+
+| Measure | Data | What it means for the bar |
+|---|---|---|
+| sharpness | 228.4 to 822, median 579 | The old bar (40) and the original "solid" 90 are both far below it; sharpness was never why a frame failed. |
+| brightness | 101.1 to 146.8 | Well inside 40 to 220. Unchanged. |
+| boxFrac | 15 frames 0.050 to 0.076 (leaning back), 14 frames 0.083 to 0.097 (ordinary seating), 17 frames 0.104 to 0.179 | The old 0.10 bar failed 29 of 46 as "too far", including his ordinary seating. The old "solid" 0.14 was reached once (0.179). |
+| pitchDeg, 25 frames with yaw under 12 that pass the new bar | median -10.2, spread 6.2 (std), range -27.6 to -2.7 | Looking straight at the screen reads about -10, not 0. |
+| pitchDeg, all 46 | maximum +1.0 | The old Up bar (+15 absolute) was 14 degrees beyond anything in the data. |
+| yawDeg | three rows of -649.9, -347 and -208.6 during head motion | Not poses. |
+
+**Pitch sign, derived, not assumed.** `estimateHeadPose` computes
+`pitchDeg = ((eyeMidY - nose.y) / eyeToMouth - FRONTAL_NOSE_RATIO) * 200`.
+Image y grows downward. The nose tip sits in front of the eye line and
+below it. Tilt the head up (chin up, looking at the ceiling) and the nose
+tip, being forward of the pivot, swings upward in the image faster than
+the eyes: its vertical drop below the eyes shrinks by about `d*sin(a)` for a
+forward offset `d` and tilt `a`. So `nose.y - eyeMidY` shrinks, `eyeMidY -
+nose.y` grows, and pitch goes positive: positive is up, negative is down,
+which is what `bucketPose` (`pitchDeg > 0 ? "up" : "down"`) and the
+existing live check in `headPose.ts` (an exaggerated chin-up measured
+positive) already assume. The same geometry explains the -10 baseline: a
+camera below eye level sees the face from beneath, so a person looking
+straight at the screen already reads as tilted down from the camera's
+side.
+
+**Pitch is now relative to the person's own straight ahead.** Camera
+height varies (a laptop on a desk, a monitor on top, a tablet), so no
+fixed absolute pitch can be right: at his height Up needed about 25
+degrees of real tilt, where the face box shrinks and the landmarks
+degrade. `EnrollmentSession` now keeps a per-enrollment baseline:
+
+- While the frontal step is open, every frame that clears the quality bar,
+  is not junk, and has yaw within `frontalMaxYaw` (12) and absolute pitch
+  within `frontalWindowPitch` (35, generous on purpose: his straight-ahead
+  scatter ran to -27.6) is a baseline sample. Frames that fail the bar or
+  are turned are never samples.
+- The frontal shot registers only once `baselineFrames` (5) such frames
+  have been seen; until then the frame is judged `calibrating` (yellow,
+  "Look straight at the screen and hold still."). At the page's 400 ms
+  tick that is about two seconds. Five gives a median whose error is about
+  the spread over the square root of five, 6.2 / 2.2 = 2.8 degrees.
+- When the frontal step completes, the baseline is the median of the
+  samples and is fixed for the rest of the enrollment. No drift. It is
+  exposed in `status().pitchBaselineDeg` and in the console line
+  (`pitchBaselineDeg`), null until fixed.
+- After that, up, down and frontal are judged on `pitch - baseline`.
+  `updownMinPitch` is now relative and is 11: a comfortable "chin up a
+  bit" is about 10 to 12 degrees, and 11 sits well clear of the 6 degree
+  sitting scatter (the largest upward excursion in his 25 frames from
+  their own median is +7.5, so none would register a false Up).
+  Left and right are unchanged in meaning: pitch still has priority, so a
+  turn with more than 11 degrees of pitch scatter is dropped as off target,
+  which costs a frame, never a wrong shot.
+- This is a calibration by measurement, not a word rule: one median and
+  one threshold, in `EnrollmentSession.judgePose`.
+
+**Junk poses are no pose.** A yaw beyond 90 degrees, a pitch beyond 60,
+or a non-finite value returns `no_pose` before anything else is looked at:
+never bucketed, never a baseline sample, never accepted, so it cannot enter
+the accepted-shot averages either. Feedback: "Hold still for a moment."
+
+**The bar (one bar, no second tier).**
+
+| Setting | Was | Now | Reasoning |
+|---|---|---|---|
+| minBoxFrac | 0.10 | 0.08 | Leaning back (0.050 to 0.076) still fails, ordinary seating (0.083 to 0.12) passes. |
+| minSharpness | 40 | 90 | The original solid number. His camera clears it by 2.5x at its worst frame (228), so yellow stays meaningful for a blurry frame. Only one camera is measured: another camera may need a different number. |
+| brightness | 40 to 220 | 40 to 220 | Unchanged; his frames sit at 101 to 147. |
+| updownMinPitch | 15 absolute | 11 relative | See above. |
+
+**Is 0.08 enough pixels?** The page judges a frame at most 480 px wide
+(`CAPTURE_MAX_WIDTH`), so a 4:3 frame is 480 x 360 = 172,800 px and 0.08 is
+a box of about 13,800 px, roughly 105 x 131. Taking the inter-eye distance
+as about 0.4 of the box width (an estimate, not a measurement), that is
+about 42 px between the eyes, and the SFace template puts them 35.2 px apart
+in the 112 x 112 crop (`faceAlign.ts`). So the crop is downscaled by about
+0.84, never enlarged. The eyes would reach 35.2 px at a box of about
+9,700 px (fraction 0.056), so the pixel count alone would tolerate less;
+0.08 is chosen from the data (it separates leaning back from sitting) with
+margin, not from the pixel floor.
+
+**Tests changed, and why.** `enrollmentSession.test.ts`: the strict-step
+tests use a one-frame baseline (`spec()` helper) because they are about
+ordering and the bar, and the calibration has its own tests with the real
+default; "a far frame" moved from 0.09 to 0.07 because 0.09 now passes; the
+bucket averages test uses sharp-enough frames. `faceCaptureDiagnostics` and
+`FaceEnrollmentCapture` expect the new `pitchBaselineDeg` key. The FACE-02I
+strict per-step tests and the FACE-02J ring tests otherwise pass unchanged.
+New: the replay of all 46 rows (old bar fails ordinary seating and no row
+can be Up; new bar passes it), the three junk-yaw rows never register, the
+baseline is the median of the first five frontal frames and never moves, a
++11 tilt over the measured baseline registers Up while the baseline pose
+and +9 do not, a different camera height moves the baseline and keeps the
++11, and the Up and Down feedback wording.
+
+**Not measured.**
+
+- A deliberate up or down tilt: none of the 46 frames contains one (the
+  maximum pitch is +1.0), so 11 is a human-range figure, not a measured one.
+- Any other camera, another person, other light or distance.
+- Whether two seconds of calibration feels right, and whether five frames
+  is enough at his real frame rate; the console lines will show it.
+- The first five frontal frames of the run: the tail did not include them,
+  so the baseline the page would have measured for him is inferred from
+  frames of the same posture, not observed.
+
+Follow-up item in `docs/BACKLOG.md` (FACE-02K-2).
 
 ## MDNS-COLLISION-01 landed (#193)
 

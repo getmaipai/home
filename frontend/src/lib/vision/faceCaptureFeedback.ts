@@ -13,10 +13,20 @@ const REASON_TEXT: Record<string, string> = {
   between_angles: "Turn a little more, or look straight ahead.",
   off_target: "Not that way yet. Follow the step above.",
   bucket_full: "Got that one, hold on.",
+  no_pose: "Hold still for a moment.",
+  calibrating: "Look straight at the screen and hold still.",
   no_face: "We can't see your face. Move into the frame.",
 };
 
-export function captureFeedbackText(reason: string): string {
+// The step's own words for "not that way yet": the person is being asked
+// to tilt, so say which way, in plain words (FACE-02K).
+const OFF_TARGET_TEXT: Record<string, string> = {
+  up: "Tilt your chin up a little, like looking at the ceiling.",
+  down: "Tilt your chin down a little, like looking at your keyboard.",
+};
+
+export function captureFeedbackText(reason: string, target?: string | null): string {
+  if (reason === "off_target" && target && OFF_TARGET_TEXT[target]) return OFF_TARGET_TEXT[target]!;
   return REASON_TEXT[reason] ?? "Hold still.";
 }
 

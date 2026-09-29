@@ -14,6 +14,8 @@ export interface JudgedFrame {
   pitchDeg: number;
   color: CaptureRing;
   reason: string;
+  /** The person's own straight-ahead pitch once fixed (FACE-02K). */
+  pitchBaselineDeg?: number | null;
 }
 
 type Sink = (...args: unknown[]) => void;
@@ -38,6 +40,7 @@ export function createFrameLogger(sink: Sink = console.debug, now: () => number 
       pitchDeg: round(frame.pitchDeg, 1),
       color: frame.color,
       reason: frame.reason,
+      pitchBaselineDeg: frame.pitchBaselineDeg ?? null,
     });
   };
 }

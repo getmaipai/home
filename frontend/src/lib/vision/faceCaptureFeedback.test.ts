@@ -10,6 +10,22 @@ describe("captureFeedbackText", () => {
     expect(captureFeedbackText("no_face")).toContain("face");
   });
 
+  // FACE-02K: on a tilt step, "not that way yet" says which way to tilt.
+  test("on the Up and Down steps the off-target text says to tilt, in plain words", () => {
+    expect(captureFeedbackText("off_target", "up")).toContain("chin up");
+    expect(captureFeedbackText("off_target", "up")).toContain("ceiling");
+    expect(captureFeedbackText("off_target", "down")).toContain("chin down");
+    expect(captureFeedbackText("off_target", "left")).toBe(captureFeedbackText("off_target"));
+    expect(captureFeedbackText("off_target")).not.toContain("chin");
+  });
+
+  test("the calibration and no-pose reasons have their own words", () => {
+    expect(captureFeedbackText("calibrating")).toContain("straight");
+    expect(captureFeedbackText("no_pose")).not.toBe("Hold still.");
+    expect(captureRing("calibrating")).toBe("yellow");
+    expect(captureRing("no_pose")).toBe("yellow");
+  });
+
   test("falls back to a generic instruction for an unknown reason", () => {
     expect(captureFeedbackText("something_new")).toBe("Hold still.");
   });

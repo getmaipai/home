@@ -438,7 +438,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       const result = session.offer(sample);
       // The ring is the offer's own verdict: green exactly when the shot
       // registered (FACE-02J, one definition of green).
-      logFrame({ ...sample, color: captureRing(result.reason), reason: result.reason });
+      logFrame({ ...sample, color: captureRing(result.reason), reason: result.reason, pitchBaselineDeg: session.status().pitchBaselineDeg });
       if (result.accepted) heldUntilRef.current = Date.now() + ACCEPTED_HOLD_MS;
       showReason(result.reason);
       const nextStatus = session.status();
@@ -691,7 +691,7 @@ function CaptureContent({
           <p className="text-center text-lg font-medium">{POSE_PROMPT[pose]}</p>
           <p className="flex items-center justify-center gap-2 text-center text-base text-muted-foreground" role="status">
             {StatusIcon ? <StatusIcon className="h-5 w-5 shrink-0" aria-hidden /> : null}
-            {captureFeedbackText(lastReason)}
+            {captureFeedbackText(lastReason, pose)}
           </p>
         </>
       ) : null}

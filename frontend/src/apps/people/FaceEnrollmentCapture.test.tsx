@@ -253,7 +253,7 @@ describe("FACE-02J: the capture ring", () => {
     renderPage();
     await waitFor(() => expect(debugSpy).toHaveBeenCalled(), WAIT);
     const [, payload] = debugSpy.mock.calls[0] as [string, Record<string, unknown>];
-    expect(Object.keys(payload).sort()).toEqual(["boxFrac", "brightness", "color", "pitchDeg", "reason", "sharpness", "yawDeg"]);
+    expect(Object.keys(payload).sort()).toEqual(["boxFrac", "brightness", "color", "pitchBaselineDeg", "pitchDeg", "reason", "sharpness", "yawDeg"]);
     expect(payload).toMatchObject({ color: "yellow", reason: "blurry" });
     expect(posts).toBe(0);
   });
