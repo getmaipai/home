@@ -6,10 +6,11 @@
 // Connect both need somewhere to hang a name/kind/area.
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { devices, deviceTokens } from "@/db/schema";
+import { devices, deviceTokens, sessions } from "@/db/schema";
 import { newDeviceId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
+import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 
 export type DeviceKind = "robot" | "pod" | "tv" | "phone" | "desktop" | "browser";
 
@@ -110,6 +111,17 @@ export function deleteDevice(id: string, personId: string): boolean {
   // backup (POST /api/backups/received) was revoked, since nothing
   // cleared this table first.
   deleteReceivedBackupsForDevice(id);
+  // FACE-03: a revoked device's already-issued sessions must not keep
+  // authenticating for up to 7 more days (sessions.expiresAt's own TTL) -
+  // a real gap for a device whose whole reason to be revoked might be
+  // "it's compromised," found while wiring the device-gated biometric
+  // sync route. Deleting the rows here isn't enough on its own while the
+  // 10s in-memory session cache (middleware/auth.ts) could still hand
+  // back a cached hit for one of them - invalidateSessionCacheForPerson()
+  // covers that, the same "DB delete alone doesn't propagate fast
+  // enough" gap its own doc comment already names for the `enabled` flag.
+  db.delete(sessions).where(eq(sessions.deviceId, id)).run();
+  invalidateSessionCacheForPerson(personId);
   // robot_credentials.device_id is deliberately NOT a foreign key (a code
   // review, 2026-09-28): a rotated password needs to survive its device
   // row's own deletion so a re-pair of the same physical unit can find

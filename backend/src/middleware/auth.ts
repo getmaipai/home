@@ -8,6 +8,7 @@ import { hashSessionToken } from "@/lib/session";
 import { resolveApiToken } from "@/lib/apiToken";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import { personIsGranted } from "@/lib/grants";
+import { getDeviceById, type DeviceKind } from "@/lib/devices";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import type { AppEnv, PersonRow } from "@/types";
 
@@ -35,10 +36,13 @@ export function __clearSessionCacheForTests(): void {
   sessionCache.clear();
 }
 
-// No caller yet: nothing in this slice deletes or changes a person's role
-// after creation (see docs/dev.md's deferred list). Kept ready for when a
-// delete-person or role-change route lands, so that route doesn't also
-// have to invent cache invalidation from scratch.
+// FACE-03: lib/devices.ts's deleteDevice() is the first real caller -
+// deleting a device's `sessions` rows in the DB isn't enough on its own
+// while this 10s in-memory cache could still hand back a cached hit for
+// one of them, the same staleness gap this comment already describes
+// for the `enabled` flag below. Also ready for a future delete-person or
+// role-change route (see docs/dev.md's deferred list), which would need
+// the identical invalidation.
 export function invalidateSessionCacheForPerson(personId: string): void {
   for (const [key, entry] of sessionCache) {
     if (entry.person.id === personId) sessionCache.delete(key);
@@ -101,6 +105,24 @@ export function resolveSession(token: string): PersonRow | null {
   }
 
   return person ?? null;
+}
+
+// FACE-03: a session's deviceId is set once at issue time (lib/session.ts's
+// issueSession()) and never changes, so unlike the person row above it
+// needs no cache of its own - requireDeviceSession() is the only caller,
+// and it's not a hot path the way requireAuth's per-request person lookup
+// is. Deliberately a plain query, not folded into resolveSession()'s
+// CachedAuth shape: every existing resolveSession() caller (requireAuth,
+// requireRole, requireRoleOrGrant) only ever needs the person, and
+// widening that shared cache entry risks a stale deviceId surviving a
+// deleteDevice() that only calls invalidateSessionCacheForPerson (keyed
+// by person, not by session) if the same person ever holds two devices'
+// sessions - simplest correct fix, no cache invalidation ordering to get
+// right.
+function resolveSessionDeviceId(token: string): string | null {
+  const tokenHash = hashSessionToken(token);
+  const row = db.select({ deviceId: sessions.deviceId }).from(sessions).where(eq(sessions.tokenHash, tokenHash)).get();
+  return row?.deviceId ?? null;
 }
 
 // CSRF defense-in-depth on top of the SameSite=Strict cookie: for
@@ -211,6 +233,56 @@ export function requireRoleOrGrant(roles: Role[], action: string) {
     if (!roles.includes(result.role as Role) && !personIsGranted(result.id, action)) {
       return c.json({ error: "Forbidden" }, 403);
     }
+    c.set("person", result);
+    await next();
+  });
+}
+
+// FACE-03: a session tied to a paired device, not just any signed-in
+// person - the gate a route needs before it can hand out something like
+// a plaintext biometric embedding to "whoever redeemed this device's
+// token," rather than to any browser session the same person happens to
+// be signed into elsewhere. Reuses authenticate() for the ordinary
+// cookie/CSRF/person checks (never duplicated, same reasoning
+// requireRole/requireRoleOrGrant above already follow), then layers the
+// device check on top. Shared groundwork for the unstarted
+// ROBOT-ROUTES-01 (docs/BACKLOG.md), so both axes that item will need are
+// real parameters, not hardcoded to this item's own caller: `kind` (not
+// hardcoded to "robot") and `capability` (optional - a code review on
+// this item, 2026-09-28, found an earlier version hardcoding the
+// `camera` check unconditionally inside this function; ROBOT-ROUTES-01's
+// own planned routes in BACKLOG.md, turn/cancel/stt/tts, are not
+// camera-related, so a robot device with no camera would have gotten a
+// wrongful 403 from every one of them the moment that item reused this
+// function for kind "robot"). Passing no capability admits any device of
+// the right kind; GET /api/biometric-prints/sync (this item's own
+// caller) passes "camera" because a robot with no camera has no
+// legitimate reason to hold face-recognition data at all.
+//
+// 401 vs 403 (BACKLOG.md's own FACE-03 exit criterion is the concrete
+// tie-breaker: "a person's session (admin included) gets 403 from the
+// sync route... deleting the device's next pull is 401"): 401 is
+// reserved for authenticate() itself failing - no cookie, an invalid or
+// expired one, or a session whose row is simply gone (exactly what
+// deleteDevice() now does to a revoked device's session, so a revoked
+// robot's next pull hits this with no session to find at all). A person
+// who authenticates FINE but isn't a device - an ordinary signed-in
+// household member, admin included - gets 403, the same "you are who you
+// say you are, but that's not enough" answer requireRole already gives a
+// wrong-role person; so does a real device of the wrong kind, or missing
+// a required capability.
+export function requireDeviceSession(kind: DeviceKind, capability?: string) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const result = authenticate(c);
+    if (result instanceof Response) return result;
+
+    const token = getCookie(c, "session");
+    const deviceId = token ? resolveSessionDeviceId(token) : null;
+    const device = deviceId ? getDeviceById(deviceId) : null;
+    if (!device || device.kind !== kind || (capability !== undefined && !device.capabilities.includes(capability))) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
     c.set("person", result);
     await next();
   });

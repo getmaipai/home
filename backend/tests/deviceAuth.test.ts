@@ -4,8 +4,8 @@ import { resetDb } from "./reset-db";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
 import { db } from "@/db";
-import { people } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { people, sessions } from "@/db/schema";
+import { eq, isNull, and } from "drizzle-orm";
 
 beforeEach(() => resetDb());
 
@@ -68,5 +68,40 @@ describe("POST /api/auth/devices/redeem", () => {
 
     const me = await client.get("/api/auth/me");
     expect(me.status).toBe(200);
+  });
+
+  // FACE-03: sessions.device_id round-trips from redeem - the whole
+  // point of the column is that a device's own session is tellable apart
+  // from its pairing admin's (middleware/auth.ts's requireDeviceSession()).
+  test("redeeming a device token tags the resulting session row with that device's id", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const person = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const { token, deviceId } = issueDeviceToken(person.id, "tv", "Living room TV");
+
+    const client = new TestClient();
+    const res = await client.post("/api/auth/devices/redeem", { token });
+    expect(res.status).toBe(200);
+
+    // The owner already has their own (device-free) session from
+    // /api/auth/setup above, so this queries for the specific row the
+    // redeem just created, not just "a" session for this person.
+    const row = db.select().from(sessions).where(eq(sessions.deviceId, deviceId)).get()!;
+    expect(row).toBeDefined();
+    expect(row.personId).toBe(person.id);
+  });
+
+  // An ordinary PIN/password sign-in (routes/auth.ts's own /verify-secret,
+  // /select) never redeems a device token at all, so its session must stay
+  // device-free - the negative case for the round-trip above, and the
+  // exact shape requireDeviceSession()'s "no device at all" branch relies
+  // on.
+  test("an ordinary sign-in leaves the session's device id null", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const person = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+
+    const row = db.select().from(sessions).where(and(eq(sessions.personId, person.id), isNull(sessions.deviceId))).get()!;
+    expect(row).toBeDefined();
   });
 });

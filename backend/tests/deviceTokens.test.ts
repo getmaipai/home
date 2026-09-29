@@ -1,9 +1,11 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { db } from "@/db";
-import { people, deviceTokens } from "@/db/schema";
+import { people, deviceTokens, sessions } from "@/db/schema";
 import { newPersonId } from "@/lib/id";
 import { issueDeviceToken, redeemDeviceToken, hashDeviceToken, pruneExpiredDeviceTokens } from "@/lib/deviceTokens";
 import { listDevicesForPerson, deleteDevice } from "@/lib/devices";
+import { hashSessionToken } from "@/lib/session";
+import { resolveSession, __clearSessionCacheForTests } from "@/middleware/auth";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 
@@ -116,6 +118,66 @@ describe("deleteDevice()", () => {
   test("false for an unknown device id", () => {
     const personId = insertPerson();
     expect(deleteDevice("device-doesnotexist", personId)).toBe(false);
+  });
+
+  // FACE-03: a revoked device used to keep a live session for up to 7
+  // more days (sessions.expiresAt's own TTL) - the real gap this item
+  // closes. Constructs the session row directly (the same raw-insert
+  // pattern tests/people.test.ts's own erasure test uses) rather than
+  // going through issueSession()'s Hono Context, since only the row
+  // itself and its device_id are under test here.
+  test("deletes that device's own session rows, not another device's", () => {
+    const personId = insertPerson();
+    const { deviceId } = issueDeviceToken(personId, "tv", "Living room TV");
+    const { deviceId: otherDeviceId } = issueDeviceToken(personId, "phone", "My phone");
+    const now = new Date();
+    const future = new Date(now.getTime() + 60_000).toISOString();
+    db.insert(sessions)
+      .values({ id: "session-revoked", personId, tokenHash: "hash-revoked", deviceId, expiresAt: future, createdAt: now.toISOString() })
+      .run();
+    db.insert(sessions)
+      .values({ id: "session-other", personId, tokenHash: "hash-other", deviceId: otherDeviceId, expiresAt: future, createdAt: now.toISOString() })
+      .run();
+
+    expect(deleteDevice(deviceId, personId)).toBe(true);
+
+    expect(db.select().from(sessions).where(eq(sessions.id, "session-revoked")).get()).toBeUndefined();
+    expect(db.select().from(sessions).where(eq(sessions.id, "session-other")).get()).toBeDefined();
+  });
+
+  // The 10s in-memory session cache (middleware/auth.ts) is the other
+  // half of the same gap: deleting the DB row alone isn't enough while a
+  // cached hit for that exact session could still authenticate it for up
+  // to 10 more seconds, the identical staleness invalidateSessionCache
+  // ForPerson() already exists to close for the `enabled` flag. This test
+  // fails if deleteDevice() ever stops calling it: without that call, the
+  // second resolveSession() below would still return the stale cached
+  // person even though the underlying row is gone.
+  test("also invalidates a live session's 10s cache entry, not just its DB row", () => {
+    __clearSessionCacheForTests();
+    const personId = insertPerson();
+    const { deviceId } = issueDeviceToken(personId, "tv", "Living room TV");
+    const rawToken = "f".repeat(64);
+    const now = new Date();
+    db.insert(sessions)
+      .values({
+        id: "session-cache-test",
+        personId,
+        tokenHash: hashSessionToken(rawToken),
+        deviceId,
+        expiresAt: new Date(now.getTime() + 60_000).toISOString(),
+        createdAt: now.toISOString(),
+      })
+      .run();
+
+    // Primes the cache with a hit - the exact state a robot mid-poll
+    // would be in the moment its device gets revoked.
+    expect(resolveSession(rawToken)?.id).toBe(personId);
+
+    expect(deleteDevice(deviceId, personId)).toBe(true);
+
+    expect(resolveSession(rawToken)).toBeNull();
+    expect(db.select().from(sessions).where(eq(sessions.id, "session-cache-test")).get()).toBeUndefined();
   });
 });
 

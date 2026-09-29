@@ -11,8 +11,8 @@
 // requireAuth to be enough on its own.
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { requireAuth } from "@/middleware/auth";
-import { createBiometricPrint, listBiometricPrints, deleteBiometricPrint } from "@/lib/biometricPrints";
+import { requireAuth, requireDeviceSession } from "@/middleware/auth";
+import { createBiometricPrint, listBiometricPrints, deleteBiometricPrint, listPrintsForSync } from "@/lib/biometricPrints";
 
 export const biometricPrintsRoutes = apiRouter();
 
@@ -114,4 +114,36 @@ biometricPrintsRoutes.openapi(deleteRoute, (c) => {
   const result = deleteBiometricPrint(actor, id);
   if (!result.ok) return c.json({ error: result.error }, deleteStatusFor(result.status));
   return c.json(result.value, 200);
+});
+
+// FACE-03: the full spec record, embedding included - see
+// lib/biometricPrints.ts's own header and listPrintsForSync() doc
+// comment for why this is the one sanctioned exception to "the
+// embedding never leaves this module." Device-gated, not person-gated:
+// requireDeviceSession("robot", "camera") replaces requireAuth here on
+// purpose, so even a household owner's own browser session gets 403, not
+// 200 - and specifically "camera", not just any robot, since a robot
+// with no camera has no legitimate reason to hold face-recognition data.
+const FullPrintSchema = SummarySchema.extend({ embedding: z.array(z.number()) });
+
+const syncRoute = createRoute({
+  method: "get",
+  path: "/sync",
+  tags: ["Biometric prints"],
+  summary: "Every live face print, full records including the embedding - a paired robot device only",
+  middleware: [requireDeviceSession("robot", "camera")] as const,
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ as_of: z.string(), prints: z.array(FullPrintSchema) }) } },
+      description: "A wholesale snapshot of every live (non-tombstoned) face print, decrypted. Voice prints are never included.",
+    },
+    ...errorResponses({
+      401: "Not signed in at all (including a revoked device's session)",
+      403: "Signed in, but not a robot device with the camera capability - an ordinary person session included",
+    }),
+  },
+});
+biometricPrintsRoutes.openapi(syncRoute, (c) => {
+  const prints = listPrintsForSync();
+  return c.json({ as_of: new Date().toISOString(), prints }, 200);
 });

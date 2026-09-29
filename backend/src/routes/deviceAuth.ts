@@ -83,6 +83,6 @@ deviceAuthRoutes.openapi(redeemRoute, (c) => {
     );
   }
 
-  issueSession(c, redeemed.personId);
+  issueSession(c, redeemed.personId, redeemed.deviceId);
   return c.json({ success: true as const }, 200);
 });
