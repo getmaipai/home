@@ -3,12 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
 import { api, type ResolvedSetting } from "@/lib/api";
 import { readShellNextCache, writeShellNextCache } from "@/next/shellNextCache";
-
-type Appearance = "system" | "light" | "dark";
-
-function isAppearance(value: unknown): value is Appearance {
-  return value === "system" || value === "light" || value === "dark";
-}
+import { pickAppearance, resolveDark, type Appearance } from "@/next/appearanceResolve";
 
 /** `ui.appearance` (person scope, backend/src/settings/uiKeys.ts) fed
  * into the vendored template's own ThemeProvider on `/`
@@ -60,8 +55,7 @@ export function useNextAppearance(personId: string): void {
   // same shared household browser included) disagree with a fetch
   // that simply hadn't landed yet, and PUT that stale value over the
   // real setting before ever reading it.
-  const found = query.data?.find((v) => v.key === "ui.appearance")?.value;
-  const appearance: Appearance | undefined = query.data ? (isAppearance(found) ? found : "system") : undefined;
+  const appearance: Appearance | undefined = pickAppearance(query.data);
 
   const { theme, setTheme } = useTheme();
   // The last setting value this hook itself synced the provider to -
@@ -114,9 +108,7 @@ export function useNextAppearance(personId: string): void {
   const cached = readShellNextCache();
   useEffect(() => {
     if (appearance === undefined) return;
-    const dark =
-      appearance === "dark" ||
-      (appearance === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    const dark = resolveDark(appearance, window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
     document.documentElement.classList.toggle("light", !dark);
     writeShellNextCache({ look: cached?.look ?? "neutral", dark });

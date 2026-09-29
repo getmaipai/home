@@ -28,6 +28,9 @@ import { estimateHeadPose } from "@/lib/vision/headPose";
 import { computeBoxFraction, computeBrightness, computeSharpness } from "@/lib/vision/faceCaptureMeasurements";
 import { captureFeedbackText } from "@/lib/vision/faceCaptureFeedback";
 import { classifyMediaAccessError } from "@/lib/media/getUserMediaErrorState";
+import { useNextLook } from "@/next/useNextLook";
+import { pickAppearance, resolveDark } from "@/next/appearanceResolve";
+import { readShellNextCache, writeShellNextCache } from "@/next/shellNextCache";
 
 type ProfileEntry = PersonRosterEntry | Roster;
 
@@ -129,6 +132,52 @@ interface SubmissionRow {
   error?: string;
 }
 
+/** Same resolved-appearance computation `useNextAppearance.ts`'s own
+ * paint effect uses (`@/next/appearanceResolve`'s shared `resolveDark`)
+ * - not that hook itself, which also calls the vendored `useTheme()` and
+ * needs a `<ThemeProvider>` ancestor this shell-less route never mounts.
+ * Without this, a person who has never opened "/" in this browser (no
+ * cached palette for `main.tsx` to pre-paint, and no `<ThemeProvider>`
+ * here to seed one) lands on this route with neither ".dark" nor
+ * ".light" on `<html>` - and found live (FACE-02J, 2026-09-29) that this
+ * is worse paired with `useNextLook` below than alone: the kit's own
+ * light-mode "style-<look>" preset rule (a higher-specificity
+ * `body.style-<look>` selector, unguarded by any dark media query) then
+ * wins over the kit's own unclassed dark media-query fallback, rendering
+ * the page fully light even when the operator's own setting and the OS
+ * both say dark.
+ *
+ * Also writes the resolved `dark` into the same per-browser cache
+ * `useNextAppearance.ts` writes (HOME-UI-04g's own "paint before React
+ * mounts" cache) - a review on this item caught the first version
+ * skipping this: `useNextLook`'s own effect (called after this one,
+ * matching `NextRoutesInner`'s real order) preserves whatever `dark` is
+ * already cached rather than computing it itself, so leaving this
+ * unwritten let a stale or default-`false` value sit in the cache after
+ * every visit here, flashing the wrong theme on the NEXT page's reload
+ * anywhere in the app, not just this route.
+ *
+ * A failed settings-values fetch leaves `appearance` (and so `<html>`'s
+ * class) exactly as `useNextAppearance.ts`'s own identical `appearance
+ * === undefined` guard does - no retry UI, matching that hook's
+ * accepted behavior rather than inventing a new resilience pattern this
+ * one route alone would carry. */
+function usePaintAppearanceForShellLessRoute(personId: string): void {
+  const query = useQuery({
+    queryKey: ["settings-values", `person:${personId}`],
+    queryFn: () => api.settingsValues(`person:${personId}`),
+  });
+  const cachedLook = readShellNextCache()?.look;
+  const appearance = pickAppearance(query.data);
+  useEffect(() => {
+    if (appearance === undefined) return;
+    const dark = resolveDark(appearance, window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.toggle("dark", dark);
+    document.documentElement.classList.toggle("light", !dark);
+    writeShellNextCache({ look: cachedLook ?? "neutral", dark });
+  }, [appearance, cachedLook]);
+}
+
 /** The entry point (FACE-02): `/people/:id/enroll-face`, reached from
  * that person's profile. Resolves the target (self, or a roster lookup
  * for someone else), gates on `canEnrollFace` (the same authority
@@ -136,6 +185,29 @@ interface SubmissionRow {
  * only ever hides the button, never lets an unauthorized POST through),
  * then hands off to the real camera flow. */
 export function FaceEnrollmentPage({ operator }: { operator: Roster }) {
+  // This route renders outside NextRoutes/FullLayout (CenteredPage's own
+  // comment above: shell-less, Wizard.tsx's SetupWizard precedent), so
+  // nothing here already keeps `useNextLook`'s "style-<look>" class alive
+  // on <body>. That hook's own cleanup strips the class on unmount, so
+  // the moment a person clicks "Enroll" from their profile page (a plain
+  // client-side navigate(), no reload), NextRoutesInner unmounts and
+  // takes the class with it - found live (FACE-02J, 2026-09-29): the
+  // page's background silently dropped from the household's actual
+  // dark look (#0a0a0a for "neutral") to the kit's own generic dark
+  // default (#07111f), a real color mismatch against every other page,
+  // not just the (intentionally black) camera preview box. Re-running
+  // the same hook here for as long as this route is mounted keeps the
+  // body in sync with the signed-in operator's own look, and its own
+  // cleanup hands the class back once NextRoutesInner remounts.
+  //
+  // Called in the same order `NextRoutesInner` (NextRoutes.tsx) calls
+  // its own pair (appearance, then look) - not incidental: the
+  // appearance hook's own comment explains why it must run first, and
+  // reversing this order is exactly the bug a review caught before this
+  // item shipped.
+  usePaintAppearanceForShellLessRoute(operator.id);
+  useNextLook(operator.id);
+
   const { id } = useParams<{ id: string }>();
   const viewingSelf = id === operator.id;
   const rosterQuery = useQuery<PersonRosterEntry[]>({
