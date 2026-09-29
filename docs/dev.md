@@ -31355,3 +31355,89 @@ capture UI (browser camera, onnxruntime-web inference, the guided
 multi-pose flow with quality gating ported from the legacy
 `EnrollmentSession`), and wiring `bot`'s real construction path to
 match against prints synced down from here.
+
+## FACE-03: hub-synced face prints on the robot (design-resolver, 2026-09-28)
+
+How an enrolled face print gets from this repo's `biometric_prints`
+store to a paired robot, so it can match faces locally, resolved
+without needing Jesse's own call: the platform plan, `bot`'s own
+`design-reachy-mini-2026-09-27.md`, and the models design
+(`bot`'s `docs/dev/design-face-recognition-models-2026-09-28.md`)
+already answer every part of it once read together.
+
+**The designed transport doesn't exist yet, so this item doesn't wait
+for it.** `spec/link/`'s oplog replica (`bot` BACKLOG's LINK-02/03,
+sized L) is unbuilt - no `link/` directory in `commons/spec`, no
+bootstrap-snapshot-plus-pull mechanism anywhere. `design-reachy-mini-
+2026-09-27.md` decision 6 already settled this class of question for
+Reachy generally: "the oplog, the replica and adoption (`spec/link/`,
+hub v0.3) are not needed by a body with no runtime, so this body ships
+before the link milestone" - it uses the routes the PWA already uses.
+Face prints follow the same precedent, and need a hub-side read route
+regardless of the oplog's timing, since a Go client (never an oplog
+replica) will need the same data eventually.
+
+**Decision:**
+
+1. **Transport**: one new route, `GET /api/biometric-prints/sync`
+   (this repo's `routes/biometricPrints.ts` + a new
+   `listPrintsForSync()` in `lib/biometricPrints.ts`), pulled by the
+   robot on the session it already has (`_hub_credentials_reader`,
+   `bot`'s FACE-04). Returns every live face print as a full spec
+   record, `{as_of, prints}` - a wholesale snapshot, not a delta:
+   the payload is tiny (a handful of people times a few samples times
+   128 floats), and wholesale replacement makes revocation complete by
+   construction (a revoked print is simply absent, no tombstone needs
+   to travel, sidestepping the fact HLC strings don't sort as text -
+   `lib/hlc.ts`'s own comment). Voice prints are never included
+   (models design §5: "a Reachy Mini or a browser never receives
+   one"). When the oplog lands, `biometric_prints` joins it like any
+   other HLC-bearing table; this route stays as the snapshot path for
+   bodies with no runtime and, later, Go.
+2. **Authority**: the hub, absolutely, already decided and confirmed
+   with Jesse (this file's FACE-01 entry: "enrollment is always
+   hub-owned, bot or no bot"; `bot`'s `dev.md` §6: a print "is
+   replicated only from the hub's encrypted store to the household's
+   paired devices"). The robot's gallery is a disposable cache, never
+   a write path - this doesn't conflict with `bot`'s standalone-
+   completeness principle, since Reachy is explicitly a connected body
+   (`design-reachy-mini-2026-09-27.md` decision 3). Robot-side
+   standalone enrollment, if it's ever built, is a separate later item
+   that still POSTs to this repo's existing `/api/biometric-prints`.
+3. **Spec change**: none for this item - the snapshot carries only
+   live prints, which already validate as `BiometricPrint`
+   (`spec-v0.1.54`) unchanged. One real defect filed separately in
+   `commons` as a LINK-03 prerequisite: `biometric-print.schema.json`
+   requires `embedding` with `minItems: 1`, but this repo tombstones a
+   print by nulling `embedding_encrypted` (`personLifecycle.ts:327-
+   335`) - a revoked print can't be expressed as a valid spec record
+   today. The fix (`embedding: ["array","null"]`, valid iff paired
+   with `deleted_at`) is needed for the future oplog, not this
+   snapshot-only item.
+4. **Auth gap this item must close**: today a robot's session can't be
+   told apart from its pairing admin's (`routes/deviceAuth.ts` calls
+   `issueSession(c, redeemed.personId)`; `sessions` has no device
+   column), and `deleteDevice()` (`lib/devices.ts:102-119`) deletes a
+   device's tokens but not its already-issued sessions, so a revoked
+   robot keeps pulling for up to 7 days. Both are real security gaps
+   for a route that releases plaintext embeddings, closed as part of
+   this item: `sessions.device_id` (migration, set at redeem),
+   `requireDeviceSession(kind)` in `middleware/auth.ts` (admits only a
+   device of kind `robot` with the `camera` capability - shared with
+   the unstarted ROBOT-ROUTES-01, which needs the same device
+   identity), and `deleteDevice()` also deleting that device's
+   sessions and invalidating the session cache.
+
+**Two contradictions surfaced while resolving this, to fix as part of
+the item:** `lib/biometricPrints.ts`'s header comment says the
+embedding is "never included in any API response" - true until this
+item, so the header gets amended to name the device-gated sync route
+as the one sanctioned exit. Separately, the models design's own §5
+imagines the PWA matching faces in-browser, which would also need
+embeddings - a browser session carries no device id, so this sync
+route does not serve it; that's a distinct, not-yet-decided item.
+
+Full reasoning, confidence levels, and the wire shape: BACKLOG's own
+FACE-03 entries (hub half here, bot half in `bot`'s `docs/BACKLOG.md`)
+carry the acceptance criteria; this section is the record of why the
+shape is what it is, not a duplicate of the checklist.
