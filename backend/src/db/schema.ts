@@ -987,6 +987,21 @@ export const devices = sqliteTable("devices", {
   hlc: text("hlc").notNull(),
 });
 
+// ROBOT-CARD-01: the latest robot-reported state is a hub-local
+// projection, deliberately separate from the synced Device record.
+export const deviceStates = sqliteTable("device_states", {
+  deviceId: text("device_id")
+    .primaryKey()
+    .references(() => devices.id, { onDelete: "cascade" }),
+  activity: text("activity").notNull(),
+  muted: integer("muted", { mode: "boolean" }).notNull(),
+  tracking: integer("tracking", { mode: "boolean" }).notNull(),
+  onBattery: integer("on_battery", { mode: "boolean" }),
+  batteryLevel: real("battery_level"),
+  daemonVersion: text("daemon_version"),
+  reportedAt: text("reported_at").notNull(),
+});
+
 // Long-lived per-device credentials (lib/deviceTokens.ts, ported from the
 // archived legacy hub's deviceToken.ts, principle 8): a native/TV client
 // trades one of these for a session cookie on whichever address answers,
