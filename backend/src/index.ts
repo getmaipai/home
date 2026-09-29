@@ -1,3 +1,7 @@
+// SINGLE-INSTANCE-01 (#194): must stay the FIRST import. It refuses a stray
+// data directory and takes the data directory's one-hub lock before any
+// later import (app, db, keystore) can open the database.
+import { instanceLock } from "@/lib/bootGuard";
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
 import { runPlugin, registerAllPackageNotificationTypes, registerAllPackageProjectTypes, runDueWarmJobs } from "@/lib/plugins";
@@ -328,6 +332,7 @@ let server = Bun.serve({
   ...(initialTls ? { tls: initialTls } : {}),
 });
 
+instanceLock.setPort(server.port!);
 let servingTls = initialTls !== null;
 function printStartupUrls(): void {
   for (const url of startupUrls(server.port!, servingTls)) {
