@@ -220,8 +220,6 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
   const [modelsState, setModelsState] = useState<ModelsState>("loading");
   const [phase, setPhase] = useState<FlowPhase>("capturing");
   const [lastReason, setLastReason] = useState("no_face");
-  // Temporary debug readout for live pose-constant tuning; remove once headPose.ts constants are confirmed.
-  const [debugPose, setDebugPose] = useState<{ yaw: number; pitch: number } | null>(null);
   const [status, setStatus] = useState<PersonStatus>(() => session.status());
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   // Separate retry keys (a code review on this item, 2026-09-29): a
@@ -316,7 +314,6 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       let pose: { yawDeg: number; pitchDeg: number };
       try {
         pose = estimateHeadPose(face);
-        setDebugPose({ yaw: pose.yawDeg, pitch: pose.pitchDeg });
       } catch {
         // Degenerate landmarks (eyes too close together, near-zero
         // eye-to-mouth span) - treat the same as "no usable face this
@@ -486,7 +483,6 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
           videoRef={videoRef}
           canvasRef={canvasRef}
           lastReason={lastReason}
-          debugPose={debugPose}
           coveragePct={status.coveragePct}
           onRetryCamera={retryCamera}
           onRetryModels={retryModels}
@@ -503,7 +499,6 @@ function CaptureContent({
   videoRef,
   canvasRef,
   lastReason,
-  debugPose,
   coveragePct,
   onRetryCamera,
   onRetryModels,
@@ -514,7 +509,6 @@ function CaptureContent({
   videoRef: RefObject<HTMLVideoElement | null>;
   canvasRef: RefObject<HTMLCanvasElement | null>;
   lastReason: string;
-  debugPose: { yaw: number; pitch: number } | null;
   coveragePct: number;
   onRetryCamera: () => void;
   onRetryModels: () => void;
@@ -581,11 +575,6 @@ function CaptureContent({
       {!settingUp ? (
         <>
           <p className="text-center text-lg font-medium">{POSE_PROMPT[pose]}</p>
-          {debugPose ? (
-            <p className="text-center text-base text-muted-foreground">
-              yaw {debugPose.yaw.toFixed(1)}° · pitch {debugPose.pitch.toFixed(1)}°
-            </p>
-          ) : null}
           <p className="text-center text-base text-muted-foreground" role="status">
             {captureFeedbackText(lastReason)}
           </p>
