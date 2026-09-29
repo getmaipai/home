@@ -947,8 +947,13 @@ export const api = {
   // never a batch endpoint, so this POSTs once per accepted pose.
   visionModels: () => request<{ detectors: VisionModelInfo[]; installed: boolean }>("/api/vision/models"),
   biometricPrints: (personId: string) => request<BiometricPrintSummary[]>(`/api/biometric-prints?personId=${encodeURIComponent(personId)}`),
-  createBiometricPrint: (input: { person_id: string; model_id: string; embedding: number[]; captured_by?: string | null }) =>
-    request<BiometricPrintSummary>("/api/biometric-prints", { method: "POST", body: JSON.stringify(input) }),
+  // `signal` (found by review, 2026-09-29): a cancel mid-submission has
+  // to actually abort the in-flight fetch, not just stop the NEXT one -
+  // request()'s own init already passes a caller-supplied signal through
+  // untouched (its own comment on that line), so this only needed to
+  // accept and forward one.
+  createBiometricPrint: (input: { person_id: string; model_id: string; embedding: number[]; captured_by?: string | null }, signal?: AbortSignal) =>
+    request<BiometricPrintSummary>("/api/biometric-prints", { method: "POST", body: JSON.stringify(input), signal }),
   // Owner/admin only (routes/store.ts's own gate) - null means the
   // package has no active store install (bundled-only, or never
   // installed). Called lazily, on-demand for the pane's selected

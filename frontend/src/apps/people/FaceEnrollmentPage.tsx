@@ -6,8 +6,9 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent } from "@maipai/ui/src/ui/card";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { getIcon, type IconName } from "@maipai/ui/src/icons";
-import { api, ApiError, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
+import { submitEmbeddings } from "@/apps/people/submitEmbeddings";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   EnrollmentSession,
@@ -189,19 +190,21 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
   const yunetSessionRef = useRef<OnnxInferenceSession | null>(null);
   const sfaceSessionRef = useRef<OnnxInferenceSession | null>(null);
   const runningRef = useRef(false);
-  // Set once the person clicks "Cancel enrollment" while samples are
-  // still being POSTed (a code review on this item, 2026-09-29): without
-  // it, submitSamples() keeps POSTing after onDone() has already
-  // navigated away, saving prints for a consent flow the person believed
-  // they'd cancelled. Checked at the top of every loop iteration, not
-  // just once, so a cancel mid-loop stops the NEXT POST, not just future
-  // calls to submitSamples.
-  const cancelledRef = useRef(false);
+  // The in-flight submission's real AbortController (a second code
+  // review, 2026-09-29, on the first fix: a plain `cancelledRef` boolean
+  // checked only between loop iterations stopped the NEXT POST but not
+  // one already mid-flight - the person clicks "Cancel enrollment" while
+  // `fetch` is in the air, and it completes and saves a print anyway,
+  // exactly the consent scenario the button exists to prevent). Created
+  // fresh each time submission starts, `.abort()`ed from
+  // cancelEnrollment(), and its `.signal` threaded all the way through
+  // `api.createBiometricPrint` to `fetch` itself
+  // (`submitEmbeddings.ts`, unit-tested for exactly this race).
+  const submitAbortRef = useRef<AbortController | null>(null);
   // Guards against two overlapping submitSamples() runs (the initial
-  // auto-submit and a double-clicked "Retry the ones that failed" - the
-  // same review): both would otherwise read the same stale "error" rows
-  // and POST the same embedding twice, one row per accepted sample
-  // (FACE-01) becoming two.
+  // auto-submit and a double-clicked "Retry the ones that failed" - a
+  // code review on this item, 2026-09-29). Both would otherwise read the
+  // same stale "error" rows and double-POST one embedding.
   const submittingRef = useRef(false);
 
   // shotsPerPose: 1, no glasses steps - the backlog's own acceptance
@@ -365,38 +368,47 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       // read the same stale "error" rows and double-POST one embedding.
       if (submittingRef.current) return;
       submittingRef.current = true;
+      const controller = new AbortController();
+      submitAbortRef.current = controller;
       try {
-        for (const embedding of embeddings) {
-          // Checked before every POST, not just once at the top: a
-          // cancel mid-loop (the same review) must stop the NEXT sample,
-          // not just a future call to this function.
-          if (cancelledRef.current) return;
-          setSubmissions((rows) => {
-            const index = rows.findIndex((row) => row.embedding === embedding);
-            if (index === -1) return [...rows, { embedding, state: "pending" as const }];
-            const next = [...rows];
-            next[index] = { ...next[index]!, state: "pending", error: undefined };
-            return next;
-          });
-          try {
+        await submitEmbeddings(
+          embeddings,
+          controller.signal,
+          (embedding, signal) => {
             const modelId = sfaceModelIdRef.current;
-            if (!modelId) throw new Error("Face model id not resolved yet.");
+            if (!modelId) return Promise.reject(new Error("Face model id not resolved yet."));
             // One POST per accepted sample (FACE-01's own one-row-per-
             // sample design), sequentially - never batched, and never
             // parallel either, so a partial-failure state is always an
             // honest reflection of exactly which ones actually saved.
-            await api.createBiometricPrint({
-              person_id: target.id,
-              model_id: modelId,
-              embedding,
-              captured_by: operator.id,
+            // Discards the response: only whether it resolved or
+            // rejected (including via `signal`'s own abort) matters
+            // here, submitEmbeddings.ts owns turning that into a result.
+            return api
+              .createBiometricPrint({ person_id: target.id, model_id: modelId, embedding, captured_by: operator.id }, signal)
+              .then(() => undefined);
+          },
+          (embedding) => {
+            setSubmissions((rows) => {
+              const index = rows.findIndex((row) => row.embedding === embedding);
+              if (index === -1) return [...rows, { embedding, state: "pending" as const }];
+              const next = [...rows];
+              next[index] = { ...next[index]!, state: "pending", error: undefined };
+              return next;
             });
-            setSubmissions((rows) => rows.map((row) => (row.embedding === embedding ? { ...row, state: "success" } : row)));
-          } catch (err) {
-            const message = err instanceof ApiError ? err.message : "Could not save that sample.";
-            setSubmissions((rows) => rows.map((row) => (row.embedding === embedding ? { ...row, state: "error", error: message } : row)));
-          }
-        }
+          },
+          (embedding, result) => {
+            setSubmissions((rows) =>
+              rows.map((row) =>
+                row.embedding === embedding
+                  ? result.status === "success"
+                    ? { ...row, state: "success" }
+                    : { ...row, state: "error", error: result.message }
+                  : row,
+              ),
+            );
+          },
+        );
       } finally {
         submittingRef.current = false;
       }
@@ -422,7 +434,9 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
   const retryModels = () => setModelsRetryKey((key) => key + 1);
   const retryFailedSubmissions = () => void submitSamples(submissions.filter((row) => row.state === "error").map((row) => row.embedding));
   function cancelEnrollment() {
-    cancelledRef.current = true;
+    // Aborts whichever sample is actually in flight right now, not just
+    // the ones still queued - see submitAbortRef's own comment.
+    submitAbortRef.current?.abort();
     onDone();
   }
 
