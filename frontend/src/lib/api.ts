@@ -179,6 +179,21 @@ export interface DeviceInfo {
   lastSeenAt: string | null;
   createdAt: string;
   capabilities: string[];
+  /** ROBOT-CARD-01: robots only; `null` until the first report. */
+  state?: RobotDeviceState | null;
+}
+// ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
+// reachability, hand-typed to match backend/src/routes/devices.ts's
+// DeviceSchema.state.
+export interface RobotDeviceState {
+  activity: "starting" | "idle" | "listening" | "thinking" | "speaking";
+  muted: boolean;
+  tracking: boolean;
+  on_battery?: boolean | null;
+  battery_level?: number | null;
+  daemon_version?: string | null;
+  reachable: boolean;
+  unreachableSince: string | null;
 }
 // ROBOT-DEVICE-01: hand-typed to match backend/src/routes/devices.ts's
 // DiscoveredRobotSchema, same reasoning as DeviceInfo above (inline

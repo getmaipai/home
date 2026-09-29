@@ -6,6 +6,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
+import { RobotCard } from "@/apps/settings/RobotCard";
 import { api, ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
 
 function whenText(iso: string): string {
@@ -29,7 +30,7 @@ const DEVICE_KIND_LABELS: Record<DeviceInfo["kind"], string> = {
 // PIN/password change already has, not gated behind AdminGatedContent.
 export function DevicesSection() {
   const queryClient = useQueryClient();
-  const devicesQuery = useQuery<DeviceInfo[]>({ queryKey: ["devices"], queryFn: () => api.devices() });
+  const devicesQuery = useQuery<DeviceInfo[]>({ queryKey: ["devices"], queryFn: () => api.devices(), refetchInterval: 5000 });
   const sessionsQuery = useQuery<SessionInfo[]>({ queryKey: ["sessions"], queryFn: () => api.sessions() });
   const [confirming, setConfirming] = useState<{ kind: "device" | "session"; id: string; label: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,10 +69,27 @@ export function DevicesSection() {
           errorMessage="Could not load your devices."
           loadingLabel="Loading devices"
         >
-          {(devices) =>
-            devices.length === 0 ? (
+          {(allDevices) => {
+            // ROBOT-CARD-01: a robot gets its live card (state polled every
+            // 5s above); every other kind keeps the plain list row.
+            const robots = allDevices.filter((d) => d.kind === "robot");
+            const devices = allDevices.filter((d) => d.kind !== "robot");
+            return allDevices.length === 0 ? (
               <EmptyState icon="inbox" text="No devices paired to your profile yet." />
             ) : (
+              <div className="flex flex-col gap-4">
+              {robots.map((r) => (
+                <RobotCard
+                  key={r.id}
+                  device={r}
+                  busy={busy}
+                  confirmingRemove={confirming?.kind === "device" && confirming.id === r.id}
+                  onRemove={() => setConfirming({ kind: "device", id: r.id, label: r.name })}
+                  onConfirmRemove={handleRevoke}
+                  onCancelRemove={() => setConfirming(null)}
+                />
+              ))}
+              {devices.length > 0 ? (
               <List
                 items={devices}
                 getKey={(d) => d.id}
@@ -119,8 +137,10 @@ export function DevicesSection() {
                   )
                 }
               />
-            )
-          }
+              ) : null}
+              </div>
+            );
+          }}
         </AsyncState>
       </Section>
 

@@ -129,4 +129,90 @@ describe("DevicesSection", () => {
       restore();
     }
   });
+
+  test("a robot shows its live state on a card, not a plain row", async () => {
+    const restore = stubFetch(
+      [
+        device({
+          id: "robot-1",
+          kind: "robot",
+          name: "Riff",
+          state: {
+            activity: "listening",
+            muted: true,
+            tracking: false,
+            on_battery: null,
+            battery_level: null,
+            daemon_version: "1.4.2",
+            reachable: true,
+            unreachableSince: null,
+          },
+        }),
+      ],
+      [],
+    );
+    try {
+      const { findByTestId, findByText } = renderSection();
+      const card = await findByTestId("robot-card");
+      await findByText("Listening");
+      expect(card.textContent).toContain("Muted");
+      expect(card.textContent).toContain("Level unknown");
+      expect(card.textContent).toContain("1.4.2");
+    } finally {
+      restore();
+    }
+  });
+
+  test("a robot that stopped reporting says not responding and since when", async () => {
+    const restore = stubFetch(
+      [
+        device({
+          kind: "robot",
+          name: "Riff",
+          state: {
+            activity: "idle",
+            muted: false,
+            tracking: true,
+            battery_level: 0.5,
+            daemon_version: null,
+            reachable: false,
+            unreachableSince: "2026-09-29T10:00:00.000Z",
+          },
+        }),
+      ],
+      [],
+    );
+    try {
+      const { findByText, findByTestId } = renderSection();
+      await findByText("Not responding");
+      const card = await findByTestId("robot-card");
+      expect(card.textContent).toContain("Last heard from");
+      expect(card.textContent).toContain("50%");
+    } finally {
+      restore();
+    }
+  });
+
+  test("a robot with no report yet says it is waiting", async () => {
+    const restore = stubFetch([device({ kind: "robot", name: "Riff", state: null })], []);
+    try {
+      const { findByText } = renderSection();
+      await findByText("Waiting for first report");
+    } finally {
+      restore();
+    }
+  });
+
+  test("removing a robot from its card asks first, then calls the revoke route", async () => {
+    const actions: Array<[string, string]> = [];
+    const restore = stubFetch([device({ id: "robot-1", kind: "robot", name: "Riff", state: null })], [], (kind, id) => actions.push([kind, id]));
+    try {
+      const { findByRole } = renderSection();
+      fireEvent.click(await findByRole("button", { name: "Remove Riff" }));
+      fireEvent.click(await findByRole("button", { name: "Yes, remove it" }));
+      await waitFor(() => expect(actions).toEqual([["device", "robot-1"]]));
+    } finally {
+      restore();
+    }
+  });
 });
