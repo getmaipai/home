@@ -32472,3 +32472,77 @@ Out of scope here, per the row: STYLE-BENCH-01 (the actual fidelity
 gate), any hub runtime code, release assets. The four adapter files
 and their PEFT source directories live under `data-scratch/voice/
 adapters/` (git-ignored), never committed - this table is the record.
+
+## SINGLE-INSTANCE-01: one hub per data directory (2026-09-29, #194)
+
+What happened: a hub was started by hand as `bun backend/src/index.ts`
+from the repo root. The data directory default was
+`resolve(process.cwd(), "../data")`, so from that folder it became
+`<org>/data`, outside the repo: a brand-new empty hub with its own
+identity, serving port 8787 for about 8 hours in place of the real one.
+`bun stop` only tracks the pid file `scripts/app.sh` wrote, so it said
+"already stopped", and `bun restart` launched a second copy that exited
+because the port was held. Nothing said two hubs existed.
+
+What changed:
+
+- **The default data directory no longer depends on the working
+  directory.** `lib/paths.ts` anchors it to the source file
+  (`<repo>/data`), so `bun backend/src/index.ts` from any folder lands in
+  the same place. `MAIPAI_DATA_DIR` still overrides; an empty value counts
+  as unset. Installed layouts are unchanged: the service manager starts
+  the hub with `WorkingDirectory=<install>/backend`, which resolved to
+  `<install>/data` before and still does.
+- **One hub per data directory, by lock.** `lib/bootGuard.ts` is the
+  first import of `index.ts`, so it runs before anything opens the
+  database. It takes `<data>/hub.lock` (`lib/instanceLock.ts`), a JSON
+  file `{pid, startedAt, port, cwd}` created exclusively. If a live hub
+  already owns it, the new process prints the running pid and port,
+  exits 1, and never opens `hub.db`. The lock is released on clean
+  exit, SIGINT and SIGTERM (index.ts's handlers end in `process.exit`,
+  which fires the release). A stale lock never blocks a boot: the pid must
+  be alive, a `bun` process, and not started after the lock was written
+  (elapsed time from `ps`, so a reused pid belonging to a shell or a newer
+  script is reclaimed); an unreadable file is reclaimed too. A `bun --hot`
+  reload keeps the same pid and simply retakes its own lock. On Windows
+  there is no `ps`, so liveness is the pid check alone.
+- **A stray data directory is refused.** Outside the repo, the hub boots
+  only when `MAIPAI_DATA_DIR` was set on purpose, or the directory is under
+  `~/.maipai/` (the installed layout in the org SERVICES.md). With the
+  anchored default this is a backstop, not something a normal boot trips.
+- **`scripts/app.sh` sees hubs it did not start.** `stop` and `start`
+  (so `restart`) check who listens on `$PORT` (default 8787) using
+  `netstat` on macOS and `ss` on Linux, never `lsof -i`, which scans every
+  open file and can hang for minutes. If the holder is not the managed
+  pid, the script prints its pid, command, working directory and data
+  directory and the exact `kill` command, and exits 1 without changing
+  anything.
+
+Clearing a stuck lock: a crashed hub leaves `<data>/hub.lock` behind, and
+the next boot reclaims it by itself. If a boot refuses because of a lock
+whose pid you know is not a hub, delete that one file
+(`data/hub.lock`); nothing else in `data/` is involved.
+
+Known gaps, kept short on purpose: a SIGTERM that arrives during the
+long boot, before `index.ts` installs its handlers, kills the process
+without releasing the lock (the next boot reclaims it). The lock is
+created by writing a temp file and `link()`ing it into place, so it never
+appears half-written. Two hubs racing to reclaim the same stale lock can
+in theory both win, or one can delete the other's fresh lock; the reclaim
+rechecks the file's contents first, which shrinks that window but does not
+close it.
+A hub that was already running before this change holds no lock, so the
+first restart after upgrading is the first time the lock exists.
+
+The cwd audit of `backend/src` found no other working-directory-relative
+path in the runtime (`grep` for `process.cwd()`, `resolve("..")` and bare
+relative `join`/`resolve` literals). Not changed: developer bench scripts
+`backend/scripts/bench/replay.ts` and `engine-contract.ts` write to a
+cwd-relative `data-scratch/`, and `MAIPAI_BACKUP_DIR` defaults to a sibling
+of whatever data directory is in use (`<data>/../backups`), which is
+correct for the repo default and for an explicit data directory.
+
+Where the one-instance rule belongs: `.github/docs/SERVICES.md` says
+where the data directory lives and how a daemon runs but has no section on
+exactly-one-instance; the lock format and the rule for every daemon
+(Stack included) belong there, a `.github` change this item did not make.

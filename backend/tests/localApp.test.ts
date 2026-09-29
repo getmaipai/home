@@ -2,12 +2,16 @@ import { describe, expect, test } from "bun:test";
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { reserveFreePort } from "./fixtures/reserveFreePort";
 
 describe("local app commands", () => {
   test("starts once, prints URLs, restarts through stop and start, and stops safely", async () => {
     const root = await mkdtemp(join(tmpdir(), "home-lifecycle-"));
+    // SINGLE-INSTANCE-01: app.sh looks at PORT for a hub it does not manage;
+    // a free port keeps the family's real hub on 8787 out of this test.
+    const env = { ...process.env, PORT: String(reserveFreePort()) };
     const run = async (command: string) => {
-      const child = Bun.spawn([process.execPath, command], { cwd: root, stdout: "pipe", stderr: "pipe" });
+      const child = Bun.spawn([process.execPath, command], { cwd: root, env, stdout: "pipe", stderr: "pipe" });
       const [out, err, code] = await Promise.all([
         new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
       ]);
@@ -59,6 +63,53 @@ describe("local app commands", () => {
       expect(process.kill(process.pid, 0)).toBe(true);
     } finally {
       await run("stop");
+      await rm(root, { recursive: true, force: true });
+    }
+  }, 20000);
+
+  // SINGLE-INSTANCE-01 (#194): a hub started by hand held the port and
+  // `bun stop` answered "already stopped" while `bun start` launched a copy
+  // that could not bind. Now all three name the holder and refuse.
+  test("stop, start and restart refuse, and name the holder, when a hub they did not start holds the port", async () => {
+    const root = await mkdtemp(join(tmpdir(), "home-lifecycle-foreign-"));
+    const port = reserveFreePort();
+    const foreign = Bun.spawn(
+      [process.execPath, "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("x") }); setTimeout(() => {}, 60000);`],
+      { cwd: root, stdout: "ignore", stderr: "ignore" },
+    );
+    const run = async (command: string) => {
+      const child = Bun.spawn([process.execPath, command], {
+        cwd: root, env: { ...process.env, PORT: String(port) }, stdout: "pipe", stderr: "pipe",
+      });
+      const [out, err, code] = await Promise.all([
+        new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
+      ]);
+      return { text: out + err, code };
+    };
+    try {
+      await mkdir(join(root, "scripts"), { recursive: true });
+      await mkdir(join(root, "frontend"));
+      await mkdir(join(root, "backend/src"), { recursive: true });
+      await cp(join(import.meta.dir, "../../scripts/app.sh"), join(root, "scripts/app.sh"));
+      const pkg = await Bun.file(join(import.meta.dir, "../../package.json")).json();
+      await writeFile(join(root, "package.json"), JSON.stringify({ scripts: pkg.scripts }));
+      await writeFile(join(root, "frontend/package.json"), JSON.stringify({ scripts: { build: "bun -e 'process.exit(0)'" } }));
+      await writeFile(join(root, "backend/src/index.ts"), "throw new Error('must not start');");
+      for (let attempt = 0; attempt < 100; attempt++) {
+        if (await fetch(`http://127.0.0.1:${port}`).then(() => true, () => false)) break;
+        await Bun.sleep(20);
+      }
+      for (const command of ["stop", "start", "restart"]) {
+        const result = await run(command);
+        expect(result.code).not.toBe(0);
+        expect(result.text).toContain(`PID ${foreign.pid}`);
+        expect(result.text).toContain("did not start");
+        expect(result.text).toContain(`kill ${foreign.pid}`);
+        expect(result.text).not.toContain("already stopped");
+      }
+      expect(process.kill(foreign.pid, 0)).toBe(true);
+    } finally {
+      foreign.kill();
       await rm(root, { recursive: true, force: true });
     }
   }, 20000);

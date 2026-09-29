@@ -9210,6 +9210,17 @@ on a spec tag that was never cut.
 
 ## Cross-cutting
 
+- [x] **SINGLE-INSTANCE-01: one hub per data directory** (M, #194) -
+  landed 2026-09-29. `lib/paths.ts` anchors the default data directory to
+  the repo (never the cwd); `lib/bootGuard.ts` + `lib/instanceLock.ts`
+  take `<data>/hub.lock` before the database opens, refuse a live second
+  hub and a stray data directory outside the repo; `scripts/app.sh` names
+  and refuses a hub it did not start on the port. Tests:
+  `backend/tests/instanceLock.test.ts`, `paths.test.ts`,
+  `localApp.test.ts`. Design note: `docs/dev.md`, "SINGLE-INSTANCE-01".
+  Open follow-up: the org SERVICES.md has no one-instance rule yet (a
+  `.github` change). Exit check: `bash scripts/check.sh`.
+
 - [x] **Local source startup commands** (S): root `package.json` and
   `scripts/app.sh` provide `bun start`, `bun stop`, and `bun restart`.
   Restart calls stop, then start. Start builds the frontend, runs the

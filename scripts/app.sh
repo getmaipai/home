@@ -24,6 +24,42 @@ running() {
   [[ "$command" == *"bun $entry" ]]
 }
 
+# SINGLE-INSTANCE-01 (#194): a hub this script did not start (run by hand,
+# or left over from another checkout) can hold the port. Without this,
+# stop said "already stopped" and start launched a copy that could not
+# bind. Report the holder plainly so nobody has to hunt for it.
+port="${PORT:-8787}"
+foreign_hub() {
+  # Not `lsof -i`: it scans every open file on the machine and can hang for
+  # minutes. netstat (macOS) and ss (Linux) answer from the socket table.
+  holder=""
+  if [ "$(uname -s)" = "Darwin" ]; then
+    holder="$(netstat -anv -p tcp 2>/dev/null | awk -v p="$port" '
+      $6 == "LISTEN" && $4 ~ ("[.:]" p "$") { n = split($11, a, ":"); print a[n]; exit }' || true)"
+  elif command -v ss >/dev/null 2>&1; then
+    holder="$(ss -ltnpH "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | head -n 1 || true)"
+  fi
+  case "$holder" in ''|*[!0-9]*) return 1 ;; esac
+  return 0
+}
+
+report_foreign_hub() {
+  local cwd command data
+  cwd="$(lsof -a -p "$holder" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1 || true)"
+  command="$(ps -p "$holder" -o command= 2>/dev/null || true)"
+  data="$(ps eww -p "$holder" -o command= 2>/dev/null | grep -o 'MAIPAI_DATA_DIR=[^ ]*' | head -n 1 | sed 's/^MAIPAI_DATA_DIR=//' || true)"
+  if [ -z "$data" ] && [ -f "$root/data/hub.lock" ] && grep -q "\"pid\":$holder[,}]" "$root/data/hub.lock"; then
+    data="$root/data"
+  fi
+  [ -n "$data" ] || data="not set in its environment (an older hub uses <its working directory>/../data)"
+  echo "Port $port is held by PID $holder, which this script did not start." >&2
+  echo "  command:           ${command:-unknown}" >&2
+  echo "  working directory: ${cwd:-unknown}" >&2
+  echo "  data directory:    $data" >&2
+  echo "To stop it: kill $holder" >&2
+  echo "Then run this command again. Nothing was changed." >&2
+}
+
 print_urls() {
   awk '
     /^Home URL: / { sub(/^Home URL: /, "  "); pending = pending $0 "\n" }
@@ -46,6 +82,10 @@ case "${1:-}" in
       exit 0
     fi
     rm -f "$state/pid"
+    if foreign_hub; then
+      report_foreign_hub
+      exit 1
+    fi
     (cd "$root/frontend" && bun run build)
     cd "$root/backend"
     nohup bun "$entry" </dev/null >"$state/app.log" 2>&1 &
@@ -73,6 +113,10 @@ case "${1:-}" in
   stop)
     if ! running; then
       rm -f "$state/pid"
+      if foreign_hub; then
+        report_foreign_hub
+        exit 1
+      fi
       echo "Home is already stopped (no managed process)."
       exit 0
     fi
