@@ -1,23 +1,44 @@
 import { linkSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, relative, isAbsolute, resolve } from "node:path";
+import { dirname, join, relative, isAbsolute, resolve } from "node:path";
 
-// SINGLE-INSTANCE-01 (#194): one hub per data directory. On 2026-09-29 a
-// hub started by hand ran for about 8 hours on a stray data directory,
-// in place of the real one, and nothing said two hubs existed. The lock
-// is a small JSON file in the data directory itself, so "same data
-// directory" and "same lock" are the same fact.
+// SINGLE-INSTANCE-01 (#194) and SINGLE-INSTANCE-02 (#196): at most ONE hub
+// per machine (per OS user), whatever its data directory or port. On
+// 2026-09-29 a hub on a stray data directory ran beside the real one for
+// hours; a lock inside the data directory could not have stopped it. The
+// lock is a small JSON file at a fixed per-user path that depends on
+// neither the working directory nor the data directory.
 
-export const LOCK_FILE_NAME = "hub.lock";
+/** The pre-SINGLE-INSTANCE-02 lock, read only (see assertNoLegacyDataDirLock). */
+export const LEGACY_LOCK_FILE_NAME = "hub.lock";
 
-export type LockInfo = { pid: number; startedAt: number; port: number; cwd: string };
+/**
+ * Set ONLY by tests and the scripts the gate, screenshots and restore
+ * drill use to boot a throwaway hub on its own data directory and port.
+ * Production boot (bun start, the service units) never sets it.
+ */
+export const OPT_OUT_ENV = "MAIPAI_TEST_ALLOW_MULTIPLE_HUBS";
+
+/** Where the machine lock lives: SERVICES.md's per-user root, next to `data/`. */
+export function hubLockPath(
+  env: Record<string, string | undefined> = process.env,
+  home: string = homedir(),
+  platform: string = process.platform,
+): string {
+  if (env.MAIPAI_HUB_LOCK_PATH) return env.MAIPAI_HUB_LOCK_PATH;
+  if (platform === "win32") return join(env.LOCALAPPDATA || join(home, "AppData", "Local"), "MaiPai", "home", "hub.lock");
+  return join(home, ".maipai", "home", "hub.lock");
+}
+
+export type LockInfo = { pid: number; startedAt: number; port: number; dataDir: string; cwd: string };
 
 export class HubAlreadyRunningError extends Error {
   constructor(readonly info: LockInfo, readonly lockPath: string) {
     super(
-      `Another Home hub is already running on this data directory (PID ${info.pid}, port ${info.port}). ` +
-        `This one will not start, and has not touched the database. ` +
-        `Stop the running hub first (for example: kill ${info.pid}). ` +
+      `Another Home hub is already running on this machine (PID ${info.pid}, port ${info.port}, ` +
+        `data directory ${info.dataDir || "unknown"}). Only one hub runs at a time, so this one will not ` +
+        `start, and it has not touched any database. ` +
+        `Stop the running hub first: kill ${info.pid} (or run "bun stop" in the checkout that started it). ` +
         `Lock file: ${lockPath}`,
     );
   }
@@ -85,7 +106,7 @@ function parseLock(text: string): LockInfo | null {
   try {
     const v = JSON.parse(text) as Partial<LockInfo>;
     if (typeof v.pid !== "number" || typeof v.startedAt !== "number") return null;
-    return { pid: v.pid, startedAt: v.startedAt, port: Number(v.port ?? 0), cwd: String(v.cwd ?? "") };
+    return { pid: v.pid, startedAt: v.startedAt, port: Number(v.port ?? 0), dataDir: String(v.dataDir ?? ""), cwd: String(v.cwd ?? "") };
   } catch {
     return null;
   }
@@ -100,15 +121,18 @@ export type InstanceLock = {
 };
 
 /**
- * Take the data directory's exclusive hub lock or throw
+ * Take the machine's exclusive hub lock at `path` or throw
  * HubAlreadyRunningError. A stale lock (dead pid, a pid reused by an
  * unrelated process, or an unreadable file) is reclaimed.
  */
-export function acquireInstanceLock(dir: string, port: number, opts: { pid?: number } = {}): InstanceLock {
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const path = join(dir, LOCK_FILE_NAME);
+export function acquireInstanceLock(
+  path: string,
+  ident: { port: number; dataDir: string },
+  opts: { pid?: number } = {},
+): InstanceLock {
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const pid = opts.pid ?? process.pid;
-  const info: LockInfo = { pid, startedAt: Date.now(), port, cwd: process.cwd() };
+  const info: LockInfo = { pid, startedAt: Date.now(), port: ident.port, dataDir: ident.dataDir, cwd: process.cwd() };
 
   for (let attempt = 0; attempt < 5; attempt++) {
     // Write the whole record to a private temp file, then link() it into
@@ -182,6 +206,33 @@ export function acquireInstanceLock(dir: string, port: number, opts: { pid?: num
     },
   };
   return lock;
+}
+
+/**
+ * Transition shim, read only: a hub started before SINGLE-INSTANCE-02
+ * holds `<data>/hub.lock` and knows nothing of the machine lock. A new hub
+ * on that same data directory must not open the database beside it. A
+ * stale legacy file is removed. Nothing new ever writes this file, so it
+ * carries no second meaning; delete this shim once no such hub can be
+ * running (the family's hub restarts onto the new code once).
+ */
+export function assertNoLegacyDataDirLock(dataDir: string): void {
+  const path = join(dataDir, LEGACY_LOCK_FILE_NAME);
+  let text: string;
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    return;
+  }
+  const existing = parseLock(text);
+  if (existing !== null && existing.pid !== process.pid && isLiveHub(existing)) {
+    throw new HubAlreadyRunningError({ ...existing, dataDir: existing.dataDir || dataDir }, path);
+  }
+  try {
+    if (readFileSync(path, "utf8") === text) unlinkSync(path);
+  } catch {
+    /* already gone */
+  }
 }
 
 function isInside(parent: string, child: string): boolean {

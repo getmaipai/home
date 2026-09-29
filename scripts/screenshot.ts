@@ -3954,6 +3954,8 @@ async function main() {
     // it must also have its own port so sidecars.freePort() never mistakes
     // the running hub's Kiwix process for an orphan and kills it.
     const screenshotKiwixPort = reserveFreePort();
+    // SINGLE-INSTANCE-02: a throwaway hub with its own data directory and
+    // port, so it opts out of the machine-wide one-hub lock (test-only).
     backend = Bun.spawn({
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
@@ -3969,7 +3971,7 @@ async function main() {
       // depends on the box being empty." This matrix never needs real
       // speech, so the engine should never spawn at all, not just not
       // collide.
-      env: { ...process.env, PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
       stdout: "pipe",
       stderr: "inherit",
     });

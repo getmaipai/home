@@ -32475,6 +32475,9 @@ adapters/` (git-ignored), never committed - this table is the record.
 
 ## SINGLE-INSTANCE-01: one hub per data directory (2026-09-29, #194)
 
+(Superseded in part by SINGLE-INSTANCE-02 below: the lock is now one per
+machine, not `<data>/hub.lock`. The rest of this section still holds.)
+
 What happened: a hub was started by hand as `bun backend/src/index.ts`
 from the repo root. The data directory default was
 `resolve(process.cwd(), "../data")`, so from that folder it became
@@ -32546,3 +32549,107 @@ Where the one-instance rule belongs: `.github/docs/SERVICES.md` says
 where the data directory lives and how a daemon runs but has no section on
 exactly-one-instance; the lock format and the rule for every daemon
 (Stack included) belong there, a `.github` change this item did not make.
+
+## SINGLE-INSTANCE-02: one hub per machine (2026-09-29, #196)
+
+SINGLE-INSTANCE-01 locked one hub per data directory. That did not
+match the rule the owner set: one hub running at a time, full stop. The
+2026-09-29 incident was a hub on a different data directory, and a lock
+kept inside the data directory cannot see a hub that uses another one;
+only the placement guard caught it. This item replaces the per-directory
+lock with a machine-wide one.
+
+**The lock.** One JSON file at a fixed per-user path that ignores the
+working directory, the data directory and the port:
+`~/.maipai/home/hub.lock` on macOS and Linux,
+`%LOCALAPPDATA%\MaiPai\home\hub.lock` on Windows. Why there: SERVICES.md
+puts each product's per-user state under `~/.maipai/<product>/` (its
+`data/` folder is `~/.maipai/<product>/data`), and the gate lock uses
+`~/.local/state/maipai/` only because it is shared by every repo on the
+machine; the hub lock is Home's own, so it sits with Home's other
+per-user state, one level above `data/` so it survives a data directory
+being swapped or pointed elsewhere. Contents:
+`{"pid":n,"startedAt":ms,"port":n,"dataDir":"...","cwd":"..."}`, created
+atomically (temp file, then `link()`), the port rewritten once the server
+has bound it (`PORT=0`). Staleness is unchanged from SINGLE-INSTANCE-01:
+the pid must be alive, a `bun` process, and not started after the lock
+was written; anything else is reclaimed.
+
+**One lock, not two.** `lib/instanceLock.ts` no longer writes
+`<data>/hub.lock`. A machine lock subsumes it (a hub with any data
+directory is still one hub). One read-only transition shim remains,
+`assertNoLegacyDataDirLock`: a hub started before this change holds
+`<data>/hub.lock` and knows nothing of the machine lock, so a new hub on
+the same data directory checks for a live legacy holder before opening the
+database, and deletes a stale legacy file. Nothing writes that file any
+more; remove the shim once no pre-change hub can be running.
+
+**Refusal.** A second hub, whatever its `MAIPAI_DATA_DIR` or `PORT`, exits 1
+in `lib/bootGuard.ts` before any import opens a database, and never
+creates its own data directory:
+
+```
+[fatal] Another Home hub is already running on this machine (PID 4242, port 8787, data directory /path/to/data). Only one hub runs at a time, so this one will not start, and it has not touched any database. Stop the running hub first: kill 4242 (or run "bun stop" in the checkout that started it). Lock file: ~/.maipai/home/hub.lock
+```
+
+**Test opt-out.** The backend suite, the screenshot and a11y run and the
+restore drill boot throwaway hubs on their own data directory and port,
+sometimes alongside the real hub, so they set
+`MAIPAI_TEST_ALLOW_MULTIPLE_HUBS=1`, which skips the lock entirely (the
+name says "test" on purpose; the service units and `bun start` never set
+it). `tests/preload.ts` sets it for every test and its children inherit it,
+and also points `MAIPAI_HUB_LOCK_PATH` (the path override, honored
+everywhere) at a temp file so no test can touch the real lock. Every place
+that boots a hub: `scripts/app.sh` (`bun start`), the launchd, systemd and
+Windows service definitions written by `scripts/install.sh` and
+`install.ps1` (all `bun run start`), `backend` `bun run dev` and `start`:
+production, no opt-out. `scripts/screenshot.ts` (its backend spawn) and
+`backend/scripts/restore-drill.ts`: opt out. The tests in
+`instanceLock.test.ts` that boot the guard as a real process strip the
+opt-out from the child's environment to prove the production-style refusal.
+`bun run dev` beside a running hub is now refused too, by design; stop
+the hub first.
+
+**`scripts/app.sh`.** `stop` and `start` (so `restart`) read the machine
+lock first: a live `bun` `index.ts` process it names that the script did
+not start is reported with its pid, port, data directory, working
+directory and command, and the `kill` line, and the script exits 1
+changing nothing. The port check from SINGLE-INSTANCE-01 stays as the
+fallback for a hub that predates the lock. `MAIPAI_HUB_LOCK_PATH` moves
+the file for tests.
+
+**The running hub.** The family's hub on port 8787 predates this change:
+it holds the old `<data>/hub.lock` and no machine lock. Nothing changes
+for it until it restarts. `bun restart` stops it (it releases its old
+lock on SIGTERM), then the new code starts and takes the machine lock.
+Until that restart, a second hub started by hand on another data
+directory and port is not refused by the lock (the old hub wrote none),
+though `bun start` still spots the port-8787 holder; on the same data
+directory the transition shim refuses it.
+
+Clearing a stuck lock: a crashed hub leaves the file behind and the next
+boot reclaims it. If a boot refuses over a lock whose pid you know is not
+a hub, delete `~/.maipai/home/hub.lock`; nothing else is involved.
+
+Proposed paragraph for `.github/docs/SERVICES.md` (not edited here; the
+coordinator carries it over). Suggested home: a new "One instance" subsection
+under the daemon requirements.
+
+> **One instance.** A daemon runs at most once per machine per OS user,
+> whatever data directory or port it is given. On boot, before opening any
+> database or binding a port, it takes an exclusive lock at
+> `~/.maipai/<product>/<daemon>.lock` (`%LOCALAPPDATA%\MaiPai\<product>\<daemon>.lock`
+> on Windows), a JSON file `{pid, startedAt, port, dataDir, cwd}` created
+> atomically (write a temp file, then `link()` it into place; fall back to an
+> exclusive create where hard links do not exist). The lock is stale, and
+> reclaimed, when the pid is dead, is not the daemon's runtime, or started
+> after `startedAt`; it is released on clean exit, SIGINT and SIGTERM. A
+> second start exits 1 and prints, in plain words, the running daemon's pid,
+> port and data directory and the command to stop it: `Another <Product>
+> <daemon> is already running on this machine (PID n, port n, data
+> directory ...). Only one runs at a time, so this one will not start, and it
+> has not touched any database. Stop the running one first: kill n.` There
+> is no production opt-out; tests that boot throwaway instances on their own
+> data directory and port set a test-only environment variable that skips the
+> lock, and point the lock path at a temp file. Service managers and status
+> tooling read the same file to name a daemon they did not start.

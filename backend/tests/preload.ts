@@ -10,6 +10,11 @@ import { installTestIsolationGuard } from "./isolation";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 
+// SINGLE-INSTANCE-02 (#196): a hub booted by a test (or by a script a test
+// runs) has its own throwaway data directory and port, and must never
+// take, or be refused by, the machine-wide hub lock. Only tests set this.
+process.env.MAIPAI_TEST_ALLOW_MULTIPLE_HUBS = "1";
+process.env.MAIPAI_HUB_LOCK_PATH = join(mkdtempSync(join(tmpdir(), "maipai-home-test-lock-")), "hub.lock");
 process.env.MAIPAI_DATA_DIR = mkdtempSync(join(tmpdir(), "maipai-home-test-"));
 // Its own, independent throwaway directory, not a sibling derived from
 // MAIPAI_DATA_DIR above: two different test runs' data dirs share the

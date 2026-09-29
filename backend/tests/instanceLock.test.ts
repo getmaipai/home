@@ -1,18 +1,21 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   acquireInstanceLock,
   assertDataDirPlacement,
+  assertNoLegacyDataDirLock,
   DataDirPlacementError,
   HubAlreadyRunningError,
-  LOCK_FILE_NAME,
+  hubLockPath,
+  LEGACY_LOCK_FILE_NAME,
+  OPT_OUT_ENV,
 } from "@/lib/instanceLock";
 
-// SINGLE-INSTANCE-01 (#194): one hub per data directory, taken from the
-// data directory itself, so a hand-started second hub cannot run beside
-// the real one.
+// SINGLE-INSTANCE-01 (#194) and -02 (#196): at most ONE hub per machine
+// (per OS user), whatever its data directory or port. The lock lives at a
+// fixed per-user path, never in the data directory.
 
 const dirs: string[] = [];
 const children: Array<ReturnType<typeof Bun.spawn>> = [];
@@ -21,6 +24,8 @@ function tmp(): string {
   dirs.push(d);
   return d;
 }
+/** A lock path in its own throwaway directory: tests never touch ~/.maipai. */
+const lockIn = (d: string) => join(d, "home", "hub.lock");
 afterEach(() => {
   for (const c of children.splice(0)) c.kill();
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
@@ -31,130 +36,173 @@ function bunChild(): ReturnType<typeof Bun.spawn> {
   children.push(c);
   return c;
 }
-function writeLock(dir: string, pid: number, startedAt: number, port = 8787): void {
-  writeFileSync(join(dir, LOCK_FILE_NAME), JSON.stringify({ pid, startedAt, port, cwd: "/elsewhere" }));
+function writeLock(path: string, pid: number, startedAt: number, port = 8787, dataDir = "/elsewhere/data"): void {
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, JSON.stringify({ pid, startedAt, port, dataDir, cwd: "/elsewhere" }));
 }
-const readLock = (dir: string) => JSON.parse(readFileSync(join(dir, LOCK_FILE_NAME), "utf8"));
+const readLock = (path: string) => JSON.parse(readFileSync(path, "utf8"));
+const ident = (dataDir: string, port = 8787) => ({ port, dataDir });
 
-describe("hub lock in the data directory", () => {
-  test("taking the lock records pid and port; releasing removes it", () => {
-    const dir = tmp();
-    const lock = acquireInstanceLock(dir, 8787);
-    expect(readLock(dir)).toMatchObject({ pid: process.pid, port: 8787 });
+describe("where the machine lock lives", () => {
+  test("the default is a fixed per-user path that ignores cwd and the data directory", () => {
+    expect(hubLockPath({}, "/home/x", "linux")).toBe("/home/x/.maipai/home/hub.lock");
+    expect(hubLockPath({ MAIPAI_DATA_DIR: "/somewhere/else" }, "/home/x", "darwin")).toBe("/home/x/.maipai/home/hub.lock");
+    expect(hubLockPath({ LOCALAPPDATA: "C:\\Users\\x\\AppData\\Local" }, "C:\\Users\\x", "win32")).toContain("MaiPai");
+  });
+  test("MAIPAI_HUB_LOCK_PATH overrides it (tests point it at a temp path)", () => {
+    expect(hubLockPath({ MAIPAI_HUB_LOCK_PATH: "/tmp/t/hub.lock" }, "/home/x", "linux")).toBe("/tmp/t/hub.lock");
+  });
+});
+
+describe("the machine-wide hub lock", () => {
+  test("taking the lock records pid, port, data directory and cwd; releasing removes it", () => {
+    const path = lockIn(tmp());
+    const lock = acquireInstanceLock(path, ident("/data/a"));
+    expect(readLock(path)).toMatchObject({ pid: process.pid, port: 8787, dataDir: "/data/a", cwd: process.cwd() });
     lock.setPort(9000);
-    expect(readLock(dir).port).toBe(9000);
+    expect(readLock(path).port).toBe(9000);
     lock.release();
-    expect(existsSync(join(dir, LOCK_FILE_NAME))).toBe(false);
+    expect(existsSync(path)).toBe(false);
   });
 
-  test("a second boot is refused when a live hub owns the directory, naming its pid and port", () => {
-    const dir = tmp();
+  test("a second boot is refused whatever its data directory or port, naming pid, port, data directory and the stop command", () => {
+    const path = lockIn(tmp());
     const owner = bunChild();
-    writeLock(dir, owner.pid, Date.now(), 8787);
+    writeLock(path, owner.pid, Date.now(), 8787, "/data/real");
     let caught: unknown;
     try {
-      acquireInstanceLock(dir, 8787);
+      acquireInstanceLock(path, ident("/data/stray", 9999));
     } catch (err) {
       caught = err;
     }
     expect(caught).toBeInstanceOf(HubAlreadyRunningError);
-    expect((caught as Error).message).toContain(`PID ${owner.pid}`);
-    expect((caught as Error).message).toContain("port 8787");
-    // The refused boot left the owner's lock and created nothing else.
-    expect(readLock(dir).pid).toBe(owner.pid);
-    expect(readdirSync(dir)).toEqual([LOCK_FILE_NAME]);
+    const msg = (caught as Error).message;
+    expect(msg).toContain(`PID ${owner.pid}`);
+    expect(msg).toContain("port 8787");
+    expect(msg).toContain("/data/real");
+    expect(msg).toContain(`kill ${owner.pid}`);
+    expect(readLock(path).pid).toBe(owner.pid);
+    expect(readdirSync(join(path, ".."))).toEqual(["hub.lock"]);
   });
 
   test("a stale lock from a dead pid is reclaimed", async () => {
-    const dir = tmp();
+    const path = lockIn(tmp());
     const dead = bunChild();
     dead.kill();
     await dead.exited;
-    writeLock(dir, dead.pid, Date.now());
-    const lock = acquireInstanceLock(dir, 8787);
-    expect(readLock(dir).pid).toBe(process.pid);
+    writeLock(path, dead.pid, Date.now());
+    const lock = acquireInstanceLock(path, ident("/data/a"));
+    expect(readLock(path).pid).toBe(process.pid);
     lock.release();
   });
 
   test("a pid reused by an unrelated (non-bun) process is reclaimed", () => {
-    const dir = tmp();
+    const path = lockIn(tmp());
     const stranger = Bun.spawn(["sleep", "60"], { stdout: "ignore", stderr: "ignore" });
     children.push(stranger);
-    writeLock(dir, stranger.pid, Date.now());
-    const lock = acquireInstanceLock(dir, 8787);
-    expect(readLock(dir).pid).toBe(process.pid);
+    writeLock(path, stranger.pid, Date.now());
+    const lock = acquireInstanceLock(path, ident("/data/a"));
+    expect(readLock(path).pid).toBe(process.pid);
     lock.release();
   });
 
   test("a pid reused by a bun process that started after the lock was written is reclaimed", () => {
-    const dir = tmp();
+    const path = lockIn(tmp());
     const later = bunChild();
-    writeLock(dir, later.pid, Date.now() - 3_600_000);
-    const lock = acquireInstanceLock(dir, 8787);
-    expect(readLock(dir).pid).toBe(process.pid);
+    writeLock(path, later.pid, Date.now() - 3_600_000);
+    const lock = acquireInstanceLock(path, ident("/data/a"));
+    expect(readLock(path).pid).toBe(process.pid);
     lock.release();
   });
 
   test("an unreadable lock file is reclaimed", () => {
-    const dir = tmp();
-    writeFileSync(join(dir, LOCK_FILE_NAME), "not json");
-    const lock = acquireInstanceLock(dir, 8787);
-    expect(readLock(dir).pid).toBe(process.pid);
+    const path = lockIn(tmp());
+    mkdirSync(join(path, ".."), { recursive: true });
+    writeFileSync(path, "not json");
+    const lock = acquireInstanceLock(path, ident("/data/a"));
+    expect(readLock(path).pid).toBe(process.pid);
     lock.release();
-  });
-
-  test("hubs on different data directories run side by side", () => {
-    const a = acquireInstanceLock(tmp(), 8787);
-    const b = acquireInstanceLock(tmp(), 8787);
-    a.release();
-    b.release();
   });
 
   test("release never removes a lock some other hub now owns", () => {
-    const dir = tmp();
-    const lock = acquireInstanceLock(dir, 8787);
+    const path = lockIn(tmp());
+    const lock = acquireInstanceLock(path, ident("/data/a"));
     const owner = bunChild();
-    writeLock(dir, owner.pid, Date.now());
+    writeLock(path, owner.pid, Date.now());
     lock.release();
-    expect(readLock(dir).pid).toBe(owner.pid);
+    expect(readLock(path).pid).toBe(owner.pid);
+  });
+});
+
+describe("a hub that predates the machine lock (data-directory hub.lock)", () => {
+  test("a live one on the same data directory still refuses a new hub; a stale one is cleared", async () => {
+    const dir = tmp();
+    const owner = bunChild();
+    writeFileSync(join(dir, LEGACY_LOCK_FILE_NAME), JSON.stringify({ pid: owner.pid, startedAt: Date.now(), port: 8787, cwd: "/x" }));
+    expect(() => assertNoLegacyDataDirLock(dir)).toThrow(HubAlreadyRunningError);
+    owner.kill();
+    await owner.exited;
+    assertNoLegacyDataDirLock(dir);
+    expect(existsSync(join(dir, LEGACY_LOCK_FILE_NAME))).toBe(false);
   });
 });
 
 describe("the boot guard, as a real second process", () => {
   const guard = join(import.meta.dir, "../src/lib/bootGuard.ts");
-  function boot(dir: string, extra: Record<string, string> = {}) {
+  /** A production-style boot: the test-only opt-out is stripped from the env. */
+  function boot(lockPath: string, dataDir: string, port: string, extra: Record<string, string> = {}, script?: string) {
+    const env: Record<string, string | undefined> = { ...process.env, MAIPAI_HUB_LOCK_PATH: lockPath, MAIPAI_DATA_DIR: dataDir, PORT: port, ...extra };
+    if (!("keepOptOut" in extra)) delete env[OPT_OUT_ENV];
+    delete env.keepOptOut;
     return Bun.spawn(
-      [process.execPath, "-e", `import ${JSON.stringify(guard)}; console.log("BOOTED"); setTimeout(() => {}, 60000);`],
-      { env: { ...process.env, MAIPAI_DATA_DIR: dir, PORT: "8799", ...extra }, stdout: "pipe", stderr: "pipe" },
+      [process.execPath, "-e", script ?? `import ${JSON.stringify(guard)}; console.log("BOOTED"); setTimeout(() => {}, 60000);`],
+      { env: env as Record<string, string>, stdout: "pipe", stderr: "pipe" },
     );
   }
 
-  test("the second hub exits non-zero with a plain message and never creates a database", async () => {
-    const dir = tmp();
-    const first = boot(dir);
+  test("a production-style second hub on a different data directory and port exits 1, names the first, and touches nothing", async () => {
+    const root = tmp();
+    const lockPath = lockIn(root);
+    const dataA = join(root, "data-a");
+    const dataB = join(root, "data-b");
+    const first = boot(lockPath, dataA, "8799");
     children.push(first);
-    const reader = first.stdout.getReader();
-    expect(new TextDecoder().decode((await reader.read()).value)).toContain("BOOTED");
+    expect(new TextDecoder().decode((await first.stdout.getReader().read()).value)).toContain("BOOTED");
 
-    const second = boot(dir);
+    const second = boot(lockPath, dataB, "8798");
     const [err, code] = await Promise.all([new Response(second.stderr).text(), second.exited]);
-    expect(code).not.toBe(0);
+    expect(code).toBe(1);
     expect(err).toContain(`PID ${first.pid}`);
     expect(err).toContain("port 8799");
-    expect(readdirSync(dir)).toEqual([LOCK_FILE_NAME]);
+    expect(err).toContain(dataA);
+    expect(err).toContain(`kill ${first.pid}`);
+    // The refused hub never created its data directory, let alone a database.
+    expect(existsSync(dataB)).toBe(false);
+  });
+
+  test("with the test-only opt-out, hubs on their own data directories run side by side and take no lock", async () => {
+    const root = tmp();
+    const lockPath = lockIn(root);
+    const a = boot(lockPath, join(root, "a"), "8797", { [OPT_OUT_ENV]: "1", keepOptOut: "1" });
+    const b = boot(lockPath, join(root, "b"), "8796", { [OPT_OUT_ENV]: "1", keepOptOut: "1" });
+    children.push(a, b);
+    expect(new TextDecoder().decode((await a.stdout.getReader().read()).value)).toContain("BOOTED");
+    expect(new TextDecoder().decode((await b.stdout.getReader().read()).value)).toContain("BOOTED");
+    expect(existsSync(lockPath)).toBe(false);
   });
 
   test("SIGTERM releases the lock so the next boot starts", async () => {
-    const dir = tmp();
-    const first = Bun.spawn(
-      [process.execPath, "-e", `import ${JSON.stringify(guard)}; process.on("SIGTERM", () => process.exit(0)); console.log("BOOTED"); setTimeout(() => {}, 60000);`],
-      { env: { ...process.env, MAIPAI_DATA_DIR: dir, PORT: "8799" }, stdout: "pipe", stderr: "ignore" },
+    const root = tmp();
+    const lockPath = lockIn(root);
+    const first = boot(
+      lockPath, join(root, "a"), "8799", {},
+      `import ${JSON.stringify(guard)}; process.on("SIGTERM", () => process.exit(0)); console.log("BOOTED"); setTimeout(() => {}, 60000);`,
     );
     children.push(first);
     await first.stdout.getReader().read();
     first.kill("SIGTERM");
     await first.exited;
-    expect(existsSync(join(dir, LOCK_FILE_NAME))).toBe(false);
+    expect(existsSync(lockPath)).toBe(false);
   });
 });
 

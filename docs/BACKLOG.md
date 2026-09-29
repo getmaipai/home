@@ -9218,7 +9218,19 @@ on a spec tag that was never cut.
   and refuses a hub it did not start on the port. Tests:
   `backend/tests/instanceLock.test.ts`, `paths.test.ts`,
   `localApp.test.ts`. Design note: `docs/dev.md`, "SINGLE-INSTANCE-01".
-  Open follow-up: the org SERVICES.md has no one-instance rule yet (a
+  Superseded in part by SINGLE-INSTANCE-02 (the lock is now per machine).
+  Exit check: `bash scripts/check.sh`.
+- [x] **SINGLE-INSTANCE-02: one hub per machine, whatever its data directory or port** (M, #196) -
+  landed 2026-09-29. The lock moved from `<data>/hub.lock` to one
+  per-user file (`~/.maipai/home/hub.lock`) holding pid, start time, port,
+  data directory and cwd; a second hub exits 1 before opening any
+  database, naming the running one. Tests and the gate's throwaway hubs
+  (`screenshot.ts`, `restore-drill.ts`) set the test-only
+  `MAIPAI_TEST_ALLOW_MULTIPLE_HUBS`; production has no opt-out.
+  `scripts/app.sh` finds a hub it did not start through the lock. Tests:
+  `instanceLock.test.ts`, `localApp.test.ts`. Design note: `docs/dev.md`,
+  "SINGLE-INSTANCE-02". Open follow-up: the org SERVICES.md still needs the
+  one-instance paragraph (proposed text is in that dev.md section; a
   `.github` change). Exit check: `bash scripts/check.sh`.
 
 - [x] **Local source startup commands** (S): root `package.json` and
