@@ -195,6 +195,23 @@ describe("edge-triggering and dwell", () => {
 });
 
 describe("the chime", () => {
+  // FACE-02P: Jesse found the 700 ms chime too long. Short and crisp:
+  // a quick attack and a quick decay, the same two-note pitch.
+  test("is short and crisp: about a quarter second, every voice stopped by then", async () => {
+    expect(CHIME.durationMs).toBeGreaterThanOrEqual(250);
+    expect(CHIME.durationMs).toBeLessThanOrEqual(300);
+    expect(CHIME.attackMs).toBeLessThanOrEqual(10);
+    expect(CHIME.partials.map((p) => p.freq)).toEqual([1568, 2349]);
+    const { ctx, sounds } = setup();
+    await sounds.unlock();
+    sounds.captured();
+    for (const voice of ctx.started) {
+      expect(voice.stop! - voice.start).toBeLessThanOrEqual(0.32);
+      expect(voice.stop! - voice.start).toBeGreaterThanOrEqual(CHIME.durationMs / 1000);
+    }
+    sounds.stop();
+  });
+
   test("never overlaps itself, then plays again once it has finished", async () => {
     const { clock, ctx, sounds } = setup();
     await sounds.unlock();

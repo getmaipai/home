@@ -37,15 +37,16 @@ export const CUES = {
 } as const;
 
 // One clear bell: a fundamental and a fifth above it, sharp attack and
-// a long decay. Higher and louder than anything else so it reads as
-// "the photo was taken".
+// a quick decay. Higher and louder than anything else so it reads as
+// "the photo was taken". FACE-02P: 260 ms, down from 700 (too long, per
+// Jesse); the decay is an exponential ramp to silence over the same 260.
 export const CHIME = {
   partials: [
     { freq: 1568, gain: 0.12 },
     { freq: 2349, gain: 0.04 },
   ],
   attackMs: 5,
-  durationMs: 700,
+  durationMs: 260,
 } as const;
 
 /** A cue does not change again until this long after the last change, so
