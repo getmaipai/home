@@ -66,8 +66,11 @@ describe("POST /api/auth/devices/redeem", () => {
     const res = await client.post("/api/auth/devices/redeem", { token });
     expect(res.status).toBe(200);
 
-    const me = await client.get("/api/auth/me");
-    expect(me.status).toBe(200);
+    // The session works on the robot's own routes and, since ROBOT-ROUTES-01,
+    // is scoped away from the rest (a robot has no use for /api/auth/me).
+    const report = await client.request("/api/devices/me/state", { method: "PUT", body: { activity: "idle", muted: false, tracking: false } });
+    expect(report.status).toBe(204);
+    expect((await client.get("/api/auth/me")).status).toBe(403);
   });
 
   // FACE-03: sessions.device_id round-trips from redeem - the whole
