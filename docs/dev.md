@@ -32071,7 +32071,7 @@ finding about the two briefs at this teacher and this validator, read
 directly from real drop reasons across all three runs: `length band`
 and `capitalized-token set` dominate `typed:conversational` (a short
 typed reply, mostly the small-talk and replay-derived rows, compresses
-or reworks a filler-heavy bare reply - e.g. "Hey there! I'm MaiPai,
+or reworks a filler-heavy bare reply - e.g. "Hey there. I'm MaiPai,
 your personal AI assistant. How can I help you today?" became
 "Hey. I'm MaiPai, your home assistant. What do you need?", dropping the
 capitalized "AI" - a real, correctly-caught substance change even
