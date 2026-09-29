@@ -210,7 +210,7 @@ function NextSignedOutRoutes({ onSignedIn }: { onSignedIn: () => void }) {
           /next) lands on the sign-in screen, not a blank no-match -
           the same "nothing renders before someone is signed in"
           posture the old shell's own SignIn.tsx documents. */}
-      <Route path="*" element={<Navigate to="sign-in" replace />} />
+      <Route path="*" element={<Navigate to="/sign-in" replace />} />
     </Routes>
   );
 }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
@@ -200,6 +200,23 @@ describe("NextRoutes sign-in redirect", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+describe("NextRoutes signed-out redirect", () => {
+  test("a signed-out visit to a deep path lands on /sign-in once, never /people/sign-in/sign-in", async () => {
+    function Path() {
+      return <div data-testid="path">{useLocation().pathname}</div>;
+    }
+    const view = renderWithQueryClient(
+      <MemoryRouter initialEntries={["/people"]}>
+        <Path />
+        <Routes>
+          <Route path="/*" element={<NextRoutes person={null} onSignedIn={() => {}} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(view.getByTestId("path").textContent).toBe("/sign-in"));
   });
 });
 
