@@ -32501,6 +32501,108 @@ and +9 do not, a different camera height moves the baseline and keeps the
 
 Follow-up item in `docs/BACKLOG.md` (FACE-02K-2).
 
+## FACE-02M: enrollment sounds and ring motion (2026-09-29, #198)
+
+Jesse's rule: the capture ring talks. Four cues, one per ring state, and a
+little motion on the ring itself. Jesse tried enrollment and heard no
+sounds only because this item had not landed yet.
+
+**What could not be verified.** Nobody who worked on this can hear audio or
+see motion. What is proven is structure: which tone starts for which ring
+state, its frequency, gain and timing, the edge-triggering and dwell,
+cleanup, the off switch and the reduced-motion class rules, all by tests
+against a recording fake `AudioContext` and a fake clock. How the cues
+sound, and how the motion feels, is Jesse's judgment. No real-browser
+stills were taken either: a headless fake camera has no face for the
+detector to find, so only the scanning state could be shown for real, and
+the other states are covered by the page tests' class and attribute checks.
+Treat FACE-02M as unheard and unseen until Jesse runs one enrollment.
+
+**The cues** (`lib/vision/faceCaptureSounds.ts`; every number is a constant
+there, and the test pins the progression). Gains are fractions of full
+scale, one set, no volume control.
+
+| Ring state | Cue | Wave | Frequency | Gain | Timing |
+|---|---|---|---|---|---|
+| none (no face yet) | scanning tick, repeats | sine | 700 Hz | 0.02 | 35 ms blip every 1400 ms |
+| yellow (seen, below the bar) | soft pulse, repeats | triangle | 880 Hz | 0.05 | 110 ms blip every 550 ms |
+| green (clears the bar) | held ready tone | sine | 1175 Hz | 0.05 | 80 ms fade in, held while green, 120 ms fade out |
+| shot registered | chime, once | sine x2 | 1568 Hz and 2349 Hz (a fifth) | 0.12 and 0.04 | 5 ms attack, exponential decay over 700 ms |
+
+Each blip is one oscillator through its own gain node (0 to peak in 8 ms,
+linear back to 0). Every oscillator and gain node is disconnected in
+`onended`. The progression is pitch up and louder: 700, 880, 1175, 1568 Hz.
+Because green and a registered shot are the same frame (green is exactly
+what `offer()` accepted), the chime lands on top of the ready tone, which
+then keeps sounding for the 1.2 s hold the ring holds green.
+
+**Rules.**
+
+- Edge-triggered: a cue starts when the ring state changes, never because
+  the same state was reported again. A change inside `MIN_DWELL_MS` (350
+  ms) of the last change waits for the dwell to end and then applies the
+  last state requested, so a flickering ring gives no burst and a ring that
+  ends where it began gives nothing.
+- The scanning tick stops when a face is found; leaving green fades the
+  held tone.
+- The chime never overlaps itself (a second one inside 700 ms is dropped).
+- Autoplay: there is no separate start button (adding one would be a
+  hand-built control), so the context is created and resumed when the page
+  mounts, which works after the "Enroll" click because a client-side route
+  change keeps the document's user activation, and again on the first click
+  or key press on the page for a cold direct link. A context that stays
+  suspended stays silent: nothing is scheduled while it is not running, so
+  a later resume is not a burst of queued sounds. A missing or throwing
+  `AudioContext` leaves the page silent, never broken.
+- Everything stops on unmount, on cancel, when capture is no longer
+  running (camera or models loading, or the shots saving), and while the
+  tab is hidden (`visibilitychange`). `stop()` closes the context.
+- The status line (`role="status"`), icon and ring colour are unchanged.
+  Sound only adds.
+- No library: four short tones do not justify a dependency, and the repo's
+  other audio code (`streamingWavPlayer.ts`, `sentenceSpeechScheduler.ts`,
+  the mic capture) plays or records streams, so there was no tone helper to
+  reuse.
+
+**The setting, and why it is not declared yet.** "Enrollment sounds" is a
+person setting (a sensory preference that follows the person, like
+`ui.appearance`; the household master has no reason to force it). SETTINGS.md
+says one declaration, drawn by the generic renderer, so no custom control.
+But a setting key is declared in `backend/src/settings/*Keys.ts`, is
+generated into `spec/settings/keys.json` in `getmaipai/commons`, and
+`scripts/check.sh` fails its registry drift step for a key the backend
+declares that the pinned spec lacks. So the key needs a `commons` change
+first. Until then `enrollmentSoundsEnabled()` in
+`lib/vision/enrollmentSoundsSetting.ts` is the one seam and returns true;
+tests drive it off (no context, no node is ever created) and on. The
+pending declaration is FACE-02N in BACKLOG.md.
+
+**Ring motion** (`captureMotion()` in `faceCaptureFeedback.ts`). Shipped
+utilities only: Tailwind's `animate-pulse` and the kit's `tw-animate-css`
+(`animate-in`, `zoom-in-50`, `fade-in`, already in the kit's `tokens.css`),
+each behind `motion-safe:`, so reduced motion keeps only the colour change.
+No new dependency and no per-frame JS.
+
+| Ring state | Motion |
+|---|---|
+| any | border colour eases over 300 ms instead of snapping |
+| none | a soft band over the preview pulses while no face is found |
+| yellow | steady, the icon fades in |
+| green | a teal inner glow pulses; the check icon pops in (zoom from 50 percent, 300 ms) |
+
+The step indicator's advance easing belongs to the kit's Wizard, outside
+this item's files, and is not changed.
+
+**Tests.** `faceCaptureSounds.test.ts` (each cue's frequency, gain and
+timing; the progression; edge and dwell; suspended context; a throwing
+factory; stop, mute and cleanup), `FaceEnrollmentCapture.test.tsx` (the
+real page with the FACE-02J seams plus `setSoundContextFactory` and
+`setEnrollmentSoundsEnabledForTest`: scanning, soft, one chime per
+registered shot and none for a rejected frame, unmount, hidden tab, sounds
+off means zero contexts and zero nodes, ring motion per state),
+`faceCaptureFeedback.test.ts` (`captureMotion`, nothing animates without
+`motion-safe:`).
+
 ## MDNS-COLLISION-01 landed (#193)
 
 `lib/mdns.ts` used to publish under the household's display name and never

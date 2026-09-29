@@ -8,6 +8,9 @@ import { TEMPLATE, alignCrop } from "@/lib/vision/faceAlign";
 import { computeSharpness } from "@/lib/vision/faceCaptureMeasurements";
 import { DEFAULT_QUALITY_CONFIG, type Pose } from "@/lib/vision/enrollmentSession";
 import type { Roster } from "@/lib/api";
+import { CHIME, CUES, setSoundContextFactory } from "@/lib/vision/faceCaptureSounds";
+import { setEnrollmentSoundsEnabledForTest } from "@/lib/vision/enrollmentSoundsSetting";
+import { FakeContext } from "../../../tests/fakeSoundContext";
 
 // FACE-02J: drives the real capture page with a scripted camera. The
 // seams are the page's own: a fake ONNX session factory (session-
@@ -151,6 +154,8 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   setSessionFactory(null);
+  setSoundContextFactory(null);
+  setEnrollmentSoundsEnabledForTest(null);
   (HTMLCanvasElement.prototype as unknown as { getContext: unknown }).getContext = originals.getContext;
   for (const key of ["readyState", "videoWidth", "videoHeight"] as const) {
     const descriptor = originals[key];
@@ -283,4 +288,106 @@ describe("FACE-02J: the capture ring", () => {
     }
     void container;
   }, 40000);
+});
+
+// FACE-02M: the sounds ride the same ring and the same offer() verdict.
+// The AudioContext is a recording fake (setSoundContextFactory); what
+// the cues sound like is not testable here, only which ones started.
+describe("FACE-02M: ring motion", () => {
+  test("scanning shows the pulsing band, yellow none, green the glow and the check pop, all motion-safe", async () => {
+    facePresent = false;
+    const first = renderPage();
+    await waitFor(() => expect(first.container.querySelector('[data-capture-motion="none"]')).not.toBeNull(), WAIT);
+    expect(first.container.querySelector('[data-capture-motion="none"]')!.className).toContain("motion-safe:animate-pulse");
+    first.unmount();
+
+    facePresent = true;
+    pixels = "soft";
+    const second = renderPage();
+    await waitFor(() => expect(ring(second.container)?.getAttribute("data-capture-ring")).toBe("yellow"), WAIT);
+    expect(second.container.querySelector("[data-capture-motion]")).toBeNull();
+    second.unmount();
+
+    pixels = "sharp";
+    const third = renderPage();
+    await waitFor(() => expect(ring(third.container)?.getAttribute("data-capture-ring")).toBe("green"), WAIT);
+    expect(third.container.querySelector('[data-capture-motion="green"]')!.className).toContain("motion-safe:animate-pulse");
+    expect(third.getByRole("status").querySelector("svg")!.getAttribute("class")).toContain("motion-safe:zoom-in-50");
+    // the words are still there
+    expect(third.getByRole("status").textContent).toContain("Got it");
+  });
+});
+
+describe("FACE-02M: enrollment sounds", () => {
+  let audio: FakeContext;
+  let contexts: number;
+  const started = (freq: number) => audio.started.filter((s) => s.freq === freq).length;
+  const chimes = () => started(CHIME.partials[0]!.freq);
+
+  beforeEach(() => {
+    contexts = 0;
+    audio = new FakeContext("running");
+    setSoundContextFactory(() => {
+      contexts += 1;
+      return audio;
+    });
+  });
+
+  test("no face yet: the scanning tick plays, and no chime", async () => {
+    facePresent = false;
+    renderPage();
+    await waitFor(() => expect(started(CUES.scanning.freq)).toBeGreaterThan(0), WAIT);
+    expect(chimes()).toBe(0);
+  });
+
+  test("a soft frame plays the soft cue, never the ready tone or the chime, and registers nothing", async () => {
+    pixels = "soft";
+    renderPage();
+    await waitFor(() => expect(started(CUES.soft.freq)).toBeGreaterThan(0), WAIT);
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect(started(CUES.ready.freq)).toBe(0);
+    expect(chimes()).toBe(0);
+  });
+
+  test("a registered shot chimes exactly once, and the ready tone plays with the green ring", async () => {
+    const { container } = renderPage();
+    await waitFor(() => expect(view().getByText("slowly turn your head to your left")).toBeTruthy(), WAIT);
+    expect(chimes()).toBe(1);
+    await waitFor(() => expect(started(CUES.ready.freq)).toBe(1), WAIT);
+    void container;
+  });
+
+  test("leaving the page stops the sound and closes the context", async () => {
+    facePresent = false;
+    const view2 = renderPage();
+    await waitFor(() => expect(started(CUES.scanning.freq)).toBeGreaterThan(0), WAIT);
+    view2.unmount();
+    expect(audio.closed).toBe(true);
+    const n = audio.started.length;
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+    expect(audio.started.length).toBe(n);
+  });
+
+  test("a hidden tab goes quiet", async () => {
+    facePresent = false;
+    renderPage();
+    await waitFor(() => expect(started(CUES.scanning.freq)).toBeGreaterThan(0), WAIT);
+    const hidden = Object.getOwnPropertyDescriptor(document, "hidden");
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    const n = audio.started.length;
+    await new Promise((resolve) => setTimeout(resolve, 1600));
+    expect(audio.started.length).toBe(n);
+    if (hidden) Object.defineProperty(document, "hidden", hidden);
+    else delete (document as unknown as Record<string, unknown>).hidden;
+  });
+
+  test("with enrollment sounds off no audio context or node is ever created, and the ring still works", async () => {
+    setEnrollmentSoundsEnabledForTest(false);
+    const { container } = renderPage();
+    await waitFor(() => expect(ring(container)?.getAttribute("data-capture-ring")).toBe("green"), WAIT);
+    await waitFor(() => expect(view().getByText("slowly turn your head to your left")).toBeTruthy(), WAIT);
+    expect(contexts).toBe(0);
+    expect(audio.created).toBe(0);
+  });
 });

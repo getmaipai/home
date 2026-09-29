@@ -42,3 +42,26 @@ export function captureRing(reason: string): CaptureRing {
   if (reason === "no_face") return "none";
   return "yellow";
 }
+
+/** FACE-02M: the ring's motion, as literal class names (Tailwind only sees
+ * whole strings). Only shipped utilities: Tailwind's `animate-pulse` and the
+ * kit's tw-animate-css (`animate-in`, `zoom-in-50`, `fade-in`), each behind
+ * `motion-safe:` so a person who asked for reduced motion gets the colour
+ * change alone. `overlay` is a decorative layer over the preview (empty
+ * means none): a soft band pulsing while no face is found, a teal glow
+ * pulsing while green. `icon` is the status icon's entrance, re-run each
+ * time the ring changes (the page keys the icon by ring): a check that pops
+ * in when a shot registers. The status text and aria-live line are
+ * unchanged by any of this. */
+export function captureMotion(ring: CaptureRing): { overlay: string; icon: string } {
+  if (ring === "green") {
+    return {
+      overlay: "shadow-[inset_0_0_36px_var(--hue-teal)] motion-safe:animate-pulse",
+      icon: "motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:fade-in motion-safe:duration-300",
+    };
+  }
+  if (ring === "yellow") {
+    return { overlay: "", icon: "motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300" };
+  }
+  return { overlay: "bg-gradient-to-b from-transparent via-foreground/15 to-transparent motion-safe:animate-pulse", icon: "" };
+}

@@ -26,7 +26,9 @@ import { runSfaceEmbedding } from "@/lib/vision/faceEmbedRuntime";
 import { alignCrop } from "@/lib/vision/faceAlign";
 import { estimateHeadPose } from "@/lib/vision/headPose";
 import { computeBoxFraction, computeBrightness, computeSharpness } from "@/lib/vision/faceCaptureMeasurements";
-import { captureFeedbackText, captureRing, type CaptureRing } from "@/lib/vision/faceCaptureFeedback";
+import { captureFeedbackText, captureMotion, captureRing, type CaptureRing } from "@/lib/vision/faceCaptureFeedback";
+import { createFaceCaptureSounds, cueForRing, type FaceCaptureSounds } from "@/lib/vision/faceCaptureSounds";
+import { enrollmentSoundsEnabled } from "@/lib/vision/enrollmentSoundsSetting";
 import { createFrameLogger, logEnrollmentSummary } from "@/lib/vision/faceCaptureDiagnostics";
 import { classifyMediaAccessError } from "@/lib/media/getUserMediaErrorState";
 import { useNextLook } from "@/next/useNextLook";
@@ -294,6 +296,11 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
   // code review on this item, 2026-09-29). Both would otherwise read the
   // same stale "error" rows and double-POST one embedding.
   const submittingRef = useRef(false);
+  // FACE-02M: sound cues for the ring, null when the person turned them
+  // off (no audio context is ever created then).
+  const soundsRef = useRef<FaceCaptureSounds | null>(null);
+  const tabHiddenRef = useRef(false);
+  const soundsRunningRef = useRef(false);
 
   // shotsPerPose: 1, no glasses steps - the backlog's own acceptance
   // criterion for this item is "a full five-pose enrollment... produce
@@ -373,6 +380,48 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
     };
   }, [modelsRetryKey]);
 
+  // FACE-02M: the capture sounds. The AudioContext is created and resumed
+  // here (the click that opened this page counts as the gesture in the
+  // same document) and again on the first click or key press on the page,
+  // for a cold direct link where the browser keeps it suspended. Sound
+  // adds to the ring and the status line, it never replaces them.
+  useEffect(() => {
+    if (!enrollmentSoundsEnabled()) return;
+    const sounds = createFaceCaptureSounds();
+    soundsRef.current = sounds;
+    const unlock = () => void sounds.unlock();
+    const applyMute = () => sounds.setMuted(tabHiddenRef.current || !soundsRunningRef.current);
+    const onVisibility = () => {
+      tabHiddenRef.current = document.hidden;
+      applyMute();
+    };
+    tabHiddenRef.current = document.hidden;
+    applyMute();
+    unlock();
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+      document.removeEventListener("visibilitychange", onVisibility);
+      sounds.stop();
+      soundsRef.current = null;
+    };
+  }, []);
+
+  // The cue follows the ring the person is looking at (held green
+  // included), and only while capture is actually running: not while the
+  // camera or models are still loading, and not once the shots are saved.
+  const soundsRunning = phase === "capturing" && cameraState === "ready" && modelsState === "ready";
+  useEffect(() => {
+    soundsRunningRef.current = soundsRunning;
+    const sounds = soundsRef.current;
+    if (!sounds) return;
+    sounds.setMuted(tabHiddenRef.current || !soundsRunning);
+    if (soundsRunning) sounds.setCue(cueForRing(captureRing(lastReason)));
+  }, [soundsRunning, lastReason]);
+
   // Skipped while a just-registered shot's green is still on show.
   const showReason = useCallback((reason: string) => {
     if (reason !== "ok" && Date.now() < heldUntilRef.current) return;
@@ -439,7 +488,10 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       // The ring is the offer's own verdict: green exactly when the shot
       // registered (FACE-02J, one definition of green).
       logFrame({ ...sample, color: captureRing(result.reason), reason: result.reason, pitchBaselineDeg: session.status().pitchBaselineDeg });
-      if (result.accepted) heldUntilRef.current = Date.now() + ACCEPTED_HOLD_MS;
+      if (result.accepted) {
+        heldUntilRef.current = Date.now() + ACCEPTED_HOLD_MS;
+        soundsRef.current?.captured();
+      }
       showReason(result.reason);
       const nextStatus = session.status();
       setStatus(nextStatus);
@@ -539,6 +591,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
     // Aborts whichever sample is actually in flight right now, not just
     // the ones still queued - see submitAbortRef's own comment.
     submitAbortRef.current?.abort();
+    soundsRef.current?.stop();
     onDone();
   }
 
@@ -663,6 +716,7 @@ function CaptureContent({
   const settingUp = cameraState === "requesting" || modelsState === "loading";
   const ring = settingUp ? "none" : captureRing(lastReason);
   const StatusIcon = ring === "green" ? getIcon("check") : ring === "yellow" ? getIcon("alert-triangle") : null;
+  const motion = captureMotion(ring);
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4">
       {/* The capture ring (FACE-02J). The kit has no camera-frame or ring
@@ -674,11 +728,17 @@ function CaptureContent({
           icon so color is never the only signal. */}
       <div
         data-capture-ring={ring}
-        className={`relative aspect-[4/3] w-full overflow-hidden rounded-[var(--radius)] border-4 bg-black transition-colors ${RING_CLASS[ring]}`}
+        className={`relative aspect-[4/3] w-full overflow-hidden rounded-[var(--radius)] border-4 bg-black transition-colors duration-300 ${RING_CLASS[ring]}`}
       >
         {/* Mirrored, so turning your head left/right on screen matches
             your own real movement, the way a selfie camera always does. */}
         <video ref={videoRef} autoPlay muted playsInline className="h-full w-full -scale-x-100 object-cover" />
+        {/* FACE-02M motion: a decorative layer, never the signal (the ring
+            colour, icon and status line are). Every animated class is
+            motion-safe:, so reduced motion keeps the colour change only. */}
+        {!settingUp && motion.overlay ? (
+          <div aria-hidden data-capture-motion={ring} className={`pointer-events-none absolute inset-0 ${motion.overlay}`} />
+        ) : null}
         {settingUp ? (
           <div className="absolute inset-0 flex items-center justify-center bg-black/60">
             <Progress mode="spinner" label="Getting the camera and face models ready…" />
@@ -690,7 +750,7 @@ function CaptureContent({
         <>
           <p className="text-center text-lg font-medium">{POSE_PROMPT[pose]}</p>
           <p className="flex items-center justify-center gap-2 text-center text-base text-muted-foreground" role="status">
-            {StatusIcon ? <StatusIcon className="h-5 w-5 shrink-0" aria-hidden /> : null}
+            {StatusIcon ? <StatusIcon key={ring} className={`h-5 w-5 shrink-0 ${motion.icon}`} aria-hidden /> : null}
             {captureFeedbackText(lastReason, pose)}
           </p>
         </>

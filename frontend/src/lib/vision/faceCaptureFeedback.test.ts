@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { captureFeedbackText, captureRing } from "@/lib/vision/faceCaptureFeedback";
+import { captureFeedbackText, captureMotion, captureRing, type CaptureRing } from "@/lib/vision/faceCaptureFeedback";
 
 describe("captureFeedbackText", () => {
   test("maps every assessQuality/offer reason to plain language", () => {
@@ -53,6 +53,31 @@ describe("captureRing", () => {
   test("every reason that reads as trouble has its own words", () => {
     for (const reason of ["too_far", "blurry", "too_dark", "too_bright"]) {
       expect(captureFeedbackText(reason)).not.toBe("Hold still.");
+    }
+  });
+});
+
+// FACE-02M: motion for the ring, from shipped utilities only (Tailwind's
+// animate-pulse and the kit's tw-animate-css), each behind `motion-safe:`
+// so reduced motion falls back to the colour change alone.
+describe("captureMotion", () => {
+  const rings: CaptureRing[] = ["none", "yellow", "green"];
+
+  test("scanning pulses a soft band, green pulses a glow, yellow stays steady", () => {
+    expect(captureMotion("none").overlay).toContain("motion-safe:animate-pulse");
+    expect(captureMotion("green").overlay).toContain("motion-safe:animate-pulse");
+    expect(captureMotion("yellow").overlay).toBe("");
+  });
+
+  test("a registered shot pops its check in", () => {
+    expect(captureMotion("green").icon).toContain("motion-safe:animate-in");
+    expect(captureMotion("green").icon).toContain("motion-safe:zoom-in-50");
+  });
+
+  test.each(rings)("no animation class for %s applies without motion-safe:", (ring) => {
+    const { overlay, icon } = captureMotion(ring);
+    for (const token of `${overlay} ${icon}`.split(/\s+/).filter(Boolean)) {
+      if (/^(animate-|zoom-in|fade-in|slide-in|duration-)/.test(token)) throw new Error(`${token} would animate under reduced motion`);
     }
   });
 });
