@@ -1,7 +1,13 @@
 export const CROP_SIZE = 112;
 
 // OpenCV's fixed SFace destination template and precomputed mean.
-const TEMPLATE: [number, number][] = [
+export const TEMPLATE: [
+  [number, number],
+  [number, number],
+  [number, number],
+  [number, number],
+  [number, number],
+] = [
   [38.2946, 51.6963],
   [73.5318, 51.5014],
   [56.0252, 71.7366],
