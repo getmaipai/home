@@ -14,7 +14,7 @@ import { join } from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { clonedVoices } from "@/db/schema";
-import { dataDir, modelsDir, enginesDir, wakewordDir, sttDir, cacheDir, clonedVoicesDir, backupDir, receivedBackupsDir } from "@/lib/paths";
+import { dataDir, modelsDir, enginesDir, wakewordDir, visionDir, sttDir, cacheDir, clonedVoicesDir, backupDir, receivedBackupsDir } from "@/lib/paths";
 import { getCacheStats } from "@/lib/packageCache";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -86,6 +86,7 @@ export function storageSummary(): StorageSummary {
     { area: "models", bytes: dirSizeBytes(modelsDir) },
     { area: "engines", bytes: dirSizeBytes(enginesDir) },
     { area: "voice_wakewords", bytes: dirSizeBytes(wakewordDir) },
+    { area: "vision_models", bytes: dirSizeBytes(visionDir) },
     { area: "voice_stt", bytes: dirSizeBytes(sttDir) },
     { area: "voice_cloned", bytes: dirSizeBytes(clonedVoicesDir) },
     { area: "cache", bytes: dirSizeBytes(cacheDir) },
