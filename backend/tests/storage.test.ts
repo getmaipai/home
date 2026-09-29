@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach } from "bun:test";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TestClient } from "./client";
@@ -12,8 +12,8 @@ import { generateDiagnostics } from "@/lib/diagnostics";
 import { setValue, setHouseholdSettingValue } from "@/lib/settings";
 import { listIssues } from "@/lib/issues";
 import { db, sqlite } from "@/db";
-import { dataDir, backupDir } from "@/lib/paths";
-import { readdirSync, rmSync } from "node:fs";
+import { dataDir, backupDir, visionDir } from "@/lib/paths";
+import { readdirSync } from "node:fs";
 import { createAttachment } from "@/lib/attachments";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
@@ -48,8 +48,20 @@ describe("storageSummary()", () => {
   test("reports areas, packages and disk usage without throwing on a fresh install", () => {
     const summary = storageSummary();
     expect(summary.areas.length).toBeGreaterThan(0);
+    expect(summary.areas.some((area) => area.area === "vision_models")).toBe(true);
     expect(Array.isArray(summary.packages)).toBe(true);
     expect(summary.disk.totalBytes).toBeGreaterThan(0);
+  });
+
+  test("counts downloaded vision models in the vision_models area", () => {
+    mkdirSync(visionDir, { recursive: true });
+    writeFileSync(join(visionDir, "fixture.onnx"), "model-bytes");
+    try {
+      const area = storageSummary().areas.find((entry) => entry.area === "vision_models");
+      expect(area?.bytes).toBe(Buffer.byteLength("model-bytes"));
+    } finally {
+      rmSync(visionDir, { recursive: true, force: true });
+    }
   });
 });
 
