@@ -31507,3 +31507,315 @@ enough from the template could see a nonzero `pitchDeg` while looking
 dead-on at the camera; real tuning against real faces, not just the
 synthetic template, is the fix, and it's the same live-camera work the
 scale constants already need).
+
+## VOICE-CLASS-01 design pass: one adapter per companion, two registers - a spoken reply takes the voice whole, a typed document takes it in its frame and keeps its body (Fable, 2026-09-29)
+
+Jesse's question, in his own words tonight: should companion voice
+work differently for typed replies than for spoken ones, "what ChatGPT
+does when it responds in text vs voice character mode"? This record
+answers it. It reads "The written prompt on tier 1, decided"
+(PREFIX-CLASS-01, 2026-09-23) and "EVAL-03 design pass" (2026-09-28)
+as settled and builds on both: the adapter mechanism, the per-request
+`lora` field, the manifest field, the bench arms and the build order
+are untouched. What changes is what the adapter is taught to do on
+each surface class, decided from real prior art and tonight's real
+corpus numbers, not from taste. Everything below is decided; the build
+is one new BACKLOG row plus dated notes on four existing ones.
+
+**Why this exists (the mess below, the thing above that must not see
+it).** Below: the corpus builder (STYLE-CORPUS-01, re-pointed at the
+household's own local 27B teacher in STYLE-CORPUS-01b) asks one brief
+of every row, "same facts, same structure, same length, change only
+the voice", and that brief has two very different jobs depending on
+what the bare model wrote. On a spoken prompt the bare reply is a
+sentence ("it started at eight thirty"), and the rewrite is a clean
+voice change ("it kicked off at eight thirty"). On a typed fact or
+how-to prompt the bare reply is the written class's own correct shape
+(PREFIX-CLASS-01: a 250 to 630 word document with headings, bold
+labels and numbered lists, no persona prose in the prompt because
+every prose shape measured 0.12x to 0.48x of the floor), and the same
+brief hands the teacher a document whose sentences are nearly all
+propositional content, with almost nowhere for a voice to go. Above:
+the household, which meets its companion on the typed chat surface
+more than anywhere else, and the STYLE-TRAIN-01 run that will learn
+whatever the corpus teaches. The failure this prevents: an adapter
+trained on typed pairs that "pass" by sprinkling interjections between
+the bullets of a document, which would teach every companion that
+personality on a screen means noise inside the answer, exactly the
+thing the reply-floor rule (2026-09-23, "the bare model's answer is
+the floor") and EVAL-03's substance-parity gate exist to forbid.
+
+### Tonight's evidence, as measured (STYLE-CORPUS-01b, uncommitted at the time of writing)
+
+From the corpus agent's own report of its most recent run against the
+live local 27B teacher (`qwen38-27b` over `/v1/chat/completions`), 35
+voice prompts per companion (20 typed, 15 spoken), the current
+validator (sentence boundaries split on newlines and bold labels, a
+closed-class stoplist on the capitalized-token check, that check as a
+set rather than a multiset, the length band at 35 percent) and the
+neutral reply now generated under the real production prefix for the
+prompt's class (`buildStablePrefix(persona, "written")` for typed,
+identity plus `stableSuffixFor("spoken")` plus `NATURALNESS_POLICY`
+for spoken):
+
+| companion | dials (formality/complexity/engagement/filler) | typed kept | spoken kept | typed neutral words, avg (min-max) | spoken neutral words, avg (min-max) |
+|---|---|---|---|---|---|
+| default | casual/standard/brief/none | 7 of 20 (35%) | 15 of 15 (100%) | 293 (104-466) | 24 (11-51) |
+| buddy | casual/simple/curious/light | 14 of 20 (70%) | 11 of 15 (73%) | 161 (9-424) | 35 (5-87) |
+| pal | casual/standard/brief/frequent | 13 of 20 (65%) | 11 of 15 (73%) | 147 (13-388) | 32 (5-78) |
+| tutor | formal/advanced/balanced/none | 11 of 20 (55%) | 6 of 15 (40%) | 214 (7-502) | 40 (13-80) |
+
+Drop reasons summed over the four companions: typed rows fail on the
+capitalized-token set 19 times, the length band 15, the digit-run set
+once; spoken rows fail on the length band 13 times (9 of them the
+tutor's, a formal rewrite of a fifteen-word reply growing past 35
+percent), the capitalized-token set 3, the digit-run set once. The
+neutral word counts are from kept rows only, so the typed averages
+read low: the longest documents are the ones still dropping. One
+dropped typed pair the agent saved: "how do I get a stain out of a
+carpet", a 313-word neutral reply in eight `### **N. Label**` sections,
+a 272-word rewrite that kept every step in order but turned the
+numbered headings into plain labels, failing the digit-run check on
+the digits 1 to 8 (the validator was right by its own rule; the
+rule was written for facts, not for list numbering).
+
+The kept typed rows are the more important finding, and the validator
+cannot see it. Read directly from `data-scratch/voice/pal/corpus.jsonl`
+(synthetic content, the prompt "what's the human heart known for"): the
+neutral reply is a 161-word numbered document with five bold labels
+and an "Overall" closer; the kept 185-word rewrite reproduces it
+verbatim and inserts "Honestly? Yeah, that'd work." before the first
+sentence, "Like, it's basically that but simpler." after the first
+bold label, "Ha, classic." after the second, "I mean, up to you, but
+it helps." after the third, and "Anyway, here's the deal." after the
+fifth. Every fact, number, name, heading and list marker is preserved,
+the length is within band, no forbidden phrase appears, and the pair
+is unusable: it is not Pal's voice on a typed answer, it is Pal's
+spoken filler glued into a document at random, and each aside reads
+as a non sequitur beside the fact it interrupts. The spoken pair in
+the same file ("it started at eight thirty" to "it kicked off at eight
+thirty") is exactly what the corpus was designed to produce. The
+same brief, the same teacher, the same validator: the difference is
+the shape of the thing being restyled.
+
+### Prior art, checked
+
+The question Jesse named is one every mainstream assistant has had to
+answer, and they answer it the same way.
+
+ChatGPT's Advanced Voice Mode runs a different instruction set from
+its text mode, not the text reply read aloud. The leaked voice system
+prompt (mirrored at
+https://huggingface.co/datasets/Nymbo/Official_LLM_System_Prompts,
+"ChatGPT Advanced Voice Mode.md"; extracted by cross-referencing
+several conversations, so verbatim within that caveat) says: "most of
+the time your lines should be a sentence or two, unless the user's
+request requires reasoning or long-form outputs" and "Avoid answering
+with a list unless the user specifically asks for one." Its text mode
+has no such rule and answers a how-to with markdown. The two registers
+share one brain and one personality; the register is set at
+generation by the surface, and users notice the difference as a
+feature and a complaint at once ("Answer in gpt voice advanced are too
+short", community.openai.com, 2025). The November 2025 change that
+put voice inside the chat (a live transcript of the spoken reply in
+the same thread, "mixed mode" typing and speaking in one
+conversation; TechCrunch, 2025-11-25) did not merge the registers: the
+transcript of a spoken turn is still a short spoken turn, beside long
+typed ones in the same scroll.
+
+ChatGPT's text-mode personalities (Cynic, Robot, Listener, Nerd,
+August 2025; renamed and extended in GPT-5.1) are OpenAI's own answer
+to "companion voice on a typed reply", and OpenAI's announcement
+labels them "Text-only" (https://x.com/OpenAI/status/1953534071772262511).
+They change tone, openers and word choice over an answer whose
+structure and substance stay: a numbered how-to under Cynic is the
+same numbered how-to with a dry opener and a dry aside, never a
+shorter or a differently shaped one.
+
+OpenAI's Realtime prompting guide
+(https://developers.openai.com/api/docs/guides/voice-prompting) is the
+clearest statement of the principle, because it is written for
+developers wiring a text brain to a voice: "Text replies are not
+automatically good for speech, so the responder must rephrase the
+thinker's text into an audio-friendly response before generating
+audio", with a spoken budget of "2-3 sentences per turn" and numbers
+read the way a person says them. Their pattern for that rephrase is a
+separate responder model with its own prompt, which is the second-pass
+bridge Jesse already ruled out for MaiPai (2026-09-23, companion voice
+is a layer, never a second pass), and which MaiPai does not need,
+because its spoken class already generates short at the source
+(`NATURALNESS_POLICY`, the plan line's sentence count, `register.ts`'s
+act caps). The point stands regardless of who does the rephrase: the
+industry treats a spoken reply as a different generation target from a
+typed one, never as a typed document compressed after the fact.
+
+Claude's voice mode is the same text model with a spoken register, and
+it keeps the typed register beside it on purpose: the announcement
+(2025-05-27, TechCrunch and Anthropic's help center) describes key
+points appearing on screen as Claude speaks and a transcript and
+summary after every conversation, so the structured, skimmable form
+and the spoken form of one answer coexist as two renderings, not one
+rendering forced to serve both. Gemini Live is a native-audio model
+and states the constraint physically: "speech cannot render a bulleted
+list, a bolded warning, or a markdown table" (prompt-architects.com,
+"Prompting Gemini Live and Voice Mode"), and its text app answers with
+all three.
+
+The reading: nobody in this field gives a personality one behavior and
+applies it to both surfaces. Voice is short, list-free, spoken-shaped,
+and the personality is the whole turn; text keeps the structured
+answer and the personality is a layer over it, strongest at the edges.
+MaiPai's own production already made the first half of this decision
+(U4/RESP-01: the register follows the surface; PREFIX-CLASS-01: the
+written prompt carries no persona prose). This pass makes the second
+half.
+
+### The decision
+
+**Yes: typed and spoken companion replies are two registers of one
+companion, and the adapter is trained for what a voice actually is on
+each. One adapter per companion, not two. The split lives in the
+training target, never in a runtime rule.**
+
+1. **Spoken rows (production's spoken prompt class) keep the full
+   rewrite.** The whole reply is the companion's voice, as the brief
+   already says and as the default companion's clean 15 of 15 shows.
+   Note what the spoken class is in production, verified in
+   `surfaceClass.ts`: `promptSurfaceClassFor` returns "spoken" for the
+   robot, pod and phone surfaces, for a dictated turn, and for every
+   child's and teen's chat turn (`isWrittenAdultTurn` is the one
+   predicate; a minor's typed turn is prompted as spoken so the prompt
+   never promises a length the age-clamped budget cannot back). So the
+   spoken corpus is the conversational register, not "voice only", and
+   its prompt pool must carry the five typed kinds (fact, how-to,
+   comparison, list, small talk) under the spoken prefix too: a child
+   typing "how do I boil an egg" is a spoken-class turn today, and the
+   adapter has to have seen that shape.
+2. **Typed rows split by the shape of the bare reply, deterministically,
+   from the neutral reply itself.** A typed neutral reply that carries a
+   heading (`HEADING_RE`), a list marker (`LIST_RE`) or more than two
+   paragraphs is document-shaped; any other typed neutral reply is
+   conversational. Conversational typed rows (small talk, a short fact,
+   the replay set's rows) keep the full rewrite: the bare reply is
+   short prose and the brief already works on it. **Document-shaped
+   typed rows get a frame rewrite:** the opener (the first paragraph,
+   when it is not itself a heading or a list item) and the closer (the
+   last paragraph, when it is not a heading or list item and not the
+   opener) are rewritten in the companion's voice, or added as one
+   sentence each when the bare reply has none; every heading, list item
+   and paragraph between them is copied character for character (after
+   whitespace normalization). The frame is where the bare model's own
+   voice already lives ("The human heart is known for several important
+   functions, most notably:" and "Overall, the human heart is essential
+   for..."), and it is where ChatGPT's text personalities put theirs.
+3. **The validator is class-aware, and the brief and the validator carry
+   one number.** Document-shaped typed rows: body byte-identical, each
+   frame paragraph within 1.5x of its neutral counterpart's word count,
+   an added frame sentence at most 25 words, no forbidden phrase; the
+   digit-run and capitalized-token checks run on the frame alone (the
+   body is identical by construction, which also retires the
+   carpet-stain class of false positive without touching those checks).
+   Full-rewrite rows (spoken and conversational typed): the five
+   existing checks unchanged, with the length band restated as the
+   larger of 25 percent or eight words (the eight-word floor is the
+   tutor's formal growth on a fifteen-word reply; the 25 percent is the
+   agent's own first-pass reading of where genuine full rewrites fall,
+   15 to 22 percent under, once the document rows that produced the
+   25 to 45 percent spread are out of that population) and
+   `REWRITE_BRIEF` stating that same number, since a brief that says 15
+   beside a validator that enforces 35 is two definitions. The
+   document brief (`FRAME_BRIEF`) is a second fixed text for a second
+   job, not a variant of the first.
+4. **The bench reads each written row by its shape.** STYLE-BENCH-01's
+   substance-parity line (tokens within 0.85x to 1.15x of arm B,
+   headings and lists wherever B has them, the five facts) reads the
+   whole reply on every written row, unchanged. Its voice lines (a
+   marker on at least 11 of 22 written rows, formal's zero
+   contractions, the marker count above B's) read the frame on a
+   document-shaped written row and the whole reply on a conversational
+   one, so a formal companion is not failed for a contraction the bare
+   model itself wrote in a body the adapter was trained to leave alone,
+   and a casual one gets credit only where its voice is supposed to be.
+   Arm B and arm C are independent samples, so body identity is not a
+   bench check; the token band and structure line already bound what
+   the body may do.
+5. **Runtime: nothing changes.** STYLE-ADAPTER-01 and STYLE-ADAPTER-02
+   stand as written; the adapter rides every generation of a turn at
+   scale 1.0 on both classes; `promptSurfaceClassFor` stays the one
+   predicate and the corpus builder uses the same production prefix per
+   class that a real turn gets, so the adapter's class conditioning is
+   the prompt it will actually see. No rule says "apply lightly on
+   typed", no scale per class (EVAL-03: strength is a bench arm, never a
+   knob), no exclusion of typed turns.
+
+**Why one adapter and not one per class.** The class is already in the
+prompt: a written-adult turn carries `buildStablePrefix(persona,
+"written")` and no policy prose, a spoken-class turn carries the
+spoken suffix and `NATURALNESS_POLICY`, and the corpus rows carry
+exactly those. An adapter conditioned on that difference learns both
+behaviors from one training run; two adapters would double the
+resident bytes, the manifest entries and the launch list to encode a
+distinction the input already makes (principle 1, one implementation).
+
+**Why the typed rows stay in the corpus rather than leaving the
+typed class voiceless.** Three reasons. ChatGPT's text personalities
+are the direct precedent for what Jesse asked for, and they exist. The
+typed chat surface is where the family meets its companion most, and
+a companion with no voice there is the household-wide-setting failure
+EVAL-03 was written to prevent, in a different coat. And an adapter
+trained on spoken rewrites only has never seen the written prefix, so
+its behavior on a typed turn would be whatever spoken habit leaks
+through (interjections, brevity), which is the uncontrolled version of
+the very thing tonight's kept Pal pair shows; teaching the frame
+explicitly is how the typed behavior becomes a decision instead of a
+side effect.
+
+**Why the body is byte-identical rather than "contractions and word
+choice allowed".** A validator can prove identity; it cannot tell "it
+is" to "it's" from "Ha, classic." inserted mid-list, and the 27B
+teacher demonstrably does the latter when given the room. The training
+signal has to be clean or the bench will fail the companion for the
+corpus's sins. There is a second, structural reason: a document
+body is the base model's own sample under the base model's own prompt,
+so SFT on those tokens is near zero loss by construction, and the
+gradient concentrates on the frame and on the spoken rows. The adapter
+cannot learn to compress, restructure or interrupt a typed answer,
+because it is never shown one that was. That is PREFIX-CLASS-01's
+guarantee (the bare model's structured answer is the floor) carried
+into the trained mechanism instead of hoped for.
+
+**Why not the OpenAI responder pattern (a spoken rephrase of a typed
+answer).** MaiPai's spoken class already generates the short shape at
+the source, the default companion's spoken corpus dropped nothing under
+that prefix, a second model round per spoken turn is the cache and
+latency cost PHRASE-01 works to avoid, and Jesse ruled the second-pass
+bridge out on 2026-09-23. The corpus's failure was never on the
+spoken side.
+
+### What does not change, stated so nobody reopens it
+
+PREFIX-CLASS-01 stands: the written-adult prompt carries no persona or
+policy prose on tier 1, and the neutral reply for a typed corpus row is
+that exact prefix, so the corpus faithfully represents production's
+long structured answers rather than working around them.
+`WRITTEN_VOICE_PROSE` stays `false`; WRITTEN-VOICE-TIER-01's tier-3
+measurement is unchanged. EVAL-03 stands: one GGUF LoRA per companion,
+selected per request through llama-server's own `lora` field, loaded
+for every installed companion at launch, the manifest field, the
+fidelity bench as the gate, the engine-contract capability row. The
+four dials keep the readers EVAL-03's table gives them; `engagement`
+in particular stays a plan-line move and never a corpus instruction
+(tonight's numbers bear this out: `brief` does not predict the typed
+drop rate, `default` at 35 percent kept beside `pal` at 65 with the
+same dial). No household data enters the pipeline; the frame brief
+gets the same synthetic-only content the rewrite brief gets.
+
+### Build order
+
+STYLE-CORPUS-01b lands first (the teacher swap, the validator fixes it
+already measured, the production prefix per class; its typed drop rate
+is reported as what it is, a finding about the target, not the brief).
+Then STYLE-CORPUS-02 below (the class-aware target and validator), the
+full four-companion run, and its per-class drop rates in this file.
+Then STYLE-TRAIN-01, STYLE-BENCH-01 and the adapter rows in the order
+EVAL-03 gave them, with the dated notes on each row in BACKLOG.md.
