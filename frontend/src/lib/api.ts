@@ -302,6 +302,41 @@ export interface VisibleFile {
   shared: boolean;
 }
 
+// FACE-02: GET/POST /api/biometric-prints's response shape
+// (routes/biometricPrints.ts's SummarySchema) - a plain frontend-side
+// mirror, not sourced from wire.ts, since this route's only consumer so
+// far is the face-enrollment flow and adding it to wire.ts would widen
+// every frontend-only change here to a full gate the moment
+// biometricPrints.ts itself changes (scripts/gateScope.ts's
+// frontend-imports-backend rule). Never carries the embedding - see
+// backend/src/lib/biometricPrints.ts's own header for why.
+export interface BiometricPrintSummary {
+  id: string;
+  person_id: string;
+  modality: "face" | "voice";
+  model_id: string;
+  model_sha256: string;
+  dim: number;
+  captured_by: string | null;
+  consent_at: string;
+  consented_by_person_id: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+  hlc: string;
+}
+
+// GET /api/vision/models's response (routes/vision.ts) - the fixed list
+// of face detector/embedder models the browser can load, each with the
+// model id the backend actually validates against in
+// lib/biometricPrints.ts's KNOWN_MODELS. Read from here instead of
+// hardcoding the SFace model id a second time on the frontend.
+export interface VisionModelInfo {
+  id: string;
+  label: string;
+  file: string;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -907,6 +942,18 @@ export const api = {
   fileContentUrl: (fileId: string) => `/api/files/${encodeURIComponent(fileId)}/content`,
   shareFile: (fileId: string, to: string) => request<Share>(`/api/files/${encodeURIComponent(fileId)}/shares`, { method: "POST", body: JSON.stringify({ to }) }),
   unshare: (shareId: string) => request<{ deletedShareIds: string[] }>(`/api/shares/${encodeURIComponent(shareId)}`, { method: "DELETE" }),
+  // FACE-02: the guided camera-capture enrollment flow. One row per
+  // accepted sample (FACE-01's own design, biometricPrints.ts's header) -
+  // never a batch endpoint, so this POSTs once per accepted pose.
+  visionModels: () => request<{ detectors: VisionModelInfo[]; installed: boolean }>("/api/vision/models"),
+  biometricPrints: (personId: string) => request<BiometricPrintSummary[]>(`/api/biometric-prints?personId=${encodeURIComponent(personId)}`),
+  // `signal` (found by review, 2026-09-29): a cancel mid-submission has
+  // to actually abort the in-flight fetch, not just stop the NEXT one -
+  // request()'s own init already passes a caller-supplied signal through
+  // untouched (its own comment on that line), so this only needed to
+  // accept and forward one.
+  createBiometricPrint: (input: { person_id: string; model_id: string; embedding: number[]; captured_by?: string | null }, signal?: AbortSignal) =>
+    request<BiometricPrintSummary>("/api/biometric-prints", { method: "POST", body: JSON.stringify(input), signal }),
   // Owner/admin only (routes/store.ts's own gate) - null means the
   // package has no active store install (bundled-only, or never
   // installed). Called lazily, on-demand for the pane's selected

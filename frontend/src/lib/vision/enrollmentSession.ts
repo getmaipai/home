@@ -121,7 +121,11 @@ export interface PersonStatus {
   glassesOff: number;
 }
 
-const POSE_PROMPT: Record<Pose, string> = {
+// Exported (FACE-02) so the guided capture UI can show a pose's
+// instruction before any sample has been offered yet - OfferResult's own
+// nextInstruction only exists after at least one offer() call, and this
+// is the same text it would eventually produce, not a second copy of it.
+export const POSE_PROMPT: Record<Pose, string> = {
   frontal: "look straight at me",
   left: "slowly turn your head to your left",
   right: "slowly turn your head to your right",
