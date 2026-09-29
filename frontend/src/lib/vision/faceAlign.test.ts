@@ -41,6 +41,10 @@ describe("similarityTransform", () => {
     expect(matrix[1]![2]).toBeCloseTo(0.00002, 10);
   });
 
+  test("rejects five identical points as degenerate input", () => {
+    expect(() => similarityTransform([[3, 4], [3, 4], [3, 4], [3, 4], [3, 4]])).toThrow(/degenerate or collinear/);
+  });
+
   test("matches the Python oracle for the rotated and translated points", () => {
     const matrix = similarityTransform(rotated);
     const expected = [

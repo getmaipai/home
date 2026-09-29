@@ -28,7 +28,7 @@ import {
   seedEmbeddingBuffer,
   type WakeWordPipelineState,
 } from "./wake-word-pipeline";
-import { evictSession, tensorFor } from "./wake-word-runtime";
+import { evictSession, tensorFor } from "../onnx/session-runtime";
 
 const HYSTERESIS_FRAMES_ABOVE = 2;
 const POST_WAKE_SUPPRESS_MS = 1000;
