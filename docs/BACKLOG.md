@@ -9433,6 +9433,7 @@ on a spec tag that was never cut.
 - [ ] **The hub's Python runtime question in STACK.md** (S decision) -
       STACK.md gives the hub no Python, yet `tts` needs `uvx` at runtime;
       flagged in `spec/voice/README.md`, decided nowhere.
+- [x] **MDNS-COLLISION-01: the hub announces itself under a unique name and says so when it cannot** (S, Sonnet, 2026-09-29; fixes #193, dev.md "MDNS-COLLISION-01 landed"). Instance name `<name>-<id4>`, one retry with ` (2)`, a Repairs issue if both are taken; TXT `name` stays the display name. Files: `backend/src/lib/mdns.ts`, `backend/tests/mdns.test.ts`. Exit: `bash scripts/check.sh`.
 - [x] **A household CA with `maipai.local` mDNS and a trust step**
       (Session F step 5, 2026-09-06) - `lib/householdCa.ts` (a real,
       node-forge-minted CA and leaf, boot-time-conditional TLS),

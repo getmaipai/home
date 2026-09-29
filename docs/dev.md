@@ -32277,3 +32277,41 @@ against the no-hand-built-UI rule; it would keep banking the mid-motion
 frames that caused the defect; and the robot's voice ceremony can only ask
 for one pose at a time. If Jesse wants a Face-ID-style free-order ring, that
 is a new kit pattern in `commons` first, as its own item.
+
+## MDNS-COLLISION-01 landed (#193)
+
+`lib/mdns.ts` used to publish under the household's display name and never
+learned when that name was taken. bonjour-service probes first, and on a
+clash it calls `service.stop()` and only `console.log()`s an Error from
+inside its own callback (`dist/lib/registry.js` line 32), so the
+`try/catch` in `advertiseMdns()` saw nothing: the hub was silent on the
+LAN and Repairs said nothing.
+
+What it does now:
+
+- The DNS-SD instance name is `<display name>-<first 4 chars of the hub
+  instance id>`, so two households on the default name do not clash and
+  one hub keeps one name across restarts. TXT `name` still carries the
+  display name and is the contract: clients (the bot's `link/discovery.py`
+  reads `name`, `id`, `tls`, `v` from TXT; the Devices page's robot browse
+  reads a different service type) never parse the instance name.
+- Before publishing, the hub browses `_maipai._tcp` for 1.2 seconds and
+  treats the name as taken only when a service with that name carries a
+  different `id` (a lingering announcement of this same hub is not a
+  clash). It then publishes with the library's own probe off (registry.js
+  lines 38-39). The library's probe is not used because its clash path
+  calls `stop()`, which sends goodbye records (ttl 0) for the fqdn the
+  other host owns, and gives no result the caller can read.
+- If the name is taken it retries once with the Bonjour ` (2)` suffix. If
+  that is taken too, or the responder throws, it raises the Repairs issue
+  `mdns` / `advertise_failed` (warning, plain-language copy) and boot goes
+  on. A later successful advertise resolves that issue.
+- `advertiseMdns()` now takes about 1.2 to 2.4 seconds to return; its
+  callers in `index.ts` already `void` it.
+
+Tests (`tests/mdns.test.ts`): a rival service holding the exact instance
+name still leaves the hub discoverable as `<name> (2)` with the display
+name in TXT; a rival holding both names raises the Repairs issue and
+leaves the hub not advertising. The discovery test's hub name is now
+"Marlow Hub", so it no longer clashes with a running hub named "Test Hub"
+(the #160 flake on the dev machine).
