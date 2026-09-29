@@ -121,7 +121,7 @@ export function deleteDevice(id: string, personId: string): boolean {
   // covers that, the same "DB delete alone doesn't propagate fast
   // enough" gap its own doc comment already names for the `enabled` flag.
   db.delete(sessions).where(eq(sessions.deviceId, id)).run();
-  invalidateSessionCacheForPerson(row.personId);
+  invalidateSessionCacheForPerson(personId);
   // robot_credentials.device_id is deliberately NOT a foreign key (a code
   // review, 2026-09-28): a rotated password needs to survive its device
   // row's own deletion so a re-pair of the same physical unit can find

@@ -6,15 +6,16 @@
 // never one row per person holding an array inside it, so a single bad
 // sample can be revoked alone without touching the rest.
 //
-// The embedding never leaves this module in the clear: encrypted at
-// rest (lib/secrets.ts, the reversible module - matching needs the
-// plaintext vector back), the same treatment a credential hash gets.
-// Never included in the ordinary list/create/delete responses below -
-// FACE-03 (2026-09-28) adds the one sanctioned exception: GET
+// The embedding never leaves this module in the clear except through the
+// one sanctioned exit below: encrypted at rest (lib/secrets.ts, the
+// reversible module - matching needs the plaintext vector back), the same
+// treatment a credential hash gets. Never included in the ordinary
+// list/create/delete responses below - FACE-03 (2026-09-28) adds the one
+// sanctioned exception: GET
 // /api/biometric-prints/sync (routes/biometricPrints.ts), gated by
-// requireDeviceSession("robot") (middleware/auth.ts) so only a paired
-// robot device's own session, never a plain person session, can read it.
-// Everywhere else, only a matcher running server-side ever calls
+// requireDeviceSession("robot", "camera") (middleware/auth.ts) so only a
+// paired robot device's own session, never a plain person session, can
+// read it. Everywhere else, only a matcher running server-side ever calls
 // decryptSecret() on it.
 //
 // Consent: a child never consents for themself (the design's own
@@ -232,22 +233,10 @@ export function listPrintsForSync(): BiometricPrintT[] {
     .all() as PrintRow[];
 
   return rows.map((row) => ({
-    id: row.id,
-    person_id: row.personId,
-    modality: row.modality as "face" | "voice",
-    model_id: row.modelId,
-    model_sha256: row.modelSha256,
-    dim: row.dim,
+    ...toSummary(row),
     // Safe: a live (deletedAt IS NULL) row always still has its embedding -
     // only the tombstone path (above) ever nulls embeddingEncrypted, and
     // it sets deletedAt in the same write.
     embedding: JSON.parse(decryptSecret(row.embeddingEncrypted!)) as number[],
-    captured_by: row.capturedBy,
-    consent_at: row.consentAt,
-    consented_by_person_id: row.consentedByPersonId,
-    created_at: row.createdAt,
-    updated_at: row.updatedAt,
-    deleted_at: row.deletedAt,
-    hlc: row.hlc,
   }));
 }
