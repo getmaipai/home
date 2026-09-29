@@ -59,12 +59,41 @@ describe("EnrollmentSession", () => {
     expect(session.status().coveragePct).toBe(0);
   });
 
-  test("a full bucket rejects another frame without changing its count", () => {
+  test("a pose already captured is rejected as off target without changing its count", () => {
     const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
     session.offer(good());
-    expect(session.offer(good()).reason).toBe("bucket_full");
+    expect(session.offer(good()).reason).toBe("off_target");
     expect(session.status().buckets[0]?.count).toBe(1);
     expect(session.status().shots).toBe(1);
+  });
+
+  test("FACE-02I: a frame that swings past another pose while moving is not banked there", () => {
+    const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+    for (const s of [good(), good({ yawDeg: 20 }), good({ yawDeg: -20 })]) expect(session.offer(s).accepted).toBe(true);
+    expect(session.currentTarget()).toBe("up");
+    const transitional = session.offer(good({ pitchDeg: -16 }));
+    expect(transitional).toMatchObject({ accepted: false, reason: "off_target" });
+    expect(session.status().buckets.find((b) => b.pose === "down")?.count).toBe(0);
+    expect(session.offer(good({ pitchDeg: 16 })).accepted).toBe(true);
+    expect(session.offer(good({ pitchDeg: -16 })).accepted).toBe(true);
+    expect(session.status().complete).toBe(true);
+  });
+
+  test("FACE-02I: an out-of-order pose is not accepted", () => {
+    const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+    expect(session.offer(good({ yawDeg: 20 })).reason).toBe("off_target");
+    expect(session.status().coveragePct).toBe(0);
+  });
+
+  test("currentTarget walks the poses in order and ends at null", () => {
+    const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+    const seen: Array<string | null> = [];
+    for (const s of [good(), good({ yawDeg: 20 }), good({ yawDeg: -20 }), good({ pitchDeg: 16 }), good({ pitchDeg: -16 })]) {
+      seen.push(session.currentTarget());
+      session.offer(s);
+    }
+    seen.push(session.currentTarget());
+    expect(seen).toEqual(["frontal", "left", "right", "up", "down", null]);
   });
 
   test("status lists remaining prompts and flags accepted but marginal poses for retakes", () => {

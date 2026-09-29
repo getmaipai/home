@@ -2,7 +2,7 @@
 // feedback line, mapping assessQuality()'s own `reason` field (plus two
 // reasons only the capture loop itself can produce - "no_face" when
 // detection finds nothing, and OfferResult's own "between_angles"/
-// "bucket_full") to dad-test-simple copy (docs/STYLE.md), never the
+// "off_target"/"bucket_full") to dad-test-simple copy (docs/STYLE.md), never the
 // bare enum values.
 const REASON_TEXT: Record<string, string> = {
   ok: "Looking good, hold still.",
@@ -11,6 +11,7 @@ const REASON_TEXT: Record<string, string> = {
   too_dark: "It's too dark here. Try more light.",
   too_bright: "That's too bright. Try softer light.",
   between_angles: "Turn a little more, or look straight ahead.",
+  off_target: "Not that way yet. Follow the step above.",
   bucket_full: "Got that one, hold on.",
   no_face: "We can't see your face. Move into the frame.",
 };

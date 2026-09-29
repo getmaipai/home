@@ -156,6 +156,10 @@ export class EnrollmentSession {
 
     const pose = bucketPose(sample.yawDeg, sample.pitchDeg, this.spec.quality);
     if (pose === null) return this.result(false, "between_angles");
+    // FACE-02I: strict per-step capture. Only the pose being asked for
+    // right now counts, so a transitional frame swinging past another
+    // pose's threshold while the person moves is dropped, not banked.
+    if (pose !== this.currentTarget()) return this.result(false, "off_target");
     if (!this.needs(pose, sample.glasses)) return this.result(false, "bucket_full");
 
     this.poseCounts[pose] += 1;
@@ -212,6 +216,17 @@ export class EnrollmentSession {
     };
   }
 
+  /** The one pose being asked for right now, in POSES order: the first pose
+   * still short of its shots, then frontal while the glasses shots are
+   * owed, then null once everything is captured. The Wizard and the
+   * robot's voice ceremony both read this, never their own ordering. */
+  currentTarget(): Pose | null {
+    for (const pose of POSES) if (this.poseCounts[pose] < this.spec.shotsPerPose) return pose;
+    if (this.spec.wearsGlasses
+      && (this.glassesCounts.false < this.spec.glassesShots || this.glassesCounts.true < this.spec.glassesShots)) return "frontal";
+    return null;
+  }
+
   private needs(pose: Pose, glasses: boolean | null): boolean {
     if (this.poseCounts[pose] < this.spec.shotsPerPose) return true;
     return this.spec.wearsGlasses && pose === "frontal" && glasses !== null
@@ -235,7 +250,8 @@ export class EnrollmentSession {
   }
 
   private nextInstruction(): string {
-    for (const pose of POSES) if (this.poseCounts[pose] < this.spec.shotsPerPose) return POSE_PROMPT[pose];
+    const target = this.currentTarget();
+    if (target !== null && POSES.some((pose) => this.poseCounts[pose] < this.spec.shotsPerPose)) return POSE_PROMPT[target];
     if (this.spec.wearsGlasses) {
       if (this.glassesCounts.false < this.spec.glassesShots) return "take your glasses off and look at me";
       if (this.glassesCounts.true < this.spec.glassesShots) return "put your glasses on and look at me";

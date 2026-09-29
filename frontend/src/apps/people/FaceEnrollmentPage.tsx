@@ -518,7 +518,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
   );
 
   const bucketFor = (pose: Pose) => status.buckets.find((b) => b.pose === pose)!;
-  const currentPose = status.complete ? null : POSES.find((pose) => bucketFor(pose).count < bucketFor(pose).needed) ?? null;
+  const currentPose = status.complete ? null : session.currentTarget();
   const currentStepId = currentPose ?? "done";
   let completedCount = 0;
   for (const pose of POSES) {

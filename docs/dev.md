@@ -32258,3 +32258,22 @@ channel (a long-poll `GET /api/devices/me/commands`, sketched but not
 decided), and - separately - whether Home should offer a mute button
 on the robot's card at all, which may be Jesse's own product call
 rather than an engineering one. Not started.
+
+## FACE-02I: strict per-step capture (2026-09-29, design-resolver)
+
+`EnrollmentSession.offer()` used to bucket every frame by the pose it
+measured, whatever step the Wizard showed, so a frame swinging past the
+"down" threshold while the person returned from "up" was banked early,
+and mid-motion frames are the soft ones. Decision: capture is strict.
+`currentTarget()` (the first pose short of its shots, then frontal while
+glasses shots are owed, then null) is the one ordering; `offer()` returns
+`off_target` for any other pose, and the page and `nextInstruction()` read
+`currentTarget()` instead of keeping their own copies.
+
+Why not the honest-opportunistic alternative: the kit's `Wizard` counts
+completed steps from the start and cannot show step 5 done while step 4 is
+open, so it would need a kit edit or a hand-built five-part display, both
+against the no-hand-built-UI rule; it would keep banking the mid-motion
+frames that caused the defect; and the robot's voice ceremony can only ask
+for one pose at a time. If Jesse wants a Face-ID-style free-order ring, that
+is a new kit pattern in `commons` first, as its own item.
