@@ -16,7 +16,6 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.128.0",
     "@hono/zod-openapi": "^1.6.3",
     "@maipai/core": "file:../../commons-tags/core-core-v0.1.0/core",
     "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.54/spec",

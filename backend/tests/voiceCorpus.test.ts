@@ -55,12 +55,72 @@ describe("validatePair", () => {
     expect(verdict).toEqual({ ok: true });
   });
 
-  test("drops a pair outside the 15 percent length band", () => {
+  test("drops a pair grossly outside the length band", () => {
     const neutral = "It's about thirty degrees.";
     const rewrite = "Honestly, if you're asking me, I would say it feels like it is currently hovering somewhere in the neighborhood of about thirty degrees or so, give or take a little.";
     const verdict = validatePair(neutral, rewrite);
     expect(verdict.ok).toBe(false);
     expect(verdict.reason).toBe("length band");
+  });
+
+  // STYLE-CORPUS-01b (docs/dev.md, 2026-09-28): widened from 15 to 35
+  // percent against real evidence - a real sample of 32 still-dropping,
+  // substance-preserving rewrites against this household's own long
+  // neutral replies had its length overage densely spread from 25% to
+  // 45%, not the old band's 15%.
+  test("keeps a pair within the widened length band that the old 15 percent band would have dropped", () => {
+    const neutral = "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty";
+    const rewrite = `${neutral} apple banana cherry date five six seven`; // 27 words vs 20 = 35% over, inside the new band, outside the old 15%
+    const verdict = validatePair(neutral, rewrite);
+    expect(verdict).toEqual({ ok: true });
+  });
+
+  // STYLE-CORPUS-01b: found live, 2026-09-28, against this household's
+  // own long, markdown-structured neutral replies (the local 8B chat
+  // engine's real shape for an open-ended factual question) - a
+  // genuine, substance-preserving rewrite routinely swaps a repeated
+  // subject for a pronoun across sentences/bullets. The entity (Fuji,
+  // Japan) is still named at least once on both sides; only the repeat
+  // count differs, which is not the kind of drift this check exists to
+  // catch (a real name changed, added, or dropped entirely - the
+  // "Canberra"/"Sydney" and "drops a name entirely" tests below).
+  test("keeps a pair where a repeated entity mention becomes a pronoun", () => {
+    const neutral = "Mount Fuji is a volcano in Japan. Mount Fuji is very famous.";
+    const rewrite = "Mount Fuji is a volcano in Japan. It's very famous.";
+    const verdict = validatePair(neutral, rewrite);
+    expect(verdict).toEqual({ ok: true });
+  });
+
+  test("drops a pair that drops a named entity entirely, not just a repeat count", () => {
+    const neutral = "Mount Fuji is in Japan.";
+    const rewrite = "It's a big mountain.";
+    const verdict = validatePair(neutral, rewrite);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.reason).toBe("capitalized-token set");
+  });
+
+  // STYLE-CORPUS-01b: found live, 2026-09-28 - an unpunctuated markdown
+  // bullet or heading line (no `.!?` before the newline) used to merge
+  // into the FOLLOWING line under the old `.!?`-only sentence split,
+  // misclassifying that next bullet's own leading word as "mid-sentence"
+  // instead of its own line-initial word.
+  test("keeps a pair where an unpunctuated heading line precedes a bulleted rewrite", () => {
+    const neutral = "Overview\n- Volcanoes are known for eruptions.";
+    const rewrite = "Overview\n- They're known for eruptions.";
+    const verdict = validatePair(neutral, rewrite);
+    expect(verdict).toEqual({ ok: true });
+  });
+
+  // STYLE-CORPUS-01b: found live, 2026-09-28, on a real corpus row - a
+  // bolded markdown label ending in a colon sits on the SAME line as
+  // the sentence it introduces, with no period or newline between them,
+  // so the `\n+` fix above alone still hid this sentence's true first
+  // word ("Volcanoes"/"They're") behind the label.
+  test("keeps a pair where a bolded label precedes the real sentence on the same line", () => {
+    const neutral = "- **Volcanic Eruptions:** Volcanoes are known for their eruptions.";
+    const rewrite = "- **Volcanic Eruptions:** They're known for their eruptions.";
+    const verdict = validatePair(neutral, rewrite);
+    expect(verdict).toEqual({ ok: true });
   });
 
   test("drops a rewrite that introduces a forbidden phrase", () => {

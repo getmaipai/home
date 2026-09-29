@@ -31819,3 +31819,163 @@ Then STYLE-CORPUS-02 below (the class-aware target and validator), the
 full four-companion run, and its per-class drop rates in this file.
 Then STYLE-TRAIN-01, STYLE-BENCH-01 and the adapter rows in the order
 EVAL-03 gave them, with the dated notes on each row in BACKLOG.md.
+
+## STYLE-CORPUS-01b: closed - local teacher, validator fixes, the production prefix per class (Sonnet, 2026-09-29)
+
+Closes STYLE-CORPUS-01b
+(`docs/plans/style-corpus-01-local-teacher-2026-09-28.md`), the row
+"STYLE-CORPUS-01: built, the rewrite brief and the real numbers" above
+left blocked on an Anthropic credential that will never exist on this
+machine. Read together with "VOICE-CLASS-01 design pass" above it,
+which cites this item's own evidence directly and made the call on
+what the typed numbers below mean. Three changes over the built-but-
+blocked state that section left off at.
+
+**1. Teacher.** `anthropic.messages.create()` replaced with
+`LlamaServerClient` (`@maipai/spec/llm/ts/client.js` - the exact class
+`llm.ts`'s own `complete()` already uses for the household's real
+engines, not a hand-rolled `fetch()`) against
+`MAIPAI_VOICE_TEACHER_URL` (default: this household's local Qwen3.8-27B
+lane) and `MAIPAI_VOICE_TEACHER_MODEL` (`qwen38-27b`), both env-
+overridable, never hardcoded - a different household has a different
+teacher. `MissingCredentialError` renamed `TeacherUnreachableError`,
+same guarantee as before (thrown once, caught once at the top of
+`main()`, so the isolated `MAIPAI_DATA_DIR` scratch directory is always
+cleaned up). `@anthropic-ai/sdk` dropped from `backend/package.json`
+and `bun.lock` (grepped first: no other use anywhere in the repo).
+Each companion's corpus now checkpoints incrementally - one line
+appended to `corpus.jsonl` per kept row as the loop runs, not
+accumulated in memory and written once at the end - because this
+laptop's eGPU-backed teacher has a documented history of dropping
+mid-session (the homelab repo's own host doc), a real risk on the
+night this item was built, not a hypothetical one; a mid-companion
+drop now loses nothing already good.
+
+**2. The validator.** Read dozens of real dropped pairs directly
+(never guessed) and found the capitalized-token and length-band checks
+were the source of a genuinely high false-positive rate against this
+household's own long, markdown-structured neutral replies (headings,
+bold labels, numbered lists - the written class's own real shape,
+confirmed against production and not a corpus artifact; see change 3).
+Fixed, all still inside the same two checks the original brief named,
+digit-run and list-marker-presence left completely untouched even
+though the same class of false positive showed up there too (a
+carpet-stain rewrite that turned "### **1. Blot, Don't Rub**" into
+plain "Blot, don't rub" failed digit-run on the vanished "1" - list
+order, not a digit label, is what actually carries the list's meaning,
+but this row's own instruction was to leave that check alone, so it
+stayed alone):
+
+- The sentence-boundary split now also breaks on `\n+` (`SENTENCE_
+  SPLIT_RE`) - an unpunctuated heading or bullet line no longer merges
+  into the next line and hides that next line's own leading word.
+- Two bold-markdown-label shapes on the same line as the sentence they
+  introduce, found live in real generations - `**Label:**` and
+  `**Label**:`, used interchangeably by this teacher - get a synthetic
+  line break inserted before the same split, for the identical reason
+  the `\n+` fix exists.
+- A small stoplist of pronouns and closed-class words (they, it, the,
+  a, so, however, and the rest - `CAPITALIZED_STOPWORDS`) is excluded
+  from the capitalized-token count; none of them is ever a real
+  entity, and a rewrite trading a repeated subject noun for a pronoun
+  across bullets ("Volcanoes are known for..." / "They're known
+  for...") is an ordinary style economy, not a dropped fact.
+- The capitalized-token check now compares a deduplicated SET rather
+  than an exact multiset. A real entity added, dropped, or swapped for
+  a different one still fails it (the "Canberra"/"Sydney" regression
+  test, and a new one that drops a named entity entirely) - only a
+  repeat-count difference, the shape the pronoun swap above produces,
+  now passes.
+- The length band widened from 15 to 35 percent, not by feel: a real
+  sample of 32 pairs that were still dropping on capitalized-token-set
+  before the fixes above landed, re-checked after, had their genuine
+  length overage densely spread 25 to 45 percent, with a real tail at
+  50 to 83 percent that still correctly fails even at 35. 20 percent
+  was tried first and measured too tight against the same sample
+  before landing on 35. `REWRITE_BRIEF`'s own text still says "within
+  15 percent" - left as the model's tighter aspirational target,
+  intentionally not matching what the validator enforces;
+  STYLE-CORPUS-02 below is the row that puts the brief and the
+  validator on one number.
+
+`voiceCorpus.test.ts` gained 5 regression tests for the above (22
+total, all passing; `tsc --noEmit` clean) - including one proving the
+widened band still drops a grossly mismatched pair, and one proving
+the set-based comparison still drops a pair that loses a named entity
+entirely, not only one that swaps it for another.
+
+**3. The neutral reply.** Was `identityLine(persona)` alone -
+deliberately stripped, on the theory that isolating voice from content
+meant isolating it from everything else too. That went too far: a real
+household member's own turn on either surface class gets more than
+bare identity from production (`turnEngine.ts`'s `buildStablePrefix`,
+`persona.ts`'s `NATURALNESS_POLICY` - read directly from the real
+source, not reconstructed from memory), and the neutral reply now gets
+exactly that, branched on the prompt's own typed/spoken class:
+`buildStablePrefix(persona, "written")` for typed (identity plus the
+privacy sentence only - `WRITTEN_VOICE_PROSE` is `false` in production
+today, so that is the whole prefix, confirmed by printing it), identity
+plus `stableSuffixFor("spoken")` plus `NATURALNESS_POLICY` for spoken.
+Neither branch adds `composePersonaPrompt` or the engagement dial's own
+sentence-count language - companion voice stays the rewrite step's job,
+exactly as before this change.
+
+**Real numbers.** 35 voice prompts per companion (20 typed, 15 spoken),
+real calls against the live local teacher, the validator and
+neutral-reply prefix described above. VOICE-CLASS-01's own table above
+cites the run that measured this item's evidence directly and made the
+Decision on what the typed numbers mean; that citation stands as an
+accurate account of what was measured, at the time it was measured.
+The committed fixtures below are from a **second** real run at the
+same parameters and the same final code, not the exact run
+VOICE-CLASS-01's table shows - an operator error late in finishing
+this item (a verification smoke test against the real teacher was run
+without redirecting its output, overwriting the first run's own
+`data-scratch/voice/*/corpus.jsonl` and committed sample fixtures
+before they were committed) meant the first run's own row-level data
+no longer existed to commit. Stated plainly rather than quietly
+patched over: the aggregate finding is unchanged (both runs land in
+the same range, typed well below the 20 percent bar and spoken well
+above it, for the same reasons VOICE-CLASS-01 already gives), but the
+exact fixture bytes committed are the second run's, and this paragraph
+is the record of why they differ from the ones already cited above.
+Second run's own numbers: default kept 25/35 (60% typed, 87% spoken),
+buddy kept 25/35 (75% typed, 67% spoken), pal kept 23/35 (50% typed,
+87% spoken), tutor kept 17/35 (55% typed, 40% spoken). Drop reasons
+summed over the four companions: typed fails the capitalized-token set
+16 times, the length band 15, the digit-run set once; spoken fails the
+length band 16 times, the capitalized-token set once, the digit-run
+set once (the near-total flip from VOICE-CLASS-01's own spoken numbers,
+where length band was already the larger share too - consistent, not
+contradictory).
+
+**What's committed, and what deliberately isn't.** The 20-row sample
+fixtures (`backend/scripts/voice/fixtures/<companion>.sample.jsonl`)
+are drawn from the second real run above - 20 rows each for default,
+buddy and pal, 17 for tutor (all it kept at this scale, never padded to
+20), with one exception: **the Pal "what's the human heart known for"
+pair VOICE-CLASS-01 cites (`pal-typed-fact-0-0`) is pinned in
+`pal.sample.jsonl` and in `data-scratch/voice/pal/corpus.jsonl` exactly
+as originally measured** (the exact bytes, recovered from this
+session's own earlier tool output, not regenerated), replacing the
+second run's own different real generation for that same prompt id -
+per the design record's own ask, since it is now a cited regression
+fixture for STYLE-CORPUS-02 and the second run's stochastic rewrite of
+the same prompt does not reproduce the specific structure (numbered
+bullets, filler glued between them) that citation is about. Every
+other row in every fixture is exactly what the second run produced,
+nothing else hand-edited. Per VOICE-CLASS-01's own build order, the
+full four-companion run (roughly 400 typed, 200 spoken and 50 tool
+rows per companion) and the per-class drop rates that matter for
+acceptance are STYLE-CORPUS-02's own deliverable, once the class-aware
+target and validator exist: running today's not-yet-class-aware
+builder at full scale now would only reproduce this same typed-class
+shortfall at several hours' greater cost, for numbers STYLE-CORPUS-02
+retakes anyway once its frame rewrite lands.
+
+This closes STYLE-CORPUS-01b: the teacher is this household's own, the
+validator drops real substance drift and nothing this evidence
+surfaced, the neutral reply matches what production actually sends on
+each surface class. What it does not close - the typed, document-
+shaped register - was never this row's brief; it is STYLE-CORPUS-02's,
+decided and queued in VOICE-CLASS-01 above.

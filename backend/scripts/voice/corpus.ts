@@ -18,9 +18,12 @@
 //      held out of every corpus: those rows are STYLE-BENCH-01's own
 //      bench, never trained on.
 //   2. The neutral reply: the bare local model at 127.0.0.1:8788, the
-//      companion's own identityLine() as the only system content,
-//      thinking off, CHAT_SAMPLING (llm.ts's complete() applies it
-//      automatically whenever no temperature is given).
+//      companion's own identityLine() plus the REAL production
+//      formatting/length guidance for that prompt's surface class (see
+//      neutralReplySystem() in run() - STYLE-CORPUS-01b, 2026-09-28:
+//      identityLine() alone under-represented a real turn), thinking
+//      off, CHAT_SAMPLING (llm.ts's complete() applies it automatically
+//      whenever no temperature is given).
 //   3. The rewrite: a frontier model, given the companion's manifest
 //      fields (display_name, tagline, backstory, interests, the four
 //      dials in words, examples verbatim as few-shot) and the fixed
@@ -46,32 +49,45 @@
 // real household turn) because the backlog names that engine explicitly;
 // every other bench in this directory uses a side instance instead.
 //
-// Needs an Anthropic API key already resolvable the way the `claude-api`
-// skill resolves one (ANTHROPIC_API_KEY, or an `ant auth login` profile)
-// - this script never reads one from a project file, and refuses with a
-// clear message (never a 100%-drop-rate lie) when no credential
-// resolves. Synthetic content only ever leaves the machine for the
-// rewrite call: every prompt here is generated from a topic word bank or
+// STYLE-CORPUS-01b (docs/plans/style-corpus-01-local-teacher-2026-09-28.md,
+// 2026-09-28): the rewrite "teacher" is this household's own local
+// Qwen3.8-27B (MAIPAI_VOICE_TEACHER_URL - required, no hardcoded
+// default: a real LAN address is household-specific and never belongs
+// in this repo's own source, not just its docs, so the operator sets
+// it per invocation, the same way a real household's own address was
+// redacted from this item's own work order doc; MAIPAI_VOICE_TEACHER_MODEL,
+// default "qwen38-27b"), an OpenAI-compatible /v1/chat/completions endpoint
+// reached through the identical LlamaServerClient the hub's own chat
+// role uses (@maipai/spec/llm/ts/client.js) - never an Anthropic key,
+// which will never exist on this machine (Jesse, 2026-09-28). A
+// connection failure or non-2xx response aborts the whole run rather
+// than silently dropping every remaining row as a misleading "drop
+// rate." Every prompt here is generated from a topic word bank or
 // drawn from owner-replay.json's own already household-free rows, so
-// nothing about the real household reaches the frontier API.
+// nothing about the real household reaches the teacher call - it stays
+// on the LAN either way, matching the product's own "nothing leaves
+// your house" promise.
 //
 // Output: data-scratch/voice/<companion>/corpus.jsonl (git-ignored, the
-// full run) and a committed 20-row sample per companion under
-// backend/scripts/voice/fixtures/<companion>.sample.jsonl (the builder's
-// own tests read the samples, and the sha256 in the manifest entry
-// STYLE-SPEC-01 declares is the FULL corpus file's, printed at the end
-// of each companion's run).
+// full run, appended to incrementally as each row is kept - not held in
+// memory and written once at the end - so a mid-run teacher drop, this
+// laptop's eGPU has a documented history of dropping mid-session, never
+// silently discards already-good rows) and a committed 20-row sample per
+// companion under backend/scripts/voice/fixtures/<companion>.sample.jsonl
+// (the builder's own tests read the samples, and the sha256 in the
+// manifest entry STYLE-SPEC-01 declares is the FULL corpus file's,
+// printed at the end of each companion's run).
 //
 // MAIPAI_VOICE_TYPED_COUNT / MAIPAI_VOICE_SPOKEN_COUNT /
 // MAIPAI_VOICE_TOOL_COUNT override the default ~400/~200/50 row counts -
 // a prefix of the identical deterministic generator, never a different
 // one - for a smaller real validation run. Never set as a standing
 // default; an operator sets them per invocation.
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import Anthropic from "@anthropic-ai/sdk";
+import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { HONESTY_LINES, EMPTY_PROMISE_LINES } from "../bench/conversationFixture";
 import { WRITTEN_QUESTIONS } from "../bench/written-set";
 import { refuseIfGateRunning, waitForHubQuiet } from "../bench/liveHubQuiet";
@@ -201,7 +217,20 @@ export function wordCount(s: string): number {
   return (s.match(WORD_RE) ?? []).length;
 }
 
-export function lengthWithinBand(neutral: string, rewrite: string, band = 0.15): boolean {
+// STYLE-CORPUS-01b (docs/dev.md "the validator, revisited against a
+// real 27B teacher"): widened from 0.15 to 0.35, backed by real
+// drop-reason evidence gathered 2026-09-28 in two passes - a first
+// small sample clustered its "brief"-persona-driven compression at
+// 15-22% under the original word count; re-checking a larger sample of
+// 32 real, still-dropping rewrites (after the capitalized-token fixes
+// below already landed) against this household's own long,
+// markdown-structured neutral replies found overage densely spread from
+// 25% to 45%, not the wholesale padding/truncation this check exists to
+// catch - 25% would have left most of that real spread failing, while
+// the wild outliers (50-83% over) stay correctly caught even at 35%
+// (7 of the 32 pairs), the kind of gross mismatch the "length band"
+// regression test below still uses.
+export function lengthWithinBand(neutral: string, rewrite: string, band = 0.35): boolean {
   const n = wordCount(neutral);
   const r = wordCount(rewrite);
   if (n === 0) return r === 0;
@@ -215,17 +244,59 @@ export function sameMultiset(a: readonly string[], b: readonly string[]): boolea
   return a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
-// Capitalized tokens after the first word of each sentence - sentence-
-// initial capitalization is just English orthography, not a fact the
-// rewrite could drop or invent, so it is excluded on both sides.
-const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+/;
+// STYLE-CORPUS-01b: closed-class words excluded from the capitalized-
+// token check below - pronouns, articles, and discourse connectives
+// that carry no entity identity of their own. Found live, 2026-09-28:
+// a real, substance-preserving rewrite against this household's own
+// markdown-structured neutral replies routinely swaps a repeated
+// subject noun for a pronoun across several bullets ("Volcanoes are
+// known for..." / "They're known for...", "The human eye is known
+// for..." / "It's known for...") - an ordinary style economy, not a
+// dropped or invented fact, but the exact same class of word the
+// original sentence-initial exclusion already existed to ignore
+// (English orthography, not substance). Real entities (Mount Everest,
+// Chile, a name) are never in this list and stay fully protected.
+const CAPITALIZED_STOPWORDS = new Set([
+  "a", "an", "the", "i", "you", "he", "she", "it", "we", "they",
+  "this", "that", "these", "those", "who", "what", "which",
+  "so", "now", "here", "there", "however", "but", "and", "or",
+  "if", "when", "while", "also", "then", "yes", "no", "well",
+  "okay", "ok", "let's", "let", "do", "does", "is", "are", "was", "were",
+]);
+
+// Capitalized tokens after the first word of each sentence OR line -
+// sentence-initial capitalization is just English orthography, not a
+// fact the rewrite could drop or invent, so it is excluded on both
+// sides. STYLE-CORPUS-01b added the `\n+` split: the original `.!?`-only
+// boundary merges an unpunctuated markdown bullet or heading into the
+// PRECEDING line (headings and short bullet fragments routinely have no
+// terminal punctuation), which misclassified that bullet's own leading
+// word as "mid-sentence" - found live, 2026-09-28, against this
+// household's own long, markdown-structured neutral replies (the local
+// 8B chat engine's real shape for an open-ended factual question, not
+// the short plain-prose replies this check was designed against).
+const SENTENCE_SPLIT_RE = /(?<=[.!?])\s+|\n+/;
+// A bolded markdown label followed by a colon, either inside the bold
+// span ("**Volcanic Eruptions:** Volcanoes are known for...") or right
+// after it ("**Volcanic Eruptions**: Volcanoes are known for...", the
+// numbered-list-item shape found live, 2026-09-28, just as often as the
+// first - Qwen38-27B uses both interchangeably across otherwise
+// near-identical rewrites) - sits on the SAME line as the real sentence
+// it introduces, with neither a period nor a newline between them,
+// still merging the label into the sentence after the `\n+` split above
+// and hiding that sentence's true first word (which the `\n+` fix alone
+// does not reach, since there is no line break to split on here at
+// all). Treated as its own boundary, the same way a heading or a fresh
+// line already is.
+const BOLD_LABEL_RE = /(\*\*[^*\n]+:\*\*|\*\*[^*\n]+\*\*:)\s*/g;
 export function capitalizedTokensAfterSentenceStart(s: string): string[] {
+  const withLabelBreaks = s.replace(BOLD_LABEL_RE, (m) => `${m}\n`);
   const out: string[] = [];
-  for (const sentence of s.split(SENTENCE_SPLIT_RE)) {
+  for (const sentence of withLabelBreaks.split(SENTENCE_SPLIT_RE)) {
     const words = sentence.match(/[A-Za-z][A-Za-z'-]*/g) ?? [];
     for (let i = 1; i < words.length; i++) {
       const w = words[i]!;
-      if (/^[A-Z]/.test(w)) out.push(w);
+      if (/^[A-Z]/.test(w) && !CAPITALIZED_STOPWORDS.has(w.toLowerCase())) out.push(w);
     }
   }
   return out.sort();
@@ -257,7 +328,21 @@ export interface ValidationResult {
 export function validatePair(neutral: string, rewrite: string): ValidationResult {
   if (!lengthWithinBand(neutral, rewrite)) return { ok: false, reason: "length band" };
   if (!sameMultiset(digitRuns(neutral), digitRuns(rewrite))) return { ok: false, reason: "digit-run set" };
-  if (!sameMultiset(capitalizedTokensAfterSentenceStart(neutral), capitalizedTokensAfterSentenceStart(rewrite))) return { ok: false, reason: "capitalized-token set" };
+  // STYLE-CORPUS-01b: compared as a deduplicated SET, not the exact
+  // multiset digit-run gets above. digitRuns() stays count-sensitive on
+  // purpose (a repeated number dropped to one occurrence is drift); a
+  // capitalized entity mentioned a different number of times across a
+  // real rewrite is not the same kind of drift - found live, 2026-09-28,
+  // a rewrite that referred to a repeated subject once by name and then
+  // by pronoun ("Mount Fuji... it's also..." instead of naming it
+  // twice) still names every entity the neutral reply named, just not
+  // the identical number of times. An entity ADDED or DROPPED entirely,
+  // or swapped for a different one (the "Canberra"/"Sydney" regression
+  // test below), still fails: it is present in one set and absent from
+  // the other either way.
+  const neutralCaps = new Set(capitalizedTokensAfterSentenceStart(neutral));
+  const rewriteCaps = new Set(capitalizedTokensAfterSentenceStart(rewrite));
+  if (!sameMultiset([...neutralCaps].sort(), [...rewriteCaps].sort())) return { ok: false, reason: "capitalized-token set" };
   if (HEADING_RE.test(neutral) !== HEADING_RE.test(rewrite)) return { ok: false, reason: "heading presence changed" };
   if (LIST_RE.test(neutral) !== LIST_RE.test(rewrite)) return { ok: false, reason: "list marker presence changed" };
   if (FORBIDDEN_RE.test(rewrite)) return { ok: false, reason: "forbidden phrase" };
@@ -485,20 +570,31 @@ export function toJsonl(rows: readonly Record<string, unknown>[]): string {
   return rows.map((r) => JSON.stringify(r)).join("\n") + (rows.length > 0 ? "\n" : "");
 }
 
-/** Thrown when no Anthropic credential resolves - caught once at the
- * very top of main() (never at the call site) so the isolated data
- * directory this script creates is always cleaned up before the
- * process exits, whichever companion or row the credential first
- * failed on (a code review, 2026-09-28: `process.exit(2)` called from
- * inside the per-row loop skipped the cleanup at the end of main()). */
-class MissingCredentialError extends Error {}
+/** Thrown when the local voice-rewrite teacher (STYLE-CORPUS-01b) can't
+ * be reached - a connection failure or a non-2xx response, either one
+ * meaning every remaining row would fail identically, so the whole run
+ * aborts here rather than quietly dropping every row into a misleading
+ * "drop rate." Caught once at the very top of main() (never at the call
+ * site) so the isolated data directory this script creates is always
+ * cleaned up before the process exits, whichever companion or row the
+ * teacher first dropped on (a code review, 2026-09-28: `process.exit(2)`
+ * called from inside the per-row loop skipped the cleanup at the end of
+ * main()). */
+class TeacherUnreachableError extends Error {}
 
 // ── main ────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   refuseIfGateRunning("voice-corpus");
 
-  const anthropic = new Anthropic();
+  // No hardcoded LAN address (STYLE-CORPUS-01b) - a real household's own
+  // teacher endpoint never belongs in this repo's own source, so the
+  // operator sets it per invocation; a clear refusal here, never a
+  // silent fallback to some other address.
+  const teacherUrl = process.env.MAIPAI_VOICE_TEACHER_URL;
+  if (!teacherUrl) throw new TeacherUnreachableError("MAIPAI_VOICE_TEACHER_URL is required (this household's own local voice-rewrite teacher, e.g. an OpenAI-compatible llama-server address) - never a hardcoded default, set it per invocation.");
+  const teacherModel = process.env.MAIPAI_VOICE_TEACHER_MODEL ?? "qwen38-27b";
+  const teacher = new LlamaServerClient(teacherUrl);
 
   const upstream = process.env.MAIPAI_LLAMA_SERVER_URL ?? "http://127.0.0.1:8788";
   process.env.MAIPAI_LLAMA_SERVER_URL = upstream;
@@ -508,15 +604,15 @@ async function main(): Promise<void> {
 
   const waitForQuiet = () => waitForHubQuiet(undefined, (msg) => console.log(msg.replace("live-hub-quiet", "voice-corpus")));
 
-  console.log(`[voice-corpus] chat=${upstream} embed=${process.env.MAIPAI_EMBED_URL} data=${ownDataDir}`);
+  console.log(`[voice-corpus] chat=${upstream} embed=${process.env.MAIPAI_EMBED_URL} teacher=${teacherUrl} (${teacherModel}) data=${ownDataDir}`);
   try {
-    await run(anthropic, waitForQuiet);
+    await run(teacher, teacherModel, waitForQuiet);
   } finally {
     rmSync(ownDataDir, { recursive: true, force: true });
   }
 }
 
-async function run(anthropic: Anthropic, waitForQuiet: () => Promise<void>): Promise<void> {
+async function run(teacher: LlamaServerClient, teacherModel: string, waitForQuiet: () => Promise<void>): Promise<void> {
 
   // CHAT-22: setup.ts must be imported (and awaited) before anything
   // that reaches "@/db" - persona.ts, plugins.ts, turnEngine.ts and
@@ -526,9 +622,34 @@ async function run(anthropic: Anthropic, waitForQuiet: () => Promise<void>): Pro
 
   const { complete } = await import("@/lib/llm");
   const { loadManifestOnly } = await import("@/lib/plugins");
-  const { PERSONAS } = await import("@/lib/persona");
-  const { identityLine } = await import("@/lib/turnEngine");
+  const { PERSONAS, NATURALNESS_POLICY } = await import("@/lib/persona");
+  const { identityLine, buildStablePrefix, stableSuffixFor } = await import("@/lib/turnEngine");
   const { visibleText } = await import("@/lib/wellFormed");
+
+  // STYLE-CORPUS-01b (Jesse, 2026-09-28): the neutral-reply system
+  // message used to be identityLine(persona) alone, on the theory that
+  // stripping everything else isolates voice from content. That went
+  // too far - a real household member's own typed chat turn gets
+  // buildStablePrefix(persona, "written") (identity plus the privacy
+  // sentence; PREFIX-CLASS-01, dev.md "The written prompt on tier 1,
+  // decided", 2026-09-23, measured that ANY added policy or persona
+  // prose collapses this model's reply quality on the written class, so
+  // production deliberately sends nothing else - the model's own long,
+  // structured, markdown-heavy habit for an open-ended question IS
+  // today's real written-adult behavior, not a corpus-script artifact),
+  // and a real SPOKEN turn additionally gets NATURALNESS_POLICY (@/lib/
+  // persona.ts) - a fixed, non-persona-varying fragment ("never bullet
+  // points," spoken-style numbers), the one formatting/length rule
+  // every companion's spoken reply gets regardless of voice. Neither
+  // adds a companion's own persona/voice fragments (composePersonaPrompt,
+  // the engagement dial's own sentence-count language) - those stay the
+  // rewrite step's job, exactly as before; this only stops
+  // UNDER-representing what the bare model already does on each real
+  // surface class.
+  function neutralReplySystem(persona: Persona, cls: "typed" | "spoken"): string {
+    if (cls === "typed") return buildStablePrefix(persona, "written");
+    return `${identityLine(persona)} ${stableSuffixFor("spoken")} ${NATURALNESS_POLICY}`;
+  }
 
   const toolSpecs: ToolSpec[] = TOOL_SPEC_IDS.map((id) => {
     const loaded = loadManifestOnly(id);
@@ -593,9 +714,21 @@ async function run(anthropic: Anthropic, waitForQuiet: () => Promise<void>): Pro
     const rows: Record<string, unknown>[] = [];
     let dropped = 0;
     const voicePrompts = [...typed, ...spoken];
+
+    const outDir = join(REPO_ROOT, "data-scratch", "voice", companionId);
+    mkdirSync(outDir, { recursive: true });
+    const outPath = join(outDir, "corpus.jsonl");
+    // Checkpointed incrementally (STYLE-CORPUS-01b step 4): one line
+    // appended per kept row as the loop runs, not accumulated in memory
+    // and written once at the end, so a mid-companion teacher drop
+    // (this laptop's eGPU has a documented history of dropping
+    // mid-session) leaves every already-good row on disk instead of
+    // discarding it.
+    writeFileSync(outPath, "");
+
     for (const p of voicePrompts) {
       await waitForQuiet();
-      const neutralResult = await complete("chat", [{ role: "system", content: identityLine(persona) }, { role: "user", content: p.text }], { thinking: false });
+      const neutralResult = await complete("chat", [{ role: "system", content: neutralReplySystem(persona, p.cls) }, { role: "user", content: p.text }], { thinking: false });
       if (!neutralResult.ok) {
         console.error(`[voice-corpus] ${companionId} ${p.id}: neutral reply failed (${neutralResult.error})`);
         dropped++;
@@ -605,32 +738,28 @@ async function run(anthropic: Anthropic, waitForQuiet: () => Promise<void>): Pro
 
       let rewrite: string;
       try {
-        const response = await anthropic.messages.create({
-          model: "claude-haiku-4-5",
+        const response = await teacher.chatComplete({
+          model: teacherModel,
           max_tokens: 1024,
-          system: rewriteSystem,
-          messages: [{ role: "user", content: `Prompt: ${p.text}\n\nNeutral reply:\n${neutral}\n\nRewrite this reply now, following the brief exactly.` }],
+          messages: [
+            { role: "system", content: rewriteSystem },
+            { role: "user", content: `Prompt: ${p.text}\n\nNeutral reply:\n${neutral}\n\nRewrite this reply now, following the brief exactly.` },
+          ],
         });
-        const block = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
-        rewrite = block ? block.text.trim() : "";
+        rewrite = (response.choices[0]?.message.content ?? "").trim();
       } catch (err) {
-        // Two distinct "no credential" shapes from the SDK: a client-side
-        // refusal before any request goes out ("Could not resolve
-        // authentication method", a plain Error - no request was ever
-        // made, so no server-side error class applies) and a server-side
-        // 401 (Anthropic.AuthenticationError, a real request that got
-        // rejected). Either one means every remaining row would fail
+        // A connection failure (this laptop's eGPU-backed teacher has a
+        // documented history of dropping mid-session, see the homelab
+        // repo's own host doc) or a non-2xx response - either one
+        // surfaces here as LlamaServerClient.chatComplete()'s own
+        // LlmClientError - means every remaining row would fail
         // identically, so this aborts the whole run right here instead
         // of quietly dropping every row and reporting a misleading
-        // "drop rate" that reads as a corpus finding instead of a
-        // missing credential.
-        const message = (err as Error).message;
-        if (err instanceof Anthropic.AuthenticationError || message.includes("Could not resolve authentication method")) {
-          throw new MissingCredentialError(`no Anthropic credential resolves (ANTHROPIC_API_KEY or an \`ant auth login\` profile - never a project file). ${message}`);
-        }
-        console.error(`[voice-corpus] ${companionId} ${p.id}: rewrite call failed (${message})`);
-        dropped++;
-        continue;
+        // "drop rate" that reads as a corpus finding instead of an
+        // unreachable teacher. Every row kept before this point is
+        // already on disk (the incremental write above), so nothing
+        // already good is lost.
+        throw new TeacherUnreachableError(`local voice teacher unreachable (${(err as Error).message})`);
       }
       if (!rewrite) {
         dropped++;
@@ -639,21 +768,30 @@ async function run(anthropic: Anthropic, waitForQuiet: () => Promise<void>): Pro
 
       const verdict = validatePair(neutral, rewrite);
       if (!verdict.ok) {
+        console.error(`[voice-corpus] ${companionId} ${p.id}: dropped (${verdict.reason})`);
+        // MAIPAI_VOICE_DEBUG_DROPS=1: the full pair, for characterizing a
+        // real drop-rate finding against actual text (never logged by
+        // default - hundreds of full replies would swamp a real run's
+        // log for no reason once the cause is already understood).
+        if (process.env.MAIPAI_VOICE_DEBUG_DROPS) {
+          console.error(`  neutral: ${JSON.stringify(neutral)}`);
+          console.error(`  rewrite: ${JSON.stringify(rewrite)}`);
+        }
         dropped++;
         continue;
       }
-      rows.push({ id: `${companionId}-${p.id}`, companion: companionId, class: p.cls, kind: p.kind, prompt: p.text, neutral, rewrite });
+      const row = { id: `${companionId}-${p.id}`, companion: companionId, class: p.cls, kind: p.kind, prompt: p.text, neutral, rewrite };
+      rows.push(row);
+      appendFileSync(outPath, JSON.stringify(row) + "\n");
     }
 
     for (const tr of toolRows) {
-      rows.push({ id: `${companionId}-${tr.id}`, companion: companionId, class: "tool", kind: "tool", prompt: tr.utterance, neutral: tr.replyText, rewrite: tr.replyText, tool_calls: tr.toolCalls });
+      const row = { id: `${companionId}-${tr.id}`, companion: companionId, class: "tool", kind: "tool", prompt: tr.utterance, neutral: tr.replyText, rewrite: tr.replyText, tool_calls: tr.toolCalls };
+      rows.push(row);
+      appendFileSync(outPath, JSON.stringify(row) + "\n");
     }
 
-    const outDir = join(REPO_ROOT, "data-scratch", "voice", companionId);
-    mkdirSync(outDir, { recursive: true });
-    const jsonl = toJsonl(rows);
-    const outPath = join(outDir, "corpus.jsonl");
-    writeFileSync(outPath, jsonl);
+    const jsonl = readFileSync(outPath, "utf-8");
     const sha256 = createHash("sha256").update(jsonl).digest("hex");
 
     mkdirSync(FIXTURES_DIR, { recursive: true });
@@ -678,10 +816,10 @@ async function run(anthropic: Anthropic, waitForQuiet: () => Promise<void>): Pro
 // buildPromptList and the rest), the exact pattern labels.test.ts already
 // uses on labels.ts - without this guard, importing this file for its
 // pure functions would also kick off a real live run against the
-// household's chat engine and the Anthropic API.
+// household's chat engine and the local voice teacher.
 if (import.meta.main) {
   main().catch((err) => {
-    if (err instanceof MissingCredentialError) {
+    if (err instanceof TeacherUnreachableError) {
       console.error(`[voice-corpus] refused: ${err.message}`);
       process.exit(2);
     }
