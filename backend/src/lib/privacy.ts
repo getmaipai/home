@@ -18,6 +18,7 @@ import { KIWIX_CATALOG_URL } from "@/lib/referenceLibrary";
 import { EMBED_MODEL_URL } from "@/lib/embedAssets";
 import { BACKGROUND_MODEL_URL, BACKGROUND_MODEL_SMALL_URL } from "@/lib/backgroundAssets";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
+import { VISION_ALL_ASSETS } from "@/lib/visionAssets";
 import { SILERO_VAD_ASSET, MOONSHINE_ARCHIVE } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
 import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
@@ -71,6 +72,7 @@ export function platformConnections(): PrivacyConnection[] {
     ENGINE_BINARIES.flatMap((b) => [b.archive.url, ...(b.extraArchives ?? []).map((a) => a.url)]),
   );
   const wakewordHosts = hostsOf(WAKEWORD_ALL_ASSETS.map((a) => a.url));
+  const visionHosts = hostsOf(VISION_ALL_ASSETS.map((a) => a.url));
   const voiceHost = hostsOf([voiceCatalogUrl()]);
   const sttHosts = hostsOf([SILERO_VAD_ASSET.url, MOONSHINE_ARCHIVE.url]);
 
@@ -85,6 +87,10 @@ export function platformConnections(): PrivacyConnection[] {
     }),
     row("platform:wake-word-models", wakewordHosts, {
       when: "once, when someone turns on listening for a wake word",
+      what: DOWNLOAD_CARRIES,
+    }),
+    row("platform:face-vision-models", visionHosts, {
+      when: "once, when someone starts face enrollment in the browser",
       what: DOWNLOAD_CARRIES,
     }),
     row("platform:voice-list", voiceHost, {

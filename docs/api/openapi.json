@@ -8580,6 +8580,130 @@
         }
       }
     },
+    "/api/vision/models": {
+      "get": {
+        "tags": [
+          "Vision"
+        ],
+        "summary": "List available face vision models",
+        "description": "The fixed list of face detector and embedding models the browser can load.",
+        "responses": {
+          "200": {
+            "description": "The list of available face vision models.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detectors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "file": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "file"
+                        ]
+                      }
+                    },
+                    "installed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "detectors",
+                    "installed"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/vision/model/:file": {
+      "get": {
+        "tags": [
+          "Vision"
+        ],
+        "summary": "Download a face vision model",
+        "description": "Serves one pinned face vision model selected from a fixed allow-list.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "file",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The raw model file bytes.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown vision asset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Asset unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/voice/stt/status": {
       "get": {
         "tags": [
