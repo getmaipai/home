@@ -1,5 +1,5 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { bundledWasmPaths } from "@/lib/voice/wake-word-runtime";
+import { bundledWasmPaths } from "@/lib/onnx/session-runtime";
 
 // Issue #59: the dev-server crash traced to `wasmPaths` pointing at
 // `public/ort/` - Vite's dev server refuses to load ANY public-dir file
@@ -41,7 +41,7 @@ describe("wake-word-runtime's default session factory", () => {
     // import.meta.env.PROD is undefined under bun:test by default (no
     // Vite build ran), which is falsy - matching a real `bun run dev`
     // session, where Vite defines it as literal `false`.
-    const { getOrLoadSession, evictAllSessions, setSessionFactory } = await import("@/lib/voice/wake-word-runtime");
+    const { getOrLoadSession, evictAllSessions, setSessionFactory } = await import("@/lib/onnx/session-runtime");
     setSessionFactory(null); // clears any factory/cache a prior test in this file left behind
     evictAllSessions();
     await getOrLoadSession("/api/voice/wakeword/hey_jarvis_v0.1.onnx");

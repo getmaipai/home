@@ -10,7 +10,7 @@
 // stage; this module exposes the pipeline loader + seeding constants it
 // shares.
 import { SHARED_MEL_PATH, SHARED_EMBEDDING_PATH, getWakeWordModel } from "./wake-word-models";
-import { getOrLoadSession, type WakeWordInferenceSession } from "./wake-word-runtime";
+import { getOrLoadSession, type OnnxInferenceSession } from "../onnx/session-runtime";
 
 export const WAKE_WORD_FRAME_SAMPLES = 1280;
 export const WAKE_WORD_SAMPLE_RATE = 16_000;
@@ -35,9 +35,9 @@ export const DETECTOR_INPUT_FRAMES = 16;
 export const WARMUP_ZERO_FRAMES = 5;
 
 export interface WakeWordPipelineState {
-  readonly mel: WakeWordInferenceSession;
-  readonly embedding: WakeWordInferenceSession;
-  readonly detector: WakeWordInferenceSession;
+  readonly mel: OnnxInferenceSession;
+  readonly embedding: OnnxInferenceSession;
+  readonly detector: OnnxInferenceSession;
   readonly modelId: string;
 }
 

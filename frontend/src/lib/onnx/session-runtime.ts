@@ -8,22 +8,22 @@
 // change. onnxruntime-web is imported lazily so a household member who
 // never enables the wake-word chat mode never pulls the WASM artifacts.
 
-export interface WakeWordInferenceSession {
-  run(feeds: Record<string, WakeWordTensor>): Promise<Record<string, WakeWordTensor>>;
+export interface OnnxInferenceSession {
+  run(feeds: Record<string, OnnxTensor>): Promise<Record<string, OnnxTensor>>;
 }
 
-export interface WakeWordTensor {
+export interface OnnxTensor {
   readonly data: Float32Array | Int32Array | BigInt64Array;
   readonly dims: readonly number[];
 }
 
 export interface SessionFactory {
-  create(modelPath: string): Promise<WakeWordInferenceSession>;
-  tensor(data: Float32Array, dims: readonly number[]): WakeWordTensor;
+  create(modelPath: string): Promise<OnnxInferenceSession>;
+  tensor(data: Float32Array, dims: readonly number[]): OnnxTensor;
 }
 
 let factory: SessionFactory | null = null;
-const SESSIONS: Map<string, Promise<WakeWordInferenceSession>> = new Map();
+const SESSIONS: Map<string, Promise<OnnxInferenceSession>> = new Map();
 
 // Exported so tests (and the future diagnostic tester) can inject a fake
 // session factory instead of a real onnxruntime-web/WASM runtime -
@@ -41,7 +41,7 @@ export function setSessionFactory(next: SessionFactory | null): void {
   defaultLoading = null;
 }
 
-export async function getOrLoadSession(modelPath: string): Promise<WakeWordInferenceSession> {
+export async function getOrLoadSession(modelPath: string): Promise<OnnxInferenceSession> {
   const existing = SESSIONS.get(modelPath);
   if (existing) return existing;
   const f = factory ?? (await loadDefaultFactory());
@@ -50,7 +50,7 @@ export async function getOrLoadSession(modelPath: string): Promise<WakeWordInfer
   return pending;
 }
 
-export async function tensorFor(data: Float32Array, dims: readonly number[]): Promise<WakeWordTensor> {
+export async function tensorFor(data: Float32Array, dims: readonly number[]): Promise<OnnxTensor> {
   const f = factory ?? (await loadDefaultFactory());
   return f.tensor(data, dims);
 }
@@ -101,16 +101,16 @@ async function loadDefaultFactory(): Promise<SessionFactory> {
     ort.env.wasm.numThreads = 1;
     ort.env.wasm.proxy = false;
     const built: SessionFactory = {
-      async create(modelPath: string): Promise<WakeWordInferenceSession> {
+      async create(modelPath: string): Promise<OnnxInferenceSession> {
         const session = await ort.InferenceSession.create(modelPath, { executionProviders: ["wasm"] });
         return {
-          async run(feeds: Record<string, WakeWordTensor>) {
+          async run(feeds: Record<string, OnnxTensor>) {
             const ortFeeds: Record<string, InstanceType<typeof ort.Tensor>> = {};
             for (const [name, t] of Object.entries(feeds)) {
               ortFeeds[name] = new ort.Tensor("float32", t.data as Float32Array, t.dims as number[]);
             }
             const out = await session.run(ortFeeds);
-            const result: Record<string, WakeWordTensor> = {};
+            const result: Record<string, OnnxTensor> = {};
             for (const [name, tensor] of Object.entries(out)) {
               result[name] = { data: tensor.data as Float32Array, dims: tensor.dims };
             }
@@ -118,7 +118,7 @@ async function loadDefaultFactory(): Promise<SessionFactory> {
           },
         };
       },
-      tensor(data: Float32Array, dims: readonly number[]): WakeWordTensor {
+      tensor(data: Float32Array, dims: readonly number[]): OnnxTensor {
         return { data, dims };
       },
     };

@@ -47,6 +47,9 @@ export function similarityTransform(points: [number, number][]): number[][] {
   const singularDifference = Math.sqrt(Math.max(0, frobeniusSquared - 2 * Math.abs(detA)));
   const signedSingularSum = detA < 0 ? singularDifference : singularSum;
   const sourceVariance = src.reduce((sum, [x, y]) => sum + x * x + y * y, 0) / 5;
+  if (!Number.isFinite(sourceVariance) || sourceVariance === 0) {
+    throw new Error("degenerate or collinear input points: source variance must be finite and non-zero");
+  }
   const scale = signedSingularSum / sourceVariance;
   const r00 = t00 * scale;
   const r01 = t01 * scale;
@@ -86,6 +89,10 @@ export function alignCrop(
   const offsetX = -(inv00 * tx + inv01 * ty);
   const offsetY = -(inv10 * tx + inv11 * ty);
   const output = new Uint8ClampedArray(CROP_SIZE * CROP_SIZE * 4);
+  const sample = (sx: number, sy: number, channel: number): number => {
+    if (sx < 0 || sx >= frameWidth || sy < 0 || sy >= frameHeight) return 0;
+    return frameRgba[(sy * frameWidth + sx) * 4 + channel]!;
+  };
 
   for (let y = 0; y < CROP_SIZE; y += 1) {
     for (let x = 0; x < CROP_SIZE; x += 1) {
@@ -97,15 +104,11 @@ export function alignCrop(
       const fy = sourceY - y0;
       const outOffset = (y * CROP_SIZE + x) * 4;
       for (let channel = 0; channel < 4; channel += 1) {
-        const sample = (sx: number, sy: number): number => {
-          if (sx < 0 || sx >= frameWidth || sy < 0 || sy >= frameHeight) return 0;
-          return frameRgba[(sy * frameWidth + sx) * 4 + channel]!;
-        };
         const blended =
-          sample(x0, y0) * (1 - fx) * (1 - fy) +
-          sample(x0 + 1, y0) * fx * (1 - fy) +
-          sample(x0, y0 + 1) * (1 - fx) * fy +
-          sample(x0 + 1, y0 + 1) * fx * fy;
+          sample(x0, y0, channel) * (1 - fx) * (1 - fy) +
+          sample(x0 + 1, y0, channel) * fx * (1 - fy) +
+          sample(x0, y0 + 1, channel) * (1 - fx) * fy +
+          sample(x0 + 1, y0 + 1, channel) * fx * fy;
         // Python's uint8 cast truncates the bilinear result.
         output[outOffset + channel] = Math.trunc(Math.min(255, Math.max(0, blended)));
       }

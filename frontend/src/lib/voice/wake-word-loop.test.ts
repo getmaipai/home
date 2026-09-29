@@ -1,6 +1,6 @@
 import { describe, expect, test, afterEach } from "bun:test";
 import { WakeWordLoop } from "@/lib/voice/wake-word-loop";
-import { setSessionFactory, type SessionFactory, type WakeWordInferenceSession, type WakeWordTensor } from "@/lib/voice/wake-word-runtime";
+import { setSessionFactory, type SessionFactory, type OnnxInferenceSession, type OnnxTensor } from "@/lib/onnx/session-runtime";
 import { WAKE_WORD_FRAME_SAMPLES, EMBEDDING_DIM, MEL_FEATURE_DIM, MEL_BUFFER_SEED_FRAMES } from "@/lib/voice/wake-word-pipeline";
 import { onWakeDetected } from "@/lib/voice/wake-word-events";
 
@@ -14,7 +14,7 @@ import { onWakeDetected } from "@/lib/voice/wake-word-events";
 class FakeSessionFactory implements SessionFactory {
   nextScores: number[] = [];
 
-  async create(modelPath: string): Promise<WakeWordInferenceSession> {
+  async create(modelPath: string): Promise<OnnxInferenceSession> {
     if (modelPath.includes("melspectrogram")) {
       return {
         run: async () => ({
@@ -37,7 +37,7 @@ class FakeSessionFactory implements SessionFactory {
     };
   }
 
-  tensor(data: Float32Array, dims: readonly number[]): WakeWordTensor {
+  tensor(data: Float32Array, dims: readonly number[]): OnnxTensor {
     return { data, dims };
   }
 }
