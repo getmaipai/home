@@ -31507,3 +31507,87 @@ enough from the template could see a nonzero `pitchDeg` while looking
 dead-on at the camera; real tuning against real faces, not just the
 synthetic template, is the fix, and it's the same live-camera work the
 scale constants already need).
+
+## FACE-02: the guided capture UI, wiring the five pure pieces together (2026-09-29)
+
+The last FACE-02 slice: `frontend/src/apps/people/FaceEnrollmentPage.tsx`
+wires FACE-02A through FACE-02E (coverage/quality gating, the model
+list, detection decode/alignment, the ONNX runtimes, head pose) into a
+real `getUserMedia` capture loop behind the kit's `Wizard` primitive.
+
+**Entry point, corrected from the item's own brief:** the brief pointed
+at `frontend/src/apps/people/PersonProfilePage.tsx` for the "Use a real
+photo" admin-approval pattern to mirror. That file is pre-migration dead
+code - `App.tsx` mounts `NextRoutes` at `/*`, which serves `/people/:id`
+from `frontend/src/next/pages/NextPersonProfilePage.tsx`, not the old
+file (confirmed live: nothing outside `PersonProfilePage.tsx`'s own test
+imports it). The "Face recognition" section and its gating live on
+`NextPersonProfilePage.tsx` instead, the page a household member
+actually reaches.
+
+**Shots per pose, corrected from the pure module's own default:**
+`enrollmentSession.ts`'s `createEnrollmentSpec()` defaults to
+`shotsPerPose: 2` (headroom for retakes on a from-scratch enrollment
+with its own review pass). This item's own acceptance line asks for
+"a full five-pose enrollment... produce five `biometric_prints` rows",
+so the UI passes `shotsPerPose: 1` explicitly - a deliberate UI-layer
+choice, not a change to the pure module's own default.
+
+**Sharpness/brightness**, left for this item to define per its own
+brief ("document whatever you choose"): both are computed on the
+aligned 112x112 SFace crop (`frontend/src/lib/vision/
+faceCaptureMeasurements.ts`), not the raw frame, since it's already
+face-cropped and already computed for the embedding. Sharpness is the
+variance of the discrete Laplacian over the crop's grayscale values
+(the standard blur-detection measure); brightness is the crop's mean
+grayscale intensity, 0-255. Both match the scale `DEFAULT_QUALITY_CONFIG`'s
+own numbers (`minBrightness: 40`, `minSharpness: 40`, `solidSharpness:
+90`) already assume.
+
+**The SFace model id** (`/api/biometric-prints`'s `model_id` field) is
+read from `GET /api/vision/models` at capture-flow start (matching by
+file name against `faceModels.ts`'s own `SFACE_PATH`), not hardcoded as
+a second copy of `backend/src/lib/faceModelPins.ts`'s `SFACE_MODEL_ID` -
+that route already existed (FACE-02B) for exactly this purpose.
+
+**Child enrollment gating**
+(`frontend/src/apps/people/faceEnrollmentGate.ts`'s `canEnrollFace`) is
+a frontend mirror of `lib/biometricPrints.ts`'s own `canConsentFor`: a
+child never consents for themself, layered on top of the same
+`canManagePerson` self-or-owner/admin authority the profile-edit dialog
+already uses. Unit-tested (`faceEnrollmentGate.test.ts`) and verified
+live against the real backend: a child's own session gets a real 403
+from `POST /api/biometric-prints` ("Only an owner or admin can consent
+to enroll a child's biometric print"), and the frontend gate renders
+the same "not allowed" state on direct navigation to the route, not
+just on the hidden button.
+
+**Verification, and its one real limit:** started an isolated instance
+of this worktree on its own port and data directory (never the shared
+dev checkout's own `data/`), created a fresh test household, and drove
+the real app in a real browser. Confirmed live: the entry point and its
+gating (self, owner-managing-a-child, and a child blocked from their
+own profile all render correctly); the Wizard's 5-pose structure and
+copy; real camera acquisition (`navigator.permissions.query` confirmed
+a genuine pending `getUserMedia` prompt, not a stub); real onnxruntime-
+web loading of both YuNet and SFace (confirmed via the model's own graph-
+construction log lines ending at its `fc1` layer); a real capture loop
+running real inference against a live (fake-device) video feed,
+correctly reporting "we can't see your face" against Chromium's
+synthetic test pattern; the exact `POST /api/biometric-prints` request
+shape producing 5 real, live `biometric_prints` rows and the profile
+page reflecting them (`GET /api/biometric-prints` round-trip); and a
+real, working (non-blank) error state when the camera can't be
+acquired at all. **Not verified by this session:** a real pose-by-pose
+walkthrough with a real face producing real accepted samples, and
+whether `headPose.ts`'s uncalibrated constants feel right turning a
+real head. Chrome's native camera-permission prompt is browser chrome,
+outside any page-automatable surface (confirmed: `chrome://settings` is
+unreachable from page automation, and the prompt renders nothing into
+the page's own screenshot); no real face fixture exists in this repo to
+feed a fake camera device, and none was fetched from outside it,
+consistent with the org's "download, don't vendor" and privacy
+postures for what would otherwise be a real, unconsented person's
+likeness held only for a throwaway test. This is a real human's
+turn: open `/people/:id/enroll-face` in an ordinary browser, allow the
+camera, and cycle through the five poses.

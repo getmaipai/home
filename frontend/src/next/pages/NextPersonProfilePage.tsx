@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -15,8 +15,9 @@ import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
 import { Textarea } from "@maipai/ui/src/dashboard/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, ApiError, isOwnerOrAdminRole, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, type BiometricPrintSummary, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
 import { ACCENT_RING_CLASS, ACCENT_SELECT_LABELS, ACCENT_SELECT_OPTIONS, canManagePerson, NO_ACCENT, ROLE_LABELS } from "@/apps/people/roles";
+import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -80,6 +81,7 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
                 <TabsContent value="overview" className="flex flex-col gap-4 py-2">
                   <p className="text-sm text-muted-foreground">{viewingSelf ? "This is your own profile." : `${profile.display_name}'s profile in this household.`}</p>
                   <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
+                  <FaceEnrollmentSection profile={profile} viewer={person} />
                 </TabsContent>
                 {canViewMemories ? (
                   <TabsContent value="memories" className="py-2">
@@ -109,6 +111,68 @@ function SharedMediaSection({ profile, viewingSelf }: { profile: ProfileEntry; v
             .map(({ file }) => ({ id: file.id, thumbnailUrl: api.fileContentUrl(file.id), mediaType: file.kind as "image" | "video", altText: file.kind === "video" ? `A video ${profile.display_name} shared` : `A photo ${profile.display_name} shared` }));
           return <MediaGrid items={items} emptyMessage={viewingSelf ? "You haven't shared anything yet." : `${profile.display_name} hasn't shared anything with you yet.`} />;
         }}
+      </AsyncState>
+    </div>
+  );
+}
+
+/** FACE-02's entry point: reachable from the person's own profile (not a
+ * dead-end route nobody can find), gated the same two ways the API
+ * itself gates biometric prints - `canManagePerson` (self, or
+ * owner/admin) for even seeing enrollment status at all, matching
+ * `listBiometricPrints`'s own gate, and the stricter `canEnrollFace` (a
+ * child never consents for themself) for the Enroll action itself,
+ * matching `createBiometricPrint`'s. Mirrors the profile-edit dialog's
+ * own "Use a real photo" admin-approval-required pattern for
+ * `role === "child"` (docs/BACKLOG.md's own FACE-02 entry). */
+function FaceEnrollmentSection({ profile, viewer }: { profile: ProfileEntry; viewer: Roster }) {
+  const navigate = useNavigate();
+  const CheckIcon = getIcon("check");
+  const target = { id: profile.id, role: profile.role };
+  const canView = canManagePerson(viewer.role, viewer.id, target);
+  const canEnroll = canEnrollFace(viewer, target);
+  const query = useQuery<BiometricPrintSummary[]>({
+    queryKey: ["biometric-prints", profile.id],
+    queryFn: () => api.biometricPrints(profile.id),
+    enabled: canView,
+  });
+
+  if (!canView) return null;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <h2 className="text-sm font-medium text-muted-foreground">Face recognition</h2>
+      <AsyncState
+        data={query.data}
+        error={query.isError}
+        isFetching={query.isFetching}
+        onRetry={() => query.refetch()}
+        errorMessage="Could not load enrollment status."
+        loadingLabel="Loading enrollment status"
+      >
+        {(prints) => (
+          <Card>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                {prints.length > 0 ? (
+                  <>
+                    <CheckIcon className="size-4 text-primary" aria-hidden />
+                    {prints.length} face sample{prints.length === 1 ? "" : "s"} enrolled.
+                  </>
+                ) : (
+                  "Not enrolled for face recognition yet."
+                )}
+              </p>
+              {canEnroll ? (
+                <Button type="button" variant="outline" onClick={() => navigate(`/people/${profile.id}/enroll-face`)}>
+                  {prints.length > 0 ? "Re-enroll" : "Enroll"}
+                </Button>
+              ) : profile.role === "child" ? (
+                <p className="text-sm text-muted-foreground">An owner or admin can enroll {profile.display_name} for face recognition.</p>
+              ) : null}
+            </CardContent>
+          </Card>
+        )}
       </AsyncState>
     </div>
   );

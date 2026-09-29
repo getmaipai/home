@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ComponentProps, type ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
@@ -29,6 +29,16 @@ function lazyNamed<P extends object = Record<string, never>>(
 const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWizard")["SetupWizard"]>>(
   () => import("@/apps/setup/SetupWizard"),
   "SetupWizard",
+);
+// FACE-02: another Wizard-driven, shell-less full-page route (the same
+// reason /setup lives here instead of under NextRoutes - Wizard.tsx's
+// own <main> would double up on FullLayout's landmark if nested inside
+// it), so it's registered directly here rather than as a NextRoutes
+// child even though its entry point lives on the (NextRoutes-hosted)
+// profile page.
+const FaceEnrollmentPage = lazyNamed<ComponentProps<typeof import("@/apps/people/FaceEnrollmentPage")["FaceEnrollmentPage"]>>(
+  () => import("@/apps/people/FaceEnrollmentPage"),
+  "FaceEnrollmentPage",
 );
 const NextRoutes = lazyNamed<ComponentProps<typeof import("@/next/NextRoutes")["NextRoutes"]>>(
   () => import("@/next/NextRoutes"),
@@ -93,6 +103,22 @@ export function App() {
                         <Suspense fallback={<RouteSkeleton />}>
                           <SetupWizard onDone={loadPerson} />
                         </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/people/:id/enroll-face"
+                      element={
+                        person === undefined ? (
+                          <div className="flex h-screen items-center justify-center">
+                            <Progress mode="spinner" label="Loading MaiPai Home" />
+                          </div>
+                        ) : person === null ? (
+                          <Navigate to="/sign-in" replace />
+                        ) : (
+                          <Suspense fallback={<RouteSkeleton />}>
+                            <FaceEnrollmentPage operator={person} />
+                          </Suspense>
+                        )
                       }
                     />
                     <Route
