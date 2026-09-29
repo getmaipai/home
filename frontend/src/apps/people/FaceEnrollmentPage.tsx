@@ -26,7 +26,8 @@ import { runSfaceEmbedding } from "@/lib/vision/faceEmbedRuntime";
 import { alignCrop } from "@/lib/vision/faceAlign";
 import { estimateHeadPose } from "@/lib/vision/headPose";
 import { computeBoxFraction, computeBrightness, computeSharpness } from "@/lib/vision/faceCaptureMeasurements";
-import { captureFeedbackText } from "@/lib/vision/faceCaptureFeedback";
+import { captureFeedbackText, captureRing, type CaptureRing } from "@/lib/vision/faceCaptureFeedback";
+import { createFrameLogger, logEnrollmentSummary } from "@/lib/vision/faceCaptureDiagnostics";
 import { classifyMediaAccessError } from "@/lib/media/getUserMediaErrorState";
 import { useNextLook } from "@/next/useNextLook";
 import { pickAppearance, resolveDark } from "@/next/appearanceResolve";
@@ -43,6 +44,19 @@ const CAPTURE_INTERVAL_MS = 400;
 // the source frame is downscaled to this width (aspect-preserved) before
 // detection ever runs.
 const CAPTURE_MAX_WIDTH = 480;
+// After a shot registers, the ring stays green with "Got it." this long, so
+// the next frame (judged against the NEXT pose, and so not yet accepted)
+// does not flash it away before anyone sees it.
+const ACCEPTED_HOLD_MS = 1200;
+
+// Kit status hues (status.ts): "ready" is --hue-teal, "warning" is
+// --hue-orange. Written out whole because Tailwind only sees literal class
+// names.
+const RING_CLASS: Record<CaptureRing, string> = {
+  green: "border-[var(--hue-teal)]",
+  yellow: "border-[var(--hue-orange)]",
+  none: "border-border",
+};
 
 function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
@@ -262,6 +276,8 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
   const yunetSessionRef = useRef<OnnxInferenceSession | null>(null);
   const sfaceSessionRef = useRef<OnnxInferenceSession | null>(null);
   const runningRef = useRef(false);
+  const heldUntilRef = useRef(0);
+  const logFrame = useMemo(() => createFrameLogger(), []);
   // The in-flight submission's real AbortController (a second code
   // review, 2026-09-29, on the first fix: a plain `cancelledRef` boolean
   // checked only between loop iterations stopped the NEXT POST but not
@@ -357,6 +373,12 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
     };
   }, [modelsRetryKey]);
 
+  // Skipped while a just-registered shot's green is still on show.
+  const showReason = useCallback((reason: string) => {
+    if (reason !== "ok" && Date.now() < heldUntilRef.current) return;
+    setLastReason(reason);
+  }, []);
+
   const tick = useCallback(async () => {
     if (runningRef.current) return;
     const video = videoRef.current;
@@ -379,7 +401,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       const faces = await runYunetDetection(yunet, frameRgba, width, height, 0.6, 0.3);
       const face = faces[0];
       if (!face) {
-        setLastReason("no_face");
+        showReason("no_face");
         return;
       }
 
@@ -390,7 +412,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
         // Degenerate landmarks (eyes too close together, near-zero
         // eye-to-mouth span) - treat the same as "no usable face this
         // frame" rather than surfacing headPose.ts's own internal error.
-        setLastReason("no_face");
+        showReason("no_face");
         return;
       }
 
@@ -414,9 +436,17 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       });
 
       const result = session.offer(sample);
-      setLastReason(result.reason);
-      setStatus(session.status());
-      if (result.complete) setPhase("submitting");
+      // The ring is the offer's own verdict: green exactly when the shot
+      // registered (FACE-02J, one definition of green).
+      logFrame({ ...sample, color: captureRing(result.reason), reason: result.reason });
+      if (result.accepted) heldUntilRef.current = Date.now() + ACCEPTED_HOLD_MS;
+      showReason(result.reason);
+      const nextStatus = session.status();
+      setStatus(nextStatus);
+      if (result.complete) {
+        logEnrollmentSummary(nextStatus.buckets);
+        setPhase("submitting");
+      }
     } catch (err) {
       // One bad frame (a mid-motion inference hiccup) doesn't end the
       // flow - the next tick just tries again with a fresh frame.
@@ -424,7 +454,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
     } finally {
       runningRef.current = false;
     }
-  }, [session]);
+  }, [session, showReason, logFrame]);
 
   useEffect(() => {
     if (phase !== "capturing" || cameraState !== "ready" || modelsState !== "ready") return;
@@ -546,7 +576,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       onSkip={doneAndSaved ? undefined : cancelEnrollment}
     >
       {currentStepId === "done" ? (
-        <CompletionContent target={target} submissions={submissions} retake={status.retake} onRetryFailed={retryFailedSubmissions} />
+        <CompletionContent target={target} submissions={submissions} onRetryFailed={retryFailedSubmissions} />
       ) : (
         <CaptureContent
           pose={currentStepId}
@@ -631,9 +661,21 @@ function CaptureContent({
   }
 
   const settingUp = cameraState === "requesting" || modelsState === "loading";
+  const ring = settingUp ? "none" : captureRing(lastReason);
+  const StatusIcon = ring === "green" ? getIcon("check") : ring === "yellow" ? getIcon("alert-triangle") : null;
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4">
-      <div className="relative aspect-[4/3] w-full overflow-hidden rounded-[var(--radius)] border bg-black">
+      {/* The capture ring (FACE-02J). The kit has no camera-frame or ring
+          component (gap named in docs/dev.md), so this is the smallest
+          composition of shipped parts: the existing preview box with a
+          border colored from the kit's own status hues (status.ts maps
+          "ready" to --hue-teal and "warning" to --hue-orange), plus the
+          status line below, which carries the same verdict in words and an
+          icon so color is never the only signal. */}
+      <div
+        data-capture-ring={ring}
+        className={`relative aspect-[4/3] w-full overflow-hidden rounded-[var(--radius)] border-4 bg-black transition-colors ${RING_CLASS[ring]}`}
+      >
         {/* Mirrored, so turning your head left/right on screen matches
             your own real movement, the way a selfie camera always does. */}
         <video ref={videoRef} autoPlay muted playsInline className="h-full w-full -scale-x-100 object-cover" />
@@ -647,7 +689,8 @@ function CaptureContent({
       {!settingUp ? (
         <>
           <p className="text-center text-lg font-medium">{POSE_PROMPT[pose]}</p>
-          <p className="text-center text-base text-muted-foreground" role="status">
+          <p className="flex items-center justify-center gap-2 text-center text-base text-muted-foreground" role="status">
+            {StatusIcon ? <StatusIcon className="h-5 w-5 shrink-0" aria-hidden /> : null}
             {captureFeedbackText(lastReason)}
           </p>
         </>
@@ -662,12 +705,10 @@ function CaptureContent({
 function CompletionContent({
   target,
   submissions,
-  retake,
   onRetryFailed,
 }: {
   target: ProfileEntry;
   submissions: SubmissionRow[];
-  retake: Pose[];
   onRetryFailed: () => void;
 }) {
   const total = submissions.length;
@@ -692,20 +733,6 @@ function CompletionContent({
           {total} face sample{total === 1 ? "" : "s"} saved.
         </p>
         <p className="text-base text-muted-foreground">{target.display_name} is now enrolled for face recognition.</p>
-        {/* enrollmentSession.ts's own status().retake: a pose that hit
-            its required count but scored below the "solid" quality bar
-            (avgSharpness/avgBoxFrac). Advisory only - the sample was
-            still accepted and saved - since this UI asks for exactly
-            one shot per pose and has no re-capture flow of its own yet
-            (a code review on this item, 2026-09-29, flagged this signal
-            being silently dropped on the floor without at least this
-            note). */}
-        {retake.length > 0 ? (
-          <p className="text-sm text-muted-foreground">
-            The {retake.map((pose) => pose).join(", ")} shot{retake.length === 1 ? " was" : "s were"} a bit soft or far.
-            You can re-enroll anytime for a sharper set.
-          </p>
-        ) : null}
       </div>
     );
   }

@@ -30,11 +30,11 @@ describe("bucketPose", () => {
 
 describe("assessQuality", () => {
   test("rejects each marginal threshold and accepts a sample on the allowed boundaries", () => {
-    expect(assessQuality(good({ boxFrac: 0.099 }), cfg)).toEqual({ ok: false, reason: "too_far" });
-    expect(assessQuality(good({ sharpness: 39.9 }), cfg)).toEqual({ ok: false, reason: "blurry" });
+    expect(assessQuality(good({ boxFrac: cfg.minBoxFrac - 0.001 }), cfg)).toEqual({ ok: false, reason: "too_far" });
+    expect(assessQuality(good({ sharpness: cfg.minSharpness - 0.1 }), cfg)).toEqual({ ok: false, reason: "blurry" });
     expect(assessQuality(good({ brightness: 39.9 }), cfg)).toEqual({ ok: false, reason: "too_dark" });
     expect(assessQuality(good({ brightness: 220.1 }), cfg)).toEqual({ ok: false, reason: "too_bright" });
-    expect(assessQuality(good({ boxFrac: 0.1, sharpness: 40, brightness: 40 }), cfg)).toEqual({ ok: true, reason: "ok" });
+    expect(assessQuality(good({ boxFrac: cfg.minBoxFrac, sharpness: cfg.minSharpness, brightness: 40 }), cfg)).toEqual({ ok: true, reason: "ok" });
     expect(assessQuality(good({ brightness: 220 }), cfg)).toEqual({ ok: true, reason: "ok" });
   });
 });
@@ -96,7 +96,7 @@ describe("EnrollmentSession", () => {
     expect(seen).toEqual(["frontal", "left", "right", "up", "down", null]);
   });
 
-  test("status lists remaining prompts and flags accepted but marginal poses for retakes", () => {
+  test("status lists the remaining prompts in order", () => {
     const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
     expect(session.status().coveragePct).toBe(0);
     expect(session.status().needs).toEqual([
@@ -106,11 +106,67 @@ describe("EnrollmentSession", () => {
       "tip your chin up a little",
       "tip your chin down a little",
     ]);
-    session.offer(good({ sharpness: 50, boxFrac: 0.11 }));
+    session.offer(good());
     expect(session.status().coveragePct).toBe(20);
     expect(session.status().needs).toHaveLength(4);
-    expect(session.status().retake).toEqual(["frontal"]);
-    expect(session.status().buckets[0]).toMatchObject({ count: 1, needed: 1, retake: true });
+  });
+
+  // FACE-02J: one bar. The old pass/solid pair is gone, so nothing is
+  // accepted and then called soft at the end.
+  test("FACE-02J: there is one quality bar, no second solid tier and no retake list", () => {
+    expect(Object.keys(cfg)).not.toContain("solidSharpness");
+    expect(Object.keys(cfg)).not.toContain("solidBoxFrac");
+    const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+    session.offer(good({ sharpness: cfg.minSharpness, boxFrac: cfg.minBoxFrac }));
+    expect(Object.keys(session.status())).not.toContain("retake");
+    expect(Object.keys(session.status().buckets[0]!)).not.toContain("retake");
+  });
+
+  test("FACE-02J: a soft frame is rejected as blurry and never counts toward the pose", () => {
+    const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+    const result = session.offer(good({ sharpness: 30 }));
+    expect(result).toMatchObject({ accepted: false, reason: "blurry" });
+    expect(session.status().buckets[0]).toMatchObject({ count: 0 });
+    expect(session.embeddings()).toEqual([]);
+    expect(session.currentTarget()).toBe("frontal");
+    expect(session.offer(good({ sharpness: 120 })).accepted).toBe(true);
+    expect(session.status().buckets[0]).toMatchObject({ count: 1, avgSharpness: 120, minSharpness: 120 });
+  });
+
+  test("FACE-02J: a far frame is rejected as too far", () => {
+    const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+    expect(session.offer(good({ boxFrac: 0.09 }))).toMatchObject({ accepted: false, reason: "too_far" });
+  });
+
+  test("FACE-02J: nothing below the bar is ever accepted, across a sweep of sharpness, size and brightness", () => {
+    let accepted = 0;
+    let rejected = 0;
+    for (let sharpness = 0; sharpness <= 200; sharpness += 5) {
+      for (let box = 0; box <= 0.3001; box += 0.01) {
+        for (const brightness of [0, 39, 40, 128, 220, 221, 255]) {
+          const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 1 }));
+          const result = session.offer(good({ sharpness, boxFrac: box, brightness }));
+          const clears = sharpness >= cfg.minSharpness && box >= cfg.minBoxFrac
+            && brightness >= cfg.minBrightness && brightness <= cfg.maxBrightness;
+          expect(result.accepted).toBe(clears);
+          expect(session.embeddings()).toHaveLength(clears ? 1 : 0);
+          expect(session.status().shots).toBe(clears ? 1 : 0);
+          if (clears) accepted += 1; else rejected += 1;
+        }
+      }
+    }
+    expect(accepted).toBeGreaterThan(0);
+    expect(rejected).toBeGreaterThan(0);
+  });
+
+  test("FACE-02J: a bucket reports the average and minimum of the accepted shots only", () => {
+    const session = new EnrollmentSession("iris", createEnrollmentSpec({ shotsPerPose: 2 }));
+    session.offer(good({ sharpness: 50, boxFrac: 0.05 }));
+    session.offer(good({ sharpness: 100, boxFrac: 0.2 }));
+    session.offer(good({ sharpness: 140, boxFrac: 0.3 }));
+    expect(session.status().buckets[0]).toMatchObject({
+      count: 2, avgSharpness: 120, minSharpness: 100, avgBoxFrac: 0.25, minBoxFrac: 0.2,
+    });
   });
 });
 

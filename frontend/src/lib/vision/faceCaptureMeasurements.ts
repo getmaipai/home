@@ -6,7 +6,7 @@
 // inlined into the capture loop's React effect.
 //
 // DEFAULT_QUALITY_CONFIG's own numbers (minBrightness: 40, maxBrightness:
-// 220, minSharpness: 40, solidSharpness: 90) are 0-255-scale brightness
+// 220, minSharpness: 40) are 0-255-scale brightness
 // and OpenCV's familiar `cv2.Laplacian(gray, CV2_64F).var()` blur measure
 // - the standard "variance of the Laplacian" sharpness metric most
 // blur-detection tutorials use, and the measure legacy's own enrollment
@@ -35,7 +35,7 @@ function toGrayscale(rgba: Uint8ClampedArray, size: number): Float64Array {
 
 /** The fraction of the frame's area a detected face's bounding box
  * covers - `enrollmentSession.ts`'s own quality gate uses this as a
- * "move closer" proxy (minBoxFrac/solidBoxFrac), so a face far from the
+ * "move closer" proxy (minBoxFrac), so a face far from the
  * camera scores low without needing real depth. Clamped to [0, 1]: a
  * box that straddles the frame edge can otherwise report slightly over
  * 100% of it. */

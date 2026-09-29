@@ -9,10 +9,15 @@ export interface QualityConfig {
   frontalMaxYaw: number;
   turnMinYaw: number;
   updownMinPitch: number;
-  solidSharpness: number;
-  solidBoxFrac: number;
 }
 
+// FACE-02J: one quality bar. A frame is green (accepted) only if it clears
+// minBoxFrac, minSharpness and the brightness range; nothing below it is
+// ever accepted. minBoxFrac and minSharpness are PROVISIONAL: the old
+// accept bar (0.10, 40) that demonstrably registered shots on a real laptop
+// webcam. Green therefore means "clears the old accept bar" until FACE-02K
+// sets a measured bar from real console numbers; raising it is that item's
+// job, not this one's (docs/dev.md, FACE-02J).
 export const DEFAULT_QUALITY_CONFIG: Readonly<QualityConfig> = Object.freeze({
   minBoxFrac: 0.1,
   minSharpness: 40,
@@ -21,8 +26,6 @@ export const DEFAULT_QUALITY_CONFIG: Readonly<QualityConfig> = Object.freeze({
   frontalMaxYaw: 12,
   turnMinYaw: 18,
   updownMinPitch: 15,
-  solidSharpness: 90,
-  solidBoxFrac: 0.14,
 });
 
 export interface EnrollmentSpec {
@@ -86,10 +89,6 @@ export function assessQuality(sample: FaceSample, cfg: QualityConfig): QualityAs
   return { ok: true, reason: "ok" };
 }
 
-export function isSolid(sample: FaceSample, cfg: QualityConfig): boolean {
-  return sample.sharpness >= cfg.solidSharpness && sample.boxFrac >= cfg.solidBoxFrac;
-}
-
 export interface OfferResult {
   accepted: boolean;
   reason: string;
@@ -104,7 +103,8 @@ export interface BucketStatus {
   needed: number;
   avgSharpness: number;
   avgBoxFrac: number;
-  retake: boolean;
+  minSharpness: number;
+  minBoxFrac: number;
 }
 
 export interface PersonStatus {
@@ -115,7 +115,6 @@ export interface PersonStatus {
   shots: number;
   buckets: BucketStatus[];
   needs: string[];
-  retake: Pose[];
   wearsGlasses: boolean;
   glassesOn: number;
   glassesOff: number;
@@ -178,23 +177,23 @@ export class EnrollmentSession {
   status(): PersonStatus {
     const buckets: BucketStatus[] = [];
     const needs: string[] = [];
-    const retake: Pose[] = [];
     for (const pose of POSES) {
       const quality = this.poseQuality[pose];
       const count = this.poseCounts[pose];
       const avgSharpness = quality.length ? quality.reduce((sum, [sharpness]) => sum + sharpness, 0) / quality.length : 0;
       const avgBoxFrac = quality.length ? quality.reduce((sum, [, box]) => sum + box, 0) / quality.length : 0;
-      const marginal = quality.length > 0 && (avgSharpness < this.spec.quality.solidSharpness || avgBoxFrac < this.spec.quality.solidBoxFrac);
+      const minSharpness = quality.length ? Math.min(...quality.map(([sharpness]) => sharpness)) : 0;
+      const minBoxFrac = quality.length ? Math.min(...quality.map(([, box]) => box)) : 0;
       buckets.push({
         pose,
         count,
         needed: this.spec.shotsPerPose,
         avgSharpness: round(avgSharpness, 1),
         avgBoxFrac: round(avgBoxFrac, 3),
-        retake: marginal,
+        minSharpness: round(minSharpness, 1),
+        minBoxFrac: round(minBoxFrac, 3),
       });
       if (count < this.spec.shotsPerPose) needs.push(POSE_PROMPT[pose]);
-      else if (marginal) retake.push(pose);
     }
     if (this.spec.wearsGlasses) {
       if (this.glassesCounts.false < this.spec.glassesShots) needs.push("take your glasses off and look at me");
@@ -209,7 +208,6 @@ export class EnrollmentSession {
       shots: this.acceptedEmbeddings.length,
       buckets,
       needs,
-      retake,
       wearsGlasses: this.spec.wearsGlasses,
       glassesOn: this.glassesCounts.true,
       glassesOff: this.glassesCounts.false,
@@ -332,7 +330,6 @@ export class FaceGallery {
       shots: this.people.get(name)!.length,
       buckets: [],
       needs: [],
-      retake: [],
       wearsGlasses: false,
       glassesOn: 0,
       glassesOff: 0,

@@ -32278,6 +32278,110 @@ frames that caused the defect; and the robot's voice ceremony can only ask
 for one pose at a time. If Jesse wants a Face-ID-style free-order ring, that
 is a new kit pattern in `commons` first, as its own item.
 
+## FACE-02J (ring): one quality bar, green registers, yellow explains (2026-09-29, #197)
+
+Not the theme fix that shares the FACE-02J label in BACKLOG.md; this is
+Jesse's 2026-09-29 rule for the guided capture. On his real webcam the
+completion screen said "The frontal, left, right, up, down shots were a bit
+soft or far" for all five poses. Cause: two bars. `assessQuality` accepted
+a shot at `minSharpness` 40 and `minBoxFrac` 0.10, then `status()` judged
+each pose's average against a second, higher "solid" bar
+(`solidSharpness` 90, `solidBoxFrac` 0.14, ported from legacy and never
+measured against a browser webcam) and flagged the pose for a retake. Every
+pose fell between the two bars.
+
+**The rule now.** The capture ring is green when the frame is sharp and
+yellow when it is soft, and a shot registers only on green.
+
+- One bar. `QualityConfig` lost `solidSharpness` and `solidBoxFrac`;
+  `minSharpness` and `minBoxFrac` keep the old accept numbers (40 and
+  0.10), which demonstrably registered shots on Jesse's webcam. `isSolid`, `status().retake`, `BucketStatus.retake` and the
+  completion screen's "soft or far" paragraph are removed as dead: nothing
+  below the bar is ever accepted, so nothing accepted can be marginal.
+- One definition of green. The ring is `captureRing(result.reason)` of the
+  same `EnrollmentSession.offer()` result that decides registration, so a
+  frame is green exactly when it was accepted. Yellow is a face that was
+  seen but not accepted (too far, a bit soft, too dark, too bright, or a
+  pose that is not the current step), with the one reason in plain words
+  from `captureFeedbackText`. No face is neither color.
+- FACE-02I stays: `currentTarget()` and `off_target` are unchanged.
+- After a shot registers the page holds the green ring and "Got it." for
+  1.2 seconds, because the very next frame is judged against the next pose
+  and would otherwise flash the green away before anyone saw it. Frames are
+  still offered during the hold.
+
+**Design gap named (no-hand-built-UI rule).** The kit has no camera-frame
+or ring component. The smallest composition of shipped parts: the preview
+box that already existed, with a 4 px border colored from the kit's own
+status hues (`status.ts`: "ready" is `--hue-teal`, "warning" is
+`--hue-orange`), plus the existing status line with the kit's `check` and
+`alert-triangle` icons. The kit has no literal green or yellow token, so the
+"green" is the kit's teal and the "yellow" is its orange; a truer green or
+yellow would be a token added in `commons` first. Color is never the only
+signal: the status line (`role="status"`, so a screen reader announces it)
+carries the same verdict in words with an icon, and the ring exposes
+`data-capture-ring`.
+
+**Measurement, console only.** The bar is a guess until it is measured, so
+`faceCaptureDiagnostics.ts` writes, in the person's own browser only:
+
+- about once a second, `console.debug` of `{sharpness, boxFrac, brightness,
+  yawDeg, pitchDeg, color, reason}` for the frame being judged;
+- at the end of a successful enrollment, one `console.info` line per pose
+  with the average and minimum sharpness and box fraction of the accepted
+  shots (`BucketStatus` gained `minSharpness` and `minBoxFrac` for this).
+
+No new UI, nothing sent, nothing stored.
+
+**The bar is PROVISIONAL.** The numbers are the old accept bar (0.10 and
+40), nothing was raised, and the former solid numbers (0.14 and 90) are
+gone, not carried. Green therefore means "clears the old accept bar", not
+"a good enrollment shot", until FACE-02K sets a measured bar from Jesse's
+console numbers. Raising the bar is FACE-02K's job, decided from data, never
+from the legacy figures. (The first cut of this item used 0.14 and 90 as the
+single bar; that raised the accept bar and was corrected the same day.)
+
+**The ring colours are the kit's teal and orange.** Jesse asked for green
+and yellow. The kit has no green or yellow token, so `--hue-teal` and
+`--hue-orange` stand in; the token follow-up is its own BACKLOG item.
+
+**Box-fraction arithmetic (estimates, not measurements).** `boxFrac` is the
+detector's box area over the frame area, so the 480 px downscale does not
+change it. Assume a face box of about 15 x 19 cm, a horizontal field of view
+of about 70 degrees and arm's length of about 60 cm: the frame is about 84 cm
+wide, 47 cm tall at 16:9 (3,950 cm2), 63 cm at 4:3 (5,300 cm2), so the box
+covers about 0.072 at 16:9 and 0.054 at 4:3. It falls with the square of the
+distance, so 0.10 needs about 51 cm at 16:9 and the old solid 0.14 would have
+needed about 43 cm, near full frame height. Since Jesse did register shots at
+0.10, his real face box or distance is more favourable than this estimate;
+the console lines will show the real figure. Sharpness has no such
+derivation: it is the variance of the Laplacian of the 112 x 112 crop and
+depends on the camera's own sharpening, noise and compression, and the 640 to
+480 downscale before the crop pulls it down somewhat. It is measured, not
+derived.
+
+**To be measured (Jesse's real enrollment).** Run a full enrollment with the
+browser console open (levels Verbose or Info) and report: the
+`face capture: judged frame` lines (sharpness, boxFrac, brightness per
+second, including the yellow ones and their reasons) and the five
+`face capture: accepted shots` lines. If the ring never went green, the
+judged-frame lines are the data; the best sharpness and boxFrac seen while
+holding a pose still is what the bar is set from. FACE-02K takes it from
+there.
+
+**Tests.** `enrollmentSession.test.ts` (a soft or far frame is rejected and
+never counts toward a pose; a sweep over sharpness, box size and brightness
+proves nothing below the bar is accepted; the buckets report accepted-shot
+averages and minimums only), `faceCaptureFeedback.test.ts` (ring color per
+reason, "soft" wording), `faceCaptureDiagnostics.test.ts` (throttle and line
+shape), and `FaceEnrollmentCapture.test.tsx`, which drives the real page
+with a scripted camera through `setSessionFactory` (a fake YuNet and SFace)
+and a canvas whose pixels are sharp or flat: sharp is green and moves to the
+next pose, soft is yellow with "a bit soft" and registers nothing, far is
+yellow with "closer", no face is neutral, the debug line appears, and a full
+five-pose walk saves five prints, logs five summary lines and never shows
+the "soft or far" text.
+
 ## MDNS-COLLISION-01 landed (#193)
 
 `lib/mdns.ts` used to publish under the household's display name and never
