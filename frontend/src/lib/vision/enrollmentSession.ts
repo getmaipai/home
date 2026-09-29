@@ -1,0 +1,344 @@
+export const POSES = ["frontal", "left", "right", "up", "down"] as const;
+export type Pose = (typeof POSES)[number];
+
+export interface QualityConfig {
+  minBoxFrac: number;
+  minSharpness: number;
+  minBrightness: number;
+  maxBrightness: number;
+  frontalMaxYaw: number;
+  turnMinYaw: number;
+  updownMinPitch: number;
+  solidSharpness: number;
+  solidBoxFrac: number;
+}
+
+export const DEFAULT_QUALITY_CONFIG: Readonly<QualityConfig> = Object.freeze({
+  minBoxFrac: 0.1,
+  minSharpness: 40,
+  minBrightness: 40,
+  maxBrightness: 220,
+  frontalMaxYaw: 12,
+  turnMinYaw: 18,
+  updownMinPitch: 15,
+  solidSharpness: 90,
+  solidBoxFrac: 0.14,
+});
+
+export interface EnrollmentSpec {
+  shotsPerPose: number;
+  wearsGlasses: boolean;
+  glassesShots: number;
+  quality: QualityConfig;
+}
+
+export function createEnrollmentSpec(overrides: Partial<EnrollmentSpec> = {}): EnrollmentSpec {
+  return {
+    shotsPerPose: overrides.shotsPerPose ?? 2,
+    wearsGlasses: overrides.wearsGlasses ?? false,
+    glassesShots: overrides.glassesShots ?? 2,
+    quality: { ...DEFAULT_QUALITY_CONFIG, ...overrides.quality },
+  };
+}
+
+export interface FaceSample {
+  embedding: number[];
+  yawDeg: number;
+  pitchDeg: number;
+  boxFrac: number;
+  sharpness: number;
+  brightness: number;
+  glasses: boolean | null;
+}
+
+export function createFaceSample(
+  embedding: number[],
+  measurements: Partial<Omit<FaceSample, "embedding">> = {},
+): FaceSample {
+  return {
+    embedding,
+    yawDeg: measurements.yawDeg ?? 0,
+    pitchDeg: measurements.pitchDeg ?? 0,
+    boxFrac: measurements.boxFrac ?? 0,
+    sharpness: measurements.sharpness ?? 0,
+    brightness: measurements.brightness ?? 128,
+    glasses: measurements.glasses ?? null,
+  };
+}
+
+export function bucketPose(yawDeg: number, pitchDeg: number, cfg: QualityConfig): Pose | null {
+  if (Math.abs(pitchDeg) >= cfg.updownMinPitch) return pitchDeg > 0 ? "up" : "down";
+  if (Math.abs(yawDeg) <= cfg.frontalMaxYaw) return "frontal";
+  if (Math.abs(yawDeg) >= cfg.turnMinYaw) return yawDeg > 0 ? "left" : "right";
+  return null;
+}
+
+export interface QualityAssessment {
+  ok: boolean;
+  reason: "too_far" | "blurry" | "too_dark" | "too_bright" | "ok";
+}
+
+export function assessQuality(sample: FaceSample, cfg: QualityConfig): QualityAssessment {
+  if (sample.boxFrac < cfg.minBoxFrac) return { ok: false, reason: "too_far" };
+  if (sample.sharpness < cfg.minSharpness) return { ok: false, reason: "blurry" };
+  if (sample.brightness < cfg.minBrightness) return { ok: false, reason: "too_dark" };
+  if (sample.brightness > cfg.maxBrightness) return { ok: false, reason: "too_bright" };
+  return { ok: true, reason: "ok" };
+}
+
+export function isSolid(sample: FaceSample, cfg: QualityConfig): boolean {
+  return sample.sharpness >= cfg.solidSharpness && sample.boxFrac >= cfg.solidBoxFrac;
+}
+
+export interface OfferResult {
+  accepted: boolean;
+  reason: string;
+  complete: boolean;
+  progress: number;
+  nextInstruction: string;
+}
+
+export interface BucketStatus {
+  pose: Pose;
+  count: number;
+  needed: number;
+  avgSharpness: number;
+  avgBoxFrac: number;
+  retake: boolean;
+}
+
+export interface PersonStatus {
+  name: string;
+  source: string;
+  complete: boolean;
+  coveragePct: number;
+  shots: number;
+  buckets: BucketStatus[];
+  needs: string[];
+  retake: Pose[];
+  wearsGlasses: boolean;
+  glassesOn: number;
+  glassesOff: number;
+}
+
+const POSE_PROMPT: Record<Pose, string> = {
+  frontal: "look straight at me",
+  left: "slowly turn your head to your left",
+  right: "slowly turn your head to your right",
+  up: "tip your chin up a little",
+  down: "tip your chin down a little",
+};
+
+export class EnrollmentSession {
+  readonly name: string;
+  readonly source: string;
+  private readonly spec: EnrollmentSpec;
+  private readonly poseCounts: Record<Pose, number> = { frontal: 0, left: 0, right: 0, up: 0, down: 0 };
+  private readonly glassesCounts: Record<"true" | "false", number> = { true: 0, false: 0 };
+  private readonly acceptedEmbeddings: number[][] = [];
+  private readonly poseQuality: Record<Pose, Array<[number, number]>> = {
+    frontal: [], left: [], right: [], up: [], down: [],
+  };
+
+  constructor(name: string, spec: EnrollmentSpec = createEnrollmentSpec(), source = "in_person") {
+    this.name = name;
+    this.spec = spec;
+    this.source = source;
+  }
+
+  offer(sample: FaceSample): OfferResult {
+    const quality = assessQuality(sample, this.spec.quality);
+    if (!quality.ok) return this.result(false, quality.reason);
+
+    const pose = bucketPose(sample.yawDeg, sample.pitchDeg, this.spec.quality);
+    if (pose === null) return this.result(false, "between_angles");
+    if (!this.needs(pose, sample.glasses)) return this.result(false, "bucket_full");
+
+    this.poseCounts[pose] += 1;
+    this.poseQuality[pose].push([sample.sharpness, sample.boxFrac]);
+    if (this.spec.wearsGlasses && pose === "frontal" && sample.glasses !== null) {
+      this.glassesCounts[String(sample.glasses) as "true" | "false"] += 1;
+    }
+    this.acceptedEmbeddings.push(sample.embedding);
+    return this.result(true, "ok");
+  }
+
+  embeddings(): number[][] {
+    return [...this.acceptedEmbeddings];
+  }
+
+  status(): PersonStatus {
+    const buckets: BucketStatus[] = [];
+    const needs: string[] = [];
+    const retake: Pose[] = [];
+    for (const pose of POSES) {
+      const quality = this.poseQuality[pose];
+      const count = this.poseCounts[pose];
+      const avgSharpness = quality.length ? quality.reduce((sum, [sharpness]) => sum + sharpness, 0) / quality.length : 0;
+      const avgBoxFrac = quality.length ? quality.reduce((sum, [, box]) => sum + box, 0) / quality.length : 0;
+      const marginal = quality.length > 0 && (avgSharpness < this.spec.quality.solidSharpness || avgBoxFrac < this.spec.quality.solidBoxFrac);
+      buckets.push({
+        pose,
+        count,
+        needed: this.spec.shotsPerPose,
+        avgSharpness: round(avgSharpness, 1),
+        avgBoxFrac: round(avgBoxFrac, 3),
+        retake: marginal,
+      });
+      if (count < this.spec.shotsPerPose) needs.push(POSE_PROMPT[pose]);
+      else if (marginal) retake.push(pose);
+    }
+    if (this.spec.wearsGlasses) {
+      if (this.glassesCounts.false < this.spec.glassesShots) needs.push("take your glasses off and look at me");
+      if (this.glassesCounts.true < this.spec.glassesShots) needs.push("put your glasses on and look at me");
+    }
+    const required = this.requiredTotal();
+    return {
+      name: this.name,
+      source: this.source,
+      complete: this.isComplete(),
+      coveragePct: round(100 * (required === 0 ? 0 : this.collectedTotal() / required), 1),
+      shots: this.acceptedEmbeddings.length,
+      buckets,
+      needs,
+      retake,
+      wearsGlasses: this.spec.wearsGlasses,
+      glassesOn: this.glassesCounts.true,
+      glassesOff: this.glassesCounts.false,
+    };
+  }
+
+  private needs(pose: Pose, glasses: boolean | null): boolean {
+    if (this.poseCounts[pose] < this.spec.shotsPerPose) return true;
+    return this.spec.wearsGlasses && pose === "frontal" && glasses !== null
+      && this.glassesCounts[String(glasses) as "true" | "false"] < this.spec.glassesShots;
+  }
+
+  private requiredTotal(): number {
+    return this.spec.shotsPerPose * POSES.length + (this.spec.wearsGlasses ? this.spec.glassesShots * 2 : 0);
+  }
+
+  private collectedTotal(): number {
+    const poses = POSES.reduce((sum, pose) => sum + Math.min(this.poseCounts[pose], this.spec.shotsPerPose), 0);
+    return poses + (this.spec.wearsGlasses
+      ? Math.min(this.glassesCounts.true, this.spec.glassesShots) + Math.min(this.glassesCounts.false, this.spec.glassesShots)
+      : 0);
+  }
+
+  private isComplete(): boolean {
+    return POSES.every((pose) => this.poseCounts[pose] >= this.spec.shotsPerPose)
+      && (!this.spec.wearsGlasses || (this.glassesCounts.true >= this.spec.glassesShots && this.glassesCounts.false >= this.spec.glassesShots));
+  }
+
+  private nextInstruction(): string {
+    for (const pose of POSES) if (this.poseCounts[pose] < this.spec.shotsPerPose) return POSE_PROMPT[pose];
+    if (this.spec.wearsGlasses) {
+      if (this.glassesCounts.false < this.spec.glassesShots) return "take your glasses off and look at me";
+      if (this.glassesCounts.true < this.spec.glassesShots) return "put your glasses on and look at me";
+    }
+    return "all set, thanks";
+  }
+
+  private result(accepted: boolean, reason: string): OfferResult {
+    const required = this.requiredTotal();
+    const progress = required === 0 ? 0 : Math.min(1, this.collectedTotal() / required);
+    const complete = this.isComplete();
+    return {
+      accepted,
+      reason,
+      complete,
+      progress: round(progress, 3),
+      nextInstruction: complete ? "all set, thanks" : this.nextInstruction(),
+    };
+  }
+}
+
+function round(value: number, digits: number): number {
+  const scale = 10 ** digits;
+  return Math.round(value * scale) / scale;
+}
+
+export function cosine(a: number[], b: number[]): number {
+  if (a.length !== b.length) throw new Error("embedding dimensions must match");
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    dot += a[i]! * b[i]!;
+    normA += a[i]! * a[i]!;
+    normB += b[i]! * b[i]!;
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+export interface Match {
+  name: string | null;
+  score: number;
+  margin: number;
+}
+
+export class FaceGallery {
+  private readonly threshold: number;
+  private readonly people = new Map<string, number[][]>();
+  private readonly personStatuses = new Map<string, PersonStatus>();
+
+  constructor(threshold = 0.36) {
+    this.threshold = threshold;
+  }
+
+  enroll(name: string, embeddings: number[][], status?: PersonStatus): void {
+    if (embeddings.length === 0) throw new Error("cannot enroll with no embeddings");
+    const saved = this.people.get(name) ?? [];
+    saved.push(...embeddings);
+    this.people.set(name, saved);
+    if (status !== undefined) this.personStatuses.set(name, status);
+  }
+
+  names(): string[] {
+    return [...this.people.keys()].sort();
+  }
+
+  status(name: string): PersonStatus | undefined {
+    return this.personStatuses.get(name);
+  }
+
+  statuses(): PersonStatus[] {
+    return this.names().map((name) => this.personStatuses.get(name) ?? {
+      name,
+      source: "imported",
+      complete: true,
+      coveragePct: 100,
+      shots: this.people.get(name)!.length,
+      buckets: [],
+      needs: [],
+      retake: [],
+      wearsGlasses: false,
+      glassesOn: 0,
+      glassesOff: 0,
+    });
+  }
+
+  remove(name: string): boolean {
+    this.personStatuses.delete(name);
+    return this.people.delete(name);
+  }
+
+  identify(embedding: number[], threshold?: number): Match {
+    const actualThreshold = threshold ?? this.threshold;
+    const perPerson = new Map<string, number>();
+    for (const [name, embeddings] of this.people) {
+      for (const enrolled of embeddings) {
+        const score = cosine(embedding, enrolled);
+        if (score > (perPerson.get(name) ?? -1)) perPerson.set(name, score);
+      }
+    }
+    if (perPerson.size === 0) return { name: null, score: 0, margin: 0 };
+    const ranked = [...perPerson].sort((a, b) => b[1] - a[1]);
+    const [bestName, bestScore] = ranked[0]!;
+    const runnerUp = ranked[1]?.[1] ?? 0;
+    const margin = round(Math.max(bestScore - runnerUp, 0), 4);
+    if (bestScore < actualThreshold) return { name: null, score: round(Math.max(bestScore, 0), 4), margin };
+    return { name: bestName, score: round(bestScore, 4), margin };
+  }
+}
