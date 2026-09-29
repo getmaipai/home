@@ -75,6 +75,7 @@ import { readRailCollapsePreference, writeRailCollapsePreference } from "@/next/
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { readyRole } from "@/apps/chat/engineRoles";
+import { ChatShortcutReference } from "@/next/pages/ChatShortcutReference";
 
 const HistoryIcon = getIcon("history");
 // CHAT-UI-03 (3): the app rail's own toggle (sidebar.tsx's
@@ -2624,6 +2625,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <WakeWordPersonContext.Provider value={person}>
       <DictationLevelMeterProvider value={dictationLevelMeter}>
         <StructuredResultTools />
+        <ChatShortcutReference />
         <WakeWordController person={person} />
         <ArtifactTool />
         <ConfirmTool />

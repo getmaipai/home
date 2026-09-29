@@ -155,6 +155,7 @@ const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
 const chatListReview = process.argv.includes("--chat-list-review");
+const chatShortcutsReview = process.argv.includes("--chat-shortcuts-review");
 const chatFindHeaderAlignmentReview = process.argv.includes("--chat-find-header-alignment-review");
 const chatFindBubbleHoverWidthReview = process.argv.includes("--chat-find-bubble-hover-width-review");
 const chatFindComposerShiftReview = process.argv.includes("--chat-find-composer-shift-review");
@@ -1770,6 +1771,35 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
         await context.close();
       }
     }
+  }
+}
+
+/** SHORTCUTS-01 acceptance: show the real chat page with its keyboard
+ * reference open, using the same seeded backend and Chromium capture
+ * path as the rest of the screenshot suite. */
+async function captureChatShortcutsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "light", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+    await page.keyboard.press("Meta+/");
+    const dialog = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+    await dialog.waitFor();
+    for (const label of ["New chat", "Focus composer", "Stop reply", "Search", "Toggle sidebar"]) {
+      await dialog.getByText(label, { exact: true }).waitFor();
+    }
+    await settleAnimations(page);
+    const file = "chat-shortcut-reference-desktop-light.png";
+    await page.screenshot({ path: join(outDir, file), fullPage: false });
+    console.log(`Wrote ${join(outDir, file)}`);
+    await page.close();
+  } finally {
+    await context.close();
   }
 }
 
@@ -4191,6 +4221,10 @@ async function main() {
       await captureChatListReview(browser, sessionValue);
     }
 
+    if (!a11yOnly && chatShortcutsReview) {
+      await captureChatShortcutsReview(browser, sessionValue);
+    }
+
     if (!a11yOnly && chatFindHeaderAlignmentReview) {
       await verifyChatFindHeaderAlignment(browser, sessionValue);
     }
@@ -4215,7 +4249,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -4246,7 +4280,7 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || laneBTouchTargetsReview
+    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || laneBTouchTargetsReview || chatShortcutsReview
       ? []
       : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview
         ? A11Y_ONLY_COMBOS
@@ -4316,7 +4350,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !chatShortcutsReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
