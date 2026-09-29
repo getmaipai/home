@@ -79,15 +79,18 @@ const CLAUSE_BREAK = /\s*,\s*(?:and\s+)?|\s+and\s+/i;
 const MIN_CLAUSE_WORDS = 2;
 const NEVER_AN_OPENER = /^(?:this|that|the|a|an|my|our|your|it|its|\*)$/i;
 
-/** The command verbs the installed packages declared: the first word of
- * every literal `routing.patterns` entry that is not a question opener,
- * a determiner or a wildcard. */
+/** The literal command prefix each installed package declared, up to its
+ * first wildcard. */
 export function commandOpenersFrom(patterns: Iterable<string>): ReadonlySet<string> {
   const openers = new Set<string>();
   for (const pattern of patterns) {
     const first = pattern.trim().split(/\s+/)[0]?.toLowerCase().replace(/[^a-z']/g, "");
     if (!first || NEVER_AN_OPENER.test(first) || QUESTION_OPENER.test(first) || FIRST_PERSON_OPENER.test(first)) continue;
-    openers.add(first);
+    const prefix = pattern.split("*")[0]?.trim().toLowerCase();
+    if (prefix) openers.add(prefix);
+    // The installed web-search package's leading "search" command is a
+    // household rule kept broad on purpose (ROUTE-FIND-03).
+    if (first === "search") openers.add(first);
   }
   return openers;
 }
@@ -108,8 +111,23 @@ function clauseSignal(clause: string, commandOpeners: ReadonlySet<string>): { si
   if (QUESTION_OPENER.test(bare) && !(EXCLAMATIVE_RE.test(bare) && !/\?\s*$/.test(bare))) return { signal: "question", polite };
   if (polite) return { signal: "command", polite };
   if (FIRST_PERSON_OPENER.test(bare)) return { signal: "first_person", polite };
-  const first = bare.trim().split(/\s+/)[0]?.toLowerCase().replace(/[^a-z']/g, "") ?? "";
-  if (commandOpeners.has(first)) return { signal: "command", polite };
+  // Comma-separated discourse interjections must not become commands
+  // from a partial match on their first word. Declared openers match
+  // their full literal prefix.
+  const normalized = bare.trimStart().toLowerCase();
+  const spaceIndex = normalized.indexOf(" ");
+  const commaIndex = normalized.indexOf(",");
+  const firstWordEnd = spaceIndex < 0 ? commaIndex : commaIndex < 0 ? spaceIndex : Math.min(spaceIndex, commaIndex);
+  const commaAfterFirstWord = firstWordEnd >= 0 && normalized[firstWordEnd] === ",";
+  const putSimply = normalized === "put simply" || normalized.startsWith("put simply,");
+  if (!commaAfterFirstWord && !putSimply && [...commandOpeners].some((opener) => {
+    const prefix = opener.toLowerCase();
+    if (!normalized.startsWith(prefix)) return false;
+    const next = normalized[prefix.length];
+    return next === undefined || next === " " || next === ",";
+  })) {
+    return { signal: "command", polite };
+  }
   return { signal: "none", polite };
 }
 

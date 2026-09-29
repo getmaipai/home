@@ -3,6 +3,7 @@
 // have embedding rows or participate in routing decisions.
 import { describe, test, expect } from "bun:test";
 import { embedUtterance, conversationShaped, utteranceShape, commandOpenersFrom } from "@/lib/routing";
+import { classifyTurnSignal } from "@/lib/turnSignal";
 
 describe("embedUtterance() for memory recall", () => {
   test("returns a real vector for real text", async () => {
@@ -23,7 +24,16 @@ describe("conversation shape", () => {
   const openers = commandOpenersFrom(["remember that *", "remember *", "turn off the * light", "set a timer for *", "give me a trivia question", "what does * mean"]);
 
   test("commandOpenersFrom reads declared command verbs, not question openers or wildcards", () => {
-    expect([...openers].sort()).toEqual(["give", "remember", "set", "turn"]);
+    expect([...openers].sort()).toEqual(["give me a trivia question", "remember", "remember that", "set a timer for", "turn off the"]);
+  });
+
+  test("Look, I really think we should talk about this and Put simply, it's complicated are not directives", () => {
+    const discourseOpeners = commandOpenersFrom(["look up *", "put simply, *"]);
+    for (const text of ["Look, I really think we should talk about this", "Put simply, it's complicated"]) {
+      expect(utteranceShape(text, discourseOpeners)).not.toBe("command");
+      expect(classifyTurnSignal({ text, ageBand: "adult", commandOpeners: discourseOpeners }).primary_act).not.toBe("directive");
+    }
+    expect(utteranceShape("look up the artist Adele", discourseOpeners)).toBe("command");
   });
 
   test("recognizes questions and first-person turns as conversational", () => {

@@ -1617,9 +1617,23 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
   // the fact from a directive it should never read; the judge is keyed
   // on the signal now, so the package has to be the one that stores it.
   const bare = text.replace(COURTESY_PREFIX, "");
-  const ordered = stack?.[0]?.type === "world" && MEDIA_KINDS.has(stack[0].kind)
-    ? [...loaded].sort((a, b) => (a.id === "media-lookup" ? -1 : b.id === "media-lookup" ? 1 : 0))
-    : loaded;
+  const specificity = (entry: LoadedManifest): number => {
+    // CHAT-13's frozen corpus records that a cold-start "tell me about
+    // the movie Cobra" belongs to knowledge. media-lookup becomes the
+    // preferred package once the live subject is a media world head.
+    if (entry.id === "media-lookup" && !(stack?.[0]?.type === "world" && MEDIA_KINDS.has(stack[0].kind))) return 0;
+    return Math.max(0, ...(entry.manifest.routing?.patterns ?? [])
+      .filter((pattern) => matchPattern(text, pattern) !== null || (bare !== text && anchoredPattern(pattern) && matchPattern(bare, pattern) !== null))
+      .map((pattern) => pattern.split("*")[0]?.trim().length ?? 0));
+  };
+  const ordered = [...loaded].sort((a, b) => {
+    if (stack?.[0]?.type === "world" && MEDIA_KINDS.has(stack[0].kind)) {
+      if (a.id === "media-lookup" && b.id !== "media-lookup") return -1;
+      if (b.id === "media-lookup" && a.id !== "media-lookup") return 1;
+    }
+    const bySpecificity = specificity(b) - specificity(a);
+    return bySpecificity || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  });
   packages: for (const { id, manifest } of ordered) {
     if (!meetsMinRole(actor.role, manifest.min_role)) continue;
     // The spec's own kind doc comment (spec/schemas/manifest.schema.json):
@@ -1638,7 +1652,9 @@ export function routeLiteral(text: string, actor: PersonRow, loaded: LoadedManif
     // confirmation flow exists specifically to enforce. Consequential
     // packages must be proposed by the model and confirmed.
     if (!manifest.consequential) {
-      for (const pattern of manifest.routing?.patterns ?? []) {
+      const patterns = [...(manifest.routing?.patterns ?? [])].sort((a, b) =>
+        (b.split("*")[0]?.trim().length ?? 0) - (a.split("*")[0]?.trim().length ?? 0));
+      for (const pattern of patterns) {
         const captured = matchPattern(text, pattern) ?? (bare !== text && anchoredPattern(pattern) ? politeCapture(matchPattern(bare, pattern)) : null);
         if (captured === null) continue;
         const args = deterministicArgs(manifest.args, captured);

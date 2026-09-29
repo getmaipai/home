@@ -4790,6 +4790,14 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     expect(routeLiteral("please add eggs to the shopping list", actor, loadAllManifests())?.winner?.id).toBe("list-add");
   });
 
+  test('"look up the artist Adele" routes to music whatever the package order', async () => {
+    const { actor } = await owner();
+    const { routeLiteral } = await import("@/lib/turnEngine");
+    const loaded = loadAllManifests();
+    expect(routeLiteral("look up the artist Adele", actor, loaded)?.winner?.id).toBe("music");
+    expect(routeLiteral("look up the artist Adele", actor, [...loaded].reverse())?.winner?.id).toBe("music");
+  });
+
   test("ALM-01: a leading connective is stripped with the courtesy prefix, so the bare almanac question routes literally", async () => {
     const { actor } = await owner();
     const { routeLiteral } = await import("@/lib/turnEngine");
