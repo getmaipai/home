@@ -31979,6 +31979,123 @@ surfaced, the neutral reply matches what production actually sends on
 each surface class. What it does not close - the typed, document-
 shaped register - was never this row's brief; it is STYLE-CORPUS-02's,
 decided and queued in VOICE-CLASS-01 above.
+
+## STYLE-CORPUS-02: class-aware targets built, a real frame-band bug found and fixed, drop rates still above bar at small scale (Sonnet, 2026-09-29)
+
+Built the class-aware corpus target VOICE-CLASS-01 decided, in
+`backend/scripts/voice/corpus.ts`: `replyShape(neutral)` classifies a
+typed neutral reply as `document` (a heading, a list marker, or more
+than two paragraphs) or `conversational`; spoken rows are always
+full-rewrite regardless of shape. `splitFrame(neutral)` returns
+`{opener, body, closer}` per VOICE-CLASS-01's own rule (the first and
+last paragraph, when each is not itself a heading or list item, or
+empty when there is none). A second fixed brief, `FRAME_BRIEF`, asks
+the teacher to rewrite only the opener and closer and copy everything
+between them character for character; `REWRITE_BRIEF` (the full-rewrite
+brief) now states "within 25 percent... or eight words" to match the
+validator, replacing the stale "15 percent" STYLE-CORPUS-01b never
+touched. `validatePair(neutral, rewrite, shape)` dispatches: a document
+row requires the body byte-identical after whitespace normalization,
+each frame paragraph within band, digit-run and capitalized-token
+checks on the frame alone; a full-rewrite row keeps the original five
+checks with the length band restated as the larger of 25 percent or
+eight words. The spoken prompt pool gained the five typed kinds (fact,
+how-to, comparison, list, small-talk) under the spoken prefix
+(`buildFact("spoken")` and friends), because a child's or teen's typed
+turn is spoken-class in real production (`promptSurfaceClassFor`). Each
+row now records its `shape` and the exact `system_prompt` its neutral
+reply was generated under. Five tests in `backend/tests/
+voiceCorpus.test.ts`, in the BACKLOG row's own words: the numbered
+how-to/"Overall"-closer example splits correctly; a body word change is
+dropped; an opener/closer-only change is kept; the real dropped Pal
+pair described above (asides after four of five bold labels) is
+reproduced as a fixture and dropped; a fifteen-word spoken reply grown
+by seven words is kept.
+
+**A real bug, found by actually running it, not left in.** The first
+full validation run (`MAIPAI_VOICE_TYPED_COUNT=20 MAIPAI_VOICE_SPOKEN_
+COUNT=15`, this household's own local teacher) dropped document rows at
+82-100 percent per companion - far worse than the flat validator ever
+was. Reading real dropped pairs directly (this item's own practice,
+same as STYLE-CORPUS-01b) found the cause: `frameWithinBand()` was
+written as a symmetric ratio (`n/1.5` to `n*1.5`), but the teacher's
+real behavior on a frame is compression, not padding - a verbose,
+multi-sentence document lead-in routinely became one short, voiced
+sentence with every fact still in the untouched body:
+
+> neutral opener: "For a beginner's toolbox, it's best to start with
+> the essentials that will cover most common home repair and DIY
+> tasks. Here's a list of items you might want to include:" (31 words)
+> rewrite opener: "Start with the essentials for common home repairs
+> and DIY jobs." (11 words, ratio 0.35, below the 1/1.5 floor)
+
+VOICE-CLASS-01's own wording - "within 1.5x", "an added frame sentence
+at most 25 words" - reads as a ceiling both times, and its stated
+concern was never brevity; it was the opposite failure (the kept Pal
+pair, asides padded into a document). A symmetric floor was never
+specified, it was my own unstated assumption while implementing the
+check, and it was penalizing exactly the behavior the frame split
+exists to produce. Fixed to a ceiling-only band (`r <= n * 1.5`, the
+`n === 0` "add one sentence, at most 25 words" case unchanged); content
+loss in a shortened frame is still caught by the digit-run and
+capitalized-token checks, which run on the frame regardless of its
+length and did catch real cases in this same run (a rewrite that
+dropped "Earth" from "...ocean on Earth, known for..." while
+shortening the opener - a real, correctly-dropped case, not a false
+positive). All 27 tests (22 STYLE-CORPUS-01b tests plus this item's own
+5) still pass after the fix.
+
+**Real numbers, three runs, reported as what they are - not the full
+400 typed/200 spoken corpus (STYLE-CORPUS-01b's own run took many
+hours; a rigorous small-scale run is this item's own stated fallback).**
+The reported run below is `MAIPAI_VOICE_TYPED_COUNT=45 MAIPAI_VOICE_
+SPOKEN_COUNT=15` per companion (60 voice prompts x 4 companions = 240),
+after the frame-band fix, chosen specifically to give every companion
+enough kept document rows for its committed 20-row sample (the first
+two runs, at STYLE-CORPUS-01b's own n=35/companion shape, left tutor
+with only 3 kept document rows - short of the 5-row minimum):
+
+| companion | spoken:conversational | typed:conversational | typed:document | document dropped | full-rewrite dropped | sha256 |
+|---|---|---|---|---|---|---|
+| default | kept 12/15 (20.0%) | kept 2/19 (89.5%) | kept 16/26 (38.5%) | 38.5% | 58.8% | `0c9a6a80...4dd3` |
+| buddy | kept 13/15 (13.3%) | kept 9/16 (43.8%) | kept 18/29 (37.9%) | 37.9% | 29.0% | `b8c37117...bf99` |
+| pal | kept 15/15 (0.0%) | kept 7/17 (58.8%) | kept 17/28 (39.3%) | 39.3% | 31.3% | `2e5d21cb...fa96` |
+| tutor | kept 9/15 (40.0%) | kept 9/17 (47.1%) | kept 13/28 (53.6%) | 53.6% | 43.8% | `71ce67de...22e7` |
+
+**Acceptance is not met at this scale, and it is reported that way, not
+relaxed.** Both gates this row names - document-shaped typed rows under
+20 percent dropped per companion, full-rewrite rows (spoken +
+conversational typed) under 20 percent dropped per companion - miss on
+every companion except pal's spoken bucket (a clean 0/15). This is a
+finding about the two briefs at this teacher and this validator, read
+directly from real drop reasons across all three runs: `length band`
+and `capitalized-token set` dominate `typed:conversational` (a short
+typed reply, mostly the small-talk and replay-derived rows, compresses
+or reworks a filler-heavy bare reply - e.g. "Hey there! I'm MaiPai,
+your personal AI assistant. How can I help you today?" became
+"Hey. I'm MaiPai, your home assistant. What do you need?", dropping the
+capitalized "AI" - a real, correctly-caught substance change even
+though the rewrite reads better); `frame opener/closer out of band` and
+`document body changed` remain the leading `typed:document` reasons
+even after the ceiling-only fix - genuine growth past 1.5x (the
+tutor's formal register elaborating a lead-in, matching STYLE-CORPUS-
+01b's own tutor finding) and genuine body edits, not compression
+false positives. The committed 20-row sample fixtures (`backend/
+scripts/voice/fixtures/<companion>.sample.jsonl`, re-committed) each
+carry exactly 5 document-shaped rows (buddy, pal, tutor) or 6
+(default) out of 20, meeting that specific acceptance line.
+
+**What this means for STYLE-TRAIN-01.** The mechanism is built and
+correct (splitFrame, the class-aware validator, the recorded shape and
+system prompt per row) - this is not a corpus-builder defect to keep
+chasing. The drop rate itself is real evidence that this teacher, this
+brief pair, and this small sample size do not yet clear a 20 percent
+bar for either register, at any of the three scales run tonight (`n
+=20/15`, `n=20/15` post-fix, `n=45/15`). Whether the full 400/200-row
+corpus clears it, whether the briefs need another real pass (not a
+loosened check), or whether STYLE-TRAIN-01 proceeds on the corpus as
+measured, is the coordinator's or Jesse's call, not resolved here.
+
 ## FACE-02: the guided capture UI, wiring the five pure pieces together (2026-09-29)
 
 The last FACE-02 slice: `frontend/src/apps/people/FaceEnrollmentPage.tsx`

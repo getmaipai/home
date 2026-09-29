@@ -83,6 +83,33 @@
 // a prefix of the identical deterministic generator, never a different
 // one - for a smaller real validation run. Never set as a standing
 // default; an operator sets them per invocation.
+//
+// STYLE-CORPUS-02 (docs/dev.md "VOICE-CLASS-01 design pass", Fable,
+// 2026-09-29): the corpus teaches one adapter per companion two
+// registers, not one brief applied everywhere. A spoken-class reply
+// (production's real spoken prompt class, which includes every child's
+// and teen's typed turn - promptSurfaceClassFor) still takes the
+// REWRITE_BRIEF full rewrite, the whole reply in voice. A typed-adult
+// reply is classified by replyShape() from its own bare shape: a short
+// conversational reply (no heading, no list marker, two paragraphs or
+// fewer) also gets the full rewrite; a document-shaped reply (a heading,
+// a list marker, or more than two paragraphs - PREFIX-CLASS-01's own
+// written-class shape) gets the FRAME_BRIEF instead, which rewrites only
+// the opener and the closer in the companion's voice and copies every
+// heading, list item and paragraph between them character for character
+// (splitFrame()). validatePair() is class-aware to match: a document
+// row requires its body byte-identical after whitespace normalization
+// and its frame paragraphs within band; a full-rewrite row keeps the
+// original five checks, with the length band restated as the larger of
+// 25 percent or eight words (VOICE-CLASS-01's own number, and
+// REWRITE_BRIEF states the same one - a brief that promises 15 beside a
+// validator that enforces something else is two definitions). Each row
+// records its shape and the exact system prompt its neutral reply was
+// generated under, so STYLE-TRAIN-01 trains on the prompt a real turn
+// sends. The spoken prompt pool gains the five typed kinds (fact,
+// how-to, comparison, list, small-talk) generated under the spoken
+// prefix, because a minor's typed turn is spoken-class in real
+// production and the adapter has to have seen that shape too.
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -149,14 +176,32 @@ export const EXCLUDED_TEXTS = new Set<string>([...WRITTEN_QUESTIONS.map((q) => q
 
 // ── The fixed rewrite brief (verbatim, dev.md keeps the same text) ────
 
+// STYLE-CORPUS-02 (VOICE-CLASS-01): "within 15 percent" replaced with
+// the validator's own real number (lengthWithinBand below) - a brief
+// that states one number beside a validator that enforces a different
+// one is two definitions, exactly what VOICE-CLASS-01 named as the
+// thing to fix.
 const REWRITE_BRIEF = [
   "Rewrite the reply below into this speaker's own voice.",
   "Keep every fact, number, name, date and list item exactly as given, in the same order.",
   "Keep the same structure: if the original has headings or a list, the rewrite keeps them; if it does not, the rewrite does not add them.",
-  "Keep the length within 15 percent of the original.",
+  "Keep the length within 25 percent of the original, or within eight words, whichever allows more.",
   "Change only the voice: word choice, sentence rhythm, contractions, and the personality below.",
   "Never add a fact the original did not state, never drop one, and never soften or hedge a fact the original stated flatly.",
   "Reply with the rewritten text only: no preamble, no quotation marks around it, no explanation.",
+].join(" ");
+
+// STYLE-CORPUS-02 (VOICE-CLASS-01, "The decision" point 2): the second
+// fixed brief, for a document-shaped typed reply. Never a variant of
+// REWRITE_BRIEF - a different job (the frame only, never the body).
+const FRAME_BRIEF = [
+  "The reply below is a structured, document-shaped answer: an opening paragraph, then headings, list items or numbered sections, then a closing paragraph.",
+  "Rewrite ONLY the opening paragraph and the closing paragraph into this speaker's own voice.",
+  "If there is no opening paragraph, add one opening sentence in this speaker's voice, at most 25 words.",
+  "If there is no closing paragraph, add one closing sentence in this speaker's voice, at most 25 words.",
+  "Copy every heading, list item, numbered section and paragraph between the opener and the closer exactly as given, character for character - do not change a single word inside them, and do not insert a remark or an aside inside them.",
+  "Never add a fact the original did not state, never drop one, and never soften or hedge a fact the original stated flatly.",
+  "Reply with the full rewritten text only, opener through closer: no preamble, no quotation marks around it, no explanation.",
 ].join(" ");
 
 const FORMALITY_WORDS: Record<Persona["formality"], string> = {
@@ -192,7 +237,10 @@ interface CompanionFields {
   filler_density: Persona["filler_density"];
 }
 
-function buildRewriteSystem(c: CompanionFields): string {
+// STYLE-CORPUS-02: takes the brief as a parameter (REWRITE_BRIEF or
+// FRAME_BRIEF) - the companion fields and dials are identical for both
+// jobs, only the instruction at the end differs.
+function buildRewriteSystem(c: CompanionFields, brief: string): string {
   const parts = [
     `You are rewriting a reply into ${c.display_name}'s own voice.`,
     c.tagline ? `${c.display_name}: ${c.tagline}` : "",
@@ -205,7 +253,7 @@ function buildRewriteSystem(c: CompanionFields): string {
       `Filler density is ${FILLER_WORDS[c.filler_density]}.`,
     ].join(" "),
     c.examples && c.examples.length > 0 ? `How ${c.display_name} talks, verbatim:\n${c.examples.map((e) => `- ${e}`).join("\n")}` : "",
-    REWRITE_BRIEF,
+    brief,
   ];
   return parts.filter((p) => p.length > 0).join("\n\n");
 }
@@ -226,15 +274,24 @@ export function wordCount(s: string): number {
 // below already landed) against this household's own long,
 // markdown-structured neutral replies found overage densely spread from
 // 25% to 45%, not the wholesale padding/truncation this check exists to
-// catch - 25% would have left most of that real spread failing, while
-// the wild outliers (50-83% over) stay correctly caught even at 35%
-// (7 of the 32 pairs), the kind of gross mismatch the "length band"
-// regression test below still uses.
-export function lengthWithinBand(neutral: string, rewrite: string, band = 0.35): boolean {
+// catch.
+//
+// STYLE-CORPUS-02 (VOICE-CLASS-01, "The decision" point 3): restated as
+// the larger of 25 percent or eight words, now that this check only
+// ever runs on a full-rewrite row (spoken, or a short typed reply) - the
+// document rows that produced the wider 25-45% spread above are now
+// validated by validateDocumentPair() instead, on the frame alone, not
+// this check, so the population this band is calibrated against is the
+// one VOICE-CLASS-01 measured at 15-22% under once those document rows
+// are excluded; the eight-word floor is the STYLE-CORPUS-01b tutor
+// finding (a formal rewrite growing a fifteen-word reply past a flat
+// percentage). REWRITE_BRIEF above states this same number.
+export function lengthWithinBand(neutral: string, rewrite: string): boolean {
   const n = wordCount(neutral);
   const r = wordCount(rewrite);
   if (n === 0) return r === 0;
-  return Math.abs(r - n) / n <= band;
+  const allowed = Math.max(0.25 * n, 8);
+  return Math.abs(r - n) <= allowed;
 }
 
 export function digitRuns(s: string): string[] {
@@ -305,6 +362,110 @@ export function capitalizedTokensAfterSentenceStart(s: string): string[] {
 const HEADING_RE = /^#{1,6}\s/m;
 const LIST_RE = /^\s*([-*]|\d+\.)\s/m;
 
+// ── STYLE-CORPUS-02: reply shape and the frame split (VOICE-CLASS-01,
+// "The decision" point 2) ──────────────────────────────────────────────
+
+/** A blank-line-separated block, trimmed. This is the one definition of
+ * "paragraph" replyShape() and splitFrame() both use, so the two can
+ * never disagree on where one paragraph ends and the next begins. */
+export function splitIntoParagraphs(s: string): string[] {
+  return s
+    .split(/\n\s*\n+/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+}
+
+function isHeadingOrListLine(line: string): boolean {
+  return /^#{1,6}\s/.test(line) || /^\s*([-*]|\d+\.)\s/.test(line);
+}
+
+export type ReplyShape = "document" | "conversational";
+
+/** VOICE-CLASS-01, "The decision" point 2: a typed neutral reply that
+ * carries a heading, a list marker, or more than two paragraphs is
+ * document-shaped; anything else typed is conversational. Spoken rows
+ * never call this - "The decision" point 1 says spoken rows are always
+ * full-rewrite regardless of shape, so callers apply that rule before
+ * reaching here (see run()'s own `p.cls === "spoken" ? "conversational"
+ * : replyShape(neutral)`). */
+export function replyShape(neutral: string): ReplyShape {
+  if (HEADING_RE.test(neutral) || LIST_RE.test(neutral)) return "document";
+  if (splitIntoParagraphs(neutral).length > 2) return "document";
+  return "conversational";
+}
+
+export interface FrameSplit {
+  opener: string;
+  body: string;
+  closer: string;
+}
+
+/** VOICE-CLASS-01, "The decision" point 2, verbatim: "the opener (the
+ * first paragraph, when it is not itself a heading or a list item) and
+ * the closer (the last paragraph, when it is not a heading or list item
+ * and not the opener) are rewritten in the companion's voice ... every
+ * heading, list item and paragraph between them is copied character for
+ * character." Only called on a document-shaped reply (replyShape() ===
+ * "document"), but defined to degrade sanely on anything else - no
+ * frame paragraph found just means an empty opener or closer, which
+ * FRAME_BRIEF is told to fill with one new sentence. */
+export function splitFrame(neutral: string): FrameSplit {
+  const paragraphs = splitIntoParagraphs(neutral);
+  if (paragraphs.length === 0) return { opener: "", body: "", closer: "" };
+  const firstLine = (p: string) => p.split("\n")[0] ?? "";
+  const openerIdx = !isHeadingOrListLine(firstLine(paragraphs[0]!)) ? 0 : -1;
+  const lastIdx = paragraphs.length - 1;
+  const closerIdx = paragraphs.length > 1 && lastIdx !== openerIdx && !isHeadingOrListLine(firstLine(paragraphs[lastIdx]!)) ? lastIdx : -1;
+  const opener = openerIdx >= 0 ? paragraphs[openerIdx]! : "";
+  const closer = closerIdx >= 0 ? paragraphs[closerIdx]! : "";
+  const bodyStart = openerIdx >= 0 ? 1 : 0;
+  const bodyEnd = closerIdx >= 0 ? lastIdx : paragraphs.length;
+  const body = paragraphs.slice(bodyStart, bodyEnd).join("\n\n");
+  return { opener, body, closer };
+}
+
+/** "Byte-identical after whitespace normalization" (VOICE-CLASS-01,
+ * "The decision" point 3): trims each line and collapses runs of blank
+ * lines to one, so an incidental trailing space or an extra blank line
+ * the teacher's own formatting habit adds is never confused with an
+ * actual word changed inside a list item or a heading. */
+export function normalizeWhitespace(s: string): string {
+  return s
+    .split("\n")
+    .map((line) => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** VOICE-CLASS-01, "The decision" point 3: "each frame paragraph within
+ * 1.5x of its neutral counterpart's word count, an added frame sentence
+ * at most 25 words." Both halves of that sentence are ceilings ("within
+ * 1.5x", "at most 25 words"), never a floor - a first real validation
+ * run against this household's own local teacher (STYLE-CORPUS-02,
+ * 2026-09-29) found a symmetric 1/1.5x-to-1.5x band dropping the large
+ * majority of real document rows, almost all of it a genuine, desirable
+ * COMPRESSION: the teacher routinely turns a document's verbose,
+ * multi-sentence lead-in ("For a beginner's toolbox, it's best to start
+ * with the essentials that will cover most common home repair and DIY
+ * tasks. Here's a list of items you might want to include:", 31 words)
+ * into one short, voiced sentence ("Start with the essentials for
+ * common home repairs and DIY jobs.", 11 words) - every fact stays in
+ * the untouched body, so nothing is lost, and a short frame is exactly
+ * "the voice" for a brief/casual companion. VOICE-CLASS-01's own
+ * concern was never brevity - it was the opposite failure, an adapter
+ * that learns to pad a document with interjections (the kept Pal pair
+ * it names) - so only growth is bounded here; genuine content loss in a
+ * shortened frame is still caught by the digit-run and
+ * capitalized-token checks below, which run on the frame regardless of
+ * its length. */
+function frameWithinBand(neutralFrame: string, rewriteFrame: string): boolean {
+  const n = wordCount(neutralFrame);
+  const r = wordCount(rewriteFrame);
+  if (n === 0) return r <= 25;
+  return r <= n * 1.5;
+}
+
 // The persona bench's own "never say this" list: STUCK_LINES mirrors
 // replay.ts's literal string (that file has no export for it), and
 // HONESTY_LINES/EMPTY_PROMISE_LINES are imported from
@@ -325,7 +486,7 @@ export interface ValidationResult {
 // REWRITE_BRIEF above also promises the frontier model never ADDS
 // structure the neutral reply didn't have ("if it does not, the
 // rewrite does not add them"), so both directions are checked now.
-export function validatePair(neutral: string, rewrite: string): ValidationResult {
+function validateFullRewritePair(neutral: string, rewrite: string): ValidationResult {
   if (!lengthWithinBand(neutral, rewrite)) return { ok: false, reason: "length band" };
   if (!sameMultiset(digitRuns(neutral), digitRuns(rewrite))) return { ok: false, reason: "digit-run set" };
   // STYLE-CORPUS-01b: compared as a deduplicated SET, not the exact
@@ -345,8 +506,39 @@ export function validatePair(neutral: string, rewrite: string): ValidationResult
   if (!sameMultiset([...neutralCaps].sort(), [...rewriteCaps].sort())) return { ok: false, reason: "capitalized-token set" };
   if (HEADING_RE.test(neutral) !== HEADING_RE.test(rewrite)) return { ok: false, reason: "heading presence changed" };
   if (LIST_RE.test(neutral) !== LIST_RE.test(rewrite)) return { ok: false, reason: "list marker presence changed" };
-  if (FORBIDDEN_RE.test(rewrite)) return { ok: false, reason: "forbidden phrase" };
   return { ok: true };
+}
+
+// STYLE-CORPUS-02 (VOICE-CLASS-01, "The decision" point 3): "document
+// rows require the body byte-identical after whitespace normalization,
+// each frame paragraph within 1.5x of its neutral counterpart's word
+// count ... digit-run and capitalized-token checks on the frame alone
+// (the body is identical by construction, which also retires the
+// carpet-stain class of false positive without touching those checks)."
+function validateDocumentPair(neutral: string, rewrite: string): ValidationResult {
+  const n = splitFrame(neutral);
+  const r = splitFrame(rewrite);
+  if (normalizeWhitespace(n.body) !== normalizeWhitespace(r.body)) return { ok: false, reason: "document body changed" };
+  if (!frameWithinBand(n.opener, r.opener)) return { ok: false, reason: "frame opener out of band" };
+  if (!frameWithinBand(n.closer, r.closer)) return { ok: false, reason: "frame closer out of band" };
+  const neutralFrame = `${n.opener}\n${n.closer}`;
+  const rewriteFrame = `${r.opener}\n${r.closer}`;
+  if (!sameMultiset(digitRuns(neutralFrame), digitRuns(rewriteFrame))) return { ok: false, reason: "digit-run set" };
+  const neutralCaps = new Set(capitalizedTokensAfterSentenceStart(neutralFrame));
+  const rewriteCaps = new Set(capitalizedTokensAfterSentenceStart(rewriteFrame));
+  if (!sameMultiset([...neutralCaps].sort(), [...rewriteCaps].sort())) return { ok: false, reason: "capitalized-token set" };
+  return { ok: true };
+}
+
+/** STYLE-CORPUS-02: class-aware (VOICE-CLASS-01, "The decision" point
+ * 3) - a document row (a document-shaped typed reply) is checked by
+ * validateDocumentPair(), everything else (a full-rewrite row: spoken,
+ * or a conversational typed reply) by validateFullRewritePair(). The
+ * forbidden-phrase check is unconditional on the rewrite either way -
+ * VOICE-CLASS-01 doesn't relax it for either class. */
+export function validatePair(neutral: string, rewrite: string, shape: ReplyShape): ValidationResult {
+  if (FORBIDDEN_RE.test(rewrite)) return { ok: false, reason: "forbidden phrase" };
+  return shape === "document" ? validateDocumentPair(neutral, rewrite) : validateFullRewritePair(neutral, rewrite);
 }
 
 // ── The prompt list: templated, deterministic, roster/documentation-
@@ -436,30 +628,39 @@ export function interleave<T>(lists: readonly (readonly T[])[]): T[] {
   return out;
 }
 
-function buildFact(): PromptSpec[] {
+// STYLE-CORPUS-02 (VOICE-CLASS-01, "The decision" point 1): each of the
+// five typed-kind generators below takes the target class, defaulting
+// to "typed" - buildPromptList() also calls each with "spoken" to give
+// the spoken pool the same five kinds under the spoken prefix, since a
+// child's or teen's typed turn is spoken-class in real production
+// (promptSurfaceClassFor). Same topic banks and templates either way -
+// the text is deliberately identical between a typed and a spoken row
+// of the same kind; what differs is which system prompt the neutral
+// reply is generated under.
+function buildFact(cls: PromptSpec["cls"] = "typed"): PromptSpec[] {
   const out: PromptSpec[] = [];
-  for (const [ti, tmpl] of FACT_TEMPLATES.entries()) for (const [wi, topic] of FACT_TOPICS.entries()) out.push({ id: `typed-fact-${ti}-${wi}`, cls: "typed", kind: "fact", text: tmpl(topic) });
+  for (const [ti, tmpl] of FACT_TEMPLATES.entries()) for (const [wi, topic] of FACT_TOPICS.entries()) out.push({ id: `${cls}-fact-${ti}-${wi}`, cls, kind: "fact", text: tmpl(topic) });
   return out;
 }
-function buildHowTo(): PromptSpec[] {
+function buildHowTo(cls: PromptSpec["cls"] = "typed"): PromptSpec[] {
   const out: PromptSpec[] = [];
-  for (const [ti, tmpl] of HOWTO_TEMPLATES.entries()) for (const [wi, topic] of HOWTO_TOPICS.entries()) out.push({ id: `typed-howto-${ti}-${wi}`, cls: "typed", kind: "how-to", text: tmpl(topic) });
+  for (const [ti, tmpl] of HOWTO_TEMPLATES.entries()) for (const [wi, topic] of HOWTO_TOPICS.entries()) out.push({ id: `${cls}-howto-${ti}-${wi}`, cls, kind: "how-to", text: tmpl(topic) });
   return out;
 }
-function buildComparison(): PromptSpec[] {
+function buildComparison(cls: PromptSpec["cls"] = "typed"): PromptSpec[] {
   const out: PromptSpec[] = [];
-  for (const [ti, tmpl] of COMPARISON_TEMPLATES.entries()) for (const [wi, [a, b]] of COMPARISON_PAIRS.entries()) out.push({ id: `typed-comparison-${ti}-${wi}`, cls: "typed", kind: "comparison", text: tmpl(a, b) });
+  for (const [ti, tmpl] of COMPARISON_TEMPLATES.entries()) for (const [wi, [a, b]] of COMPARISON_PAIRS.entries()) out.push({ id: `${cls}-comparison-${ti}-${wi}`, cls, kind: "comparison", text: tmpl(a, b) });
   return out;
 }
-function buildList(): PromptSpec[] {
+function buildList(cls: PromptSpec["cls"] = "typed"): PromptSpec[] {
   const out: PromptSpec[] = [];
-  for (const [ti, tmpl] of LIST_TEMPLATES.entries()) for (const [wi, topic] of LIST_TOPICS.entries()) out.push({ id: `typed-list-${ti}-${wi}`, cls: "typed", kind: "list", text: tmpl(topic) });
+  for (const [ti, tmpl] of LIST_TEMPLATES.entries()) for (const [wi, topic] of LIST_TOPICS.entries()) out.push({ id: `${cls}-list-${ti}-${wi}`, cls, kind: "list", text: tmpl(topic) });
   return out;
 }
-function buildSmallTalk(): PromptSpec[] {
+function buildSmallTalk(cls: PromptSpec["cls"] = "typed"): PromptSpec[] {
   const out: PromptSpec[] = [];
   let i = 0;
-  for (const base of SMALL_TALK_BASE) for (const tag of SMALL_TALK_TAGS) out.push({ id: `typed-small-talk-${i++}`, cls: "typed", kind: "small-talk", text: `${base}${tag}`.trim() });
+  for (const base of SMALL_TALK_BASE) for (const tag of SMALL_TALK_TAGS) out.push({ id: `${cls}-small-talk-${i++}`, cls, kind: "small-talk", text: `${base}${tag}`.trim() });
   return out;
 }
 
@@ -519,7 +720,12 @@ function buildSpokenCategories(): PromptSpec[] {
 
 export function buildPromptList(): { typed: PromptSpec[]; spoken: PromptSpec[] } {
   const typedPool = interleave([buildFromOwnerReplay(), buildFact(), buildHowTo(), buildComparison(), buildList(), buildSmallTalk()]);
-  const spokenPool = buildSpokenCategories();
+  // STYLE-CORPUS-02 (VOICE-CLASS-01, "The decision" point 1): the spoken
+  // pool gains the same five typed kinds, generated under the spoken
+  // prefix - interleaved in beside the seven naturalness-corpus
+  // categories, same SPOKEN_COUNT default as before ("the counts
+  // unchanged" - the top-level pool size, not the per-kind topic count).
+  const spokenPool = interleave([buildSpokenCategories(), buildFact("spoken"), buildHowTo("spoken"), buildComparison("spoken"), buildList("spoken"), buildSmallTalk("spoken")]);
   const typed = typedPool.filter((p) => !EXCLUDED_TEXTS.has(p.text.toLowerCase())).slice(0, TYPED_COUNT);
   const spoken = spokenPool.filter((p) => !EXCLUDED_TEXTS.has(p.text.toLowerCase())).slice(0, SPOKEN_COUNT);
   return { typed, spoken };
@@ -691,14 +897,43 @@ async function run(teacher: LlamaServerClient, teacherModel: string, waitForQuie
   if (typed.length < TYPED_COUNT) console.log(`[voice-corpus] typed pool has only ${typed.length} rows after held-out exclusion, short of the requested ${TYPED_COUNT}.`);
   if (spoken.length < SPOKEN_COUNT) console.log(`[voice-corpus] spoken pool has only ${spoken.length} rows after held-out exclusion, short of the requested ${SPOKEN_COUNT}.`);
 
-  const summary: { companion: string; kept: number; dropped: number; dropRate: number; sha256: string }[] = [];
+  const summary: {
+    companion: string;
+    kept: number;
+    dropped: number;
+    dropRate: number;
+    sha256: string;
+    documentDropRate: number;
+    fullRewriteDropRate: number;
+  }[] = [];
+
+  // STYLE-CORPUS-02: at least this many document-shaped rows in the
+  // committed 20-row sample per companion (acceptance evidence below).
+  const SAMPLE_SIZE = 20;
+  const MIN_DOCUMENT_SAMPLE = 5;
+
+  /** Builds the committed sample so it always carries at least
+   * MIN_DOCUMENT_SAMPLE document-shaped rows when the run produced that
+   * many, instead of leaving it to the luck of which 20 rows landed
+   * first - a plain `.slice(0, 20)` on a typed-then-spoken row order can
+   * easily miss the document rows entirely on a small validation run. */
+  function buildSample(voiceRows: readonly Record<string, unknown>[]): Record<string, unknown>[] {
+    const documentRows = voiceRows.filter((r) => r.shape === "document");
+    const otherRows = voiceRows.filter((r) => r.shape !== "document");
+    const docCount = Math.min(MIN_DOCUMENT_SAMPLE, documentRows.length);
+    const sample = [...documentRows.slice(0, docCount), ...otherRows.slice(0, Math.max(0, SAMPLE_SIZE - docCount))];
+    if (sample.length < SAMPLE_SIZE && documentRows.length > docCount) {
+      sample.push(...documentRows.slice(docCount, docCount + (SAMPLE_SIZE - sample.length)));
+    }
+    return sample.slice(0, SAMPLE_SIZE);
+  }
 
   for (const companionId of COMPANIONS) {
     const persona = PERSONAS.find((p: Persona) => p.id === companionId);
     const manifest = loadManifestOnly(companionId);
     if (!persona || !manifest.ok || !manifest.value.companion) throw new Error(`bundled companion ${companionId} failed to load`);
     const c = manifest.value.companion;
-    const rewriteSystem = buildRewriteSystem({
+    const companionFields: CompanionFields = {
       display_name: c.display_name,
       tagline: c.tagline,
       backstory: c.backstory,
@@ -708,12 +943,28 @@ async function run(teacher: LlamaServerClient, teacherModel: string, waitForQuie
       complexity: persona.complexity,
       engagement: persona.engagement,
       filler_density: persona.filler_density,
-    });
+    };
+    // STYLE-CORPUS-02: two systems, one per brief - the companion fields
+    // and dials are identical, only the instruction at the end differs
+    // (buildRewriteSystem's own comment).
+    const fullRewriteSystem = buildRewriteSystem(companionFields, REWRITE_BRIEF);
+    const frameRewriteSystem = buildRewriteSystem(companionFields, FRAME_BRIEF);
 
     console.log(`\n[voice-corpus] === ${companionId} ===`);
     const rows: Record<string, unknown>[] = [];
     let dropped = 0;
     const voicePrompts = [...typed, ...spoken];
+
+    // STYLE-CORPUS-02: kept/dropped per (class, shape) bucket, so the
+    // drop rate can be reported and gated per class/shape (item 7 and
+    // the acceptance evidence below), not just per companion overall.
+    const classShapeStats = new Map<string, { kept: number; dropped: number }>();
+    function bump(cls: PromptSpec["cls"], shape: ReplyShape, field: "kept" | "dropped"): void {
+      const key = `${cls}:${shape}`;
+      const cur = classShapeStats.get(key) ?? { kept: 0, dropped: 0 };
+      cur[field]++;
+      classShapeStats.set(key, cur);
+    }
 
     const outDir = join(REPO_ROOT, "data-scratch", "voice", companionId);
     mkdirSync(outDir, { recursive: true });
@@ -728,13 +979,20 @@ async function run(teacher: LlamaServerClient, teacherModel: string, waitForQuie
 
     for (const p of voicePrompts) {
       await waitForQuiet();
-      const neutralResult = await complete("chat", [{ role: "system", content: neutralReplySystem(persona, p.cls) }, { role: "user", content: p.text }], { thinking: false });
+      const neutralSystem = neutralReplySystem(persona, p.cls);
+      const neutralResult = await complete("chat", [{ role: "system", content: neutralSystem }, { role: "user", content: p.text }], { thinking: false });
       if (!neutralResult.ok) {
         console.error(`[voice-corpus] ${companionId} ${p.id}: neutral reply failed (${neutralResult.error})`);
         dropped++;
         continue;
       }
       const neutral = visibleText(neutralResult.value.text).trim();
+
+      // STYLE-CORPUS-02 (VOICE-CLASS-01, "The decision" points 1-2):
+      // spoken rows are always full-rewrite ("conversational" shape);
+      // a typed row's shape comes from its own bare neutral reply.
+      const shape: ReplyShape = p.cls === "spoken" ? "conversational" : replyShape(neutral);
+      const rewriteSystem = shape === "document" ? frameRewriteSystem : fullRewriteSystem;
 
       let rewrite: string;
       try {
@@ -763,12 +1021,13 @@ async function run(teacher: LlamaServerClient, teacherModel: string, waitForQuie
       }
       if (!rewrite) {
         dropped++;
+        bump(p.cls, shape, "dropped");
         continue;
       }
 
-      const verdict = validatePair(neutral, rewrite);
+      const verdict = validatePair(neutral, rewrite, shape);
       if (!verdict.ok) {
-        console.error(`[voice-corpus] ${companionId} ${p.id}: dropped (${verdict.reason})`);
+        console.error(`[voice-corpus] ${companionId} ${p.id}: dropped (${shape}, ${verdict.reason})`);
         // MAIPAI_VOICE_DEBUG_DROPS=1: the full pair, for characterizing a
         // real drop-rate finding against actual text (never logged by
         // default - hundreds of full replies would swamp a real run's
@@ -778,15 +1037,17 @@ async function run(teacher: LlamaServerClient, teacherModel: string, waitForQuie
           console.error(`  rewrite: ${JSON.stringify(rewrite)}`);
         }
         dropped++;
+        bump(p.cls, shape, "dropped");
         continue;
       }
-      const row = { id: `${companionId}-${p.id}`, companion: companionId, class: p.cls, kind: p.kind, prompt: p.text, neutral, rewrite };
+      const row = { id: `${companionId}-${p.id}`, companion: companionId, class: p.cls, shape, kind: p.kind, system_prompt: neutralSystem, prompt: p.text, neutral, rewrite };
       rows.push(row);
       appendFileSync(outPath, JSON.stringify(row) + "\n");
+      bump(p.cls, shape, "kept");
     }
 
     for (const tr of toolRows) {
-      const row = { id: `${companionId}-${tr.id}`, companion: companionId, class: "tool", kind: "tool", prompt: tr.utterance, neutral: tr.replyText, rewrite: tr.replyText, tool_calls: tr.toolCalls };
+      const row = { id: `${companionId}-${tr.id}`, companion: companionId, class: "tool", shape: "tool", kind: "tool", prompt: tr.utterance, neutral: tr.replyText, rewrite: tr.replyText, tool_calls: tr.toolCalls };
       rows.push(row);
       appendFileSync(outPath, JSON.stringify(row) + "\n");
     }
@@ -796,18 +1057,53 @@ async function run(teacher: LlamaServerClient, teacherModel: string, waitForQuie
 
     mkdirSync(FIXTURES_DIR, { recursive: true });
     const voiceRows = rows.filter((r) => r.class !== "tool");
-    const sample = voiceRows.slice(0, 20);
+    const sample = buildSample(voiceRows);
     writeFileSync(join(FIXTURES_DIR, `${companionId}.sample.jsonl`), toJsonl(sample));
 
     const dropRate = voicePrompts.length > 0 ? dropped / voicePrompts.length : 0;
     console.log(`[voice-corpus] ${companionId}: kept ${voiceRows.length}/${voicePrompts.length} voice pairs + ${toolRows.length} tool rows, dropped ${dropped} (${(dropRate * 100).toFixed(1)}%), sha256=${sha256}`);
-    summary.push({ companion: companionId, kept: voiceRows.length, dropped, dropRate, sha256 });
+
+    // STYLE-CORPUS-02: per-class-and-shape breakdown (item 7), and the
+    // two buckets the acceptance evidence gates on - "document-shaped
+    // typed rows" (typed:document) and "full-rewrite rows" (spoken and
+    // conversational typed combined, VOICE-CLASS-01's own phrase).
+    console.log(`[voice-corpus] ${companionId} by class/shape:`);
+    for (const [key, stats] of [...classShapeStats.entries()].sort()) {
+      const total = stats.kept + stats.dropped;
+      const rate = total > 0 ? stats.dropped / total : 0;
+      console.log(`  ${key.padEnd(22)} kept=${stats.kept} dropped=${stats.dropped} dropRate=${(rate * 100).toFixed(1)}%`);
+    }
+    const documentStats = classShapeStats.get("typed:document") ?? { kept: 0, dropped: 0 };
+    const documentTotal = documentStats.kept + documentStats.dropped;
+    const documentDropRate = documentTotal > 0 ? documentStats.dropped / documentTotal : 0;
+    const fullRewriteStats = ["typed:conversational", "spoken:conversational"].reduce(
+      (acc, key) => {
+        const s = classShapeStats.get(key) ?? { kept: 0, dropped: 0 };
+        return { kept: acc.kept + s.kept, dropped: acc.dropped + s.dropped };
+      },
+      { kept: 0, dropped: 0 },
+    );
+    const fullRewriteTotal = fullRewriteStats.kept + fullRewriteStats.dropped;
+    const fullRewriteDropRate = fullRewriteTotal > 0 ? fullRewriteStats.dropped / fullRewriteTotal : 0;
+    console.log(`  document-shaped typed (typed:document): ${(documentDropRate * 100).toFixed(1)}% dropped (${documentTotal} rows)`);
+    console.log(`  full-rewrite (spoken + conversational typed): ${(fullRewriteDropRate * 100).toFixed(1)}% dropped (${fullRewriteTotal} rows)`);
+
+    summary.push({ companion: companionId, kept: voiceRows.length, dropped, dropRate, sha256, documentDropRate, fullRewriteDropRate });
   }
 
   console.log("\n## Drop rate summary\n");
-  for (const s of summary) console.log(`${s.companion.padEnd(8)} kept=${s.kept} dropped=${s.dropped} dropRate=${(s.dropRate * 100).toFixed(1)}% sha256=${s.sha256}`);
   for (const s of summary) {
-    if (s.dropRate >= 0.2) console.log(`[voice-corpus] FINDING: ${s.companion}'s drop rate is at or above 20% - a corpus/brief problem, not relaxed here.`);
+    console.log(
+      `${s.companion.padEnd(8)} kept=${s.kept} dropped=${s.dropped} dropRate=${(s.dropRate * 100).toFixed(1)}% documentDropRate=${(s.documentDropRate * 100).toFixed(1)}% fullRewriteDropRate=${(s.fullRewriteDropRate * 100).toFixed(1)}% sha256=${s.sha256}`,
+    );
+  }
+  for (const s of summary) {
+    // STYLE-CORPUS-02 acceptance: document-shaped typed rows under 20%
+    // dropped per companion, and full-rewrite rows (spoken +
+    // conversational typed) under 20% dropped per companion - two
+    // separate findings, since VOICE-CLASS-01 gates them separately.
+    if (s.documentDropRate >= 0.2) console.log(`[voice-corpus] FINDING: ${s.companion}'s document-shaped typed drop rate is at or above 20% - a corpus/brief problem, not relaxed here.`);
+    if (s.fullRewriteDropRate >= 0.2) console.log(`[voice-corpus] FINDING: ${s.companion}'s full-rewrite drop rate is at or above 20% - a corpus/brief problem, not relaxed here.`);
   }
 }
 
