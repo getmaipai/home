@@ -7741,6 +7741,609 @@
         }
       }
     },
+    "/api/status/board": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Read the household status board",
+        "responses": {
+          "200": {
+            "description": "Current status note and scheduled maintenance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "note": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "body": {
+                          "type": "string"
+                        },
+                        "posted_at": {
+                          "type": "string"
+                        },
+                        "posted_by_name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "body",
+                        "posted_at",
+                        "posted_by_name"
+                      ]
+                    },
+                    "maintenance": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "components": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "starts_at": {
+                            "type": "string"
+                          },
+                          "ends_at": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "cancelled",
+                              "scheduled",
+                              "in_progress",
+                              "completed"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "description",
+                          "components",
+                          "starts_at",
+                          "ends_at",
+                          "status"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "note",
+                    "maintenance"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status/note": {
+      "post": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Post the status note",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "body": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "body"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The posted note.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^note-[a-z0-9]{6,}$"
+                    },
+                    "body": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 500,
+                      "description": "Plain text only, with no markup."
+                    },
+                    "posted_by": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "posted_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "expires_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "cleared_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "cleared_by": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "body",
+                    "posted_by",
+                    "posted_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One plain-text note an admin pins to the status page. At most one uncleared, unexpired note is shown at a time; that is a display rule, not enforceable in this schema."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The note is invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Clear the status note",
+        "responses": {
+          "204": {
+            "description": "The active note was cleared."
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status/maintenance": {
+      "post": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Schedule maintenance",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 1000
+                  },
+                  "components": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "embed",
+                        "background",
+                        "voice",
+                        "library",
+                        "hub"
+                      ]
+                    },
+                    "minItems": 1
+                  },
+                  "starts_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "ends_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "title",
+                  "components",
+                  "starts_at",
+                  "ends_at"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The scheduled maintenance window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^maint-[a-z0-9]{6,}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "components": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "chat",
+                          "embed",
+                          "background",
+                          "voice",
+                          "library",
+                          "hub"
+                        ]
+                      },
+                      "minItems": 1
+                    },
+                    "starts_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "ends_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "created_by": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node."
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": ""
+                    },
+                    "cancelled_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "components",
+                    "starts_at",
+                    "ends_at",
+                    "created_by",
+                    "created_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Scheduled maintenance. Status is derived at read time from the clock and cancelled_at (scheduled -> in_progress -> completed, or cancelled), never stored. ends_at must be after starts_at; JSON Schema cannot express this, so the hub enforces it. Recurrence is deliberately not modeled yet; a later shape may add strategy."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The maintenance window is invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status/maintenance/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Cancel a maintenance window",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "maint-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled maintenance window.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^maint-[a-z0-9]{6,}$"
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 120
+                    },
+                    "components": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "chat",
+                          "embed",
+                          "background",
+                          "voice",
+                          "library",
+                          "hub"
+                        ]
+                      },
+                      "minItems": 1
+                    },
+                    "starts_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "ends_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "created_by": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node."
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 1000,
+                      "default": ""
+                    },
+                    "cancelled_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "components",
+                    "starts_at",
+                    "ends_at",
+                    "created_by",
+                    "created_at",
+                    "hlc"
+                  ],
+                  "additionalProperties": false,
+                  "description": "Scheduled maintenance. Status is derived at read time from the clock and cancelled_at (scheduled -> in_progress -> completed, or cancelled), never stored. ends_at must be after starts_at; JSON Schema cannot express this, so the hub enforces it. Recurrence is deliberately not modeled yet; a later shape may add strategy."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Maintenance window not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Window is completed or already cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/voice/wakewords": {
       "get": {
         "tags": [

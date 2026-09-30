@@ -912,6 +912,32 @@ export const issues = sqliteTable("issues", {
   hlc: text("hlc").notNull(),
 });
 
+// Admin-authored status page records. The maintenance status is derived
+// from starts_at, ends_at, cancelled_at at read time and is never stored.
+export const statusNotes = sqliteTable("status_notes", {
+  id: text("id").primaryKey(),
+  body: text("body").notNull(),
+  postedBy: text("posted_by").notNull(),
+  postedAt: text("posted_at").notNull(),
+  expiresAt: text("expires_at"),
+  clearedAt: text("cleared_at"),
+  clearedBy: text("cleared_by"),
+  hlc: text("hlc").notNull(),
+});
+
+export const maintenanceWindows = sqliteTable("maintenance_windows", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  components: text("components").notNull(),
+  startsAt: text("starts_at").notNull(),
+  endsAt: text("ends_at").notNull(),
+  cancelledAt: text("cancelled_at"),
+  createdBy: text("created_by").notNull(),
+  createdAt: text("created_at").notNull(),
+  hlc: text("hlc").notNull(),
+});
+
 // --- Session D: packages and the store ------------------------------
 //
 // One row per bundled/installed package, tracking bronze's "a smoke

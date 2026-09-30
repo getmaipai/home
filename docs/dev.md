@@ -83,6 +83,30 @@ for everyone. The controls were removed from `/models`; that page now keeps
 the chat model picker only. History, notes, maintenance, and the Search,
 Library, and hub rows are later slices.
 
+## STATUS-B2a
+
+The spec pin is `spec-v0.1.61`, which defines the `StatusNote` and
+`MaintenanceWindow` record shapes. The hub stores notes in `status_notes`
+and maintenance windows in `maintenance_windows`; both records carry an
+HLC. Posting a note clears any currently active note first, so only one
+uncleared, unexpired note can appear on the board. Owners and admins can
+post or clear notes and create or cancel maintenance windows.
+
+Maintenance status is derived on each read and never stored: `cancelled`
+when `cancelled_at` is set, `scheduled` before `starts_at`, `in_progress`
+from `starts_at` up to but not including `ends_at`, and `completed` at or
+after `ends_at`. A window must end after it starts, must not end in the
+past, and cannot start more than 90 days ahead. Completed history is shown
+for seven days. The exported `activeMaintenanceComponents()` helper
+returns the component ids in current windows; alarm suppression is a later
+slice.
+
+Every signed-in household member can read `GET /api/status/board`. That
+view includes the active note with its poster's display name and the
+maintenance list, but leaves out creator ids and HLCs. Only owners and
+admins can use the write routes. The status page UI that consumes this
+response is STATUS-B2b.
+
 ## STATUS-A2b
 
 The `/status` page uses the kit Status badge in its overall banner and
