@@ -33538,6 +33538,10 @@ Jesse decided that any non-Home process holding an engine port may be killed wit
 
 The blocked-port Repair test now injects EPERM for its listener, because an ordinary foreign holder is reaped under this policy; this keeps the test focused on the plain Repair sentence and its technical detail when Home cannot remove the holder.
 
+## ENGINE-AVAIL-05a (backend)
+
+`POST /api/host/engines/{role}/restart` restarts `chat`, `embed`, `voice`, or `background` for an owner or admin. Chat reuses the existing restart-and-wait flow and returns 503 with an error sentence if it does not become ready within 90 seconds. Embed, voice, and background restart their supervisor and immediately request the lazy client start, then return without waiting for readiness so the Health pill can show that the engine is starting. Those three supervisors do not yet track a manual-stop state, so a real Stop action is deferred until that state exists. The existing `POST /api/host/engine/restart` remains available with its existing response.
+
 ## DATA-LOCATION: where the household's data lives, choosing it at install and moving it later (design, 2026-09-29)
 
 **Revision 2026-09-30.** The first version grouped the data into three

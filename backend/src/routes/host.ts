@@ -132,8 +132,12 @@ hostRoutes.post("/engine/stop", requireRole("owner", "admin"), async (c) => {
 // so a shorter idleTimeout silently kills the connection first.
 export const RESTART_TIMEOUT_MS = 90_000;
 
-hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
+export async function restartChatAndWait(): Promise<void> {
   await restartChatBackend();
+  await withTimeout(getChatClient(), RESTART_TIMEOUT_MS, () => new Error(`timed out waiting for the chat engine after ${RESTART_TIMEOUT_MS / 1000}s`));
+}
+
+hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
   // withTimeout (lib/withTimeout.ts) owns the race-plus-clear-the-timer
   // shape now - a code review (2026-09-06) found this hand-rolled copy
   // was one of three in the codebase (scheduler.ts's per-job budget,
@@ -141,7 +145,7 @@ hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
   // "timer never cleared" bug class a 2026-09-04 review already found
   // and fixed once, here specifically.
   try {
-    await withTimeout(getChatClient(), RESTART_TIMEOUT_MS, () => new Error(`timed out waiting for the chat engine after ${RESTART_TIMEOUT_MS / 1000}s`));
+    await restartChatAndWait();
   } catch (err) {
     return c.json({ error: (err as Error).message }, 503);
   }
