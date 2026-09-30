@@ -79,10 +79,10 @@ export function NextSettingsPage({ person, onPersonChange }: { person: Roster; o
       </CardHeader>
       {canManageHousehold || showDeviceSettings ? (
         <Tabs value={tab} onValueChange={(v) => setTab(v as "household" | "me" | "device")}>
-          <TabsList className="h-auto min-h-12">
-            {canManageHousehold ? <TabsTrigger className="min-h-12 min-w-12" value="household">Household</TabsTrigger> : null}
-            <TabsTrigger className="min-h-12 min-w-12" value="me">Me</TabsTrigger>
-            {showDeviceSettings ? <TabsTrigger className="min-h-12 min-w-12" value="device">This device</TabsTrigger> : null}
+          <TabsList className="h-auto min-h-12 w-auto self-start">
+            {canManageHousehold ? <TabsTrigger className="min-h-12 min-w-fit flex-none px-4" value="household">Household</TabsTrigger> : null}
+            <TabsTrigger className="min-h-12 min-w-fit flex-none px-4" value="me">Me</TabsTrigger>
+            {showDeviceSettings ? <TabsTrigger className="min-h-12 min-w-fit flex-none px-4" value="device">This device</TabsTrigger> : null}
           </TabsList>
           {canManageHousehold ? (
             <TabsContent value="household" className="flex flex-col gap-4">

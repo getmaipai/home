@@ -85,6 +85,27 @@ function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string
 }
 
 describe("NextSettingsPage", () => {
+  test("Household and Me tabs have fitting width and even horizontal padding", async () => {
+    const { restore } = mockSettingsFetch([], { household: [], "person:person-abc123": [] });
+    try {
+      renderWithQueryClient(<MemoryRouter><NextSettingsPage person={makePerson()} /></MemoryRouter>);
+      const household = await waitFor(() => {
+        const found = Array.from(document.querySelectorAll('[role="tab"]')).find((tab) => tab.textContent === "Household");
+        expect(found).not.toBeNull();
+        return found as HTMLElement;
+      });
+      const me = Array.from(document.querySelectorAll('[role="tab"]')).find((tab) => tab.textContent === "Me") as HTMLElement;
+      const list = household.closest('[role="tablist"]') as HTMLElement;
+      expect(list.className).toContain("w-auto");
+      expect(list.className).toContain("self-start");
+      for (const trigger of [household, me]) {
+        expect(trigger.className).toContain("min-w-fit");
+        expect(trigger.className).toContain("flex-none");
+        expect(trigger.className).toContain("px-4");
+      }
+    } finally { restore(); }
+  });
+
   test.each(["owner", "child"] as const)("the %s can reach Status from Privacy and data", async (role) => {
     const { restore } = mockSettingsFetch([], { household: [], "person:person-abc123": [] });
     try {

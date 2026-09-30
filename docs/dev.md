@@ -36,6 +36,14 @@ open Me > Profile. A parent or admin viewing someone else keeps the existing
 Edit dialog and sees that person's Face recognition card. The card reads the
 same `/api/biometric-prints` status used by the former profile section.
 
+## SETTINGS-S8
+
+The viewer's own profile page has one header action, Edit profile, which opens
+Me > Profile. The overview shows face recognition as a plain status row, with
+no extra Settings link or filler sentence. Another person's profile keeps its
+Edit dialog and face enrollment card. The Household and Me switch uses content
+width tabs with even side padding and 48 px touch targets.
+
 ## SETTINGS-S5
 
 Owners and admins can open a Limits tab on a child's profile. It uses the shared settings renderer for the child's nine daily time limits and storage caps. The tab is hidden on the viewer's own profile, on adult profiles, and on teen profiles. The interim Me > Limits section is removed. Decided by Jesse 2026-09-30: teens stay private; no admin path to a teen's settings; teen daily limits are set by nobody, by design.

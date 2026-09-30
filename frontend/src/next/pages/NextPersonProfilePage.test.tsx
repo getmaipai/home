@@ -227,17 +227,21 @@ describe("NextPersonProfilePage", () => {
     } finally { restore(); }
   });
 
-  test("self has Settings links while an owner keeps Edit and the enrollment card for someone else", async () => {
+  test("self has one Edit profile link and plain face status while another person's page keeps Edit and enrollment", async () => {
     const restore = stubFetch({});
     try {
       const self = renderProfile("/people/person-sage", viewer({ role: "owner" }));
-      const edit = await self.findByRole("link", { name: "Edit in Settings" });
+      const edit = await self.findByRole("link", { name: "Edit profile" });
       expect(edit.getAttribute("href")).toBe("/settings?tab=me&section=profile");
-      expect(self.getAllByRole("link", { name: "Manage in Settings" })[0]?.getAttribute("href")).toBe("/settings?tab=me&section=profile");
+      expect(self.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
+      expect(self.queryByText("This is your own profile.")).toBeNull();
+      expect(self.getByText((_, element) => element?.textContent === "Face recognition: Not set up yet")).toBeTruthy();
+      expect(self.getAllByRole("link").filter((link) => link.getAttribute("href") === "/settings?tab=me&section=profile")).toHaveLength(1);
       cleanup();
       const other = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
       expect(await other.findByRole("button", { name: "Edit" })).toBeTruthy();
       expect(await other.findByText("Face recognition")).toBeTruthy();
+      expect(other.queryByRole("link", { name: "Edit profile" })).toBeNull();
       expect(other.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
     } finally { restore(); }
   });

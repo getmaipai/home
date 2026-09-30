@@ -7501,6 +7501,11 @@ approvals are still real, unstarted work for a future session.
 
 ## Settings
 
+- [x] **SETTINGS-S8: tidy the own profile page and Settings toggle** (S,
+      2026-09-30). **Committed, live check pending.** The viewer's own profile
+      has one Edit profile action and a plain face status row. Household and Me
+      tabs have content width and even padding. See `docs/dev.md`.
+
 - [ ] **Rebuild Settings as a real settings editor** (L) - Jesse,
       2026-09-05, with a VS Code screenshot: a tree sidebar showing the
       section and subsection you are in, search, scope as tabs, and each

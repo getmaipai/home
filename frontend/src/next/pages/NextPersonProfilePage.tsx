@@ -83,9 +83,9 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
                   {showLimits ? <TabsTrigger value="limits" className="min-h-12">Limits</TabsTrigger> : null}
                 </TabsList>
                 <TabsContent value="overview" className="flex flex-col gap-4 py-2">
-                  <p className="text-sm text-muted-foreground">{viewingSelf ? "This is your own profile." : `${profile.display_name}'s profile in this household.`}</p>
+                  {viewingSelf ? null : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
                   <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
-                  {viewingSelf ? <Link to="/settings?tab=me&section=profile" className="min-h-12 self-start text-sm text-primary underline">Manage in Settings</Link> : <FaceEnrollmentCard profile={profile} viewer={person} viewingSelf={false} />}
+                  {viewingSelf ? <FaceStatusRow profile={profile} /> : <FaceEnrollmentCard profile={profile} viewer={person} viewingSelf={false} />}
                 </TabsContent>
                 {canViewMemories ? (
                   <TabsContent value="memories" className="py-2">
@@ -126,6 +126,15 @@ function SharedMediaSection({ profile, viewingSelf }: { profile: ProfileEntry; v
   );
 }
 
+function FaceStatusRow({ profile }: { profile: ProfileEntry }) {
+  const query = useQuery({
+    queryKey: ["biometric-prints", profile.id],
+    queryFn: () => api.biometricPrints(profile.id),
+  });
+  const setUp = query.data?.some((print) => print.modality === "face") === true;
+  return <p className="text-sm text-muted-foreground">Face recognition: {query.isLoading ? "Checking" : setUp ? "Set up" : "Not set up yet"}</p>;
+}
+
 /** FACE-02's entry point: reachable from the person's own profile (not a
  * dead-end route nobody can find), gated the same two ways the API
  * itself gates biometric prints - `canManagePerson` (self, or
@@ -138,7 +147,7 @@ function SharedMediaSection({ profile, viewingSelf }: { profile: ProfileEntry; v
 function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { profile: ProfileEntry; viewer: Roster; viewingSelf: boolean; onPersonChange: () => void | Promise<void> }) {
   const [editOpen, setEditOpen] = useState(false);
   const canEdit = canManagePerson(viewer.role, viewer.id, { id: profile.id, role: profile.role });
-  const showManageLink = viewingSelf && isOwnerOrAdminRole(viewer.role);
+  const showSelfEdit = viewingSelf && isOwnerOrAdminRole(viewer.role);
   const accentClass = profile.accent ? ACCENT_RING_CLASS[profile.accent] : null;
   return (
     <Card className={accentClass ? `ring-2 ring-offset-2 ring-offset-background ${accentClass}` : undefined}>
@@ -150,8 +159,7 @@ function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { p
           {profile.bio ? <p className="text-base text-muted-foreground">{profile.bio}</p> : null}
         </div>
         <div className="flex basis-full flex-row items-center justify-end gap-4 sm:w-auto sm:basis-auto sm:flex-col sm:items-end sm:gap-2">
-          {viewingSelf && canEdit ? <Link to="/settings?tab=me&section=profile" className="min-h-12 content-center text-sm text-primary underline">Edit in Settings</Link> : canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="min-h-12 gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
-          {showManageLink ? <Link to="/settings?tab=me&section=profile" className="min-h-12 content-center text-sm text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Manage in Settings</Link> : null}
+          {showSelfEdit && canEdit ? <Link to="/settings?tab=me&section=profile" className="min-h-12 content-center text-sm text-primary underline">Edit profile</Link> : canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="min-h-12 gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
         </div>
       </CardContent>
       {canEdit && !viewingSelf ? <EditProfileDialog profile={profile} open={editOpen} onOpenChange={setEditOpen} onPersonChange={onPersonChange} /> : null}

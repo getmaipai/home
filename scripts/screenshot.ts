@@ -3088,7 +3088,7 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
  * child to prove the admin-only Limits section is absent. The output
  * directory can be supplied for review artifacts outside this checkout. */
 async function captureNextSettingsS2Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || process.env.MAIPAI_SETTINGS_S2_SCREEN_DIR || join(ROOT, "data-scratch", "screenshots", "settings-s2");
+  const outDir = process.env.MAIPAI_SETTINGS_S8_SCREEN_DIR || process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || process.env.MAIPAI_SETTINGS_S2_SCREEN_DIR || join(ROOT, "data-scratch", "screenshots", "settings-s2");
   mkdirSync(outDir, { recursive: true });
   const peopleResponse = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
   if (!peopleResponse.ok) throw new Error(`SETTINGS-S2: household lookup failed: ${peopleResponse.status}`);
@@ -3166,7 +3166,7 @@ async function captureNextSettingsS2Review(browser: Browser, ownerSession: strin
 }
 
 async function captureNextSettingsS3Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || join(ROOT, "../home/data-scratch/screens/settings-s3");
+  const outDir = process.env.MAIPAI_SETTINGS_S8_SCREEN_DIR || process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || join(ROOT, "../home/data-scratch/screens/settings-s3");
   mkdirSync(outDir, { recursive: true });
   const response = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
   if (!response.ok) throw new Error(`SETTINGS-S3: household lookup failed: ${response.status}`);
@@ -3201,8 +3201,8 @@ async function captureNextSettingsS3Review(browser: Browser, ownerSession: strin
         const pageResponse = await page.goto(`${BASE_URL}/people/${owner.id}`);
         if (!pageResponse?.ok()) throw new Error(`SETTINGS-S3: owner's profile returned ${pageResponse?.status() ?? "no response"}`);
         await page.waitForLoadState("networkidle");
-        await page.getByRole("link", { name: "Edit in Settings" }).waitFor({ state: "visible" });
-        const file = join(outDir, `settings-s3-owner-people-${viewport.width}-${theme}.png`);
+        await page.getByRole("link", { name: "Edit profile" }).waitFor({ state: "visible" });
+        const file = join(outDir, `settings-s8-owner-people-${viewport.width}-${theme}.png`);
         await page.screenshot({ path: file, fullPage: true }); console.log(`Wrote ${file}`);
         await page.close();
       } finally { await context.close(); }
