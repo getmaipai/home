@@ -2,9 +2,10 @@ import { describe, test, expect, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, act } from "@testing-library/react";
 import { ModelsSection, formatEta } from "@/apps/settings/ModelsSection";
 import { waitForGone } from "../../../tests/waitForGone";
-import { api } from "@/lib/api";
+import { api, type FitPlanResponse } from "@/lib/api";
 import { __resetFitPlanCacheForTests } from "@/lib/useFitPlan";
 import { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
+import { summarizeFits } from "@/lib/fitSummary";
 
 afterEach(() => { cleanup(); __resetFitPlanCacheForTests(); });
 
@@ -36,6 +37,18 @@ function stubFetchWithFitPlan(byPath: Record<string, unknown>, response: unknown
       onRequest?.(JSON.parse(String(init?.body)));
       return Promise.resolve(jsonResponse(response));
     }
+    const match = Object.entries(byPath).find(([path]) => url.includes(path));
+    if (!match) throw new Error(`unstubbed fetch: ${url}`);
+    return Promise.resolve(jsonResponse(match[1]));
+  }) as unknown as typeof fetch;
+  return () => { globalThis.fetch = original; };
+}
+
+function stubFetchWithFitPlanResponder(byPath: Record<string, unknown>, responder: (body: { source: { url?: string; repo?: string } }) => unknown): () => void {
+  const original = globalThis.fetch;
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/fit-plan")) return Promise.resolve(jsonResponse(responder(JSON.parse(String(init?.body)))));
     const match = Object.entries(byPath).find(([path]) => url.includes(path));
     if (!match) throw new Error(`unstubbed fetch: ${url}`);
     return Promise.resolve(jsonResponse(match[1]));
@@ -98,6 +111,94 @@ describe("formatEta", () => {
 });
 
 describe("ModelsSection", () => {
+  const baseResponses = {
+    "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [],
+    "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE,
+  };
+
+  test("after two successful checks Compare shows the recommended model and both checked models", async () => {
+    const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
+    try {
+      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      await findByText("Use this");
+      const input = await findByRole("textbox", { name: "Hugging Face model link" });
+      fireEvent.change(input, { target: { value: GGUF_LINK } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      await findByText("Compare");
+      fireEvent.change(input, { target: { value: "https://huggingface.co/example-org/second-model" } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      await findByText("example-org/second-model");
+      expect(document.querySelectorAll('[data-slot="comparison-card"] > div > div')).toHaveLength(3);
+      expect(document.querySelector('[data-slot="comparison-card"]')?.textContent).toContain("Qwen3 8B Instruct");
+      expect(document.querySelector('[data-slot="comparison-card"]')?.textContent).toContain("example-model-Q4_K_M");
+      expect(document.querySelector('[data-slot="comparison-card"]')?.textContent).toContain("example-org/second-model");
+    } finally { restore(); }
+  });
+
+  test("checking the same model link again replaces its row", async () => {
+    const restore = stubFetchWithFitPlanResponder(baseResponses, () => FIT_YES);
+    try {
+      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const input = await findByRole("textbox", { name: "Hugging Face model link" });
+      for (let i = 0; i < 2; i += 1) {
+        fireEvent.change(input, { target: { value: GGUF_LINK } });
+        await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+        await findByText("example-model-Q4_K_M");
+      }
+      expect(document.querySelectorAll('[data-slot="comparison-card"] > div > div')).toHaveLength(2);
+    } finally { restore(); }
+  });
+
+  test("shows no Compare card with only the recommended model", async () => {
+    const restore = stubFetchWithFitPlanResponder(baseResponses, () => FIT_YES);
+    try {
+      const { findByText } = render(<ModelsSection />);
+      await findByText("Use this");
+      expect(document.querySelector('[data-slot="comparison-card"]')).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("Copy summary writes the deterministic summary to the clipboard", async () => {
+    const originalClipboard = navigator.clipboard;
+    let copied = "";
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { copied = value; } } });
+    const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
+    try {
+      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const input = await findByRole("textbox", { name: "Hugging Face model link" });
+      fireEvent.change(input, { target: { value: GGUF_LINK } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      fireEvent.change(input, { target: { value: "https://huggingface.co/example-org/second-model" } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      await findByText("Compare");
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Copy summary" })); });
+      const expected = summarizeFits([
+        { name: "Qwen3 8B Instruct", wording: FIT_YES.wording as FitPlanResponse["wording"], plan: FIT_YES.plan },
+        { name: "example-org/second-model", wording: FIT_NO.wording as FitPlanResponse["wording"], plan: FIT_NO.plan },
+        { name: "example-model-Q4_K_M", wording: FIT_YES.wording as FitPlanResponse["wording"], plan: FIT_YES.plan },
+      ], { memoryGb: 24, usableGb: 24 });
+      expect(copied).toBe(expected);
+    } finally { restore(); Object.defineProperty(navigator, "clipboard", { configurable: true, value: originalClipboard }); }
+  });
+
+  test("clipboard failure reveals the summary in a read-only textarea", async () => {
+    const originalClipboard = navigator.clipboard;
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("denied"); } } });
+    const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
+    try {
+      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      const input = await findByRole("textbox", { name: "Hugging Face model link" });
+      for (const link of [GGUF_LINK, "https://huggingface.co/example-org/second-model"]) {
+        fireEvent.change(input, { target: { value: link } });
+        await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      }
+      await findByText("Compare");
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Copy summary" })); });
+      await findByText("Could not copy. Select the text below instead.");
+      expect(getByRole("textbox", { name: "Summary to copy" }).getAttribute("readonly")).not.toBeNull();
+    } finally { restore(); Object.defineProperty(navigator, "clipboard", { configurable: true, value: originalClipboard }); }
+  });
+
   test("a GGUF link is sent to fit-plan and shows the returned verdict", async () => {
     let posted: unknown;
     const restore = stubFetchWithFitPlan({

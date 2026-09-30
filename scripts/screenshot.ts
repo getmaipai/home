@@ -1512,7 +1512,7 @@ async function captureChatContinueReview(browser: Browser, sessionValue: string)
 /** HOME-FIT-02B's dedicated review for the recommended model's fit verdict.
  * Only selection and fit-plan are stubbed at the browser boundary; the
  * remaining model card data comes from the throwaway demo backend. */
-async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable" | "checked-yes" | "checked-no" | "checked-error" | "checked-notfound" | "memory-tight"): Promise<void> {
+async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable" | "checked-yes" | "checked-no" | "checked-error" | "checked-notfound" | "memory-tight" | "compare"): Promise<void> {
   const context = await newContext(browser, viewport, theme, sessionValue);
   try {
     const page = await context.newPage();
@@ -1543,7 +1543,10 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       verdict, bottleneck: verdict === "unknown" ? "unknown" : "memory",
     });
     await page.route("**/api/fit-plan", (route) => {
-      const answerState = state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state === "checked-notfound" ? "notfound" : state === "memory-tight" ? "yes" : state;
+      const source = route.request().postDataJSON()?.source as { url?: string; repo?: string } | undefined;
+      const answerState = state === "compare"
+        ? source?.url ? "yes" : source?.repo === "example-org/example-big-model" ? "no" : "yes"
+        : state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state === "checked-notfound" ? "notfound" : state === "memory-tight" ? "yes" : state;
       const wording = answerState in answers ? answers[answerState as keyof typeof answers] : answers.yes;
       // Keep the browser boundary fixture valid against StackFitPlan.
       return route.fulfill({
@@ -1553,6 +1556,23 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       });
     });
     await page.goto(`${BASE_URL}/models`);
+    if (state === "compare") {
+      const links = [
+        "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf",
+        "https://huggingface.co/example-org/example-big-model",
+      ];
+      for (const link of links) {
+        await page.getByRole("textbox", { name: "Hugging Face model link" }).fill(link);
+        await page.getByRole("button", { name: "Check", exact: true }).click();
+      }
+      await page.getByRole("heading", { name: "Compare", exact: true }).waitFor();
+      await page.getByText("Needs about 6 GB more memory.", { exact: true }).waitFor();
+      await settleAnimations(page);
+      const screenshot = `fit-compare-${viewport.slug}-light.png`;
+      await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+      dedicatedScreenshots.push({ file: screenshot, route: "settings-models-fit-compare", viewport: viewport.slug, theme: "light" });
+      return;
+    }
     if (state === "checked-yes" || state === "checked-no" || state === "checked-error" || state === "checked-notfound") {
       const link = state === "checked-error" ? "not a link" : state === "checked-notfound" ? "https://huggingface.co/example-org/no-such-model" : "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf";
       await page.getByRole("textbox", { name: "Hugging Face model link" }).fill(link);
@@ -4462,6 +4482,7 @@ async function main() {
           await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
         }
         await captureFitVerdictCard(browser, sessionValue, viewport, "light", "memory-tight");
+        await captureFitVerdictCard(browser, sessionValue, viewport, "light", "compare");
         for (const state of ["checked-yes", "checked-no", "checked-error", "checked-notfound"] as const) {
           await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
         }

@@ -4,17 +4,20 @@ import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Status } from "@maipai/ui/src/ui/status";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
+import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { getIcon } from "@maipai/ui/src/icons";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type EngineStatus } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
-import { parseModelLink } from "@/lib/modelLink";
+import { modelLinkName, parseModelLink } from "@/lib/modelLink";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
+import { ComparisonCard } from "@maipai/ui/src/elements/comparison-card";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { describeFitPlan, type FitPanelRow } from "@/lib/fitPanel";
 import type { ComputerMemoryResponse } from "@/lib/api";
 import type { FitPlanResponse } from "@/lib/api";
+import { summarizeFits } from "@/lib/fitSummary";
 
 // The model-selection wizard, real half (2026-09-04): docs/SETTINGS.md
 // Rule 3 ("One card per role... with the chosen model... and 'change.'
@@ -38,6 +41,7 @@ export function ModelsSection() {
   const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
   const [job, setJob] = useState<ModelJob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [checked, setChecked] = useState<Array<{ name: string; response: FitPlanResponse }>>([]);
 
   const load = useCallback(() => {
     setError(null);
@@ -59,6 +63,13 @@ export function ModelsSection() {
     api.computerMemory().then(setComputerMemory).catch(() => setComputerMemory({ available: false }));
   }, []);
   useEffect(loadComputerMemory, [loadComputerMemory]);
+
+  const implementedChatFits = chatFits?.filter((fit) => fit.model.implemented) ?? [];
+  const activeRecommendedJob = activeJobOf(job);
+  const failedRecommendedJob = job?.status === "failed" ? job : null;
+  const recommended = implementedChatFits.find((fit) => fit.model.id === (activeRecommendedJob?.modelId ?? failedRecommendedJob?.modelId ?? selectedModelId)) ?? implementedChatFits[0] ?? null;
+  const recommendedUrl = recommended?.model.download?.url?.startsWith("https://huggingface.co/") ? recommended.model.download.url : null;
+  const recommendedFit = useFitPlan(recommendedUrl, recommended?.contextUsed);
 
   // A light background poll for "is it still running" (engine control's
   // other half: seeing it go down, not just starting/stopping it) - slow
@@ -142,11 +153,13 @@ export function ModelsSection() {
             selectedModelId={selectedModelId}
             job={job}
             engineStatus={engineStatus}
+            fitPlan={recommendedFit}
             onChoose={handleChoose}
             onStop={handleStop}
             onRestart={handleRestart}
           />
-          <CheckModelCard />
+          <CheckModelCard onChecked={(name, response) => setChecked((items) => [{ name, response }, ...items.filter((item) => item.name !== name)].slice(0, 3))} />
+          {recommended ? <CompareCard recommended={{ name: recommended.model.label, response: recommendedFit.response?.plan ? recommendedFit.response : null }} checked={checked} hardware={hardware} /> : null}
           <PlannedRoleCard title="Image generation" fits={imageFits} />
           <PlannedRoleCard title="Video generation" fits={videoFits} />
         </div>
@@ -307,6 +320,7 @@ function ChatModelCard({
   selectedModelId,
   job,
   engineStatus,
+  fitPlan,
   onChoose,
   onStop,
   onRestart,
@@ -315,6 +329,7 @@ function ChatModelCard({
   selectedModelId: string | null;
   job: ModelJob | null;
   engineStatus: EngineStatus | null;
+  fitPlan: ReturnType<typeof useFitPlan>;
   onChoose: (modelId: string) => void;
   onStop: () => void;
   onRestart: () => void;
@@ -346,8 +361,6 @@ function ChatModelCard({
   const isSelected = selectedModelId === primary.model.id && !activeJob;
   const { isRunning, isStarting, isStopped, isStalled } = deriveEngineState(isSelected, engineStatus, primary.model.id);
   const others = implementedFits.filter((f) => f.model.id !== primary.model.id);
-  const fitUrl = primary.model.download?.url && primary.model.download.url.startsWith("https://huggingface.co/") ? primary.model.download.url : null;
-
   return (
     <RoleCardShell title="Chat">
       <div className="flex flex-col gap-2">
@@ -406,7 +419,7 @@ function ChatModelCard({
           </div>
         ) : isSelected ? null : (
           <div className="flex flex-col gap-2">
-            <FitLine modelUrl={fitUrl} contextTokens={primary.contextUsed} legacyWarning={!primary.fits} />
+            <FitLine fitPlan={fitPlan} legacyWarning={!primary.fits} />
             <Button className="w-fit" onClick={() => onChoose(primary.model.id)}>
               Use this
             </Button>
@@ -421,7 +434,7 @@ function ChatModelCard({
             {(primary.model.cons ?? []).map((con) => (
               <p key={con} className="text-base text-[var(--muted-foreground)]">− {con}</p>
             ))}
-            <DetailsFitPanel modelUrl={fitUrl} contextTokens={primary.contextUsed} legacyBytes={primary.requiredBytes} />
+            <DetailsFitPanel fitPlan={fitPlan} legacyBytes={primary.requiredBytes} />
           </div>
         </Disclosure>
 
@@ -445,8 +458,8 @@ function ChatModelCard({
 }
 
 
-function FitLine({ modelUrl, contextTokens, legacyWarning }: { modelUrl: string | null; contextTokens: number | undefined; legacyWarning: boolean }) {
-  const { state, response } = useFitPlan(modelUrl, contextTokens);
+function FitLine({ fitPlan, legacyWarning }: { fitPlan: ReturnType<typeof useFitPlan>; legacyWarning: boolean }) {
+  const { state, response } = fitPlan;
   if (state === "loading") return <Progress mode="spinner" label="Checking this computer" />;
   if (state === "ready" && response && response.plan !== null) {
     return <FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} />;
@@ -461,7 +474,7 @@ function FitResult({ headline, detail, verdict }: { headline: string; detail: st
   return <div className="flex flex-col items-start gap-1"><Status status={status}>{headline}</Status><p className="text-base text-[var(--muted-foreground)]">{detail}</p></div>;
 }
 
-function CheckModelCard() {
+function CheckModelCard({ onChecked }: { onChecked: (name: string, response: FitPlanResponse) => void }) {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -478,7 +491,9 @@ function CheckModelCard() {
     }
     setBusy(true);
     try {
-      setResponse(await api.fitPlan({ source: parsed.source }));
+      const fitResponse = await api.fitPlan({ source: parsed.source });
+      setResponse(fitResponse);
+      if (fitResponse.plan !== null) onChecked(modelLinkName(parsed), fitResponse);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not check that link.");
     } finally {
@@ -500,8 +515,8 @@ function CheckModelCard() {
   );
 }
 
-function DetailsFitPanel({ modelUrl, contextTokens, legacyBytes }: { modelUrl: string | null; contextTokens: number | undefined; legacyBytes: number }) {
-  const { state, response } = useFitPlan(modelUrl, contextTokens);
+function DetailsFitPanel({ fitPlan, legacyBytes }: { fitPlan: ReturnType<typeof useFitPlan>; legacyBytes: number }) {
+  const { state, response } = fitPlan;
   if (state === "ready" && response?.plan) return <FitPanel response={response} />;
   return <p className="text-base text-[var(--muted-foreground)]">Uses about {formatBytes(legacyBytes)} of memory.</p>;
 }
@@ -510,6 +525,51 @@ function FitPanel({ response }: { response: FitPlanResponse }) {
   if (!response.plan) return null;
   const { rows, remedy } = describeFitPlan(response.plan);
   return <div className="flex flex-col gap-3 pt-2"><SpecSheet title="Fit details" rows={rows.map(({ label, value }) => ({ label, value }))} visibleCount={rows.length} />{rows.filter((row) => row.source && row.source !== "unknown").map((row) => <FitSource key={row.label} row={row} />)}{remedy ? <Alert><AlertTitle>What would help?</AlertTitle><AlertDescription>{remedy}</AlertDescription></Alert> : null}</div>;
+}
+
+function CompareCard({ recommended, checked, hardware }: { recommended: { name: string; response: FitPlanResponse | null }; checked: Array<{ name: string; response: FitPlanResponse }>; hardware: HardwareInfo | null }) {
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
+  const comparable = [
+    ...(recommended.response?.plan ? [{ name: recommended.name, response: recommended.response }] : []),
+    ...checked.filter((item) => item.response.plan !== null),
+  ];
+  if (comparable.length < 2) return null;
+  const options = comparable.map((item, index) => {
+    const need = item.response.plan ? describeFitPlan(item.response.plan).rows.find((row) => row.label === "Memory it needs")?.value ?? "Not known yet" : "Not known yet";
+    return { id: index === 0 ? "recommended" : `checked-${index}`, name: item.name, headline: item.response.wording.headline, traits: [need] };
+  });
+  const usableGb = recommended.response?.plan?.cap.high === null || recommended.response?.plan?.cap.high === undefined
+    ? null
+    : Math.ceil(recommended.response.plan.cap.high / (1024 ** 3));
+  const summary = summarizeFits(comparable.map((item) => ({ name: item.name, wording: item.response.wording, plan: item.response.plan })), {
+    memoryGb: hardware ? (hardware.isAppleSilicon ? hardware.unifiedMemoryGb : hardware.totalRamGb) : null,
+    usableGb,
+  });
+  async function copySummary() {
+    setCopied(false);
+    setCopyFailed(false);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(summary);
+      setCopied(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopyFailed(true);
+    }
+  }
+  return (
+    <RoleCardShell title="Compare">
+      <div className="flex flex-col gap-3">
+        <ComparisonCard traitLabels={["Memory it needs"]} options={options} recommendedId="recommended" reason="The recommended model and the models checked on this page." />
+        <Button type="button" variant="secondary" className="w-fit" onClick={() => void copySummary()}>{copied ? "Copied" : "Copy summary"}</Button>
+        {copyFailed ? <div className="flex flex-col gap-2"><p className="text-base text-[var(--muted-foreground)]">Could not copy. Select the text below instead.</p><Textarea aria-label="Summary to copy" readOnly rows={Math.min(12, summary.split("\n").length)} value={summary} /></div> : null}
+      </div>
+    </RoleCardShell>
+  );
 }
 
 function FitSource({ row }: { row: FitPanelRow }) {

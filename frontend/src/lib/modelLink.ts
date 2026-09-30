@@ -21,3 +21,10 @@ export function parseModelLink(text: string): ModelLinkParseResult {
   }
   return { error: BAD_LINK };
 }
+
+export function modelLinkName(parsed: Extract<ModelLinkParseResult, { source: unknown }>): string {
+  if ("repo" in parsed.source) return parsed.source.repo;
+  const pathname = new URL(parsed.source.url).pathname;
+  const filename = pathname.slice(pathname.lastIndexOf("/") + 1);
+  return filename.replace(/\.gguf$/i, "");
+}

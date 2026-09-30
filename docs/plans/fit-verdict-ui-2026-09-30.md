@@ -31,6 +31,8 @@ Home's first panel uses the shipped `SpecSheet` and `RecommendationCard`; source
 4. **The computer beside the list.** A narrow card that stays in view: memory used by what is loaded now (one line per role), what is free, and the computer's usable limit. It reads the Stack's budget route; it is the same numbers the plan used.
 5. **Compare and copy.** Mark two or three models, see them side by side, and copy a plain-text summary a person can paste into a message to a friend ("what can my computer run"). Nothing leaves the house unless the person pastes it.
 
+Home uses the shipped `ComparisonCard` for model names, verdict headlines and memory needs, with the shipped `Button` and read-only `Textarea` for copying and its fallback.
+
 The first-run wizard's sizing page (SETUP-SIZE-01) is screen 3 and 4 with the proposal and the step-down on top; it uses the same route and the same words.
 
 ## What it is made of (the no-hand-built-UI rule)

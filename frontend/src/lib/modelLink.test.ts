@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseModelLink } from "@/lib/modelLink";
+import { modelLinkName, parseModelLink } from "@/lib/modelLink";
 
 describe("parseModelLink", () => {
   test("accepts a GGUF resolve link", () => {
@@ -28,5 +28,19 @@ describe("parseModelLink", () => {
   });
   test("rejects a repository path with extra segments", () => {
     expect(parseModelLink("owner/repo/extra")).toEqual({ error: "That does not look like a Hugging Face model link." });
+  });
+});
+
+describe("modelLinkName", () => {
+  test("uses the repository owner and name", () => {
+    const parsed = parseModelLink("https://huggingface.co/example-org/example-model");
+    if ("error" in parsed) throw new Error(parsed.error);
+    expect(modelLinkName(parsed)).toBe("example-org/example-model");
+  });
+
+  test("uses a GGUF filename without its extension", () => {
+    const parsed = parseModelLink("https://huggingface.co/example-org/example-model/resolve/main/example-model-Q4_K_M.gguf");
+    if ("error" in parsed) throw new Error(parsed.error);
+    expect(modelLinkName(parsed)).toBe("example-model-Q4_K_M");
   });
 });
