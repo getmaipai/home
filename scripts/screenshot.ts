@@ -3109,7 +3109,6 @@ async function captureNextSettingsS2Review(browser: Browser, ownerSession: strin
     { id: "voice-ai", path: "/settings?tab=me&section=voice-ai", heading: "Voice and AI" },
     { id: "notifications", path: "/settings?tab=me&section=notifications", heading: "Notifications" },
     { id: "privacy-data", path: "/settings?tab=me&section=privacy-data", heading: "Privacy and data" },
-    { id: "limits", path: "/settings?tab=me&section=limits", heading: "Limits" },
   ] as const;
 
   for (const slug of ["desktop", "phone"] as const) {
@@ -3134,18 +3133,14 @@ async function captureNextSettingsS2Review(browser: Browser, ownerSession: strin
             const requestedUrl = new URL(entry.path, BASE_URL);
             await page.evaluate((url) => { history.pushState(history.state, "", url); window.dispatchEvent(new PopStateEvent("popstate")); }, requestedUrl.pathname + requestedUrl.search);
             if (entry.id !== "me") {
-              if (slug === "phone") await page.locator('select[aria-label="Settings section"]').selectOption(entry.id);
+              if (slug === "phone") await page.getByRole("tabpanel", { name: "Me" }).getByLabel("Settings section", { exact: true }).selectOption(entry.id);
               else await page.getByRole("tab", { name: entry.heading, exact: true }).last().click();
             }
-            if (entry.id === "profile" || entry.id === "me") await page.getByText("Your profile", { exact: true }).waitFor({ state: "visible" });
-            if (entry.id === "appearance") await page.locator('[id="settings-profile.appearance"]').waitFor({ state: "visible" });
+            if (entry.id === "profile" || entry.id === "me") await page.getByLabel("Name", { exact: true }).waitFor({ state: "visible" });
+            if (entry.id === "appearance") await page.getByRole("combobox", { name: "Appearance", exact: true }).waitFor({ state: "visible" });
             if (entry.id === "voice-ai") await page.locator('[id="settings-person.persona"]').waitFor({ state: "visible" });
-            if (entry.id === "notifications") await page.getByRole("button", { name: /Advanced/ }).waitFor({ state: "visible" });
+            if (entry.id === "notifications") await page.getByRole("button", { name: /Telegram options/ }).waitFor({ state: "visible" });
             if (entry.id === "privacy-data") await page.getByRole("link", { name: "Privacy" }).waitFor({ state: "visible" });
-            if (entry.id === "limits") {
-              await page.locator('[id="settings-person.allowance"]').waitFor({ state: "visible" });
-              await page.locator('[id="settings-person.storage"]').waitFor({ state: "visible" });
-            }
             if (person === "member") {
               const limitsTab = page.locator('[data-slot="tabs-trigger"]').filter({ hasText: /^Limits$/ });
               const limitsOption = page.locator('[data-slot="native-select-option"][value="limits"]');
