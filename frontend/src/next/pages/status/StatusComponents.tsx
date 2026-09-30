@@ -60,6 +60,7 @@ export function StatusComponents({ person, health: initialHealth, maintenance = 
   const health = query.data ?? initialHealth;
   const [pendingRole, setPendingRole] = useState<EngineKey | null>(null);
   const [restartingRole, setRestartingRole] = useState<EngineKey | null>(null);
+  const [changingRole, setChangingRole] = useState<EngineKey | null>(null);
   const canRestart = isOwnerOrAdminRole(person.role);
 
   async function handleRestart() {
@@ -76,6 +77,20 @@ export function StatusComponents({ person, health: initialHealth, maintenance = 
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : `Could not restart ${row.label}.`);
     } finally { setRestartingRole(null); }
+  }
+
+  async function handleRunState(role: EngineKey, action: "start" | "stop") {
+    const row = ENGINE_ROWS.find((candidate) => candidate.key === role);
+    if (!row) return;
+    setChangingRole(role);
+    try {
+      if (action === "stop") await api.stopEngineRole(role);
+      else await api.startEngineRole(role);
+      toast.success(`${row.label} ${action === "stop" ? "stopped" : "started"}.`);
+      await query.refetch();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : `Could not ${action} ${row.label}.`);
+    } finally { setChangingRole(null); }
   }
 
   const rows = [
@@ -95,7 +110,7 @@ export function StatusComponents({ person, health: initialHealth, maintenance = 
         return <div key={row.key} className="flex flex-col gap-2 py-3 sm:gap-2">
           <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="flex min-w-0 items-start gap-3"><Icon className="mt-1 size-5 shrink-0 text-muted-foreground" aria-hidden="true" /><div className="min-w-0"><div className="flex min-h-12 items-center gap-2"><span className="font-medium">{row.label}</span><Tooltip><TooltipTrigger asChild><button type="button" aria-label={`About ${row.label}`} className="inline-flex size-12 shrink-0 items-center justify-center rounded-full text-muted-foreground"><span aria-hidden="true" className="text-sm">ⓘ</span></button></TooltipTrigger><TooltipContent>{row.hint}</TooltipContent></Tooltip></div><p className="text-sm text-muted-foreground">{row.hint}</p></div></div>
-            <div className="flex min-h-12 flex-wrap items-center gap-2 pl-8 sm:min-h-0 sm:pl-0"><span className="text-sm text-muted-foreground">{part ? part.uptime_percent === null ? "No data yet" : `${part.uptime_percent.toFixed(3)}% uptime` : null}</span><Status status={state.status}>{state.label}</Status>{canRestart && !underMaintenance && ENGINE_HEALTH_ROWS.some((engine) => engine.key === row.key) ? <Button variant="secondary" onClick={() => setPendingRole(row.key as EngineKey)} disabled={restartingRole === row.key}>{restartingRole === row.key ? "Restarting…" : "Restart"}</Button> : null}</div>
+            <div className="flex min-h-12 flex-wrap items-center gap-2 pl-8 sm:min-h-0 sm:pl-0"><span className="text-sm text-muted-foreground">{part ? part.uptime_percent === null ? "No data yet" : `${part.uptime_percent.toFixed(3)}% uptime` : null}</span><Status status={state.status}>{state.label}</Status>{canRestart && !underMaintenance && ENGINE_HEALTH_ROWS.some((engine) => engine.key === row.key) ? <><Button variant="secondary" onClick={() => void handleRunState(row.key as EngineKey, state.label === "Running" || state.label === "Demo mode" ? "stop" : "start")} disabled={restartingRole === row.key || changingRole === row.key}>{changingRole === row.key ? (state.label === "Running" || state.label === "Demo mode" ? "Stopping…" : "Starting…") : state.label === "Running" || state.label === "Demo mode" ? "Stop" : "Start"}</Button><Button variant="secondary" onClick={() => setPendingRole(row.key as EngineKey)} disabled={restartingRole === row.key || changingRole === row.key}>{restartingRole === row.key ? "Restarting…" : "Restart"}</Button></> : null}</div>
           </div>
           {part ? <div data-status-strip className="w-full min-w-0 overflow-hidden sm:pl-8"><UptimeStrip data={part.days.map(dayData)} summary={statusStripSummary(part.uptime_percent, history?.incidents.filter((incident) => incident.component === part.component) ?? [])} /></div> : null}
         </div>;

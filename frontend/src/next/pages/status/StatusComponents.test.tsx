@@ -222,6 +222,35 @@ describe("StatusComponents", () => {
     }
   });
 
+  test("engine controls show Stop while running and Start while manually stopped", async () => {
+    const stopped = health({ engines: {
+      chat: { kind: "stopped", pid: null, alive: null },
+      embed: { kind: "stopped", pid: null, alive: null },
+      background: { kind: "stopped", pid: null, alive: null },
+      voice: { kind: "stopped", pid: null, alive: null },
+    } });
+    const restore = stubHealth(stopped);
+    try {
+      const view = renderWithQuery(<StatusComponents person={makePerson("admin")} health={stopped} />);
+      expect(await view.findAllByRole("button", { name: "Start" })).toHaveLength(4);
+      expect(view.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+      view.unmount();
+      const running = health();
+      const liveRestore = stubHealth(running);
+      try {
+        const live = renderWithQuery(<StatusComponents person={makePerson("admin")} health={running} />);
+        expect(await live.findAllByRole("button", { name: "Stop" })).toHaveLength(3);
+        expect(live.getAllByRole("button", { name: "Start" })).toHaveLength(1);
+        expect(live.getAllByRole("button", { name: "Restart" })).toHaveLength(4);
+        live.unmount();
+        const adult = renderWithQuery(<StatusComponents person={makePerson("adult")} health={running} />);
+        expect(adult.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+        expect(adult.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
+        expect(adult.queryByRole("button", { name: "Restart" })).not.toBeInTheDocument();
+      } finally { liveRestore(); }
+    } finally { restore(); }
+  });
+
   test("engine restart waits for confirmation, calls its role route, disables only that row, and refreshes health", async () => {
     const original = globalThis.fetch;
     let resolveRestart!: (response: Response) => void;

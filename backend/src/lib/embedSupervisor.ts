@@ -69,6 +69,7 @@ interface EmbedSupervisorState {
   // the cache afterward. See that file's own comment for the full
   // reasoning; applied here from the start rather than re-discovered later.
   generation: number;
+  manuallyStopped: boolean;
 }
 
 const state = hotReloadState<EmbedSupervisorState>("embedSupervisor", () => ({
@@ -77,6 +78,7 @@ const state = hotReloadState<EmbedSupervisorState>("embedSupervisor", () => ({
   startingStartedAtMs: null,
   startupStalled: false,
   generation: 0,
+  manuallyStopped: false,
 }));
 
 // Session F, step 2: the spawn+freePort+health-wait shape this module
@@ -117,6 +119,7 @@ async function spawnEmbedServer(binPath: string): Promise<EmbedBackend> {
  * auto-heal needs a real caller for it here too. */
 export async function restartEmbedBackend(): Promise<void> {
   cancelEngineRespawn("embed");
+  state.manuallyStopped = false;
   state.generation++;
   // The state is cleared before the (now awaited, #73) stop, so a
   // caller that does not await, the test reset among them, sees the
@@ -128,8 +131,25 @@ export async function restartEmbedBackend(): Promise<void> {
   await previous?.stop();
 }
 
+export async function stopEmbedBackend(): Promise<void> {
+  cancelEngineRespawn("embed");
+  state.manuallyStopped = true;
+  state.generation++;
+  const previous = state.embedBackend;
+  state.embedBackend = null;
+  state.startingPromise = null;
+  state.startingStartedAtMs = null;
+  await previous?.stop();
+}
+
+export async function startEmbedBackendNow(): Promise<void> {
+  state.manuallyStopped = false;
+  await getEmbedClient();
+}
+
 /** For GET /api/health: the kind plus a real probe of the process. */
 export async function probeEmbedEngine(): Promise<EngineHealth> {
+  if (state.manuallyStopped) return { kind: "stopped", pid: null, alive: null };
   const port = Number(process.env.MAIPAI_EMBED_PORT ?? 8794);
   return { kind: engineHealthKind("embed", getEmbedBackendKind(), port), pid: state.embedBackend?.pid ?? null, alive: await probeAlive(state.embedBackend?.client) };
 }
@@ -164,6 +184,7 @@ async function startEmbedBackend(): Promise<EmbedBackend> {
  * llmSupervisor.ts's getChatClient() and ttsSupervisor.ts's
  * getTtsClient() already carry. */
 export async function getEmbedClient(): Promise<LlamaServerClient> {
+  if (state.manuallyStopped) throw new Error("the embed engine is stopped");
   if (state.embedBackend) return state.embedBackend.client;
   expireStalledEmbedStart();
   if (!state.startingPromise) {
@@ -184,7 +205,7 @@ export async function getEmbedClient(): Promise<LlamaServerClient> {
           // generation resolves to (a fresh spawn if nothing else is in
           // flight, or another in-flight one), the same guarantee a
           // caller starting fresh right now would get.
-          backend.stop();
+          await backend.stop();
           return { ...backend, client: await getEmbedClient() };
         }
         state.embedBackend = backend;
@@ -217,7 +238,8 @@ function expireStalledEmbedStart(): boolean {
 
 /** Which backend (if any) is currently serving `embed` - "none" before
  * the first embed call in this process's lifetime. */
-export function getEmbedBackendKind(): EmbedBackendKind | "starting" | "stalled" | "none" {
+export function getEmbedBackendKind(): EmbedBackendKind | "starting" | "stalled" | "none" | "stopped" {
+  if (state.manuallyStopped) return "stopped";
   if (state.embedBackend) return state.embedBackend.kind;
   if (state.startingPromise) return expireStalledEmbedStart() ? "stalled" : "starting";
   if (state.startupStalled) return "stalled";

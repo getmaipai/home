@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { getEmbedClient, getEmbedBackendKind, getEmbedEngineIdentity, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
+import { getEmbedClient, getEmbedBackendKind, getEmbedEngineIdentity, stopEmbedBackend, startEmbedBackendNow, restartEmbedBackend, probeEmbedEngine, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { listIssues, resolveIssue } from "@/lib/issues";
@@ -45,6 +45,21 @@ describe("embedSupervisor getEmbedClient()", () => {
 
   test("reports no backend until the first call", () => {
     expect(getEmbedBackendKind()).toBe("none");
+  });
+
+  test("manual stop stays stopped, Start starts it, and Restart works from stopped", async () => {
+    await getEmbedClient();
+    await stopEmbedBackend();
+    expect(getEmbedBackendKind()).toBe("stopped");
+    expect(await probeEmbedEngine()).toEqual({ kind: "stopped", pid: null, alive: null });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(getEmbedBackendKind()).toBe("stopped");
+    await expect(getEmbedClient()).rejects.toThrow("embed engine is stopped");
+    await startEmbedBackendNow();
+    expect(getEmbedBackendKind()).toBe("stub");
+    await stopEmbedBackend();
+    await restartEmbedBackend();
+    expect(await (await getEmbedClient()).health()).toBe(true);
   });
 
   test("falls back to the stub backend when no engine is installed (every test run)", async () => {

@@ -60,12 +60,14 @@ interface TtsSupervisorState {
   // it started under; if a restart bumped it before the spawn resolves,
   // the stale backend stops itself instead of being cached.
   generation: number;
+  manuallyStopped: boolean;
 }
 
 const state = hotReloadState<TtsSupervisorState>("ttsSupervisor", () => ({
   ttsBackend: null,
   startingPromise: null,
   generation: 0,
+  manuallyStopped: false,
 }));
 
 async function commandExists(bin: string): Promise<boolean> {
@@ -147,6 +149,7 @@ export async function spawnPocketTts(): Promise<TtsBackend> {
 
 /** For GET /api/health: the kind plus a real probe of the process. */
 export async function probeTtsEngine(): Promise<EngineHealth> {
+  if (state.manuallyStopped) return { kind: "stopped", pid: null, alive: null };
   // ENGINE-PORT-01: this role spawns through the identical
   // spawnAndWaitHealthy()/freePort() mechanism the other three engines
   // do (Issue #44's own comment above, on the spawn path) - a code
@@ -178,6 +181,7 @@ async function startTtsBackend(): Promise<TtsBackend> {
  * carries for the same class of bug (a stale rejected promise permanently
  * wedging the role after one transient failure). */
 export async function getTtsClient(): Promise<PocketTtsClient> {
+  if (state.manuallyStopped) throw new Error("the voice engine is stopped");
   if (state.ttsBackend) return state.ttsBackend.client;
   if (!state.startingPromise) {
     const myGeneration = state.generation;
@@ -198,7 +202,7 @@ export async function getTtsClient(): Promise<PocketTtsClient> {
           // Recursing into getTtsClient() instead means that caller
           // transparently lands on whatever the CURRENT generation
           // resolves to.
-          backend.stop();
+          await backend.stop();
           return { ...backend, client: await getTtsClient() };
         }
         state.ttsBackend = backend;
@@ -214,7 +218,8 @@ export async function getTtsClient(): Promise<PocketTtsClient> {
 
 /** Which backend (if any) is currently serving `tts` - "none" before the
  * first synthesize call in this process's lifetime. */
-export function getTtsBackendKind(): TtsBackendKind | "starting" | "none" {
+export function getTtsBackendKind(): TtsBackendKind | "starting" | "none" | "stopped" {
+  if (state.manuallyStopped) return "stopped";
   if (state.ttsBackend) return state.ttsBackend.kind;
   if (state.startingPromise) return "starting";
   return "none";
@@ -240,10 +245,26 @@ export function getTtsLivePid(): number | null {
  * re-reads the setting on its own. */
 export async function restartTtsBackend(): Promise<void> {
   cancelEngineRespawn("tts");
+  state.manuallyStopped = false;
   state.generation++;
   state.ttsBackend?.stop();
   state.ttsBackend = null;
   state.startingPromise = null;
+}
+
+export async function stopTtsBackend(): Promise<void> {
+  cancelEngineRespawn("tts");
+  state.manuallyStopped = true;
+  state.generation++;
+  const previous = state.ttsBackend;
+  state.ttsBackend = null;
+  state.startingPromise = null;
+  await previous?.stop();
+}
+
+export async function startTtsBackendNow(): Promise<void> {
+  state.manuallyStopped = false;
+  await getTtsClient();
 }
 
 /** Test-only: stop whatever backend is running and clear the cached
@@ -252,6 +273,7 @@ export async function restartTtsBackend(): Promise<void> {
 export function __resetTtsSupervisorForTests(): void {
   cancelEngineRespawn("tts");
   state.generation++;
+  state.manuallyStopped = false;
   state.ttsBackend?.stop();
   state.ttsBackend = null;
   state.startingPromise = null;

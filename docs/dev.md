@@ -33713,7 +33713,11 @@ The blocked-port Repair test now injects EPERM for its listener, because an ordi
 
 ## ENGINE-AVAIL-05a (backend)
 
-`POST /api/host/engines/{role}/restart` restarts `chat`, `embed`, `voice`, or `background` for an owner or admin. Chat reuses the existing restart-and-wait flow and returns 503 with an error sentence if it does not become ready within 90 seconds. Embed, voice, and background restart their supervisor and immediately request the lazy client start, then return without waiting for readiness so the Health pill can show that the engine is starting. Those three supervisors do not yet track a manual-stop state, so a real Stop action is deferred until that state exists. The existing `POST /api/host/engine/restart` remains available with its existing response.
+`POST /api/host/engines/{role}/restart` restarts `chat`, `embed`, `voice`, or `background` for an owner or admin. Chat reuses the existing restart-and-wait flow and returns 503 with an error sentence if it does not become ready within 90 seconds. Embed, voice, and background restart their supervisor and request the lazy client start. At this slice, those supervisors did not track manual-stop state; ENGINE-AVAIL-05b below adds Stop and Start. The existing `POST /api/host/engine/restart` remains available with its existing response.
+
+## ENGINE-AVAIL-05b
+
+The role routes now include owner/admin-only `POST /api/host/engines/{role}/stop` and `/start` alongside `/restart`. Chat delegates to its existing Stop and restart-and-wait functions. Embed, voice and background keep a process-local manual-stop flag: a stop invalidates an in-flight start, cancels the watchdog retry, shuts down the owned child through the identity-checked watcher, and makes health report `stopped`; client requests do not silently start it again. Start clears the flag and starts the selected backend. Restart clears the flag, stops the old backend and starts a fresh one. The flag starts clear on hub boot. The status page shows Stop for running engines, Start for inactive ones, and Restart for all four roles to owners and admins.
 
 ## DATA-LOCATION: where the household's data lives, choosing it at install and moving it later (design, 2026-09-29)
 

@@ -255,6 +255,7 @@ const statusA2bReview = process.argv.includes("--status-a2b-review");
 const statusA2cReview = process.argv.includes("--status-a2c-review");
 const statusC3bReview = process.argv.includes("--status-c3b-review");
 const statusB2bReview = process.argv.includes("--status-b2b-review");
+const statusEngineControlsReview = process.argv.includes("--status-engine-controls-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
 const nextBackupsReview = process.argv.includes("--next-backups-review");
@@ -3613,6 +3614,54 @@ async function captureStatusB2bReview(browser: Browser, ownerSession: string): P
   console.log("The completed window starts yesterday and ends just before capture because the real API rejects past end times.");
 }
 
+async function captureStatusEngineControlsReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/avail-05b";
+  mkdirSync(outDir, { recursive: true });
+  const ownerHeaders = { "Content-Type": "application/json", Cookie: `session=${ownerSession}` };
+  const created = await fetch(`${BASE_URL}/api/people`, {
+    method: "POST", headers: ownerHeaders,
+    body: JSON.stringify({ displayName: "Controls Reviewer", role: "adult", secret: "review-controls-secret" }),
+  });
+  if (!created.ok) throw new Error(`engine controls review adult setup failed: ${created.status} ${await created.text()}`);
+  const person = await created.json() as { id: string };
+  const signedIn = await fetch(`${BASE_URL}/api/auth/verify-secret`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ personId: person.id, secret: "review-controls-secret" }),
+  });
+  if (!signedIn.ok) throw new Error(`engine controls review adult sign-in failed: ${signedIn.status}`);
+  const adultSession = signedIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!adultSession) throw new Error("engine controls review adult sign-in carried no session cookie");
+
+  for (const [name, session, admin] of [["admin", ownerSession, true], ["non-admin", adultSession, false]] as const) {
+    const context = await newContext(browser, VIEWPORTS.find((item) => item.slug === "desktop")!, "light", session);
+    try {
+      const page = await context.newPage();
+      await page.route("**/api/health", async (route) => {
+        const response = await route.fetch();
+        const health = await response.json() as { engines: Record<string, { kind: string; pid: number | null; alive: boolean | null }> };
+        health.engines = {
+          chat: { kind: "spawned", pid: 4242, alive: true },
+          embed: { kind: "stopped", pid: null, alive: null },
+          background: { kind: "spawned", pid: 4244, alive: true },
+          voice: { kind: "stopped", pid: null, alive: null },
+        };
+        await route.fulfill({ response, json: health });
+      });
+      await page.goto(`${BASE_URL}/status`);
+      await page.getByText("Components", { exact: true }).waitFor();
+      if (admin) {
+        await page.getByRole("button", { name: "Stop" }).first().waitFor();
+        if (await page.getByRole("button", { name: "Stop" }).count() !== 2 || await page.getByRole("button", { name: "Start" }).count() !== 2 || await page.getByRole("button", { name: "Restart" }).count() !== 4) throw new Error("admin status capture does not show two Stop, two Start and four Restart controls");
+      } else if (await page.getByRole("button", { name: "Stop" }).count() || await page.getByRole("button", { name: "Start" }).count() || await page.getByRole("button", { name: "Restart" }).count()) {
+        throw new Error("non-admin status capture shows engine controls");
+      }
+      const path = join(outDir, `status-${name}-desktop-light.png`);
+      await page.screenshot({ path, fullPage: true });
+      console.log(`Wrote ${path}`);
+    } finally { await context.close(); }
+  }
+}
+
 async function captureStatusA2cReview(browser: Browser, ownerSession: string): Promise<void> {
   const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-a2c";
   mkdirSync(outDir, { recursive: true });
@@ -4647,6 +4696,11 @@ async function main() {
     if (statusB2bReview) {
       await captureStatusB2bReview(browser, sessionValue);
       console.log("completed named review: --status-b2b-review");
+      return;
+    }
+    if (statusEngineControlsReview) {
+      await captureStatusEngineControlsReview(browser, sessionValue);
+      console.log("completed named review: --status-engine-controls-review");
       return;
     }
     if (statusA2cReview) {

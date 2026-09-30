@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { getBackgroundClient, getBackgroundBackendKind, getBackgroundEngineIdentity, backgroundLaunchArgs, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
+import { getBackgroundClient, getBackgroundBackendKind, getBackgroundEngineIdentity, backgroundLaunchArgs, stopBackgroundBackend, startBackgroundBackendNow, restartBackgroundBackend, probeBackgroundEngine, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { listIssues, resolveIssue } from "@/lib/issues";
@@ -38,6 +38,21 @@ describe("backgroundSupervisor getBackgroundClient()", () => {
 
   test("reports no backend until the first call", () => {
     expect(getBackgroundBackendKind()).toBe("none");
+  });
+
+  test("manual stop stays stopped, Start starts it, and Restart works from stopped", async () => {
+    await getBackgroundClient();
+    await stopBackgroundBackend();
+    expect(getBackgroundBackendKind()).toBe("stopped");
+    expect(await probeBackgroundEngine()).toEqual({ kind: "stopped", pid: null, alive: null });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(getBackgroundBackendKind()).toBe("stopped");
+    await expect(getBackgroundClient()).rejects.toThrow("background engine is stopped");
+    await startBackgroundBackendNow();
+    expect(getBackgroundBackendKind()).toBe("stub");
+    await stopBackgroundBackend();
+    await restartBackgroundBackend();
+    expect(await (await getBackgroundClient()).health()).toBe(true);
   });
 
   test("falls back to the stub backend when no engine is installed", async () => {

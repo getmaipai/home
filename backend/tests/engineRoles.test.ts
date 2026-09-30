@@ -9,10 +9,10 @@ beforeEach(() => {
   resetDb();
   calls.length = 0;
   __setEngineRoleActionsForTests({
-    chat: async () => undefined,
-    embed: async () => { calls.push("embed"); },
-    voice: async () => { calls.push("voice"); },
-    background: async () => { calls.push("background"); },
+    chat: { restart: async () => { calls.push("chat:restart"); }, stop: async () => { calls.push("chat:stop"); }, start: async () => { calls.push("chat:start"); } },
+    embed: { restart: async () => { calls.push("embed:restart"); }, stop: async () => { calls.push("embed:stop"); }, start: async () => { calls.push("embed:start"); } },
+    voice: { restart: async () => { calls.push("voice:restart"); }, stop: async () => { calls.push("voice:stop"); }, start: async () => { calls.push("voice:start"); } },
+    background: { restart: async () => { calls.push("background:restart"); }, stop: async () => { calls.push("background:stop"); }, start: async () => { calls.push("background:start"); } },
   });
 });
 afterEach(() => __setEngineRoleActionsForTests(null));
@@ -28,11 +28,10 @@ describe("POST /api/host/engines/{role}/restart", () => {
   for (const role of ["chat", "embed", "voice", "background"] as const) {
     test(`${role} restart returns the contract body`, async () => {
       const client = await ownerClient();
-      if (role === "chat") calls.push("chat");
       const res = await client.post(`/api/host/engines/${role}/restart`, {});
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ role, restarted: true });
-      expect(calls).toContain(role);
+      expect(calls).toContain(`${role}:restart`);
     });
   }
 
@@ -58,13 +57,37 @@ describe("POST /api/host/engines/{role}/restart", () => {
 
   test("chat timeout returns 503 with an error", async () => {
     __setEngineRoleActionsForTests({
-      chat: async () => { throw new Error("chat did not return in time"); },
-      embed: async () => undefined,
-      voice: async () => undefined,
-      background: async () => undefined,
+      chat: { restart: async () => { throw new Error("chat did not return in time"); }, stop: async () => {}, start: async () => {} },
+      embed: { restart: async () => {}, stop: async () => {}, start: async () => {} },
+      voice: { restart: async () => {}, stop: async () => {}, start: async () => {} },
+      background: { restart: async () => {}, stop: async () => {}, start: async () => {} },
     });
     const res = await (await ownerClient()).post("/api/host/engines/chat/restart", {});
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: "chat did not return in time" });
+  });
+});
+
+describe("POST /api/host/engines/{role}/{stop,start}", () => {
+  for (const action of ["stop", "start"] as const) for (const role of ["chat", "embed", "voice", "background"] as const) {
+    test(`${role} ${action} is owner/admin-only and reaches its supervisor`, async () => {
+      const client = await ownerClient();
+      const res = await client.post(`/api/host/engines/${role}/${action}`, {});
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ role, [action === "stop" ? "stopped" : "started"]: true });
+      expect(calls).toContain(`${role}:${action}`);
+    });
+  }
+
+  test("a non-admin cannot stop or start an engine", async () => {
+    const owner = await ownerClient();
+    const created = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const person = (await created.json()) as { id: string };
+    const adult = new TestClient();
+    await adult.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
+    for (const role of ["chat", "embed", "voice", "background"] as const) {
+      for (const action of ["stop", "start"] as const) expect((await adult.post(`/api/host/engines/${role}/${action}`, {})).status).toBe(403);
+    }
+    expect(calls).toEqual([]);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, test, afterEach } from "bun:test";
-import { getTtsClient, getTtsBackendKind, restartTtsBackend, spawnPocketTts, __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
+import { getTtsClient, getTtsBackendKind, restartTtsBackend, stopTtsBackend, startTtsBackendNow, probeTtsEngine, spawnPocketTts, __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
 
 afterEach(() => {
@@ -51,6 +51,20 @@ describe("ttsSupervisor getTtsClient()", () => {
 });
 
 describe("restartTtsBackend", () => {
+  test("manual stop stays stopped, Start starts it, and Restart works from stopped", async () => {
+    await getTtsClient();
+    await stopTtsBackend();
+    expect(getTtsBackendKind()).toBe("stopped");
+    expect(await probeTtsEngine()).toEqual({ kind: "stopped", pid: null, alive: null });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(getTtsBackendKind()).toBe("stopped");
+    await expect(getTtsClient()).rejects.toThrow("voice engine is stopped");
+    await startTtsBackendNow();
+    expect(getTtsBackendKind()).toBe("stub");
+    await stopTtsBackend();
+    await restartTtsBackend();
+    expect(await (await getTtsClient()).health()).toBe(true);
+  });
   // A code review (2026-09-04) found restartTtsBackend() cleared the
   // cache but did nothing about a spawn already in flight: that spawn's
   // own `.then()` would later re-install itself into `ttsBackend`,

@@ -1050,6 +1050,10 @@ export const api = {
   restartEngine: () => request<EngineStatus>("/api/host/engine/restart", { method: "POST", timeoutMs: 100_000 }),
   restartEngineRole: (role: "chat" | "embed" | "voice" | "background") =>
     request<{ role: string; restarted: true }>(`/api/host/engines/${role}/restart`, { method: "POST", timeoutMs: 100_000 }),
+  stopEngineRole: (role: "chat" | "embed" | "voice" | "background") =>
+    request<{ role: string; stopped: true }>(`/api/host/engines/${role}/stop`, { method: "POST", timeoutMs: 15_000 }),
+  startEngineRole: (role: "chat" | "embed" | "voice" | "background") =>
+    request<{ role: string; started: true }>(`/api/host/engines/${role}/start`, { method: "POST", timeoutMs: 100_000 }),
   // The whole hub, not just the chat engine - the process exits and the
   // OS service manager brings it back (routes/host.ts's own comment has
   // the full reasoning). A short timeout: this only waits for the "yes,

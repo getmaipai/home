@@ -50,6 +50,7 @@ interface BackgroundSupervisorState {
   startingStartedAtMs: number | null;
   startupStalled: boolean;
   generation: number;
+  manuallyStopped: boolean;
 }
 
 const state = hotReloadState<BackgroundSupervisorState>("backgroundSupervisor", () => ({
@@ -58,6 +59,7 @@ const state = hotReloadState<BackgroundSupervisorState>("backgroundSupervisor", 
   startingStartedAtMs: null,
   startupStalled: false,
   generation: 0,
+  manuallyStopped: false,
 }));
 
 /** The background engine's launch line, pure so a test can hold it.
@@ -119,6 +121,7 @@ async function spawnBackgroundServer(binPath: string): Promise<BackgroundBackend
 
 export async function restartBackgroundBackend(): Promise<void> {
   cancelEngineRespawn("background");
+  state.manuallyStopped = false;
   state.generation++;
   // The state is cleared before the (now awaited, #73) stop, so a
   // caller that does not await, the test reset among them, sees the
@@ -130,7 +133,24 @@ export async function restartBackgroundBackend(): Promise<void> {
   await previous?.stop();
 }
 
+export async function stopBackgroundBackend(): Promise<void> {
+  cancelEngineRespawn("background");
+  state.manuallyStopped = true;
+  state.generation++;
+  const previous = state.backgroundBackend;
+  state.backgroundBackend = null;
+  state.startingPromise = null;
+  state.startingStartedAtMs = null;
+  await previous?.stop();
+}
+
+export async function startBackgroundBackendNow(): Promise<void> {
+  state.manuallyStopped = false;
+  await getBackgroundClient();
+}
+
 export async function probeBackgroundEngine(): Promise<EngineHealth> {
+  if (state.manuallyStopped) return { kind: "stopped", pid: null, alive: null };
   const port = Number(process.env.MAIPAI_BACKGROUND_PORT ?? 8789);
   return {
     kind: engineHealthKind("background", getBackgroundBackendKind(), port),
@@ -161,6 +181,7 @@ async function startBackgroundBackend(): Promise<BackgroundBackend> {
 }
 
 export async function getBackgroundClient(): Promise<LlamaServerClient> {
+  if (state.manuallyStopped) throw new Error("the background engine is stopped");
   if (state.backgroundBackend) return state.backgroundBackend.client;
   expireStalledBackgroundStart();
   if (!state.startingPromise) {
@@ -169,7 +190,7 @@ export async function getBackgroundClient(): Promise<LlamaServerClient> {
     state.startingPromise = startBackgroundBackend()
       .then(async (backend): Promise<BackgroundBackend> => {
         if (myGeneration !== state.generation) {
-          backend.stop();
+          await backend.stop();
           return { ...backend, client: await getBackgroundClient() };
         }
         state.backgroundBackend = backend;
@@ -200,7 +221,8 @@ function expireStalledBackgroundStart(): boolean {
   });
 }
 
-export function getBackgroundBackendKind(): BackgroundBackendKind | "starting" | "stalled" | "none" {
+export function getBackgroundBackendKind(): BackgroundBackendKind | "starting" | "stalled" | "none" | "stopped" {
+  if (state.manuallyStopped) return "stopped";
   if (state.backgroundBackend) return state.backgroundBackend.kind;
   if (state.startingPromise) return expireStalledBackgroundStart() ? "stalled" : "starting";
   if (state.startupStalled) return "stalled";
