@@ -16,6 +16,21 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "profile.appearance",
     honoured_by: ["home"],
   }),
+  // FACE-02N: the on/off switch for FACE-02M's face-capture sounds. The
+  // person at the screen is the one who hears them, so it is theirs
+  // (person scope), and it is a plain boolean the generic settings
+  // renderer draws under Profile, Appearance with no bespoke control.
+  SettingsKey.parse({
+    key: "ui.enrollment_sounds",
+    scope: "person",
+    selector: "boolean",
+    default: true,
+    label: "Enrollment sounds",
+    help: "Play soft sounds during face enrollment as the camera finds your face, then a chime when a photo is taken.",
+    level: "basic",
+    lives_in: "profile.appearance",
+    honoured_by: ["home"],
+  }),
   SettingsKey.parse({
     key: "ui.appearance",
     scope: "person",

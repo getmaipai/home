@@ -157,6 +157,37 @@ describe("NextSettingsPage", () => {
     }
   });
 
+  // FACE-02N: the enrollment-sounds toggle is drawn by the generic
+  // renderer from its registry declaration alone (no hand-built control),
+  // on by default, and writes to the person's own scope.
+  test("ui.enrollment_sounds shows as a switch under Me, on by default, and turning it off writes false", async () => {
+    const sounds = makeKey({ key: "ui.enrollment_sounds", scope: "person", selector: "boolean", default: true, label: "Enrollment sounds", level: "basic", lives_in: "profile.appearance" });
+    const { restore, puts } = mockSettingsFetch([sounds], { household: [], "person:person-abc123": [makeValue(sounds, true)] });
+    try {
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextSettingsPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      const meTab = await waitFor(() => {
+        const found = Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Me");
+        expect(found).toBeDefined();
+        return found as HTMLElement;
+      });
+      fireEvent.click(meTab);
+      const toggle = await waitFor(() => {
+        const found = document.querySelector('[role="switch"]');
+        expect(found).not.toBeNull();
+        return found as HTMLElement;
+      });
+      expect(toggle.getAttribute("aria-checked")).toBe("true");
+      fireEvent.click(toggle);
+      await waitFor(() => expect(puts).toContainEqual({ scope: "person:person-abc123", key: "ui.enrollment_sounds", value: false }));
+    } finally {
+      restore();
+    }
+  });
+
   // ui-v0.5.23's rail restructuring dropped the permanent Engines/
   // Updates/Repairs/Backups nav entries - this is their real way back,
   // so a real href to each real route is the acceptance, not just that

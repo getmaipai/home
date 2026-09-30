@@ -28,7 +28,7 @@ import { estimateHeadPose } from "@/lib/vision/headPose";
 import { computeBoxFraction, computeBrightness, computeSharpness } from "@/lib/vision/faceCaptureMeasurements";
 import { captureFeedbackText, captureMotion, captureRing, type CaptureRing } from "@/lib/vision/faceCaptureFeedback";
 import { createFaceCaptureSounds, cueForRing, type FaceCaptureSounds } from "@/lib/vision/faceCaptureSounds";
-import { enrollmentSoundsEnabled } from "@/lib/vision/enrollmentSoundsSetting";
+import { useEnrollmentSoundsEnabled } from "@/lib/vision/enrollmentSoundsSetting";
 import { createFrameLogger, logEnrollmentSummary } from "@/lib/vision/faceCaptureDiagnostics";
 import { classifyMediaAccessError } from "@/lib/media/getUserMediaErrorState";
 import { useNextLook } from "@/next/useNextLook";
@@ -385,8 +385,12 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
   // same document) and again on the first click or key press on the page,
   // for a cold direct link where the browser keeps it suspended. Sound
   // adds to the ring and the status line, it never replaces them.
+  // FACE-02N: the operator's own `ui.enrollment_sounds` (the person at the
+  // screen hears them, even when enrolling someone else). Not on until
+  // their settings have answered, so no audio is created before we know.
+  const soundsOn = useEnrollmentSoundsEnabled(operator.id) === true;
   useEffect(() => {
-    if (!enrollmentSoundsEnabled()) return;
+    if (!soundsOn) return;
     const sounds = createFaceCaptureSounds();
     soundsRef.current = sounds;
     const unlock = () => void sounds.unlock();
@@ -408,7 +412,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       sounds.stop();
       soundsRef.current = null;
     };
-  }, []);
+  }, [soundsOn]);
 
   // The cue follows the ring the person is looking at (held green
   // included), and only while capture is actually running: not while the
@@ -420,7 +424,7 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
     if (!sounds) return;
     sounds.setMuted(tabHiddenRef.current || !soundsRunning);
     if (soundsRunning) sounds.setCue(cueForRing(captureRing(lastReason)));
-  }, [soundsRunning, lastReason]);
+  }, [soundsRunning, lastReason, soundsOn]);
 
   // Skipped while a just-registered shot's green is still on show.
   const showReason = useCallback((reason: string) => {

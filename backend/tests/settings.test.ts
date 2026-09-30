@@ -48,6 +48,37 @@ describe("GET /api/settings/registry", () => {
     const body = (await res.json()) as Array<{ key: string }>;
     expect(body.some((k) => k.key === "household.locale")).toBe(true);
   });
+
+  // FACE-02N: the enrollment-sounds toggle is declared once, in the
+  // registry, so the generic settings renderer draws it under Profile,
+  // Appearance with no hand-built control.
+  test("declares ui.enrollment_sounds as a basic, person-scoped boolean under Profile, Appearance", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const res = await owner.get("/api/settings/registry");
+    const body = (await res.json()) as Array<Record<string, unknown>>;
+    const key = body.find((k) => k.key === "ui.enrollment_sounds");
+    expect(key).toMatchObject({
+      scope: "person",
+      selector: "boolean",
+      default: true,
+      label: "Enrollment sounds",
+      level: "basic",
+      lives_in: "profile.appearance",
+      honoured_by: ["home"],
+    });
+  });
+
+  test("ui.enrollment_sounds resolves to on for a person who never set it", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const ownerPerson = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const res = await owner.get(`/api/settings?scope=person:${ownerPerson.id}`);
+    const body = (await res.json()) as Array<{ key: string; value: unknown; source: string }>;
+    const found = body.find((s) => s.key === "ui.enrollment_sounds");
+    expect(found?.value).toBe(true);
+    expect(found?.source).toBe("default");
+  });
 });
 
 describe("GET /api/settings (list)", () => {

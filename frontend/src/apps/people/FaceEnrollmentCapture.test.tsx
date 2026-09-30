@@ -9,7 +9,6 @@ import { computeSharpness } from "@/lib/vision/faceCaptureMeasurements";
 import { DEFAULT_QUALITY_CONFIG, type Pose } from "@/lib/vision/enrollmentSession";
 import type { Roster } from "@/lib/api";
 import { CHIME, CUES, setSoundContextFactory } from "@/lib/vision/faceCaptureSounds";
-import { setEnrollmentSoundsEnabledForTest } from "@/lib/vision/enrollmentSoundsSetting";
 import { FakeContext } from "../../../tests/fakeSoundContext";
 
 // FACE-02J: drives the real capture page with a scripted camera. The
@@ -105,10 +104,13 @@ let infoSpy: ReturnType<typeof mock>;
 let posts = 0;
 let postedBodies: Array<{ person_id: string; samples: unknown[] }> = [];
 let failNextPost = false;
+// The operator's stored `ui.enrollment_sounds` (FACE-02N); undefined = never set.
+let soundsSetting: boolean | undefined;
 
 beforeEach(() => {
   postedBodies = [];
   failNextPost = false;
+  soundsSetting = undefined;
   facePresent = true;
   faceSize = 190;
   pose = "frontal";
@@ -150,7 +152,9 @@ beforeEach(() => {
       }
       return Promise.resolve(Response.json({ prints: sent.samples.map((_, i) => ({ id: `print-${i + 1}` })), replaced: 0 }, { status: 201 }));
     }
-    if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/settings")) {
+      return Promise.resolve(Response.json(soundsSetting === undefined ? [] : [{ scope: "person:person-sage", key: "ui.enrollment_sounds", value: soundsSetting }]));
+    }
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
   originals.debug = console.debug;
@@ -165,7 +169,6 @@ afterEach(() => {
   cleanup();
   setSessionFactory(null);
   setSoundContextFactory(null);
-  setEnrollmentSoundsEnabledForTest(null);
   (HTMLCanvasElement.prototype as unknown as { getContext: unknown }).getContext = originals.getContext;
   for (const key of ["readyState", "videoWidth", "videoHeight"] as const) {
     const descriptor = originals[key];
@@ -420,8 +423,15 @@ describe("FACE-02M: enrollment sounds", () => {
     else delete (document as unknown as Record<string, unknown>).hidden;
   });
 
+  test("with enrollment sounds stored on the cues play as they do when it is unset", async () => {
+    soundsSetting = true;
+    facePresent = false;
+    renderPage();
+    await waitFor(() => expect(started(CUES.scanning.freq)).toBeGreaterThan(0), WAIT);
+  });
+
   test("with enrollment sounds off no audio context or node is ever created, and the ring still works", async () => {
-    setEnrollmentSoundsEnabledForTest(false);
+    soundsSetting = false;
     const { container } = renderPage();
     await waitFor(() => expect(ring(container)?.getAttribute("data-capture-ring")).toBe("green"), WAIT);
     await waitFor(() => expect(view().getByText("slowly turn your head to your left")).toBeTruthy(), WAIT);
