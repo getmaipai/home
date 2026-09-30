@@ -1530,14 +1530,22 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       unavailable: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." },
       notfound: { verdict: "unknown", headline: "Can't find that model", detail: "Check the link and try again." },
     } as const;
+    const figure = (low: number | null, high: number | null, source: "measured" | "unknown" = "measured") => ({ low, high, source, as_of: "2026-09-30" });
+    const makePlan = (verdict: "yes" | "slow" | "no" | "unknown") => ({
+      schema: 1, model: "qwen3-8b-instruct-q4-k-m", context_tokens: 8192, kv_cache_type: "f16",
+      roles: [{ role: "chat", choice: "q4_k_m", peak: figure(4 * 1024 ** 3, 5 * 1024 ** 3) }],
+      total: figure(4 * 1024 ** 3, 5 * 1024 ** 3), cap: figure(23 * 1024 ** 3, 24 * 1024 ** 3), margin: figure(18 * 1024 ** 3, 19 * 1024 ** 3),
+      paths: [{ path: "unified", fits: verdict === "yes", verdict: verdict === "slow" ? "no" : verdict, ...(verdict === "no" ? { shortfall: figure(5 * 1024 ** 3, 6 * 1024 ** 3) } : {}) }],
+      verdict, bottleneck: verdict === "unknown" ? "unknown" : "memory",
+    });
     await page.route("**/api/fit-plan", (route) => {
       const answerState = state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state === "checked-notfound" ? "notfound" : state;
       const wording = answerState in answers ? answers[answerState as keyof typeof answers] : answers.yes;
-      // The card only checks plan !== null; schema: 1 is enough for this browser review.
+      // Keep the browser boundary fixture valid against StackFitPlan.
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ plan: state === "unavailable" || state === "checked-notfound" ? null : { schema: 1 }, wording }),
+        body: JSON.stringify({ plan: state === "unavailable" || state === "checked-notfound" ? null : makePlan(wording.verdict), wording }),
       });
     });
     await page.goto(`${BASE_URL}/models`);
@@ -1564,6 +1572,15 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
     const screenshot = `fit-verdict-${state}-${viewport.slug}-${theme}.png`;
     await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
     dedicatedScreenshots.push({ file: screenshot, route: "settings-models-fit-verdict", viewport: viewport.slug, theme });
+    if ((state === "yes" || state === "no") && theme === "light") {
+      await page.getByRole("button", { name: "Details", exact: true }).click();
+      await page.getByText("Memory it needs", { exact: true }).waitFor();
+      if (state === "no") await page.getByText(/It needs about 6 GB more memory\./).waitFor();
+      await settleAnimations(page);
+      const panelShot = `fit-panel-${state}-${viewport.slug}-light.png`;
+      await page.screenshot({ path: join(SCREENS_DIR, panelShot), fullPage: true });
+      dedicatedScreenshots.push({ file: panelShot, route: "settings-models-fit-panel", viewport: viewport.slug, theme: "light" });
+    }
   } finally {
     await context.close();
   }

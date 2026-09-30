@@ -4,6 +4,7 @@ import { ModelsSection, formatEta } from "@/apps/settings/ModelsSection";
 import { waitForGone } from "../../../tests/waitForGone";
 import { api } from "@/lib/api";
 import { __resetFitPlanCacheForTests } from "@/lib/useFitPlan";
+import { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 
 afterEach(() => { cleanup(); __resetFitPlanCacheForTests(); });
 
@@ -75,8 +76,10 @@ function chatFit(overrides: Partial<{ fits: boolean; implemented: boolean; url: 
 const NO_SELECTION = { modelId: null };
 const NO_ENGINE = { kind: "none", modelId: null, pid: null, startedAt: null };
 const RUNNING_ENGINE = { kind: "selection", modelId: "qwen3-8b-instruct-q4-k-m", pid: 4242, startedAt: "2026-09-04T10:00:00.000Z" };
-const FIT_YES = { plan: { schema: 1 }, wording: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of the 24 GB this computer can give to models." } };
-const FIT_UNKNOWN = { plan: { schema: 1 }, wording: { verdict: "unknown", headline: "Can't tell yet", detail: "Nobody has measured a model like this on a computer like yours yet." } };
+const testPlan = (verdict: "yes" | "no" | "slow" | "unknown") => StackFitPlan.parse({ schema: 1, model: "example", context_tokens: 8192, kv_cache_type: "f16", roles: [{ role: "chat", choice: "q4", peak: { low: 4 * 1024 ** 3, high: 5 * 1024 ** 3, source: "estimated", as_of: "2026-09-30" } }], total: { low: 5 * 1024 ** 3, high: 9 * 1024 ** 3, source: "estimated", as_of: "2026-09-30" }, cap: { low: 23 * 1024 ** 3, high: 24 * 1024 ** 3, source: "measured", as_of: "2026-09-30" }, margin: { low: 14 * 1024 ** 3, high: 19 * 1024 ** 3, source: "measured", as_of: "2026-09-30" }, paths: [{ path: "unified", fits: verdict === "yes", verdict: verdict === "slow" ? "no" : verdict, ...(verdict === "no" ? { shortfall: { low: 5 * 1024 ** 3, high: 6 * 1024 ** 3, source: "estimated", as_of: "2026-09-30" } } : {}) }], verdict, bottleneck: verdict === "unknown" ? "unknown" : "memory" });
+const FIT_YES = { plan: testPlan("yes"), wording: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of the 24 GB this computer can give to models." } };
+const FIT_NO = { plan: testPlan("no"), wording: { verdict: "no", headline: "Won't fit", detail: "Needs about 6 GB more memory." } };
+const FIT_UNKNOWN = { plan: testPlan("unknown"), wording: { verdict: "unknown", headline: "Can't tell yet", detail: "Nobody has measured a model like this on a computer like yours yet." } };
 const FIT_UNAVAILABLE = { plan: null, wording: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." } };
 const GGUF_LINK = "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf";
 
@@ -158,6 +161,48 @@ describe("ModelsSection", () => {
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
       await findByText("Can't check right now");
       await findByText("The model size checker did not answer. Try again in a moment.");
+    } finally { restore(); }
+  });
+
+  test("opening recommended model Details shows the plan memory range", async () => {
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES);
+    try {
+      const { findByText, getByText } = render(<ModelsSection />);
+      await findByText("Use this");
+      fireEvent.click(getByText("Details"));
+      await findByText("Memory it needs");
+      await findByText("about 5 to 9 GB");
+    } finally { restore(); }
+  });
+
+  test("a no verdict plan shows the plan's remedy", async () => {
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_NO);
+    try {
+      const { findByText, getByText } = render(<ModelsSection />);
+      await findByText("Use this");
+      fireEvent.click(getByText("Details"));
+      await findByText("It needs about 6 GB more memory. A smaller version of this model, or a shorter conversation memory, would help.");
+    } finally { restore(); }
+  });
+
+  test("a plan-null response keeps the legacy memory line without a fit panel", async () => {
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNAVAILABLE);
+    try {
+      const { findByText, getByText, queryByText } = render(<ModelsSection />);
+      await findByText("Use this");
+      fireEvent.click(getByText("Details"));
+      await findByText(/Uses about .* of memory\./);
+      expect(queryByText("Memory it needs")).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("a checked model result offers the worked out plan disclosure", async () => {
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES);
+    try {
+      const { findByRole, getByRole } = render(<ModelsSection />);
+      fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: GGUF_LINK } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      await findByRole("button", { name: "How this was worked out" });
     } finally { restore(); }
   });
 
@@ -388,7 +433,7 @@ describe("ModelsSection", () => {
 
   test("the Stack verdict replaces both legacy lines and sends the pinned URL and context", async () => {
     const fit = chatFit({ fits: false });
-    const response = { plan: {} as NonNullable<import("@maipai/spec/gen/ts/stack-fit-plan.js").StackFitPlan>, wording: { verdict: "yes" as const, headline: "Runs well on this computer", detail: "About 3 GB of the 16 GB this computer can give to models." } };
+    const response = { plan: testPlan("yes"), wording: { verdict: "yes" as const, headline: "Runs well on this computer", detail: "About 3 GB of the 16 GB this computer can give to models." } };
     const fitPlan = mock(() => Promise.resolve(response));
     const original = api.fitPlan;
     api.fitPlan = fitPlan as typeof api.fitPlan;
@@ -403,6 +448,7 @@ describe("ModelsSection", () => {
       expect(queryByText("This may run slowly on this computer.")).toBeNull();
       await act(async () => { fireEvent.click(getByText("Details")); });
       expect(queryByText(/Uses about/)).toBeNull();
+      await findByText("Memory it needs");
       expect(fitPlan).toHaveBeenCalledWith({ source: { url: fit.model.download!.url }, context_tokens: fit.contextUsed });
     } finally { restore(); api.fitPlan = original; }
   });
@@ -414,7 +460,7 @@ describe("ModelsSection", () => {
   ] as const)("shows the backend wording for %s", async (verdict, headline, detail) => {
     const fit = chatFit();
     const original = api.fitPlan;
-    api.fitPlan = mock(() => Promise.resolve({ plan: {} as NonNullable<import("@maipai/spec/gen/ts/stack-fit-plan.js").StackFitPlan>, wording: { verdict, headline, detail } })) as typeof api.fitPlan;
+    api.fitPlan = mock(() => Promise.resolve({ plan: testPlan(verdict), wording: { verdict, headline, detail } })) as typeof api.fitPlan;
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [fit], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE });
     try { const { findByText } = render(<ModelsSection />); await findByText(headline); await findByText(detail); }
     finally { restore(); api.fitPlan = original; }

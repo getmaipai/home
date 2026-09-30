@@ -9,6 +9,10 @@ import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type En
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
 import { parseModelLink } from "@/lib/modelLink";
+import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
+import { RecommendationCard } from "@maipai/ui/src/elements/recommendation-card";
+import { describeFitPlan, type FitPanelRow } from "@/lib/fitPanel";
+import type { FitPlanResponse } from "@/lib/api";
 
 // The model-selection wizard, real half (2026-09-04): docs/SETTINGS.md
 // Rule 3 ("One card per role... with the chosen model... and 'change.'
@@ -407,7 +411,7 @@ function ChatModelCard({
             {(primary.model.cons ?? []).map((con) => (
               <p key={con} className="text-base text-[var(--muted-foreground)]">− {con}</p>
             ))}
-            <DetailsMemoryLine modelUrl={fitUrl} contextTokens={primary.contextUsed} legacyBytes={primary.requiredBytes} />
+            <DetailsFitPanel modelUrl={fitUrl} contextTokens={primary.contextUsed} legacyBytes={primary.requiredBytes} />
           </div>
         </Disclosure>
 
@@ -452,6 +456,7 @@ function CheckModelCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<Awaited<ReturnType<typeof api.fitPlan>> | null>(null);
+  const [showPlan, setShowPlan] = useState(false);
 
   async function check() {
     const parsed = parseModelLink(value);
@@ -480,15 +485,27 @@ function CheckModelCard() {
       </form>
       {error ? <p className="mt-2 text-base text-[var(--muted-foreground)]">{error}</p> : null}
       {busy ? <div className="mt-2"><Progress mode="spinner" label="Checking this computer" /></div> : null}
-      {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} /></div> : null}
+      {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} />{response.plan ? <Disclosure open={showPlan} onToggle={() => setShowPlan((open) => !open)} label="How this was worked out" icon={getIcon("chevron-down")}><FitPanel response={response} /></Disclosure> : null}</div> : null}
     </RoleCardShell>
   );
 }
 
-function DetailsMemoryLine({ modelUrl, contextTokens, legacyBytes }: { modelUrl: string | null; contextTokens: number | undefined; legacyBytes: number }) {
+function DetailsFitPanel({ modelUrl, contextTokens, legacyBytes }: { modelUrl: string | null; contextTokens: number | undefined; legacyBytes: number }) {
   const { state, response } = useFitPlan(modelUrl, contextTokens);
-  if (state === "ready" && response && response.plan !== null) return null;
+  if (state === "ready" && response?.plan) return <FitPanel response={response} />;
   return <p className="text-base text-[var(--muted-foreground)]">Uses about {formatBytes(legacyBytes)} of memory.</p>;
+}
+
+function FitPanel({ response }: { response: FitPlanResponse }) {
+  if (!response.plan) return null;
+  const { rows, remedy } = describeFitPlan(response.plan);
+  return <div className="flex flex-col gap-3 pt-2"><SpecSheet title="Fit details" rows={rows.map(({ label, value }) => ({ label, value }))} visibleCount={rows.length} />{rows.filter((row) => row.source && row.source !== "unknown").map((row) => <FitSource key={row.label} row={row} />)}{remedy ? <RecommendationCard question="What would help?" state="idle" confidenceLabel="Based on this plan" acceptedLabel="" onAlternatives={() => {}} onAccept={() => {}}>{remedy}</RecommendationCard> : null}</div>;
+}
+
+function FitSource({ row }: { row: FitPanelRow }) {
+  if (!row.source || row.source === "unknown") return null;
+  const sourceName = { measured: "Measured", "dry-run": "Dry run", estimated: "Estimated" }[row.source];
+  return <p className="text-sm text-[var(--muted-foreground)]">{row.label}: {sourceName}{row.asOf ? ` · ${row.asOf}` : ""}</p>;
 }
 
 function PlannedRoleCard({ title, fits }: { title: string; fits: ModelFit[] | null }) {

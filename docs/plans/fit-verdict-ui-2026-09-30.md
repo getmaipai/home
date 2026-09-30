@@ -26,6 +26,8 @@ An unknown answer is never dressed up as a no or a yes. A number that is an esti
 1. **The model list gets a verdict on every row.** The model picker and the Models page show the status pill above and one short reason under the name ("about 3 GB of your 16 GB, with room to spare"). A search box filters as you type, and one switch, "Only models that fit", hides the rest.
 2. **The sizing strip above the list.** Three controls change every row live: how much conversation to remember (a slider over the model's real limit, from the plan's context length), how the memory is used (Full, Quantized, Auto, the KV rule in `docs/dev.md`), and the switch above. Changing one re-asks the Stack; the rows update in place.
 3. **The model's fit panel.** A card with the plan laid out: memory needed (a range), memory available now (what is loaded, what is free), the way it would run, what limits it, and where the number came from and when. When it will not fit, the panel says what would make it fit (a smaller size, a shorter memory, turning something off) using the plan's shortfall and the per-role list.
+
+Home's first panel uses the shipped `SpecSheet` and `RecommendationCard`; source dates appear beside each measured figure.
 4. **The computer beside the list.** A narrow card that stays in view: memory used by what is loaded now (one line per role), what is free, and the computer's usable limit. It reads the Stack's budget route; it is the same numbers the plan used.
 5. **Compare and copy.** Mark two or three models, see them side by side, and copy a plain-text summary a person can paste into a message to a friend ("what can my computer run"). Nothing leaves the house unless the person pastes it.
 
