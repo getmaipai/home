@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
-import { NativeSelect, NativeSelectOption } from "@maipai/ui/src/dashboard/components/ui/native-select";
+import { Link } from "react-router-dom";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
@@ -9,6 +7,7 @@ import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
+import { SettingsSectionFrame, type SettingsSection } from "@/next/pages/settings/SettingsSectionFrame";
 
 const telegramNotificationKeys = ["notifications.telegram.chat_id", ...["approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available", "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated", "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available"].map((key) => `notifications.${key}.telegram`)];
 
@@ -19,68 +18,38 @@ const sections = [
   { id: "notifications", title: "Notifications", description: "Choose what you hear about." },
   { id: "privacy-data", title: "Privacy and data", description: "Review your data and signed-in devices." },
 ] as const;
-type SectionId = typeof sections[number]["id"];
-
-function validSection(value: string | null, isAdmin: boolean): SectionId | "limits" {
-  if (sections.some((section) => section.id === value)) return value as SectionId;
-  return isAdmin && value === "limits" ? "limits" : "profile";
-}
 
 export function NextMeSettings({ person, onPersonChange = () => {} }: { person: Roster; onPersonChange?: () => void | Promise<void> }) {
   const queryClient = useQueryClient();
   const isAdmin = isOwnerOrAdminRole(person.role);
-  const [params, setParams] = useSearchParams();
-  const [section, setSection] = useState<SectionId | "limits">(() => validSection(params.get("section"), isAdmin));
-
-  useEffect(() => {
-    const requested = params.get("section");
-    if (requested !== null) {
-      const next = validSection(requested, isAdmin);
-      setSection(next);
-      if (next !== requested) setParams((current) => { const updated = new URLSearchParams(current); updated.set("section", next); return updated; }, { replace: true });
+  function renderSection(id: typeof sections[number]["id"]) {
+    if (id === "profile") {
+      return <><ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} /><FaceEnrollmentCard profile={person} viewer={person} /></>;
     }
-  }, [params, isAdmin, setParams]);
-
-  function changeSection(value: string) {
-    const next = validSection(value, isAdmin);
-    setSection(next);
-    setParams((current) => { const updated = new URLSearchParams(current); updated.set("section", next); return updated; }, { replace: true });
+    if (id === "appearance") {
+      return <>
+        <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.appearance", "ui.look"]} />
+        <Collapsible>
+          <Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Advanced<span aria-hidden>⌄</span></CollapsibleTrigger></CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.show_turn_stats"]} /></CardContent></CollapsibleContent></Card>
+        </Collapsible>
+      </>;
+    }
+    if (id === "voice-ai") return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.persona", "person.voice", "person.search"]} /><ManagementLinks links={["Voices", "Commands"]} /></>;
+    if (id === "notifications") return <NotificationSettings person={person} />;
+    return <><ManagementLinks links={["Devices"]} /><div className="grid gap-4 sm:grid-cols-2">
+      <LinkCard title="Storage" description="Usage against your storage limit." to="/storage" />
+      <LinkCard title="Privacy" description="See what connects to the internet and what stays here." to="/privacy" />
+      <LinkCard title="Status" description="See whether the parts of MaiPai are working." to="/status" />
+    </div></>;
   }
-
-  return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 py-4 md:flex-row md:gap-10">
-      <NativeSelect aria-label="Settings section" className="w-full md:hidden [&>select]:min-h-12" value={section} onChange={(event) => changeSection(event.target.value)}>
-        {sections.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.title}</NativeSelectOption>)}
-        {isAdmin ? <NativeSelectOption value="limits">Limits</NativeSelectOption> : null}
-      </NativeSelect>
-      <Tabs orientation="vertical" value={section} onValueChange={changeSection} className="w-full md:flex-1">
-        <TabsList aria-label="Settings sections" className="hidden h-auto w-full items-stretch gap-1 bg-transparent p-0 md:flex md:w-56 md:shrink-0">
-          {sections.map((item) => <TabsTrigger key={item.id} value={item.id} className="min-h-12 justify-start px-3 text-left">{item.title}</TabsTrigger>)}
-          {isAdmin ? <TabsTrigger value="limits" className="min-h-12 justify-start px-3 text-left">Limits</TabsTrigger> : null}
-        </TabsList>
-        <div className="min-w-0 w-full max-w-3xl flex-1">
-          {sections.map((item) => <TabsContent key={item.id} value={item.id} className="mt-0 flex flex-col gap-5">
-            <header className="flex flex-col gap-1"><h2 className="text-xl font-semibold">{item.title}</h2><p className="text-sm text-muted-foreground">{item.description}</p></header>
-            {item.id === "profile" ? <><ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} /><FaceEnrollmentCard profile={person} viewer={person} /></> : null}
-            {item.id === "appearance" ? <>
-              <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.appearance", "ui.look"]} />
-              <Collapsible>
-                <Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Advanced<span aria-hidden>⌄</span></CollapsibleTrigger></CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.show_turn_stats"]} /></CardContent></CollapsibleContent></Card>
-              </Collapsible>
-            </> : null}
-            {item.id === "voice-ai" ? <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.persona", "person.voice", "person.search"]} /><ManagementLinks links={["Voices", "Commands"]} /></> : null}
-            {item.id === "notifications" ? <NotificationSettings person={person} /> : null}
-            {item.id === "privacy-data" ? <><ManagementLinks links={["Devices"]} /><div className="grid gap-4 sm:grid-cols-2">
-              <LinkCard title="Storage" description="Usage against your storage limit." to="/storage" />
-              <LinkCard title="Privacy" description="See what connects to the internet and what stays here." to="/privacy" />
-              <LinkCard title="Status" description="See whether the parts of MaiPai are working." to="/status" />
-            </div></> : null}
-          </TabsContent>)}
-          {isAdmin ? <TabsContent value="limits" className="mt-0 flex flex-col gap-5"><header className="flex flex-col gap-1"><h2 className="text-xl font-semibold">Limits</h2><p className="text-sm text-muted-foreground">Manage daily time and storage limits.</p></header><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.allowance", "person.storage"]} /></TabsContent> : null}
-        </div>
-      </Tabs>
-    </div>
-  );
+  const content: SettingsSection[] = sections.map((item) => ({
+    id: item.id,
+    label: item.title,
+    description: item.description,
+    render: renderSection(item.id),
+  }));
+  if (isAdmin) content.push({ id: "limits", label: "Limits", description: "Manage daily time and storage limits.", render: <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.allowance", "person.storage"]} /> });
+  return <SettingsSectionFrame sections={content} defaultSection="profile" />;
 }
 
 function NotificationSettings({ person }: { person: Roster }) {

@@ -243,6 +243,7 @@ const nextTableRolloutReview = process.argv.includes("--next-table-rollout-revie
 const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextSettingsS2Review = process.argv.includes("--next-settings-s2-review");
 const nextSettingsS3Review = process.argv.includes("--next-settings-s3-review");
+const nextSettingsS6Review = process.argv.includes("--next-settings-s6-review");
 const nextLaneA13Review = process.argv.includes("--next-lane-a-13-review");
 const nextPersonalManagementReview = process.argv.includes("--next-personal-management-review");
 const nextPrivacyReview = process.argv.includes("--next-privacy-review");
@@ -3150,6 +3151,36 @@ async function captureNextSettingsS3Review(browser: Browser, ownerSession: strin
   }
 }
 
+async function captureNextSettingsS6Review(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "../home/data-scratch/screens/settings-s6");
+  mkdirSync(outDir, { recursive: true });
+  const sections = [
+    ["general", "General"], ["people", "People"], ["ai", "AI"],
+    ["integrations", "Integrations"], ["storage", "Storage and backups"], ["maintenance", "Maintenance"],
+  ] as const;
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, ownerSession);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        for (const [id, label] of sections) {
+          const response = await page.goto(`${BASE_URL}/settings?tab=household&section=${id}`);
+          if (!response?.ok()) throw new Error(`SETTINGS-S6: Household ${id} returned ${response?.status() ?? "no response"}`);
+          await page.waitForLoadState("networkidle");
+          await page.getByRole("heading", { name: label }).waitFor({ state: "visible" });
+          await settleAnimations(page);
+          const path = join(outDir, `settings-s6-household-${id}-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path, fullPage: true });
+          console.log(`Wrote ${path}`);
+        }
+        await page.close();
+      } finally { await context.close(); }
+    }
+  }
+}
+
 /** Lane B-13 review: each newly migrated personal management page and
  * Settings > Me at 1440/390 in both themes. Output stays in data-scratch. */
 async function captureNextPersonalManagementReview(browser: Browser, sessionValue: string): Promise<void> {
@@ -4177,6 +4208,11 @@ async function main() {
     if (nextSettingsS3Review) {
       await captureNextSettingsS3Review(browser, sessionValue);
       console.log("completed named review: --next-settings-s3-review");
+      return;
+    }
+    if (nextSettingsS6Review) {
+      await captureNextSettingsS6Review(browser, sessionValue);
+      console.log("completed named review: --next-settings-s6-review");
       return;
     }
     if (shell09DocsMatrixReview) {

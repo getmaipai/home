@@ -17,9 +17,9 @@ Design: [settings redesign plan](plans/settings-redesign-2026-09-30.md).
 - [x] **S1: Shared `ProfileForm` extracted from the profile page's Edit dialog (same fields, same API, tests), used by both** (S, committed): one definition of "edit a person".
 - [x] **S2: Me shell: left section list (desktop) / select (phone), routes `?section=`, sections Appearance and Privacy and data; remove allowance, storage caps from Me** (committed, live check pending): the new frame and the short sections.
 - [ ] **S3: Me > Profile section: profile card (S1 form) + Face recognition card (status, Enroll, sounds switch); person's profile page gets a link to Settings > Profile and keeps its read view**: profile editing and enrollment under Me.
-- [ ] **S4: Me > Voice and AI and Notifications sections; Telegram folded and shown only when configured**: the last two sections.
+- [x] **S4: Me > Voice and AI and Notifications sections; Telegram folded and shown only when configured** (done in S2, card merging is in S7): the last two sections.
 - [ ] **S5: Person page "Limits" card for parents and admins (allowance keys)**: allowance leaves Me without being lost.
-- [ ] **S6: Household shell: left list, seven grouped sections with the existing cards and link cards**: Household grouped.
+- [x] **S6: Household shell: six grouped sections with the existing cards and link cards** (committed, live check pending): Household grouped.
 - [ ] **S7: Screenshot review (`scripts/screenshot.ts --next-settings-review`), fix, retire dead code (`SETTINGS.md`-obsolete sections, old page bits)**: polish and cleanup.
 
 ## The chat rebuild (2026-09-22)

@@ -6,7 +6,7 @@ import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/ca
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
 import { NextMeSettings } from "@/next/pages/settings/NextMeSettings";
-import { NextManageSection } from "@/next/pages/settings/NextManageSection";
+import { NextHouseholdSettings } from "@/next/pages/settings/NextHouseholdSettings";
 import { api, isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { meetsMinRole } from "@/apps/people/roles";
 import { getDeviceSettingsScope } from "@/lib/deviceSettingsScope";
@@ -35,10 +35,8 @@ export const SettingsIcon = getIcon("settings");
  * filtering. This row remains the registry-driven keys only, the same
  * ones `SettingsRenderer.tsx` already draws inline on the old page.
  * Voices, Commands, and Devices now have their own routes and link-out
- * cards under Me below. Backups/Repairs/Updates/Engines remain in
- * `NextManageSection`: ui-v0.5.23's rail restructuring dropped their
- * permanent nav entry, so the Household tab's bottom section is their
- * real way back, not a settings key at all. */
+ * cards under Me below. Household's settings and management links are
+ * grouped into their own sections. */
 export function NextSettingsPage({ person, onPersonChange }: { person: Roster; onPersonChange?: () => void | Promise<void> }) {
   useDocumentTitle("Settings");
   const canManageHousehold = isOwnerOrAdminRole(person.role);
@@ -88,8 +86,7 @@ export function NextSettingsPage({ person, onPersonChange }: { person: Roster; o
           </TabsList>
           {canManageHousehold ? (
             <TabsContent value="household" className="flex flex-col gap-4">
-              <NextSettingsRenderer scope="household" scopeValue="household" />
-              <NextManageSection />
+              <NextHouseholdSettings />
             </TabsContent>
           ) : null}
           <TabsContent value="me" className="flex flex-col gap-4">

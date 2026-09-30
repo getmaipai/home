@@ -34806,3 +34806,27 @@ Still on the real clock, on purpose: every wait that is not an absence
 check. The start_project polling test in `NextChatPage.test.tsx` runs a
 real 2 s poll cycle; it passed in every run and is the next candidate if
 the family returns.
+# SETTINGS-S6: Household settings become grouped sections (2026-09-30)
+
+The Household tab now uses the shared `SettingsSectionFrame` already used
+by Me. The frame keeps the section in `?section=`, selects General when a
+section is unknown, shows vertical tabs on desktop, and uses a select on
+phones. The Household tab stays owner/admin only. Me keeps its existing
+sections and query behavior through the extracted frame.
+
+The old content now appears in these sections:
+
+| Before | Household section |
+|---|---|
+| `household.system` | General |
+| Users, Family | People |
+| AI models, `household.ai`, Engines | AI (Engines now links to Status) |
+| `household.integrations`, `household.notifications`, `household.reference` | Integrations |
+| `household.storage`, Backups, Storage | Storage and backups |
+| Updates, Repairs, Performance | Maintenance |
+
+The Engines card pointed to the Stack-only `/engines` page. Status is the
+household page for engine health and restarts. No settings groups or keys
+moved. Household now has six sections, following the detailed section
+list and tests in the S6 brief. The briefing overview's count of seven
+sections did not match that list.

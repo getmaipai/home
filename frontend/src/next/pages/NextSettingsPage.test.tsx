@@ -195,11 +195,8 @@ describe("NextSettingsPage", () => {
     }
   });
 
-  // ui-v0.5.23's rail restructuring dropped the permanent Engines/
-  // Updates/Repairs/Backups nav entries - this is their real way back,
-  // so a real href to each real route is the acceptance, not just that
-  // the section renders.
-  test("the Household tab's own Manage section links to all four routes", async () => {
+  // Every former Manage route remains reachable from its new section.
+  test("the Household sections link to all former Manage routes or their replacement", async () => {
     const { restore } = mockSettingsFetch([], { household: [], "person:person-abc123": [] });
     try {
       renderWithQueryClient(
@@ -207,20 +204,36 @@ describe("NextSettingsPage", () => {
           <NextSettingsPage person={makePerson()} />
         </MemoryRouter>,
       );
-      await waitFor(() => expect(document.body.textContent).toContain("Manage"));
-      for (const [title, href] of [
-        ["Engines", "/engines"],
-        ["Updates", "/updates"],
-        ["Repairs", "/repairs"],
-        ["Backups", "/backups"],
-      ] as const) {
-        const link = Array.from(document.querySelectorAll("a")).find((a) => a.textContent?.includes(title));
-        expect(link).toBeDefined();
-        expect(link!.getAttribute("href")).toBe(href);
+      const statusTab = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "AI") as HTMLElement);
+      fireEvent.click(statusTab);
+      await waitFor(() => expect(Array.from(document.querySelectorAll("a")).some((a) => a.textContent?.includes("Status") && a.getAttribute("href") === "/status")).toBe(true));
+      for (const [title, href, section] of [["Updates", "/updates", "Maintenance"], ["Repairs", "/repairs", "Maintenance"], ["Performance", "/performance", "Maintenance"], ["Backups", "/backups", "Storage and backups"], ["Users", "/users", "People"], ["AI models", "/models", "AI"]] as const) {
+        fireEvent.click(Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === section) as HTMLElement);
+        await waitFor(() => expect(Array.from(document.querySelectorAll("a")).some((a) => a.textContent?.includes(title) && a.getAttribute("href") === href)).toBe(true));
       }
+      expect(Array.from(document.querySelectorAll("a")).some((a) => a.getAttribute("href") === "/engines")).toBe(false);
     } finally {
       restore();
     }
+  });
+
+  test("Household has six grouped sections and hides the tab from non-admins", async () => {
+    const { restore } = mockSettingsFetch([], { household: [], "person:person-abc123": [] });
+    try {
+      renderWithQueryClient(<MemoryRouter><NextSettingsPage person={makePerson()} /></MemoryRouter>);
+      const tabs = await waitFor(() => {
+        const names = Array.from(document.querySelectorAll('[role="tab"]')).map((tab) => tab.textContent);
+        expect(names).toContain("General");
+        return names;
+      });
+      expect(tabs.filter((name) => ["General", "People", "AI", "Integrations", "Storage and backups", "Maintenance"].includes(name ?? ""))).toEqual(["General", "People", "AI", "Integrations", "Storage and backups", "Maintenance"]);
+    } finally { restore(); }
+    cleanup();
+    const second = mockSettingsFetch([], { household: [], "person:person-abc123": [] });
+    try {
+      renderWithQueryClient(<MemoryRouter><NextSettingsPage person={makePerson({ role: "child" })} /></MemoryRouter>);
+      await waitFor(() => expect(Array.from(document.querySelectorAll('[role="tab"]')).some((tab) => tab.textContent === "Household")).toBe(false));
+    } finally { second.restore(); }
   });
 
   // A review caught this: `tab` was seeded from `?tab=` only inside a
@@ -230,7 +243,7 @@ describe("NextSettingsPage", () => {
   // SECOND search result naming the other tab never saw it switch.
   test("a later navigation to a different ?tab= switches the active tab - not just the URL", async () => {
     const appearance = makeKey({ key: "ui.appearance", scope: "person", selector: "select", range: { options: ["system", "light", "dark"] }, label: "Appearance", level: "basic" });
-    const householdKey = makeKey({ key: "household.test_key", scope: "household", selector: "boolean", label: "Household Test Setting", level: "basic" });
+    const householdKey = makeKey({ key: "household.test_key", scope: "household", selector: "boolean", label: "Household Test Setting", level: "basic", lives_in: "household.system" });
     const { restore } = mockSettingsFetch([appearance, householdKey], { household: [makeValue(householdKey, false)], "person:person-abc123": [makeValue(appearance, "system")] });
     function GoToHouseholdTab() {
       const navigate = useNavigate();
@@ -250,50 +263,21 @@ describe("NextSettingsPage", () => {
       await waitFor(() => expect(document.body.textContent).toContain("Appearance"));
       expect(document.body.textContent).not.toContain("Household Test Setting");
       fireEvent.click(getByText("simulate a search result to the household tab"));
-      await waitFor(() => expect(document.body.textContent).toContain("Household Test Setting"));
+      await waitFor(() => expect(Array.from(document.querySelectorAll('[role="tab"]')).find((tab) => tab.textContent === "Household")?.getAttribute("aria-selected")).toBe("true"));
+      expect(document.body.textContent).toContain("Household Test Setting");
     } finally {
       restore();
     }
   });
 
-  // A review caught this: NextSettingsRenderer's own scroll-to-section
-  // effect latched a plain "have we ever scrolled" boolean permanently
-  // true - a SECOND search result naming a different section, clicked
-  // without leaving Settings (react-router never remounts this page
-  // for a search-params-only URL change), was silently ignored.
-  test("a second ?section= naming a different section scrolls again - the first scroll doesn't latch the page", async () => {
-    const first = makeKey({ key: "household.first_key", scope: "household", selector: "boolean", label: "First Setting", level: "basic", lives_in: "household.first" });
-    const second = makeKey({ key: "household.second_key", scope: "household", selector: "boolean", label: "Second Setting", level: "basic", lives_in: "household.second" });
-    const { restore } = mockSettingsFetch([first, second], { household: [makeValue(first, false), makeValue(second, false)], "person:person-abc123": [] });
-    function GoToSection({ section }: { section: string }) {
-      const navigate = useNavigate();
-      return (
-        <button type="button" onClick={() => navigate(`/settings?tab=household&section=${section}`)}>
-          go to {section}
-        </button>
-      );
-    }
-    const originalScroll = HTMLElement.prototype.scrollIntoView;
-    const scrolled: string[] = [];
-    HTMLElement.prototype.scrollIntoView = function (this: HTMLElement) {
-      scrolled.push(this.id);
-    };
+  test("unknown Household section values fall back to General", async () => {
+    const system = makeKey({ key: "household.test_key", scope: "household", selector: "boolean", label: "Household Test Setting", level: "basic", lives_in: "household.system" });
+    const { restore } = mockSettingsFetch([system], { household: [makeValue(system, false)], "person:person-abc123": [] });
     try {
-      const { getByText } = renderWithQueryClient(
-        <MemoryRouter initialEntries={["/settings?tab=household&section=household.first"]}>
-          <GoToSection section="household.first" />
-          <GoToSection section="household.second" />
-          <NextSettingsPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await waitFor(() => expect(document.body.textContent).toContain("First Setting"));
-      await waitFor(() => expect(scrolled).toContain("settings-household.first"));
-      fireEvent.click(getByText("go to household.second"));
-      await waitFor(() => expect(scrolled).toContain("settings-household.second"));
-    } finally {
-      HTMLElement.prototype.scrollIntoView = originalScroll;
-      restore();
-    }
+      renderWithQueryClient(<MemoryRouter initialEntries={["/settings?tab=household&section=not-a-section"]}><NextSettingsPage person={makePerson()} /></MemoryRouter>);
+      await waitFor(() => expect(document.body.textContent).toContain("Household Test Setting"));
+      expect(Array.from(document.querySelectorAll('[role="tab"]')).find((tab) => tab.textContent === "General")?.getAttribute("aria-selected")).toBe("true");
+    } finally { restore(); }
   });
 
   test("a non-admin sees no tab bar, only their own settings", async () => {
