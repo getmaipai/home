@@ -27,6 +27,21 @@ function stubFetch(byPath: Record<string, unknown>): () => void {
   };
 }
 
+function stubFetchWithFitPlan(byPath: Record<string, unknown>, response: unknown, onRequest?: (body: unknown) => void): () => void {
+  const original = globalThis.fetch;
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/fit-plan")) {
+      onRequest?.(JSON.parse(String(init?.body)));
+      return Promise.resolve(jsonResponse(response));
+    }
+    const match = Object.entries(byPath).find(([path]) => url.includes(path));
+    if (!match) throw new Error(`unstubbed fetch: ${url}`);
+    return Promise.resolve(jsonResponse(match[1]));
+  }) as unknown as typeof fetch;
+  return () => { globalThis.fetch = original; };
+}
+
 const HARDWARE = {
   platform: "darwin",
   totalRamGb: 24,
@@ -60,6 +75,10 @@ function chatFit(overrides: Partial<{ fits: boolean; implemented: boolean; url: 
 const NO_SELECTION = { modelId: null };
 const NO_ENGINE = { kind: "none", modelId: null, pid: null, startedAt: null };
 const RUNNING_ENGINE = { kind: "selection", modelId: "qwen3-8b-instruct-q4-k-m", pid: 4242, startedAt: "2026-09-04T10:00:00.000Z" };
+const FIT_YES = { plan: { schema: 1 }, wording: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of your 24 GB." } };
+const FIT_UNKNOWN = { plan: { schema: 1 }, wording: { verdict: "unknown", headline: "Can't tell yet", detail: "Nobody has measured a model like this on a computer like yours yet." } };
+const FIT_UNAVAILABLE = { plan: null, wording: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." } };
+const GGUF_LINK = "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf";
 
 describe("formatEta", () => {
   test("under 90 seconds reads as 'less than a minute'", () => {
@@ -76,6 +95,72 @@ describe("formatEta", () => {
 });
 
 describe("ModelsSection", () => {
+  test("a GGUF link is sent to fit-plan and shows the returned verdict", async () => {
+    let posted: unknown;
+    const restore = stubFetchWithFitPlan({
+      "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [],
+      "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE,
+    }, FIT_YES, (body) => { posted = body; });
+    try {
+      const { findByRole, getByRole, findAllByText } = render(<ModelsSection />);
+      const input = await findByRole("textbox", { name: "Hugging Face model link" });
+      fireEvent.change(input, { target: { value: GGUF_LINK } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      const headlines = await findAllByText("Runs well on this computer");
+      expect(headlines.length).toBeGreaterThan(0);
+      expect(posted).toEqual({ source: { url: GGUF_LINK } });
+    } finally { restore(); }
+  });
+
+  test("an MLX repository link is sent as a repository source", async () => {
+    let posted: unknown;
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES, (body) => { posted = body; });
+    try {
+      const { findByRole, getByRole, findAllByText } = render(<ModelsSection />);
+      fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: "https://huggingface.co/example-org/example-mlx" } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      await findAllByText("Runs well on this computer");
+      expect(posted).toEqual({ source: { repo: "example-org/example-mlx" } });
+    } finally { restore(); }
+  });
+
+  test("an unknown verdict stays neutral", async () => {
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNKNOWN);
+    try {
+      const { findByRole, getByRole, findAllByText, queryByText } = render(<ModelsSection />);
+      fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: GGUF_LINK } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      const headlines = await findAllByText("Can't tell yet");
+      expect(headlines.length).toBeGreaterThan(0);
+      expect(queryByText("Won't fit")).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("a bad link shows its error without making a request", async () => {
+    let fitPlanCalls = 0;
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES, () => { fitPlanCalls += 1; });
+    try {
+      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      await findByText("This computer: Apple Silicon, 24 GB memory.");
+      const callsBeforeClick = fitPlanCalls;
+      fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: "not a link" } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      await findByText("That does not look like a Hugging Face model link.");
+      expect(fitPlanCalls).toBe(callsBeforeClick);
+    } finally { restore(); }
+  });
+
+  test("a plan-null answer shows its unavailable wording", async () => {
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNAVAILABLE);
+    try {
+      const { findByRole, getByRole, findByText } = render(<ModelsSection />);
+      fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: GGUF_LINK } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      await findByText("Can't check right now");
+      await findByText("The model size checker did not answer. Try again in a moment.");
+    } finally { restore(); }
+  });
+
   test("shows the detected hardware in plain language", async () => {
     const restore = stubFetch({
       "/api/host/hardware": HARDWARE,

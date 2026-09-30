@@ -1511,7 +1511,7 @@ async function captureChatContinueReview(browser: Browser, sessionValue: string)
 /** HOME-FIT-02B's dedicated review for the recommended model's fit verdict.
  * Only selection and fit-plan are stubbed at the browser boundary; the
  * remaining model card data comes from the throwaway demo backend. */
-async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable"): Promise<void> {
+async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable" | "checked-yes" | "checked-no" | "checked-error"): Promise<void> {
   const context = await newContext(browser, viewport, theme, sessionValue);
   try {
     const page = await context.newPage();
@@ -1522,14 +1522,15 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       body: JSON.stringify({ modelId: null }),
     }));
     const answers = {
-      yes: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of your 16 GB." },
+      yes: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of your 24 GB." },
       slow: { verdict: "slow", headline: "Runs, but slowly", detail: "It fits only by using the processor, so answers will be slower." },
       no: { verdict: "no", headline: "Won't fit", detail: "Needs about 6 GB more memory." },
       unknown: { verdict: "unknown", headline: "Can't tell yet", detail: "Nobody has measured a model like this on a computer like yours yet." },
       unavailable: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." },
     } as const;
     await page.route("**/api/fit-plan", (route) => {
-      const wording = answers[state];
+      const answerState = state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state;
+      const wording = answerState in answers ? answers[answerState as keyof typeof answers] : answers.yes;
       // The card only checks plan !== null; schema: 1 is enough for this browser review.
       return route.fulfill({
         status: 200,
@@ -1538,6 +1539,17 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       });
     });
     await page.goto(`${BASE_URL}/models`);
+    if (state === "checked-yes" || state === "checked-no" || state === "checked-error") {
+      const link = state === "checked-error" ? "not a link" : "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf";
+      await page.getByRole("textbox", { name: "Hugging Face model link" }).fill(link);
+      await page.getByRole("button", { name: "Check", exact: true }).click();
+      await page.getByText(state === "checked-yes" ? answers.yes.headline : state === "checked-no" ? answers.no.headline : "That does not look like a Hugging Face model link.", { exact: true }).waitFor();
+      await settleAnimations(page);
+      const screenshot = `fit-check-${state}-${viewport.slug}-light.png`;
+      await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+      dedicatedScreenshots.push({ file: screenshot, route: "settings-models-fit-check", viewport: viewport.slug, theme: "light" });
+      return;
+    }
     const card = page.getByText("Qwen3 8B Instruct", { exact: true }).first();
     await card.waitFor();
     if (state === "unavailable") {
@@ -4365,6 +4377,9 @@ async function main() {
       const desktop = VIEWPORTS.find((item) => item.slug === "desktop")!;
       for (const viewport of [phone, desktop]) {
         for (const state of ["yes", "slow", "no", "unknown", "unavailable"] as const) {
+          await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
+        }
+        for (const state of ["checked-yes", "checked-no", "checked-error"] as const) {
           await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
         }
       }

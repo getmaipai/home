@@ -3,10 +3,12 @@ import { Section } from "@maipai/ui/src/primitives/Section";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Status } from "@maipai/ui/src/ui/status";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type EngineStatus } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
+import { parseModelLink } from "@/lib/modelLink";
 
 // The model-selection wizard, real half (2026-09-04): docs/SETTINGS.md
 // Rule 3 ("One card per role... with the chosen model... and 'change.'
@@ -130,6 +132,7 @@ export function ModelsSection() {
             onStop={handleStop}
             onRestart={handleRestart}
           />
+          <CheckModelCard />
           <PlannedRoleCard title="Image generation" fits={imageFits} />
           <PlannedRoleCard title="Video generation" fits={videoFits} />
         </div>
@@ -432,12 +435,54 @@ function FitLine({ modelUrl, contextTokens, legacyWarning }: { modelUrl: string 
   const { state, response } = useFitPlan(modelUrl, contextTokens);
   if (state === "loading") return <Progress mode="spinner" label="Checking this computer" />;
   if (state === "ready" && response && response.plan !== null) {
-    const status = { yes: "online", slow: "degraded", no: "offline", unknown: "maintenance" }[response.wording.verdict] as "online" | "degraded" | "offline" | "maintenance";
-    return <div className="flex flex-col items-start gap-1"><Status status={status}>{response.wording.headline}</Status><p className="text-base text-[var(--muted-foreground)]">{response.wording.detail}</p></div>;
+    return <FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} />;
   }
   if (!legacyWarning) return null;
   const AlertIcon = getIcon("alert-triangle");
   return <p className="flex items-start gap-1.5 text-base text-[var(--muted-foreground)]"><AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> This may run slowly on this computer.</p>;
+}
+
+function FitResult({ headline, detail, verdict }: { headline: string; detail: string; verdict: "yes" | "slow" | "no" | "unknown" }) {
+  const status = { yes: "online", slow: "degraded", no: "offline", unknown: "maintenance" }[verdict] as "online" | "degraded" | "offline" | "maintenance";
+  return <div className="flex flex-col items-start gap-1"><Status status={status}>{headline}</Status><p className="text-base text-[var(--muted-foreground)]">{detail}</p></div>;
+}
+
+function CheckModelCard() {
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [response, setResponse] = useState<Awaited<ReturnType<typeof api.fitPlan>> | null>(null);
+
+  async function check() {
+    const parsed = parseModelLink(value);
+    setResponse(null);
+    setError(null);
+    if ("error" in parsed) {
+      setError(parsed.error);
+      return;
+    }
+    setBusy(true);
+    try {
+      setResponse(await api.fitPlan({ source: parsed.source }));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not check that link.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <RoleCardShell title="Check a model">
+      <p className="mb-3 text-base text-[var(--muted-foreground)]">Paste a Hugging Face link to see if a model will run on this computer before you download it.</p>
+      <form className="flex flex-col items-start gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); void check(); }}>
+        <Input value={value} onChange={(event) => setValue(event.target.value)} aria-label="Hugging Face model link" />
+        <Button type="submit" disabled={busy}>{busy ? "Checking…" : "Check"}</Button>
+      </form>
+      {error ? <p className="mt-2 text-base text-[var(--muted-foreground)]">{error}</p> : null}
+      {busy ? <div className="mt-2"><Progress mode="spinner" label="Checking this computer" /></div> : null}
+      {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} /></div> : null}
+    </RoleCardShell>
+  );
 }
 
 function DetailsMemoryLine({ modelUrl, contextTokens, legacyBytes }: { modelUrl: string | null; contextTokens: number | undefined; legacyBytes: number }) {
