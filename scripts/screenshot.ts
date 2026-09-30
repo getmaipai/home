@@ -145,6 +145,7 @@ const a11yOnly = process.argv.includes("--a11y-only");
 const chatFocusReview = process.argv.includes("--chat-focus-review");
 const chatTemporaryReview = process.argv.includes("--chat-temporary-review");
 const chatContinueReview = process.argv.includes("--chat-continue-review");
+const fitVerdictReview = process.argv.includes("--fit-verdict-review");
 const chatReview = process.argv.includes("--chat-review") || chatFocusReview || chatTemporaryReview;
 const chatStatsReview = process.argv.includes("--chat-stats-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
@@ -1502,6 +1503,53 @@ async function captureChatContinueReview(browser: Browser, sessionValue: string)
     const screenshot = "chat-continue-desktop-light.png";
     await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
     dedicatedScreenshots.push({ file: screenshot, route: "chat-continue", viewport: viewport.slug, theme: "light" });
+  } finally {
+    await context.close();
+  }
+}
+
+/** HOME-FIT-02B's dedicated review for the recommended model's fit verdict.
+ * Only selection and fit-plan are stubbed at the browser boundary; the
+ * remaining model card data comes from the throwaway demo backend. */
+async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable"): Promise<void> {
+  const context = await newContext(browser, viewport, theme, sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.route("**/api/host/models/selection", (route) => route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ modelId: null }),
+    }));
+    const answers = {
+      yes: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of your 16 GB." },
+      slow: { verdict: "slow", headline: "Runs, but slowly", detail: "It fits only by using the processor, so answers will be slower." },
+      no: { verdict: "no", headline: "Won't fit", detail: "Needs about 6 GB more memory." },
+      unknown: { verdict: "unknown", headline: "Can't tell yet", detail: "Nobody has measured a model like this on a computer like yours yet." },
+      unavailable: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." },
+    } as const;
+    await page.route("**/api/fit-plan", (route) => {
+      const wording = answers[state];
+      // The card only checks plan !== null; schema: 1 is enough for this browser review.
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ plan: state === "unavailable" ? null : { schema: 1 }, wording }),
+      });
+    });
+    await page.goto(`${BASE_URL}/models`);
+    const card = page.getByText("Qwen3 8B Instruct", { exact: true }).first();
+    await card.waitFor();
+    if (state === "unavailable") {
+      await page.getByRole("button", { name: "Use this", exact: true }).waitFor();
+      await page.getByText(answers.unavailable.headline, { exact: true }).waitFor({ state: "detached" });
+    } else {
+      await page.getByText(answers[state].headline, { exact: true }).waitFor();
+    }
+    await settleAnimations(page);
+    const screenshot = `fit-verdict-${state}-${viewport.slug}-${theme}.png`;
+    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+    dedicatedScreenshots.push({ file: screenshot, route: "settings-models-fit-verdict", viewport: viewport.slug, theme });
   } finally {
     await context.close();
   }
@@ -4312,6 +4360,22 @@ async function main() {
 
     const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
+    if (fitVerdictReview) {
+      const phone = VIEWPORTS.find((item) => item.slug === "phone")!;
+      const desktop = VIEWPORTS.find((item) => item.slug === "desktop")!;
+      for (const viewport of [phone, desktop]) {
+        for (const state of ["yes", "slow", "no", "unknown", "unavailable"] as const) {
+          await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
+        }
+      }
+      for (const viewport of [phone, desktop]) {
+        for (const state of ["yes", "no"] as const) {
+          await captureFitVerdictCard(browser, sessionValue, viewport, "dark", state);
+        }
+      }
+      console.log("completed named review: --fit-verdict-review");
+      return;
+    }
     if (nextSettingsS2Review) {
       await captureNextSettingsS2Review(browser, sessionValue);
       console.log("completed named review: --next-settings-s2-review");
@@ -4576,7 +4640,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -4607,9 +4671,9 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || laneBTouchTargetsReview || chatShortcutsReview
+    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview
       ? []
-      : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview
+      : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
         ? A11Y_ONLY_COMBOS
         : VIEWPORTS.flatMap((v) => THEMES.map((t) => ({ viewport: v.slug, theme: t })));
 
