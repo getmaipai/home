@@ -163,8 +163,9 @@ uses it:
 3. **Auto-reap without asking is approved** (this replaces the earlier
    "ask first" option). The admin fix button in section D stays only as the
    fallback for a holder the supervisor could not reap (a permission error).
-4. **Still open (Jesse):** browser push as a default channel for the
-   engine-problem notification.
+4. **Browser push is a default channel** for the engine-problem
+   notification (agreed 2026-09-29), beside `in_app`; Telegram when the
+   household has opted in.
 
 ## Out of scope
 
