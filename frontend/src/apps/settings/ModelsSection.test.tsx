@@ -2,8 +2,10 @@ import { describe, test, expect, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, act } from "@testing-library/react";
 import { ModelsSection, formatEta } from "@/apps/settings/ModelsSection";
 import { waitForGone } from "../../../tests/waitForGone";
+import { api } from "@/lib/api";
+import { __resetFitPlanCacheForTests } from "@/lib/useFitPlan";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); __resetFitPlanCacheForTests(); });
 
 // Same fetch-stub approach as ChangeSecretSection.test.tsx (this file's
 // static import of the component under test means Bun's module cache
@@ -34,7 +36,7 @@ const HARDWARE = {
   cudaDevices: [],
 };
 
-function chatFit(overrides: Partial<{ fits: boolean; implemented: boolean }> = {}) {
+function chatFit(overrides: Partial<{ fits: boolean; implemented: boolean; url: string }> = {}) {
   return {
     model: {
       id: "qwen3-8b-instruct-q4-k-m",
@@ -46,6 +48,7 @@ function chatFit(overrides: Partial<{ fits: boolean; implemented: boolean }> = {
       pros: ["Runs well on a single 8GB GPU"],
       cons: ["Less capable on hard reasoning tasks"],
       sizing: { kind: "transformer_gguf", param_count_billion: 8.2, bits_per_weight: 4, num_layers: 36, num_kv_heads: 8, head_dim: 128, max_context: 32768 },
+      download: overrides.url ? { url: overrides.url } : { url: "https://huggingface.co/atlas/model.gguf" },
     },
     fits: overrides.fits ?? true,
     contextUsed: 8192,
@@ -297,4 +300,61 @@ describe("ModelsSection", () => {
       restore();
     }
   });
+
+  test("the Stack verdict replaces both legacy lines and sends the pinned URL and context", async () => {
+    const fit = chatFit({ fits: false });
+    const response = { plan: {} as NonNullable<import("@maipai/spec/gen/ts/stack-fit-plan.js").StackFitPlan>, wording: { verdict: "yes" as const, headline: "Runs well on this computer", detail: "About 3 GB of your 16 GB." } };
+    const fitPlan = mock(() => Promise.resolve(response));
+    const original = api.fitPlan;
+    api.fitPlan = fitPlan as typeof api.fitPlan;
+    const restore = stubFetch({
+      "/api/host/hardware": HARDWARE, "role=chat": [fit], "role=image": [], "role=video": [],
+      "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE,
+    });
+    try {
+      const { findByText, getByText, queryByText } = render(<ModelsSection />);
+      await findByText(response.wording.headline);
+      expect(getByText(response.wording.detail)).toBeTruthy();
+      expect(queryByText("This may run slowly on this computer.")).toBeNull();
+      await act(async () => { fireEvent.click(getByText("Details")); });
+      expect(queryByText(/Uses about/)).toBeNull();
+      expect(fitPlan).toHaveBeenCalledWith({ source: { url: fit.model.download!.url }, context_tokens: fit.contextUsed });
+    } finally { restore(); api.fitPlan = original; }
+  });
+
+  test.each([
+    ["slow", "Runs, but slowly", "It fits only by using the processor, so answers will be slower."],
+    ["no", "Won't fit", "Needs about 6 GB more memory."],
+    ["unknown", "Can't tell yet", "Nobody has measured a model like this on a computer like yours yet."],
+  ] as const)("shows the backend wording for %s", async (verdict, headline, detail) => {
+    const fit = chatFit();
+    const original = api.fitPlan;
+    api.fitPlan = mock(() => Promise.resolve({ plan: {} as NonNullable<import("@maipai/spec/gen/ts/stack-fit-plan.js").StackFitPlan>, wording: { verdict, headline, detail } })) as typeof api.fitPlan;
+    const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [fit], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE });
+    try { const { findByText } = render(<ModelsSection />); await findByText(headline); await findByText(detail); }
+    finally { restore(); api.fitPlan = original; }
+  });
+
+  test.each(["null", "reject"] as const)("falls back to both legacy lines when the Stack response is %s", async (mode) => {
+    const fit = chatFit({ fits: false });
+    const original = api.fitPlan;
+    api.fitPlan = (mode === "null" ? mock(() => Promise.resolve({ plan: null, wording: { verdict: "unknown", headline: "ignored", detail: "ignored" } })) : mock(() => Promise.reject(new Error("offline")))) as typeof api.fitPlan;
+    const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [fit], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE });
+    try {
+      const { findByText, getByText } = render(<ModelsSection />);
+      await findByText("This may run slowly on this computer.");
+      await act(async () => { fireEvent.click(getByText("Details")); });
+      await findByText(/Uses about/);
+    } finally { restore(); api.fitPlan = original; }
+  });
+
+  test("does not ask the Stack for a non Hugging Face model URL", async () => {
+    const original = api.fitPlan;
+    const fitPlan = mock(() => Promise.reject(new Error("unused")));
+    api.fitPlan = fitPlan as typeof api.fitPlan;
+    const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit({ url: "https://example.invalid/model.gguf" })], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE });
+    try { const { findByText } = render(<ModelsSection />); await findByText("Use this"); expect(fitPlan).not.toHaveBeenCalled(); }
+    finally { restore(); api.fitPlan = original; }
+  });
+
 });

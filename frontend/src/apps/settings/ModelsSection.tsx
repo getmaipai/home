@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
+import { Status } from "@maipai/ui/src/ui/status";
 import { Button } from "@maipai/ui/src/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type EngineStatus } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
+import { useFitPlan } from "@/lib/useFitPlan";
 
 // The model-selection wizard, real half (2026-09-04): docs/SETTINGS.md
 // Rule 3 ("One card per role... with the chosen model... and 'change.'
@@ -327,6 +329,7 @@ function ChatModelCard({
   const isSelected = selectedModelId === primary.model.id && !activeJob;
   const { isRunning, isStarting, isStopped, isStalled } = deriveEngineState(isSelected, engineStatus, primary.model.id);
   const others = implementedFits.filter((f) => f.model.id !== primary.model.id);
+  const fitUrl = primary.model.download?.url && primary.model.download.url.startsWith("https://huggingface.co/") ? primary.model.download.url : null;
 
   return (
     <RoleCardShell title="Chat">
@@ -386,11 +389,7 @@ function ChatModelCard({
           </div>
         ) : isSelected ? null : (
           <div className="flex flex-col gap-2">
-            {!primary.fits ? (
-              <p className="flex items-start gap-1.5 text-base text-[var(--muted-foreground)]">
-                <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> This may run slowly on this computer.
-              </p>
-            ) : null}
+            <FitLine modelUrl={fitUrl} contextTokens={primary.contextUsed} legacyWarning={!primary.fits} />
             <Button className="w-fit" onClick={() => onChoose(primary.model.id)}>
               Use this
             </Button>
@@ -405,7 +404,7 @@ function ChatModelCard({
             {(primary.model.cons ?? []).map((con) => (
               <p key={con} className="text-base text-[var(--muted-foreground)]">− {con}</p>
             ))}
-            <p className="text-base text-[var(--muted-foreground)]">Uses about {formatBytes(primary.requiredBytes)} of memory.</p>
+            <DetailsMemoryLine modelUrl={fitUrl} contextTokens={primary.contextUsed} legacyBytes={primary.requiredBytes} />
           </div>
         </Disclosure>
 
@@ -426,6 +425,25 @@ function ChatModelCard({
       </div>
     </RoleCardShell>
   );
+}
+
+
+function FitLine({ modelUrl, contextTokens, legacyWarning }: { modelUrl: string | null; contextTokens: number | undefined; legacyWarning: boolean }) {
+  const { state, response } = useFitPlan(modelUrl, contextTokens);
+  if (state === "loading") return <Progress mode="spinner" label="Checking this computer" />;
+  if (state === "ready" && response && response.plan !== null) {
+    const status = { yes: "online", slow: "degraded", no: "offline", unknown: "maintenance" }[response.wording.verdict] as "online" | "degraded" | "offline" | "maintenance";
+    return <div className="flex flex-col items-start gap-1"><Status status={status}>{response.wording.headline}</Status><p className="text-base text-[var(--muted-foreground)]">{response.wording.detail}</p></div>;
+  }
+  if (!legacyWarning) return null;
+  const AlertIcon = getIcon("alert-triangle");
+  return <p className="flex items-start gap-1.5 text-base text-[var(--muted-foreground)]"><AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> This may run slowly on this computer.</p>;
+}
+
+function DetailsMemoryLine({ modelUrl, contextTokens, legacyBytes }: { modelUrl: string | null; contextTokens: number | undefined; legacyBytes: number }) {
+  const { state, response } = useFitPlan(modelUrl, contextTokens);
+  if (state === "ready" && response && response.plan !== null) return null;
+  return <p className="text-base text-[var(--muted-foreground)]">Uses about {formatBytes(legacyBytes)} of memory.</p>;
 }
 
 function PlannedRoleCard({ title, fits }: { title: string; fits: ModelFit[] | null }) {
