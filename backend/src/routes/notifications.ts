@@ -8,6 +8,7 @@ export const notificationsRoutes = apiRouter();
 const NotificationSchema = z.object({
   id: z.string(),
   typeId: z.string(),
+  level: z.enum(["immediate", "time_sensitive", "passive"]),
   text: z.string(),
   channels: z.array(z.enum(["in_app", "telegram"])),
   createdAt: z.string(),

@@ -53,6 +53,7 @@ function notification(id: string, text: string, opts?: { typeId?: string; toast?
   return {
     id,
     typeId: opts?.typeId ?? "model.download_ready",
+    level: opts?.typeId === "engines.problem" ? "time_sensitive" : "passive",
     text,
     channels: ["in_app"],
     createdAt: "2026-09-05T00:00:00.000Z",

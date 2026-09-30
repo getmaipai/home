@@ -102,4 +102,30 @@ describe("sw.ts (getmaipai/home#90): Firefox gets zero 'fetch' listeners, not on
     }
     expect(skipWaitingCalls.count).toBe(1);
   });
+
+  test("notification click opens or focuses the Status page", async () => {
+    const { fakeSelf, listenersByType } = await loadSwWithUserAgent(
+      "Mozilla/5.0 Chrome/128.0.0.0 Safari/537.36",
+      "notification-click",
+    );
+    Object.assign(fakeSelf, { location: { origin: "http://localhost:8787" } });
+    const focused: string[] = [];
+    Object.assign(fakeSelf.clients, {
+      matchAll: async () => [{ url: "http://localhost:8787/chat", navigate: async (url: string) => { focused.push(url); }, focus: async () => { focused.push("focused"); } }],
+      openWindow: async (url: string) => { focused.push(url); },
+    });
+    const previousSelf = (globalThis as { self?: unknown }).self;
+    (globalThis as { self?: unknown }).self = fakeSelf;
+    try {
+      let waited: Promise<unknown> | undefined;
+      let closed = false;
+      const listener = (listenersByType.get("notificationclick") ?? [])[0] as (event: unknown) => void;
+      listener({ notification: { close: () => { closed = true; } }, waitUntil: (promise: Promise<unknown>) => { waited = promise; } });
+      await waited;
+      expect(closed).toBe(true);
+      expect(focused).toEqual(["http://localhost:8787/status", "focused"]);
+    } finally {
+      (globalThis as { self?: unknown }).self = previousSelf;
+    }
+  });
 });

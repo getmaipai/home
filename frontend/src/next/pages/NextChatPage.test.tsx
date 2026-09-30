@@ -1257,6 +1257,7 @@ describe("NextChatPage (getmaipai/home#181: project result reload)", () => {
     return {
       id,
       typeId,
+      level: "time_sensitive",
       text: "Bedtime story finished.",
       channels: ["in_app"],
       createdAt: "2026-09-27T00:00:00.000Z",

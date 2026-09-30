@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { StatusIndicator } from "@/shell/StatusIndicator";
+import { BrowserAlerts } from "@/shell/BrowserAlerts";
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -158,6 +159,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
     // actually renders (a sibling of this Outlet, not a descendant) -
     // needs the SAME provider instance NextChatPage writes into.
     <ChatHeaderDataProvider>
+      <BrowserAlerts person={person} />
       <Routes>
         {/* HOME-UI-02d: the old Memories page now lives on the signed-in
             person's own profile. Preserve both old bookmarks and deep

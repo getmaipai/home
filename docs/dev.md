@@ -33719,6 +33719,10 @@ The blocked-port Repair test now injects EPERM for its listener, because an ordi
 
 The role routes now include owner/admin-only `POST /api/host/engines/{role}/stop` and `/start` alongside `/restart`. Chat delegates to its existing Stop and restart-and-wait functions. Embed, voice and background keep a process-local manual-stop flag: a stop invalidates an in-flight start, cancels the watchdog retry, shuts down the owned child through the identity-checked watcher, and makes health report `stopped`; client requests do not silently start it again. Start clears the flag and starts the selected backend. Restart clears the flag, stops the old backend and starts a fresh one. The flag starts clear on hub boot. The status page shows Stop for running engines, Start for inactive ones, and Restart for all four roles to owners and admins.
 
+## ENGINE-AVAIL-06a
+
+The person setting `notifications.browser.enabled` is declared in Home's notification settings and included in the pinned commons spec registry (`spec-v0.1.63`). Me > Notifications renders it through the shared settings renderer and Switch. Permission is requested only from its on-switch action; if the browser denies it, the setting remains off and the page explains why. The shell reads the bell's existing 15-second pending-notification query. It seeds the first result as existing history, then asks the active service worker to show one generic system alert per new notification id at level `immediate` or `time_sensitive`. Clicking opens `/status`. Home has no quiet-hours policy yet, so no additional quiet-hours filter applies. These alerts run only while a Home page is open. The org notification standard now describes local alerts from the open app and browser-maker push as a separate opt-in relay. The relay remains ENGINE-AVAIL-06b.
+
 ## DATA-LOCATION: where the household's data lives, choosing it at install and moving it later (design, 2026-09-29)
 
 **Revision 2026-09-30.** The first version grouped the data into three

@@ -226,6 +226,7 @@ export function notifyIfFlagged(
 export interface NotificationDeliveryView {
   id: string;
   typeId: string;
+  level: "immediate" | "time_sensitive" | "passive";
   text: string;
   channels: NotificationChannel[];
   createdAt: string;
@@ -246,6 +247,7 @@ function toView(row: typeof notificationDeliveries.$inferSelect): NotificationDe
   return {
     id: row.id,
     typeId: row.typeId,
+    level: getNotificationType(row.typeId)?.level ?? "passive",
     text: row.text,
     channels: JSON.parse(row.channels) as NotificationChannel[],
     createdAt: row.createdAt,

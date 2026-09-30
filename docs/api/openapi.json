@@ -4394,6 +4394,14 @@
                       "typeId": {
                         "type": "string"
                       },
+                      "level": {
+                        "type": "string",
+                        "enum": [
+                          "immediate",
+                          "time_sensitive",
+                          "passive"
+                        ]
+                      },
                       "text": {
                         "type": "string"
                       },
@@ -4436,6 +4444,7 @@
                     "required": [
                       "id",
                       "typeId",
+                      "level",
                       "text",
                       "channels",
                       "createdAt",
@@ -4485,6 +4494,14 @@
                       "typeId": {
                         "type": "string"
                       },
+                      "level": {
+                        "type": "string",
+                        "enum": [
+                          "immediate",
+                          "time_sensitive",
+                          "passive"
+                        ]
+                      },
                       "text": {
                         "type": "string"
                       },
@@ -4527,6 +4544,7 @@
                     "required": [
                       "id",
                       "typeId",
+                      "level",
                       "text",
                       "channels",
                       "createdAt",
@@ -4585,6 +4603,14 @@
                     "typeId": {
                       "type": "string"
                     },
+                    "level": {
+                      "type": "string",
+                      "enum": [
+                        "immediate",
+                        "time_sensitive",
+                        "passive"
+                      ]
+                    },
                     "text": {
                       "type": "string"
                     },
@@ -4627,6 +4653,7 @@
                   "required": [
                     "id",
                     "typeId",
+                    "level",
                     "text",
                     "channels",
                     "createdAt",

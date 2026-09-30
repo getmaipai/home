@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { PersonMultiSelect } from "@/next/pages/settings/PersonMultiSelect";
+import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 
 /** SHELL-05's own per-key control: the registry-selector-to-primitive
  * mapping docs/SETTINGS.md's generic renderer calls for, pointed at the
@@ -52,6 +53,7 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
   const [secretEditing, setSecretEditing] = useState(false);
   const [secretDraft, setSecretDraft] = useState("");
   const [secretSaving, setSecretSaving] = useState(false);
+  const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
 
   async function commitSecret() {
     if (!secretDraft) return;
@@ -85,6 +87,21 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
     }
     const ok = await onChange(value);
     if (!ok) setDraft(String(resolved.value ?? ""));
+  }
+
+  async function handleSwitchChange(value: boolean) {
+    setPermissionMessage(null);
+    if (def.key === "notifications.browser.enabled" && value) {
+      if (typeof Notification === "undefined" || !("serviceWorker" in navigator)) {
+        setPermissionMessage("This browser cannot show system alerts.");
+        return;
+      }
+      if (!(await requestBrowserAlertPermission(() => Notification.requestPermission(), value))) {
+        setPermissionMessage("Browser permission was not granted, so alerts are off.");
+        return;
+      }
+    }
+    onChange(value);
   }
 
   let control: ReactNode;
@@ -131,7 +148,7 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
       </div>
     );
   } else if (def.selector === "boolean") {
-    control = <Switch checked={Boolean(resolved.value)} onCheckedChange={onChange} disabled={disabled} aria-label={def.label} />;
+    control = <><Switch checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
   } else if (def.selector === "select") {
     const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
     const getLabel = def.key === "household.locale" ? localeDisplayName : titleCaseOption;

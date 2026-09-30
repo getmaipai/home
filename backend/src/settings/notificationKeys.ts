@@ -20,6 +20,17 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
+    key: "notifications.browser.enabled",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Show alerts on this device",
+    help: "You'll see a pop-up when MaiPai needs attention, while MaiPai is open. It won't reach you when MaiPai is closed.",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "notifications.telegram.bot_token",
     scope: "household",
     selector: "text",

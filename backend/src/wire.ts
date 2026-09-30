@@ -662,6 +662,7 @@ export interface CommandRow {
 export interface NotificationDeliveryView {
   id: string;
   typeId: string;
+  level: "immediate" | "time_sensitive" | "passive";
   text: string;
   channels: ("in_app" | "telegram")[];
   createdAt: string;

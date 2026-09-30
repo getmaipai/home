@@ -77,7 +77,7 @@ describe("PhoneHeaderExtras", () => {
   test("Notifications links to the history page and shows the real pending count", async () => {
     const restore = stubFetch({
       "/api/notifications": [
-        { id: "n1", typeId: "model.download_ready", text: "Model ready", channels: ["in_app"], createdAt: "2026-09-05T00:00:00.000Z", readAt: null, dismissedAt: null, subjectTurnId: null, memoryIds: null, toast: true },
+        { id: "n1", typeId: "model.download_ready", level: "passive", text: "Model ready", channels: ["in_app"], createdAt: "2026-09-05T00:00:00.000Z", readAt: null, dismissedAt: null, subjectTurnId: null, memoryIds: null, toast: true },
       ],
     });
     try {

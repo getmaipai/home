@@ -12,6 +12,7 @@ function notification(overrides: Partial<NotificationDeliveryView> = {}): Notifi
   return {
     id: "notif-abc123",
     typeId: "repairs.new",
+    level: "passive",
     text: "A repair needs your attention",
     channels: ["in_app"],
     createdAt: new Date().toISOString(),

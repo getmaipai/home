@@ -99,6 +99,16 @@ if (!PASSTHROUGH) {
 }
 cleanupOutdatedCaches();
 
+self.addEventListener("notificationclick", (event: NotificationEvent) => {
+  event.notification.close();
+  const target = new URL("/status", self.location.origin).href;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    const existing = windows.find((client) => "focus" in client && client.url.startsWith(self.location.origin));
+    if (existing && "navigate" in existing) return existing.navigate(target).then(() => (existing as WindowClient).focus());
+    return self.clients.openWindow(target);
+  }));
+});
+
 // A new worker never waits (getmaipai/home#128, PWA-SW-01): install
 // is followed by `skipWaiting()` unconditionally, so the build that
 // was just fetched is the one that activates on the next load even

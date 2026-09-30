@@ -256,6 +256,7 @@ const statusA2cReview = process.argv.includes("--status-a2c-review");
 const statusC3bReview = process.argv.includes("--status-c3b-review");
 const statusB2bReview = process.argv.includes("--status-b2b-review");
 const statusEngineControlsReview = process.argv.includes("--status-engine-controls-review");
+const browserAlertsReview = process.argv.includes("--browser-alerts-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
 const nextBackupsReview = process.argv.includes("--next-backups-review");
@@ -3662,6 +3663,23 @@ async function captureStatusEngineControlsReview(browser: Browser, ownerSession:
   }
 }
 
+async function captureBrowserAlertsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screens", "avail-06a");
+  mkdirSync(outDir, { recursive: true });
+  for (const [slug, width] of [["phone", 390], ["desktop", 1440]] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    const context = await newContext(browser, viewport, "light", sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/settings?tab=me&section=notifications`);
+      await page.getByText("Show alerts on this device", { exact: true }).waitFor();
+      const path = join(outDir, `me-notifications-${width}.png`);
+      await page.screenshot({ path, fullPage: true });
+      console.log(`Wrote ${path}`);
+    } finally { await context.close(); }
+  }
+}
+
 async function captureStatusA2cReview(browser: Browser, ownerSession: string): Promise<void> {
   const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-a2c";
   mkdirSync(outDir, { recursive: true });
@@ -4701,6 +4719,11 @@ async function main() {
     if (statusEngineControlsReview) {
       await captureStatusEngineControlsReview(browser, sessionValue);
       console.log("completed named review: --status-engine-controls-review");
+      return;
+    }
+    if (browserAlertsReview) {
+      await captureBrowserAlertsReview(browser, sessionValue);
+      console.log("completed named review: --browser-alerts-review");
       return;
     }
     if (statusA2cReview) {

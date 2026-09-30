@@ -22,6 +22,7 @@ function setup(role: Roster["role"], initialUrl = "/settings", telegramChatId = 
     makeKey("ui.enrollment_sounds", "profile.appearance", "boolean", "advanced"), makeKey("ui.show_turn_stats", "profile.appearance", "boolean", "advanced"),
     ...Array.from({ length: 9 }, (_, i) => makeKey(`allowance.${i}.daily_minutes`, "person.allowance", "number")),
     makeKey("notifications.telegram.chat_id", "person.notifications"),
+    makeKey("notifications.browser.enabled", "person.notifications", "boolean"),
     ...["approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available", "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated", "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available"].map((name) => makeKey(`notifications.${name}.telegram`, "person.notifications", "boolean")),
     makeKey("personality.style", "person.persona"), makeKey("search.safe_search", "person.search", "boolean"), makeKey("tts.voice_id", "person.voice", "select"),
     makeKey("storage.cap", "person.storage", "number"), makeKey("storage.cap_warning", "person.storage", "number"),
@@ -100,7 +101,7 @@ describe("NextMeSettings", () => {
     const { restore } = setup("child", "/settings?section=notifications");
     try {
       await waitFor(() => expect(document.body.textContent).toContain("Telegram options"));
-      expect(document.querySelector('[data-slot="switch"]')).toBeNull();
+      expect(document.querySelectorAll('[data-slot="switch"]')).toHaveLength(1); // the device alert setting stays visible above the advanced Telegram rows
       const triggers = document.querySelectorAll('[data-slot="collapsible-trigger"]');
       fireEvent.click(triggers[triggers.length - 1]!);
       expect(document.querySelectorAll('[data-slot="switch"]').length).toBeGreaterThan(0);
