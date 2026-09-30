@@ -53,4 +53,18 @@ describe("StatusIndicator", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  test("uses the maintenance state while an affected part is under maintenance", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/status/board")) return Promise.resolve(Response.json({ note: null, maintenance: [{ id: "m1", title: "Voice update", description: "", components: ["voice"], starts_at: "2026-09-30T00:00:00Z", ends_at: "2026-10-01T00:00:00Z", status: "in_progress" }] }));
+      return Promise.resolve(Response.json({ ...baseHealth, engines: { ...baseHealth.engines, voice: { kind: "stopped", pid: null, alive: null } } }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><StatusIndicator /></MemoryRouter>);
+      const link = await view.findByRole("link", { name: "Maintenance" });
+      await waitFor(() => expect(link.querySelector('[data-status="maintenance"]')).toBeTruthy());
+    } finally { globalThis.fetch = originalFetch; }
+  });
 });

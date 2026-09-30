@@ -34858,3 +34858,28 @@ household page for engine health and restarts. No settings groups or keys
 moved. Household now has six sections, following the detailed section
 list and tests in the S6 brief. The briefing overview's count of seven
 sections did not match that list.
+# STATUS-B2b: notes and scheduled maintenance on Status (2026-09-30)
+
+`/status` reads the member-safe `GET /api/status/board` response. Everyone
+can see the current note and maintenance windows. Owners and admins can
+post or clear the note, schedule a one-off window, and cancel an upcoming
+or active window. The page refreshes the board every 30 seconds and after
+each write. Note expiry is based on the owner's local clock. Window times
+are shown in each viewer's local time.
+
+The six shared part names live in the status row map. An active window
+shows affected rows as "Under maintenance" and removes those parts from
+the displayed outage summary. A separate outage still takes priority.
+This is display behavior only. B3 will suppress alarm notifications.
+
+The headless review mode is `bun run screenshots --status-b2b-review`.
+It seeds an isolated screenshot backend through the real status routes
+and writes owner and child captures at 1440 and 390 pixels in light and
+dark themes under `data-scratch/screens/status-b2b/`. The API refuses a
+window whose end time is in the past, so the completed screenshot window
+starts yesterday and ends just before capture. This exercises the Done
+state, but the exact "finished yesterday" fixture cannot be made through
+the current route.
+
+The focused frontend status tests and frontend typecheck and lint pass.
+The slice is committed with the repo gate result in its lane report.

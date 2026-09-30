@@ -251,6 +251,7 @@ const nextPrivacyReview = process.argv.includes("--next-privacy-review");
 const nextPersonProfileReview = process.argv.includes("--next-person-profile-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
 const statusA2bReview = process.argv.includes("--status-a2b-review");
+const statusB2bReview = process.argv.includes("--status-b2b-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
 const nextBackupsReview = process.argv.includes("--next-backups-review");
@@ -3434,6 +3435,71 @@ async function captureNextEnginesReview(browser: Browser, sessionValue: string):
   }
 }
 
+async function captureStatusB2bReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-b2b";
+  mkdirSync(outDir, { recursive: true });
+  const headers = { "Content-Type": "application/json", Cookie: `session=${ownerSession}` };
+  async function post(path: string, payload: unknown): Promise<void> {
+    const response = await fetch(`${BASE_URL}${path}`, { method: "POST", headers, body: JSON.stringify(payload) });
+    if (!response.ok) throw new Error(`STATUS-B2b seed ${path} failed: ${response.status} ${await response.text()}`);
+  }
+  await post("/api/status/note", { body: "Voice and Library will pause for a short update." });
+  const now = new Date();
+  await post("/api/status/maintenance", {
+    title: "Voice and Library update", description: "The home will keep working while these parts refresh.",
+    components: ["voice", "library"], starts_at: new Date(now.getTime() - 20 * 60_000).toISOString(), ends_at: new Date(now.getTime() + 40 * 60_000).toISOString(),
+  });
+  const tomorrowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 2, 0);
+  const tomorrowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 3, 30);
+  await post("/api/status/maintenance", {
+    title: "Home tune-up", description: "A short planned update.", components: ["hub"], starts_at: tomorrowStart.toISOString(), ends_at: tomorrowEnd.toISOString(),
+  });
+  // The API rejects windows whose end is already in the past. Create a
+  // valid record that started yesterday, then let its short remaining
+  // interval end so the real API computes the completed state for review.
+  const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 9, 0);
+  const soon = new Date(Date.now() + 3_000);
+  await post("/api/status/maintenance", {
+    title: "Finished maintenance", description: "This planned work is complete.", components: ["embed"], starts_at: yesterdayStart.toISOString(), ends_at: soon.toISOString(),
+  });
+  await new Promise((resolve) => setTimeout(resolve, 3_500));
+
+  const peopleResponse = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
+  if (!peopleResponse.ok) throw new Error(`STATUS-B2b household lookup failed: ${peopleResponse.status}`);
+  const people = await peopleResponse.json() as Array<{ id: string; display_name: string; role: string }>;
+  const child = people.find((person) => person.display_name === "Nova" && person.role === "child");
+  if (!child) throw new Error("STATUS-B2b seeded child Nova was not found");
+  const childSignIn = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
+  if (!childSignIn.ok) throw new Error(`STATUS-B2b signing in as Nova failed: ${childSignIn.status}`);
+  const childSession = childSignIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      for (const [who, session] of [["owner", ownerSession], ["child", childSession]] as const) {
+        if (!session) continue;
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          await page.goto(`${BASE_URL}/status`);
+          await page.getByText("Voice and Library will pause for a short update.", { exact: true }).waitFor();
+          await page.getByText("Voice and Library update", { exact: true }).waitFor();
+          await page.getByText("Home tune-up", { exact: true }).waitFor();
+          await page.getByText("Finished maintenance", { exact: true }).waitFor();
+          await page.getByText("Under maintenance", { exact: true }).first().waitFor();
+          if (who === "owner") await page.getByRole("button", { name: "Post a note" }).waitFor();
+          else if (await page.getByRole("button", { name: "Post a note" }).count()) throw new Error("STATUS-B2b child screenshot exposed an admin control");
+          const path = join(outDir, `status-${who}-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path, fullPage: true });
+          console.log(`Wrote ${path}`);
+        } finally { await context.close(); }
+      }
+    }
+  }
+  console.log("The owner and child sessions use the capture script's isolated backend.");
+  console.log("The completed window starts yesterday and ends just before capture because the real API rejects past end times.");
+}
+
 /** SHELL-07's own acceptance ("captures"): both viewports, both
  * themes, of `/updates`. Waits on "MaiPai Home" - the app's own
  * row is always present regardless of whether a Stack is configured,
@@ -4293,6 +4359,11 @@ async function main() {
     if (nextPersonProfileReview) {
       await captureNextPersonProfileReview(browser, sessionValue);
       console.log("completed named review: --next-person-profile-review");
+      return;
+    }
+    if (statusB2bReview) {
+      await captureStatusB2bReview(browser, sessionValue);
+      console.log("completed named review: --status-b2b-review");
       return;
     }
     if (statusA2bReview) {

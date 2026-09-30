@@ -1,4 +1,6 @@
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
+import type { StatusNote } from "@maipai/spec/gen/ts/status-note.js";
+import type { MaintenanceWindow } from "@maipai/spec/gen/ts/maintenance-window.js";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
 import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
@@ -98,6 +100,10 @@ export type SignedInPerson = Roster & {
   sessionLockTimeoutMinutes: number;
 };
 export type Role = Person["role"];
+
+export interface StatusBoardNote { id: string; body: string; posted_at: string; posted_by_name: string }
+export interface StatusMaintenance { id: string; title: string; description: string; components: string[]; starts_at: string; ends_at: string; status: "scheduled" | "in_progress" | "completed" | "cancelled" }
+export interface StatusBoard { note: StatusBoardNote | null; maintenance: StatusMaintenance[] }
 
 // PROJECT-PROGRESS-01: routes/projects.ts's own GET response, a real
 // Project (@maipai/spec) plus the one derived sibling field that route
@@ -1009,6 +1015,11 @@ export const api = {
   // narrow because that's all the chat status pill (useEngineHealth.ts)
   // has ever needed.
   health: () => request<HealthStatus>("/api/health", { timeoutMs: 8_000 }),
+  statusBoard: () => request<StatusBoard>("/api/status/board"),
+  postStatusNote: (input: { body: string; expires_at?: string }) => request<StatusNote>("/api/status/note", { method: "POST", body: JSON.stringify(input) }),
+  clearStatusNote: () => request<void>("/api/status/note", { method: "DELETE" }),
+  createMaintenance: (input: { title: string; description?: string; components: string[]; starts_at: string; ends_at: string }) => request<MaintenanceWindow>("/api/status/maintenance", { method: "POST", body: JSON.stringify(input) }),
+  cancelMaintenance: (id: string) => request<MaintenanceWindow>(`/api/status/maintenance/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   engineStatus: () => request<EngineStatus>("/api/host/engine/status"),
   engineStats: () => request<EngineStatsSample[]>("/api/host/engine/stats"),
   stopEngine: () => request<EngineStatus>("/api/host/engine/stop", { method: "POST", timeoutMs: 15_000 }),

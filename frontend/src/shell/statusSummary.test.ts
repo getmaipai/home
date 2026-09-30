@@ -21,6 +21,14 @@ describe("statusSummary", () => {
     expect(statusSummary(undefined)).toEqual({ level: "online", text: "All good", problems: [] });
   });
 
+  test("maintenance is shown only when every problem is inside a maintenance window", () => {
+    const ready = health();
+    const down = { ...ready, engines: { ...ready.engines, voice: { kind: "stopped" as const, pid: null, alive: null } } };
+    expect(statusSummary(down, ["voice"])).toEqual({ level: "maintenance", text: "Maintenance", problems: [] });
+    expect(statusSummary(down, ["voice"]).level).toBe("maintenance");
+    expect(statusSummary({ ...down, engines: { ...down.engines, chat: { kind: "stopped", pid: null, alive: null } } }, ["voice"]).level).toBe("offline");
+  });
+
   test("any unavailable engine makes the status offline and names it", () => {
     const result = statusSummary(health({ engines: { ...health().engines, embed: { kind: "stopped", pid: null, alive: null } } }));
     expect(result).toEqual({ level: "offline", text: "Something is down", problems: ["Understanding"] });

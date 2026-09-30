@@ -9,17 +9,22 @@ import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescript
 import { toast } from "sonner";
 import { api, ApiError, isOwnerOrAdminRole, type HealthStatus, type Roster, type EngineHealthEntry } from "@/lib/api";
 
-interface StatusComponentsProps { person: Roster; health: HealthStatus; }
+interface StatusComponentsProps { person: Roster; health: HealthStatus; maintenance?: string[]; }
 type EngineKey = keyof HealthStatus["engines"];
+type StatusPartId = EngineKey | "library" | "hub";
 type EngineState = { label: string; status: "online" | "offline" | "degraded" };
 
 // One shared definition for component names, purpose and row icons.
-export const ENGINE_ROWS: Array<{ key: EngineKey; label: string; hint: string; icon: string }> = [
+export const ENGINE_ROWS: Array<{ key: StatusPartId; label: string; hint: string; icon: string }> = [
   { key: "chat", label: "Brain", hint: "Answers your conversations.", icon: "brain" },
   { key: "embed", label: "Understanding", hint: "Matches what you say to skills and memories.", icon: "sparkles" },
   { key: "background", label: "Memory", hint: "Remembers and organizes what matters.", icon: "circuit-board" },
   { key: "voice", label: "Voice", hint: "Speaks the replies.", icon: "audio-waveform" },
+  { key: "library", label: "Library", hint: "Offline reference library.", icon: "archive" },
+  { key: "hub", label: "Home", hint: "This MaiPai Home itself.", icon: "home" },
 ];
+
+const ENGINE_HEALTH_ROWS = ENGINE_ROWS.filter((row): row is typeof row & { key: EngineKey } => row.key !== "library" && row.key !== "hub");
 
 export function engineState(engine: EngineHealthEntry): EngineState {
   if (engine.kind === "stub") return { label: "Demo mode", status: "degraded" };
@@ -44,10 +49,9 @@ export function formatUptime(seconds: number): string {
   return unit(Math.max(minutes, 1), "minute");
 }
 
-const ICON_NAMES: Record<string, string> = { Brain: "brain", Understanding: "sparkles", Memory: "circuit-board", Voice: "audio-waveform", Library: "archive", Home: "home" };
 const HEALTH_QUERY_KEY = ["health"];
 
-export function StatusComponents({ person, health: initialHealth }: StatusComponentsProps) {
+export function StatusComponents({ person, health: initialHealth, maintenance = [] }: StatusComponentsProps) {
   const query = useQuery<HealthStatus>({ queryKey: HEALTH_QUERY_KEY, queryFn: () => api.health(), refetchInterval: 15_000, initialData: initialHealth });
   const health = query.data ?? initialHealth;
   const [pendingRole, setPendingRole] = useState<EngineKey | null>(null);
@@ -71,32 +75,35 @@ export function StatusComponents({ person, health: initialHealth }: StatusCompon
   }
 
   const rows = [
-    ...ENGINE_ROWS.map((row) => ({ ...row, state: engineState(health.engines[row.key]) })),
-    ...(health.sidecars.some((item) => item.id === "kiwix-serve") ? [{ key: "library", label: "Library", hint: "Offline reference library.", icon: ICON_NAMES.Library, state: { label: health.sidecars.find((item) => item.id === "kiwix-serve")?.status === "running" ? "Running" : health.sidecars.find((item) => item.id === "kiwix-serve")?.status === "starting" ? "Starting" : "Stopped", status: health.sidecars.find((item) => item.id === "kiwix-serve")?.status === "running" ? "online" as const : "degraded" as const } }] : []),
-    { key: "home", label: "Home", hint: "This MaiPai Home itself.", icon: ICON_NAMES.Home, state: { label: "Running", status: "online" as const } },
+    ...ENGINE_HEALTH_ROWS.map((row) => ({ ...row, state: engineState(health.engines[row.key]) })),
+    ...(health.sidecars.some((item) => item.id === "kiwix-serve") ? [{ ...ENGINE_ROWS.find((row) => row.key === "library")!, state: { label: health.sidecars.find((item) => item.id === "kiwix-serve")?.status === "running" ? "Running" : health.sidecars.find((item) => item.id === "kiwix-serve")?.status === "starting" ? "Starting" : "Stopped", status: health.sidecars.find((item) => item.id === "kiwix-serve")?.status === "running" ? "online" as const : "degraded" as const } }] : []),
+    { ...ENGINE_ROWS.find((row) => row.key === "hub")!, state: { label: "Running", status: "online" as const } },
   ];
 
   return <Card>
-    <CardHeader><CardTitle>Components</CardTitle></CardHeader>
+    <CardHeader><CardTitle>Parts</CardTitle></CardHeader>
     <CardContent className="flex flex-col divide-y divide-border">
       {rows.map((row) => {
         const Icon = getIcon(row.icon ?? "activity");
+        const underMaintenance = maintenance.includes(row.key);
+        const state = underMaintenance ? { label: "Under maintenance", status: "maintenance" as const } : row.state;
         return <div key={row.key} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <div className="flex min-w-0 items-start gap-3"><Icon className="mt-1 size-5 shrink-0 text-muted-foreground" aria-hidden="true" /><div className="min-w-0"><div className="font-medium">{row.label}</div><p className="text-sm text-muted-foreground">{row.hint}</p></div></div>
-          <div className="flex min-h-12 flex-wrap items-center gap-2 pl-8 sm:min-h-0 sm:pl-0"><Status status={row.state.status}>{row.state.label}</Status>{canRestart && "key" in row && ENGINE_ROWS.some((engine) => engine.key === row.key) ? <Button variant="secondary" onClick={() => setPendingRole(row.key as EngineKey)} disabled={restartingRole === row.key}>{restartingRole === row.key ? "Restarting…" : "Restart"}</Button> : null}</div>
+          <div className="flex min-h-12 flex-wrap items-center gap-2 pl-8 sm:min-h-0 sm:pl-0"><Status status={state.status}>{state.label}</Status>{canRestart && !underMaintenance && ENGINE_HEALTH_ROWS.some((engine) => engine.key === row.key) ? <Button variant="secondary" onClick={() => setPendingRole(row.key as EngineKey)} disabled={restartingRole === row.key}>{restartingRole === row.key ? "Restarting…" : "Restart"}</Button> : null}</div>
         </div>;
       })}
     </CardContent>
     <AlertDialog open={pendingRole !== null} onOpenChange={(open) => { if (!open && restartingRole === null) setPendingRole(null); }}>
-          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restart {ENGINE_ROWS.find((row) => row.key === pendingRole)?.label ?? "component"}?</AlertDialogTitle><AlertDialogDescription>Anything using it will pause for a moment.{pendingRole === "chat" ? " A reply being written right now will be cut off." : ""}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={restartingRole !== null}>Cancel</AlertDialogCancel><Button variant="destructive" onClick={handleRestart} disabled={restartingRole !== null}>{restartingRole !== null ? "Restarting…" : "Restart engine"}</Button></AlertDialogFooter></AlertDialogContent>
+          <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restart {ENGINE_HEALTH_ROWS.find((row) => row.key === pendingRole)?.label ?? "part"}?</AlertDialogTitle><AlertDialogDescription>Anything using it will pause for a moment.{pendingRole === "chat" ? " A reply being written right now will be cut off." : ""}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={restartingRole !== null}>Cancel</AlertDialogCancel><Button variant="destructive" onClick={handleRestart} disabled={restartingRole !== null}>{restartingRole !== null ? "Restarting…" : "Restart"}</Button></AlertDialogFooter></AlertDialogContent>
     </AlertDialog>
   </Card>;
 }
 
-export function OverallBanner({ summary, health }: { summary: { level: "online" | "degraded" | "offline"; problems: string[] }; health?: HealthStatus }) {
+export function OverallBanner({ summary, health }: { summary: { level: "online" | "degraded" | "offline" | "maintenance"; problems: string[] }; health?: HealthStatus }) {
   const sentence = summary.level === "online" ? `Everything is running.${health ? ` Up for ${formatUptime(health.uptimeSeconds)}.` : ""}`
     : summary.level === "degraded" ? "Something is starting up or slow."
-      : `${summary.problems.join(", ").replace(/, ([^,]*)$/, " and $1")} ${summary.problems.length === 1 ? "isn't" : "aren't"} running.`;
+      : summary.level === "maintenance" ? "Some parts are under maintenance."
+        : `${summary.problems.join(", ").replace(/, ([^,]*)$/, " and $1")} ${summary.problems.length === 1 ? "isn't" : "aren't"} running.`;
   const state = summary.level === "offline" ? "offline" : summary.level;
-  return <Alert className="flex flex-wrap items-center gap-3"><Status status={state}>{summary.level === "online" ? "Online" : summary.level === "offline" ? "Offline" : "Degraded"}</Status><p className="min-w-0 text-base" role="status">{sentence}</p></Alert>;
+  return <Alert className="flex flex-wrap items-center gap-3"><Status status={state}>{summary.level === "online" ? "Online" : summary.level === "offline" ? "Offline" : summary.level === "maintenance" ? "Maintenance" : "Degraded"}</Status><p className="min-w-0 text-base" role="status">{sentence}</p></Alert>;
 }

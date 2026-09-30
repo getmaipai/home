@@ -247,7 +247,7 @@ describe("StatusComponents", () => {
       await waitFor(() => expect(queryByRole("alertdialog")).not.toBeInTheDocument());
       expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(false);
       fireEvent.click(brainButton);
-      fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Restart engine" }));
+      fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Restart" }));
       await waitFor(() => expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(true));
       expect(calls.filter((call) => call.url.includes("/api/host/engines/chat/restart"))).toEqual([
         { url: "/api/host/engines/chat/restart", method: "POST" },
@@ -277,8 +277,8 @@ describe("StatusComponents", () => {
       const understandingButton = (await findAllByRole("button", { name: "Restart" }))[1];
       if (!understandingButton) throw new Error("Understanding restart button not found");
       fireEvent.click(understandingButton);
-      await waitFor(() => expect(getByRole("button", { name: "Restart engine" })).toBeEnabled());
-      fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Restart engine" }));
+      await waitFor(() => expect(getByRole("button", { name: "Restart" })).toBeEnabled());
+      fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Restart" }));
       expect(await findByText("Understanding could not restart.")).toBeInTheDocument();
     } finally {
       globalThis.fetch = original;
