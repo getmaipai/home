@@ -35,9 +35,22 @@ import { db } from "@/db";
 import { appUpdateState } from "@/db/schema";
 import { trigger } from "@/lib/notifications";
 import { tryConsume } from "@/lib/rateLimiter";
+import { listDevicesByKind } from "@/lib/devices";
+import { getDeviceState } from "@/lib/deviceStates";
 
-const STATE_ROW_ID = "app";
-const GITHUB_API_URL = "https://api.github.com/repos/getmaipai/home/releases/latest";
+// ROBOT-UPDATES-01: the same unauthenticated GitHub release check, now
+// parameterised by repo. Each repo has its own cached `app_update_state`
+// row and its own rate-limit bucket, so a burst of checks on one never
+// uses up the other's allowance.
+interface ReleaseTarget {
+  rowId: string;
+  repo: string;
+  limitKey: string;
+}
+const APP_TARGET: ReleaseTarget = { rowId: "app", repo: "getmaipai/home", limitKey: "updates:github-release-check" };
+const BOT_TARGET: ReleaseTarget = { rowId: "bot", repo: "getmaipai/bot", limitKey: "updates:github-release-check:bot" };
+const NO_RELEASE_MESSAGE = "no release has been published yet";
+const githubApiUrl =(repo: string) => `https://api.github.com/repos/${repo}/releases/latest`;
 
 // "Every integration gets a rate limiter at its single choke point"
 // (CLAUDE.md > Third-party services). One check a day from the core job
@@ -131,21 +144,21 @@ interface UpsertFields {
  * until the review caught it). `notifiedVersion` is read-modify-write
  * (never overwritten by this function itself) so a plain state update
  * never has to know or re-supply whether a notification already fired. */
-function upsertState(fields: UpsertFields): void {
+function upsertState(rowId: string, fields: UpsertFields): void {
   const { assets, ...rest } = fields;
   const values = { ...rest, assetsJson: JSON.stringify(assets) };
   db.insert(appUpdateState)
-    .values({ id: STATE_ROW_ID, ...values })
+    .values({ id: rowId, ...values })
     .onConflictDoUpdate({ target: appUpdateState.id, set: values })
     .run();
 }
 
 function currentNotifiedVersion(): string | null {
-  return db.select({ v: appUpdateState.notifiedVersion }).from(appUpdateState).where(eq(appUpdateState.id, STATE_ROW_ID)).get()?.v ?? null;
+  return db.select({ v: appUpdateState.notifiedVersion }).from(appUpdateState).where(eq(appUpdateState.id, APP_TARGET.rowId)).get()?.v ?? null;
 }
 
 function markNotified(version: string): void {
-  db.update(appUpdateState).set({ notifiedVersion: version }).where(eq(appUpdateState.id, STATE_ROW_ID)).run();
+  db.update(appUpdateState).set({ notifiedVersion: version }).where(eq(appUpdateState.id, APP_TARGET.rowId)).run();
 }
 
 // Fully anchored (`$` at the end, not just `^v?` at the start): a code
@@ -187,15 +200,45 @@ export function isNewerVersion(installed: string, latest: string): boolean {
  * past the scheduled job that calls this unattended. Rate-limited and
  * time-bounded: see this file's own top-of-file comments for both. */
 export async function checkForAppUpdate(): Promise<UpdateProjection> {
-  const now = new Date().toISOString();
-
-  if (!tryConsume("updates:github-release-check", GITHUB_RATE_LIMIT)) {
+  const limited = await checkRelease(APP_TARGET);
+  if (limited) {
     const message = "checked too recently - try again later";
-    return projectionFromState({ checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message });
+    return projectionFromState({ checkedAt: new Date().toISOString(), latestVersion: null, latestUrl: null, latestSummary: null, error: message });
   }
+  return cachedUpdateProjection();
+}
+
+/** ROBOT-UPDATES-01: the Bot's own release check, run only when at least
+ * one `robot` device is paired (no robot, no request to GitHub about the
+ * Bot). Never throws; a failure is recorded on the Bot's own state row
+ * and surfaces as `robotsError`, never touching Home's own row. */
+export async function checkForBotUpdate(): Promise<void> {
+  if (listDevicesByKind("robot").length === 0) return;
+  await checkRelease(BOT_TARGET);
+}
+
+/** Everything the daily `updates.check` job and the manual "check now"
+ * button run: Home's own release, then the Bot's when a robot is paired.
+ * The two are independent, so one failing never skips the other. */
+export async function checkForUpdates(): Promise<UpdateProjection> {
+  const projection = await checkForAppUpdate();
+  await checkForBotUpdate();
+  return projection;
+}
+
+/** One rate-limited, time-bounded GET of `target.repo`'s latest release,
+ * recorded in that repo's own state row. Returns true when the rate
+ * limit refused the call (nothing was requested or written). Never
+ * throws. Only the app's own target fires `updates.available`; the Bot's
+ * release is shown on Settings > Updates, never announced. */
+async function checkRelease(target: ReleaseTarget): Promise<boolean> {
+  const now = new Date().toISOString();
+  const rowId = target.rowId;
+
+  if (!tryConsume(target.limitKey, GITHUB_RATE_LIMIT)) return true;
 
   try {
-    const res = await fetch(GITHUB_API_URL, {
+    const res = await fetch(githubApiUrl(target.repo), {
       headers: { Accept: "application/vnd.github+json" },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
@@ -205,13 +248,14 @@ export async function checkForAppUpdate(): Promise<UpdateProjection> {
       // since a household's own projection has nothing to show either
       // way, but the wording should say "checked, nothing published"
       // rather than imply something broke.
-      const message = res.status === 404 ? "no release has been published yet" : `GitHub returned ${res.status}`;
-      upsertState({ checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message, assets: [] });
-      return cachedUpdateProjection();
+      const message = res.status === 404 ? NO_RELEASE_MESSAGE : `GitHub returned ${res.status}`;
+      upsertState(rowId, { checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message, assets: [] });
+      return false;
     }
     const release = (await res.json()) as GitHubRelease;
     const assets: UpdateAsset[] = release.assets.map((a) => ({ name: a.name, url: a.browser_download_url, digest: a.digest ?? null }));
-    upsertState({ checkedAt: now, latestVersion: release.tag_name, latestUrl: release.html_url, latestSummary: release.body, error: null, assets });
+    upsertState(rowId, { checkedAt: now, latestVersion: release.tag_name, latestUrl: release.html_url, latestSummary: release.body, error: null, assets });
+    if (rowId !== APP_TARGET.rowId) return false;
     // Issue #40: this used to build its own transient projection here
     // (never persisting `assets`), so it was the ONLY caller that ever
     // saw them - every later GET /api/updates/ (cachedUpdateProjection())
@@ -232,11 +276,11 @@ export async function checkForAppUpdate(): Promise<UpdateProjection> {
       await trigger("updates.available", { version: projection.latest });
       markNotified(projection.latest);
     }
-    return projection;
+    return false;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    upsertState({ checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message, assets: [] });
-    return cachedUpdateProjection();
+    upsertState(rowId, { checkedAt: now, latestVersion: null, latestUrl: null, latestSummary: null, error: message, assets: [] });
+    return false;
   }
 }
 
@@ -280,9 +324,64 @@ function projectionFromState(state: StoredState): UpdateProjection {
  * should call; the daily core job is the only caller of
  * checkForAppUpdate() itself. */
 export function cachedUpdateProjection(): UpdateProjection {
-  const row = db.select().from(appUpdateState).where(eq(appUpdateState.id, STATE_ROW_ID)).get();
+  const row = db.select().from(appUpdateState).where(eq(appUpdateState.id, APP_TARGET.rowId)).get();
   if (!row) {
     return projectionFromState({ checkedAt: null, latestVersion: null, latestUrl: null, latestSummary: null, error: null });
   }
   return projectionFromState(row);
+}
+
+export interface RobotUpdateRow {
+  id: string;
+  name: string;
+  /** The MaiPai version the robot reports (`app_version`); null when it
+   * never has - shown as unknown, never compared. */
+  installed: string | null;
+  /** The latest MaiPai Bot release tag, or null before a good check. */
+  latest: string | null;
+  /** The body's own software (Pollen's SDK), shown as detail only. */
+  daemonVersion: string | null;
+  updateAvailable: boolean;
+  /** Set only while an update is available: installing robot updates
+   * from Home is ROBOT-UPDATE-APPLY-01, not built. */
+  blockedBy: string | null;
+  lastChecked: string | null;
+}
+
+export interface RobotUpdates {
+  robots: RobotUpdateRow[];
+  robotsError: string | null;
+}
+
+const ROBOT_INSTALL_BLOCKED = "Installing robot updates from Home isn't built yet.";
+
+/** ROBOT-UPDATES-01: one row per paired robot, read from the cached Bot
+ * release check (never calls GitHub). A robot that has not reported an
+ * `app_version` is unknown and never marked as having an update. */
+export function cachedRobotUpdates(): RobotUpdates {
+  const robots = listDevicesByKind("robot");
+  if (robots.length === 0) return { robots: [], robotsError: null };
+  const row = db.select().from(appUpdateState).where(eq(appUpdateState.id, BOT_TARGET.rowId)).get();
+  const latest = row?.latestVersion ?? null;
+  return {
+    robots: robots.map((device) => {
+      const state = getDeviceState(device.id);
+      const installed = state?.app_version ?? null;
+      const updateAvailable = installed !== null && latest !== null && isNewerVersion(installed, latest);
+      return {
+        id: device.id,
+        name: device.name,
+        installed,
+        latest,
+        daemonVersion: state?.daemon_version ?? null,
+        updateAvailable,
+        blockedBy: updateAvailable ? ROBOT_INSTALL_BLOCKED : null,
+        lastChecked: row?.checkedAt ?? null,
+      };
+    }),
+    // "No release published yet" is a checked answer, not a failure (the
+    // row's latest stays null and the page says so); only a real failed
+    // check is an error.
+    robotsError: row?.error && row.error !== NO_RELEASE_MESSAGE ? row.error : null,
+  };
 }

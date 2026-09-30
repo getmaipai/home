@@ -3,7 +3,9 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { checkForAppUpdate, cachedUpdateProjection, isNewerVersion } from "@/lib/updates";
+import { checkForAppUpdate, checkForUpdates, cachedUpdateProjection, isNewerVersion } from "@/lib/updates";
+import { issueDeviceToken } from "@/lib/deviceTokens";
+import { upsertDeviceState } from "@/lib/deviceStates";
 import { listPending } from "@/lib/notifications";
 import { sqlite } from "@/db";
 import { mkdirSync } from "node:fs";
@@ -411,5 +413,206 @@ describe("GET /api/updates, with a configured Stack", () => {
     expect(res.status).toBe(503);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe("updates model unavailable: the Stack is offline");
+  });
+});
+
+
+// ROBOT-UPDATES-01: one GitHub call per repo, the Bot's only when a robot
+// is paired, and one honest row per paired robot.
+describe("robot update rows", () => {
+  const HOME_URL = "https://api.github.com/repos/getmaipai/home/releases/latest";
+  const BOT_URL = "https://api.github.com/repos/getmaipai/bot/releases/latest";
+  const release = (tag: string) => ({ tag_name: tag, html_url: `https://github.com/getmaipai/bot/releases/tag/${tag}`, body: "notes", assets: [] });
+
+  /** A fake GitHub keyed by URL; records every URL asked for. */
+  function fakeGitHub(answers: Record<string, { status: number; body: unknown } | "network-error">) {
+    const originalFetch = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = mock((input: unknown) => {
+      const url = String(input);
+      urls.push(url);
+      const answer = answers[url];
+      if (!answer) return Promise.resolve(new Response("{}", { status: 404 }));
+      if (answer === "network-error") return Promise.reject(new Error("connection refused"));
+      return Promise.resolve(new Response(JSON.stringify(answer.body), { status: answer.status }));
+    }) as unknown as typeof fetch;
+    return { urls, restore: () => { globalThis.fetch = originalFetch; } };
+  }
+
+  async function ownerAndPersonId(): Promise<{ owner: TestClient; personId: string }> {
+    const owner = new TestClient();
+    const res = await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const { person } = (await res.json()) as { person: { id: string } };
+    return { owner, personId: person.id };
+  }
+
+  function pairRobot(personId: string, name: string, frame?: { app_version?: string | null; daemon_version?: string | null }): string {
+    const { deviceId } = issueDeviceToken(personId, "robot", name);
+    if (frame) upsertDeviceState(deviceId, { activity: "idle", muted: false, tracking: false, ...frame });
+    return deviceId;
+  }
+
+  type RobotsBody = {
+    robots: Array<{ id: string; name: string; installed: string | null; latest: string | null; daemonVersion: string | null; updateAvailable: boolean; blockedBy: string | null; lastChecked: string | null }>;
+    robotsError: string | null;
+    installed: string;
+    latest: string | null;
+    error: string | null;
+  };
+  const readRobots = async (owner: TestClient) => (await (await owner.get("/api/updates")).json()) as RobotsBody;
+
+  test("no robot paired: no request to the Bot's releases, and robots is an empty list", async () => {
+    const { owner } = await ownerAndPersonId();
+    const github = fakeGitHub({ [HOME_URL]: { status: 200, body: release("v0.1.0") }, [BOT_URL]: { status: 200, body: release("v0.2.0") } });
+    try {
+      await checkForUpdates();
+      expect(github.urls).toEqual([HOME_URL]);
+      const body = await readRobots(owner);
+      expect(body.robots).toEqual([]);
+      expect(body.robotsError).toBeNull();
+    } finally {
+      github.restore();
+    }
+  });
+
+  test("a robot on 0.1.0 with a scripted v0.2.0 Bot release gives an update row that is honestly blocked", async () => {
+    const { owner, personId } = await ownerAndPersonId();
+    const deviceId = pairRobot(personId, "Reachy", { app_version: "0.1.0", daemon_version: "1.2.3" });
+    const github = fakeGitHub({ [HOME_URL]: { status: 200, body: release("v0.1.0") }, [BOT_URL]: { status: 200, body: release("v0.2.0") } });
+    try {
+      await checkForUpdates();
+      expect([...github.urls].sort()).toEqual([BOT_URL, HOME_URL].sort());
+    } finally {
+      github.restore();
+    }
+    const body = await readRobots(owner);
+    expect(body.robotsError).toBeNull();
+    expect(body.robots).toHaveLength(1);
+    expect(body.robots[0]).toMatchObject({
+      id: deviceId,
+      name: "Reachy",
+      installed: "0.1.0",
+      latest: "v0.2.0",
+      daemonVersion: "1.2.3",
+      updateAvailable: true,
+      blockedBy: "Installing robot updates from Home isn't built yet.",
+    });
+    expect(body.robots[0]!.lastChecked).toBeString();
+  });
+
+  test("a robot on the latest Bot release shows no update and no block", async () => {
+    const { owner, personId } = await ownerAndPersonId();
+    pairRobot(personId, "Reachy", { app_version: "0.2.0", daemon_version: "1.2.3" });
+    const github = fakeGitHub({ [HOME_URL]: { status: 200, body: release("v0.1.0") }, [BOT_URL]: { status: 200, body: release("v0.2.0") } });
+    try {
+      await checkForUpdates();
+    } finally {
+      github.restore();
+    }
+    const row = (await readRobots(owner)).robots[0]!;
+    expect(row).toMatchObject({ installed: "0.2.0", latest: "v0.2.0", updateAvailable: false, blockedBy: null });
+  });
+
+  test("a robot that never reported app_version is shown as unknown and never marked as having an update", async () => {
+    const { owner, personId } = await ownerAndPersonId();
+    pairRobot(personId, "Never reported");
+    pairRobot(personId, "Old build", { daemon_version: "1.2.3" });
+    const github = fakeGitHub({ [HOME_URL]: { status: 200, body: release("v0.1.0") }, [BOT_URL]: { status: 200, body: release("v9.9.9") } });
+    try {
+      await checkForUpdates();
+    } finally {
+      github.restore();
+    }
+    const body = await readRobots(owner);
+    expect(body.robots).toHaveLength(2);
+    for (const row of body.robots) {
+      expect(row.installed).toBeNull();
+      expect(row.latest).toBe("v9.9.9");
+      expect(row.updateAvailable).toBe(false);
+      expect(row.blockedBy).toBeNull();
+    }
+    expect(body.robots.find((r) => r.name === "Old build")?.daemonVersion).toBe("1.2.3");
+  });
+
+  test("a failed Bot check shows in robotsError and leaves Home's own row alone", async () => {
+    const { owner, personId } = await ownerAndPersonId();
+    pairRobot(personId, "Reachy", { app_version: "0.1.0" });
+    const github = fakeGitHub({ [HOME_URL]: { status: 200, body: release("v0.1.5") }, [BOT_URL]: "network-error" });
+    try {
+      await checkForUpdates();
+    } finally {
+      github.restore();
+    }
+    const body = await readRobots(owner);
+    expect(body.robotsError).toContain("connection refused");
+    expect(body.robots[0]).toMatchObject({ installed: "0.1.0", latest: null, updateAvailable: false, blockedBy: null });
+    expect(body.latest).toBe("v0.1.5");
+    expect(body.error).toBeNull();
+  });
+
+  test("no Bot release published yet (404) is not an error: robotsError stays null and no update shows", async () => {
+    const { owner, personId } = await ownerAndPersonId();
+    pairRobot(personId, "Reachy", { app_version: "0.1.0" });
+    const github = fakeGitHub({ [HOME_URL]: { status: 200, body: release("v0.1.0") }, [BOT_URL]: { status: 404, body: { message: "Not Found" } } });
+    try {
+      await checkForUpdates();
+    } finally {
+      github.restore();
+    }
+    const body = await readRobots(owner);
+    expect(body.robotsError).toBeNull();
+    expect(body.robots[0]).toMatchObject({ installed: "0.1.0", latest: null, updateAvailable: false, blockedBy: null });
+    expect(body.robots[0]!.lastChecked).toBeString();
+  });
+
+  test("a failed Home check does not hide a good Bot check", async () => {
+    const { owner, personId } = await ownerAndPersonId();
+    pairRobot(personId, "Reachy", { app_version: "0.1.0" });
+    const github = fakeGitHub({ [HOME_URL]: "network-error", [BOT_URL]: { status: 200, body: release("v0.2.0") } });
+    try {
+      await checkForUpdates();
+    } finally {
+      github.restore();
+    }
+    const body = await readRobots(owner);
+    expect(body.error).toContain("connection refused");
+    expect(body.robotsError).toBeNull();
+    expect(body.robots[0]!.updateAvailable).toBe(true);
+  });
+
+  test("the Bot's check has its own rate limit, so Home's checks never use it up", async () => {
+    const { personId } = await ownerAndPersonId();
+    pairRobot(personId, "Reachy", { app_version: "0.1.0" });
+    const github = fakeGitHub({ [HOME_URL]: { status: 200, body: release("v0.1.0") }, [BOT_URL]: { status: 200, body: release("v0.2.0") } });
+    try {
+      for (let i = 0; i < 6; i++) await checkForUpdates();
+      expect(github.urls.filter((u) => u === HOME_URL)).toHaveLength(5);
+      expect(github.urls.filter((u) => u === BOT_URL)).toHaveLength(5);
+    } finally {
+      github.restore();
+    }
+  });
+
+  test("the existing projection fields are untouched and the new ones are additive", async () => {
+    const { owner } = await ownerAndPersonId();
+    const body = (await (await owner.get("/api/updates")).json()) as Record<string, unknown>;
+    for (const key of ["installed", "latest", "summary", "url", "assets", "channel", "progress", "needs", "blockedBy", "checkedAt", "error", "stack", "stackError", "reference", "referenceError"]) {
+      expect(body).toHaveProperty(key);
+    }
+    expect(body.robots).toEqual([]);
+    expect(body.robotsError).toBeNull();
+  });
+
+  test("POST /api/updates/check also refreshes the Bot's row when a robot is paired", async () => {
+    const { owner, personId } = await ownerAndPersonId();
+    pairRobot(personId, "Reachy", { app_version: "0.1.0" });
+    const github = fakeGitHub({ [HOME_URL]: { status: 200, body: release("v0.1.0") }, [BOT_URL]: { status: 200, body: release("v0.2.0") } });
+    try {
+      expect((await owner.post("/api/updates/check", {})).status).toBe(200);
+      expect(github.urls).toContain(BOT_URL);
+    } finally {
+      github.restore();
+    }
+    expect((await readRobots(owner)).robots[0]!.latest).toBe("v0.2.0");
   });
 });

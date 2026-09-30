@@ -32243,6 +32243,44 @@ Full work orders: this repo's own BACKLOG (`ROBOT-CARD-01`, hub half),
 (`ROBOT-STATE-SPEC-01`). `bot`'s own `docs/dev.md` carries the
 bot-side pointer to this record, not a duplicate.
 
+## ROBOT-UPDATES-01: the robot's update rows (2026-09-30)
+
+Decision (design-resolver, 2026-09-30): a robot's vendor update is a MaiPai
+Bot release, read from GitHub Releases of `getmaipai/bot` and compared with
+the `app_version` the robot itself reports (`RobotState.app_version`, spec
+v0.1.57, stored in `device_states.app_version`). The body's own software
+(`daemon_version`, Pollen's SDK) is detail only: `bot/body/pyproject.toml`
+pins it, so it moves only with a Bot release and never gets its own row
+(UPDATES.md: a sidecar never updates alone).
+
+How it works:
+
+- `lib/updates.ts` runs one release check per repo (`ReleaseTarget`: state
+  row id, repo, rate-limit bucket). Home's row is `app` and is unchanged;
+  the Bot's is a second `app_update_state` row, `bot`, with its own
+  5-per-burst rate limit so one never uses up the other's allowance. Only
+  Home's check fires the `updates.available` notification.
+- `checkForUpdates()` (the daily `updates.check` job, and `POST
+  /api/updates/check`) runs Home's check, then the Bot's only when at
+  least one `robot` device is paired. No robot, no request about the Bot.
+  A failure of one never skips or overwrites the other.
+- `GET /api/updates` gains `robots` and `robotsError`, additive. `robots`
+  is one entry per paired robot: `id`, `name`, `installed` (`app_version`,
+  or null when never reported), `latest` (the Bot release tag, or null
+  before a good check), `daemonVersion`, `updateAvailable`, `blockedBy`,
+  `lastChecked`. A robot with a null `installed` is never marked
+  `updateAvailable`. `blockedBy` is set only while an update is available,
+  and says "Installing robot updates from Home isn't built yet." until
+  ROBOT-UPDATE-APPLY-01 exists. `robotsError` carries the Bot check's
+  failure text; `[]` and null when no robot is paired.
+- Settings > Updates draws each robot as a row in the same table as
+  Home's; there is no action menu on it. The Devices card labels its
+  versions "MaiPai version" (`app_version`) and "Body software"
+  (`daemon_version`).
+- Privacy: the existing `platform:update-check` row now says the second,
+  Bot request happens only while a robot is paired. It is the same
+  unauthenticated `api.github.com` call, no identifier sent.
+
 ## ROBOT-MUTE-01: the mute command needs its own channel (filed 2026-09-29)
 
 Surfaced while resolving ROBOT-CARD-01's state transport: `bot`'s

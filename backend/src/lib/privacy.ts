@@ -160,7 +160,7 @@ export function platformConnections(): PrivacyConnection[] {
     // MaiPai-operated server.
     row("platform:update-check", "api.github.com", {
       when: "automatically, at most once a day",
-      what: "a request for this project's latest release information, and your home's internet address. Nothing anyone in the house said, asked, or saved.",
+      what: "a request for this project's latest release information, and, only when a MaiPai robot is paired, a second request for MaiPai Bot's latest release information, plus your home's internet address. No name or device ID goes with either. Nothing anyone in the house said, asked, or saved.",
     }),
     // KIWIX-SIDECAR-01's own gap: kiwix-serve itself sends nothing (it
     // only listens on this computer), but installing it in the first

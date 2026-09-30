@@ -90,6 +90,15 @@ describe("the hub's own connections", () => {
     expect(byId.get("platform:text-embedding-model")?.destination).toContain("huggingface.co");
   });
 
+  // ROBOT-UPDATES-01: the daily update check also reads MaiPai Bot's
+  // releases when a robot is paired, the same unauthenticated call.
+  test("the update check row says Home also reads MaiPai Bot's releases when a robot is paired", () => {
+    const row = platformConnections().find((r) => r.id === "platform:update-check");
+    expect(row?.destination).toBe("api.github.com");
+    expect(row?.what).toContain("MaiPai Bot");
+    expect(row?.what).toContain("robot is paired");
+  });
+
   // #112: the background memory helper's model download was missing from
   // this table, and the embedding row still described a retired keyword
   // scorer instead of the embedder memory recall now uses.

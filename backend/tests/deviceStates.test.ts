@@ -34,6 +34,7 @@ const frame = {
   on_battery: null,
   battery_level: 0.73,
   daemon_version: "1.2.3",
+  app_version: "0.1.0",
 } as const;
 
 describe("PUT /api/devices/me/state", () => {
@@ -49,6 +50,19 @@ describe("PUT /api/devices/me/state", () => {
     expect(state).toMatchObject({ ...frame, reachable: true, unreachableSince: null });
     expect(robots.find((device) => device.id === deviceId)?.state).toEqual(state);
     expect(db.select().from(deviceStates).where(eq(deviceStates.deviceId, deviceId)).get()?.reportedAt).toBeString();
+  });
+
+  test("app_version is stored and returned, and reads as null when the robot leaves it out", async () => {
+    const { client: owner, personId } = await ownerSession();
+    const { client: robot, deviceId } = await deviceSession(personId);
+    const stateOf = async () => ((await (await owner.get("/api/devices/robots")).json()) as Array<{ id: string; state: { app_version: string | null } | null }>).find((d) => d.id === deviceId)?.state;
+    await robot.request("/api/devices/me/state", { method: "PUT", body: frame });
+    expect((await stateOf())?.app_version).toBe("0.1.0");
+    const { app_version: _omitted, ...withoutVersion } = frame;
+    await robot.request("/api/devices/me/state", { method: "PUT", body: withoutVersion });
+    expect((await stateOf())?.app_version).toBeNull();
+    await robot.request("/api/devices/me/state", { method: "PUT", body: { ...frame, app_version: null } });
+    expect((await stateOf())?.app_version).toBeNull();
   });
 
   test("a person's session gets 403", async () => {

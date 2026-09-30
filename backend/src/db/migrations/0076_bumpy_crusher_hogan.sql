@@ -1,0 +1,1 @@
+ALTER TABLE `device_states` ADD `app_version` text;

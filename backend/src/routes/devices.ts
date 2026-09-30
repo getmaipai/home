@@ -35,6 +35,7 @@ const DeviceSchema = z.object({
     on_battery: z.boolean().nullable(),
     battery_level: z.number().nullable(),
     daemon_version: z.string().nullable(),
+    app_version: z.string().nullable(),
     reachable: z.boolean(),
     unreachableSince: z.string().nullable(),
   }).nullable(),

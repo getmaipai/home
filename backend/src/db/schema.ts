@@ -999,6 +999,8 @@ export const deviceStates = sqliteTable("device_states", {
   onBattery: integer("on_battery", { mode: "boolean" }),
   batteryLevel: real("battery_level"),
   daemonVersion: text("daemon_version"),
+  // ROBOT-UPDATES-01: the MaiPai app version the robot runs (spec-v0.1.57).
+  appVersion: text("app_version"),
   reportedAt: text("reported_at").notNull(),
 });
 

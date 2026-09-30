@@ -41,7 +41,7 @@ import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle
 import { trigger } from "@/lib/notifications";
 import { checkDiskFull } from "@/lib/storage";
 import { reconcileFileStore } from "@/lib/storage/usage";
-import { checkForAppUpdate } from "@/lib/updates";
+import { checkForUpdates } from "@/lib/updates";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { stackUpdatesEnabled, checkStackUpdates, runStackReadinessCheck, sweepStackStorage } from "@/lib/stackUpdates";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -253,7 +253,7 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
     reconcileFileStore();
   },
   "updates.check": async () => {
-    await checkForAppUpdate();
+    await checkForUpdates();
   },
   // HOME-STACK-05: the maintenance the Stack does not schedule for
   // itself (stack/docs/integrations.md) - gated on the household's own

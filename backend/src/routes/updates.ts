@@ -3,7 +3,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRoleOrGrant } from "@/middleware/auth";
-import { cachedUpdateProjection, checkForAppUpdate } from "@/lib/updates";
+import { cachedUpdateProjection, cachedRobotUpdates, checkForUpdates, type RobotUpdates } from "@/lib/updates";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { getStackUpdatesState, checkStackUpdates, applyStackEngineUpdate, rollbackStackEngine, sweepStackStorage, runStackReadinessCheck } from "@/lib/stackUpdates";
 import { getReferenceUpdates, type ReferenceUpdates } from "@/lib/referenceLibrary";
@@ -46,11 +46,27 @@ const ReferenceUpdatesSchema = z.object({ lastChecked: z.string(), entries: z.ar
 // or when there's simply no Stack configured; set only when a Stack IS
 // configured but the read failed, so the page can say why the section
 // is missing instead of looking like there was never a Stack at all.
+// ROBOT-UPDATES-01: robots/robotsError are additive too. `robots` is one
+// entry per paired robot ([] when none is paired, and then the Bot's
+// releases were never requested); robotsError is set only when the last
+// Bot release check failed.
+const RobotUpdateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  installed: z.string().nullable().openapi({ description: "The MaiPai version the robot reports (app_version); null when it never has." }),
+  latest: z.string().nullable().openapi({ description: "The latest MaiPai Bot release tag; null before a good check." }),
+  daemonVersion: z.string().nullable().openapi({ description: "The body's own software version, shown as detail only." }),
+  updateAvailable: z.boolean().openapi({ description: "Never true while installed is null." }),
+  blockedBy: z.string().nullable().openapi({ description: "Set while an update is available: Home cannot install robot updates yet." }),
+  lastChecked: z.string().nullable(),
+});
 const UpdatesResponseSchema = UpdateProjectionSchema.extend({
   stack: StackUpdatesSchema.nullable(),
   stackError: z.string().nullable(),
   reference: ReferenceUpdatesSchema.nullable(),
   referenceError: z.string().nullable(),
+  robots: z.array(RobotUpdateSchema),
+  robotsError: z.string().nullable(),
 });
 
 // Every signed-in person can see whether an update is available -
@@ -75,10 +91,17 @@ updatesRoutes.openapi(getRoute, async (c) => {
   } catch (err) {
     referenceError = err instanceof Error ? err.message : String(err);
   }
-  if (!isStackConfigured()) return c.json({ ...app, stack: null, stackError: null, reference, referenceError }, 200);
+  let robotUpdates: RobotUpdates = { robots: [], robotsError: null };
+  try {
+    robotUpdates = cachedRobotUpdates();
+  } catch (err) {
+    robotUpdates = { robots: [], robotsError: err instanceof Error ? err.message : String(err) };
+  }
+  const { robots, robotsError } = robotUpdates;
+  if (!isStackConfigured()) return c.json({ ...app, stack: null, stackError: null, reference, referenceError, robots, robotsError }, 200);
   const stack = await getStackUpdatesState();
-  if (!stack.ok) return c.json({ ...app, stack: null, stackError: stack.error, reference, referenceError }, 200);
-  return c.json({ ...app, stack: { checksEnabled: stack.value.checksEnabled, engines: stack.value.engines, models: stack.value.models }, stackError: null, reference, referenceError }, 200);
+  if (!stack.ok) return c.json({ ...app, stack: null, stackError: stack.error, reference, referenceError, robots, robotsError }, 200);
+  return c.json({ ...app, stack: { checksEnabled: stack.value.checksEnabled, engines: stack.value.engines, models: stack.value.models }, stackError: null, reference, referenceError, robots, robotsError }, 200);
 });
 
 // Owner/admin (or a backups.run grant, the closest existing action to
@@ -96,7 +119,7 @@ const checkRoute = createRoute({
     ...errorResponses({ 403: "Not owner/admin" }),
   },
 });
-updatesRoutes.openapi(checkRoute, async (c) => c.json(await checkForAppUpdate(), 200));
+updatesRoutes.openapi(checkRoute, async (c) => c.json(await checkForUpdates(), 200));
 
 const nameParamSchema = z.object({ name: z.string().openapi({ param: { name: "name", in: "path" }, example: "llama-server" }) });
 
