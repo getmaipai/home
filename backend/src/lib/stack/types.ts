@@ -1,6 +1,14 @@
 // The Stack's wire shapes, hand-copied field-for-field from
 // stack/backend/src/spec/schemas/. A follow-up swaps them for
 // @maipai/spec once those schemas move into shared/spec.
+import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
+export type { StackFitPlan };
+
+export interface FitPlanRequest {
+  source: { url: string } | { path: string } | { repo: string; revision?: string };
+  context_tokens?: number;
+  kv_cache_type?: "f16" | "q8_0" | "q4_0";
+}
 
 // role-request.schema.json
 export interface RoleRequest {

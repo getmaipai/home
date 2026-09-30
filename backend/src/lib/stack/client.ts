@@ -21,6 +21,8 @@ import type {
   StackEngineRollbackResult,
   StackStorageSweepResult,
   StackCheckRun,
+  FitPlanRequest,
+  StackFitPlan,
 } from "./types";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8770";
@@ -63,6 +65,7 @@ export interface StackClient {
   settings(opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
   applySettings(values: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
   budget(opts?: { signal?: AbortSignal }): Promise<BudgetResponse>;
+  fitPlan(body: FitPlanRequest, opts?: { signal?: AbortSignal }): Promise<StackFitPlan>;
   hardware(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   updates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
   checkUpdates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
@@ -304,6 +307,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     settings: (opts) => call("/stack/v1/settings", { method: "GET" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
     applySettings: (values, opts) => call("/stack/v1/settings/apply", jsonInit(values), json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
     budget: (opts) => call("/stack/v1/hardware/budget", { method: "GET" }, json<BudgetResponse>, opts),
+    fitPlan: (body, opts) => call("/stack/v1/fit-plan", jsonInit(body), json<StackFitPlan>, opts),
     hardware: (opts) => call("/stack/v1/hardware", { method: "GET" }, json<Record<string, unknown>>, opts),
     updates: (opts) => call("/stack/v1/updates", { method: "GET" }, json<StackUpdatesState>, opts),
     checkUpdates: (opts) => call("/stack/v1/updates/check", { method: "POST" }, json<StackUpdatesState>, opts),
