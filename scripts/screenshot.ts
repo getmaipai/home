@@ -252,6 +252,7 @@ const nextPrivacyReview = process.argv.includes("--next-privacy-review");
 const nextPersonProfileReview = process.argv.includes("--next-person-profile-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
 const statusA2bReview = process.argv.includes("--status-a2b-review");
+const statusA2cReview = process.argv.includes("--status-a2c-review");
 const statusB2bReview = process.argv.includes("--status-b2b-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
@@ -3555,6 +3556,57 @@ async function captureStatusB2bReview(browser: Browser, ownerSession: string): P
   console.log("The completed window starts yesterday and ends just before capture because the real API rejects past end times.");
 }
 
+async function captureStatusA2cReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-a2c";
+  mkdirSync(outDir, { recursive: true });
+  const headers = { "Content-Type": "application/json", Cookie: `session=${ownerSession}` };
+  const now = Date.now();
+  const viewports = [VIEWPORTS.find((item) => item.slug === "desktop")!, VIEWPORTS.find((item) => item.slug === "phone")!];
+  const states = ["all-good", "one-down", "starting", "maintenance"] as const;
+  for (const state of states) {
+    if (state === "maintenance") {
+      const maintenance = await fetch(`${BASE_URL}/api/status/maintenance`, { method: "POST", headers, body: JSON.stringify({
+        title: "Voice tune-up", description: "A short planned update.", components: ["voice"],
+        starts_at: new Date(now - 60_000).toISOString(), ends_at: new Date(now + 45 * 60_000).toISOString(),
+      }) });
+      if (!maintenance.ok) throw new Error(`STATUS-A2c maintenance seed failed: ${maintenance.status} ${await maintenance.text()}`);
+    }
+    for (const viewport of viewports) {
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, ownerSession);
+        try {
+          if (state !== "maintenance") {
+            await context.route("**/api/health", async (route) => {
+              const response = await route.fetch();
+              const health = await response.json() as { ok: boolean; engines: Record<string, { kind: string; pid: number | null; alive: boolean | null }> };
+              const engines = { ...health.engines };
+              if (state === "one-down") engines.chat = { kind: "stopped", pid: null, alive: null };
+              if (state === "starting") engines.chat = { kind: "starting", pid: null, alive: null };
+              if (state === "all-good") for (const role of Object.keys(engines)) engines[role] = { kind: "spawned", pid: null, alive: true };
+              const sidecars = state === "all-good" ? [] : (health as typeof health & { sidecars?: unknown[] }).sidecars;
+              await route.fulfill({ response, json: { ...health, ok: state !== "one-down", engines, sidecars } });
+            });
+          }
+          const page = await context.newPage();
+          await page.goto(`${BASE_URL}/status`);
+          await page.locator("[data-status-banner]").waitFor();
+          if (state === "one-down") await page.getByText("Brain isn't running").waitFor();
+          if (state === "starting") await page.getByText("Brain is starting up").waitFor();
+          if (state === "maintenance") await page.getByText("Scheduled maintenance is in progress").waitFor();
+          if (state === "all-good") {
+            try { await page.getByText("We're fully operational").waitFor({ timeout: 5000 }); }
+            catch { throw new Error(`STATUS-A2c all-good banner was: ${await page.locator("[data-status-banner]").innerText()}`); }
+          }
+          const path = join(outDir, `status-${state}-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path, fullPage: true });
+          console.log(`Wrote ${path}`);
+        } finally { await context.close(); }
+      }
+    }
+  }
+  console.log("One-down and starting captures rewrite only the browser's own /api/health response. Maintenance is created through the isolated backend's owner route.");
+}
+
 /** SHELL-07's own acceptance ("captures"): both viewports, both
  * themes, of `/updates`. Waits on "MaiPai Home" - the app's own
  * row is always present regardless of whether a Stack is configured,
@@ -4438,6 +4490,11 @@ async function main() {
     if (statusB2bReview) {
       await captureStatusB2bReview(browser, sessionValue);
       console.log("completed named review: --status-b2b-review");
+      return;
+    }
+    if (statusA2cReview) {
+      await captureStatusA2cReview(browser, sessionValue);
+      console.log("completed named review: --status-a2c-review");
       return;
     }
     if (statusA2bReview) {

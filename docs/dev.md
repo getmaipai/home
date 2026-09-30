@@ -131,6 +131,23 @@ test. The four part labels live in `ENGINE_ROWS` there, shared with
 `statusSummary()`. The screenshot and accessibility route list includes
 `/status`. Reliability history, notes, and maintenance remain later slices.
 
+## STATUS-A2c
+
+The `/status` banner now has a full-width, tinted heading with a large
+state icon and plain copy for good, starting, down, and maintenance states.
+Unavailable parts appear as red chips, and maintenance shows its affected
+parts and local end time. An incident card sits below the banner only while
+a part is down or starting. Both members and admins see the same card.
+
+The status page keeps the note, banner, incident, maintenance, and Parts
+sections in that order. `StatusBanner` and `StatusIncident` have focused
+tests, and the page test checks the section order. The headless capture mode
+`bun run screenshots --status-a2c-review` saves all-good, one-down, starting,
+and maintenance states at 1440 and 390 pixels in light and dark themes under
+`data-scratch/screens/status-a2c/`. The down and starting views change only
+the browser's own health response; the maintenance window uses the isolated
+backend's owner route.
+
 ## ENGINE-AVAIL-02 (first half)
 
 `beginTurn()` in `backend/src/lib/turnMachine/turnNext.ts` refuses a turn before resolving or creating a conversation when the locally supervised chat AI is stopped, blocked by a foreign process on its port, or has exhausted automatic restarts. The synchronous check runs before any tool or turn storage, so the failure returns as a 503 status instead of being saved as assistant reply text. Explicit `MAIPAI_LLAMA_SERVER_URL` and configured Stack routes skip the local check, while an engine that has not started remains eligible to start on demand. The chat adapter shows “MaiPai's AI isn't running right now. Try again in a moment.” A blocked-port refusal checks whether the recorded process still exists and clears the stale marker if it has exited. Each refusal also nudges a background supervisor retry, throttled to once every 30 seconds, unless an admin intentionally stopped the engine.

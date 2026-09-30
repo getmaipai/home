@@ -2,7 +2,8 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
-import { StatusComponents, OverallBanner } from "@/next/pages/status/StatusComponents";
+import { StatusComponents } from "@/next/pages/status/StatusComponents";
+import { StatusBanner } from "@/next/pages/status/StatusBanner";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { api, type HealthStatus, type Roster } from "@/lib/api";
 
@@ -77,7 +78,7 @@ describe("StatusComponents", () => {
   test("all engines answering reads as everything running", async () => {
     const restore = stubHealth(health());
     try {
-      const { findByText, getAllByText } = renderWithQuery(<><OverallBanner summary={{ level: "online", problems: [] }} health={health()} /><StatusComponents person={makePerson("owner")} health={health()} /></>);
+      const { findByText, getAllByText } = renderWithQuery(<><StatusBanner summary={{ level: "online", text: "All good", problems: [] }} uptimeSeconds={health().uptimeSeconds} /><StatusComponents person={makePerson("owner")} health={health()} /></>);
       expect(await findByText("Everything is running. Up for 1 hour 1 minute.")).toBeInTheDocument();
       expect(getAllByText("Running")).toHaveLength(4);
     } finally {
@@ -87,16 +88,10 @@ describe("StatusComponents", () => {
 
   test("uptime uses readable minute, hour and day phrases", () => {
     for (const [seconds, phrase] of [[60, "1 minute"], [3_600, "1 hour"], [172_800, "2 days"]] as const) {
-      const view = renderWithQuery(<OverallBanner summary={{ level: "online", problems: [] }} health={health({ uptimeSeconds: seconds })} />);
+      const view = renderWithQuery(<StatusBanner summary={{ level: "online", text: "All good", problems: [] }} uptimeSeconds={seconds} />);
       expect(view.getByText(`Everything is running. Up for ${phrase}.`)).toBeInTheDocument();
       view.unmount();
     }
-  });
-
-  test("online banner uses the compact phone spacing classes", () => {
-    const view = renderWithQuery(<OverallBanner summary={{ level: "online", problems: [] }} health={health()} />);
-    expect(view.getByRole("alert").className).toContain("py-1 sm:py-2");
-    expect(view.getByText("Everything is running. Up for 1 hour 1 minute.").className).toContain("text-base");
   });
 
   test("a dead engine reads as not answering, and the headline says so", async () => {
@@ -104,8 +99,8 @@ describe("StatusComponents", () => {
       health({ ok: false, engines: { ...health().engines, chat: { kind: "selection", pid: 4242, alive: false } } }),
     );
     try {
-      const { findByText, getByText } = renderWithQuery(<><OverallBanner summary={{ level: "offline", problems: ["Brain"] }} health={health()} /><StatusComponents person={makePerson("adult")} health={health()} /></>);
-      expect(await findByText("Brain isn't running.")).toBeInTheDocument();
+      const { findByText, getByText } = renderWithQuery(<><StatusBanner summary={{ level: "offline", text: "Something is down", problems: ["Brain"] }} /><StatusComponents person={makePerson("adult")} health={health()} /></>);
+      expect(await findByText("We're having problems")).toBeInTheDocument();
       expect(getByText("Not running")).toBeInTheDocument();
     } finally {
       restore();
@@ -117,9 +112,9 @@ describe("StatusComponents", () => {
       health({ ok: false, engines: { ...health().engines, background: { kind: "failed", pid: null, alive: null } } }),
     );
     try {
-      const { findByText, getByText } = renderWithQuery(<><OverallBanner summary={{ level: "offline", problems: ["Memory"] }} health={health()} /><StatusComponents person={makePerson("adult")} health={health()} /></>);
-      expect(await findByText("Memory isn't running.")).toBeInTheDocument();
-      expect(getByText("Memory")).toBeInTheDocument();
+      const { findByText, getByText } = renderWithQuery(<><StatusBanner summary={{ level: "offline", text: "Something is down", problems: ["Memory"] }} /><StatusComponents person={makePerson("adult")} health={health()} /></>);
+      expect(await findByText("We're having problems")).toBeInTheDocument();
+      expect(getByText("Memory", { selector: "div.font-medium" })).toBeInTheDocument();
       expect(getByText("Not running")).toBeInTheDocument();
     } finally {
       restore();
@@ -131,8 +126,8 @@ describe("StatusComponents", () => {
       health({ ok: false, engines: { ...health().engines, chat: { kind: "stalled", pid: null, alive: null } } }),
     );
     try {
-      const { findByText } = renderWithQuery(<><OverallBanner summary={{ level: "offline", problems: ["Brain"] }} health={health()} /><StatusComponents person={makePerson("owner")} health={health()} /></>);
-      expect(await findByText("Brain isn't running.")).toBeInTheDocument();
+      const { findByText } = renderWithQuery(<><StatusBanner summary={{ level: "offline", text: "Something is down", problems: ["Brain"] }} /><StatusComponents person={makePerson("owner")} health={health()} /></>);
+      expect(await findByText("We're having problems")).toBeInTheDocument();
       expect(await findByText("Not running")).toBeInTheDocument();
     } finally {
       restore();

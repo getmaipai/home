@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { OverallBanner, StatusComponents } from "@/next/pages/status/StatusComponents";
+import { StatusComponents } from "@/next/pages/status/StatusComponents";
+import { StatusBanner } from "@/next/pages/status/StatusBanner";
+import { StatusIncident } from "@/next/pages/status/StatusIncident";
 import { api, isOwnerOrAdminRole, type HealthStatus, type Roster } from "@/lib/api";
 import { statusSummary } from "@/shell/statusSummary";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -25,7 +27,8 @@ export function NextStatusPage({ person }: { person: Roster }) {
   return (
     <div className="flex flex-col gap-4">
       {boardData?.note || isOwnerOrAdminRole(person.role) ? <StatusBoardNotes person={person} note={boardData?.note ?? null} /> : null}
-      <OverallBanner summary={summary} health={query.data} />
+      <StatusBanner summary={summary} uptimeSeconds={summary.level === "online" ? query.data?.uptimeSeconds : undefined} maintenanceEndsAt={boardData?.maintenance.find((window) => window.status === "in_progress" && window.components.some((part) => maintenance.includes(part)))?.ends_at} />
+      <StatusIncident level={summary.level} problems={summary.problems} />
       {boardData || isOwnerOrAdminRole(person.role) ? <StatusMaintenanceCard person={person} windows={boardData?.maintenance ?? []} /> : null}
       {query.data ? <StatusComponents person={person} health={query.data} maintenance={maintenance} /> : null}
     </div>

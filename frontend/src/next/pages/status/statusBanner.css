@@ -1,0 +1,21 @@
+[data-status-banner="online"] > div:first-child {
+  border-color: color-mix(in srgb, var(--hue-green) 28%, transparent);
+  background-color: color-mix(in srgb, var(--hue-green) 10%, transparent);
+  color: color-mix(in srgb, var(--hue-green) 72%, black);
+}
+
+.dark [data-status-banner="online"] > div:first-child {
+  color: color-mix(in srgb, var(--hue-green) 72%, white);
+}
+
+[data-status-banner="degraded"] > div:first-child {
+  border-color: color-mix(in srgb, var(--hue-yellow) 35%, transparent);
+  background-color: color-mix(in srgb, var(--hue-yellow) 12%, transparent);
+  color: var(--hue-yellow);
+}
+
+[data-status-banner="maintenance"] > div:first-child {
+  border-color: color-mix(in srgb, var(--hue-blue) 30%, transparent);
+  background-color: color-mix(in srgb, var(--hue-blue) 12%, transparent);
+  color: var(--hue-blue);
+}

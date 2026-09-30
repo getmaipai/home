@@ -58,7 +58,7 @@ describe("NextStatusPage", () => {
       expect(await view.findByText("Everything is running. Up for 1 minute.")).toBeTruthy();
       for (const label of ["Brain", "Understanding", "Memory", "Voice"]) expect(view.getByText(label)).toBeTruthy();
       expect(view.getAllByRole("button", { name: "Restart" })).toHaveLength(4);
-      expect(view.getByText("Online")).toBeTruthy();
+      expect(view.getByText("We're fully operational")).toBeTruthy();
     } finally {
       restore();
     }
@@ -87,7 +87,10 @@ describe("NextStatusPage", () => {
     } })))) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
-      expect(await view.findByText("Brain and Understanding aren't running.")).toBeTruthy();
+      expect(await view.findByText("We're having problems")).toBeTruthy();
+      expect(view.getAllByText("Brain").length).toBeGreaterThan(0);
+      expect(view.getAllByText("Understanding").length).toBeGreaterThan(0);
+      expect(view.getByText("Brain and Understanding aren't running")).toBeTruthy();
     } finally { globalThis.fetch = original; }
   });
 
@@ -96,7 +99,8 @@ describe("NextStatusPage", () => {
     globalThis.fetch = mock(() => Promise.resolve(Response.json(body({ engines: { ...body().engines, voice: { kind: "starting", pid: null, alive: null } }, sidecars: [{ id: "kiwix-serve", status: "running", baseUrl: "http://127.0.0.1" }] })))) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("adult")} />);
-      expect(await view.findByText("Something is starting up or slow.")).toBeTruthy();
+      expect(await view.findByText("Some parts are starting up")).toBeTruthy();
+      expect(view.getByText("Voice is starting up")).toBeTruthy();
       expect(view.getByText("Library")).toBeTruthy();
     } finally { globalThis.fetch = original; }
   });
@@ -143,6 +147,27 @@ describe("NextStatusPage", () => {
       await view.findByText("Brain");
       expect(view.queryByText("Scheduled maintenance")).toBeNull();
       expect(calls.every((url) => url.includes("/api/health") || url.includes("/api/status/board"))).toBe(true);
+    } finally { globalThis.fetch = original; }
+  });
+
+  test("keeps note, banner, incident, maintenance and parts in order", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health")) return Promise.resolve(Response.json(body({ ok: false, engines: { ...body().engines, chat: { kind: "stopped", pid: null, alive: null } } })));
+      return Promise.resolve(Response.json({ note: { id: "n", body: "Notice text", posted_at: new Date().toISOString(), posted_by_name: "Sage" }, maintenance: [{ id: "m", title: "Work window", description: "", components: ["voice"], starts_at: new Date(Date.now() - 60_000).toISOString(), ends_at: new Date(Date.now() + 60_000).toISOString(), status: "in_progress" }] }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
+      await view.findByText("Brain isn't running");
+      const note = view.getByText("Notice text").closest("[data-slot='alert']");
+      const banner = view.container.querySelector("[data-status-banner]");
+      const incident = view.getByText("Brain isn't running").closest("[data-slot='card']");
+      const maintenance = view.getByText("Scheduled maintenance").closest("[data-slot='card']");
+      const parts = view.getByText("Parts").closest("[data-slot='card']");
+      const order = [note, banner, incident, maintenance, parts];
+      expect(order.every(Boolean)).toBe(true);
+      expect(order.map((node) => Array.from(node?.parentElement?.children ?? []).indexOf(node!))).toEqual([0, 1, 2, 3, 4]);
     } finally { globalThis.fetch = original; }
   });
 
@@ -242,8 +267,8 @@ describe("NextStatusPage", () => {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
       const voice = await view.findByText("Under maintenance");
       expect(voice.closest("[data-status]")?.getAttribute("data-status")).toBe("maintenance");
-      await waitFor(() => expect(view.getByText("Some parts are under maintenance.")).toBeTruthy());
-      expect(view.queryByText("Voice isn't running.")).toBeNull();
+      await waitFor(() => expect(view.getByText("Scheduled maintenance is in progress")).toBeTruthy());
+      expect(view.queryByText("Voice isn't running")).toBeNull();
     } finally { globalThis.fetch = original; }
   });
 });
