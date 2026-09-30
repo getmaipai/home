@@ -539,6 +539,13 @@ export type ComputerMemoryResponse = { available: true; memory: ComputerMemory }
 
 export type FitPlanResponse = { plan: StackFitPlan | null; wording: { verdict: "yes" | "slow" | "no" | "unknown"; headline: string; detail: string } };
 
+export type StatusHistoryState = "operational" | "degraded" | "outage" | "maintenance" | "none";
+export type StatusHistoryMinutes = { operational: number; degraded: number; outage: number; maintenance: number };
+export type StatusHistoryDay = { date: string; worst: StatusHistoryState; minutes: StatusHistoryMinutes };
+export type StatusHistoryIncident = { component: "chat" | "embed" | "background" | "voice" | "library" | "hub"; started_at: string; ended_at: string | null; minutes: number; ongoing: boolean };
+export type StatusHistoryComponent = { component: StatusHistoryIncident["component"]; uptime_percent: number | null; days: StatusHistoryDay[]; current: { state: StatusHistoryState; since: string | null } };
+export type StatusHistory = { generated_at: string; days: number; components: StatusHistoryComponent[]; incidents: StatusHistoryIncident[] };
+
 export const api = {
   profiles: () => request<Roster[]>("/api/auth/profiles"),
   setup: (displayName: string, secret: string) =>
@@ -1024,6 +1031,11 @@ export const api = {
   // has ever needed.
   health: () => request<HealthStatus>("/api/health", { timeoutMs: 8_000 }),
   statusBoard: () => request<StatusBoard>("/api/status/board"),
+  statusHistory: async (days = 90) => {
+    const history = await request<StatusHistory>(`/api/status/history?days=${days}`);
+    if (!Array.isArray(history.components) || !Array.isArray(history.incidents)) throw new Error("Status history is not available.");
+    return history;
+  },
   postStatusNote: (input: { body: string; expires_at?: string }) => request<StatusNote>("/api/status/note", { method: "POST", body: JSON.stringify(input) }),
   clearStatusNote: () => request<void>("/api/status/note", { method: "DELETE" }),
   createMaintenance: (input: { title: string; description?: string; components: string[]; starts_at: string; ends_at: string }) => request<MaintenanceWindow>("/api/status/maintenance", { method: "POST", body: JSON.stringify(input) }),

@@ -604,7 +604,7 @@ Design: [docs/plans/status-page-2026-09-30.md](plans/status-page-2026-09-30.md).
 - [x] **STATUS-C1: status event record** (commons, S). Add the `StatusEvent` schema and a tag. **Landed as spec-v0.1.62.**
 - [x] **STATUS-C2: record status history** (home, M). Record heartbeats, state changes, and gaps while the hub is stopped. Keep 90 days and exclude maintenance time. **Committed; live check needs time to pass.**
 - [x] **STATUS-C3a: reliability history API** (home, backend). Add the authenticated `GET /api/status/history` view with UTC day buckets, uptime percentages, current state, and recent outage incidents. **Committed.**
-- [ ] **STATUS-C3b: reliability history page** (home, frontend). Render daily status strips, uptime percentages, and recent problems from the history API.
+- [x] **STATUS-C3b: daily history on the status page** (home, frontend). Read the 90-day history contract, show daily strips, uptime percentages, incident duration, and recent problems for every member. **Landed via C3d after the kit fix.**
 
 ## Projects (2026-09-26)
 

@@ -1,0 +1,17 @@
+[data-status-legend="fine"] {
+  background-color: var(--hue-green);
+}
+
+[data-status-legend="slow"] {
+  background-color: var(--hue-yellow);
+}
+
+[data-status-legend="down"] {
+  background-color: var(--destructive);
+}
+
+[data-status-legend="maintenance"] {
+  background-color: var(--primary);
+}
+
+[data-status-strip] [role="img"] { gap: 1px; }

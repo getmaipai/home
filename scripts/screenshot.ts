@@ -253,6 +253,7 @@ const nextPersonProfileReview = process.argv.includes("--next-person-profile-rev
 const nextEnginesReview = process.argv.includes("--next-engines-review");
 const statusA2bReview = process.argv.includes("--status-a2b-review");
 const statusA2cReview = process.argv.includes("--status-a2c-review");
+const statusC3bReview = process.argv.includes("--status-c3b-review");
 const statusB2bReview = process.argv.includes("--status-b2b-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
@@ -3662,6 +3663,103 @@ async function captureStatusA2cReview(browser: Browser, ownerSession: string): P
   console.log("One-down and starting captures rewrite only the browser's own /api/health response. Maintenance is created through the isolated backend's owner route.");
 }
 
+function seedStatusC3bEvents(): void {
+  const now = Date.now();
+  const rows: Array<{ id: string; component: string; state: string; at: string; hlc: string }> = [];
+  const add = (component: string, state: string, offsetMinutes: number, key: string) => {
+    const at = new Date(now - offsetMinutes * 60_000).toISOString();
+    rows.push({ id: `c3b-${key}`, component, state, at, hlc: `${at}:0:c3b-${key}` });
+  };
+  for (const component of ["chat", "embed", "background", "voice", "library", "hub"]) add(component, "operational", 95 * 1440, `${component}-base`);
+  add("voice", "outage", 54 * 1440, "voice-down-1"); add("voice", "operational", 54 * 1440 - 24, "voice-up-1");
+  add("voice", "outage", 16 * 1440, "voice-down-2"); add("voice", "operational", 16 * 1440 - 35, "voice-up-2");
+  add("embed", "maintenance", 40 * 1440, "embed-maintenance-start"); add("embed", "operational", 40 * 1440 - 120, "embed-maintenance-end");
+  add("embed", "degraded", 7 * 1440, "embed-slow-start"); add("embed", "operational", 7 * 1440 - 60, "embed-slow-end");
+  add("library", "outage", 30 * 60, "library-down-yesterday"); add("library", "operational", 30 * 60 - 480, "library-up-yesterday");
+  add("chat", "outage", 130, "chat-down-current");
+  const source = `import { sqlite } from "./src/db/index.ts";\nconst rows = ${JSON.stringify(rows)};\nsqlite.exec("DELETE FROM status_events");\nconst insert = sqlite.prepare("INSERT INTO status_events (id, component, state, at, source, detail, hlc) VALUES (?, ?, ?, ?, 'sample', NULL, ?)");\nfor (const row of rows) insert.run(row.id, row.component, row.state, row.at, row.hlc);\nsqlite.close();\n`;
+  const seeded = Bun.spawnSync({ cmd: ["bun", "-e", source], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+  if (seeded.exitCode !== 0) throw new Error(`STATUS-C3b database seed failed with exit code ${seeded.exitCode}`);
+}
+
+function statusC3bScreenshotHistory() {
+  const now = new Date();
+  const names = ["chat", "embed", "background", "voice", "library", "hub"] as const;
+  const daysByPart = Object.fromEntries(names.map((component) => [component, Array.from({ length: 90 }, (_, i) => {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 89 + i)).toISOString().slice(0, 10);
+    return { date, worst: "operational", minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } };
+  })])) as Record<typeof names[number], Array<{ date: string; worst: string; minutes: { operational: number; degraded: number; outage: number; maintenance: number } }>>;
+  const alter = (component: typeof names[number], ago: number, state: "degraded" | "outage" | "maintenance", minutes: number) => {
+    const day = daysByPart[component]![89 - ago]!;
+    day.worst = state;
+    day.minutes = { operational: 1440 - minutes, degraded: state === "degraded" ? minutes : 0, outage: state === "outage" ? minutes : 0, maintenance: state === "maintenance" ? minutes : 0 };
+  };
+  alter("voice", 54, "outage", 24); alter("voice", 16, "outage", 35); alter("embed", 40, "maintenance", 120); alter("embed", 7, "degraded", 60); alter("library", 1, "outage", 480); alter("chat", 0, "outage", 130);
+  const started = new Date(now.getTime() - 130 * 60_000).toISOString();
+  const libraryStart = new Date(now.getTime() - 30 * 60 * 60_000).toISOString();
+  const libraryEnd = new Date(now.getTime() - 22 * 60 * 60_000).toISOString();
+  return {
+    generated_at: now.toISOString(), days: 90,
+    components: names.map((component) => ({ component, uptime_percent: component === "chat" ? 99.982 : component === "library" ? 98.765 : 99.996, current: { state: component === "chat" ? "outage" : "operational", since: component === "chat" ? started : null }, days: daysByPart[component] })),
+    incidents: [
+      { component: "chat", started_at: started, ended_at: null, minutes: 130, ongoing: true },
+      { component: "library", started_at: libraryStart, ended_at: libraryEnd, minutes: 480, ongoing: false },
+      { component: "voice", started_at: new Date(now.getTime() - 16 * 86_400_000).toISOString(), ended_at: new Date(now.getTime() - (16 * 1440 - 35) * 60_000).toISOString(), minutes: 35, ongoing: false },
+      { component: "voice", started_at: new Date(now.getTime() - 54 * 86_400_000).toISOString(), ended_at: new Date(now.getTime() - (54 * 1440 - 24) * 60_000).toISOString(), minutes: 24, ongoing: false },
+    ],
+  };
+}
+
+async function captureStatusC3bReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-c3d";
+  mkdirSync(outDir, { recursive: true });
+  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } })).json()) as Array<{ id: string; display_name: string }>;
+  const child = people.find((person) => person.display_name === "Nova");
+  if (!child) throw new Error("STATUS-C3b capture: seeded child Nova was not found");
+  const selected = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
+  if (!selected.ok) throw new Error(`STATUS-C3b capture: child sign-in failed: ${selected.status}`);
+  const childSession = selected.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("STATUS-C3b capture: child session cookie was missing");
+  const history = statusC3bScreenshotHistory();
+  for (const who of [{ name: "owner", session: ownerSession }, { name: "child", session: childSession }]) {
+    for (const viewport of [VIEWPORTS.find((item) => item.slug === "desktop")!, VIEWPORTS.find((item) => item.slug === "phone")!]) {
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, who.session);
+        try {
+          await context.route("**/api/status/history?days=90", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(history) }));
+          await context.route("**/api/health", async (route) => {
+            const response = await route.fetch();
+            const health = await response.json() as { ok: boolean; engines: Record<string, { kind: string; pid: number | null; alive: boolean | null }>; sidecars: unknown[] };
+            await route.fulfill({ response, json: { ...health, ok: false, engines: { ...health.engines, chat: { kind: "stopped", pid: null, alive: null } }, sidecars: [{ id: "kiwix-serve", status: "running", baseUrl: "http://127.0.0.1" }] } });
+          });
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          await page.goto(`${BASE_URL}/status`);
+          const firstStrip = page.getByRole("img", { name: /Last 90 days:/ }).first();
+          await firstStrip.waitFor();
+          if (viewport.width === 390) {
+            const dimensions = await firstStrip.evaluate((group) => {
+              const cells = [...group.children].filter((cell) => cell instanceof HTMLElement);
+              return { width: group.getBoundingClientRect().width, cells: cells.map((cell) => cell.getBoundingClientRect().width), buttons: group.querySelectorAll("button").length };
+            });
+            if (dimensions.width <= 0 || dimensions.cells.length !== 90 || dimensions.cells.some((width) => width <= 0) || dimensions.buttons !== 0) {
+              throw new Error(`STATUS-C3d phone strip layout failed for ${who.name}/${theme}: strip width ${dimensions.width}, ${dimensions.cells.length} cells, widths ${dimensions.cells.filter((width) => width > 0).length} visible, ${dimensions.buttons} buttons`);
+            }
+            console.log(`STATUS-C3d phone strip verified for ${who.name}/${theme}: ${dimensions.width.toFixed(1)} px wide, 90 cells, no buttons; min cell ${Math.min(...dimensions.cells).toFixed(2)} px.`);
+          }
+          await page.getByText("Recent problems", { exact: true }).waitFor();
+          const filename = `status-${who.name}-${viewport.width}-${theme}.png`;
+          const path = join(outDir, filename);
+          await page.screenshot({ path, fullPage: true });
+          console.log(`Wrote ${path}`);
+        } finally { await context.close(); }
+      }
+    }
+  }
+  console.log("The temporary backend received 95 days of status_events in its own hub.db; the capture supplies a fixed history response for repeatable review.");
+  console.log("The child view is signed in as Nova. No household hub database was opened or changed.");
+}
+
 /** SHELL-07's own acceptance ("captures"): both viewports, both
  * themes, of `/updates`. Waits on "MaiPai Home" - the app's own
  * row is always present regardless of whether a Stack is configured,
@@ -4259,6 +4357,7 @@ async function main() {
   DATA_DIR = createOwnedDemoDataDir(ROOT, DATA_OWNER);
   try {
     seedWeatherCache(DATA_DIR);
+    if (statusC3bReview) seedStatusC3bEvents();
 
   console.log("Starting a throwaway backend on a temp data dir...");
   // Not gated on `chatReview` (it used to be) - Home's own WeatherCard
@@ -4552,6 +4651,11 @@ async function main() {
     if (statusA2cReview) {
       await captureStatusA2cReview(browser, sessionValue);
       console.log("completed named review: --status-a2c-review");
+      return;
+    }
+    if (statusC3bReview) {
+      await captureStatusC3bReview(browser, sessionValue);
+      console.log("completed named review: --status-c3b-review");
       return;
     }
     if (statusA2bReview) {

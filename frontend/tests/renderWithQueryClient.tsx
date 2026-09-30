@@ -1,6 +1,7 @@
 import { render } from "@testing-library/react";
 import { QueryClientProvider, type QueryClient } from "@tanstack/react-query";
 import { createQueryClient } from "@/lib/queryClient";
+import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 
 /** A fresh `QueryClient` per render (docs/plans/session-b-ui.md step 3):
  * every test needs its own, so one test's cached data (or a `staleTime:
@@ -15,5 +16,5 @@ export function renderWithQueryClient(
   ui: React.ReactElement,
 ): ReturnType<typeof render> & { queryClient: QueryClient } {
   const queryClient = createQueryClient();
-  return { ...render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>), queryClient };
+  return { ...render(<QueryClientProvider client={queryClient}><TooltipProvider>{ui}</TooltipProvider></QueryClientProvider>), queryClient };
 }

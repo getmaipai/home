@@ -34963,3 +34963,31 @@ and restarting are degraded; and other states are operational. Changes to
 that shared rule must be reflected in the recorder mapping and its table
 tests. This slice stores events and heartbeats only. The history API, uptime
 bars, percentages, and recent problems are STATUS-C3.
+
+## STATUS-C3d
+
+`/status` reads `GET /api/status/history?days=90` on a 60 second poll. The
+history query is independent of health, so a failed history request leaves
+the banner and parts list in place. Each part shows 90 daily cells from the
+shared `UptimeStrip`, its uptime percentage, and a short purpose tooltip.
+Children and other members see the same strips and percentages as admins.
+
+The incident card adds elapsed time from the earliest open outage. Recent
+problems lists up to five recorded outages after Scheduled maintenance.
+Daily summaries omit zero minute states. At phone width the percentage sits
+above the full-width strip. The strip is one `role="img"` with a plain
+summary sentence, such as "Last 90 days: 99.982% uptime, 1 outage, 2 h 10
+min down." The 90 cells are not controls. Screen readers hear the summary
+once, and pointer users can still read each day's hover detail. The Recent
+problems list gives everyone the incident details.
+
+The pin moved from `ui-v0.5.82` to `ui-v0.5.83` because the older kit made
+each 11 by 28 pixel day cell a button. That missed the 48 pixel touch
+target. The new kit makes the cells non-interactive and labels the whole
+strip as one image. This removes the small targets and the 90 tab stops.
+
+The headless review mode is `bun run screenshots --status-c3b-review`. It
+seeds the script-owned temporary database with status events and saves owner
+and child captures at 1440 and 390 pixels in both themes under
+`data-scratch/screens/status-c3d/`. The history response is fixed in the
+capture for repeatability. The frontend reads the STATUS-C3a history route.

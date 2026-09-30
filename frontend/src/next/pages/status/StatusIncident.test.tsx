@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { render } from "@testing-library/react";
-import { StatusIncident } from "@/next/pages/status/StatusIncident";
+import { RecentProblems, StatusIncident } from "@/next/pages/status/StatusIncident";
 
 describe("StatusIncident", () => {
   test("shows offline singular title and meta", () => {
@@ -21,5 +21,10 @@ describe("StatusIncident", () => {
     degraded.unmount();
     expect(render(<StatusIncident level="online" problems={[]} />).container.firstChild).toBeNull();
     expect(render(<StatusIncident level="maintenance" problems={[]} />).container.firstChild).toBeNull();
+  });
+
+  test("hides recent problems when the history has no incidents", () => {
+    const view = render(<RecentProblems history={{ generated_at: "2026-09-30T12:00:00.000Z", days: 90, components: [], incidents: [] }} />);
+    expect(view.container.firstChild).toBeNull();
   });
 });

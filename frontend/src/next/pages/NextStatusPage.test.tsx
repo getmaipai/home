@@ -34,6 +34,7 @@ function mockHealth() {
       },
       sidecars: [],
     }));
+    if (url.includes("/api/status/history")) return Promise.resolve(Response.json({ generated_at: new Date().toISOString(), days: 90, components: [], incidents: [] }));
     return Promise.resolve(Response.json({ note: null, maintenance: [] }));
   }) as unknown as typeof fetch;
   return { paths, restore: () => { globalThis.fetch = originalFetch; } };
@@ -80,6 +81,56 @@ describe("NextStatusPage", () => {
       restore();
     }
   });
+
+  test("history failure keeps the banner and parts visible", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/health")) return Promise.resolve(Response.json(body()));
+      if (url.includes("/api/status/history")) return Promise.resolve(new Response("failed", { status: 503 }));
+      return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
+      expect(await view.findByText("We're fully operational")).toBeTruthy();
+      expect(await view.findByText("Brain")).toBeTruthy();
+      expect(view.queryByRole("img", { name: /Last 90 days:/i })).toBeNull();
+    } finally { globalThis.fetch = original; }
+  }, 30_000);
+
+  test("members get the same 90 day bars, percentages, incident line, and recent problems", async () => {
+    const original = globalThis.fetch;
+    const history = {
+      generated_at: "2026-09-30T14:10:00.000Z", days: 90,
+      components: ["chat", "embed", "background", "voice", "library", "hub"].map((component) => ({ component, uptime_percent: component === "hub" ? null : 99.982, current: { state: "operational", since: null }, days: Array.from({ length: 90 }, (_, i) => ({ date: `2026-09-${String((i % 30) + 1).padStart(2, "0")}`, worst: "operational", minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } })) })),
+      incidents: [{ component: "voice", started_at: "2026-09-30T12:00:00.000Z", ended_at: null, minutes: 130, ongoing: true }, { component: "library", started_at: "2026-09-29T14:10:00.000Z", ended_at: "2026-09-29T15:40:00.000Z", minutes: 90, ongoing: false }],
+    };
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/health")) return Promise.resolve(Response.json(body({ ok: false, engines: { ...body().engines, voice: { kind: "stopped", pid: null, alive: null } }, sidecars: [{ id: "kiwix-serve", status: "running", baseUrl: "http://127.0.0.1" }] })));
+      if (url.includes("/api/status/history")) return Promise.resolve(Response.json(history));
+      return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
+      expect((await view.findAllByText("99.982% uptime", undefined, statusAsyncTimeout)).length).toBeGreaterThan(0);
+      const strips = view.getAllByRole("img", { name: /Last 90 days:/i });
+      expect(strips).toHaveLength(6);
+      expect(strips.some((strip) => strip.getAttribute("aria-label") === "Last 90 days: 99.982% uptime, 1 outage, 2 h 10 min down.")).toBe(true);
+      expect(strips.some((strip) => strip.getAttribute("aria-label") === "Last 90 days: 99.982% uptime, 1 outage, 1 h 30 min down.")).toBe(true);
+      expect(strips.some((strip) => strip.getAttribute("aria-label") === "Last 90 days: no data yet.")).toBe(true);
+      expect(view.container.querySelectorAll("[data-status-strip] button")).toHaveLength(0);
+      expect(view.getByText("No data yet")).toBeTruthy();
+      for (const label of ["Last 90 days", "Fine", "Slow", "Down", "Maintenance"]) expect(view.getByText(label)).toBeTruthy();
+      expect(view.getByText("Investigating · Ongoing for 2 h 10 min · Affects Voice")).toBeTruthy();
+      expect(view.getByText("Recent problems")).toBeTruthy();
+      const recentProblems = view.getByText("Recent problems").closest("[data-slot='card']");
+      expect(recentProblems?.textContent).toContain("Ongoing since");
+      expect(recentProblems?.textContent).toContain("Sep 29");
+      expect(recentProblems?.textContent).toContain("1 h 30 min");
+      expect(recentProblems?.textContent).toContain("Ended");
+    } finally { globalThis.fetch = original; }
+  }, 30_000);
 
   test("offline banner joins problem names and uses singular grammar", async () => {
     const original = globalThis.fetch;
@@ -148,7 +199,7 @@ describe("NextStatusPage", () => {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
       await view.findByText("Brain");
       expect(view.queryByText("Scheduled maintenance")).toBeNull();
-      expect(calls.every((url) => url.includes("/api/health") || url.includes("/api/status/board"))).toBe(true);
+      expect(calls.every((url) => url.includes("/api/health") || url.includes("/api/status/board") || url.includes("/api/status/history"))).toBe(true);
     } finally { globalThis.fetch = original; }
   });
 

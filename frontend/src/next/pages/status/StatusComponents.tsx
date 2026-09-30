@@ -4,12 +4,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { Button } from "@maipai/ui/src/ui/button";
 import { Alert } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Status } from "@maipai/ui/src/ui/status";
+import { UptimeStrip } from "@maipai/ui/src/ui/uptime-strip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { getIcon } from "@maipai/ui/src/icons";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { api, ApiError, isOwnerOrAdminRole, type HealthStatus, type Roster, type EngineHealthEntry } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, type HealthStatus, type Roster, type EngineHealthEntry, type StatusHistory } from "@/lib/api";
+import { dayData, statusStripSummary } from "@/next/pages/status/statusHistoryFormat";
+import "@/next/pages/status/statusLegend.css";
 
-interface StatusComponentsProps { person: Roster; health: HealthStatus; maintenance?: string[]; }
+interface StatusComponentsProps { person: Roster; health: HealthStatus; maintenance?: string[]; history?: StatusHistory; }
 type EngineKey = keyof HealthStatus["engines"];
 type StatusPartId = EngineKey | "library" | "hub";
 type EngineState = { label: string; status: "online" | "offline" | "degraded" };
@@ -51,7 +55,7 @@ export function formatUptime(seconds: number): string {
 
 const HEALTH_QUERY_KEY = ["health"];
 
-export function StatusComponents({ person, health: initialHealth, maintenance = [] }: StatusComponentsProps) {
+export function StatusComponents({ person, health: initialHealth, maintenance = [], history }: StatusComponentsProps) {
   const query = useQuery<HealthStatus>({ queryKey: HEALTH_QUERY_KEY, queryFn: () => api.health(), refetchInterval: 15_000, initialData: initialHealth });
   const health = query.data ?? initialHealth;
   const [pendingRole, setPendingRole] = useState<EngineKey | null>(null);
@@ -81,15 +85,19 @@ export function StatusComponents({ person, health: initialHealth, maintenance = 
   ];
 
   return <Card>
-    <CardHeader><CardTitle>Parts</CardTitle></CardHeader>
+    <CardHeader><CardTitle>Parts</CardTitle><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"><span className="mr-1">Last 90 days</span>{([["fine", "Fine"], ["slow", "Slow"], ["down", "Down"], ["maintenance", "Maintenance"]] as const).map(([status, label]) => <span key={status} className="inline-flex items-center gap-1.5"><span aria-hidden="true" data-status-legend={status} className="size-2 rounded-sm" />{label}</span>)}</div></CardHeader>
     <CardContent className="flex flex-col divide-y divide-border">
       {rows.map((row) => {
         const Icon = getIcon(row.icon ?? "activity");
         const underMaintenance = maintenance.includes(row.key);
         const state = underMaintenance ? { label: "Under maintenance", status: "maintenance" as const } : row.state;
-        return <div key={row.key} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <div className="flex min-w-0 items-start gap-3"><Icon className="mt-1 size-5 shrink-0 text-muted-foreground" aria-hidden="true" /><div className="min-w-0"><div className="font-medium">{row.label}</div><p className="text-sm text-muted-foreground">{row.hint}</p></div></div>
-          <div className="flex min-h-12 flex-wrap items-center gap-2 pl-8 sm:min-h-0 sm:pl-0"><Status status={state.status}>{state.label}</Status>{canRestart && !underMaintenance && ENGINE_HEALTH_ROWS.some((engine) => engine.key === row.key) ? <Button variant="secondary" onClick={() => setPendingRole(row.key as EngineKey)} disabled={restartingRole === row.key}>{restartingRole === row.key ? "Restarting…" : "Restart"}</Button> : null}</div>
+        const part = history?.components.find((item) => item.component === row.key);
+        return <div key={row.key} className="flex flex-col gap-2 py-3 sm:gap-2">
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <div className="flex min-w-0 items-start gap-3"><Icon className="mt-1 size-5 shrink-0 text-muted-foreground" aria-hidden="true" /><div className="min-w-0"><div className="flex min-h-12 items-center gap-2"><span className="font-medium">{row.label}</span><Tooltip><TooltipTrigger asChild><button type="button" aria-label={`About ${row.label}`} className="inline-flex size-12 shrink-0 items-center justify-center rounded-full text-muted-foreground"><span aria-hidden="true" className="text-sm">ⓘ</span></button></TooltipTrigger><TooltipContent>{row.hint}</TooltipContent></Tooltip></div><p className="text-sm text-muted-foreground">{row.hint}</p></div></div>
+            <div className="flex min-h-12 flex-wrap items-center gap-2 pl-8 sm:min-h-0 sm:pl-0"><span className="text-sm text-muted-foreground">{part ? part.uptime_percent === null ? "No data yet" : `${part.uptime_percent.toFixed(3)}% uptime` : null}</span><Status status={state.status}>{state.label}</Status>{canRestart && !underMaintenance && ENGINE_HEALTH_ROWS.some((engine) => engine.key === row.key) ? <Button variant="secondary" onClick={() => setPendingRole(row.key as EngineKey)} disabled={restartingRole === row.key}>{restartingRole === row.key ? "Restarting…" : "Restart"}</Button> : null}</div>
+          </div>
+          {part ? <div data-status-strip className="w-full min-w-0 overflow-hidden sm:pl-8"><UptimeStrip data={part.days.map(dayData)} summary={statusStripSummary(part.uptime_percent, history?.incidents.filter((incident) => incident.component === part.component) ?? [])} /></div> : null}
         </div>;
       })}
     </CardContent>

@@ -5,6 +5,7 @@ import type { ReactElement } from "react";
 import { StatusComponents } from "@/next/pages/status/StatusComponents";
 import { StatusBanner } from "@/next/pages/status/StatusBanner";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
+import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { api, type HealthStatus, type Roster } from "@/lib/api";
 
 afterEach(cleanup);
@@ -56,7 +57,7 @@ function renderWithQuery(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <ToastProvider>{ui}</ToastProvider>
+      <ToastProvider><TooltipProvider>{ui}</TooltipProvider></ToastProvider>
     </QueryClientProvider>,
   );
 }
@@ -116,7 +117,7 @@ describe("StatusComponents", () => {
     try {
       const { findByText, getByText } = renderWithQuery(<><StatusBanner summary={{ level: "offline", text: "Something is down", problems: ["Memory"] }} /><StatusComponents person={makePerson("adult")} health={health()} /></>);
       expect(await findByText("We're having problems")).toBeInTheDocument();
-      expect(getByText("Memory", { selector: "div.font-medium" })).toBeInTheDocument();
+      expect(getByText("Memory", { selector: "[data-slot='card-content'] span.font-medium" })).toBeInTheDocument();
       expect(getByText("Not running")).toBeInTheDocument();
     } finally {
       restore();
@@ -234,11 +235,11 @@ describe("StatusComponents", () => {
       return Promise.reject(new Error(`unstubbed fetch: ${method} ${url}`));
     }) as unknown as typeof fetch;
     try {
-      const { findAllByRole, getByRole, queryByRole } = renderWithQuery(<StatusComponents person={makePerson("owner")} health={health()} />);
+      const { findAllByRole, getByRole } = renderWithQuery(<StatusComponents person={makePerson("owner")} health={health()} />);
       const buttons = await findAllByRole("button", { name: "Restart" }, statusAsyncTimeout);
       const brainButton = buttons[0];
       if (!brainButton) throw new Error("Brain restart button not found");
-      const brainRow = brainButton.parentElement?.parentElement;
+      const brainRow = brainButton.parentElement?.parentElement?.parentElement;
       if (!brainRow) throw new Error("Brain row not found");
       const otherButtons = buttons.slice(1);
       fireEvent.click(brainButton);
@@ -247,7 +248,7 @@ describe("StatusComponents", () => {
       expect(getByRole("alertdialog")).toHaveTextContent("A reply being written right now will be cut off.");
       expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(false);
       fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
-      await waitFor(() => expect(queryByRole("alertdialog")).not.toBeInTheDocument(), statusAsyncTimeout);
+      await waitFor(() => expect(getByRole("alertdialog")).toHaveAttribute("data-closed"), statusAsyncTimeout);
       expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(false);
       fireEvent.click(brainButton);
       fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Restart" }));
@@ -255,10 +256,10 @@ describe("StatusComponents", () => {
       expect(calls.filter((call) => call.url.includes("/api/host/engines/chat/restart"))).toEqual([
         { url: "/api/host/engines/chat/restart", method: "POST" },
       ]);
-      await waitFor(() => expect(brainRow.querySelector("button")?.disabled).toBe(true), statusAsyncTimeout);
+      await waitFor(() => expect(brainRow.querySelector<HTMLButtonElement>('button[data-slot="button"]')?.disabled).toBe(true), statusAsyncTimeout);
       expect(otherButtons.every((button) => !button.hasAttribute("disabled"))).toBe(true);
       resolveRestart(new Response(JSON.stringify({ role: "chat", restarted: true }), { status: 200 }));
-      await waitFor(() => expect(brainRow.querySelector("button")?.disabled).toBe(false), statusAsyncTimeout);
+      await waitFor(() => expect(brainRow.querySelector<HTMLButtonElement>('button[data-slot="button"]')?.disabled).toBe(false), statusAsyncTimeout);
       await waitFor(() => expect(calls.filter((call) => call.url.includes("/api/health"))).toHaveLength(2), statusAsyncTimeout);
     } finally {
       globalThis.fetch = original;
