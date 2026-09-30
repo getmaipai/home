@@ -53,6 +53,20 @@ for everyone. The controls were removed from `/models`; that page now keeps
 the chat model picker only. History, notes, maintenance, and the Search,
 Library, and hub rows are later slices.
 
+## STATUS-A2b
+
+The `/status` page uses the kit Status badge in its overall banner and
+component rows. It shows the four AI parts, Library when `kiwix-serve` is
+registered, and Home. The banner names unavailable parts and gives readable
+uptime. Owners and admins keep the confirmed Restart control in each AI row;
+members see the same rows without controls or technical details.
+
+The former `HealthSection` and its tests moved to
+`frontend/src/next/pages/status/StatusComponents.tsx` and its neighboring
+test. The four part labels live in `ENGINE_ROWS` there, shared with
+`statusSummary()`. The screenshot and accessibility route list includes
+`/status`. Reliability history, notes, and maintenance remain later slices.
+
 ## ENGINE-AVAIL-02 (first half)
 
 `beginTurn()` in `backend/src/lib/turnMachine/turnNext.ts` refuses a turn before resolving or creating a conversation when the locally supervised chat AI is stopped, blocked by a foreign process on its port, or has exhausted automatic restarts. The synchronous check runs before any tool or turn storage, so the failure returns as a 503 status instead of being saved as assistant reply text. Explicit `MAIPAI_LLAMA_SERVER_URL` and configured Stack routes skip the local check, while an engine that has not started remains eligible to start on demand. The chat adapter shows “MaiPai's AI isn't running right now. Try again in a moment.” A blocked-port refusal checks whether the recorded process still exists and clears the stale marker if it has exited. Each refusal also nudges a background supervisor retry, throttled to once every 30 seconds, unless an admin intentionally stopped the engine.

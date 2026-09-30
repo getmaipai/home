@@ -246,6 +246,7 @@ const nextPersonalManagementReview = process.argv.includes("--next-personal-mana
 const nextPrivacyReview = process.argv.includes("--next-privacy-review");
 const nextPersonProfileReview = process.argv.includes("--next-person-profile-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
+const statusA2bReview = process.argv.includes("--status-a2b-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
 const nextBackupsReview = process.argv.includes("--next-backups-review");
@@ -288,6 +289,7 @@ const ROUTES: RouteSpec[] = [
   { slug: "people-memories", path: "/memory" },
   { slug: "privacy", path: "/privacy" },
   { slug: "settings", path: "/settings" },
+  { slug: "status", path: "/status" },
   { slug: "settings-models", path: "/models" },
   { slug: "settings-backups", path: "/backups" },
   { slug: "settings-voices", path: "/voices" },
@@ -4060,6 +4062,27 @@ async function main() {
     if (nextPersonProfileReview) {
       await captureNextPersonProfileReview(browser, sessionValue);
       console.log("completed named review: --next-person-profile-review");
+      return;
+    }
+    if (statusA2bReview) {
+      const outDir = join(ROOT, "data-scratch", "screens", "status-a2b");
+      mkdirSync(outDir, { recursive: true });
+      for (const viewport of [VIEWPORTS.find((item) => item.slug === "desktop")!, VIEWPORTS.find((item) => item.slug === "phone")!]) {
+        for (const theme of THEMES) {
+          const context = await newContext(browser, viewport, theme, sessionValue);
+          try {
+            const page = await context.newPage();
+            await page.goto(`${BASE_URL}/status`);
+            await page.getByText("Components", { exact: true }).waitFor();
+            const path = join(outDir, `status-${viewport.slug}-${theme}-admin.png`);
+            await page.screenshot({ path, fullPage: true });
+            console.log(`Wrote ${path}`);
+          } finally { await context.close(); }
+        }
+      }
+      console.log("The seeded screenshot setup signs in as its seeded owner; it does not create a member session.");
+      console.log("The seeded backend has no registered kiwix-serve sidecar, so the conditional Library row is absent.");
+      console.log("A degraded or down state is not seeded by this capture.");
       return;
     }
     if (nextTableRolloutReview) {

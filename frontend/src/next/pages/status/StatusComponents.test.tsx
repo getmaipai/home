@@ -2,7 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
-import { HealthSection } from "@/apps/settings/HealthSection";
+import { StatusComponents, OverallBanner } from "@/next/pages/status/StatusComponents";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { api, type HealthStatus, type Roster } from "@/lib/api";
 
@@ -46,7 +46,7 @@ function health(overrides: Partial<HealthStatus> = {}): HealthStatus {
   };
 }
 
-// HealthSection reads through react-query (a 15 s refetch), so it needs
+// StatusComponents reads through react-query (a 15 s refetch), so it needs
 // the provider the app shell normally supplies; retries off so a failed
 // stub surfaces at once instead of after react-query's own backoff.
 function renderWithQuery(ui: ReactElement) {
@@ -73,15 +73,23 @@ function stubHealth(body: HealthStatus) {
 // The 2026-09-07 question this page has to answer honestly: "why didn't
 // our health page show bad health when these are down." Every state
 // below comes from the backend's real probe, never from a kind label.
-describe("HealthSection", () => {
+describe("StatusComponents", () => {
   test("all engines answering reads as everything running", async () => {
     const restore = stubHealth(health());
     try {
-      const { findByText, getAllByText } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
-      expect(await findByText("Everything is running.")).toBeInTheDocument();
-      expect(getAllByText("Running")).toHaveLength(3);
+      const { findByText, getAllByText } = renderWithQuery(<><OverallBanner summary={{ level: "online", problems: [] }} health={health()} /><StatusComponents person={makePerson("owner")} health={health()} /></>);
+      expect(await findByText("Everything is running. Up for 1 hour 1 minute.")).toBeInTheDocument();
+      expect(getAllByText("Running")).toHaveLength(4);
     } finally {
       restore();
+    }
+  });
+
+  test("uptime uses readable minute, hour and day phrases", () => {
+    for (const [seconds, phrase] of [[60, "1 minute"], [3_600, "1 hour"], [172_800, "2 days"]] as const) {
+      const view = renderWithQuery(<OverallBanner summary={{ level: "online", problems: [] }} health={health({ uptimeSeconds: seconds })} />);
+      expect(view.getByText(`Everything is running. Up for ${phrase}.`)).toBeInTheDocument();
+      view.unmount();
     }
   });
 
@@ -90,10 +98,9 @@ describe("HealthSection", () => {
       health({ ok: false, engines: { ...health().engines, chat: { kind: "selection", pid: 4242, alive: false } } }),
     );
     try {
-      const { findByText, getByText } = renderWithQuery(<HealthSection person={makePerson("adult")} />);
-      expect(await findByText("Something is not answering.")).toBeInTheDocument();
-      expect(getByText("Not answering")).toBeInTheDocument();
-      expect(getByText(/restarts a stopped engine on its own/)).toBeInTheDocument();
+      const { findByText, getByText } = renderWithQuery(<><OverallBanner summary={{ level: "offline", problems: ["Brain"] }} health={health()} /><StatusComponents person={makePerson("adult")} health={health()} /></>);
+      expect(await findByText("Brain isn't running.")).toBeInTheDocument();
+      expect(getByText("Not running")).toBeInTheDocument();
     } finally {
       restore();
     }
@@ -104,10 +111,10 @@ describe("HealthSection", () => {
       health({ ok: false, engines: { ...health().engines, background: { kind: "failed", pid: null, alive: null } } }),
     );
     try {
-      const { findByText, getByText } = renderWithQuery(<HealthSection person={makePerson("adult")} />);
-      expect(await findByText("Something is not answering.")).toBeInTheDocument();
+      const { findByText, getByText } = renderWithQuery(<><OverallBanner summary={{ level: "offline", problems: ["Memory"] }} health={health()} /><StatusComponents person={makePerson("adult")} health={health()} /></>);
+      expect(await findByText("Memory isn't running.")).toBeInTheDocument();
       expect(getByText("Memory")).toBeInTheDocument();
-      expect(getByText("Keeps stopping")).toBeInTheDocument();
+      expect(getByText("Not running")).toBeInTheDocument();
     } finally {
       restore();
     }
@@ -118,9 +125,9 @@ describe("HealthSection", () => {
       health({ ok: false, engines: { ...health().engines, chat: { kind: "stalled", pid: null, alive: null } } }),
     );
     try {
-      const { findByText } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
-      expect(await findByText("Something is not answering.")).toBeInTheDocument();
-      expect(await findByText("Start is stuck")).toBeInTheDocument();
+      const { findByText } = renderWithQuery(<><OverallBanner summary={{ level: "offline", problems: ["Brain"] }} health={health()} /><StatusComponents person={makePerson("owner")} health={health()} /></>);
+      expect(await findByText("Brain isn't running.")).toBeInTheDocument();
+      expect(await findByText("Not running")).toBeInTheDocument();
     } finally {
       restore();
     }
@@ -140,9 +147,9 @@ describe("HealthSection", () => {
       }),
     );
     try {
-      const { findByText, getByText } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
+      const { findByText, getByText } = renderWithQuery(<StatusComponents person={makePerson("owner")} health={health()} />);
       expect(await findByText("Restarting")).toBeInTheDocument();
-      expect(getByText("Keeps stopping")).toBeInTheDocument();
+      expect(getByText("Not running")).toBeInTheDocument();
       // The built-in stand-in answers health checks but is never "Running".
       expect(getByText("Demo mode")).toBeInTheDocument();
     } finally {
@@ -159,21 +166,52 @@ describe("HealthSection", () => {
       health({ ok: false, engines: { ...health().engines, chat: { kind: "blocked", pid: null, alive: null } } }),
     );
     try {
-      const { findByText } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
-      expect(await findByText("Blocked by another program")).toBeInTheDocument();
+      const { findByText } = renderWithQuery(<StatusComponents person={makePerson("owner")} health={health()} />);
+      expect(await findByText("Blocked")).toBeInTheDocument();
     } finally {
       restore();
     }
   });
 
+  test("short state words cover every existing engine state", async () => {
+    const cases = [
+      [{ kind: "stub", pid: null, alive: true }, "Demo mode"],
+      [{ kind: "blocked", pid: null, alive: null }, "Blocked"],
+      [{ kind: "selection", pid: 1, alive: true }, "Running"],
+      [{ kind: "selection", pid: 1, alive: false }, "Not running"],
+      [{ kind: "restarting", pid: null, alive: null }, "Restarting"],
+      [{ kind: "failed", pid: null, alive: null }, "Not running"],
+      [{ kind: "stalled", pid: null, alive: null }, "Not running"],
+      [{ kind: "starting", pid: null, alive: null }, "Starting"],
+      [{ kind: "stopped", pid: null, alive: null }, "Stopped"],
+      [{ kind: "none", pid: null, alive: null }, "Stopped"],
+    ] as const;
+    for (const [entry, label] of cases) {
+      const restore = stubHealth(health({ engines: { ...health().engines, chat: entry } }));
+      try {
+        const view = renderWithQuery(<StatusComponents person={makePerson("child")} health={health({ engines: { ...health().engines, chat: entry } })} />);
+        expect(await view.findAllByText(label)).not.toHaveLength(0);
+        view.unmount();
+      } finally { restore(); }
+    }
+  });
+
+  test("Library appears only when kiwix-serve is registered", async () => {
+    const restore = stubHealth(health({ sidecars: [{ id: "kiwix-serve", status: "running", baseUrl: "http://127.0.0.1" }] }));
+    try {
+      const view = renderWithQuery(<StatusComponents person={makePerson("child")} health={health({ sidecars: [{ id: "kiwix-serve", status: "running", baseUrl: "http://127.0.0.1" }] })} />);
+      expect(await view.findByText("Library")).toBeInTheDocument();
+      expect(view.getByText("Offline reference library.")).toBeInTheDocument();
+    } finally { restore(); }
+  });
+
   test("only owners and admins see four engine restart buttons", async () => {
     const restore = stubHealth(health());
     try {
-      const admin = renderWithQuery(<HealthSection person={makePerson("admin")} />);
+      const admin = renderWithQuery(<StatusComponents person={makePerson("admin")} health={health()} />);
       expect(await admin.findAllByRole("button", { name: "Restart" })).toHaveLength(4);
       admin.unmount();
-      const adult = renderWithQuery(<HealthSection person={makePerson("adult")} />);
-      await adult.findByText("Everything is running.");
+      const adult = renderWithQuery(<StatusComponents person={makePerson("adult")} health={health()} />);
       expect(adult.queryByRole("button", { name: "Restart" })).not.toBeInTheDocument();
     } finally {
       restore();
@@ -193,7 +231,7 @@ describe("HealthSection", () => {
       return Promise.reject(new Error(`unstubbed fetch: ${method} ${url}`));
     }) as unknown as typeof fetch;
     try {
-      const { findAllByRole, getByRole, queryByRole } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
+      const { findAllByRole, getByRole, queryByRole } = renderWithQuery(<StatusComponents person={makePerson("owner")} health={health()} />);
       const buttons = await findAllByRole("button", { name: "Restart" });
       const brainButton = buttons[0];
       if (!brainButton) throw new Error("Brain restart button not found");
@@ -235,7 +273,7 @@ describe("HealthSection", () => {
       return Promise.reject(new Error(`unstubbed fetch: ${url}`));
     }) as unknown as typeof fetch;
     try {
-      const { findAllByRole, getByRole, findByText } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
+      const { findAllByRole, getByRole, findByText } = renderWithQuery(<StatusComponents person={makePerson("owner")} health={health()} />);
       const understandingButton = (await findAllByRole("button", { name: "Restart" }))[1];
       if (!understandingButton) throw new Error("Understanding restart button not found");
       fireEvent.click(understandingButton);

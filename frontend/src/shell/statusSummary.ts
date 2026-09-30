@@ -1,6 +1,6 @@
 import type { HealthStatus } from "@/lib/api";
 import { chatAvailability } from "@/apps/chat/chatAvailability";
-import { ENGINE_ROWS } from "@/apps/settings/HealthSection";
+import { ENGINE_ROWS } from "@/next/pages/status/StatusComponents";
 
 export interface StatusSummary {
   level: "online" | "degraded" | "offline";

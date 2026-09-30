@@ -37,16 +37,28 @@ function mockHealth() {
   return { paths, restore: () => { globalThis.fetch = originalFetch; } };
 }
 
+function body(overrides: Record<string, unknown> = {}) {
+  return {
+    brain: "selection", voice: "spawned", ok: true, uptimeSeconds: 60,
+    engines: {
+      chat: { kind: "selection", pid: null, alive: true },
+      embed: { kind: "spawned", pid: null, alive: true },
+      background: { kind: "spawned", pid: null, alive: true },
+      voice: { kind: "spawned", pid: null, alive: true },
+    }, sidecars: [], ...overrides,
+  };
+}
+
 describe("NextStatusPage", () => {
   test("an admin sees the overall line, four engine rows, and Restart controls", async () => {
     const { restore } = mockHealth();
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("admin")} />);
       await view.findByText("Brain");
-      expect(view.getAllByText("Everything is running.").length).toBeGreaterThan(0);
+      expect(await view.findByText("Everything is running. Up for 1 minute.")).toBeTruthy();
       for (const label of ["Brain", "Understanding", "Memory", "Voice"]) expect(view.getByText(label)).toBeTruthy();
       expect(view.getAllByRole("button", { name: "Restart" })).toHaveLength(4);
-      expect(view.getByText("All good")).toBeTruthy();
+      expect(view.getByText("Online")).toBeTruthy();
     } finally {
       restore();
     }
@@ -57,12 +69,35 @@ describe("NextStatusPage", () => {
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
       await view.findByText("Brain");
-      expect(view.getAllByText("Everything is running.").length).toBeGreaterThan(0);
+      expect(await view.findByText("Everything is running. Up for 1 minute.")).toBeTruthy();
       for (const label of ["Brain", "Understanding", "Memory", "Voice"]) expect(view.getByText(label)).toBeTruthy();
       expect(view.queryByRole("button", { name: "Restart" })).toBeNull();
-      expect(paths).toEqual(["/api/health"]);
+      expect(view.queryByText(/pid|port|process|engine|sidecar/i)).toBeNull();
+      expect(paths[0]).toBe("/api/health");
     } finally {
       restore();
     }
+  });
+
+  test("offline banner joins problem names and uses singular grammar", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock(() => Promise.resolve(Response.json(body({ ok: false, engines: {
+      chat: { kind: "stopped", pid: 2, alive: null }, embed: { kind: "stopped", pid: null, alive: null },
+      background: { kind: "spawned", pid: null, alive: true }, voice: { kind: "spawned", pid: null, alive: true },
+    } })))) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
+      expect(await view.findByText("Brain and Understanding aren't running.")).toBeTruthy();
+    } finally { globalThis.fetch = original; }
+  });
+
+  test("degraded banner copy is plain and Library is conditional", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock(() => Promise.resolve(Response.json(body({ engines: { ...body().engines, voice: { kind: "starting", pid: null, alive: null } }, sidecars: [{ id: "kiwix-serve", status: "running", baseUrl: "http://127.0.0.1" }] })))) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<NextStatusPage person={makePerson("adult")} />);
+      expect(await view.findByText("Something is starting up or slow.")).toBeTruthy();
+      expect(view.getByText("Library")).toBeTruthy();
+    } finally { globalThis.fetch = original; }
   });
 });
