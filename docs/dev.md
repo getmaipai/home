@@ -33470,28 +33470,65 @@ The New Thread button and its Cmd/Ctrl+Shift+O shortcut are also disabled while 
 
 ## DATA-LOCATION: where the household's data lives, choosing it at install and moving it later (design, 2026-09-29)
 
+**Revision 2026-09-30.** The first version grouped the data into three
+locations (household records, big files, backups), kept the records on
+the internal disk by default and asked the installer only about big
+files. The owner's requirement of 2026-09-30 is that the person controls
+where every kind of data goes, because they may lack space on one disk,
+or want redundancy for some data and speed for other data. So the three
+groups are replaced by a list of twenty-one data classes for Home and
+four for the Stack, each with its own location chosen at install and movable
+later from Settings > Storage. The class list is declared once and every
+consumer (paths, the installer, the Storage page, the mover, describe,
+the backup) reads it. The bootstrap record holds a root folder plus
+per-class overrides. The marker, the never-create rule, hold mode,
+checksum-verified moves with rollback before the first healthy boot,
+describe before delete and set aside instead of delete all carry over,
+now per class, and a hub whose classes sit on several disks gets exact
+rules for which missing disk stops it and which only turns features off.
+The Linux sandbox decision is reversed (any mount point, not a fixed
+list), `bun start` gains a restart loop so the Settings move works from a
+source checkout, the reference library's own location setting is folded
+into the record, and the earlier questions 1 to 4 are decided below.
+
 This is the design pass that DATA-LOCATION-01 and -02 in `docs/BACKLOG.md`
-asked for. It covers the bootstrap record that says where the data is,
-the install-time choice, what the hub does when that folder's drive is
-missing, the move from Settings > Storage, every way this could lose a
-household's data and what closes each one, what goes through the spec,
-and the split into items. It is documentation only; nothing here is
-built yet.
+asked for. It covers the class list, the bootstrap record, the choice at
+install, what the hub does when a class's disk is missing, the move from
+Settings > Storage, every way this could lose a household's data and what
+closes each one, what goes through the spec, and the split into items. It
+is documentation only; nothing here is built yet.
 
 ### What exists today
 
 - `backend/src/lib/paths.ts`: `dataDir` is `MAIPAI_DATA_DIR`, or
   `<repoRoot>/data` anchored to the source file (SINGLE-INSTANCE-01).
-  Every other path is derived from it: `models/`, `engines/`,
-  `voice/wakewords`, `voice/stt`, `vision/models`, `sidecars/`,
-  `reference/`, `cache/`, `logs/`, `keys/` (via `lib/keystore.ts`),
-  `people/` (attachments), `projects/`, `packages/<id>/state` and
-  `versions/`, `voice/cloned`. `backupDir` is `MAIPAI_BACKUP_DIR` or
-  `<data>/../backups`; `receivedBackupsDir` is its sibling.
+  Every other path is derived from it by a constant in that file or by a
+  literal `join(dataDir, ...)` in the module that uses it:
+  `lib/keystore.ts` and `lib/householdCa.ts` (`keys/`), `lib/deviceId.ts`
+  (`device-id6.txt`), `lib/favicons.ts` (`favicons/`), `lib/sidecars.ts`
+  (`local-app/engine-pids.json`), `lib/restoreStaging.ts` and
+  `lib/factoryReset.ts` (the `hub.db.pending-restore`, `.pre-restore`,
+  `.pre-factory-reset` and `factory-reset-pending.json` files beside
+  `hub.db`), `scripts/bench/labels.ts` (`labels/`). `backupDir` is
+  `MAIPAI_BACKUP_DIR` or `<data>/../backups`; `receivedBackupsDir` is its
+  sibling.
+- Twenty-six call sites in nineteen modules create folders under the data
+  folder with `ensureDataDir` or `mkdirSync`, each on first use. Any of
+  them would create a class folder on the boot disk if that class's
+  drive were missing. One already runs against a person-chosen path:
+  `kiwixSidecar.ts`'s `regenerateLibrary` calls `mkdirSync(libraryDir,
+  { recursive: true })` on the folder named by the household setting
+  `reference.library_dir`, whose help text invites an external drive or
+  a NAS mount and promises a move that no code performs.
+- `commons/core/src/keystore.ts`: `getOrCreateHexKey` mints a fresh key
+  when it finds none. With `keys/` on a disk that is not connected, the
+  file backend (Linux, Windows) would mint new keys into a newly created
+  folder, and every secret and biometric print encrypted with the old
+  keys would become unreadable. On macOS the key bytes are in the
+  Keychain under the app id and only the markers are in `keys/`.
 - `backend/src/lib/bootGuard.ts` runs before anything opens `hub.db`:
-  the placement guard (`assertDataDirPlacement`: outside the repo only
-  when `MAIPAI_DATA_DIR` is set or the folder is under `~/.maipai/`),
-  then the machine lock at `hubLockPath()` (SINGLE-INSTANCE-02).
+  the placement guard (`assertDataDirPlacement`), then the machine lock
+  at `hubLockPath()` (SINGLE-INSTANCE-02).
 - The installers put source and state in one root, run the hub as a
   system service, and keep data at `<install>/data`:
 
@@ -33505,626 +33542,965 @@ built yet.
   SERVICES.md describes a per-user install with data at
   `~/.maipai/<product>/data`. Home's installer predates that and this
   design does not change it; the design works for both layouts because
-  it keys everything off the lock's folder and `repoRoot`, which both
-  layouts have.
+  it keys everything off the lock's folder and `repoRoot`.
 - The Linux unit runs with `ProtectSystem=strict` and
-  `ReadWritePaths=<install>`. The hub cannot write anywhere else, so
-  today a data folder on another drive would fail on Linux at the first
-  write.
-- All three service managers restart the hub after a non-zero exit:
-  launchd `KeepAlive true`, systemd `Restart=on-failure`, WinSW
-  `<onfailure action="restart">`. `bun start` (`scripts/app.sh`) does
-  not.
-- The Stack keeps its own state at `<install>/stack/data`
-  (`STACK_DATA_DIR`, written into its launchd or `systemd --user` unit by
-  `maipai-stack install-service`). It never reads Home's folder; Home
-  finds it only through `engines.stack.url`. The Stack's `lib/paths.ts`
-  calls `ensureDataDir(dataDir)`, so it creates whatever folder it is
-  pointed at.
-- `commons/core/src/keystore.ts`: the macOS Keychain entries are named by
-  app id (`com.maipai-home.keystore.<name>`), not by folder, so they
-  follow the household anywhere on the same machine. The key files and
-  Keychain markers in `<data>/keys/` must move with it. On Windows the
-  key files are DPAPI-protected for the service account, and a copy on
-  the same machine under the same account stays readable.
+  `ReadWritePaths=<install>`, so today a class on another drive would
+  fail on Linux at the first write.
+- launchd `KeepAlive true`, systemd `Restart=on-failure` and WinSW
+  `<onfailure action="restart">` restart the hub after a non-zero exit.
+  `bun start` (`scripts/app.sh`) starts it with `nohup` and restarts
+  nothing.
+- The Stack keeps its state at `<install>/stack/data` (`STACK_DATA_DIR`).
+  Its `lib/paths.ts` calls `ensureDataDir(dataDir)` at import, so it
+  creates whatever folder it is pointed at. Its `store/` and `models/`
+  folders are joined by links: `store/blobs.ts` hard-links or symlinks
+  blobs into place and `store/hfCache.ts` symlinks each snapshot to its
+  blob.
+- One engine writes outside the data folder altogether:
+  `ttsSupervisor.ts` spawns `uvx pocket-tts serve`, so the TTS engine's
+  Python, its packages and its model land in the service account's
+  `~/.cache/uv` and `~/.cache/huggingface`, where no person chose to put
+  them. The Stack already avoids this: `stack/backend/src/lib/
+  uvEnvironment.ts` sets `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR` and
+  `HOME` for its Python engines to folders under its own data folder.
+- Backups (`lib/backup.ts`) cover `hub.db` only, through `VACUUM INTO`.
+  Attachments, cloned voices and project files are in no backup today;
+  CHAT-PARITY-10 owns attachments.
 - Repairs issues (`lib/issues.ts`) are rows in `hub.db`. A hub that
   cannot open its database cannot raise one.
-- `lib/restoreStaging.ts` stages a pending restore inside `dataDir`,
-  applied on the next boot.
 
-### Three locations, not one
+### Every class of data, one list
 
-The household's files fall into three groups with different value and
-size, and the design gives each its own location:
+A data class is a folder whose contents share one owner, one size and
+access profile, one durability need and one rule for what happens when
+it is missing. Each class has one location. The list below is every
+folder and file the current code writes under the data folder or beside
+it, verified from `paths.ts` and every module that builds a path from
+`dataDir` or `backupDir`.
 
-| group | what is in it | if it is lost | size |
-|---|---|---|---|
-| **records** | `hub.db` and its `-wal`/`-shm`, `keys/`, `people/`, `voice/cloned/`, `projects/`, `packages/`, `logs/`, `cache/`, a staged restore | the household is gone, except what a backup holds | megabytes to a few gigabytes |
-| **big files** | `models/`, `engines/`, `voice/wakewords/`, `voice/stt/`, `vision/models/`, `sidecars/`, `reference/` when `reference.library_dir` is empty | fetched again from their pins | many gigabytes |
-| **backups** | `backups/`, `received-backups/` | the safety net for the other two | grows with retention |
+**Home's classes, what they hold.** The default folder is relative to
+the root; the two backup classes default to folders beside the root, as
+today. Every default equals today's layout, so adopting an existing hub
+writes markers and a record and moves no file.
 
-With no choice made, all three stay where they are today (big files
-inside the records folder, backups beside it), so nothing changes for an
-existing install. `paths.ts` resolves the big-files paths from the
-record's `bigFiles.path` when one is set, and from `dataDir` otherwise.
+| id | default folder | holds | size | access |
+|---|---|---|---|---|
+| `records` | the root itself | `hub.db`, `-wal`, `-shm`; the staged restore and factory-reset files beside it; `device-id6.txt` | MB to a few GB | small random writes, `fsync` on every commit |
+| `keys` | `keys/` | keystore key files and Keychain markers, the household CA and hub identity keys | under 1 MB | written once, read at boot |
+| `people-files` | `people/` | each person's uploaded attachments | grows, MB to tens of GB | written once, read often |
+| `cloned-voices` | `voice/cloned/` | voice samples people uploaded for cloning | MB | written once, read by TTS |
+| `projects` | `projects/` | each project run's artifact files | MB to GB | bursts of writes during a run |
+| `packages` | `packages/` | per package: `state/` (a Tier 1 package's own files, often SQLite), `versions/` (store-installed source), `.staging/` | MB to hundreds of MB | small random writes in `state/`; installs by rename |
+| `models` | `models/` | GGUF chat, embedding and background-image weights | 4 to 40 GB each | written once by download, read in large runs at engine start |
+| `engines` | `engines/` | `llama-server` builds | hundreds of MB | written once, executed |
+| `sidecars` | `sidecars/` | `kiwix-tools` binaries | tens of MB | written once, executed |
+| `reference` | `reference/` | offline reference archives (ZIM files) and `library.xml` | 1 GB to over 100 GB | written once, random reads during search |
+| `wakeword-models` | `voice/wakewords/` | wake-word feature models and detectors | MB | written once, read at start |
+| `stt-models` | `voice/stt/` | VAD and speech-to-text models | tens to hundreds of MB | written once, read at start |
+| `tts-models` | `voice/tts/` | the TTS engine's Python, packages and model weights, today in `~/.cache/uv` and `~/.cache/huggingface` | 1 to 3 GB | written once, read at engine start |
+| `vision-models` | `vision/models/` | face detection and embedding models served to browsers | tens of MB | written once, read on request |
+| `logs` | `logs/` | the hub's structured logs, rotated | up to the rotation cap | appends |
+| `cache` | `cache/` | package fetch responses | MB | small random writes |
+| `favicons` | `favicons/` | source icons and their index | MB | small random writes |
+| `runtime` | `local-app/` | `engine-pids.json`, the running engines' pids | bytes | rewritten on each engine start |
+| `labels` | `labels/` | weekly turn-label exports from `scripts/bench/labels.ts` | KB to MB | written by an operator's export |
+| `backups` | `../backups/` | the household's encrypted archives | grows with retention | one large sequential write a night |
+| `received-backups` | `../received-backups/` | archives robots and pods pushed, encrypted with their own keys | grows | sequential writes by devices |
 
-The split matters because a person who adds a large drive wants the
-models on it, not necessarily the household. An unplugged drive that
-holds only big files takes chat and voice down, which is an ordinary
-Repairs issue because the database is still open. An unplugged drive
-that holds the records stops the whole hub. So the installer's question
-is about big files, and moving the records is the advanced choice (see
-"Decisions" below).
+**Home's classes, how each behaves.** "Needs" are filesystem
+capabilities the class requires, probed at the target (see (b)). "If
+missing" is what a boot does when the class's folder is absent or its
+marker does not match. "Move" is how (c) moves it.
 
-### (a) The bootstrap record
+| id | if lost | sensitive | needs | if missing | move | backup |
+|---|---|---|---|---|---|---|
+| `records` | the household, except what a backup holds | personal, biometric prints (encrypted), secrets (encrypted) | `sqlite`, `private` | refuse to boot: hold mode | offline | hot |
+| `keys` | every secret and biometric print becomes unreadable | holds keys | `private` | refuse to boot: hold mode; never mint a replacement | offline | emergency kit only, never in the archive |
+| `people-files` | irreplaceable | personal | none beyond writing | attachments unavailable, uploads refused | offline | hot |
+| `cloned-voices` | irreplaceable | biometric | none beyond writing | a person's cloned voice falls back to the household's default preset voice | offline | hot |
+| `projects` | the household's own work | personal | none beyond writing | project runs refused, artifact files unavailable | offline | hot |
+| `packages` | package state is irreplaceable; versions download again | personal (package state) | `sqlite` | Tier 1 and store-installed packages do not load; bundled Tier 0 packages run | offline | per package manifest (`hot`, `cold`, `exclude`) |
+| `models` | downloads again from pins | none | `large-files` | chat, memory embedding and background images unavailable | online, or download again | exclude |
+| `engines` | downloads again | none | `exec` | the same as `models` | online, or download again | exclude |
+| `sidecars` | downloads again | none | `exec` | reference search unavailable | online, or download again | exclude |
+| `reference` | downloads again, possibly 100 GB | none | `large-files` | reference search unavailable | online, or download again | library (listed, not copied) |
+| `wakeword-models` | downloads again | none | none | wake word off; typed chat and push-to-talk work | online, or download again | exclude |
+| `stt-models` | downloads again | none | none | voice input off; typed chat works | online, or download again | exclude |
+| `tts-models` | downloads again | none | `exec`, `symlinks` | spoken replies off; replies arrive as text | online, or download again | exclude |
+| `vision-models` | downloads again | none | none | face recognition and enrollment off | online, or download again | exclude |
+| `logs` | operational history | redacted operational data | none | logs go to stdout and stderr, which the service manager keeps | online | exclude |
+| `cache` | rebuilt | none | none | package widgets show no data until it returns | start empty | exclude |
+| `favicons` | rebuilt | none | none | sources show the fallback icon | start empty | exclude |
+| `runtime` | rebuilt | none | none | engine pids kept in memory only; the orphan sweep after a crash cannot see older engines | start empty | exclude |
+| `labels` | recomputed from `records` | personal (turn text; credential turns are skipped) | none | exports refused | online | exclude |
+| `backups` | the safety net | encrypted household data | `large-files` | backups fail (Repairs); updates, restores and offline moves wait, since each needs a fresh backup first | online | not applicable |
+| `received-backups` | the devices' safety net | encrypted, foreign keys | `large-files` | device pushes answered "try later" | online | not applicable |
 
-The records location cannot be a setting: settings live in `hub.db`,
-inside the folder being located. It is a small file outside all three
-folders.
+The capability names mean: `sqlite`, a local filesystem with reliable
+`fsync` and byte-range locks (APFS, HFS+, ext4, XFS, Btrfs, ZFS, NTFS,
+ReFS); `private`, owner-only permissions the filesystem enforces;
+`exec`, a mount that allows executing files; `large-files`, files over
+4 GB; `symlinks` and `hardlinks`, as named. `engines` gains `symlinks`
+if the pinned engine archives contain links; DATA-LOCATION-00c checks
+the pinned archives and records the answer in the list.
+
+**The Stack's classes.** The Stack owns these and its own record (see
+"The Stack" under (c)); Home shows them and asks for moves.
+
+| id | default folder | holds | needs | if missing | move |
+|---|---|---|---|---|---|
+| `stack-state` | `<stack data>/` | `stack.db`, `keys/` | `sqlite`, `private` | the Stack refuses to start; Home reports every role down | offline |
+| `stack-models` | `models/` and `store/` | model files, their manifests, and the content store they link into | `large-files`, `symlinks`, `hardlinks` | the roles those models serve are down | online, or download again |
+| `stack-engines` | `engines/` | engine builds, including the uv Python and cache under `engines/uv/` | `exec` | the roles those engines serve are down | online, or download again |
+| `stack-logs` | `logs/` | the Stack's logs | none | stdout only | online |
+
+`stack-models` is one class, not two, because its files link into each
+other: a class boundary between `store/` and `models/` would put links
+across filesystems. The Stack also sets `HOME` for its Python engines to
+`<stack data>/home/`, where libraries keep their own caches;
+DATA-LOCATION-STACK assigns that folder to a class (most likely
+`stack-engines`) after checking what lands there, so nothing the Stack
+writes sits outside its list.
+
+`tts-models` is the one class that changes where files go today: the
+TTS child gets `UV_CACHE_DIR`, `UV_PYTHON_INSTALL_DIR` and `HF_HOME`
+pointing into it, the same way the Stack's `uvEnvironment.ts` does. It
+starts empty and downloads its pinned set on first use; the old copies
+in the service account's caches are not MaiPai's own folders, so they
+are named on the Storage page for the person to remove and never
+deleted by MaiPai.
+
+**Not classes.** The lock and the record live outside every class (see
+(a)). The bundled packages (`backend/packages/`) and the built frontend
+are part of the install, replaced by an update, and not data. The legacy
+`hub.lock` inside the data folder is never copied. A `home.db` found in
+the family hub's data folder has no writer in the current code (a
+pre-rebuild file); `describeFolder` lists files like it as "not part of
+the current layout", and nothing moves or deletes them.
+
+**Why so many classes, and how the page stays usable.** Each row differs
+from its neighbours in at least one column that changes where a person
+would put it: `cloned-voices` is biometric where `people-files` is not,
+`engines` needs `exec` where `models` needs `large-files`, `reference`
+can be larger than every other class together. Merging any two would
+force one location on data a person might want apart. The Storage page
+keeps it readable with SETTINGS.md Rule 4's disclosure levels, declared
+per class: basic (`records`, `keys`, `people-files`, `cloned-voices`,
+`projects`, `models`, `reference`, `backups`), advanced, folded
+(`packages`, `engines`, `sidecars`, `wakeword-models`, `stt-models`,
+`tts-models`, `vision-models`, `received-backups`, `logs`, and the
+Stack's four),
+and expert, under Developer tools (`cache`, `favicons`, `runtime`,
+`labels`).
+
+**Where the list is declared.** The shape of one class declaration is a
+spec schema, `commons/spec/schemas/data-class.schema.json`: `id`,
+`product`, `title`, `help`, `level`, `default` (`{base: "root" |
+"beside-root", subpath}`), `holds`, `size`, `access`, `durability`
+(`irreplaceable`, `rebuildable`, `disposable`), `rebuild` (`none`,
+`download`, `recompute`, `empty`), `sensitive` (`none`, `personal`,
+`biometric`, `keys`), `needs`, `whenMissing` (`hold` or `degrade`),
+`degrades` (the feature codes it turns off), `move` (`offline`,
+`online`, `empty`), `refetch` (boolean), `backup` (`hot`, `cold`,
+`exclude`, `library`, `kit`, `none`), `largestFileBytes`. The list itself
+is each product's, because each product's layout is its own and
+`commons` never holds a product's layout: Home's is
+`backend/src/lib/dataClasses.ts`, one array validated against the schema
+by a fixture test; the Stack's is `stack/backend/src/lib/dataClasses.ts`,
+served at `GET /stack/v1/storage/classes`; the robot will declare its own
+in the same shape.
+
+Every consumer draws from that array: `paths.ts` resolves each class's
+folder from it and exports nothing hand-joined; the installer reads it
+through `bun backend/scripts/data-location.ts classes`; the Storage page
+reads it through `GET /api/storage/locations`; the mover reads `move`,
+`needs` and `refetch`; `describeFolder` reads `holds` and `sensitive`;
+the backup reads `backup`. That last one is BACKUPS.md's "core declares
+its stores", which `lib/backup.ts` has deferred until a second store
+existed; the class list is that declaration. The Stack's existing
+`PreciousState` (`GET /stack/v1/backup`) is derived from the Stack's
+class list from then on, so the two cannot disagree. The household
+setting `reference.library_dir` is retired into the record (see (a)):
+a location in two places could disagree.
+
+### (a) The bootstrap record, per class
+
+The locations cannot be settings: settings live in `hub.db`, inside the
+`records` class. They are a small file outside every class.
 
 **Path.** `data-location.json` in the lock's folder,
-`dirname(hubLockPath())/data-location.json`: that is
-`~/.maipai/home/data-location.json` on macOS and Linux and
-`%LOCALAPPDATA%\MaiPai\home\data-location.json` on Windows, for the
-account the hub runs as. `MAIPAI_DATA_LOCATION_PATH` overrides it the
-same way `MAIPAI_HUB_LOCK_PATH` overrides the lock, and
-`tests/preload.ts` points it at a temp file so no test touches the real
-one. One record per OS account matches the one-hub-per-machine-per-user
-rule. The lock and the record sit together, one level above any data
-folder, so neither is inside what it describes.
+`dirname(hubLockPath())/data-location.json`: `~/.maipai/home/` on macOS
+and Linux and `%LOCALAPPDATA%\MaiPai\home\` on Windows, for the account
+the hub runs as. `MAIPAI_DATA_LOCATION_PATH` overrides it the way
+`MAIPAI_HUB_LOCK_PATH` overrides the lock, and `tests/preload.ts` points
+it at a temp file. One record per OS account matches the one-instance
+rule.
 
-**Format.** JSON, one object, its shape declared in the spec (see (e)):
+**Format.** JSON, its shape declared in the spec (see (e)):
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "productRoot": "/usr/local/maipai-home",
-  "records": {
-    "path": "/usr/local/maipai-home/data",
-    "folderId": "01J9...",
-    "generation": 1,
-    "volume": { "id": "C3F1...", "label": "Macintosh HD", "relativePath": "usr/local/maipai-home/data" }
+  "householdFolderId": "01J9...",
+  "root": { "path": "/Volumes/Mirror/MaiPai", "volume": { "id": "C3F1...", "label": "Mirror", "relativePath": "MaiPai" } },
+  "classes": {
+    "records": { "path": null, "generation": 1 },
+    "keys": { "path": null, "generation": 1 },
+    "models": { "path": "/Volumes/Big/MaiPai/home/models", "generation": 2,
+                "volume": { "id": "9A0B...", "label": "Big", "relativePath": "MaiPai/home/models" } },
+    "reference": { "path": "/Volumes/Big/MaiPai/home/reference", "generation": 1,
+                   "volume": { "id": "9A0B...", "label": "Big", "relativePath": "MaiPai/home/reference" } },
+    "backups": { "path": "/Volumes/Backup/MaiPai/backups", "generation": 1,
+                 "volume": { "id": "77D2...", "label": "Backup", "relativePath": "MaiPai/backups" } }
   },
-  "bigFiles": null,
-  "backups": { "path": "/usr/local/maipai-home/backups" },
-  "writtenAt": "2026-09-29T21:04:00Z",
-  "writtenBy": "adopt",
-  "previous": null,
+  "writtenAt": "2026-09-30T21:04:00Z",
+  "writtenBy": "move",
   "move": null
 }
 ```
 
-`productRoot` is the `repoRoot` of the hub that owns the record. A hub
-whose `repoRoot` differs (a worktree, a second checkout) treats the
-record as not its own: it boots on its own default or on
-`MAIPAI_DATA_DIR`, never writes the record, and logs one line saying so.
-`bigFiles` has the same shape as `records` when set. `previous` and
-`move` hold a move's state (see (c)). `volume.id` is the filesystem UUID
-on macOS (`diskutil info -plist`) and Linux (`findmnt -no UUID -T`), and
-the volume GUID on Windows (`Get-Volume`).
+A class resolves to its own `path` when set (an override), otherwise to
+`root.path` joined with the class's default subpath from the class list
+(or the root's parent for `beside-root` classes). A class absent from
+`classes` is treated as `{path: null, generation: 1}`, so a hub update
+that adds a class needs no record migration. `householdFolderId` is
+minted once, when the household's first folder is created or adopted,
+and never changes; `generation` is per class and goes up by one on every
+move of that class. `volume.id` is the filesystem UUID on macOS
+(`diskutil info -plist`, `VolumeUUID`) and Linux (`findmnt -no UUID -T`),
+the volume GUID on Windows (`Get-Volume`, `UniqueId`), and for a network
+share the share's address (`//nas/share`, `nas:/export`), which has no
+UUID. `productRoot` works as before: a hub whose `repoRoot` differs (a
+worktree, a second checkout) treats the record as not its own, boots on
+its own default or `MAIPAI_DATA_DIR`, never writes the record, and logs
+one line saying so.
 
 **Writes** are atomic: a temp file in the same folder, `fsync`, a rename
-over the old file, `fsync` of the folder, the same pattern the lock
-uses. There are three writers: the installer (through
-`backend/scripts/data-location.ts init`, the one implementation, called
-the way `install.sh` already calls `set-setting.ts`), the hub's
-adoption step at boot, and the move. No person edits it by hand and no
-Settings form writes it.
+over the old file, `fsync` of the folder. Three writers: the installer
+through `backend/scripts/data-location.ts init`, the hub's adoption step,
+and the move. No person edits it by hand and no Settings form writes it.
 
-**The folder marker.** Every folder a record points at carries
-`maipai-folder.json` at its top: `{schema, product: "home", kind:
-"records" | "bigFiles" | "backups", folderId, generation, createdAt,
-moveId?, retired?: {at, movedTo, moveId}, note}`. The `note` is a plain
-sentence for a person who opens the folder: "This folder holds a MaiPai
-Home household's data. MaiPai uses it while Settings > Storage lists it;
-do not delete or move it by hand." It is a visible file on purpose: a
-hidden file is easy to lose in a manual copy and invisible to the person
-the note is for. `folderId` is minted once, when the household's first
-records folder is created or adopted, and never changes; `generation`
-goes up by one on every move. Exactly one folder on the machine matches
-the record's `(folderId, generation)`, and that folder is the live one.
-That rule, not the folder's location, decides which folder is real.
+**The folder marker, one per class folder.** Every class folder carries
+`maipai-folder.json` at its top: `{schema, product: "home", class,
+householdFolderId, generation, createdAt, moveId?, retired?: {at,
+movedTo, moveId}, note}`. The note is a plain sentence for a person who
+opens the folder: "This folder holds part of a MaiPai Home household's
+data (class: people-files). MaiPai uses it while Settings > Storage lists
+it; do not delete or move it by hand." It is a visible file on purpose.
+Exactly one folder on the machine matches `(householdFolderId, class,
+generation)` for each class, and that folder is that class's live one.
+With the default layout the root holds the `records` marker and each
+default subfolder (`keys/`, `models/` and the rest) holds its own.
 
-**Who reads it at boot, in order.** `lib/bootGuard.ts` stays the first
-import of `index.ts` and grows these steps, all before anything opens a
-database:
+**Nesting.** No class folder may sit inside another class's folder, with
+one exception: the default subfolders inside the root, which is also the
+default `records` folder. When `records` has an override, its folder may
+hold no other class folder. No class folder may sit inside `backups` or
+`received-backups`, and neither of those may sit inside any class they
+protect (BACKUPS.md: a backup never lives inside what it protects).
 
-1. Resolve the records location: `MAIPAI_DATA_DIR` when set, else the
-   record's `records.path` when the record is this hub's own, else
-   `<repoRoot>/data`. `paths.ts` exposes the source (`env`, `record`,
-   `default`) beside `dataDir`, replacing the bare `dataDirIsExplicit`.
-2. The placement guard. A path from the record counts as chosen on
-   purpose, like one from `MAIPAI_DATA_DIR`. Nothing else about the
-   guard changes.
-3. The machine lock, unchanged, recording the resolved `dataDir`.
+**Boot order.** `lib/bootGuard.ts` stays the first import of `index.ts`
+and grows these steps, all before anything opens a database:
+
+1. Resolve the root and every class: `MAIPAI_DATA_DIR`, when set, is the
+   root and every class resolves under it with no overrides (tests, the
+   screenshot run, the restore drill); else the record when it is this
+   hub's own; else `<repoRoot>/data`. `paths.ts` exposes the source
+   (`env`, `record`, `default`) per class beside each path, replacing
+   `dataDirIsExplicit`.
+2. The placement guard, applied to the `records` folder; a path from the
+   record counts as chosen on purpose.
+3. The machine lock, unchanged, recording the `records` folder as
+   `dataDir`.
 4. When the record has a `move` in progress, the move's boot step runs
    (see (c)) and may end the process.
-5. The marker check. A folder whose marker says `retired` is refused
-   whatever the source, and the message names the move that retired it.
-   When the source is the record, the folder must exist and its marker
-   must match `(folderId, generation)`; if not, the hub enters hold mode
-   (see (b)) and never creates the folder. When the source is
-   `MAIPAI_DATA_DIR` (tests, the screenshot run, the restore drill), the
-   folder is created as today and given a marker if it has none, and the
-   record is neither read nor written.
+5. The marker check, for every class. A folder whose marker is retired is
+   refused and never used. When the source is the record, each class
+   folder must exist and its marker must match. A `hold` class
+   (`records`, `keys`) that fails the check puts the hub into hold mode
+   (see (b)). A `degrade` class that fails it is marked unavailable for
+   this boot and raises its health item. No folder is created either way.
+   When the source is `MAIPAI_DATA_DIR`, folders are created as today and
+   given markers if they have none, and the record is neither read nor
+   written.
 6. Adoption, once, for a hub with no record of its own on the default
-   location. If `<repoRoot>/data/hub.db` exists, the hub writes a marker
-   into the folder (a new `folderId`, generation 1) and a record
-   pointing at it (`writtenBy: "adopt"`). If there is no `hub.db`, this
-   is a first run: the folder is created as today and nothing is
-   written, so an empty worktree or a fresh checkout never claims the
-   record. The next boot that finds a `hub.db` adopts. From the moment a
-   record exists, a missing records folder means hold mode, never a
-   fresh household.
+   location. If `<repoRoot>/data/hub.db` exists, the hub mints the
+   `householdFolderId`, writes a marker into every class folder that
+   exists (generation 1), writes explicit overrides for `backups` and
+   `received-backups` so a later root move never shifts them, and writes
+   the record (`writtenBy: "adopt"`). A non-empty `reference.library_dir`
+   becomes the `reference` override if that folder exists; the setting's
+   value is then cleared and the key removed from `referenceKeys.ts` in
+   the same change. If there is no `hub.db`, this is a first run: nothing
+   is written, so an empty worktree never claims the record. From the
+   moment a record exists, a missing class folder means hold mode or a
+   degraded class, never a fresh one.
 
-`@maipai/core`'s `ensureDataDir` creates any folder it is handed. It
-gains a mode that refuses to create a folder a record points at, used by
-Home and the Stack (see (e)).
+**Never create a class folder.** `paths.ts` gains `classDir(id)`, the one
+way a module reaches a class folder. It returns the folder only when this
+boot's marker check passed for that class, and otherwise throws
+`ClassUnavailableError` naming the class, which the caller turns into its
+feature's "unavailable" answer. It creates subfolders inside a live class
+folder freely, and never the class folder itself; only `init` and the
+move create class folders. The twenty-six create sites move to it, including
+`regenerateLibrary`'s. `@maipai/core`'s `ensureDataDir` gains the
+matching `{create: false}` mode for the Stack. The keystore is created
+only after the marker check has passed for `keys`, so a missing keys
+disk can never lead to a minted replacement.
 
-**Service definitions and `bun start`.** No service definition carries
-the location. DATA-LOCATION-01's first draft put the path in the
-launchd plist or the systemd unit; this design drops that for three
-reasons. The Linux hub runs as `maipai` and cannot rewrite its own unit
-in `/etc`, so a move would need a privileged helper to change one path.
-A second copy of the location in the unit would be one value in two
-places that can disagree. And `bun start` has no unit at all. Instead
-every way of starting the hub (launchd, systemd, WinSW, `bun start`,
-`bun run dev`) reads the same record through `bootGuard.ts`, with no
-code per launcher. The service definitions gain one variable,
-`MAIPAI_SUPERVISED=1`, which tells the hub that a non-zero exit will be
-restarted by the service manager; hold mode and the move depend on it
-(see (b) and (c)). `bun start` does not set it.
+**A disk that goes away while the hub runs.** Every 30 seconds the hub
+checks each class folder's marker (one `stat` and one small read each).
+A `degrade` class that fails turns its features off and raises its
+health item; when its marker returns, the item resolves and the features
+come back (engines restart through the supervisor). A `hold` class that
+fails stops the hub from taking writes: it exits with code 75 and the
+next process starts in hold mode. SQLite's own I/O error on `hub.db`
+takes the same exit.
+
+**Service definitions and `bun start`.** No service definition carries a
+location: the Linux hub runs as `maipai` and cannot rewrite its own unit,
+a copy of a path in the unit is a second definition, and `bun start` has
+no unit. Every launcher reads the record through `bootGuard.ts`. The
+service definitions gain `MAIPAI_SUPERVISED=1`, meaning a non-zero exit
+is restarted. `scripts/app.sh` gains the same: `bun start` runs the hub
+inside a loop that restarts it only when it exits with code 75, and sets
+`MAIPAI_SUPERVISED=1`; `bun stop` stops the loop and the hub together
+(the loop's pid is what `app.sh` records). Any other exit ends the loop,
+so a crash in a source checkout still stops as it does today. `bun run
+dev` is not supervised. This is the cheapest way to make hold mode and
+the Settings move work the same on the family hub (a source checkout) as
+on an installed one: about fifteen lines of shell, and no second move
+path.
 
 **Upgrades must not delete the record.** On Linux the lock folder is
 `/opt/maipai-home/.maipai/`, inside the install root, and the upgrade's
-`rsync --delete` removes anything the release tarball lacks. It already
-removes `hub.lock` on every upgrade, harmless only because the service
-is stopped first. `install.sh` adds `--exclude=/.maipai`, and
-`scripts/install.test.ts` asserts it. On macOS and Windows the lock
-folder is outside the install root. The Linux `maipai` account having
-its home inside the install root is the underlying oddity; changing it
-is out of scope and listed in the questions.
+`rsync --delete` removes anything the release tarball lacks. `install.sh`
+adds `--exclude=/.maipai`, and `scripts/install.test.ts` asserts it. On
+macOS and Windows the lock folder is outside the install root.
 
 **`scripts/app.sh` and `scripts/uninstall.sh`** read the record through
-`bun run data-location show` (one reader, no second parser in shell).
-`app.sh` names the real data folder in its "another hub" message, and
-`uninstall.sh` stops guessing from `MAIPAI_DATA_DIR` and `<root>/data`
-and offers exactly the folders the record names, each with its inventory
-(see (d)).
+`bun run data-location show` (one reader). `app.sh` names the real
+`records` folder in its "another hub" message; `uninstall.sh` offers
+exactly the class folders the record names, each with its inventory
+(see (d)), and keeps data by default (SERVICES.md).
 
-### (b) The install-time choice, and a missing drive at boot
+### (b) Choosing at install, the checks, and a missing disk at boot
 
-**The question.** `install.sh` and `install.ps1` ask one question when
-they have a terminal (`/dev/tty` on macOS and Linux, the console on
-Windows): "Where should MaiPai keep AI models and other big downloads?
-Press Enter to use this computer's own disk." With no terminal, or with
-`--yes`, the default is used. Flags answer it up front:
-`--big-files-dir <path>`, and the advanced `--data-dir <path>` for the
-records. The default is today's layout, so a person who presses Enter
-gets exactly what an install gives now. An upgrade never asks: an
-existing install keeps its record and paths, and a second run with a
-different flag is refused with a pointer to Settings > Storage.
+**The flow.** `install.sh` and `install.ps1` show, when they have a
+terminal, the disks they found and one line per basic class with the
+proposed folder:
 
-**Validation.** Every check runs before anything is written, and each
-failure is one plain sentence saying what to do:
+```
+Disks on this computer
+  Macintosh HD   APFS   internal  SSD   212 GB free
+  Mirror         APFS   external  SSD   1.8 TB free   (RAID set)
+  Big            exFAT  external  HDD   7.2 TB free
 
-- The path is absolute and its parent exists. The installer never
-  creates a folder under `/Volumes`, `/mnt`, `/media` or `/run/media`
-  unless the volume holding it is mounted: the path's filesystem (`df
-  -P`, or `Get-Volume` on Windows) must be a different one from `/` (or
-  `C:`), otherwise the drive is not plugged in.
-- The folder is empty or does not exist yet. A folder that already
-  holds anything is refused; the installer never merges into or
-  overwrites a folder.
-- The service account can write there. The installer creates and
-  removes a probe file as that account (`sudo -u maipai` on Linux, root
-  on macOS, SYSTEM on Windows), because external drives that ignore
-  ownership make the permission bits meaningless.
-- The filesystem suits the group. Records need a filesystem SQLite's
-  locking is safe on: APFS, HFS+, ext4, XFS, Btrfs or NTFS. exFAT is
-  allowed for big files only. FAT32 is refused everywhere, since its
-  4 GB file limit is smaller than one chat model. Network filesystems
-  are refused: they are out of scope, and SQLite over NFS or SMB is
-  unsafe.
-- Free space. For big files: the default model set for this machine's
-  hardware tier plus 10 percent plus 2 GB, with the set's size read from
-  the bundled catalog's pinned model sizes, never a typed-in number. For
-  records: 2 GB.
-- On Linux, the path is inside the unit's writable set (next point).
+Where MaiPai will keep each kind of data
+  Household records        /usr/local/maipai-home/data
+  Keys                     /usr/local/maipai-home/data/keys
+  ...
+  AI models                /usr/local/maipai-home/data/models
+  Reference library        /usr/local/maipai-home/data/reference
+  Backups                  /usr/local/maipai-home/backups
 
-**The Linux sandbox.** The unit becomes `ReadWritePaths=<install> -/mnt
--/media -/run/media -/srv`; the leading `-` makes a missing path
-harmless. A folder anywhere else is refused with the reason. This keeps
-`ProtectSystem=strict` for the rest of the system and means a later move
-never needs a unit rewrite. A drive a desktop auto-mounted under
-`/run/media/<user>` is usually writable only by that user; the write
-probe catches it and says so.
+Press Enter to keep these. Type "root" to move everything at once,
+a kind's name to change just that one, or "more" to see every kind.
+```
 
-**What gets written.** The folder, its marker (generation 1), and the
-record, all through `data-location.ts init`. A chosen big-files folder
-holds two subfolders, `home/` for Home's big files and `stack/` for the
-Stack's models and engines, each with its own marker, so the two
-products never share one folder (see "The Stack" under (c)).
+A person expresses "records on my mirrored volume and models on the big
+slow disk" in two answers: `root` then `/Volumes/Mirror/MaiPai`, which
+moves every class that has no override; then `AI models` then
+`/Volumes/Big/MaiPai/home/models`. The same install unattended:
 
-**A missing drive at boot: hold mode.** When step 5 of the boot order
-finds the records folder missing, or present with the wrong marker, the
-hub does the following.
+```
+install.sh --data-root /Volumes/Mirror/MaiPai \
+  --location models=/Volumes/Big/MaiPai/home/models \
+  --location reference=/Volumes/Big/MaiPai/home/reference
+```
 
-1. It keeps the machine lock, so no second hub can start on another
-   folder while this one waits, and it never creates, opens or writes
-   anything under the recorded path.
-2. It tries the volume identity first. If a mounted volume carries the
-   recorded `volume.id` and `<that mount>/<relativePath>` holds a folder
-   whose marker matches, the drive came back under another name (macOS
-   names a second drive with the same label `Big 1`; Windows reassigns
-   letters). The hub rewrites `records.path` in the record and boots
-   normally. The marker, not the path, is the proof.
-3. Otherwise it binds its port and serves a page and the SERVICES.md
-   health list with no database: one critical item,
-   `storage.records_missing`, titled "MaiPai can't find its storage
-   drive", naming the drive's label and the folder's name. There is no
-   Fix button, because the fix is plugging the drive in. The full path
-   is shown only to requests from the machine itself, because this page
-   has no sign-in.
-4. It checks the path and the volume every 30 seconds. When the right
-   folder appears it exits with code 75, and the service manager starts
-   it again on the normal path. Without `MAIPAI_SUPERVISED` (a source
-   checkout) it prints "the drive is back: run bun restart" and keeps
-   waiting.
-5. It writes `data-hold.json` beside the record (`{since, reason,
-   path}`). The next normal boot turns that into a resolved Repairs
+`--location <class>=<path>` repeats; `--locations-file <file.json>` takes
+the record's `classes` object for a scripted install. With no terminal,
+or with `--yes`, the proposal is used. An upgrade never asks: it keeps
+the record, and a second run with a different location flag is refused
+with a pointer to Settings > Storage.
+
+**The proposal.** Every class under the root on the internal disk,
+today's layout, with one exception: when the internal disk's free space
+is less than the default model set for this machine's hardware tier plus
+the class minimums below, and a local external disk has room, the
+proposal puts `models` and `reference` on that disk and says why in one
+line. It is a proposal; the person can change every line.
+
+**Refusals, only where data safety demands one.** Each is one plain
+sentence saying what to do instead.
+
+| check | refused for | why |
+|---|---|---|
+| the filesystem lacks reliable `fsync` or locks: exFAT, FAT32, any network filesystem | `records`, `keys`, `packages`, `stack-state` | SQLite corrupts on them; keys need `private` |
+| the filesystem ignores permissions (exFAT, FAT32) | `keys`, `stack-state` | any account on the computer could read the keys |
+| a file larger than the filesystem allows (FAT32: 4 GB) | any class whose `largestFileBytes` exceeds it | the first download fails half way |
+| the mount forbids executing files (`noexec` on Linux) | `engines`, `sidecars`, `stack-engines` | the engines cannot start |
+| symlinks or hard links fail the probe | classes that declare them | the Stack's model store breaks |
+| the folder already holds anything, or a marker from another household or product | every class | never merge into another household's folder |
+| the volume is not mounted (the path's filesystem is the same as `/` or `C:` while the path is under `/Volumes`, `/mnt`, `/media`, `/run/media`, or a Windows volume mount point) | every class | the drive is not plugged in, and the folder would land on the boot disk |
+| the service account cannot write there (a probe file created and removed as that account) | every class | the hub would fail at its first write |
+| too little free space for the class's minimum (below) | every class | the install or the move would fail part way |
+| the nesting rules in (a) | every class | a backup inside what it protects, or two classes in one folder |
+
+The minimums: `records` 2 GB; `models` the default model set's pinned
+sizes from the bundled catalog, plus 10 percent; `reference` the size of
+the archives already chosen, or 1 GB; `backups` five times the current
+`hub.db` or 2 GB; every other class 200 MB. Sizes come from pins and
+measurements, never a typed-in number.
+
+**Warnings, never blocking.** Shown in the installer and on the Storage
+page beside the row they concern:
+
+- A backup class on the same physical disk as an irreplaceable class
+  (`records`, `keys`, `people-files`, `cloned-voices`, `projects`,
+  `packages`): "Your backups are on the same disk as your household. If
+  that disk fails, you lose both."
+- `keys` on a removable disk: "Your keys are on a drive that can be
+  unplugged or carried off. MaiPai will not start without them, and
+  anyone holding the drive and your records together can read your
+  household."
+- `keys` and `records` on different disks: "MaiPai needs both of these
+  disks connected to start."
+- An irreplaceable class on a network share (allowed for `people-files`,
+  `cloned-voices` and `projects`): "These files will live on your
+  network storage. MaiPai can only reach them while it is on and
+  shared, and your NAS's own sign-in decides who else can read them."
+- `people-files` or `cloned-voices` on a filesystem that ignores
+  permissions: "Any account on this computer can read these files."
+- A rebuildable class on a network share or a spinning disk:
+  "Models will load more slowly from here."
+- Any class on a disk with under 10 percent or under 5 GB free, whichever
+  is larger, or where the class's growth over the last 30 days would
+  fill the disk within 30 days.
+- The "ignore ownership" setting on a macOS external volume holding a
+  personal class, with where to turn it off (Finder, Get Info, Sharing &
+  Permissions).
+
+**The disk facts, per OS.** One core function, `diskFacts(path)`,
+returns the volume identity, filesystem type, whether the disk is
+internal, external or network, solid-state or spinning when the OS says,
+the backing physical disk when the OS says, and free and total space:
+
+- **macOS.** `diskutil info -plist <mount>`: `VolumeUUID`,
+  `FilesystemType`, `Internal`, `RemovableMediaOrExternalDevice`,
+  `SolidState`, and the APFS physical store for "same physical disk".
+  Network volumes are recognized by `statfs`'s `f_fstypename` (`smbfs`,
+  `nfs`, `afpfs`). Mount names are not identity: a second drive labeled
+  `Big` mounts as `/Volumes/Big 1`, and the record's `VolumeUUID` finds
+  it again. An SMB share mounted by the signed-in person in Finder is
+  generally not writable by a root LaunchDaemon; the write probe finds
+  that and says to mount the share for the whole system or choose a
+  local disk. Whether a root LaunchDaemon running `bun` may write to a
+  removable volume without a privacy prompt is not verified;
+  DATA-LOCATION-01c measures it on a real external drive, and its
+  acceptance cannot pass without that.
+- **Linux.** `findmnt -no UUID,FSTYPE,SOURCE,OPTIONS -T <path>` for
+  identity, type and `noexec`; `lsblk -no PKNAME,RM,ROTA,TRAN` for the
+  physical disk, removable, spinning and USB. A mount point with no drive
+  mounted is an empty folder on the root filesystem: the path exists and
+  the marker does not, so the marker check catches it. A network share
+  must be mounted by the system (`/etc/fstab` or autofs, with `nofail`
+  so a missing NAS does not stop the computer booting); a share a
+  desktop session mounted through gvfs is invisible to `maipai`, and the
+  probe says so. Drives a desktop auto-mounts under `/run/media/<user>`
+  are writable only by that user; the probe catches that too, and the
+  message names `chown` of the chosen folder to `maipai` as the fix.
+- **Windows.** `Get-Volume` for `UniqueId` (the volume GUID),
+  `FileSystemType`, `DriveType`; `Get-Partition` and `Get-Disk` for
+  `BusType` (USB), the physical disk, and `Get-PhysicalDisk` `MediaType`.
+  Drive letters change between plug-ins, and the GUID finds the volume
+  again; a volume mounted into an NTFS folder instead of a letter works
+  the same way, through its `\\?\Volume{GUID}\` path. A mapped network
+  drive letter belongs to one person's sign-in and a service cannot see
+  it; a network class must be a UNC path (`\\nas\share\...`), and
+  LocalSystem reaches the network as the computer's account, which most
+  home NAS boxes refuse, so the probe usually fails and says to choose a
+  local disk or run the service as an account the NAS accepts. Paths
+  over 260 characters use the `\\?\` form. The DPAPI-protected key files
+  stay readable after a move because the service account does not
+  change.
+
+**Redundancy and speed are the person's to arrange.** The design accepts
+any mounted volume for any class that passes the refusals: an APFS or
+Disk Utility RAID set, `mdadm`, ZFS or Btrfs RAID, Windows Storage
+Spaces, a fast NVMe SSD for `records`, a large spinning disk for
+`reference`. MaiPai does not build or check redundancy itself. A RAID
+set appears as one volume; when the OS does not report the physical
+disks behind it, "same physical disk" says "MaiPai can't tell which
+disks this uses" rather than guessing, and the backup warning is shown
+unless the backup volume is plainly a different device.
+
+**The Linux sandbox: `ProtectSystem=full`.** The unit changes from
+`ProtectSystem=strict` with `ReadWritePaths=<install>` to
+`ProtectSystem=full`, which keeps `/usr`, `/boot`, `/efi` and `/etc`
+read-only and leaves every other path to ordinary permissions. The
+first version listed `-/mnt -/media -/run/media -/srv` instead, which
+refuses a ZFS pool at `/tank` or a RAID at `/data`, and any fixed list
+would refuse someone's mount point; rewriting the unit per move needs
+root, which the hub does not have. The `maipai` account owns nothing
+outside its own folders, so ordinary permissions are the real limit,
+and the write probe proves each chosen folder. `install.test.ts` asserts
+the unit's new line.
+
+**What `init` writes.** Each chosen class folder with its marker
+(generation 1), then the record, all through `data-location.ts init`.
+Home's and the Stack's folders never share a folder: a person who puts
+"AI models" on `Big` gets `<Big>/MaiPai/home/models` and
+`<Big>/MaiPai/stack/models`, each product's own (see "The Stack").
+
+**A missing `hold` class at boot: hold mode.** When step 5 finds
+`records` or `keys` missing or mismatched, the hub:
+
+1. Keeps the machine lock, and never creates, opens or writes anything
+   under any recorded path.
+2. Tries the volume identity. If a mounted volume carries the recorded
+   `volume.id` and `<that mount>/<relativePath>` holds a folder whose
+   marker matches, the drive came back under another name. The hub
+   rewrites that class's `path` in the record and boots normally. The
+   marker, not the path, is the proof. This runs for every class, `hold`
+   or `degrade`.
+3. Otherwise binds its port and serves a page and the SERVICES.md health
+   list with no database: one critical item, `storage.class_missing`
+   keyed by class, titled "MaiPai can't find its storage drive", naming
+   each missing class's drive label and folder name. No Fix button: the
+   fix is plugging the drive in. The full path is shown only to requests
+   from the machine itself, because this page has no sign-in.
+4. Checks every 30 seconds. When every `hold` class is back, it exits
+   with code 75 and the service manager (or `app.sh`'s loop) starts it on
+   the normal path.
+5. Writes `data-hold.json` beside the record (`{since, reason,
+   classes}`). The next normal boot turns it into a resolved Repairs
    issue ("MaiPai was waiting for its storage drive from 9:10 to 9:42")
-   and a notification to admins, then deletes the file. That is the
-   Repairs record DATA-LOCATION-01 asked for; it cannot be written while
-   the database is out of reach.
+   and a notification to admins, then deletes the file.
 
-A missing big-files folder is not hold mode. The records are reachable,
-so the hub boots, raises an ordinary Repairs issue
-(`storage.big_files_missing`), and every engine that needs a file there
-reports itself down through the existing engine-availability path. The
-hub still never creates the folder.
+**A missing `degrade` class at boot.** The hub boots. The class's health
+item (`storage.class_missing`, keyed by class, severity `error` for
+`people-files`, `cloned-voices`, `projects`, `packages`, `backups`;
+`warning` for the rest) names the drive and what is off, from the
+class's `degrades` list, and every feature listed there answers
+"unavailable" through its existing path (the engine-availability path
+and ENGINE-AVAIL-00's composer notice for `models` and `engines`). Several
+classes on one missing disk raise one item per class and one
+notification naming the disk. Degraded modes, precisely:
+
+| missing | still works | off |
+|---|---|---|
+| `models` or `engines` | sign-in, people, memory browsing, settings, reference search | chat replies, memory embedding, background images |
+| `tts-models` | everything, in text | spoken replies |
+| `reference` or `sidecars` | everything else | reference search and its citations |
+| `wakeword-models` / `stt-models` | typed chat | wake word / voice input |
+| `vision-models` | everything else | face recognition and enrollment |
+| `people-files` | chat without attachments | viewing and adding attachments |
+| `cloned-voices` | speech in the default preset voice | cloned voices |
+| `projects` | chat, project records | project runs, artifact files |
+| `packages` | bundled Tier 0 packages | Tier 1 and store-installed packages |
+| `backups` | everything, for now | backups, updates, restores, offline moves |
+| `received-backups` | everything | robot and pod backup pushes |
+| `logs`, `cache`, `favicons`, `runtime`, `labels` | everything | as in the class table |
 
 ### (c) Moving later, from Settings > Storage
 
 **The page.** Settings > Storage (`frontend/src/next/pages/
-NextStoragePage.tsx`, the Household page SETTINGS.md Rule 2 calls
-"Storage and backups") gains a Locations section built from kit and
-shadcndashboard components: one card per group, showing the folder, the
-drive's label, the free space, how much the group holds, where the value
-came from (record, `MAIPAI_DATA_DIR` or default), and a Move button for
-admins. The cards read a new `GET /api/storage/locations`. Nothing here
-is a `SettingsKey`, so the generic renderer is not involved and no
-hand-drawn field stands in for one. The Move button is disabled, with
-the reason shown, when the location came from `MAIPAI_DATA_DIR`
-(someone set it on purpose outside MaiPai) or when the hub is not
-supervised (a source checkout). There the same move runs as `bun run
-move-data --records --to <path>` with the hub stopped.
+NextStoragePage.tsx`) gains a Locations section: the template's data
+table, one row per class, grouped by product and folded by level, each
+row showing the folder, the drive's label, filesystem, internal, external
+or network, free space, the class's size, where the value came from
+(record, `MAIPAI_DATA_DIR`, default), and its warnings. A Disks table
+above it lists each disk once with which classes it holds. Admins select
+one or more rows and press Move. The rows read `GET
+/api/storage/locations`, which the class list and the record feed.
+Nothing here is a `SettingsKey`, so the generic renderer is not involved
+and no hand-drawn field stands in for one. Move is disabled, with the
+reason, when the source is `MAIPAI_DATA_DIR` or the hub is not supervised
+(`bun run dev`); `bun run move-data --class <id> --to <path>` runs the
+same move with the hub stopped.
 
-**The steps.** Each step's state is written to the record's `move` field
-before the step starts: `{id, group, from, to, staging, state,
-startedAt, bootAttempts}`.
+**One move, one or several classes.** A move is one operation over the
+selected classes, recorded in the record's `move` field before each step
+starts: `{id, bootAttempts, steps: [{class, from, to, mode, staging,
+state}]}`. One move runs at a time. Classes are processed one after
+another, each with its own copy, verify, switch and retire, so each
+class's switch is its own commit point.
 
-1. **Preflight**, with the hub running and nothing changed. The target
-   passes every install-time check above, plus these: the target is not
-   inside the source and the source is not inside the target; a records
-   target is not inside the backups folder, and the backups folder is
-   not inside the target (BACKUPS.md: a backup target never lives inside
-   what it protects); there are no names that differ only by case when
-   the target's filesystem ignores case and the source's does not; free
-   space covers the group's measured size plus 10 percent. The hub must
-   be idle by UPDATES.md's "only when safe" list (no conversation,
-   generation, playback or download running), with no staged restore, no
-   backup running and no update in progress. The person sees the plan:
-   from, to, the size, "MaiPai will be off while it copies; robots and
-   speakers keep working on their own", and a destructive confirm.
-2. **Backup.** A fresh backup goes to the existing backup target, as
-   BACKUPS.md already requires before an update or a restore. A failed
-   backup stops the move before anything else happens.
-3. **Stop.** State `planned`. The hub drains packages, stops its
-   engines and sidecars, checkpoints the SQLite WAL (`PRAGMA
-   wal_checkpoint(TRUNCATE)`), closes the database and exits with
-   code 75.
-4. **Copy**, in the next process. `bootGuard` sees `planned`, takes the
-   machine lock, enters hold mode with a progress page in place of the
-   missing-drive page (it never opens the source database for writing),
-   and sets `copying`. Every file of the group is copied into `staging`,
-   a folder named `.maipai-move-<id>` beside the target, on the target's
-   drive: read, write, `fsync`, then the SHA-256 of the source compared
-   with the SHA-256 of the copy read back from disk. Modes and mtimes are
-   kept (`keys/` stays `0700`, key files `0600`). `cache/` and the legacy
-   `hub.lock` are not copied; a cache is rebuilt and the new folder
-   starts with an empty one. A symlink or special file in the group
-   stops the move and is named, since nothing in the layout should hold
-   one. A file locked on Windows (an antivirus scan) is retried three
-   times, then the move stops.
-5. **Verify.** The file list, sizes and hashes match a manifest written
-   during the copy; the copied `hub.db` passes `PRAGMA quick_check`
-   opened read-only; `keys/` holds every key file the source held. The
-   staging folder gets its marker (the same `folderId`, `generation +
-   1`, the `moveId`) and is renamed to the target path, a rename on one
-   drive and so atomic. State `verified`.
-6. **Switch.** The record is rewritten atomically: `records.path` is the
-   target, `generation` goes up, `previous` holds the old path and
-   generation, state `switched`. This rename is the commit point: before
-   it the household lives in the old folder, after it in the new one.
+**The steps.**
+
+1. **Preflight**, with the hub running and nothing changed. Every target
+   passes the install-time refusals for its class. Nesting is checked
+   against the resulting layout, not the current one. Names that differ
+   only by case are refused when the target ignores case and the source
+   does not. **Space:** for each target volume, the sum of the sizes of
+   the classes going there, plus 10 percent, plus 2 GB, must be free,
+   since during the copy both copies exist; after the move the old copy
+   stays until the person deletes it, so the plan says "Until you delete
+   the old copy, both drives hold it." A move within one filesystem is a
+   rename and needs no space (below). For an offline move the hub must be
+   idle by UPDATES.md's "only when safe" list, with no staged restore, no
+   backup and no update running; an online move needs only that class's
+   own users idle (below). The plan shows each class's from, to and size,
+   what is off and for about how long, "robots and speakers keep working
+   on their own" when the hub will stop, and a destructive confirm.
+2. **Backup**, when any class in the move has `move: offline`: a fresh
+   backup to the backup target before anything else, as BACKUPS.md
+   requires before an update or a restore. A failure stops the move.
+   When `backups` itself is in the move, the backup runs first, into the
+   old backups folder.
+3. **Stop or pause.** Offline classes: state `planned`, the hub drains
+   packages, stops engines and sidecars, checkpoints the WAL (`PRAGMA
+   wal_checkpoint(TRUNCATE)`), closes the database and exits with code
+   75; the next process sees `planned`, takes the lock, serves a progress
+   page in hold mode, and never opens a source database for writing.
+   Online classes: the hub stays up and pauses only that class's users:
+   the engines or sidecars that read it, the downloads that write it, the
+   backup scheduler for `backups`, device pushes for `received-backups`,
+   the logger switches files for `logs`. Their features show "moving" for
+   the duration.
+4. **Copy**, into `staging`, a folder named `.maipai-move-<id>-<class>`
+   beside the target on the target's drive: read, write, `fsync`, then
+   the SHA-256 of the source compared with the SHA-256 of the copy read
+   back. Modes and mtimes are kept (`keys/` stays `0700`, key files
+   `0600`). Relative symlinks that stay inside the class are copied as
+   links; hard links inside the class are kept as hard links by inode;
+   a symlink pointing outside the class, or a special file, stops the
+   move and is named. A file locked on Windows is retried three times,
+   then the move stops. `empty` classes are not copied: the target folder
+   is created empty with its marker. With "download again instead of
+   copying" chosen for a `refetch` class, the target starts empty and the
+   hub fetches the pinned set into it after the switch.
+5. **Verify.** File list, sizes and hashes match the manifest written
+   during the copy; a copied `hub.db` passes `PRAGMA quick_check` opened
+   read-only; `keys` holds every key file the source held. Staging gets
+   its marker (`generation + 1`, the `moveId`) and is renamed to the
+   target path, a rename on one drive and so atomic. State `verified`.
+6. **Switch.** The record is rewritten atomically with that class's new
+   `path`, `volume` and `generation`, and the step's state `switched`.
+   This rename is the commit point for that class.
 7. **Retire the old folder.** Its marker gains `retired: {at, movedTo,
-   moveId}`. Nothing else in it changes. A hub pointed at it by any
-   route refuses to boot. The process exits with code 75.
-8. **First boot on the new folder.** `bootAttempts` goes up. The hub
-   opens the database, runs migrations (none, normally), and proves the
-   move: `quick_check`, one secret decrypted through the keystore, one
-   live biometric print decrypted if the household has any, the
-   household CA key loaded, the HTTP server answering a sign-in route.
-   Passing all of it sets `healthy`. Engines are not part of this check;
-   an engine problem after a move is an ordinary engine issue.
+   moveId}`; nothing else in it changes. Online classes then resume their
+   users on the new folder. After the last offline class the process
+   exits with code 75.
+8. **First boot on the new folders**, offline classes only. `bootAttempts`
+   goes up. The hub opens the database and proves the move: `quick_check`,
+   one secret decrypted through the keystore, one live biometric print
+   decrypted if the household has any, the household CA key loaded, the
+   HTTP server answering a sign-in route, and one file read from each
+   moved irreplaceable class. Passing sets every offline step `healthy`.
+   Online classes are `healthy` when their users have resumed; an engine
+   problem after that is an ordinary engine issue.
 9. **Automatic rollback, only before `healthy`.** If two boots in a row
-   end without `healthy`, the third boot rolls back: `records.path` and
-   `generation` return to `previous`, the old folder's `retired` field
-   is removed, the new folder's marker is marked retired by this failed
-   move, and the hub boots on the old folder with a Repairs issue saying
-   what failed. No household write can reach the new folder before
-   `healthy`, so this loses nothing.
-10. **After `healthy`, no pointer rollback.** The household may have
-    written to the new folder, and pointing back would silently drop
-    those writes. "Move back" is a new move, the same steps, into a new
-    empty folder. The old folder stays as a copy dated at the switch.
-11. **Confirm, then delete the old folder.** Storage shows "Your data now
-    lives on Big. The old copy (4.1 GB, as of 21:04) is still on
-    Macintosh HD." Delete is offered only after a backup of the new
-    location has succeeded, and only after the page has shown the old
-    folder's inventory (see (d)). The hub deletes only a folder whose
-    marker is retired with this move's `moveId`. The state is
-    `deleting-old` during the delete; afterwards `move` and `previous`
-    are cleared. Keeping the old folder is also a choice, and nothing
-    deletes it on a timer.
+   end without `healthy`, the third boot rolls back every offline class
+   switched by this move: each class's `path` and `generation` return to
+   their previous values (kept in the step), each old folder's `retired`
+   field is removed, each new folder's marker is retired by this failed
+   move, and the hub boots on the old folders with a Repairs issue saying
+   what failed. No household write reaches a new folder before `healthy`,
+   so this loses nothing.
+10. **After `healthy`, no pointer rollback.** "Move back" is a new move
+    into a new empty folder. The old folder stays as a copy dated at the
+    switch.
+11. **Confirm, then delete the old copy, per class.** Storage shows "Your
+    records now live on Mirror. The old copy (4.1 GB, as of 21:04) is
+    still on Macintosh HD." Delete is offered after the page has shown
+    the old folder's inventory (see (d)), and for an irreplaceable class
+    only after a backup of the new location has succeeded. The hub
+    deletes only a folder whose marker is retired with this move's
+    `moveId`, and never a folder that contains any live class folder
+    (after `records` moves off the default root, the old root still holds
+    `keys/` and the rest, so only the old root's `records` files are
+    deleted, by name from the class's `holds`, never the folder). State
+    `deleting-old` during the delete; afterwards the step is cleared.
+    Keeping the old copy is also a choice, and nothing deletes it on a
+    timer.
 
-**A move killed at each step.** A kill is a power cut, a `kill -9` or a
-crash. Before `switched` the rule is simple: a move that did not finish
-is abandoned, never resumed, because abandoning is always safe and
-resuming is only an optimization.
+**A move within one filesystem.** When the source and target are on the
+same volume, the copy and verify steps are one directory `rename`, which
+is atomic and needs no free space. The switch, retire (nothing is left to
+retire), first-boot and rollback steps are the same, and rollback is a
+rename back. No old copy remains, so step 11 does not apply.
 
-| killed during | the record says | the next boot does | the household runs on |
+**A move killed at each step, per class.** A kill is a power cut, a
+`kill -9` or a crash. Before a class's `switched`, a move that did not
+finish is abandoned for that class, never resumed; classes already
+switched earlier in the same move stay switched.
+
+| killed during | the step says | the next boot does | that class runs on |
 |---|---|---|---|
 | preflight or backup (1, 2) | no `move` | nothing to undo | old |
-| stop (3) | `planned` | abandons: clears `move`, deletes nothing, boots | old |
-| copy (4) | `copying` | deletes `staging` (only the exact path in the record, named `.maipai-move-<id>`), clears `move`, boots, raises "the move to Big did not finish; nothing changed" | old |
+| stop (3) | `planned` | abandons: clears the step, deletes nothing, boots | old |
+| copy (4) | `copying` | deletes `staging` (only the exact path in the step, named `.maipai-move-<id>-<class>`), clears the step, boots, raises "the move of your records to Mirror did not finish; nothing changed" | old |
 | verify or its rename (5) | `copying` or `verified` | the same, and also deletes the target if its marker carries this `moveId`, never a target without that marker | old |
 | the record write (6) | the old record or the new one | the atomic rename leaves one or the other, never half | old or new |
 | retiring (7) | `switched` | finishes the retire, boots | new |
-| first boots (8, 9) | `switched`, with `bootAttempts` | boots and checks; rolls back after two failures | new, or old after a rollback |
-| the delete (11) | `deleting-old` | finishes deleting that retired folder, checking its identity again | new |
+| first boots (8, 9) | `switched` with `bootAttempts` | boots and checks; rolls back after two failures | new, or old after a rollback |
+| the delete (11) | `deleting-old` | finishes deleting that retired folder or those named files, checking identity again | new |
+| a same-volume rename | `planned` or `switched` | the rename is atomic: the folder is at one path or the other, and the marker check finds it at either | old or new |
 
-Every row ends with exactly one folder matching the record, and every
-other copy either retired or deleted by identity, never by path alone.
+Every row ends with exactly one folder matching the record for that
+class, and every other copy retired or deleted by identity, never by
+path alone.
 
-**Big files move on their own.** The same steps with `group:
-"bigFiles"` move Home's big files; the records stay put. Because the
-files can be fetched again, a failed or killed big-files move is always
-safe to abandon, and preflight offers one more choice: "download them
-again on the new drive instead of copying", for a household with a fast
-connection and a slow drive. The hub still stops, because engines hold
-model files open, but only for the time the big files take to copy.
+**Backups.** `backups` and `received-backups` are classes like the rest,
+moved online. A move of any other class never moves them, and the
+adoption step writes their paths explicitly, so moving the root never
+shifts where backups go. Preflight refuses a layout where a backup class
+sits inside a class it protects or the reverse. A backups move copies the
+archives with their hashes and keeps retention intact; listing and
+pruning read the new folder after the switch. Storage keeps its existing
+warning until an off-machine target exists.
 
-**Backups.** A records move never moves `backups/`. Backups stay where
-they are, which after a move to a new drive means on a different drive
-from the data, the safer place. The record's `backups.path` is written
-explicitly as soon as a record exists, so moving the records never
-shifts where backups go. Today `backupDir` is derived from `dataDir`, so
-without this a move would strand the old backups and start a new set in
-a new place, breaking retention. A later "move backups" uses the same
-steps with `group: "backups"`, and preflight refuses a backups folder
-inside the records folder or the reverse. Storage keeps its existing
-warning until an off-machine target exists, and that warning also names
-a local backup on the same drive as the records.
+**The Stack.** Each product owns its own classes, its own record and its
+own markers; no folder is ever shared between Home and the Stack, because
+two owners of one folder means two deleters.
 
-**The Stack.** A records move does not touch the Stack: its precious
-state (`stack.db`, `keys/`) lives at `<install>/stack/data`, small and
-on the internal disk, and Home reaches it by URL. Two Stack changes are
-needed, listed as their own item because they land in `getmaipai/stack`.
-First, the Stack adopts the same marker and never-create rule for its
-data folder and its models folder; today its `ensureDataDir` would
-create `/Volumes/Big/...` on the boot disk if the drive were missing,
-then download gigabytes into it. Second, it gains a models root separate
-from `STACK_DATA_DIR`, relocatable on Home's request with the same
-copy, verify and switch steps, reporting progress on its event feed. That
-models root can be an ordinary Stack setting (`needs_restart`), because
-`stack.db` is not inside the models folder; that is the Stack's own
-design call. This record fixes only the contract Home needs: the
-location, its size, a relocate request, and a health item when the
-folder is missing. Home's Storage page moves "big files" as one choice
-and drives both halves.
+- The Stack's record is `~/.maipai/stack/data-location.json`, beside its
+  own lock, for the account the Stack runs as. Only the Stack writes it.
+  Its classes are `stack-state`, `stack-models`, `stack-engines` and
+  `stack-logs`.
+- Home is the Stack's only caller and has the only interface, so Home's
+  installer passes the Stack's chosen locations to `maipai-stack
+  install-service` (`--location <class>=<path>`, the same flag shape),
+  and Home's Storage page lists the Stack's classes from `GET
+  /stack/v1/storage/classes` and `GET /stack/v1/storage/locations`, and
+  moves one through `POST /stack/v1/storage/move`, following its
+  progress on the Stack's event feed.
+- The Stack runs the same steps with the same core helpers (verified
+  copy with links kept, marker, never-create, hold for `stack-state`,
+  degrade for the rest). Its offline class, `stack-state`, stops the
+  Stack only; Home stays up and reports every role down meanwhile.
+- Home's own `models` and `engines` classes exist while Home's own
+  supervisor runs engines. When Home's roles run on the Stack, those
+  two classes are removed from Home's list; their folders are then
+  described and offered for delete like any retired folder, never
+  removed by the update.
+- When a person moves Home's `models`, the plan offers "also move the
+  Stack's models to the same disk" as one choice, which becomes two
+  moves, one per product, each committed by its owner.
+
+**One instance.** The one-instance rule is per machine per OS account,
+and the record sits beside the lock, so there is one live record per
+account. A second hub cannot start while the first holds the lock, in
+hold mode or out of it. A hub installed under another account (its own
+lock, its own record) that is pointed at a folder the first hub owns
+finds a marker with another `householdFolderId`: `init` and the move
+refuse it, and at boot it is treated as missing. So two hubs can never
+share a class folder, whatever accounts they run as.
 
 **Robots and pods.** The hub's identity and the household CA live in
-`keys/` and move with the records; the Keychain entries are named by app
-id and do not move at all. A paired robot or pod sees the same hub after
-a move and needs no re-pairing. While the hub is stopped, robots run
-standalone (principle 2) and pods are offline, and the plan screen says
-so. Backups a robot pushed (`received-backups/`) stay with the backups.
-The robot's own storage is `bot`'s to design; the record and marker
-shapes are in the spec (see (e)) so that `bot`'s Python can read and
-write the same files when it adopts the same rules.
-
-**Per OS.**
-
-- **macOS.** The hazard particular to macOS: a process that creates
-  `/Volumes/Big/...` while the drive is unplugged makes a real folder on
-  the boot disk, and the drive then mounts as `/Volumes/Big 1`. The
-  never-create rule and the volume-identity lookup close both halves.
-  External drives often have "ignore ownership" on, which is why
-  writability is probed and not read from permissions. Whether a root
-  LaunchDaemon running `bun` may write to a removable volume without a
-  privacy prompt is not verified; DATA-LOCATION-01c measures it on a
-  real external drive, and its acceptance cannot pass without that.
-- **Linux.** The writable set above, and ownership: the target must be
-  writable by `maipai`. A mount point with no drive mounted is an empty
-  folder on the root filesystem, which the marker check catches (the
-  path exists, the marker does not). A move never rewrites the unit.
-- **Windows.** Drive letters change between plug-ins, and the volume
-  GUID in the record finds the drive again. Records need NTFS. Paths
-  over 260 characters use the `\\?\` form. The DPAPI-protected key files
-  move with `keys/` and stay readable because the service account does
-  not change. The record lives outside the install root, so
-  `install.ps1`'s `robocopy /MIR` upgrade needs no new exclusion.
+`keys` and move with it; a paired robot or pod sees the same hub after a
+move and needs no re-pairing. While the hub is stopped for an offline
+move, robots run standalone (principle 2) and pods are offline, and the
+plan says so. The robot's own storage is `bot`'s to design; the class,
+record and marker shapes are in the spec so `bot`'s Python can adopt
+them.
 
 ### (d) How this could lose a household's data, and what stops it
 
 **The 2026-09-29 incident.** A hub started by hand from the repo root
 ran on `<org>/data`, a stray folder, and served port 8787 for about eight
-hours (SINGLE-INSTANCE-01). Face enrollments made in that window were
-written to the stray hub's database. The stray folder was then deleted
-as "the stray one", and those enrollments went with it. Two things
-failed: nothing made the running hub's real folder unambiguous, and the
-delete was judged by where the folder was, not by what it held. A folder
-a hub has written to holds household data, wherever it is.
+hours (SINGLE-INSTANCE-01). Face enrollments made in that window went to
+the stray hub's database. The stray folder was then deleted as "the stray
+one", and those enrollments went with it. Nothing made the running hub's
+real folder unambiguous, and the delete was judged by where the folder
+was, not by what it held.
 
 | risk | how data is lost | what prevents it |
 |---|---|---|
-| a second hub on another folder | writes split across two households | the machine lock and the anchored default (SINGLE-INSTANCE-01, -02); the record and marker make "the live folder" a checkable fact |
-| a folder judged stray by its path is deleted | the only copy of recent writes goes (the incident) | describe before delete, and set aside instead of delete (below) |
-| the drive is unplugged at boot | an empty folder is created, onboarding runs, a second household forms; on macOS the drive then mounts under another name | a recorded folder is never created; hold mode; the volume-identity lookup |
-| a different drive, or an old copy, sits at the same path | the hub opens the wrong household | the marker's `(folderId, generation)` must match |
-| an upgrade deletes the record | the hub falls back to the default path and starts fresh | the record lives outside the install tree, except on Linux, where `rsync` excludes `/.maipai` (tested); a default folder whose marker is retired refuses to boot |
+| a second hub on another folder | writes split across two households | the machine lock and the anchored default (SINGLE-INSTANCE-01, -02); markers make "the live folder" per class a checkable fact |
+| a folder judged stray by its path is deleted | the only copy of recent writes goes (the incident) | describe before delete, and set aside instead of delete |
+| a class's drive is unplugged at boot | an empty folder is created, a fresh household or empty class forms; on macOS the drive then mounts under another name | no class folder is ever created outside `init` and the move; hold mode; the volume-identity lookup |
+| `keys` missing while `records` is present | a replacement key is minted and every secret and biometric print becomes unreadable | `keys` is a `hold` class; the keystore is created only after the `keys` marker check passes |
+| a parent folder is deleted while a live class sits inside it | a class nobody chose to delete goes with it | nothing deletes a folder containing any live class folder; after `records` moves off the root, only its named files are deleted |
+| a different drive, or an old copy, sits at the same path | the hub opens the wrong data | the marker's `(householdFolderId, class, generation)` must match |
+| two hubs under different accounts point at one folder | two households write one folder | a marker with another `householdFolderId` is refused |
+| an upgrade deletes the record | the hub falls back to the default path | the record lives outside the install tree, except on Linux, where `rsync` excludes `/.maipai` (tested); a retired marker refuses every boot |
 | a partial copy is switched to | missing or truncated files | per-file SHA-256 read back, a manifest, `quick_check`, all before the switch |
-| a torn SQLite copy | the database is copied while open | the hub has exited and the mover never opens the source for writing; the WAL is checkpointed first |
-| keys left behind | secrets and biometric embeddings cannot be decrypted | `keys/` belongs to records; verify checks every key file; the first healthy boot decrypts a secret and a biometric print |
-| a killed move | half a move | the table above: abandoned before the switch, finished after it |
+| links flattened or lost in a copy | the Stack's store doubles in size or breaks | the copy keeps relative symlinks and hard links inside the class and refuses links that leave it; `symlinks` and `hardlinks` are probed at the target |
+| a torn SQLite copy | the database copied while open | offline classes are copied by a process that never opens them for writing, after a WAL checkpoint |
+| `records` or `packages` on exFAT or a network share | corruption under SQLite | refused for every `sqlite` class |
+| engines on a `noexec` mount | engines fail to start after a move | `exec` probed for classes that need it |
+| a killed move | half a move | the table in (c): abandoned before a class's switch, finished after it |
 | rollback after the household wrote to the new folder | those writes vanish | pointer rollback only before `healthy`; afterwards "Move back" is a full move |
-| the old folder is deleted too early | no copy left if the new drive fails | delete only after `healthy` and a successful backup of the new location, and only by marker identity |
-| a backup target inside the folder it protects | one failure takes both | preflight refuses it either way round; backups never move with records |
-| a filesystem unsafe for SQLite, or too small for one file | corruption, or a copy that fails half way | the filesystem check; the free-space check with margin; FAT32 refused, exFAT for big files only |
-| a target that is not empty | merging into another household | the target must be empty |
+| the old copy is deleted too early | no copy left if the new drive fails | delete only after `healthy`, for irreplaceable classes only after a backup of the new location, and only by marker identity |
+| a backup inside the folder it protects, or on the same disk | one failure takes both | nesting refused; same-disk warned |
+| a network share the service cannot see | the class looks missing on every boot | the write probe runs as the service account at choice time |
+| the reference library's own setting creates its folder | an unplugged drive's path created on the boot disk, then filled | `reference.library_dir` retired into the record; `regenerateLibrary` goes through `classDir` |
 | a retired folder booted through `MAIPAI_DATA_DIR` | two live copies drift apart | a retired marker refuses every boot |
-| uninstall with data on an external drive | a folder deleted without the person seeing what is in it | `uninstall.sh` reads the record, shows each folder's inventory, and keeps data by default (SERVICES.md) |
-| the Stack creates its folder on the boot disk | gigabytes downloaded to the wrong disk, and a shadowed mount | the Stack item adopts the same never-create rule |
+| uninstall with data on several drives | a folder deleted without the person seeing what is in it | `uninstall.sh` reads the record, shows each class folder's inventory, and keeps data by default |
+| an engine writes to the service account's own caches | gigabytes on a disk nobody chose, outside every move and every describe | `tts-models` gives the TTS child its cache folders; DATA-LOCATION-STACK inventories everything the Stack writes, including the `home/` it gives its Python engines |
+| the Stack creates its folder on the boot disk | gigabytes downloaded to the wrong disk | DATA-LOCATION-STACK adopts never-create |
 
-**Describe before delete.** One function, `describeFolder(path)`,
-answers "what does this folder hold" for any folder that looks like
-MaiPai data, with or without a marker: its kind and marker, whether it
-is the live folder (it matches the record) or retired, its size, the
-newest file's time, and, when it holds a `hub.db`, opened read-only: the
-household's name and the counts of people, memories, conversations and
-live biometric prints, each with its newest row's time. It is exposed as
-`bun run data-location describe <path>`, and used by Settings > Storage
-on every location and on the old folder before its delete, by
-`uninstall.sh` before it offers a delete, and by `app.sh` when it names
-a hub it did not start.
+**Describe before delete.** One function, `describeFolder(path)`, answers
+"what does this folder hold" for any folder that looks like MaiPai data,
+with or without a marker: every class marker found at its top or in its
+subfolders, whether each is live (matches the record) or retired, sizes,
+the newest file's time, files that are not part of the current layout,
+and, when it holds a `hub.db`, opened read-only: the household's name and
+the counts of people, memories, conversations and live biometric prints,
+each with its newest row's time. A folder holding a `sensitive` class
+says so ("holds voice samples", "holds keys"). It is exposed as `bun run
+data-location describe <path>`, and used by Settings > Storage on every
+location and on each old copy before its delete, by `uninstall.sh`, and
+by `app.sh` when it names a hub it did not start.
 
-**Set aside instead of delete.** MaiPai's own tooling deletes a
-records folder only when its marker is retired by a move the person has
-since confirmed. Anything else (a stray folder, an unmarked copy) is
-renamed to `<name>.set-aside-<date>` and listed on Storage with its
-inventory, where an admin can delete it after reading what it holds.
-The same rule is proposed for SERVICES.md, for people and AI sessions
-alike:
+**Set aside instead of delete.** MaiPai's own tooling deletes a class
+folder only when its marker is retired by a move the person has since
+confirmed. Anything else is renamed to `<name>.set-aside-<date>` and
+listed on Storage with its inventory, where an admin can delete it after
+reading what it holds. The same rule is proposed for SERVICES.md:
 
 Proposed paragraph for `.github/docs/SERVICES.md` (not edited here; the
-coordinator carries it over), suggested as a new subsection after "One
-instance":
+coordinator carries it over), a new subsection after "One instance":
 
-> **The data location, and what a delete must show first.** A daemon
-> whose data folder can live away from its default keeps the chosen
-> path in a bootstrap record beside its lock
+> **Data locations, and what a delete must show first.** A daemon
+> declares its data as classes, each with its own location, and keeps
+> the chosen locations in a bootstrap record beside its lock
 > (`~/.maipai/<product>/data-location.json`), never in the service
-> definition and never inside the folder it names. Every folder it names
-> carries a `maipai-folder.json` marker, and the live folder is the one
-> whose marker matches the record's folder id and generation. A daemon
-> never creates a folder its record names: a missing folder means its
-> drive is not connected, and the daemon waits and says so. No tool,
-> script or session deletes a data folder because of where it is. It
-> first shows what the folder holds (the daemon's `describe` command),
-> and a folder that no confirmed move has retired is set aside under a
-> new name, not deleted.
+> definition and never inside a folder it names. Every class folder
+> carries a `maipai-folder.json` marker, and a class's live folder is the
+> one whose marker matches the record. A daemon never creates a class
+> folder its record names: a missing folder means its drive is not
+> connected, and the daemon waits, or runs without that class, and says
+> so. No tool, script or session deletes a data folder because of where
+> it is. It first shows what the folder holds (the daemon's `describe`
+> command), and a folder that no confirmed move has retired is set aside
+> under a new name, not deleted.
 
 ### (e) What goes through the spec, and what does not
 
 Through `commons` first:
 
-- `spec/schemas/data-location.schema.json` (the bootstrap record) and
-  `spec/schemas/data-folder.schema.json` (the marker). More than one
-  product writes these files (Home now, the Stack next, the robot when
-  `bot` adopts the rules), and each is read across a move and an
-  upgrade, so they are shared record shapes under the org rule. `bot`
-  needs them from the Python package, not as a TypeScript import.
+- `spec/schemas/data-class.schema.json` (one class declaration),
+  `spec/schemas/data-location.schema.json` (the record, `schema: 2`) and
+  `spec/schemas/data-folder.schema.json` (the marker, with `class`). Home,
+  the Stack and later the robot write and read these files across moves
+  and upgrades, so they are shared record shapes under the org rule, and
+  `bot` needs them from the Python package.
 - `@maipai/core`: `readDataLocation`, `writeDataLocation` (atomic),
-  `readFolderMarker`, `writeFolderMarker`, `volumeIdentity(path)` per
-  OS, `findVolume(id)`, and `ensureDataDir`'s refuse-to-create mode.
-  Home and the Stack both need them, and none of it knows a product's
-  layout, which is core's test for what belongs there.
+  `resolveClassPath`, `readFolderMarker`, `writeFolderMarker`,
+  `volumeIdentity(path)` and `findVolume(id)` per OS, `diskFacts(path)`,
+  the capability probes (`probeWrite`, `probeExec`, `probeSymlink`,
+  `probeHardlink`, `probeLargeFile`, `probePermissions`), `copyVerified`
+  (the copy of step 4 with its manifest, links kept), and `ensureDataDir`'s
+  `{create: false}` mode. Home and the Stack both need them, and none of
+  it knows a product's layout.
 
 Not through the spec:
 
-- No new `SettingsKey`. A location is not a setting: it must be known
-  before the settings database opens, it belongs to one machine and must
-  never sync to a robot over the oplog, and a person changes it only
-  through the move. Settings > Storage shows it read-only from a route,
-  so the value keeps one definition, the record.
-- No change to the health-item or issue schemas.
-  `storage.records_missing` and `storage.big_files_missing` are new
-  codes in the existing shapes.
+- Each product's class list is its own (`backend/src/lib/dataClasses.ts`
+  in Home), validated against the spec schema.
+- No `SettingsKey`. A location must be known before the settings database
+  opens, belongs to one machine and must never sync to a robot over the
+  oplog. `reference.library_dir` is removed from `referenceKeys.ts` for
+  the same reason.
+- No change to the health-item or issue schemas. `storage.class_missing`
+  (keyed by class) is a new code in the existing shapes.
 - `/api/storage/locations`, `/api/storage/move` and the describe route
-  are Home's own `@hono/zod-openapi` routes.
+  are Home's own `@hono/zod-openapi` routes; the Stack's storage routes
+  are the Stack's.
 - The database counts in `describeFolder` read Home's tables, so that
-  part is Home's (`backend/src/lib/dataLocation.ts`), built on core's
-  generic size and marker reading.
+  part is Home's (`backend/src/lib/dataLocation.ts`), on core's generic
+  size and marker reading.
 
 ### (f) The items
 
-The two coarse items now point here, and these items follow them in
+The two coarse items point here, and these follow them in
 `docs/BACKLOG.md`, in build order:
 
 | item | size | what |
 |---|---|---|
-| DATA-LOCATION-00a | S | spec: the record and marker schemas (commons) |
-| DATA-LOCATION-00b | M | core: record and marker reading and writing, volume identity, refuse-to-create (commons) |
-| DATA-LOCATION-03 | M | describe before delete, and set aside (the incident's fix, early on purpose) |
-| DATA-LOCATION-01a | M | boot from the record: resolution, marker check, adoption |
-| DATA-LOCATION-01b | M | hold mode for a missing records drive; the big-files Repairs issue |
-| DATA-LOCATION-01c | M | the installers' choice and validation, the Linux writable set, upgrade and uninstall |
-| DATA-LOCATION-02a | S | Storage page: the Locations section, read-only |
-| DATA-LOCATION-02b | M | the move's state machine, the offline script, a killed move at every step |
-| DATA-LOCATION-02c | M | the move from Settings: preflight, progress, confirm, deleting the old folder |
-| DATA-LOCATION-02d | S | the big-files move and the backups move |
-| DATA-LOCATION-STACK | M | the Stack: never-create, markers, a relocatable models root (lands in `stack`) |
+| DATA-LOCATION-00a | S | spec: the class, record and marker schemas (commons) |
+| DATA-LOCATION-00b | M | core: record and marker reading and writing, class path resolution, volume identity, refuse-to-create (commons) |
+| DATA-LOCATION-00d | M | core: disk facts and capability probes per OS (commons; new) |
+| DATA-LOCATION-00e | M | core: the verified copy with links kept (commons; new) |
+| DATA-LOCATION-00c | M | Home's class list, and `paths.ts` derived from it (new) |
+| DATA-LOCATION-03 | M | describe before delete, and set aside, per class |
+| DATA-LOCATION-01a | M | boot from the record: per-class resolution, marker checks, adoption, `reference.library_dir` retired |
+| DATA-LOCATION-01d | M | `classDir`: the twenty-six create sites never create a class folder; the keystore after the `keys` check (new) |
+| DATA-LOCATION-01b | M | hold mode for `records` and `keys`; `app.sh`'s restart loop |
+| DATA-LOCATION-01e | M | degraded classes: health items, features off, the 30-second watch (new) |
+| DATA-LOCATION-01f | M | the placement check: refusals and warnings per class, one function for installer and Storage (new) |
+| DATA-LOCATION-01c | M | the installers' per-class choice, flags, `ProtectSystem=full`, upgrade and uninstall |
+| DATA-LOCATION-02a | M | Storage page: the per-class Locations table and Disks table, read-only (was S) |
+| DATA-LOCATION-02b | M | the move's state machine for offline classes and same-volume renames, the offline script, a killed move at every step |
+| DATA-LOCATION-02c | M | the move from Settings: select classes, preflight, progress, confirm, delete the old copy |
+| DATA-LOCATION-02d | M | online moves: rebuildable classes, logs and the backup classes, and "download again" (was S) |
+| DATA-LOCATION-06 | M | the backup's file set from the class list (new) |
+| DATA-LOCATION-STACK | M | the Stack: class list, record, never-create, markers, moves on Home's request (lands in `stack`) |
 | DATA-LOCATION-04 | S | docs: the user guide page and the SERVICES.md paragraph |
+
+No item is retired: every earlier id keeps its meaning, widened from
+three groups to the class list.
 
 ### Decisions made here where the docs were silent or disagreed
 
-- **The location is not written into the service definition,** although
-  DATA-LOCATION-01's first draft said so. The reasons are under (a).
-- **SERVICES.md's per-user layout against the installers' system
-  layout.** The record goes in the lock's folder, which exists in both,
-  so this design does not need to settle that conflict. It is flagged
-  here, not fixed.
-- **Records stay on the internal disk by default,** and the installer
-  asks only about big files, because a missing records drive stops the
-  whole hub while a missing big-files drive stops only the engines.
-- **The Linux unit gains `/mnt`, `/media`, `/run/media` and `/srv` as
-  writable,** so a move never needs a privileged unit rewrite. The rest
-  of `ProtectSystem=strict` stays.
-- **An interrupted move is abandoned, not resumed,** before the switch.
-- **Rollback by pointer only before the first healthy boot.**
-- **The old folder is deleted only after a backup of the new location
-  succeeds.**
-- **Hold mode shows the full path only to the machine itself,** because
-  it has no sign-in.
-- **A move from a source checkout is a script, not the Settings
-  button,** because nothing restarts a `bun start` hub.
-- **`cache/` is not copied.**
+- **Every class is the person's to place (2026-09-30, owner's
+  requirement).** This supersedes the first version's "records stay on
+  the internal disk and the installer asks only about big files" (its
+  question 1). The installer still proposes today's layout, so pressing
+  Enter changes nothing.
+- **The class list is declared once, per product, in the spec's shape.**
+  The shape is in `commons`; the list is in each product because a
+  product's layout never lives in `commons`. Paths, installer, Storage,
+  mover, describe and backup all read it.
+- **Default subpaths equal today's layout,** so adoption moves no file,
+  and `records` stays at the root rather than moving into a `records/`
+  subfolder, a `hub.db` move nothing requires.
+- **`packages` is one class,** not state and versions apart: both sit
+  under `packages/<id>/`, a store install renames within it, and
+  splitting them would change the layout for no placement anyone needs.
+- **`stack-models` is one class** because its files are linked together.
+- **The TTS engine's caches become a class,** because data outside the
+  data folder is data the person cannot place, move or see.
+- **The drive format is whatever the person has, validated per class
+  (the first version's question 2).** exFAT is fine for models and the
+  reference library and refused for `records`, `keys`, `packages` and
+  `stack-state`, with the reason.
+- **Refuse only for data safety; warn for everything else.** Backups on
+  the same disk, keys on a removable disk, network storage for personal
+  files and slow disks are warnings.
+- **Network storage is allowed for every class that does not need
+  `sqlite` or `private`,** because a NAS in the house keeps data in the
+  house; the write probe as the service account is the gate.
+- **`keys` is a `hold` class, and the keystore opens only after its
+  marker check,** because `getOrCreateHexKey` would otherwise mint a
+  replacement key.
+- **`bun start` gets a restart loop on exit code 75 (the first version's
+  question 3).** About fifteen lines in `app.sh` make hold mode and the
+  Settings move work the same on a source checkout as on an installed
+  hub, with no second move path. `bun run dev` stays unsupervised and
+  moves through `bun run move-data`.
+- **The Linux `maipai` account's home stays where it is (the first
+  version's question 4).** Only the `rsync` exclusion depends on it, and
+  moving the account's home would change every existing Linux install
+  for no data-location gain.
+- **The Linux unit moves to `ProtectSystem=full`,** reversing the first
+  version's fixed writable list, so any mount point works and a move
+  never needs a root-owned unit rewrite.
+- **Online moves for classes whose users the hub can pause,** so moving
+  100 GB of reference archives does not take the whole hub down; offline
+  only for classes the database or requests write to.
+- **A move within one filesystem is a rename.**
+- **`reference.library_dir` is retired into the record,** one definition
+  of a location.
+- **Home's and the Stack's folders are never shared; each product owns
+  its classes' locations,** and Home drives the Stack's moves through the
+  Stack's API.
+- **The location is not written into the service definition; an
+  interrupted move is abandoned before the switch; rollback by pointer
+  only before the first healthy boot; the old copy of an irreplaceable
+  class is deleted only after a backup of the new location succeeds;
+  hold mode shows full paths only to the machine itself.** Carried over
+  unchanged, now per class.
 
 ### Questions only Jesse can answer
 
-1. The default split: records on the computer's own disk unless someone
-   passes `--data-dir`, and one installer question, about big files. Is
-   that the product you want, or should the installer also ask about
-   the records location?
-2. The drive you have in mind: what is it formatted as? exFAT would be
-   accepted for models but refused for household records.
-3. The family hub runs from a source checkout with `bun start`, so under
-   this design its Settings > Storage Move button stays disabled and a
-   move there is `bun run move-data`. Should the family hub move to the
-   installed service first, or should `bun start` get a restart loop so
-   the button works from a checkout?
-4. On Linux the `maipai` account's home is the install root, which is
-   why the record needs an `rsync` exclusion. Moving that account's home
-   to `/var/lib/maipai` removes the special case but changes existing
-   Linux installs. Worth doing, or leave it?
+1. The disks you have in mind for the family hub: which volumes, and
+   which classes go where? The design supports any answer; the answer
+   decides what DATA-LOCATION-01c's live macOS test uses and what the
+   first real move on the family hub is.
