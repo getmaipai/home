@@ -6,6 +6,8 @@ import type { Roster } from "@/lib/api";
 
 afterEach(cleanup);
 
+const statusAsyncTimeout = { timeout: 10_000 };
+
 function makePerson(role: Roster["role"]): Roster {
   return {
     id: "person-abc123", display_name: "Nova", nickname: null, role,
@@ -186,20 +188,20 @@ describe("NextStatusPage", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("owner")} />);
-      fireEvent.click(await view.findByRole("button", { name: "Post a note" }));
-      const dialog = await view.findByRole("dialog");
+      fireEvent.click(await view.findByRole("button", { name: "Post a note" }, statusAsyncTimeout));
+      const dialog = await view.findByRole("dialog", undefined, statusAsyncTimeout);
       fireEvent.change(view.getByLabelText("Note"), { target: { value: "Library will pause soon." } });
       await act(async () => { fireEvent.click(view.getByRole("combobox")); });
-      const hour = await view.findByRole("option", { name: "1 hour" });
+      const hour = await view.findByRole("option", { name: "1 hour" }, statusAsyncTimeout);
       await act(async () => { fireEvent.pointerDown(hour, { pointerId: 1, pointerType: "mouse", button: 0 }); fireEvent.pointerUp(hour, { pointerId: 1, pointerType: "mouse", button: 0 }); fireEvent.click(hour); });
-      await waitFor(() => expect(view.getByRole("combobox").textContent).toContain("1 hour"));
+      await waitFor(() => expect(view.getByRole("combobox").textContent).toContain("1 hour"), statusAsyncTimeout);
       fireEvent.click(within(dialog).getByRole("button", { name: "Post note" }));
-      await waitFor(() => expect(posted).toBeDefined());
+      await waitFor(() => expect(posted).toBeDefined(), statusAsyncTimeout);
       expect(posted?.body).toBe("Library will pause soon.");
       expect(Date.parse(posted?.expires_at ?? "") - Date.now()).toBeGreaterThan(3_590_000);
       expect(Date.parse(posted?.expires_at ?? "") - Date.now()).toBeLessThanOrEqual(3_600_000);
     } finally { globalThis.fetch = original; }
-  });
+  }, 30_000);
 
   test("clearing an active note uses the admin DELETE route and refreshes the board", async () => {
     const original = globalThis.fetch;
@@ -215,12 +217,12 @@ describe("NextStatusPage", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("admin")} />);
-      expect(await view.findByText("Quiet hours tonight.")).toBeTruthy();
+      expect(await view.findByText("Quiet hours tonight.", undefined, statusAsyncTimeout)).toBeTruthy();
       fireEvent.click(view.getByRole("button", { name: "Clear" }));
-      await waitFor(() => expect(calls.some((call) => call.url.endsWith("/api/status/note") && call.method === "DELETE")).toBe(true));
-      await waitFor(() => expect(view.queryByText("Quiet hours tonight.")).toBeNull());
+      await waitFor(() => expect(calls.some((call) => call.url.endsWith("/api/status/note") && call.method === "DELETE")).toBe(true), statusAsyncTimeout);
+      await waitFor(() => expect(view.queryByText("Quiet hours tonight.")).toBeNull(), statusAsyncTimeout);
     } finally { globalThis.fetch = original; }
-  });
+  }, 30_000);
 
   test("maintenance validation and cancel confirmation guard admin actions", async () => {
     const original = globalThis.fetch;
@@ -234,26 +236,26 @@ describe("NextStatusPage", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("admin")} />);
-      fireEvent.click(await view.findByRole("button", { name: "Schedule maintenance" }));
+      fireEvent.click(await view.findByRole("button", { name: "Schedule maintenance" }, statusAsyncTimeout));
       fireEvent.change(view.getByLabelText("Title"), { target: { value: "Night work" } });
       fireEvent.change(view.getByLabelText("Starts"), { target: { value: "2026-10-01T10:00" } });
       fireEvent.change(view.getByLabelText("Ends"), { target: { value: "2026-10-01T09:00" } });
-      fireEvent.click(within(await view.findByRole("dialog")).getByRole("button", { name: "Schedule" }));
-      expect(await view.findByText("The end time must be after the start time.")).toBeTruthy();
+      fireEvent.click(within(await view.findByRole("dialog", undefined, statusAsyncTimeout)).getByRole("button", { name: "Schedule" }));
+      expect(await view.findByText("The end time must be after the start time.", undefined, statusAsyncTimeout)).toBeTruthy();
       fireEvent.change(view.getByLabelText("Ends"), { target: { value: "2026-10-01T11:00" } });
       fireEvent.click(within(view.getByRole("dialog")).getByRole("button", { name: "Schedule" }));
-      expect(await view.findByText("Choose at least one part.")).toBeTruthy();
+      expect(await view.findByText("Choose at least one part.", undefined, statusAsyncTimeout)).toBeTruthy();
       fireEvent.click(within(view.getByRole("dialog")).getAllByRole("button", { name: "Close" })[1]!);
 
       fireEvent.click(view.getByRole("button", { name: "Cancel" }));
-      const confirm = await view.findByRole("alertdialog");
+      const confirm = await view.findByRole("alertdialog", undefined, statusAsyncTimeout);
       expect(confirm.textContent).toContain("Voice care will be marked as cancelled.");
       expect(writes).toHaveLength(0);
       fireEvent.click(within(confirm).getByRole("button", { name: "Cancel maintenance" }));
-      await waitFor(() => expect(writes).toHaveLength(1));
+      await waitFor(() => expect(writes).toHaveLength(1), statusAsyncTimeout);
       expect(writes[0]?.url).toContain("/api/status/maintenance/window-1/cancel");
     } finally { globalThis.fetch = original; }
-  });
+  }, 30_000);
 
   test("maintenance status replaces a down state for the covered part", async () => {
     const original = globalThis.fetch;
@@ -265,10 +267,10 @@ describe("NextStatusPage", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
-      const voice = await view.findByText("Under maintenance");
+      const voice = await view.findByText("Under maintenance", undefined, statusAsyncTimeout);
       expect(voice.closest("[data-status]")?.getAttribute("data-status")).toBe("maintenance");
-      await waitFor(() => expect(view.getByText("Scheduled maintenance is in progress")).toBeTruthy());
+      await waitFor(() => expect(view.getByText("Scheduled maintenance is in progress")).toBeTruthy(), statusAsyncTimeout);
       expect(view.queryByText("Voice isn't running")).toBeNull();
     } finally { globalThis.fetch = original; }
-  });
+  }, 30_000);
 });

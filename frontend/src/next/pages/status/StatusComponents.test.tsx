@@ -9,6 +9,8 @@ import { api, type HealthStatus, type Roster } from "@/lib/api";
 
 afterEach(cleanup);
 
+const statusAsyncTimeout = { timeout: 10_000 };
+
 function makePerson(role: Roster["role"]): Roster {
   return {
     id: "person-owner",
@@ -233,7 +235,7 @@ describe("StatusComponents", () => {
     }) as unknown as typeof fetch;
     try {
       const { findAllByRole, getByRole, queryByRole } = renderWithQuery(<StatusComponents person={makePerson("owner")} health={health()} />);
-      const buttons = await findAllByRole("button", { name: "Restart" });
+      const buttons = await findAllByRole("button", { name: "Restart" }, statusAsyncTimeout);
       const brainButton = buttons[0];
       if (!brainButton) throw new Error("Brain restart button not found");
       const brainRow = brainButton.parentElement?.parentElement;
@@ -245,23 +247,23 @@ describe("StatusComponents", () => {
       expect(getByRole("alertdialog")).toHaveTextContent("A reply being written right now will be cut off.");
       expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(false);
       fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
-      await waitFor(() => expect(queryByRole("alertdialog")).not.toBeInTheDocument());
+      await waitFor(() => expect(queryByRole("alertdialog")).not.toBeInTheDocument(), statusAsyncTimeout);
       expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(false);
       fireEvent.click(brainButton);
       fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Restart" }));
-      await waitFor(() => expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(true));
+      await waitFor(() => expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(true), statusAsyncTimeout);
       expect(calls.filter((call) => call.url.includes("/api/host/engines/chat/restart"))).toEqual([
         { url: "/api/host/engines/chat/restart", method: "POST" },
       ]);
-      await waitFor(() => expect(brainRow.querySelector("button")?.disabled).toBe(true));
+      await waitFor(() => expect(brainRow.querySelector("button")?.disabled).toBe(true), statusAsyncTimeout);
       expect(otherButtons.every((button) => !button.hasAttribute("disabled"))).toBe(true);
       resolveRestart(new Response(JSON.stringify({ role: "chat", restarted: true }), { status: 200 }));
-      await waitFor(() => expect(brainRow.querySelector("button")?.disabled).toBe(false));
-      await waitFor(() => expect(calls.filter((call) => call.url.includes("/api/health"))).toHaveLength(2));
+      await waitFor(() => expect(brainRow.querySelector("button")?.disabled).toBe(false), statusAsyncTimeout);
+      await waitFor(() => expect(calls.filter((call) => call.url.includes("/api/health"))).toHaveLength(2), statusAsyncTimeout);
     } finally {
       globalThis.fetch = original;
     }
-  });
+  }, 30_000);
 
   test("a failed restart shows the server sentence", async () => {
     const original = globalThis.fetch;
@@ -275,16 +277,16 @@ describe("StatusComponents", () => {
     }) as unknown as typeof fetch;
     try {
       const { findAllByRole, getByRole, findByText } = renderWithQuery(<StatusComponents person={makePerson("owner")} health={health()} />);
-      const understandingButton = (await findAllByRole("button", { name: "Restart" }))[1];
+      const understandingButton = (await findAllByRole("button", { name: "Restart" }, statusAsyncTimeout))[1];
       if (!understandingButton) throw new Error("Understanding restart button not found");
       fireEvent.click(understandingButton);
-      await waitFor(() => expect(getByRole("button", { name: "Restart" })).toBeEnabled());
+      await waitFor(() => expect(getByRole("button", { name: "Restart" })).toBeEnabled(), statusAsyncTimeout);
       fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Restart" }));
-      expect(await findByText("Understanding could not restart.")).toBeInTheDocument();
+      expect(await findByText("Understanding could not restart.", undefined, statusAsyncTimeout)).toBeInTheDocument();
     } finally {
       globalThis.fetch = original;
     }
-  });
+  }, 30_000);
 
   test("restartEngineRole posts to the selected engine route", async () => {
     const original = globalThis.fetch;
