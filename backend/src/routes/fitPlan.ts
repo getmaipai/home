@@ -1,9 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { getStackClient } from "@/lib/stackEngine";
+import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
-import { fitNotFoundWording, fitUnavailableWording, fitWording } from "@/lib/fitWording";
+import { fitNoStackWording, fitNotFoundWording, fitUnavailableWording, fitWording } from "@/lib/fitWording";
 import { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 
 export const fitPlanRoutes = apiRouter();
@@ -35,6 +35,9 @@ const route = createRoute({
 
 fitPlanRoutes.openapi(route, async (c) => {
   const body = c.req.valid("json");
+  if (!isStackConfigured()) {
+    return c.json({ plan: null, wording: fitNoStackWording() }, 200);
+  }
   try {
     const plan = await getStackClient().fitPlan(body);
     return c.json({ plan, wording: fitWording(plan) }, 200);

@@ -40,6 +40,14 @@ export function fitUnavailableWording(): { verdict: "unknown"; headline: string;
   };
 }
 
+export function fitNoStackWording(): { verdict: "unknown"; headline: string; detail: string } {
+  return {
+    verdict: "unknown",
+    headline: "Needs the MaiPai Stack",
+    detail: "Checking a model's size uses the MaiPai Stack, which is not set up on this computer yet.",
+  };
+}
+
 export function fitNotFoundWording(): { verdict: "unknown"; headline: string; detail: string } {
   return {
     verdict: "unknown",

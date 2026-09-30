@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fitNotFoundWording, fitWording } from "@/lib/fitWording";
+import { fitNoStackWording, fitNotFoundWording, fitWording } from "@/lib/fitWording";
 import { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 import { makePlan } from "./fixtures/fitPlanFixtures";
 
@@ -30,6 +30,10 @@ describe("fit wording", () => {
 
   test("words a model the Stack could not find", () => {
     expect(fitNotFoundWording()).toEqual({ verdict: "unknown", headline: "Can't find that model", detail: "Check the link and try again." });
+  });
+
+  test("words when no Stack is set up", () => {
+    expect(fitNoStackWording()).toEqual({ verdict: "unknown", headline: "Needs the MaiPai Stack", detail: "Checking a model's size uses the MaiPai Stack, which is not set up on this computer yet." });
   });
 
   test("does not throw for an empty paths list", () => {

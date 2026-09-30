@@ -39,7 +39,7 @@ export function getStackUrl(): string | null {
 }
 
 export function isStackConfigured(): boolean {
-  return getStackUrl() !== null;
+  return testClient !== null || getStackUrl() !== null;
 }
 
 let cachedClient: StackClient | null = null;

@@ -3,6 +3,7 @@ import { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import type { StackClient } from "@/lib/stack/client";
 import { StackError } from "@/lib/stack/errors";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { owner } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 import { makePlan } from "./fixtures/fitPlanFixtures";
@@ -24,6 +25,15 @@ describe("POST /api/fit-plan", () => {
     const body = await response.json() as { plan: StackFitPlan; wording: { verdict: string; headline: string; detail: string } };
     expect(body.plan.verdict).toBe("yes");
     expect(body.wording.headline).toBe("Runs well on this computer");
+  });
+
+  test("explains no Stack is set up without calling a Stack client", async () => {
+    setHouseholdSettingValue("engines.stack.url", "");
+    __resetStackEngineForTests();
+    const { client } = await owner();
+    const response = await client.post("/api/fit-plan", { source: { repo: "Qwen/Qwen3-8B" } });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ plan: null, wording: { verdict: "unknown", headline: "Needs the MaiPai Stack", detail: "Checking a model's size uses the MaiPai Stack, which is not set up on this computer yet." } });
   });
 
   test("returns the no plan with its wording", async () => {

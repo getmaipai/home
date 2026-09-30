@@ -1513,7 +1513,7 @@ async function captureChatContinueReview(browser: Browser, sessionValue: string)
 /** HOME-FIT-02B's dedicated review for the recommended model's fit verdict.
  * Only selection and fit-plan are stubbed at the browser boundary; the
  * remaining model card data comes from the throwaway demo backend. */
-async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable" | "checked-yes" | "checked-no" | "checked-error" | "checked-notfound" | "memory-tight" | "compare"): Promise<void> {
+async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable" | "checked-yes" | "checked-no" | "checked-error" | "checked-notfound" | "checked-nostack" | "memory-tight" | "compare"): Promise<void> {
   const context = await newContext(browser, viewport, theme, sessionValue);
   try {
     const page = await context.newPage();
@@ -1534,6 +1534,7 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       unknown: { verdict: "unknown", headline: "Can't tell yet", detail: "Nobody has measured a model like this on a computer like yours yet." },
       unavailable: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." },
       notfound: { verdict: "unknown", headline: "Can't find that model", detail: "Check the link and try again." },
+      nostack: { verdict: "unknown", headline: "Needs the MaiPai Stack", detail: "Checking a model's size uses the MaiPai Stack, which is not set up on this computer yet." },
     } as const;
     const figure = (low: number | null, high: number | null, source: "measured" | "unknown" = "measured") => ({ low, high, source, as_of: "2026-09-30" });
     const makePlan = (verdict: "yes" | "slow" | "no" | "unknown") => ({
@@ -1547,13 +1548,13 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       const source = route.request().postDataJSON()?.source as { url?: string; repo?: string } | undefined;
       const answerState = state === "compare"
         ? source?.url ? "yes" : source?.repo === "example-org/example-big-model" ? "no" : "yes"
-        : state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state === "checked-notfound" ? "notfound" : state === "memory-tight" ? "yes" : state;
+        : state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state === "checked-notfound" ? "notfound" : state === "checked-nostack" ? "nostack" : state === "memory-tight" ? "yes" : state;
       const wording = answerState in answers ? answers[answerState as keyof typeof answers] : answers.yes;
       // Keep the browser boundary fixture valid against StackFitPlan.
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ plan: state === "unavailable" || state === "checked-notfound" ? null : makePlan(wording.verdict), wording }),
+        body: JSON.stringify({ plan: state === "unavailable" || state === "checked-notfound" || state === "checked-nostack" ? null : makePlan(wording.verdict), wording }),
       });
     });
     await page.goto(`${BASE_URL}/models`);
@@ -1574,11 +1575,11 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       dedicatedScreenshots.push({ file: screenshot, route: "settings-models-fit-compare", viewport: viewport.slug, theme: "light" });
       return;
     }
-    if (state === "checked-yes" || state === "checked-no" || state === "checked-error" || state === "checked-notfound") {
+    if (state === "checked-yes" || state === "checked-no" || state === "checked-error" || state === "checked-notfound" || state === "checked-nostack") {
       const link = state === "checked-error" ? "not a link" : state === "checked-notfound" ? "https://huggingface.co/example-org/no-such-model" : "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf";
       await page.getByRole("textbox", { name: "Hugging Face model link" }).fill(link);
       await page.getByRole("button", { name: "Check", exact: true }).click();
-      await page.getByText(state === "checked-yes" ? answers.yes.headline : state === "checked-no" ? answers.no.headline : state === "checked-notfound" ? answers.notfound.headline : "That does not look like a Hugging Face model link.", { exact: true }).waitFor();
+      await page.getByText(state === "checked-yes" ? answers.yes.headline : state === "checked-no" ? answers.no.headline : state === "checked-notfound" ? answers.notfound.headline : state === "checked-nostack" ? answers.nostack.headline : "That does not look like a Hugging Face model link.", { exact: true }).waitFor();
       await settleAnimations(page);
       const screenshot = `fit-check-${state}-${viewport.slug}-light.png`;
       await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
@@ -4582,7 +4583,7 @@ async function main() {
         }
         await captureFitVerdictCard(browser, sessionValue, viewport, "light", "memory-tight");
         await captureFitVerdictCard(browser, sessionValue, viewport, "light", "compare");
-        for (const state of ["checked-yes", "checked-no", "checked-error", "checked-notfound"] as const) {
+        for (const state of ["checked-yes", "checked-no", "checked-error", "checked-notfound", "checked-nostack"] as const) {
           await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
         }
       }
