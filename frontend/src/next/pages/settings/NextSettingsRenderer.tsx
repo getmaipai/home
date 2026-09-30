@@ -20,6 +20,8 @@ interface NextSettingsRendererProps {
    * NextSettingField loop. Omitted (every existing call site) renders
    * every eligible group, unchanged. */
   only?: readonly string[];
+  includeKeys?: readonly string[];
+  expandAdvanced?: boolean;
 }
 
 const REGISTRY_QUERY_KEY = ["settings-registry"];
@@ -39,7 +41,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
-export function NextSettingsRenderer({ scope, scopeValue, only }: NextSettingsRendererProps) {
+export function NextSettingsRenderer({ scope, scopeValue, only, includeKeys, expandAdvanced = false }: NextSettingsRendererProps) {
   // NOTIFY-SHARE-02: NextSettingField's own PersonMultiSelect control
   // needs the viewer's own id to drop from its option list -
   // `scopeValue` is already exactly "person:<id>" for a person-scope
@@ -148,7 +150,7 @@ export function NextSettingsRenderer({ scope, scopeValue, only }: NextSettingsRe
       >
         {({ registry, values }: { registry: SettingsKey[]; values: ResolvedSetting[] }) => {
           const allGroups: SettingsGroup[] = groupSettings(registry, values, scope, "home");
-          const groups = only ? allGroups.filter((g) => only.includes(g.id)) : allGroups;
+          const groups = (only ? allGroups.filter((g) => only.includes(g.id)) : allGroups).map((group) => includeKeys ? { ...group, basic: group.basic.filter((item) => includeKeys.includes(item.def.key)), advanced: group.advanced.filter((item) => includeKeys.includes(item.def.key)) } : group).filter((group) => group.basic.length + group.advanced.length > 0);
           return groups.length === 0 ? (
             <p className="text-sm text-muted-foreground">No settings yet.</p>
           ) : (
@@ -175,7 +177,7 @@ export function NextSettingsRenderer({ scope, scopeValue, only }: NextSettingsRe
                       <NextSettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />
                     ))}
                     {group.advanced.length > 0 ? (
-                      group.foldAdvanced && !advancedOpen[group.id] ? (
+                      group.foldAdvanced && !expandAdvanced && !advancedOpen[group.id] ? (
                         <Button
                           type="button"
                           variant="link"

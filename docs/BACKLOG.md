@@ -15,7 +15,7 @@ Rough size tags: **S** (a session or less), **M** (a real slice, days),
 Design: [settings redesign plan](plans/settings-redesign-2026-09-30.md).
 
 - [x] **S1: Shared `ProfileForm` extracted from the profile page's Edit dialog (same fields, same API, tests), used by both** (S, committed): one definition of "edit a person".
-- [ ] **S2: Me shell: left section list (desktop) / select (phone), routes `?section=`, sections Appearance and Privacy and data; remove allowance, storage caps from Me**: the new frame and the short sections.
+- [x] **S2: Me shell: left section list (desktop) / select (phone), routes `?section=`, sections Appearance and Privacy and data; remove allowance, storage caps from Me** (committed, live check pending): the new frame and the short sections.
 - [ ] **S3: Me > Profile section: profile card (S1 form) + Face recognition card (status, Enroll, sounds switch); person's profile page gets a link to Settings > Profile and keeps its read view**: profile editing and enrollment under Me.
 - [ ] **S4: Me > Voice and AI and Notifications sections; Telegram folded and shown only when configured**: the last two sections.
 - [ ] **S5: Person page "Limits" card for parents and admins (allowance keys)**: allowance leaves Me without being lost.

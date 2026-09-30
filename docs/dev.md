@@ -6,6 +6,22 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## SETTINGS-S2
+
+Settings > Me now has Profile, Appearance, Voice and AI, Notifications, Privacy and data, and an admin-only Limits section. Desktop uses a vertical section list and phones use a select. The URL keeps `?tab=` and now reads and updates `?section=`. Status is inside Privacy and data with the existing Storage and Privacy destinations.
+
+| Previous group | New section |
+|---|---|
+| `profile.appearance` (`ui.appearance`, `ui.look`) | Appearance |
+| `profile.appearance` (`ui.enrollment_sounds`, `ui.show_turn_stats`) | Appearance, under Advanced |
+| `person.persona`, `person.voice`, `person.search` | Voice and AI |
+| `person.notifications` (`notifications.file_shared.muted_senders`) | Notifications |
+| `person.notifications` (Telegram chat id and 15 Telegram toggles) | Notifications, under Advanced |
+| `person.allowance` | Limits, owners and admins only |
+| `person.storage` | Limits, owners and admins only |
+
+The Profile card shows the person's generated photo, name, and role, with Edit profile opening the existing person page. Household's inner layout is unchanged. Status remains available to everyone from Privacy and data.
+
 ## SETTINGS-S1
 
 The profile page's Edit dialog now uses the reusable `ProfileForm`, so the Settings > Me profile card can use

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@maipai/ui/src/dashboard/components/ui/tabs";
-import { Card, CardHeader, CardTitle, CardDescription } from "@maipai/ui/src/dashboard/components/ui/card";
+import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
+import { NextMeSettings } from "@/next/pages/settings/NextMeSettings";
 import { NextManageSection } from "@/next/pages/settings/NextManageSection";
 import { api, isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { meetsMinRole } from "@/apps/people/roles";
@@ -92,8 +93,7 @@ export function NextSettingsPage({ person }: { person: Roster }) {
             </TabsContent>
           ) : null}
           <TabsContent value="me" className="flex flex-col gap-4">
-            <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
-            <PersonalManagementLinks />
+            <NextMeSettings person={person} />
           </TabsContent>
           {showDeviceSettings ? (
             <TabsContent value="device" className="flex flex-col gap-4">
@@ -106,63 +106,10 @@ export function NextSettingsPage({ person }: { person: Roster }) {
         // own comment): a non-admin has only their own settings to see,
         // household-scope writes 403 for anyone else.
         <div className="flex flex-col gap-4">
-          <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} />
-          <PersonalManagementLinks />
+          <NextMeSettings person={person} />
         </div>
       )}
-      {/* STORE-PAGE-01: unlike NextManageSection's owner/admin-only links
-          above, Storage is reachable by everyone regardless of tab - a
-          child's own row lives there too (GET /api/storage/usage's own
-          row-visibility rule), so this link-out sits outside the
-          canManageHousehold branch rather than inside either tab. */}
-      <Link to="/storage" className="block">
-        <Card className="py-4 transition-colors hover:bg-accent">
-          <CardHeader>
-            <CardTitle>Storage</CardTitle>
-            <CardDescription>Usage against the cap, and the largest kinds of files.</CardDescription>
-          </CardHeader>
-        </Card>
-      </Link>
-      <Link to="/status" className="block">
-        <Card className="py-4 transition-colors hover:bg-accent">
-          <CardHeader>
-            <CardTitle>Status</CardTitle>
-            <CardDescription>See whether the parts of MaiPai are working.</CardDescription>
-          </CardHeader>
-        </Card>
-      </Link>
-      {/* Privacy explains data flows for every signed-in person. Keep it
-          outside both role tabs, like Storage, so the link is always visible. */}
-      <Link to="/privacy" className="block">
-        <Card className="py-4 transition-colors hover:bg-accent">
-          <CardHeader>
-            <CardTitle>Privacy</CardTitle>
-            <CardDescription>See what connects to the internet and what stays here.</CardDescription>
-          </CardHeader>
-        </Card>
-      </Link>
-    </div>
-  );
-}
 
-function PersonalManagementLinks() {
-  const links = [
-    ["Voices", "Browse voices and manage your voice recordings.", "/voices"],
-    ["Commands", "View and manage household commands.", "/commands"],
-    ["Devices", "Review your signed-in devices and sessions.", "/devices"],
-  ] as const;
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {links.map(([title, description, to]) => (
-        <Link key={to} to={to} className="block">
-          <Card className="h-full py-4 transition-colors hover:bg-accent">
-            <CardHeader>
-              <CardTitle>{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
-      ))}
     </div>
   );
 }

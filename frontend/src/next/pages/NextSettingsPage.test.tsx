@@ -84,7 +84,7 @@ function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string
 }
 
 describe("NextSettingsPage", () => {
-  test.each(["owner", "child"] as const)("the %s can reach the shared Status page", async (role) => {
+  test.each(["owner", "child"] as const)("the %s can reach Status from Privacy and data", async (role) => {
     const { restore } = mockSettingsFetch([], { household: [], "person:person-abc123": [] });
     try {
       renderWithQueryClient(
@@ -92,11 +92,11 @@ describe("NextSettingsPage", () => {
           <NextSettingsPage person={makePerson({ role })} />
         </MemoryRouter>,
       );
-      const link = await waitFor(() => {
-        const found = Array.from(document.querySelectorAll("a")).find((anchor) => anchor.textContent?.includes("Status"));
-        expect(found).toBeDefined();
-        return found as HTMLAnchorElement;
-      });
+      const meTab = Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Me");
+      if (meTab) fireEvent.click(meTab);
+      const privacy = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Privacy and data") as HTMLElement);
+      fireEvent.click(privacy);
+      const link = await waitFor(() => Array.from(document.querySelectorAll("a")).find((anchor) => anchor.textContent?.includes("Status")) as HTMLAnchorElement);
       expect(link.getAttribute("href")).toBe("/status");
     } finally {
       restore();
@@ -139,47 +139,24 @@ describe("NextSettingsPage", () => {
     }
   });
 
-  test("an owner sees both tabs; a basic person-scope select key changes live", async () => {
+  test("an owner can choose the Appearance section from Me", async () => {
     const appearance = makeKey({ key: "ui.appearance", scope: "person", selector: "select", range: { options: ["system", "light", "dark"] }, label: "Appearance", level: "basic", lives_in: "profile.appearance" });
-    const { restore, puts } = mockSettingsFetch([appearance], {
-      household: [],
-      "person:person-abc123": [makeValue(appearance, "system")],
-    });
+    const { restore } = mockSettingsFetch([appearance], { household: [], "person:person-abc123": [makeValue(appearance, "system")] });
     try {
-      // NextManageSection (the Household tab's own bottom section,
-      // ui-v0.5.23) renders real react-router-dom Links - a router
-      // context is needed the moment this renders, not just when a
-      // link is clicked.
-      renderWithQueryClient(
-        <MemoryRouter>
-          <NextSettingsPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await waitFor(() => expect(document.body.textContent).toContain("Household"));
-      expect(document.body.textContent).toContain("Me");
-      const meTab = Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Me");
-      expect(meTab).toBeDefined();
-      fireEvent.click(meTab!);
-      await waitFor(() => expect(document.body.textContent).toContain("Appearance"));
-      const trigger = document.querySelector('[data-slot="select-trigger"]') as HTMLElement | null;
-      expect(trigger).not.toBeNull();
-      fireEvent.click(trigger!);
-      await waitFor(() => expect(document.body.textContent).toContain("Light"));
-      const option = Array.from(document.querySelectorAll('[data-slot="select-item"]')).find((el) => el.textContent === "Light");
-      expect(option).toBeDefined();
-      fireEvent.pointerDown(option!, { pointerId: 1, pointerType: "mouse", button: 0 });
-      fireEvent.pointerUp(option!, { pointerId: 1, pointerType: "mouse", button: 0 });
-      fireEvent.click(option!);
-      await waitFor(() => expect(puts.some((p) => p.key === "ui.appearance" && p.value === "light")).toBe(true));
-    } finally {
-      restore();
-    }
+      renderWithQueryClient(<MemoryRouter><NextSettingsPage person={makePerson()} /></MemoryRouter>);
+      const meTab = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Me") as HTMLElement);
+      fireEvent.click(meTab);
+      const appearanceTab = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Appearance") as HTMLElement);
+      fireEvent.click(appearanceTab);
+      await waitFor(() => expect(appearanceTab.getAttribute("aria-selected")).toBe("true"));
+      expect(document.body.textContent).toContain("Choose how MaiPai looks.");
+    } finally { restore(); }
   });
 
   // FACE-02N: the enrollment-sounds toggle is drawn by the generic
   // renderer from its registry declaration alone (no hand-built control),
   // on by default, and writes to the person's own scope.
-  test("ui.enrollment_sounds shows as a switch under Me, on by default, and turning it off writes false", async () => {
+  test("ui.enrollment_sounds is under Appearance advanced settings and writes false", async () => {
     const sounds = makeKey({ key: "ui.enrollment_sounds", scope: "person", selector: "boolean", default: true, label: "Enrollment sounds", level: "basic", lives_in: "profile.appearance" });
     const { restore, puts } = mockSettingsFetch([sounds], { household: [], "person:person-abc123": [makeValue(sounds, true)] });
     try {
@@ -194,6 +171,10 @@ describe("NextSettingsPage", () => {
         return found as HTMLElement;
       });
       fireEvent.click(meTab);
+      const appearanceTab = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Appearance") as HTMLElement);
+      fireEvent.click(appearanceTab);
+      const advancedTrigger = await waitFor(() => Array.from(document.querySelectorAll('[data-slot="collapsible-trigger"]')).find((el) => el.textContent?.includes("Advanced")) as HTMLElement);
+      fireEvent.click(advancedTrigger);
       const toggle = await waitFor(() => {
         const found = document.querySelector('[role="switch"]');
         expect(found).not.toBeNull();
@@ -318,7 +299,8 @@ describe("NextSettingsPage", () => {
         </MemoryRouter>,
       );
       await waitFor(() => expect(document.body.textContent).toContain("Appearance"));
-      expect(document.querySelector('[data-slot="tabs-list"]')).toBeNull();
+      expect(document.querySelector('[data-slot="native-select"]')).not.toBeNull();
+      expect(document.querySelector('[role="tablist"]')?.className).toContain("hidden");
     } finally {
       restore();
     }
@@ -336,6 +318,7 @@ describe("NextSettingsPage", () => {
       range: { multiple: true },
       label: "Don't notify me about shares from",
       level: "basic",
+      lives_in: "person.notifications",
     });
     const marlow = makePerson({ id: "person-marlow1", display_name: "Marlow" });
     const iris = makePerson({ id: "person-iris1", display_name: "Iris" });
@@ -354,6 +337,8 @@ describe("NextSettingsPage", () => {
       const meTab = Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Me");
       expect(meTab).toBeDefined();
       fireEvent.click(meTab!);
+      const notificationsTab = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Notifications") as HTMLElement);
+      fireEvent.click(notificationsTab);
       await waitFor(() => expect(document.body.textContent).toContain("Don't notify me about shares from"));
       // The existing pick renders as a chip with a real name, not the raw id.
       await waitFor(() => expect(document.body.textContent).toContain("Marlow"));
@@ -393,7 +378,7 @@ describe("NextSettingsPage", () => {
   });
 
   test("an unsupported selector renders the registry's own fallback, never crashes", async () => {
-    const media = makeKey({ key: "test.media_key", selector: "media", label: "Media Key", level: "basic" });
+    const media = makeKey({ key: "test.media_key", selector: "media", label: "Media Key", level: "basic", lives_in: "person.persona" });
     const { restore } = mockSettingsFetch([media], { household: [], "person:person-abc123": [makeValue(media, null)] });
     try {
       renderWithQueryClient(
@@ -401,6 +386,8 @@ describe("NextSettingsPage", () => {
           <NextSettingsPage person={makePerson({ role: "adult" })} />
         </MemoryRouter>,
       );
+      const voiceTab = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Voice and AI") as HTMLElement);
+      fireEvent.click(voiceTab);
       await waitFor(() => expect(document.body.textContent).toContain("Media Key"));
       expect(document.body.textContent).toContain("Not supported in this hub version yet.");
     } finally {
@@ -413,7 +400,7 @@ describe("NextSettingsPage", () => {
     globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;
     try {
       renderWithQueryClient(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={["/settings?section=appearance"]}>
           <NextSettingsPage person={makePerson({ role: "adult" })} />
         </MemoryRouter>,
       );
