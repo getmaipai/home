@@ -938,6 +938,23 @@ export const maintenanceWindows = sqliteTable("maintenance_windows", {
   hlc: text("hlc").notNull(),
 });
 
+// STATUS-C2: append-only state changes behind the public uptime strips.
+export const statusEvents = sqliteTable("status_events", {
+  id: text("id").primaryKey(),
+  component: text("component", { enum: ["chat", "embed", "background", "voice", "library", "hub"] }).notNull(),
+  state: text("state", { enum: ["operational", "degraded", "outage", "maintenance"] }).notNull(),
+  at: text("at").notNull(),
+  source: text("source", { enum: ["sample", "boot_gap", "maintenance"] }).notNull(),
+  detail: text("detail"),
+  hlc: text("hlc").notNull(),
+}, (table) => [index("status_events_component_at_idx").on(table.component, table.at)]);
+
+// A single heartbeat lets boot distinguish a clean restart from a gap.
+export const statusHeartbeat = sqliteTable("status_heartbeat", {
+  id: integer("id").primaryKey(),
+  lastSeenAt: text("last_seen_at").notNull(),
+});
+
 // --- Session D: packages and the store ------------------------------
 //
 // One row per bundled/installed package, tracking bronze's "a smoke

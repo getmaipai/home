@@ -32,6 +32,7 @@ import { installConsoleFileMirror, installFatalErrorHandlers, appendLogLine } fr
 import { shutdownEngines } from "@/lib/hubShutdown";
 import { ensureSecretPepperReady } from "@/lib/secret";
 import { KeystoreProtectionFailedError } from "@/lib/keystore";
+import { recordBootGap, recordStatusSample, pruneStatusEvents } from "@/lib/statusHistory";
 
 const configuredPort = Number(process.env.PORT ?? 8787);
 installConsoleFileMirror();
@@ -69,6 +70,8 @@ setWarmupPrompt(() => ({ system: buildOldPathStablePrefix(), tools: ordinaryTool
 // module-load seeding, still there - see lib/hlc.ts's own header on why
 // the wider seed lives here instead of scattered per-table).
 seedHlcFromDatabase();
+await recordBootGap();
+void recordStatusSample();
 
 // COR-8 (code review, 2026-09-06): activeJob (lib/modelDownloadJobs.ts)
 // is in-memory only and always starts null on a fresh process - a crash
@@ -258,6 +261,10 @@ setInterval(() => {
 // "how busy the machine has been" (Jesse, 2026-09-04) doesn't need finer
 // granularity than that to show a real trend.
 setInterval(() => void sampleEngineStats(), 60_000);
+const statusSampleInterval = setInterval(() => void recordStatusSample(), 30_000);
+statusSampleInterval.unref();
+const statusPruneInterval = setInterval(() => pruneStatusEvents(), 6 * 60 * 60_000);
+statusPruneInterval.unref();
 // lib/householdCa.ts's own "rotation as a Repairs item" - once a day is
 // plenty for a 30-day warning window; the job itself is idempotent and
 // cheap (a single file read and a date comparison) when nothing's close

@@ -601,8 +601,8 @@ Design: [docs/plans/status-page-2026-09-30.md](plans/status-page-2026-09-30.md).
 - [x] **STATUS-B2a: keep the admin's note and scheduled maintenance** (home, backend, two commits). Add the tables, validated library, member board read, and owner/admin routes to post or clear the note and create or cancel windows. **Committed, live check pending.**
 - [x] **STATUS-B2b: show notes and scheduled maintenance** (home, frontend, S). Render the member board response on `/status`, with admin controls for owners and admins. Mirror the existing status page and its tests. Keep the board free of admin-only fields. The page shows current notes, local maintenance times, and maintenance-aware status for affected parts. **Committed, live check pending.**
 - [x] **STATUS-B3: suppress alarms during scheduled maintenance** (home, M). Keep matching issue rows visible while deferring their new and still-open notifications until the maintenance window ends; resolving or dismissing clears the deferred check. **Committed; live check needs a real outage during a window.**
-- [ ] **STATUS-C1: status event record** (commons, S). Add the `StatusEvent` schema and a tag.
-- [ ] **STATUS-C2: record status history** (home, M). Record heartbeats, state changes, and gaps while the hub is stopped. Keep 90 days and exclude maintenance time.
+- [x] **STATUS-C1: status event record** (commons, S). Add the `StatusEvent` schema and a tag. **Landed as spec-v0.1.62.**
+- [x] **STATUS-C2: record status history** (home, M). Record heartbeats, state changes, and gaps while the hub is stopped. Keep 90 days and exclude maintenance time. **Committed; live check needs time to pass.**
 - [ ] **STATUS-C3: reliability history page** (home, M). Add `GET /api/status`, 30-day status bars and uptime percentages, and recent problems.
 
 ## Projects (2026-09-26)

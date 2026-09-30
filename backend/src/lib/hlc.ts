@@ -35,6 +35,7 @@ export const HLC_BEARING_TABLES = [
   "conversations",
   "conversation_turns",
   "issues",
+  "status_events",
   "status_notes",
   "maintenance_windows",
   "devices",

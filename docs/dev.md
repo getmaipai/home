@@ -34918,3 +34918,25 @@ the current route.
 
 The focused frontend status tests and frontend typecheck and lint pass.
 The slice is committed with the repo gate result in its lane report.
+
+## STATUS-C2
+
+The hub stores an append-only event whenever chat, embed, background, voice,
+Library, or the hub itself changes state. It samples health every 30 seconds
+and writes the single heartbeat row on each sample. A state that does not
+change creates no event. Scheduled maintenance is recorded as its own state,
+so the later status API can exclude those seconds from uptime.
+
+On boot, a heartbeat older than 120 seconds creates a hub outage event at the
+old heartbeat time and a recovery event at boot time. A missing or recent
+heartbeat creates no gap. Pruning runs every six hours, removes events older
+than 90 days, and keeps the newest older event for each component so the
+state at the window edge is known.
+
+The history recorder mirrors the engine rule in
+`frontend/src/apps/chat/chatAvailability.ts`: blocked, failed, stalled, or
+stopped engines are outages; a dead configured engine is an outage; starting
+and restarting are degraded; and other states are operational. Changes to
+that shared rule must be reflected in the recorder mapping and its table
+tests. This slice stores events and heartbeats only. The history API, uptime
+bars, percentages, and recent problems are STATUS-C3.
