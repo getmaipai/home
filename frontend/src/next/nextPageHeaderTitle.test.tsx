@@ -45,6 +45,7 @@ describe("NextPageHeaderTitle", () => {
     ["/people/person-sage", "Family", "lucide-users"],
     ["/settings", "Settings", "lucide-settings"],
     ["/storage", "Storage", "lucide-database"],
+    ["/status", "Status", "lucide-activity"],
     ["/engines", "Engines", "lucide-cpu"],
     ["/performance", "Performance", "lucide-gauge"],
     ["/updates", "Updates", "lucide-refresh-cw"],

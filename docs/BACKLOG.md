@@ -575,6 +575,18 @@ Slice 05a frontend committed: Restart buttons were invisible until 05a2 mounted 
 - [ ] **ENGINE-AVAIL-05: an Engines card per role with Start, Stop, Restart, and stop scripts leaking engines** (M, Sonnet floor). Objective: the Engines page shows a status pill from the availability state and Start/Stop/Restart for chat, embed, TTS and background through one client route per role that the hub sends to the local supervisor now and to the Stack later; separately, every script or bench that spawns an engine uses an ephemeral port and its own process group and kills it on exit, and a standards-core check flags a fixed default engine port in a script. Pointers: `routes/host.ts` and `routes/engines.ts`, `frontend/src/next/pages/NextModelsPage.tsx`, `backend/scripts/bench/`, `.github/standards/`. Acceptance: the card works against a fake supervisor and a fake Stack client with no page change; a killed bench leaves no listener behind. Out of scope: Stack-side changes. Exit: `bash scripts/check.sh` in `home`, the standards core in `.github`.
   Slice 05a backend committed: `POST /api/host/engines/{role}/restart`. Still open: real Stop for embed/voice/background (needs manual-stop state in each supervisor), Start distinct from Restart.
 
+## Status page
+
+Design: [docs/plans/status-page-2026-09-30.md](plans/status-page-2026-09-30.md).
+
+- [x] **STATUS-A2a: the always-visible status dot and current status page** (home, two commits). The header dot uses the shared health query, links to `/status`, and stays online if health data is missing. The page shows the overall state and the existing health rows, with Restart controls for owners and admins. Settings links to Status for everyone. Health controls no longer appear on `/models`, which keeps the chat model picker. **Committed, live check pending.**
+- [ ] **STATUS-A2b: status rows for Search, Library, and the hub** (home, S). Restyle the status page with Status badges and add the Search, Library, and hub rows.
+- [ ] **STATUS-B1: note and maintenance records** (commons, S). Add `StatusNote` and `MaintenanceWindow` schemas, fixtures, and a tag. Mirror the maintenance fields from Uptime Kuma and the state names from Statuspage.
+- [ ] **STATUS-B2: notes and scheduled maintenance** (home, M, two commits). Add tables and admin routes to post and clear a note and create, edit, and cancel maintenance windows. Let members read them and show them on the page. Suppress alarms during an active window.
+- [ ] **STATUS-C1: status event record** (commons, S). Add the `StatusEvent` schema and a tag.
+- [ ] **STATUS-C2: record status history** (home, M). Record heartbeats, state changes, and gaps while the hub is stopped. Keep 90 days and exclude maintenance time.
+- [ ] **STATUS-C3: reliability history page** (home, M). Add `GET /api/status`, 30-day status bars and uptime percentages, and recent problems.
+
 ## Projects (2026-09-26)
 
 The harness design: a prompt becomes either a turn (unchanged) or a durable background project of typed recipe steps, per `docs/plans/harness-turns-and-projects-2026-09-26.md` (proposed, awaiting Jesse's read; nothing below starts before that read). The runner is Home host machinery; every project type is a catalog package shipping a recipe; hardware never branches the code, the per-model budget record and the Stack's governor do the sizing. The owner direction section (2026-09-26) sets the emphasis: the model-authored loop is the target, recipes are the skills half of the same substrate, and `plan_authoring` is gated by measurement only.

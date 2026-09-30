@@ -65,13 +65,28 @@ describe("ChatHeaderBar", () => {
   // grow into the header's free space and truncate only once it must
   // are present, not the actual pixel behavior (that's the captures at
   // 1440/390 the item's own exit line asks for).
-  test("the title grows to fill the header's free space (flex-1, min-w-0, truncate - no fixed max-w-64)", async () => {
+  test("the title can shrink while keeping a 48 px minimum and truncates its text", async () => {
     const view = renderBar(baseData({ title: "What's 2 plus 2?" }));
-    const title = await view.findByText("What's 2 plus 2?");
-    expect(title.className).toContain("flex-1");
-    expect(title.className).toContain("min-w-0");
-    expect(title.className).toContain("truncate");
+    const title = (await view.findByText("What's 2 plus 2?")).closest("button")!;
+    const layoutClasses = title.className.split(" relative before:").at(0) ?? "";
+    expect(layoutClasses).toContain("flex-1");
+    expect(layoutClasses).toContain("min-w-12");
+    expect(layoutClasses.split(" ")).not.toContain("shrink-0");
+    expect(layoutClasses).not.toContain("grow");
+    expect(layoutClasses).not.toContain("max-w-full");
+    expect(title.querySelector("span")?.className).toContain("min-w-0");
+    expect(title.querySelector("span")?.className).toContain("truncate");
     expect(title.className).not.toContain("max-w-64");
+  });
+
+  test("the New Chat title keeps a 48 px target while its text can truncate", async () => {
+    const view = renderBar(baseData({ title: "" }));
+    const button = await view.findByRole("button", { name: "New Chat" });
+    const layoutClasses = button.className.split(" relative before:").at(0) ?? "";
+    expect(layoutClasses).toContain("min-w-12");
+    expect(layoutClasses).toContain("flex-1");
+    expect(layoutClasses.split(" ")).not.toContain("shrink-0");
+    expect(button.querySelector("span")?.className).toContain("min-w-0 truncate");
   });
 
   // A review (2026-09-23): the rename Input kept the old fixed

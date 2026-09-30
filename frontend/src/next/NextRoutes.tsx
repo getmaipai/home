@@ -16,6 +16,7 @@ import { NextEnginesPage } from "@/next/pages/NextEnginesPage";
 import { NextPerformancePage } from "@/next/pages/NextPerformancePage";
 import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
+import { NextStatusPage } from "@/next/pages/NextStatusPage";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
 import { NextVoicesPage } from "@/next/pages/NextVoicesPage";
 import { NextCommandsPage } from "@/next/pages/NextCommandsPage";
@@ -31,6 +32,7 @@ import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
+import { StatusIndicator } from "@/shell/StatusIndicator";
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -72,6 +74,7 @@ function NextPageHeaderLayout() {
     "/performance": "Performance",
     "/updates": "Updates",
     "/repairs": "Repairs",
+    "/status": "Status",
     "/backups": "Backups",
     "/voices": "Voices",
     "/commands": "Commands",
@@ -173,7 +176,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
         {/* THEME-TOGGLE-01 (2026-09-26): light/dark already lives at
             Settings > Me > Appearance (ui.appearance) - the header's
             own shortcut duplicated it, so it's off here. */}
-        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} />}>
+        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} statusIndicator={<StatusIndicator />} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />
@@ -185,6 +188,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
             <Route path="performance" element={<NextPerformancePage />} />
             <Route path="updates" element={<NextUpdatesPage person={person} />} />
             <Route path="repairs" element={<NextRepairsPage person={person} />} />
+            <Route path="status" element={<NextStatusPage person={person} />} />
             <Route path="backups" element={<NextBackupsPage person={person} />} />
             <Route path="voices" element={<NextVoicesPage person={person} />} />
             <Route path="commands" element={<NextCommandsPage person={person} />} />

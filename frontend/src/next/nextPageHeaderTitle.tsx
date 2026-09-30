@@ -34,6 +34,7 @@ import { PrivacyIcon } from "@/next/pages/NextPrivacyPage";
 import { UsersIcon } from "@/next/pages/NextUsersPage";
 import { ModelsIcon } from "@/next/pages/NextModelsPage";
 import { FilesIcon } from "@/next/pages/NextFilesPage";
+import { StatusIcon } from "@/next/pages/NextStatusPage";
 
 interface PageHeaderEntry {
   icon: Icon;
@@ -53,6 +54,7 @@ for (const group of SidebarContent) {
 const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/settings": { icon: SettingsIcon, label: "Settings" },
   "/storage": { icon: StorageIcon, label: "Storage" },
+  "/status": { icon: StatusIcon, label: "Status" },
   "/engines": { icon: EnginesIcon, label: "Engines" },
   "/performance": { icon: PerformanceIcon, label: "Performance" },
   "/updates": { icon: UpdatesIcon, label: "Updates" },

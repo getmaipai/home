@@ -160,7 +160,7 @@ export function ChatHeaderBar() {
   const title = data.title || "New Chat";
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1">
+    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
       <ChatIcon className="text-muted-foreground size-4 shrink-0" />
       {renaming ? (
         <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />
@@ -181,10 +181,10 @@ export function ChatHeaderBar() {
           <Button
             type="button"
             variant="ghost"
-            className={`h-10 min-w-0 flex-1 justify-start truncate px-2 text-base font-medium ${hitArea(1)}`}
+            className={`h-10 min-w-12 flex-1 justify-start px-2 text-base font-medium ${hitArea(1)}`}
             onClick={() => setRenaming(true)}
           >
-            {title}
+            <span className="min-w-0 truncate">{title}</span>
           </Button>
           <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>

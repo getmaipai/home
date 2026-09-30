@@ -47,7 +47,7 @@ function engineState(engine: EngineHealthEntry): { label: string; variant: "seco
   return { label: "Starts when needed", variant: "outline" };
 }
 
-const ENGINE_ROWS: Array<{ key: keyof HealthStatus["engines"]; label: string; hint: string }> = [
+export const ENGINE_ROWS: Array<{ key: keyof HealthStatus["engines"]; label: string; hint: string }> = [
   { key: "chat", label: "Brain", hint: "Answers your conversations." },
   { key: "embed", label: "Understanding", hint: "Matches what you say to skills and memories." },
   { key: "background", label: "Memory", hint: "Keeps household memories up to date." },

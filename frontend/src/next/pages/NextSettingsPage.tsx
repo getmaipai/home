@@ -123,6 +123,14 @@ export function NextSettingsPage({ person }: { person: Roster }) {
           </CardHeader>
         </Card>
       </Link>
+      <Link to="/status" className="block">
+        <Card className="py-4 transition-colors hover:bg-accent">
+          <CardHeader>
+            <CardTitle>Status</CardTitle>
+            <CardDescription>See whether the parts of MaiPai are working.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Link>
       {/* Privacy explains data flows for every signed-in person. Keep it
           outside both role tabs, like Storage, so the link is always visible. */}
       <Link to="/privacy" className="block">

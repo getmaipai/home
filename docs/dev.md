@@ -31,6 +31,28 @@ The component and its buttons were therefore invisible. The AI models page
 admins. Before briefing UI work, grep that the target component is rendered
 by a route.
 
+## STATUS-A2a
+
+The UI kit pin moved to `ui-v0.5.82`, which adds the header's status slot and
+the shared Status badge. The home shell puts a small status dot and label in
+the header before the notification bell. It links to `/status` and uses the
+shared `health` query, so the page and dot read the same `/api/health` result.
+
+`statusSummary()` uses `chatAvailability()` for all four parts. Any part that
+is unavailable makes the dot offline. A part that is starting, or Search or
+Library reporting unhealthy or crashed, makes it degraded. Missing health
+data, including a failed request, stays online so a failed health call never
+turns the dot red. The labels for the four parts come from `HealthSection`'s
+single exported list. The sidecar ids `searxng` and `kiwix-serve` display as
+Search and Library.
+
+The signed-in `/status` page shows the overall state and reuses the existing
+`HealthSection`. Owners and admins get its four Restart controls. Other
+members see the same health rows without controls. Settings links to Status
+for everyone. The controls were removed from `/models`; that page now keeps
+the chat model picker only. History, notes, maintenance, and the Search,
+Library, and hub rows are later slices.
+
 ## ENGINE-AVAIL-02 (first half)
 
 `beginTurn()` in `backend/src/lib/turnMachine/turnNext.ts` refuses a turn before resolving or creating a conversation when the locally supervised chat AI is stopped, blocked by a foreign process on its port, or has exhausted automatic restarts. The synchronous check runs before any tool or turn storage, so the failure returns as a 503 status instead of being saved as assistant reply text. Explicit `MAIPAI_LLAMA_SERVER_URL` and configured Stack routes skip the local check, while an engine that has not started remains eligible to start on demand. The chat adapter shows “MaiPai's AI isn't running right now. Try again in a moment.” A blocked-port refusal checks whether the recorded process still exists and clears the stale marker if it has exited. Each refusal also nudges a background supervisor retry, throttled to once every 30 seconds, unless an admin intentionally stopped the engine.

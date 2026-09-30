@@ -5,6 +5,7 @@ import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
 import { NextRoutes } from "@/next/NextRoutes";
+import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { Roster } from "@/lib/api";
 
@@ -32,6 +33,19 @@ function makePerson(): Roster {
     hlc: "1788000000000:0:test",
     hasSecret: true,
   };
+}
+
+function healthResponse() {
+  return Response.json({
+    brain: "selection", voice: "spawned", ok: true, uptimeSeconds: 60,
+    engines: {
+      chat: { kind: "selection", pid: null, alive: true },
+      embed: { kind: "spawned", pid: null, alive: true },
+      background: { kind: "spawned", pid: null, alive: true },
+      voice: { kind: "spawned", pid: null, alive: true },
+    },
+    sidecars: [],
+  });
 }
 
 // HOME-UI-04d's own acceptance: the class on <html> follows
@@ -141,6 +155,36 @@ describe("NextRoutes appearance", () => {
   });
 });
 
+describe("NextRoutes status indicator", () => {
+  test.each(["/", "/chat"])("shows the shared status link on %s", async (path) => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health")) return Promise.resolve(healthResponse());
+      if (url.includes("/api/settings")) return Promise.resolve(Response.json([
+        { scope: "person:person-abc123", key: "ui.appearance", value: "dark" },
+        { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
+      ]));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/dashboard")) return Promise.resolve(Response.json({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(
+        <TooltipProvider>
+          <MemoryRouter initialEntries={[path]}>
+            <Routes><Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} /></Routes>
+          </MemoryRouter>
+        </TooltipProvider>,
+      );
+      const statusLink = await view.findByRole("link", { name: /All good/ });
+      expect(statusLink.getAttribute("href")).toBe("/status");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 // SHELL-FLAG-01's third redirect: signing in at /next/sign-in lands on
 // /next. Already-working behavior (NextRoutesInner's own `path="sign-in"`
 // route, above, redirects an authenticated visit there), proven here
@@ -154,6 +198,8 @@ describe("NextRoutes sign-in redirect", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health")) return Promise.resolve(healthResponse());
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/settings")) {
         return Promise.resolve(
           Response.json([
@@ -180,11 +226,13 @@ describe("NextRoutes sign-in redirect", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(
-        <MemoryRouter initialEntries={["/sign-in"]}>
-          <Routes>
-            <Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
-          </Routes>
-        </MemoryRouter>,
+        <TooltipProvider>
+          <MemoryRouter initialEntries={["/sign-in"]}>
+            <Routes>
+              <Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
+            </Routes>
+          </MemoryRouter>
+        </TooltipProvider>,
       );
       // The dashboard's own heading proves the redirect reached the
       // root route; the sign-in form's field proves it left the PIN
@@ -225,6 +273,7 @@ describe("NextRoutes retired Tools paths", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health")) return Promise.resolve(healthResponse());
       if (url.includes("/api/settings")) {
         return Promise.resolve(Response.json([
           { scope: "person:person-abc123", key: "ui.appearance", value: "dark" },
@@ -234,11 +283,13 @@ describe("NextRoutes retired Tools paths", () => {
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     const view = renderWithQueryClient(
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
-        </Routes>
-      </MemoryRouter>,
+      <TooltipProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>,
     );
     return { view, restore: () => { globalThis.fetch = originalFetch; } };
   }

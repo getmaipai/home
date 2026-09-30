@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
-import { HealthSection } from "@/apps/settings/HealthSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -20,12 +19,7 @@ export function NextModelsPage({ person }: { person: Roster }) {
         </CardTitle>
       </CardHeader>
       {canManage ? (
-        <>
-          <ModelsSection />
-          <div className="[&>section>div>div>div]:flex-wrap [&>section>div>div>div>span:last-child]:flex-wrap">
-            <HealthSection person={person} />
-          </div>
-        </>
+        <ModelsSection />
       ) : (
         <Card>
           <CardContent className="p-6">

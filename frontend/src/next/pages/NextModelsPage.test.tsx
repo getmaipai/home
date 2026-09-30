@@ -43,7 +43,7 @@ describe("NextModelsPage", () => {
     }
   });
 
-  test("an admin sees the real ModelsSection and detected hardware", async () => {
+  test("an admin sees ModelsSection and detected hardware without the health controls", async () => {
     const originalFetch = globalThis.fetch;
     const fetchMock = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -75,12 +75,9 @@ describe("NextModelsPage", () => {
       const view = renderWithQueryClient(<NextModelsPage person={makePerson("admin")} />);
       await waitFor(() => expect(view.getByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy());
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/host/hardware"), expect.anything());
-      await waitFor(() => {
-        for (const label of ["Brain", "Understanding", "Memory", "Voice"]) {
-          expect(view.getByText(label)).toBeTruthy();
-        }
-        expect(view.getAllByRole("button", { name: "Restart" })).toHaveLength(4);
-      });
+      expect(view.getByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy();
+      expect(view.queryByText("Brain")).toBeNull();
+      expect(view.queryByRole("button", { name: "Restart" })).toBeNull();
       expect(view.getByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy();
     } finally {
       globalThis.fetch = originalFetch;

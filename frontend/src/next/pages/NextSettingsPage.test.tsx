@@ -84,6 +84,25 @@ function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string
 }
 
 describe("NextSettingsPage", () => {
+  test.each(["owner", "child"] as const)("the %s can reach the shared Status page", async (role) => {
+    const { restore } = mockSettingsFetch([], { household: [], "person:person-abc123": [] });
+    try {
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextSettingsPage person={makePerson({ role })} />
+        </MemoryRouter>,
+      );
+      const link = await waitFor(() => {
+        const found = Array.from(document.querySelectorAll("a")).find((anchor) => anchor.textContent?.includes("Status"));
+        expect(found).toBeDefined();
+        return found as HTMLAnchorElement;
+      });
+      expect(link.getAttribute("href")).toBe("/status");
+    } finally {
+      restore();
+    }
+  });
+
   test("an adult's composer and This device settings control write the same wake-word value", async () => {
     const wakeword = makeKey({ key: "voice.wakeword.enabled", scope: "device", selector: "boolean", default: false, label: "Wake word listening", lives_in: "device.voice" });
     localStorage.setItem("maipai.device-settings-id.v1", "browser-1234567890ab");
