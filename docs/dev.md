@@ -34872,6 +34872,10 @@ shows affected rows as "Under maintenance" and removes those parts from
 the displayed outage summary. A separate outage still takes priority.
 This is display behavior only. B3 will suppress alarm notifications.
 
+## STATUS-B3: planned maintenance does not page anyone
+
+An error from a mapped component raised during an in-progress maintenance window stays visible in Repairs, but its `repairs.new` notification and any configured `repairs.still_open` reminder wait until the latest matching window ends. At that point the issue row is re-read; an unresolved, undismissed issue is announced once, and its reminder timer starts then. Resolving or dismissing the issue during the window clears the deferred check and sends no notification. If the window is cancelled after suppression begins, the check still runs at the original scheduled end time. This keeps the real problem visible while maintenance quiets alarms without swallowing an outage that outlasts the window.
+
 The headless review mode is `bun run screenshots --status-b2b-review`.
 It seeds an isolated screenshot backend through the real status routes
 and writes owner and child captures at 1440 and 390 pixels in light and

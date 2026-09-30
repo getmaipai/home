@@ -14,15 +14,32 @@ import {
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
 import { people } from "@/db/schema";
+import { notificationDeliveries } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
+import { createMaintenance, cancelMaintenance } from "@/lib/statusBoard";
+let activeTestWindowId: string | undefined;
 
 beforeEach(() => {
   resetDb();
   __resetFixHandlersForTests();
   __resetReminderTimersForTests();
   __setReminderTimingForTests(200);
+  activeTestWindowId = undefined;
 });
+
+async function startMaintenance(components: string[], durationMs = 200): Promise<void> {
+  const now = Date.now();
+  const actor = { id: "person-owner0001", displayName: "Sage" };
+  const window = createMaintenance(actor, { title: "Service", components, startsAt: new Date(now - 20).toISOString(), endsAt: new Date(now + durationMs).toISOString() });
+  if (durationMs === 40) activeTestWindowId = window.id;
+}
+
+function notificationCount(typeId: string): number {
+  return db.select().from(notificationDeliveries).all().filter((row) => row.typeId === typeId).length;
+}
+
+async function waitForDeferred(): Promise<void> { await new Promise((resolve) => setTimeout(resolve, 260)); }
 
 async function waitForReminder(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 260));
@@ -36,6 +53,58 @@ async function owner(): Promise<PersonRow> {
 }
 
 describe("raiseIssue()", () => {
+  test("maps issue sources to status components", async () => {
+    const { componentForIssueSource } = await import("@/lib/statusBoard");
+    expect(["chat-engine", "embed-engine", "background-engine", "tts-engine", "sidecar:kiwix-serve", "websearch", "sidecar:other"]
+      .map(componentForIssueSource)).toEqual(["chat", "embed", "background", "voice", "library", null, null]);
+  });
+
+  test("suppresses chat during chat maintenance while keeping the row", async () => {
+    await owner();
+    await startMaintenance(["chat"]);
+    const suppressed = await raiseIssue({ source: "chat-engine", key: "spawn", severity: "error", title: "Chat down", detail: "d" });
+    expect(suppressed.id).toBeTruthy();
+    expect(listIssues()).toHaveLength(1);
+    expect(notificationCount("repairs.new")).toBe(0);
+  });
+
+  test("notifies after a window is over and defers an ongoing issue until its end", async () => {
+    await owner();
+    await startMaintenance(["chat"], 40);
+    __setReminderTimingForTests(45);
+    await raiseIssue({ source: "chat-engine", key: "ongoing", severity: "error", title: "Ongoing", detail: "d", remindAfterMs: 200 });
+    await raiseIssue({ source: "chat-engine", key: "ongoing", severity: "error", title: "Ongoing again", detail: "d2", remindAfterMs: 200 });
+    expect(notificationCount("repairs.new")).toBe(0);
+    cancelMaintenance({ id: "person-owner0001", displayName: "Sage" }, activeTestWindowId!);
+    await waitForDeferred();
+    expect(notificationCount("repairs.new")).toBe(1);
+    await waitForDeferred();
+    expect(notificationCount("repairs.still_open")).toBe(1);
+    const past = new Date(Date.now() - 1000);
+    createMaintenance({ id: "person-owner0001", displayName: "Sage" }, { title: "Past", components: ["chat"], startsAt: new Date(Date.now() - 2000).toISOString(), endsAt: past.toISOString() }, new Date(Date.now() - 2000));
+    await raiseIssue({ source: "chat-engine", key: "after", severity: "error", title: "After", detail: "d" });
+    expect(notificationCount("repairs.new")).toBe(2);
+  });
+
+  test("clears suppressed notification on resolve and dismissal", async () => {
+    await owner();
+    await startMaintenance(["chat"]);
+    await raiseIssue({ source: "chat-engine", key: "resolved", severity: "error", title: "Resolved", detail: "d" });
+    resolveIssue("chat-engine", "resolved");
+    await raiseIssue({ source: "chat-engine", key: "dismissed", severity: "error", title: "Dismissed", detail: "d" });
+    dismissIssue(listIssues()[0]!.id);
+    await waitForDeferred();
+    expect(notificationCount("repairs.new")).toBe(0);
+    expect(notificationCount("repairs.resolved")).toBe(0);
+  });
+
+  test("suppresses the library sidecar only when its library component is maintained", async () => {
+    await owner();
+    await startMaintenance(["library"]);
+    await raiseIssue({ source: "sidecar:kiwix-serve", key: "died", severity: "error", title: "Library down", detail: "d" });
+    await raiseIssue({ source: "sidecar:other", key: "died", severity: "error", title: "Other down", detail: "d" });
+    expect(notificationCount("repairs.new")).toBe(1);
+  });
   test("creates a new open issue, wire-shaped like the spec (snake_case)", async () => {
     const issue = await raiseIssue({
       source: "backup",

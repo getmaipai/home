@@ -95,3 +95,22 @@ export function activeMaintenanceComponents(now: Date = new Date()): Set<string>
   const active = listMaintenance(now).filter((row) => row.status === "in_progress");
   return new Set(active.flatMap((row) => row.components));
 }
+
+export function componentForIssueSource(source: string): string | null {
+  const components: Record<string, string> = {
+    "chat-engine": "chat",
+    "embed-engine": "embed",
+    "background-engine": "background",
+    "tts-engine": "voice",
+    "sidecar:kiwix-serve": "library",
+  };
+  return components[source] ?? null;
+}
+
+export function maintenanceEndsAt(component: string, now: Date = new Date()): string | null {
+  const ends = listMaintenance(now)
+    .filter((row) => row.status === "in_progress" && (row.components as string[]).includes(component))
+    .map((row) => row.ends_at)
+    .sort((a, b) => Date.parse(b) - Date.parse(a));
+  return ends[0] ?? null;
+}

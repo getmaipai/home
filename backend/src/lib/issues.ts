@@ -19,6 +19,7 @@ import { trigger } from "@/lib/notifications";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { Issue } from "@maipai/spec/gen/ts/issue.js";
+import { componentForIssueSource, maintenanceEndsAt } from "@/lib/statusBoard";
 
 export type IssueSeverity = Issue["severity"];
 export type IssueFix = NonNullable<Issue["fix"]>;
@@ -63,6 +64,9 @@ export interface RaiseIssueInput {
 const reminderTimers = hotReloadState<Map<string, ReturnType<typeof setTimeout>>>("issueReminderTimers", () => new Map());
 let reminderTimingOverride: number | undefined;
 const reminderTimerKey = (source: string, key: string): string => `${source}/${key}`;
+type SuppressedIssue = { timer: ReturnType<typeof setTimeout>; remindAfterMs?: number };
+const suppressedIssues = hotReloadState<Map<string, SuppressedIssue>>("issueMaintenanceTimers", () => new Map());
+let maintenanceNowOverride: (() => Date) | undefined;
 
 function clearReminderTimer(source: string, key: string): void {
   const timerKey = reminderTimerKey(source, key);
@@ -71,12 +75,58 @@ function clearReminderTimer(source: string, key: string): void {
   reminderTimers.delete(timerKey);
 }
 
+function clearSuppressedIssue(source: string, key: string): boolean {
+  const timerKey = reminderTimerKey(source, key);
+  const entry = suppressedIssues.get(timerKey);
+  if (!entry) return false;
+  clearTimeout(entry.timer);
+  suppressedIssues.delete(timerKey);
+  return true;
+}
+
+function startReminderTimer(source: string, key: string, remindAfterMs: number): void {
+  clearReminderTimer(source, key);
+  const timerKey = reminderTimerKey(source, key);
+  const timer = setTimeout(() => {
+    if (reminderTimers.get(timerKey) !== timer) return;
+    reminderTimers.delete(timerKey);
+    const current = findRow(source, key);
+    if (!current || current.resolvedAt || current.dismissedAt) return;
+    trackBackgroundWork(
+      trigger("repairs.still_open", { title: current.title }).catch((err) => {
+        console.error(`[issues] repairs.still_open notification failed for ${source}/${key}: ${(err as Error).message}`);
+      }),
+    );
+  }, reminderTimingOverride ?? remindAfterMs);
+  reminderTimers.set(timerKey, timer);
+}
+
+function deferMaintenanceNotification(source: string, key: string, endsAt: string, remindAfterMs?: number): void {
+  const timerKey = reminderTimerKey(source, key);
+  clearSuppressedIssue(source, key);
+  const delay = Math.max(0, Date.parse(endsAt) - (maintenanceNowOverride?.().getTime() ?? Date.now()));
+  const timer = setTimeout(async () => {
+    const entry = suppressedIssues.get(timerKey);
+    if (!entry || entry.timer !== timer) return;
+    suppressedIssues.delete(timerKey);
+    const current = findRow(source, key);
+    if (!current || current.resolvedAt || current.dismissedAt) return;
+    await trigger("repairs.new", { title: current.title });
+    if (entry.remindAfterMs !== undefined) startReminderTimer(source, key, entry.remindAfterMs);
+  }, reminderTimingOverride ?? delay);
+  suppressedIssues.set(timerKey, { timer, remindAfterMs });
+}
+
 export function __setReminderTimingForTests(ms: number): void { reminderTimingOverride = ms; }
 export function __resetReminderTimersForTests(): void {
   for (const timer of reminderTimers.values()) clearTimeout(timer);
   reminderTimers.clear();
+  for (const entry of suppressedIssues.values()) clearTimeout(entry.timer);
+  suppressedIssues.clear();
   reminderTimingOverride = undefined;
+  maintenanceNowOverride = undefined;
 }
+export function __setMaintenanceNowForTests(now: () => Date): void { maintenanceNowOverride = now; }
 
 function findRow(source: string, key: string): IssueRow | undefined {
   return db.select().from(issues).where(and(eq(issues.source, source), eq(issues.key, key))).get();
@@ -148,22 +198,20 @@ export async function raiseIssue(input: RaiseIssueInput): Promise<Issue> {
   }
 
   if (isNewOpenError) {
-    await trigger("repairs.new", { title: input.title });
-    if (input.remindAfterMs !== undefined) {
-      clearReminderTimer(input.source, input.key);
-      const timerKey = reminderTimerKey(input.source, input.key);
-      const timer = setTimeout(async () => {
-        if (reminderTimers.get(timerKey) !== timer) return;
-        reminderTimers.delete(timerKey);
-        const current = findRow(input.source, input.key);
-        if (!current || current.resolvedAt || current.dismissedAt) return;
-        trackBackgroundWork(
-          trigger("repairs.still_open", { title: current.title }).catch((err) => {
-            console.error(`[issues] repairs.still_open notification failed for ${input.source}/${input.key}: ${(err as Error).message}`);
-          }),
-        );
-      }, reminderTimingOverride ?? input.remindAfterMs);
-      reminderTimers.set(timerKey, timer);
+    const component = componentForIssueSource(input.source);
+    const endsAt = component ? maintenanceEndsAt(component, maintenanceNowOverride?.() ?? new Date()) : null;
+    if (endsAt) {
+      deferMaintenanceNotification(input.source, input.key, endsAt, input.remindAfterMs);
+    } else {
+      clearSuppressedIssue(input.source, input.key);
+      await trigger("repairs.new", { title: input.title });
+      if (input.remindAfterMs !== undefined) startReminderTimer(input.source, input.key, input.remindAfterMs);
+    }
+  } else if (input.severity === "error" && !wasGenuinelyResolved && !existing?.dismissedAt) {
+    const component = componentForIssueSource(input.source);
+    const endsAt = component ? maintenanceEndsAt(component, maintenanceNowOverride?.() ?? new Date()) : null;
+    if (endsAt && !suppressedIssues.has(reminderTimerKey(input.source, input.key))) {
+      deferMaintenanceNotification(input.source, input.key, endsAt, input.remindAfterMs);
     }
   }
 
@@ -191,6 +239,7 @@ export async function raiseIssue(input: RaiseIssueInput): Promise<Issue> {
  * place. */
 export function resolveIssue(source: string, key: string): void {
   clearReminderTimer(source, key);
+  const wasSuppressed = clearSuppressedIssue(source, key);
   const existing = findRow(source, key);
   if (!existing || existing.resolvedAt) return;
   const wasOpenError = existing.severity === "error" && !existing.dismissedAt;
@@ -198,7 +247,7 @@ export function resolveIssue(source: string, key: string): void {
     .set({ resolvedAt: new Date().toISOString(), dismissedAt: null, hlc: nextHlc() })
     .where(eq(issues.id, existing.id))
     .run();
-  if (wasOpenError) {
+  if (wasOpenError && !wasSuppressed) {
     // trackBackgroundWork (a review, 2026-09-24): the identical shape
     // notifications.ts's own notifyIfFlagged() already uses for its own
     // detached trigger() call, so a test's global afterEach can drain
@@ -291,6 +340,7 @@ export function dismissIssue(id: string): IssueOpResult<{ id: string }, 404> {
   if (!row) return { ok: false, status: 404, error: `no issue ${id}` };
   if (!row.dismissedAt) {
     clearReminderTimer(row.source, row.key);
+    clearSuppressedIssue(row.source, row.key);
     db.update(issues)
       .set({ dismissedAt: new Date().toISOString(), hlc: nextHlc() })
       .where(eq(issues.id, id))
