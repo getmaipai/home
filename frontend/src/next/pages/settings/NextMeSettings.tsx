@@ -4,11 +4,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/dashboa
 import { NativeSelect, NativeSelectOption } from "@maipai/ui/src/dashboard/components/ui/native-select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
-import { api, isOwnerOrAdminRole, type Roster } from "@/lib/api";
-import { ROLE_LABELS } from "@/apps/people/roles";
+import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
+import { ProfileForm } from "@/apps/people/ProfileForm";
+import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { useQueryClient } from "@tanstack/react-query";
 
 const telegramNotificationKeys = ["notifications.telegram.chat_id", ...["approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available", "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated", "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available"].map((key) => `notifications.${key}.telegram`)];
 
@@ -26,7 +26,8 @@ function validSection(value: string | null, isAdmin: boolean): SectionId | "limi
   return isAdmin && value === "limits" ? "limits" : "profile";
 }
 
-export function NextMeSettings({ person }: { person: Roster }) {
+export function NextMeSettings({ person, onPersonChange = () => {} }: { person: Roster; onPersonChange?: () => void | Promise<void> }) {
+  const queryClient = useQueryClient();
   const isAdmin = isOwnerOrAdminRole(person.role);
   const [params, setParams] = useSearchParams();
   const [section, setSection] = useState<SectionId | "limits">(() => validSection(params.get("section"), isAdmin));
@@ -60,11 +61,11 @@ export function NextMeSettings({ person }: { person: Roster }) {
         <div className="min-w-0 w-full max-w-3xl flex-1">
           {sections.map((item) => <TabsContent key={item.id} value={item.id} className="mt-0 flex flex-col gap-5">
             <header className="flex flex-col gap-1"><h2 className="text-xl font-semibold">{item.title}</h2><p className="text-sm text-muted-foreground">{item.description}</p></header>
-            {item.id === "profile" ? <ProfileCard person={person} /> : null}
+            {item.id === "profile" ? <><ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} /><FaceEnrollmentCard profile={person} viewer={person} /></> : null}
             {item.id === "appearance" ? <>
               <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.appearance", "ui.look"]} />
               <Collapsible>
-                <Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Advanced<span aria-hidden>⌄</span></CollapsibleTrigger></CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.enrollment_sounds", "ui.show_turn_stats"]} /></CardContent></CollapsibleContent></Card>
+                <Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Advanced<span aria-hidden>⌄</span></CollapsibleTrigger></CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.show_turn_stats"]} /></CardContent></CollapsibleContent></Card>
               </Collapsible>
             </> : null}
             {item.id === "voice-ai" ? <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.persona", "person.voice", "person.search"]} /><ManagementLinks links={["Voices", "Commands"]} /></> : null}
@@ -80,10 +81,6 @@ export function NextMeSettings({ person }: { person: Roster }) {
       </Tabs>
     </div>
   );
-}
-
-function ProfileCard({ person }: { person: Roster }) {
-  return <Card><CardHeader><CardTitle>Your profile</CardTitle><CardDescription>Your household role and profile photo.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-center gap-4"><Avatar name={person.display_name} seed={person.avatar_seed} className="size-16" /><div className="min-w-0 flex-1"><p className="font-medium">{person.display_name}</p><p className="text-sm text-muted-foreground">{ROLE_LABELS[person.role]}</p></div><Link to={`/people/${person.id}`}><Button type="button" variant="outline" className="min-h-12">Edit profile</Button></Link></CardContent></Card>;
 }
 
 function NotificationSettings({ person }: { person: Roster }) {

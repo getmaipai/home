@@ -59,6 +59,7 @@ function mockSettingsFetch(registry: SettingsKey[], valuesByScope: Record<string
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/api/voice/wakewords")) return Promise.resolve(Response.json({ detectors: [], installed: true }));
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
+    if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/settings?scope=")) {
       const scope = decodeURIComponent(url.split("scope=")[1] ?? "");
       return Promise.resolve(Response.json(valuesByScope[scope] ?? []));
@@ -153,13 +154,22 @@ describe("NextSettingsPage", () => {
     } finally { restore(); }
   });
 
-  // FACE-02N: the enrollment-sounds toggle is drawn by the generic
-  // renderer from its registry declaration alone (no hand-built control),
-  // on by default, and writes to the person's own scope.
-  test("ui.enrollment_sounds is under Appearance advanced settings and writes false", async () => {
+  // SETTINGS-S3 keeps enrollment sounds on the face card's shared settings path.
+  test("ui.enrollment_sounds is on the Profile face card and writes false", async () => {
     const sounds = makeKey({ key: "ui.enrollment_sounds", scope: "person", selector: "boolean", default: true, label: "Enrollment sounds", level: "basic", lives_in: "profile.appearance" });
-    const { restore, puts } = mockSettingsFetch([sounds], { household: [], "person:person-abc123": [makeValue(sounds, true)] });
+    const stats = makeKey({ key: "ui.show_turn_stats", scope: "person", selector: "boolean", default: true, label: "Show reply stats", level: "advanced", lives_in: "profile.appearance" });
+    const { restore, puts } = mockSettingsFetch([sounds, stats], { household: [], "person:person-abc123": [makeValue(sounds, true), makeValue(stats, true)] });
     try {
+      const prints = Promise.resolve(Response.json([]));
+      const previous = globalThis.fetch;
+      globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/api/biometric-prints")) return prints;
+        if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([sounds, stats]));
+        if (url.includes("/api/settings?scope=")) return Promise.resolve(Response.json([makeValue(sounds, true), makeValue(stats, true)]));
+        if (url.includes("/api/settings") && init?.method === "PUT") { const body = JSON.parse(String(init.body)); puts.push(body); return Promise.resolve(Response.json(makeValue(sounds, body.value))); }
+        return Promise.resolve(Response.json([]));
+      }) as unknown as typeof fetch;
       renderWithQueryClient(
         <MemoryRouter>
           <NextSettingsPage person={makePerson()} />
@@ -171,18 +181,15 @@ describe("NextSettingsPage", () => {
         return found as HTMLElement;
       });
       fireEvent.click(meTab);
-      const appearanceTab = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Appearance") as HTMLElement);
-      fireEvent.click(appearanceTab);
-      const advancedTrigger = await waitFor(() => Array.from(document.querySelectorAll('[data-slot="collapsible-trigger"]')).find((el) => el.textContent?.includes("Advanced")) as HTMLElement);
-      fireEvent.click(advancedTrigger);
-      const toggle = await waitFor(() => {
-        const found = document.querySelector('[role="switch"]');
-        expect(found).not.toBeNull();
-        return found as HTMLElement;
-      });
+      const toggle = await waitFor(() => { const found = document.querySelector('[role="switch"][aria-label="Enrollment sounds"]'); expect(found).not.toBeNull(); return found as HTMLElement; });
       expect(toggle.getAttribute("aria-checked")).toBe("true");
       fireEvent.click(toggle);
       await waitFor(() => expect(puts).toContainEqual({ scope: "person:person-abc123", key: "ui.enrollment_sounds", value: false }));
+      fireEvent.click(await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Appearance") as HTMLElement));
+      fireEvent.click(await waitFor(() => Array.from(document.querySelectorAll('[data-slot="collapsible-trigger"]')).find((el) => el.textContent?.includes("Advanced")) as HTMLElement));
+      await waitFor(() => expect(document.body.textContent).toContain("Show reply stats"));
+      expect(document.body.textContent).not.toContain("Enrollment sounds");
+      globalThis.fetch = previous;
     } finally {
       restore();
     }

@@ -13,7 +13,8 @@ Settings > Me now has Profile, Appearance, Voice and AI, Notifications, Privacy 
 | Previous group | New section |
 |---|---|
 | `profile.appearance` (`ui.appearance`, `ui.look`) | Appearance |
-| `profile.appearance` (`ui.enrollment_sounds`, `ui.show_turn_stats`) | Appearance, under Advanced |
+| `profile.appearance` (`ui.show_turn_stats`) | Appearance, under Advanced |
+| `ui.enrollment_sounds` | Profile, inside Face recognition |
 | `person.persona`, `person.voice`, `person.search` | Voice and AI |
 | `person.notifications` (`notifications.file_shared.muted_senders`) | Notifications |
 | `person.notifications` (Telegram chat id and 15 Telegram toggles) | Notifications, under Advanced |
@@ -21,6 +22,19 @@ Settings > Me now has Profile, Appearance, Voice and AI, Notifications, Privacy 
 | `person.storage` | Limits, owners and admins only |
 
 The Profile card shows the person's generated photo, name, and role, with Edit profile opening the existing person page. Household's inner layout is unchanged. Status remains available to everyone from Privacy and data.
+
+## SETTINGS-S3
+
+Me > Profile now edits the signed-in person's profile in place with the shared
+`ProfileForm`. Saving refreshes the shell's person record. The same section has
+a Face recognition card with the setup date, an Enroll or Re-enroll link, and
+the enrollment-sounds switch through the existing settings renderer. A child
+sees that an admin must set it up. Appearance > Advanced keeps reply stats.
+
+On a person's own profile page, Edit in Settings and Manage in Settings both
+open Me > Profile. A parent or admin viewing someone else keeps the existing
+Edit dialog and sees that person's Face recognition card. The card reads the
+same `/api/biometric-prints` status used by the former profile section.
 
 ## SETTINGS-S1
 

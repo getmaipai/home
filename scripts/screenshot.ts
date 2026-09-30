@@ -242,6 +242,7 @@ const nextProfileSheetReview = process.argv.includes("--next-profile-sheet-revie
 const nextTableRolloutReview = process.argv.includes("--next-table-rollout-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextSettingsS2Review = process.argv.includes("--next-settings-s2-review");
+const nextSettingsS3Review = process.argv.includes("--next-settings-s3-review");
 const nextLaneA13Review = process.argv.includes("--next-lane-a-13-review");
 const nextPersonalManagementReview = process.argv.includes("--next-personal-management-review");
 const nextPrivacyReview = process.argv.includes("--next-privacy-review");
@@ -3104,6 +3105,51 @@ async function captureNextSettingsS2Review(browser: Browser, ownerSession: strin
   }
 }
 
+async function captureNextSettingsS3Review(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "../home/data-scratch/screens/settings-s3");
+  mkdirSync(outDir, { recursive: true });
+  const response = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
+  if (!response.ok) throw new Error(`SETTINGS-S3: household lookup failed: ${response.status}`);
+  const people = await response.json() as Array<{ id: string; display_name: string; role: string }>;
+  const owner = people.find((p) => p.role === "owner");
+  const child = people.find((p) => p.display_name === "Nova" && p.role === "child");
+  if (!owner || !child) throw new Error("SETTINGS-S3: seeded owner and child Nova are required");
+  const signedIn = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
+  if (!signedIn.ok) throw new Error(`SETTINGS-S3: Nova sign-in failed: ${signedIn.status}`);
+  const childSession = signedIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("SETTINGS-S3: Nova sign-in returned no session");
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      for (const person of [{ name: "owner", id: owner.id, session: ownerSession }, { name: "nova", id: child.id, session: childSession }]) {
+        const context = await newContext(browser, viewport, theme, person.session);
+        try {
+          const page = await context.newPage(); page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          const pageResponse = await page.goto(`${BASE_URL}/settings?tab=me&section=profile`);
+          if (!pageResponse?.ok()) throw new Error(`SETTINGS-S3: ${person.name} settings returned ${pageResponse?.status() ?? "no response"}`);
+          await page.waitForLoadState("networkidle");
+          await page.getByText("Face recognition", { exact: true }).waitFor({ state: "visible" });
+          if (person.name === "nova") await page.getByText("Ask an admin to set this up.", { exact: true }).waitFor({ state: "visible" });
+          const file = join(outDir, `settings-s3-${person.name}-profile-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path: file, fullPage: true }); console.log(`Wrote ${file}`);
+          await page.close();
+        } finally { await context.close(); }
+      }
+      const context = await newContext(browser, viewport, theme, ownerSession);
+      try {
+        const page = await context.newPage(); page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        const pageResponse = await page.goto(`${BASE_URL}/people/${owner.id}`);
+        if (!pageResponse?.ok()) throw new Error(`SETTINGS-S3: owner's profile returned ${pageResponse?.status() ?? "no response"}`);
+        await page.waitForLoadState("networkidle");
+        await page.getByRole("link", { name: "Edit in Settings" }).waitFor({ state: "visible" });
+        const file = join(outDir, `settings-s3-owner-people-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path: file, fullPage: true }); console.log(`Wrote ${file}`);
+        await page.close();
+      } finally { await context.close(); }
+    }
+  }
+}
+
 /** Lane B-13 review: each newly migrated personal management page and
  * Settings > Me at 1440/390 in both themes. Output stays in data-scratch. */
 async function captureNextPersonalManagementReview(browser: Browser, sessionValue: string): Promise<void> {
@@ -4126,6 +4172,11 @@ async function main() {
     if (nextSettingsS2Review) {
       await captureNextSettingsS2Review(browser, sessionValue);
       console.log("completed named review: --next-settings-s2-review");
+      return;
+    }
+    if (nextSettingsS3Review) {
+      await captureNextSettingsS3Review(browser, sessionValue);
+      console.log("completed named review: --next-settings-s3-review");
       return;
     }
     if (shell09DocsMatrixReview) {

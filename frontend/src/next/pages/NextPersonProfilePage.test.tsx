@@ -47,6 +47,7 @@ function stubFetch(byPath: Record<string, unknown>) {
     const url = String(input);
     if (url.includes("/api/people")) return Promise.resolve(Response.json(people));
     if (url.includes("/api/files")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/memory")) {
       const matched = Object.entries(byPath).find(([path]) => path !== "/api/people" && url.includes(path));
       const value = matched?.[1] ?? [];
@@ -128,14 +129,17 @@ describe("NextPersonProfilePage", () => {
     } finally { restore(); }
   });
 
-  test("the owner edit action remains available on self and for a child's profile", async () => {
+  test("self has Settings links while an owner keeps Edit and the enrollment card for someone else", async () => {
     const restore = stubFetch({});
     try {
       const self = renderProfile("/people/person-sage", viewer({ role: "owner" }));
-      expect(await self.findByRole("button", { name: "Edit" })).toBeTruthy();
+      const edit = await self.findByRole("link", { name: "Edit in Settings" });
+      expect(edit.getAttribute("href")).toBe("/settings?tab=me&section=profile");
+      expect(self.getByRole("link", { name: "Manage in Settings" }).getAttribute("href")).toBe("/settings?tab=me&section=profile");
       cleanup();
       const other = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
       expect(await other.findByRole("button", { name: "Edit" })).toBeTruthy();
+      expect(await other.findByText("Face recognition")).toBeTruthy();
       expect(other.getByRole("link", { name: "Manage in Settings" }).getAttribute("href")).toContain("/settings?tab=household");
     } finally { restore(); }
   });

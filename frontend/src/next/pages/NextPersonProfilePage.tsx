@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
@@ -9,10 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/dashboa
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, isOwnerOrAdminRole, type BiometricPrintSummary, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
 import { ACCENT_RING_CLASS, canManagePerson, ROLE_LABELS } from "@/apps/people/roles";
 import { ProfileForm } from "@/apps/people/ProfileForm";
-import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
+import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -76,7 +76,7 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
                 <TabsContent value="overview" className="flex flex-col gap-4 py-2">
                   <p className="text-sm text-muted-foreground">{viewingSelf ? "This is your own profile." : `${profile.display_name}'s profile in this household.`}</p>
                   <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
-                  <FaceEnrollmentSection profile={profile} viewer={person} />
+                  {viewingSelf ? <Link to="/settings?tab=me&section=profile" className="min-h-12 self-start text-sm text-primary underline">Manage in Settings</Link> : <FaceEnrollmentCard profile={profile} viewer={person} viewingSelf={false} />}
                 </TabsContent>
                 {canViewMemories ? (
                   <TabsContent value="memories" className="py-2">
@@ -120,59 +120,6 @@ function SharedMediaSection({ profile, viewingSelf }: { profile: ProfileEntry; v
  * matching `createBiometricPrint`'s. Mirrors the profile-edit dialog's
  * own "Use a real photo" admin-approval-required pattern for
  * `role === "child"` (docs/BACKLOG.md's own FACE-02 entry). */
-function FaceEnrollmentSection({ profile, viewer }: { profile: ProfileEntry; viewer: Roster }) {
-  const navigate = useNavigate();
-  const CheckIcon = getIcon("check");
-  const target = { id: profile.id, role: profile.role };
-  const canView = canManagePerson(viewer.role, viewer.id, target);
-  const canEnroll = canEnrollFace(viewer, target);
-  const query = useQuery<BiometricPrintSummary[]>({
-    queryKey: ["biometric-prints", profile.id],
-    queryFn: () => api.biometricPrints(profile.id),
-    enabled: canView,
-  });
-
-  if (!canView) return null;
-
-  return (
-    <div className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-muted-foreground">Face recognition</h2>
-      <AsyncState
-        data={query.data}
-        error={query.isError}
-        isFetching={query.isFetching}
-        onRetry={() => query.refetch()}
-        errorMessage="Could not load enrollment status."
-        loadingLabel="Loading enrollment status"
-      >
-        {(prints) => (
-          <Card>
-            <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-              <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                {prints.length > 0 ? (
-                  <>
-                    <CheckIcon className="size-4 text-primary" aria-hidden />
-                    {prints.length} face sample{prints.length === 1 ? "" : "s"} enrolled.
-                  </>
-                ) : (
-                  "Not enrolled for face recognition yet."
-                )}
-              </p>
-              {canEnroll ? (
-                <Button type="button" variant="outline" onClick={() => navigate(`/people/${profile.id}/enroll-face`)}>
-                  {prints.length > 0 ? "Re-enroll" : "Enroll"}
-                </Button>
-              ) : profile.role === "child" ? (
-                <p className="text-sm text-muted-foreground">An owner or admin can enroll {profile.display_name} for face recognition.</p>
-              ) : null}
-            </CardContent>
-          </Card>
-        )}
-      </AsyncState>
-    </div>
-  );
-}
-
 function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { profile: ProfileEntry; viewer: Roster; viewingSelf: boolean; onPersonChange: () => void | Promise<void> }) {
   const [editOpen, setEditOpen] = useState(false);
   const canEdit = canManagePerson(viewer.role, viewer.id, { id: profile.id, role: profile.role });
@@ -188,11 +135,11 @@ function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { p
           {profile.bio ? <p className="text-base text-muted-foreground">{profile.bio}</p> : null}
         </div>
         <div className="flex basis-full flex-row items-center justify-end gap-4 sm:w-auto sm:basis-auto sm:flex-col sm:items-end sm:gap-2">
-          {canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="min-h-12 gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
+          {viewingSelf && canEdit ? <Link to="/settings?tab=me&section=profile" className="min-h-12 content-center text-sm text-primary underline">Edit in Settings</Link> : canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="min-h-12 gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
           {showManageLink ? <Link to="/settings?tab=household" className="text-sm text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Manage in Settings</Link> : null}
         </div>
       </CardContent>
-      {canEdit ? <EditProfileDialog profile={profile} open={editOpen} onOpenChange={setEditOpen} onPersonChange={onPersonChange} /> : null}
+      {canEdit && !viewingSelf ? <EditProfileDialog profile={profile} open={editOpen} onOpenChange={setEditOpen} onPersonChange={onPersonChange} /> : null}
     </Card>
   );
 }

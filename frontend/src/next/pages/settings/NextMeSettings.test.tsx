@@ -30,22 +30,27 @@ function setup(role: Roster["role"], initialUrl = "/settings") {
   ];
   const values: ResolvedSetting[] = registry.map((key) => ({ key: key.key, value: key.key === "notifications.telegram.chat_id" ? "chat-123" : key.default ?? "sample", source: "default", label: key.label, help: key.help, level: key.level, secret: key.secret }));
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = mock((input: RequestInfo | URL) => {
+  const patches: unknown[] = [];
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.endsWith(`/api/people/${makePerson(role).id}`) && init?.method === "PATCH") { const body = JSON.parse(String(init.body)); patches.push(body); return Promise.resolve(Response.json({ ...makePerson(role), display_name: body.displayName ?? "Nova" })); }
+    if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.includes("/api/settings?scope=")) return Promise.resolve(Response.json(values));
     return Promise.resolve(Response.json([]));
   }) as unknown as typeof fetch;
   function Location() { const [params] = useSearchParams(); return <output data-testid="section-param">{params.get("section") ?? ""}</output>; }
   const view = renderWithQueryClient(<MemoryRouter initialEntries={[initialUrl]}><NextMeSettings person={makePerson(role)} /><Location /></MemoryRouter>);
-  return { ...view, restore: () => { globalThis.fetch = originalFetch; } };
+  return { ...view, patches, restore: () => { globalThis.fetch = originalFetch; } };
 }
 
 describe("NextMeSettings", () => {
   test("a non-admin sees the five personal sections without limits or admin settings", async () => {
     const { restore } = setup("child");
     try {
-      await waitFor(() => expect(document.body.textContent).toContain("Your profile"));
+      await waitFor(() => expect(document.querySelector("input#profile-display-name")).not.toBeNull());
+      expect((document.querySelector("input#profile-display-name") as HTMLInputElement).value).toBe("Nova");
+      expect(document.body.textContent).toContain("Face recognition");
       for (const name of ["Profile", "Appearance", "Voice and AI", "Notifications", "Privacy and data"]) expect(document.body.textContent).toContain(name);
       expect(document.body.textContent).not.toContain("Limits");
       expect(document.body.textContent).not.toContain("Allowance");
@@ -98,6 +103,21 @@ describe("NextMeSettings", () => {
       const triggers = document.querySelectorAll('[data-slot="collapsible-trigger"]');
       fireEvent.click(triggers[triggers.length - 1]!);
       expect(document.querySelectorAll('[data-slot="switch"]').length).toBeGreaterThan(0);
+    } finally { restore(); }
+  });
+
+  test("profile form saves the person's name and Appearance keeps only reply stats", async () => {
+    const { restore, patches, getByRole, findByRole } = setup("owner");
+    try {
+      const name = document.querySelector("input#profile-display-name") as HTMLInputElement;
+      fireEvent.change(name, { target: { value: "Nova Two" } });
+      fireEvent.click(getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(patches).toContainEqual({ displayName: "Nova Two" }));
+      fireEvent.click(getByRole("tab", { name: "Appearance" }));
+      const advanced = await findByRole("button", { name: /Advanced/ });
+      fireEvent.click(advanced);
+      await waitFor(() => expect(document.body.textContent).toContain("ui.show_turn_stats"));
+      expect(document.body.textContent).not.toContain("Enrollment sounds");
     } finally { restore(); }
   });
 });
