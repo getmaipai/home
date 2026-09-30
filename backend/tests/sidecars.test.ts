@@ -25,6 +25,7 @@ import {
   __setFreePortProcessScanForTests,
   __setFreePortProcessFactsForTests,
   __setFreePortKillForTests,
+  stopBlockedPortHolder,
   killWithIdentityCheck,
 } from "@/lib/sidecars";
 import { listIssues, fixIssue, __resetFixHandlersForTests } from "@/lib/issues";
@@ -794,6 +795,18 @@ async function spawnRealListener(port: number, replyText: string): Promise<Bun.S
 }
 
 describe("freePort", () => {
+  test("blocked-port fix refuses to signal a pid whose identity changed", () => {
+    const port = reserveFreePort();
+    __blockPortForTests(port, 987650);
+    __setFreePortProcessFactsForTests(() => ({ command: "replacement process", startedAtMs: Date.now() }));
+    const kill = spyOn(process, "kill");
+    try {
+      expect(() => stopBlockedPortHolder(port)).toThrow(/has changed/);
+      expect(kill).not.toHaveBeenCalled();
+    } finally {
+      kill.mockRestore();
+    }
+  });
   beforeEach(() => {
     __resetPortOwnershipForTests();
   });
@@ -889,14 +902,14 @@ describe("freePort", () => {
     expect(signals).toHaveLength(0);
   });
 
-  test("keeps the owned pid log wording", async () => {
+  test("logs the owned pid as reaped only after the kill succeeds", async () => {
     const port = reserveFreePort();
     const child = await spawnRealListener(port, "owned wording");
     const error = spyOn(console, "error").mockImplementation(() => {});
     try {
       __recordOwnedPortForTests(port, child.pid);
       await freePort(port);
-      expect(error.mock.calls.some(([line]) => String(line).includes(`killing pid ${child.pid}`) && String(line).includes("an orphan this install spawned previously"))).toBe(true);
+      expect(error.mock.calls.some(([line]) => String(line).includes(`reaped pid ${child.pid}`) && String(line).includes("an orphan this install spawned previously"))).toBe(true);
     } finally {
       error.mockRestore();
       child.kill();

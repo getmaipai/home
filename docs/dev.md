@@ -33711,6 +33711,10 @@ Jesse decided that any non-Home process holding an engine port may be killed wit
 
 The blocked-port Repair test now injects EPERM for its listener, because an ordinary foreign holder is reaped under this policy; this keeps the test focused on the plain Repair sentence and its technical detail when Home cannot remove the holder.
 
+## ENGINE-AVAIL-04d
+
+While chat availability is `unavailable/blocked_port`, the supervisor retries port recovery every 30 seconds. A successful engine start resolves the blocked-port Repair and clears the timer; an explicit stop or restart also clears it. If identity-checked signaling is denied, the Repair offers "Stop it and start MaiPai's AI" and shows the holder pid, command and age. The fix re-reads process facts immediately before signaling and refuses if the pid now names a different process, then starts chat and lets the normal healthy-start path resolve the issue. Non-admins cannot run the Repairs fix route. Port logs say whether the holder was reaped, already gone, changed identity, or could not be reaped.
+
 ## ENGINE-AVAIL-05a (backend)
 
 `POST /api/host/engines/{role}/restart` restarts `chat`, `embed`, `voice`, or `background` for an owner or admin. Chat reuses the existing restart-and-wait flow and returns 503 with an error sentence if it does not become ready within 90 seconds. Embed, voice, and background restart their supervisor and request the lazy client start. At this slice, those supervisors did not track manual-stop state; ENGINE-AVAIL-05b below adds Stop and Start. The existing `POST /api/host/engine/restart` remains available with its existing response.

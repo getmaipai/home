@@ -103,10 +103,40 @@ function ownedPid(port: number): number | null {
  * the moment that same port is later freed or spawned onto
  * successfully - a stale "blocked" reading a caller couldn't reproduce
  * would be its own bug. */
-const blockedPorts = new Map<number, { pid: number; command: string; at: string }>();
+const blockedPorts = new Map<number, { pid: number; command: string; at: string; startedAtMs: number }>();
 
 export function blockedPortReason(port: number): { pid: number; command: string; at: string } | undefined {
-  return blockedPorts.get(port);
+  const holder = blockedPorts.get(port);
+  return holder ? { pid: holder.pid, command: holder.command, at: holder.at } : undefined;
+}
+
+export function blockedPortDetails(port: number): { pid: number; command: string; age: string } | undefined {
+  const holder = blockedPorts.get(port);
+  return holder ? { pid: holder.pid, command: holder.command, age: ageLabel(holder.startedAtMs) } : undefined;
+}
+
+/** Kill a permission-blocked holder only if its process identity still
+ * matches the exact command and start time observed during the port scan. */
+export function stopBlockedPortHolder(port: number): { pid: number; command: string } {
+  const holder = blockedPorts.get(port);
+  if (!holder) throw new Error("The process holding MaiPai's AI port has changed. Check Repairs and try again.");
+  const current = factsForFreePort(holder.pid);
+  if (!current || current.command !== holder.command || current.startedAtMs === null || Math.abs(current.startedAtMs - holder.startedAtMs) > 1_000) {
+    blockedPorts.delete(port);
+    throw new Error("The process holding MaiPai's AI port has changed. It was not stopped. Check Repairs and try again.");
+  }
+  const recheck = factsForFreePort(holder.pid);
+  if (!recheck || recheck.command !== holder.command || recheck.startedAtMs === null || Math.abs(recheck.startedAtMs - holder.startedAtMs) > 1_000) {
+    blockedPorts.delete(port);
+    throw new Error("The process holding MaiPai's AI port has changed. It was not stopped. Check Repairs and try again.");
+  }
+  try {
+    process.kill(holder.pid, "SIGKILL");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+  }
+  blockedPorts.delete(port);
+  return { pid: holder.pid, command: holder.command };
 }
 
 /** True only while the recorded foreign port holder still exists. A dead
@@ -141,7 +171,8 @@ export function __recordOwnedPortForTests(port: number, pid: number, command = "
  * a real listener or process lookup. The turn availability tests use
  * this to exercise the same blocked-port state freePort() records. */
 export function __blockPortForTests(port: number, pid: number): void {
-  blockedPorts.set(port, { pid, command: "test", at: new Date().toISOString() });
+  const facts = factsForFreePort(pid);
+  blockedPorts.set(port, { pid, command: facts?.command ?? "test", at: new Date().toISOString(), startedAtMs: facts?.startedAtMs ?? Date.now() });
 }
 
 /** Test-only: set the same terminal auto-restart state real sidecar
@@ -246,6 +277,7 @@ export class ForeignPortHolderError extends Error {
   constructor(
     public readonly port: number,
     public readonly pid: number,
+    public readonly reason: "still_alive" | "not_permitted" = "still_alive",
   ) {
     super(`port ${port} is held by pid ${pid}, a process this install did not spawn - refusing to kill it`);
     this.name = "ForeignPortHolderError";
@@ -465,17 +497,16 @@ export async function freePort(port: number): Promise<void> {
     if (!snapshot || snapshot.startedAtMs === null) continue;
     const expected = { command: match.command, startedAtMs: snapshot.startedAtMs };
     const result = await killWithIdentityCheck(match.pid, expected);
-    if (owned === match.pid) {
-      console.error(`[sidecars] freePort(${port}): killing pid ${match.pid} (an orphan this install spawned previously: ${match.command})`);
-    } else {
-      console.error(`[sidecars] freePort(${port}): reaped pid ${match.pid} (${ageLabel(expected.startedAtMs)} old, ${match.command}): it held an engine port and is not this install's engine`);
-    }
     attemptedReap = true;
     if (result === "still_alive" || result === "not_permitted") {
-      blockedPorts.set(port, { pid: match.pid, command: match.command, at: new Date().toISOString() });
+      blockedPorts.set(port, { pid: match.pid, command: match.command, at: new Date().toISOString(), startedAtMs: expected.startedAtMs });
+      console.error(`[sidecars] freePort(${port}): could not reap pid ${match.pid} (${ageLabel(expected.startedAtMs)} old, ${match.command}): ${result}`);
       console.error(`[sidecars] port ${port} is held by pid ${match.pid}, not ours: set MAIPAI_LLAMA_SERVER_PORT, MAIPAI_BACKGROUND_PORT and MAIPAI_EMBED_PORT (command: ${match.command})`);
-      throw new ForeignPortHolderError(port, match.pid);
+      throw new ForeignPortHolderError(port, match.pid, result);
     }
+    if (result === "killed") console.error(`[sidecars] freePort(${port}): reaped pid ${match.pid} (${ageLabel(expected.startedAtMs)} old${owned === match.pid ? ", an orphan this install spawned previously" : ""}, ${match.command})`);
+    else if (result === "gone") console.error(`[sidecars] freePort(${port}): holder pid ${match.pid} was already gone (${match.command})`);
+    else if (result === "identity_changed") console.error(`[sidecars] freePort(${port}): holder pid ${match.pid} changed identity; did not signal it (${match.command})`);
   }
   blockedPorts.delete(port);
 

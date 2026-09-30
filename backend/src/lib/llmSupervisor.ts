@@ -39,11 +39,12 @@ import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFla
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
-import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, blockedPortReason, expireStalledStart, cancelEngineRespawn, ForeignPortHolderError, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, blockedPortReason, blockedPortDetails, stopBlockedPortHolder, expireStalledStart, cancelEngineRespawn, ForeignPortHolderError, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
+import { readProcessFacts } from "@/lib/instanceLock";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
-import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import { getStackUrl } from "@/lib/stackEngine";
 
 let lastChatRecoveryNudgeAt = 0;
@@ -141,6 +142,41 @@ const state = hotReloadState<LlmSupervisorState>("llmSupervisor", () => ({
   manuallyStopped: false,
   lastStartFailure: null,
 }));
+
+let blockedPortRetryTimer: ReturnType<typeof setInterval> | null = null;
+let blockedPortRetryMs = 30_000;
+let blockedPortRetryForTests: (() => Promise<void>) | null = null;
+
+function clearBlockedPortRetry(): void {
+  if (blockedPortRetryTimer) clearInterval(blockedPortRetryTimer);
+  blockedPortRetryTimer = null;
+}
+
+function startBlockedPortRetry(port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788)): void {
+  if (blockedPortRetryTimer) return;
+  blockedPortRetryTimer = setInterval(() => {
+    void (async () => {
+      try {
+        if (blockedPortRetryForTests) await blockedPortRetryForTests();
+        else {
+          await freePort(port);
+          await getChatClient();
+        }
+      } catch {
+        return;
+      }
+      clearBlockedPortRetry();
+      resolveIssue("chat-engine", "spawn");
+    })();
+  }, blockedPortRetryMs);
+}
+
+/** Test-only timer/operation seam; production always re-probes the port and starts chat. */
+export function __setBlockedPortRetryForTests(operation: (() => Promise<void>) | null): void {
+  blockedPortRetryForTests = operation;
+}
+export function __setBlockedPortRetryIntervalForTests(ms: number): void { blockedPortRetryMs = ms; }
+export function startBlockedPortRetryForTests(): void { startBlockedPortRetry(); }
 
 /** ROUTE-02: the warm-up carries the ordinary tool block too, so the
  * prefix it primes is the one the first real turn sends (the template
@@ -569,6 +605,7 @@ export async function getChatClient(): Promise<LlamaServerClient> {
         // resourceGovernor's own resolveIssue("resource-governor", "chat")
         // call already has just above.
         resolveIssue("chat-engine", "spawn");
+        clearBlockedPortRetry();
         resolveIssue("chat-engine", "startup_stalled");
         return backend;
       })
@@ -578,6 +615,27 @@ export async function getChatClient(): Promise<LlamaServerClient> {
           state.startingStartedAtMs = null;
           const message = (err as Error).message;
           state.lastStartFailure = /hasn't finished downloading|no longer in the catalog|no llama-server-compatible sizing/.test(message) ? "not_installed" : "failed_start";
+          if (err instanceof ForeignPortHolderError && err.reason === "not_permitted") {
+            const port = err.port;
+            registerFixHandler(`start_chat_after_blocked_port:${port}`, async () => {
+              stopBlockedPortHolder(port);
+              clearBlockedPortRetry();
+              await getChatClient();
+            });
+            const holder = blockedPortDetails(port);
+            void raiseIssue({
+              source: "chat-engine",
+              key: "spawn",
+              severity: "error",
+              title: "MaiPai's AI can't start while another program uses its port",
+              detail: holder
+                ? `MaiPai tried to stop the holder but lacked permission. Process ${holder.pid}: ${holder.command} (running ${holder.age}). Use the fix to stop it and start MaiPai's AI.`
+                : message,
+              fix: { label: "Stop it and start MaiPai's AI", action: `start_chat_after_blocked_port:${port}` },
+              remindAfterMs: 15 * 60_000,
+            });
+            startBlockedPortRetry(port);
+          }
         }
         // Found live 2026-09-07: a genuine chat-engine spawn failure had
         // no Repairs-page visibility at all - only found by a household
@@ -598,7 +656,7 @@ export async function getChatClient(): Promise<LlamaServerClient> {
         // it AFTER the new generation's own resolveIssue() already
         // cleared it, leaving a phantom issue stuck open while the engine
         // is actually running fine.
-        if (myGeneration === state.generation) {
+        if (myGeneration === state.generation && !(err instanceof ForeignPortHolderError && err.reason === "not_permitted")) {
           void raiseIssue({
             source: "chat-engine",
             key: "spawn",
@@ -638,6 +696,7 @@ function expireStalledChatStart(): boolean {
  * this once a fresh download's checksum verifies, right before the
  * select job's own "loading"/"testing" phases exercise the new spawn. */
 export async function restartChatBackend(): Promise<void> {
+  clearBlockedPortRetry();
   cancelEngineRespawn("chat");
   state.manuallyStopped = false;
   state.generation++;
@@ -657,6 +716,7 @@ export async function restartChatBackend(): Promise<void> {
  * a fresh model select, which calls that) runs. Safe to call with nothing
  * running (a stopped stub, or nothing started yet). */
 export async function stopChatBackend(): Promise<void> {
+  clearBlockedPortRetry();
   cancelEngineRespawn("chat");
   state.manuallyStopped = true;
   state.generation++;
@@ -756,6 +816,9 @@ export function getChatLivePid(): number | null {
  * server) and clear the cached client, the same reset-between-test-files
  * shape as resetDb()/__clearSessionCacheForTests. */
 export function __resetLlmSupervisorForTests(): void {
+  clearBlockedPortRetry();
+  blockedPortRetryMs = 30_000;
+  blockedPortRetryForTests = null;
   lastChatRecoveryNudgeAt = 0;
   chatRecoveryNudge = () => {
     void getChatClient().catch(() => {});

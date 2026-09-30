@@ -57,6 +57,14 @@ describe("POST /api/repairs/:id/fix", () => {
     const res = await client.post("/api/repairs/issue-nope/fix");
     expect(res.status).toBe(404);
   });
+
+  test("does not let a teen run an issue fix", async () => {
+    const { client } = await owner();
+    const issue = await raiseIssue({ source: "a", key: "restricted", severity: "error", title: "T", detail: "d", fix: { label: "Fix it", action: "do_it" } });
+    const teenClient = await teen(client);
+    const res = await teenClient.post(`/api/repairs/${issue.id}/fix`);
+    expect(res.status).toBe(403);
+  });
 });
 
 describe("POST /api/repairs/:id/dismiss", () => {

@@ -3,7 +3,8 @@ import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, ge
 import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
-import { listIssues, resolveIssue } from "@/lib/issues";
+import { listIssues, resolveIssue, fixIssue } from "@/lib/issues";
+import { __setBlockedPortRetryForTests, __setBlockedPortRetryIntervalForTests, startBlockedPortRetryForTests } from "@/lib/llmSupervisor";
 import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests, __restartEngineForTests, blockedPortReason, __recordOwnedPortForTests, __setFreePortKillForTests } from "@/lib/sidecars";
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { join } from "node:path";
@@ -116,6 +117,22 @@ describe("llmSupervisor chatEngineDown()", () => {
     } finally {
       child.kill("SIGKILL");
     }
+  });
+
+  test("re-probes a blocked port and resolves the chat Repair once the holder exits", async () => {
+    const port = Number(testChatPort);
+    __setBlockedPortRetryIntervalForTests(20);
+    __blockPortForTests(port, 987654);
+    const issue = await import("@/lib/issues").then(({ raiseIssue }) => raiseIssue({
+      source: "chat-engine", key: "spawn", severity: "error", title: "blocked", detail: "blocked",
+    }));
+    let available = false;
+    __setBlockedPortRetryForTests(async () => {
+      if (available) resolveIssue("chat-engine", "spawn");
+    });
+    startBlockedPortRetryForTests();
+    available = true;
+    await waitForTest(() => listIssues().every((row) => row.id !== issue.id));
   });
 
   test("a blocked port stays down while its recorded holder pid is alive", () => {
@@ -327,8 +344,14 @@ describe("llmSupervisor tier 3: the household's selected chat model", () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       await expect(getChatClient()).rejects.toBeInstanceOf(Error);
       const issue = listIssues().find((i) => i.source === "chat-engine" && i.key === "spawn");
-      expect(issue?.detail).toContain("Another program is using the port MaiPai's AI needs, so it can't start.");
-      expect(issue?.detail).toContain(`(Technical detail: port ${port} is held by pid ${holder.pid}`);
+      expect(issue?.detail).toContain(`Process ${holder.pid}:`);
+      expect(issue?.fix?.label).toBe("Stop it and start MaiPai's AI");
+      delete process.env.MAIPAI_LLAMA_SERVER_BIN;
+      delete process.env.MAIPAI_CHAT_MODEL_PATH;
+      const fixed = await fixIssue(issue!.id);
+      expect(fixed.ok).toBe(true);
+      await holder.exited;
+      expect(getEngineStatus().kind).toBe("stub");
     } finally {
       holder.kill();
       await holder.exited;
