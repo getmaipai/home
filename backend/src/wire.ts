@@ -530,6 +530,8 @@ export interface EngineHealthEntry {
   /** A real probe of the process: true/false when something is supposed
    * to be up, null when there is nothing to probe yet. */
   alive: boolean | null;
+  availability?: "ready" | "starting" | "unavailable";
+  reason?: "stopped" | "crashed" | "blocked_port" | "not_installed" | "failed_start" | null;
 }
 
 export interface HealthStatus {

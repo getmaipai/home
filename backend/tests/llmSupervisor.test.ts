@@ -1,10 +1,10 @@
 import { describe, expect, test, afterEach, beforeEach } from "bun:test";
-import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, getChatEngineIdentity, getChatLivePid, sweepOrphanEngineProcesses, reportChatBackendUnreachable, chatEngineDown, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, getChatEngineIdentity, getChatLivePid, sweepOrphanEngineProcesses, reportChatBackendUnreachable, chatEngineDown, chatAvailabilityState, probeChatEngine, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
 import { listIssues, resolveIssue } from "@/lib/issues";
-import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests, blockedPortReason, __recordOwnedPortForTests, __setFreePortKillForTests } from "@/lib/sidecars";
+import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests, __restartEngineForTests, blockedPortReason, __recordOwnedPortForTests, __setFreePortKillForTests } from "@/lib/sidecars";
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
@@ -14,6 +14,15 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 
 const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
+
+async function waitForTest(check: () => boolean | Promise<boolean>, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await check()) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error("waitForTest() timed out");
+}
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
@@ -61,6 +70,52 @@ describe("llmSupervisor chatEngineDown()", () => {
     __resetSidecarsForTests();
     __failEngineForTests("chat");
     expect(chatEngineDown()).toBe(true);
+  });
+
+  test("derives starting, stopped, crash, blocked port and failed start reasons", () => {
+    const state = (globalThis as typeof globalThis & {
+      __maipai_llmSupervisor?: { startingPromise: Promise<never> | null; startingStartedAtMs: number | null; startupStalled: boolean; manuallyStopped: boolean; lastStartFailure: "not_installed" | "failed_start" | null };
+    }).__maipai_llmSupervisor!;
+    state.startingPromise = new Promise<never>(() => {});
+    state.startingStartedAtMs = Date.now();
+    expect(chatAvailabilityState()).toEqual({ availability: "starting", reason: null });
+    state.startingPromise = null;
+    state.startingStartedAtMs = null;
+    state.manuallyStopped = true;
+    expect(chatAvailabilityState()).toEqual({ availability: "unavailable", reason: "stopped" });
+    state.manuallyStopped = false;
+    __blockPortForTests(Number(testChatPort), process.pid);
+    expect(chatAvailabilityState()).toEqual({ availability: "unavailable", reason: "blocked_port" });
+    __resetSidecarsForTests();
+    __failEngineForTests("chat");
+    expect(chatAvailabilityState()).toEqual({ availability: "unavailable", reason: "failed_start" });
+    state.lastStartFailure = "not_installed";
+    expect(chatAvailabilityState()).toEqual({ availability: "unavailable", reason: "not_installed" });
+  });
+
+  test("maps an auto-restarting engine to the crashed reason", () => {
+    const state = (globalThis as typeof globalThis & { __maipai_llmSupervisor?: { startingPromise: Promise<never> | null; startingStartedAtMs: number | null } }).__maipai_llmSupervisor!;
+    state.startingPromise = null;
+    state.startingStartedAtMs = null;
+    __restartEngineForTests("chat");
+    expect(chatAvailabilityState()).toEqual({ availability: "unavailable", reason: "crashed" });
+  });
+
+  test("foreign process holding chat port is reported and clears after it exits", async () => {
+    const port = Number(testChatPort);
+    const child = spawn("bun", ["-e", `Bun.serve({ port: ${port}, fetch: () => new Response("ok") }); setInterval(() => {}, 1000);`], { stdio: "ignore" });
+    if (!child.pid) throw new Error("expected stand-in listener process");
+    try {
+      await waitForTest(() => fetch(`http://127.0.0.1:${port}`).then((r) => r.ok, () => false));
+      __blockPortForTests(port, child.pid);
+      expect((await probeChatEngine()).availability).toBe("unavailable");
+      expect((await probeChatEngine()).reason).toBe("blocked_port");
+      child.kill("SIGKILL");
+      await once(child, "exit");
+      expect(chatAvailabilityState()).toEqual({ availability: "ready", reason: null });
+    } finally {
+      child.kill("SIGKILL");
+    }
   });
 
   test("a blocked port stays down while its recorded holder pid is alive", () => {
@@ -236,6 +291,7 @@ describe("llmSupervisor tier 3: the household's selected chat model", () => {
   test("an unknown catalog id fails with a specific reason", async () => {
     setHouseholdSettingValue("chat.model_id", "not-a-real-model-id");
     await expect(getChatClient()).rejects.toThrow(/no longer in the catalog/);
+    expect(chatAvailabilityState()).toEqual({ availability: "unavailable", reason: "not_installed" });
   });
 
   test("a real catalog id with no downloaded GGUF yet fails with a specific reason", async () => {

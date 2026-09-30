@@ -39,7 +39,7 @@ import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFla
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
-import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, expireStalledStart, cancelEngineRespawn, ForeignPortHolderError, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, blockedPortReason, expireStalledStart, cancelEngineRespawn, ForeignPortHolderError, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
@@ -128,6 +128,7 @@ interface LlmSupervisorState {
   // must stay stopped until a manual start/restart, or "stop" would do
   // nothing observable beyond one killed process.
   manuallyStopped: boolean;
+  lastStartFailure: "not_installed" | "failed_start" | null;
 }
 
 const state = hotReloadState<LlmSupervisorState>("llmSupervisor", () => ({
@@ -138,6 +139,7 @@ const state = hotReloadState<LlmSupervisorState>("llmSupervisor", () => ({
   lastPostLoadCheck: null,
   generation: 0,
   manuallyStopped: false,
+  lastStartFailure: null,
 }));
 
 /** ROUTE-02: the warm-up carries the ordinary tool block too, so the
@@ -317,7 +319,44 @@ export function reportChatBackendUnreachable(message: string): void {
 export async function probeChatEngine(): Promise<EngineHealth> {
   const status = getEngineStatus();
   const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
-  return { kind: engineHealthKind("chat", status.kind, port), pid: status.pid, alive: await probeAlive(state.chatBackend?.client) };
+  if (blockedPortReason(port)) blockedPortHolderAlive(port);
+  const kind = engineHealthKind("chat", status.kind, port);
+  const alive = await probeAlive(state.chatBackend?.client);
+  const availability = deriveChatAvailability(kind, alive);
+  if (status.kind === "none" && state.lastStartFailure) {
+    availability.availability = "unavailable";
+    availability.reason = state.lastStartFailure;
+  }
+  return { kind, pid: status.pid, alive, ...availability };
+}
+
+type ChatAvailabilityReason = "stopped" | "crashed" | "blocked_port" | "not_installed" | "failed_start";
+type ChatAvailabilityState = { availability: "ready" | "starting" | "unavailable"; reason: ChatAvailabilityReason | null };
+
+/** The single mapping from supervisor state to the household-facing chat state. */
+function deriveChatAvailability(kind: EngineHealth["kind"], alive: boolean | null): ChatAvailabilityState {
+  if (kind === "stopped") return { availability: "unavailable", reason: "stopped" };
+  if (kind === "blocked") return { availability: "unavailable", reason: "blocked_port" };
+  if (kind === "restarting") return { availability: "unavailable", reason: "crashed" };
+  if (kind === "failed" || kind === "stalled") return { availability: "unavailable", reason: "failed_start" };
+  if ((kind === "url" || kind === "override" || kind === "selection" || kind === "spawned") && alive === false)
+    return { availability: "unavailable", reason: "failed_start" };
+  if (kind === "starting") return { availability: "starting", reason: null };
+  return { availability: "ready", reason: null };
+}
+
+export function chatAvailabilityState(): ChatAvailabilityState {
+  if (process.env.MAIPAI_LLAMA_SERVER_URL || getStackUrl()) return { availability: "ready", reason: null };
+  const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
+  const status = getEngineStatus();
+  const kind = engineHealthKind("chat", status.kind, port);
+  if (kind === "blocked" && !blockedPortHolderAlive(port)) return { availability: "ready", reason: null };
+  const availability = deriveChatAvailability(kind, null);
+  if (status.kind === "none" && state.lastStartFailure) {
+    availability.availability = "unavailable";
+    availability.reason = state.lastStartFailure;
+  }
+  return availability;
 }
 
 /** Null unless the engine is genuinely fully installed - both the binary
@@ -524,6 +563,7 @@ export async function getChatClient(): Promise<LlamaServerClient> {
         state.startingPromise = null;
         state.startingStartedAtMs = null;
         state.startupStalled = false;
+        state.lastStartFailure = null;
         // A genuinely healthy spawn closes out any earlier failure -
         // same "a fresh success clears a prior fault" posture
         // resourceGovernor's own resolveIssue("resource-governor", "chat")
@@ -536,6 +576,8 @@ export async function getChatClient(): Promise<LlamaServerClient> {
         if (myGeneration === state.generation) {
           state.startingPromise = null;
           state.startingStartedAtMs = null;
+          const message = (err as Error).message;
+          state.lastStartFailure = /hasn't finished downloading|no longer in the catalog|no llama-server-compatible sizing/.test(message) ? "not_installed" : "failed_start";
         }
         // Found live 2026-09-07: a genuine chat-engine spawn failure had
         // no Repairs-page visibility at all - only found by a household
@@ -651,11 +693,7 @@ export function getEngineStatus(): EngineStatus {
  * not use this supervisor; `none` and `starting` remain valid because
  * the local engine starts on demand. */
 export function chatEngineDown(): boolean {
-  if (process.env.MAIPAI_LLAMA_SERVER_URL || getStackUrl()) return false;
-  const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
-  const kind = engineHealthKind("chat", getEngineStatus().kind, port);
-  if (kind === "blocked") return blockedPortHolderAlive(port);
-  return kind === "stopped" || kind === "failed";
+  return chatAvailabilityState().availability === "unavailable";
 }
 
 /** Ask the supervisor to retry a refused turn in the background, rate
@@ -731,4 +769,5 @@ export function __resetLlmSupervisorForTests(): void {
   state.startupStalled = false;
   state.lastPostLoadCheck = null;
   state.manuallyStopped = false;
+  state.lastStartFailure = null;
 }

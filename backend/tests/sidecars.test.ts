@@ -367,12 +367,14 @@ describe("GET /api/health", () => {
     registerSidecar({ id: "reported", command: ["true"], port: 12345, startupOrder: 1 });
     const res = await client.get("/api/health");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { sidecars: unknown[]; ok: boolean; engines: Record<string, { kind: string; alive: boolean | null }> };
+    const body = (await res.json()) as { sidecars: unknown[]; ok: boolean; engines: Record<string, { kind: string; alive: boolean | null; availability?: string; reason?: string | null }> };
     expect(body.sidecars).toEqual([{ id: "reported", status: "stopped", baseUrl: "http://127.0.0.1:12345" }]);
     // Nothing has been asked to start yet, so there is nothing to probe
     // and nothing wrong: `alive` is null (not false) and the page reads ok.
     expect(body.ok).toBe(true);
     expect(body.engines.chat!.alive).toBeNull();
+    expect(body.engines.chat!.availability).toBe("ready");
+    expect(body.engines.chat!.reason).toBeNull();
     expect(body.engines.background).toBeDefined();
 
     // The OpenAPI response is the public contract for this route. Keep its
@@ -391,6 +393,8 @@ describe("GET /api/health", () => {
     };
     const healthSchema = openapi.paths["/api/health"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
     expect(healthSchema?.properties?.engines?.properties).toHaveProperty("background");
+    expect(healthSchema?.properties?.engines?.properties.chat?.properties).toHaveProperty("availability");
+    expect(healthSchema?.properties?.engines?.properties.chat?.properties).toHaveProperty("reason");
   });
 
   // The Health page kept saying fine while the chat engine was dead

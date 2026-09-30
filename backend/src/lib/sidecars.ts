@@ -150,6 +150,10 @@ export function __failEngineForTests(role: string): void {
   respawnState[role] = "gave_up";
 }
 
+export function __restartEngineForTests(role: string): void {
+  respawnState[role] = "pending";
+}
+
 /** Test-only: clears both the on-disk ownership record and the
  * in-memory blocked-ports map, so one test's port numbers (often
  * reused across files) never leak an owned/blocked reading into the

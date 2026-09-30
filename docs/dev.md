@@ -34995,3 +34995,16 @@ seeds the script-owned temporary database with status events and saves owner
 and child captures at 1440 and 390 pixels in both themes under
 `data-scratch/screens/status-c3d/`. The history response is fixed in the
 capture for repeatability. The frontend reads the STATUS-C3a history route.
+
+## ENGINE-AVAIL-01
+
+`llmSupervisor.ts` derives the chat engine's `ready`, `starting`, or
+`unavailable` state from the supervisor kind, the current blocked port, and
+the last start failure. An unavailable state includes one fixed reason:
+`stopped`, `crashed`, `blocked_port`, `not_installed`, or `failed_start`.
+`chatEngineDown()` reads this derivation. `GET /api/health` adds `availability`
+and `reason` to `engines.chat`; its existing `kind` and `alive` fields stay as
+they were. The shape belongs to Home's OpenAPI route schema and its wire mirror.
+The pinned commons spec has no `EngineHealth` shape, so this change does not
+create a spec tag or move a pin. The chat availability helper reads the new
+state instead of re-deriving it from `kind` and `alive`.

@@ -92,6 +92,8 @@ const EngineHealthSchema = z.object({
   kind: z.enum(ENGINE_HEALTH_KINDS),
   pid: z.number().nullable(),
   alive: z.boolean().nullable(),
+  availability: z.enum(["ready", "starting", "unavailable"]).optional(),
+  reason: z.enum(["stopped", "crashed", "blocked_port", "not_installed", "failed_start"]).nullable().optional(),
 });
 const HealthResponseSchema = z.object({
   brain: z.string(),
