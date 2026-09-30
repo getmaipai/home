@@ -1225,6 +1225,7 @@ export function __resetSidecarsForTests(): void {
     entry.proc?.kill();
   }
   registry.clear();
+  blockedPorts.clear();
   for (const timer of engineWatchTimers) clearInterval(timer);
   engineWatchTimers.clear();
   for (const timer of pendingRespawnTimers.values()) clearTimeout(timer);

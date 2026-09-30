@@ -13,8 +13,10 @@ import {
   cancelEngineRespawn,
   engineRespawnState,
   engineHealthKind,
+  __failEngineForTests,
   registerGracefulExit,
   __resetSidecarsForTests,
+  __blockPortForTests,
   __setSidecarTimingForTestsOnly,
   blockedPortReason,
   ForeignPortHolderError,
@@ -39,6 +41,19 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetSidecarsForTests();
+});
+
+describe("__resetSidecarsForTests", () => {
+  test("clears blocked ports and failed engine state", () => {
+    const port = 39171;
+    __blockPortForTests(port, process.pid);
+    __failEngineForTests("chat");
+
+    __resetSidecarsForTests();
+
+    expect(blockedPortReason(port)).toBeUndefined();
+    expect(engineHealthKind("chat", "none", port)).not.toBe("failed");
+  });
 });
 
 async function waitUntil(check: () => boolean | Promise<boolean>, timeoutMs = 5_000): Promise<void> {
