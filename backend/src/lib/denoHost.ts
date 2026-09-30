@@ -399,7 +399,9 @@ export function startIdleSweep(): void {
 
 let gracefulExitRegistered = false;
 
-/** Kills every live Tier 1 sandbox process before the hub itself exits -
+/** Registers synchronous cleanup hooks that kill every live Tier 1 sandbox
+ * process. index.ts owns SIGINT/SIGTERM shutdown and process exit so its
+ * awaited engine shutdown cannot be bypassed by an earlier listener -
  * the same "an exit hook, not the next spawn attempt, is what actually
  * prevents a leaked child" fix lib/sidecars.ts's own registerGracefulExit()
  * already made for sidecars, mirrored here rather than reusing that
@@ -428,14 +430,8 @@ export function registerDenoHostGracefulExit(): void {
     }
   };
   process.on("exit", killAll);
-  process.on("SIGINT", () => {
-    killAll();
-    process.exit(0);
-  });
-  process.on("SIGTERM", () => {
-    killAll();
-    process.exit(0);
-  });
+  process.on("SIGINT", killAll);
+  process.on("SIGTERM", killAll);
 }
 
 // A test's own way to make a real handle() call take real time - without

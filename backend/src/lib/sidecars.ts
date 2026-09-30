@@ -1165,8 +1165,9 @@ export async function stopAllSidecars(): Promise<void> {
 
 let gracefulExitRegistered = false;
 
-/** Registers a process-exit hook that kills every running sidecar's child
- * process before the hub itself exits - the actual fix for the class of
+/** Registers synchronous cleanup hooks that kill every running sidecar's child
+ * process. index.ts owns SIGINT/SIGTERM shutdown and process exit so its
+ * awaited engine shutdown cannot be bypassed by an earlier listener - the actual fix for the class of
  * bug freePort() only ever papered over after the fact (a leaked child
  * from a reload or crash, discovered and killed on the NEXT spawn attempt
  * rather than prevented). Idempotent and called once from index.ts at
@@ -1185,14 +1186,8 @@ export function registerGracefulExit(): void {
   // "exit" handlers must be synchronous - killAll() is (Bun.Subprocess.kill()
   // sends the signal and returns immediately, it doesn't await the exit).
   process.on("exit", killAll);
-  process.on("SIGINT", () => {
-    killAll();
-    process.exit(0);
-  });
-  process.on("SIGTERM", () => {
-    killAll();
-    process.exit(0);
-  });
+  process.on("SIGINT", killAll);
+  process.on("SIGTERM", killAll);
 }
 
 /** Test-only: clears the registry and any in-flight timers, and restores

@@ -33514,6 +33514,10 @@ The New Thread button and its Cmd/Ctrl+Shift+O shortcut are also disabled while 
 
 The hub shutdown list previously stopped chat, embed and background engines but left the voice engine running, so its process kept port 8793 occupied and prevented the next hub boot from starting voice. The default shutdown list now calls `restartTtsBackend()` to cancel respawn and stop the voice engine on both signal and fatal shutdown paths.
 
+## ENGINE-AVAIL-04b
+
+On 2026-09-29, `bun stop` terminated the hub immediately while the chat, embedding and voice engine processes remained alive. The sidecar and Deno host SIGTERM handlers were registered before `index.ts`'s shutdown handler, and each called `process.exit(0)` after synchronous cleanup. That ended the process before the later handler could await `shutdownEngines()`. The module handlers now perform synchronous cleanup only; `index.ts` owns SIGINT/SIGTERM shutdown and process exit, allowing the bounded engine shutdown to finish first.
+
 ## DATA-LOCATION: where the household's data lives, choosing it at install and moving it later (design, 2026-09-29)
 
 **Revision 2026-09-30.** The first version grouped the data into three
