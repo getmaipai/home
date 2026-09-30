@@ -1512,7 +1512,7 @@ async function captureChatContinueReview(browser: Browser, sessionValue: string)
 /** HOME-FIT-02B's dedicated review for the recommended model's fit verdict.
  * Only selection and fit-plan are stubbed at the browser boundary; the
  * remaining model card data comes from the throwaway demo backend. */
-async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable" | "checked-yes" | "checked-no" | "checked-error" | "checked-notfound"): Promise<void> {
+async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable" | "checked-yes" | "checked-no" | "checked-error" | "checked-notfound" | "memory-tight"): Promise<void> {
   const context = await newContext(browser, viewport, theme, sessionValue);
   try {
     const page = await context.newPage();
@@ -1522,6 +1522,10 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       contentType: "application/json",
       body: JSON.stringify({ modelId: null }),
     }));
+    const memory = state === "memory-tight"
+      ? { available: true, memory: { usableGb: 16, usedGb: 14.8, freeGb: 1.2, pressure: "warn", pressureText: "Memory is getting tight.", loaded: [{ id: "chat", label: "Chat", gb: 12.4 }, { id: "image", label: "Pictures", gb: 2.4 }] } }
+      : { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }, { id: "embed", label: "Search", gb: 1.1 }] } };
+    await page.route("**/api/computer-memory", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(memory) }));
     const answers = {
       yes: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of the 24 GB this computer can give to models." },
       slow: { verdict: "slow", headline: "Runs, but slowly", detail: "It fits only by using the processor, so answers will be slower." },
@@ -1539,7 +1543,7 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       verdict, bottleneck: verdict === "unknown" ? "unknown" : "memory",
     });
     await page.route("**/api/fit-plan", (route) => {
-      const answerState = state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state === "checked-notfound" ? "notfound" : state;
+      const answerState = state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state === "checked-notfound" ? "notfound" : state === "memory-tight" ? "yes" : state;
       const wording = answerState in answers ? answers[answerState as keyof typeof answers] : answers.yes;
       // Keep the browser boundary fixture valid against StackFitPlan.
       return route.fulfill({
@@ -1566,12 +1570,25 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       await page.getByRole("button", { name: "Use this", exact: true }).waitFor();
       await page.getByText(answers.unavailable.headline, { exact: true }).waitFor({ state: "detached" });
     } else {
-      await page.getByText(answers[state].headline, { exact: true }).waitFor();
+      await page.getByText((state === "memory-tight" ? answers.yes : answers[state]).headline, { exact: true }).waitFor();
     }
     await settleAnimations(page);
     const screenshot = `fit-verdict-${state}-${viewport.slug}-${theme}.png`;
-    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
-    dedicatedScreenshots.push({ file: screenshot, route: "settings-models-fit-verdict", viewport: viewport.slug, theme });
+    if (state !== "memory-tight") {
+      await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+      dedicatedScreenshots.push({ file: screenshot, route: "settings-models-fit-verdict", viewport: viewport.slug, theme });
+    }
+    if (state === "yes" && theme === "light") {
+      const normalShot = `fit-memory-normal-${viewport.slug}-light.png`;
+      await page.screenshot({ path: join(SCREENS_DIR, normalShot), fullPage: true });
+      dedicatedScreenshots.push({ file: normalShot, route: "settings-models-computer-memory", viewport: viewport.slug, theme });
+    }
+    if (state === "memory-tight") {
+      const tightShot = `fit-memory-tight-${viewport.slug}-light.png`;
+      await page.screenshot({ path: join(SCREENS_DIR, tightShot), fullPage: true });
+      dedicatedScreenshots.push({ file: tightShot, route: "settings-models-computer-memory", viewport: viewport.slug, theme });
+      return;
+    }
     if ((state === "yes" || state === "no") && theme === "light") {
       await page.getByRole("button", { name: "Details", exact: true }).click();
       await page.getByText("Memory it needs", { exact: true }).waitFor();
@@ -4444,6 +4461,7 @@ async function main() {
         for (const state of ["yes", "slow", "no", "unknown", "unavailable"] as const) {
           await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
         }
+        await captureFitVerdictCard(browser, sessionValue, viewport, "light", "memory-tight");
         for (const state of ["checked-yes", "checked-no", "checked-error", "checked-notfound"] as const) {
           await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
         }

@@ -208,6 +208,34 @@ describe("ModelsSection", () => {
     } finally { restore(); }
   });
 
+
+  test("shows Memory right now, its figure, and a loaded model line", async () => {
+    const memory = { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }] } };
+    const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
+    try {
+      const { findByText } = render(<ModelsSection />);
+      await findByText("Memory right now");
+      await findByText("6.2 GB in use of 16 GB");
+      expect((await findByText("5.1 GB")).textContent).toBe("5.1 GB");
+      expect(document.querySelector('[data-slot="spec-sheet"]')?.textContent).toContain("Chat");
+    } finally { restore(); }
+  });
+
+  test("shows the empty loaded-memory message", async () => {
+    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [] } };
+    const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
+    try { await render(<ModelsSection />).findByText("Nothing is loaded right now."); } finally { restore(); }
+  });
+
+  test("renders no memory card when the Stack is unavailable", async () => {
+    const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": { available: false } });
+    try {
+      const { findByText, queryByText } = render(<ModelsSection />);
+      await findByText("This computer: Apple Silicon, 24 GB memory.");
+      expect(queryByText("Memory right now")).toBeNull();
+    } finally { restore(); }
+  });
+
   test("shows the detected hardware in plain language", async () => {
     const restore = stubFetch({
       "/api/host/hardware": HARDWARE,

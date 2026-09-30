@@ -5,6 +5,7 @@ import { Status } from "@maipai/ui/src/ui/status";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { getIcon } from "@maipai/ui/src/icons";
+import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type EngineStatus } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
@@ -12,6 +13,7 @@ import { parseModelLink } from "@/lib/modelLink";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { describeFitPlan, type FitPanelRow } from "@/lib/fitPanel";
+import type { ComputerMemoryResponse } from "@/lib/api";
 import type { FitPlanResponse } from "@/lib/api";
 
 // The model-selection wizard, real half (2026-09-04): docs/SETTINGS.md
@@ -27,6 +29,7 @@ import type { FitPlanResponse } from "@/lib/api";
 // flow is wired for it; image/video stay a single honest line, no
 // pros/cons dump, since there's nothing to choose yet.
 export function ModelsSection() {
+  const [computerMemory, setComputerMemory] = useState<ComputerMemoryResponse | null>(null);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
   const [chatFits, setChatFits] = useState<ModelFit[] | null>(null);
   const [imageFits, setImageFits] = useState<ModelFit[] | null>(null);
@@ -51,6 +54,11 @@ export function ModelsSection() {
   }, []);
 
   useEffect(load, [load]);
+
+  const loadComputerMemory = useCallback(() => {
+    api.computerMemory().then(setComputerMemory).catch(() => setComputerMemory({ available: false }));
+  }, []);
+  useEffect(loadComputerMemory, [loadComputerMemory]);
 
   // A light background poll for "is it still running" (engine control's
   // other half: seeing it go down, not just starting/stopping it) - slow
@@ -107,13 +115,14 @@ export function ModelsSection() {
   // to live in its own effect covering every path job can reach "ready"
   // through, not inlined into just one of them.
   useEffect(() => {
-    if (job?.status === "ready") setSelectedModelId(job.modelId);
-  }, [job]);
+    if (job?.status === "ready") { setSelectedModelId(job.modelId); loadComputerMemory(); }
+  }, [job, loadComputerMemory]);
 
   async function handleChoose(modelId: string) {
     setError(null);
     try {
       setJob(await api.selectModel(modelId));
+      loadComputerMemory();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not start setting up this model.");
     }
@@ -127,6 +136,7 @@ export function ModelsSection() {
       ) : (
         <div className="flex flex-col gap-4">
           <p className="text-base text-[var(--muted-foreground)]">{describeHardware(hardware)}</p>
+          {computerMemory ? <ComputerMemoryCard response={computerMemory} /> : null}
           <ChatModelCard
             fits={chatFits}
             selectedModelId={selectedModelId}
@@ -506,6 +516,22 @@ function FitSource({ row }: { row: FitPanelRow }) {
   if (!row.source || row.source === "unknown") return null;
   const sourceName = { measured: "Measured", "dry-run": "Dry run", estimated: "Estimated" }[row.source];
   return <p className="text-sm text-[var(--muted-foreground)]">{row.label}: {sourceName}{row.asOf ? ` · ${row.asOf}` : ""}</p>;
+}
+
+function ComputerMemoryCard({ response }: { response: ComputerMemoryResponse }) {
+  if (!response.available) return null;
+  const { memory } = response;
+  const percent = memory.usableGb > 0 ? (memory.usedGb / memory.usableGb) * 100 : 0;
+  return (
+    <RoleCardShell title="Memory right now">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3"><IconTile icon="cpu" hue="--hue-blue" /><p className="text-lg font-medium tabular-nums">{memory.usedGb} GB in use of {memory.usableGb} GB</p></div>
+        <p className="text-base text-[var(--muted-foreground)]">{memory.pressureText}</p>
+        <Progress mode="determinate" value={percent} label="Memory used" />
+        {memory.loaded.length ? <SpecSheet title="Models using memory" rows={memory.loaded.map((item) => ({ label: item.label, value: `${item.gb} GB` }))} visibleCount={memory.loaded.length} /> : <p className="text-base text-[var(--muted-foreground)]">Nothing is loaded right now.</p>}
+      </div>
+    </RoleCardShell>
+  );
 }
 
 function PlannedRoleCard({ title, fits }: { title: string; fits: ModelFit[] | null }) {

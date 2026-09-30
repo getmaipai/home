@@ -534,6 +534,9 @@ export async function* readBareCompareStream(response: Response): AsyncGenerator
   }
 }
 
+export type ComputerMemory = { usableGb: number; usedGb: number; freeGb: number; pressure: "normal" | "warn" | "critical"; pressureText: string; loaded: Array<{ id: string; label: string; gb: number }> };
+export type ComputerMemoryResponse = { available: true; memory: ComputerMemory } | { available: false };
+
 export type FitPlanResponse = { plan: StackFitPlan | null; wording: { verdict: "yes" | "slow" | "no" | "unknown"; headline: string; detail: string } };
 
 export const api = {
@@ -1008,6 +1011,7 @@ export const api = {
   uninstallPackage: (id: string) => request<{ ok: true }>(`/api/store/installs/${encodeURIComponent(id)}/uninstall`, { method: "POST" }),
   hardware: () => request<HardwareInfo>("/api/host/hardware"),
   models: (role: string) => request<ModelFit[]>(`/api/host/models?role=${encodeURIComponent(role)}`),
+  computerMemory: () => request<ComputerMemoryResponse>("/api/computer-memory"),
   fitPlan: (body: { source: { url: string } | { path: string } | { repo: string; revision?: string }; context_tokens?: number; kv_cache_type?: "f16" | "q8_0" | "q4_0" }) => request<FitPlanResponse>("/api/fit-plan", { method: "POST", body: JSON.stringify(body) }),
   chatModels: () => request<ChatModelsResponse>("/api/host/chat-models"),
   modelSelection: () => request<{ modelId: string | null }>("/api/host/models/selection"),

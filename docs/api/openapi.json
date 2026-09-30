@@ -12865,6 +12865,121 @@
         }
       }
     },
+    "/api/computer-memory": {
+      "get": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "What model memory this computer is using right now",
+        "responses": {
+          "200": {
+            "description": "Current model memory, when the Stack answers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "available": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        },
+                        "memory": {
+                          "type": "object",
+                          "properties": {
+                            "usableGb": {
+                              "type": "number"
+                            },
+                            "usedGb": {
+                              "type": "number"
+                            },
+                            "freeGb": {
+                              "type": "number"
+                            },
+                            "pressure": {
+                              "type": "string",
+                              "enum": [
+                                "normal",
+                                "warn",
+                                "critical"
+                              ]
+                            },
+                            "pressureText": {
+                              "type": "string"
+                            },
+                            "loaded": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  },
+                                  "gb": {
+                                    "type": "number"
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "gb"
+                                ]
+                              }
+                            }
+                          },
+                          "required": [
+                            "usableGb",
+                            "usedGb",
+                            "freeGb",
+                            "pressure",
+                            "pressureText",
+                            "loaded"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "available",
+                        "memory"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "available": {
+                          "type": "boolean",
+                          "enum": [
+                            false
+                          ]
+                        }
+                      },
+                      "required": [
+                        "available"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/performance": {
       "get": {
         "tags": [

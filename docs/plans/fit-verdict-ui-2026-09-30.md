@@ -36,6 +36,7 @@ The first-run wizard's sizing page (SETUP-SIZE-01) is screen 3 and 4 with the pr
 ## What it is made of (the no-hand-built-UI rule)
 
 Every piece is a shipped part of the kit or the dashboard set, restyled only by the tokens, so any theme package restyles it with no extra work: the icon-tile metric cards and panel headers (screen 4), the status pill (verdicts), `model-picker`, `model-selector` and `data-table` with `command-palette` for search (screens 1 and 2), `range` and `context-display` (the context slider), `context-breakdown` and `spec-sheet` (the fit panel), `comparison-card` and `recommendation-card` (screen 5 and the "what would fit" line), `confidence-marker` and `inline-citation` (the estimate marker and its source), `number-ticker`, `empty-state`, `loading-state` and `error-state`. The one gap, named here before a line is written: a verdict pill that carries its one-line reason. The smallest composition of shipped parts wins: the status pill and the `confidence-marker` side by side in one row, no new component.
+Home uses the shipped `IconTile`, `Progress` and `SpecSheet` parts for “Memory right now”, backed by `GET /api/computer-memory`.
 
 Standing rules that apply: the phone is the same design as the desktop, optimized for the small screen (`feedback_mobile_same_design`); every expand and collapse animates; screenshots are generated from the seeded demo household and opened and looked at before they are used anywhere; no household facts in any fixture.
 

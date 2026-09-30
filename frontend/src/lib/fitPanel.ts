@@ -2,7 +2,7 @@ import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 
 export type FitPanelRow = { label: string; value: string; source?: "measured" | "dry-run" | "estimated" | "unknown"; asOf?: string };
 
-const roleNames: Record<StackFitPlan["roles"][number]["role"], string> = {
+export const roleNames: Record<StackFitPlan["roles"][number]["role"], string> = {
   chat: "Chat", router: "Routing", embed: "Search", rerank: "Ranking", vision: "Vision", image: "Pictures", video: "Video", music: "Music", coding: "Coding", judge: "Safety checks", tts: "Speaking", stt: "Listening", wakeword: "Wake word", "turn-signal": "Turn signal",
 };
 const pathNames: Record<StackFitPlan["paths"][number]["path"], string> = {
