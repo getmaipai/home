@@ -236,6 +236,31 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
       globalThis.fetch = original;
     }
   });
+
+  test("disables New Thread while chat is blocked and keeps past threads enabled", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/health")) {
+        return Promise.resolve(Response.json({ engines: { chat: { kind: "blocked", pid: 1, alive: true } } }));
+      }
+      if (url.includes("/api/conversations")) {
+        return Promise.resolve(Response.json([{ id: "conv-past123", title: "A past chat", surface: "chat", created_at: "2026-09-07T00:00:00Z", pinned: false }]));
+      }
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole } = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await findByRole("button", { name: "New Thread" })).toBeDisabled();
+      expect(await findByRole("button", { name: "A past chat" })).toBeEnabled();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
 });
 
 describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {

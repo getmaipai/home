@@ -11,10 +11,12 @@ export const CHAT_SHORTCUTS = [
 export function registerChatShortcuts({
   aui,
   isRunning,
+  unavailable,
   setReferenceOpen,
 }: {
   aui: AssistantClient;
   isRunning: boolean;
+  unavailable: boolean;
   setReferenceOpen: (open: boolean) => void;
 }): () => void {
   function onKeyDown(event: KeyboardEvent) {
@@ -24,7 +26,7 @@ export function registerChatShortcuts({
       setReferenceOpen(true);
     } else if ((event.metaKey || event.ctrlKey) && event.shiftKey && key === "o") {
       event.preventDefault();
-      void aui.threads.switchToNewThread();
+      if (!unavailable) void aui.threads.switchToNewThread();
     } else if (!event.metaKey && !event.ctrlKey && event.shiftKey && key === "escape") {
       event.preventDefault();
       document.querySelector<HTMLElement>('[aria-label="Message input"]')?.focus();

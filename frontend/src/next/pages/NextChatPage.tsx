@@ -1337,12 +1337,13 @@ function NextThreadList({
   collapseToggle?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
+  const availability = useContext(ChatAvailabilityContext);
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
   return (
     <ThreadListRoot>
       <div className="flex items-center gap-1">
         {collapseToggle}
-        <ThreadListNew className="min-h-12" onClick={onNewThread} />
+        <ThreadListNew className="min-h-12" onClick={onNewThread} disabled={availability === "unavailable"} />
       </div>
       {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} />}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />

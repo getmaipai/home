@@ -19,12 +19,27 @@ test("Cmd+Shift+O switches the real thread runtime to a new thread", () => {
   const cleanup = registerChatShortcuts({
     aui: { threads: { switchToNewThread }, thread: { cancelRun: stopRun } } as unknown as AssistantClient,
     isRunning: false,
+    unavailable: false,
     setReferenceOpen,
   });
   const event = key("o", { metaKey: true, shiftKey: true });
   cleanup();
   expect(event.defaultPrevented).toBe(true);
   expect(switchToNewThread).toHaveBeenCalledTimes(1);
+});
+
+test("Cmd+Shift+O does not switch threads while chat is unavailable", () => {
+  const switchToNewThread = mock(() => Promise.resolve());
+  const cleanup = registerChatShortcuts({
+    aui: { threads: { switchToNewThread } } as unknown as AssistantClient,
+    isRunning: false,
+    unavailable: true,
+    setReferenceOpen: () => {},
+  });
+  const event = key("o", { metaKey: true, shiftKey: true });
+  cleanup();
+  expect(event.defaultPrevented).toBe(true);
+  expect(switchToNewThread).not.toHaveBeenCalled();
 });
 
 test("Shift+Esc focuses the real composer input", () => {
@@ -34,6 +49,7 @@ test("Shift+Esc focuses the real composer input", () => {
   const cleanup = registerChatShortcuts({
     aui: {} as AssistantClient,
     isRunning: false,
+    unavailable: false,
     setReferenceOpen: () => {},
   });
   key("Escape", { shiftKey: true });
@@ -46,6 +62,7 @@ test("Esc cancels the active reply", () => {
   const cleanup = registerChatShortcuts({
     aui: { thread: { cancelRun } } as unknown as AssistantClient,
     isRunning: true,
+    unavailable: false,
     setReferenceOpen: () => {},
   });
   const event = key("Escape");
@@ -59,6 +76,7 @@ test("Cmd+/ opens the shortcut reference with all five entries", () => {
   const cleanup = registerChatShortcuts({
     aui: {} as AssistantClient,
     isRunning: false,
+    unavailable: false,
     setReferenceOpen,
   });
   const event = key("/", { metaKey: true });
