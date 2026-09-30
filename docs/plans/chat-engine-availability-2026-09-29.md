@@ -87,9 +87,9 @@ uses it:
 - **Debounce.** Raise only when the state has been `unavailable` for 60 seconds.
   A crash the watchdog fixes in 5 seconds is a log line, not a ping. This is
   the fix for the 42-notifications flap.
-- **Louder channels.** The type gains browser push beside `in_app`, and the
-  Telegram channel when the household has opted into it. Level stays
-  `time_sensitive` (held in quiet hours; a chat outage is not a door
+- **Channels.** `in_app` plus Telegram where opted in, now; browser push is
+  ENGINE-AVAIL-06 (it does not exist yet, see "Decided by Jesse" 4). Level
+  stays `time_sensitive` (held in quiet hours; a chat outage is not a door
   camera).
 - **One reminder.** If still unavailable 15 minutes after the first notice, one
   repeat, keyed so it never becomes a stream.
@@ -163,9 +163,14 @@ uses it:
 3. **Auto-reap without asking is approved** (this replaces the earlier
    "ask first" option). The admin fix button in section D stays only as the
    fallback for a holder the supervisor could not reap (a permission error).
-4. **Browser push is a default channel** for the engine-problem
-   notification (agreed 2026-09-29), beside `in_app`; Telegram when the
-   household has opted in.
+4. **Browser push was agreed as a default channel, then found not to exist.**
+   Verified 2026-09-29 in source: the backend has no push subscription route or
+   key handling, and the service worker has no push handler. Only the in-app bell
+   and opt-in Telegram deliver today. Browser push is therefore its own item
+   (ENGINE-AVAIL-06, L, design pass first: NOTIFICATIONS.md already describes the
+   hub's own push endpoint on the LAN). Until it ships, the engine-problem
+   notification goes to `in_app` (bell and toast) and to Telegram for households
+   that opted in.
 
 ## Out of scope
 
