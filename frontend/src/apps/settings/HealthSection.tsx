@@ -4,8 +4,9 @@ import { Section } from "@maipai/ui/src/primitives/Section";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Badge } from "@maipai/ui/src/ui/badge";
-import { useToast } from "@maipai/ui/src/primitives/Toast";
-import { api, ApiError, type HealthStatus, type Roster } from "@/lib/api";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { api, ApiError, isOwnerOrAdminRole, type HealthStatus, type Roster } from "@/lib/api";
 import type { EngineHealthEntry } from "@/lib/api";
 
 interface HealthSectionProps {
@@ -76,19 +77,25 @@ const HEALTH_QUERY_KEY = ["health"];
 // stays visible to everyone.
 export function HealthSection({ person }: HealthSectionProps) {
   const query = useQuery<HealthStatus>({ queryKey: HEALTH_QUERY_KEY, queryFn: () => api.health(), refetchInterval: 15_000 });
-  const { push } = useToast();
-  const [confirming, setConfirming] = useState(false);
-  const [restarting, setRestarting] = useState(false);
-  const canRestart = person.role === "owner" || person.role === "admin";
+  const [pendingRole, setPendingRole] = useState<keyof HealthStatus["engines"] | null>(null);
+  const [restartingRole, setRestartingRole] = useState<keyof HealthStatus["engines"] | null>(null);
+  const canRestart = isOwnerOrAdminRole(person.role);
 
   async function handleRestart() {
-    setRestarting(true);
+    if (!pendingRole) return;
+    const role = pendingRole;
+    const row = ENGINE_ROWS.find((candidate) => candidate.key === role);
+    if (!row) return;
+    setRestartingRole(role);
     try {
-      await api.restartServer();
-      push("Restarting MaiPai Home. This page will reconnect once it's back.");
+      await api.restartEngineRole(role);
+      toast.success(`${row.label} restarted.`);
+      await query.refetch();
+      setPendingRole(null);
     } catch (e) {
-      push(e instanceof ApiError ? e.message : "Could not restart MaiPai Home.");
-      setRestarting(false);
+      toast.error(e instanceof ApiError ? e.message : `Could not restart ${row.label}.`);
+    } finally {
+      setRestartingRole(null);
     }
   }
 
@@ -112,7 +119,7 @@ export function HealthSection({ person }: HealthSectionProps) {
               </span>
             </div>
             {!health.ok ? (
-              <p className="text-base text-[var(--muted-foreground)]">MaiPai restarts a stopped engine on its own. If one keeps stopping, Repairs has a button to start it again, or restart the server below.</p>
+              <p className="text-base text-[var(--muted-foreground)]">MaiPai restarts a stopped engine on its own. If one keeps stopping, Repairs has a button to start it again.</p>
             ) : null}
 
             <div className="flex flex-col divide-y divide-[var(--border)]">
@@ -124,7 +131,14 @@ export function HealthSection({ person }: HealthSectionProps) {
                       <span>{row.label}</span>
                       <span className="text-sm text-[var(--muted-foreground)]">{row.hint}</span>
                     </span>
-                    <Badge variant={state.variant}>{state.label}</Badge>
+                    <span className="flex items-center gap-2">
+                      <Badge variant={state.variant}>{state.label}</Badge>
+                      {canRestart ? (
+                        <Button variant="secondary" onClick={() => setPendingRole(row.key)} disabled={restartingRole === row.key}>
+                          {restartingRole === row.key ? "Restarting…" : "Restart"}
+                        </Button>
+                      ) : null}
+                    </span>
                   </div>
                 );
               })}
@@ -141,31 +155,26 @@ export function HealthSection({ person }: HealthSectionProps) {
               </div>
             ) : null}
 
-            {canRestart ? (
-              confirming ? (
-                <div className="flex flex-col gap-2 py-1">
-                  <p className="text-base font-medium">Restart MaiPai Home?</p>
-                  <p className="text-base text-[var(--muted-foreground)]">
-                    Everyone's conversation and anything playing will drop for about a minute while it comes back up.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="destructive" onClick={handleRestart} disabled={restarting}>
-                      {restarting ? "Restarting…" : "Yes, restart now"}
-                    </Button>
-                    <Button variant="secondary" onClick={() => setConfirming(false)} disabled={restarting}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button variant="secondary" onClick={() => setConfirming(true)} className="w-fit">
-                  Restart server
-                </Button>
-              )
-            ) : null}
           </div>
         )}
       </AsyncState>
+      <AlertDialog open={pendingRole !== null} onOpenChange={(open) => { if (!open && restartingRole === null) setPendingRole(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restart {ENGINE_ROWS.find((row) => row.key === pendingRole)?.label ?? "engine"}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Anything using it will pause for a moment.
+              {pendingRole === "chat" ? " A reply being written right now will be cut off." : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restartingRole !== null}>Cancel</AlertDialogCancel>
+            <Button variant="destructive" onClick={handleRestart} disabled={restartingRole !== null}>
+              {restartingRole !== null ? "Restarting…" : "Restart engine"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Section>
   );
 }

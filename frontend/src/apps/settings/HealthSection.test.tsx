@@ -1,10 +1,10 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { render, cleanup } from "@testing-library/react";
+import { render, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement } from "react";
 import { HealthSection } from "@/apps/settings/HealthSection";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
-import type { HealthStatus, Roster } from "@/lib/api";
+import { api, type HealthStatus, type Roster } from "@/lib/api";
 
 afterEach(cleanup);
 
@@ -163,6 +163,102 @@ describe("HealthSection", () => {
       expect(await findByText("Blocked by another program")).toBeInTheDocument();
     } finally {
       restore();
+    }
+  });
+
+  test("only owners and admins see four engine restart buttons", async () => {
+    const restore = stubHealth(health());
+    try {
+      const admin = renderWithQuery(<HealthSection person={makePerson("admin")} />);
+      expect(await admin.findAllByRole("button", { name: "Restart" })).toHaveLength(4);
+      admin.unmount();
+      const adult = renderWithQuery(<HealthSection person={makePerson("adult")} />);
+      await adult.findByText("Everything is running.");
+      expect(adult.queryByRole("button", { name: "Restart" })).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  test("engine restart waits for confirmation, calls its role route, disables only that row, and refreshes health", async () => {
+    const original = globalThis.fetch;
+    let resolveRestart!: (response: Response) => void;
+    const calls: Array<{ url: string; method: string }> = [];
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const method = init?.method ?? "GET";
+      calls.push({ url, method });
+      if (url.includes("/api/health")) return Promise.resolve(new Response(JSON.stringify(health()), { status: 200 }));
+      if (url.includes("/api/host/engines/chat/restart")) return new Promise<Response>((resolve) => { resolveRestart = resolve; });
+      return Promise.reject(new Error(`unstubbed fetch: ${method} ${url}`));
+    }) as unknown as typeof fetch;
+    try {
+      const { findAllByRole, getByRole, queryByRole } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
+      const buttons = await findAllByRole("button", { name: "Restart" });
+      const brainButton = buttons[0];
+      if (!brainButton) throw new Error("Brain restart button not found");
+      const brainRow = brainButton.parentElement?.parentElement;
+      if (!brainRow) throw new Error("Brain row not found");
+      const otherButtons = buttons.slice(1);
+      fireEvent.click(brainButton);
+      expect(getByRole("alertdialog")).toHaveTextContent("Restart Brain?");
+      expect(getByRole("alertdialog")).toHaveTextContent("Anything using it will pause for a moment.");
+      expect(getByRole("alertdialog")).toHaveTextContent("A reply being written right now will be cut off.");
+      expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(false);
+      fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(queryByRole("alertdialog")).not.toBeInTheDocument());
+      expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(false);
+      fireEvent.click(brainButton);
+      fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Restart engine" }));
+      await waitFor(() => expect(calls.some((call) => call.url.includes("/api/host/engines/chat/restart"))).toBe(true));
+      expect(calls.filter((call) => call.url.includes("/api/host/engines/chat/restart"))).toEqual([
+        { url: "/api/host/engines/chat/restart", method: "POST" },
+      ]);
+      await waitFor(() => expect(brainRow.querySelector("button")?.disabled).toBe(true));
+      expect(otherButtons.every((button) => !button.hasAttribute("disabled"))).toBe(true);
+      resolveRestart(new Response(JSON.stringify({ role: "chat", restarted: true }), { status: 200 }));
+      await waitFor(() => expect(brainRow.querySelector("button")?.disabled).toBe(false));
+      await waitFor(() => expect(calls.filter((call) => call.url.includes("/api/health"))).toHaveLength(2));
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("a failed restart shows the server sentence", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health")) return Promise.resolve(new Response(JSON.stringify(health()), { status: 200 }));
+      if (url.includes("/api/host/engines/embed/restart") && init?.method === "POST") {
+        return Promise.resolve(new Response(JSON.stringify({ error: "Understanding could not restart." }), { status: 503 }));
+      }
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
+    try {
+      const { findAllByRole, getByRole, findByText } = renderWithQuery(<HealthSection person={makePerson("owner")} />);
+      const understandingButton = (await findAllByRole("button", { name: "Restart" }))[1];
+      if (!understandingButton) throw new Error("Understanding restart button not found");
+      fireEvent.click(understandingButton);
+      await waitFor(() => expect(getByRole("button", { name: "Restart engine" })).toBeEnabled());
+      fireEvent.click(within(getByRole("alertdialog")).getByRole("button", { name: "Restart engine" }));
+      expect(await findByText("Understanding could not restart.")).toBeInTheDocument();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("restartEngineRole posts to the selected engine route", async () => {
+    const original = globalThis.fetch;
+    let request: { url: string; method: string } | undefined;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      request = { url: typeof input === "string" ? input : input.toString(), method: init?.method ?? "GET" };
+      return Promise.resolve(new Response(JSON.stringify({ role: "voice", restarted: true }), { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      expect(await api.restartEngineRole("voice")).toEqual({ role: "voice", restarted: true });
+      expect(request).toEqual({ url: expect.stringContaining("/api/host/engines/voice/restart"), method: "POST" });
+    } finally {
+      globalThis.fetch = original;
     }
   });
 });

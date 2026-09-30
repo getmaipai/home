@@ -1017,6 +1017,8 @@ export const api = {
   // safety net (a dead connection the server never sees), never races a
   // legitimate server-side response that's about to arrive.
   restartEngine: () => request<EngineStatus>("/api/host/engine/restart", { method: "POST", timeoutMs: 100_000 }),
+  restartEngineRole: (role: "chat" | "embed" | "voice" | "background") =>
+    request<{ role: string; restarted: true }>(`/api/host/engines/${role}/restart`, { method: "POST", timeoutMs: 100_000 }),
   // The whole hub, not just the chat engine - the process exits and the
   // OS service manager brings it back (routes/host.ts's own comment has
   // the full reasoning). A short timeout: this only waits for the "yes,
