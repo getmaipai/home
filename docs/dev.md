@@ -33375,3 +33375,7 @@ registered in `backend/tests/benchSetup.test.ts`'s `ENTRY_POINTS`
 test tests/llm.test.ts`, 72/72 passing). `bash scripts/check.sh` and a
 code review are this item's own remaining exit checks, run after this
 section landed.
+
+## ENGINE-AVAIL-00
+
+The chat composer disables typing and shows an availability notice when `/api/health` reports that MaiPai's AI is unavailable, then restores itself as health recovers. It reads `/api/health` because the signed-in chat page can already access the authenticated health endpoint, and no new backend route is needed.

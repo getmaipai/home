@@ -212,6 +212,30 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
       restore();
     }
   });
+
+  test("shows the availability notice and Repairs link when health reports the chat as blocked", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/health")) {
+        return Promise.resolve(Response.json({ engines: { chat: { kind: "blocked", pid: 1, alive: true } } }));
+      }
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const { findByRole, findByText } = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await findByText("MaiPai's AI isn't running right now")).toBeVisible();
+      expect(await findByText("You can't send messages until it's back.")).toBeVisible();
+      expect(await findByRole("link", { name: "Open Repairs to see what's wrong." })).toHaveAttribute("href", "/repairs");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
 });
 
 describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {

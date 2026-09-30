@@ -24,6 +24,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { ComposerPrimitive, useAuiState } from "@assistant-ui/react";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
+import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 
 const DictationLevelMeterContext = createContext<LevelMeter | null>(null);
 
@@ -61,6 +62,7 @@ const POLL_MS = 60;
 export function ComposerDictationWaveform() {
   const dictating = useAuiState((s) => s.composer.dictation != null);
   const meter = useContext(DictationLevelMeterContext);
+  const availability = useContext(ChatAvailabilityContext);
   const [colors] = useState(() => ({ bar: readColorToken("--color-primary") || "rgb(160, 198, 255)" }));
   // A rolling window of recent levels, oldest first - each render tick
   // shifts one out and pushes the meter's current read in, the classic
@@ -91,7 +93,8 @@ export function ComposerDictationWaveform() {
     // trades away; every other prop matches exactly.
     return (
       <ComposerPrimitive.Input
-        placeholder="Send a message..."
+        placeholder={availability === "unavailable" ? "MaiPai's AI isn't running right now" : "Send a message..."}
+        disabled={availability === "unavailable"}
         // Same Tailwind utilities as the kit's own default Input - not
         // its "aui-composer-input" marker class, which has no real CSS
         // rule anywhere and only the kit's own thread.aui.tsx carries an

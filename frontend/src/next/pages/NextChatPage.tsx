@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type MutableRefObject, type PointerEvent, type PropsWithChildren, type ReactNode } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolApprovalOption, type ToolCallMessagePartComponent } from "@assistant-ui/react";
@@ -61,6 +61,7 @@ import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { ComposerDictationWaveform, DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
+import { ChatAvailabilityContext, useChatAvailability } from "@/apps/chat/useChatAvailability";
 import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
@@ -2053,6 +2054,7 @@ function ProjectResultReload() {
 }
 
 export function NextChatPage({ person }: { person: Roster }) {
+  const chatAvailability = useChatAvailability();
   // CHAT-HEADER-01: ChatHeaderBar is a stable, zero-prop reference - the
   // shell header's own slot (ui-v0.5.35) mounts and unmounts it, never
   // re-created per render.
@@ -2609,6 +2611,7 @@ export function NextChatPage({ person }: { person: Roster }) {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
+      <ChatAvailabilityContext.Provider value={chatAvailability}>
       <ArtifactOpenContext.Provider value={setOpenArtifactId}>
       <ReloadMainThreadProvider>
       <ConfirmAskAnswerProvider askAnswerRef={askAnswerRef}>
@@ -2684,6 +2687,15 @@ export function NextChatPage({ person }: { person: Roster }) {
               <CompareIcon className="size-4" />
               <AlertTitle>Bare mode is on</AlertTitle>
               <AlertDescription>Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards.</AlertDescription>
+            </Alert>
+          ) : null}
+          {chatAvailability === "unavailable" ? (
+            <Alert variant="destructive" className="mx-4 mt-2 mb-2" role="status">
+              <AlertTitle>MaiPai's AI isn't running right now</AlertTitle>
+              <AlertDescription>
+                You can't send messages until it's back.{" "}
+                {isOwnerOrAdminRole(person.role) ? <Link to="/repairs">Open Repairs to see what's wrong.</Link> : null}
+              </AlertDescription>
             </Alert>
           ) : null}
           {banner ? (
@@ -2952,6 +2964,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </ConfirmAskAnswerProvider>
       </ReloadMainThreadProvider>
       </ArtifactOpenContext.Provider>
+      </ChatAvailabilityContext.Provider>
     </AssistantRuntimeProvider>
   );
 }
