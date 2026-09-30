@@ -959,7 +959,7 @@ export const api = {
   unshare: (shareId: string) => request<{ deletedShareIds: string[] }>(`/api/shares/${encodeURIComponent(shareId)}`, { method: "DELETE" }),
   // FACE-02: the guided camera-capture enrollment flow. One row per
   // accepted sample (FACE-01's own design, biometricPrints.ts's header) -
-  // never a batch endpoint, so this POSTs once per accepted pose.
+  // the enrollment page saves the whole set through enrollBiometricPrints (FACE-02Q).
   visionModels: () => request<{ detectors: VisionModelInfo[]; installed: boolean }>("/api/vision/models"),
   biometricPrints: (personId: string) => request<BiometricPrintSummary[]>(`/api/biometric-prints?personId=${encodeURIComponent(personId)}`),
   // `signal` (found by review, 2026-09-29): a cancel mid-submission has
@@ -969,6 +969,11 @@ export const api = {
   // accept and forward one.
   createBiometricPrint: (input: { person_id: string; model_id: string; embedding: number[]; captured_by?: string | null }, signal?: AbortSignal) =>
     request<BiometricPrintSummary>("/api/biometric-prints", { method: "POST", body: JSON.stringify(input), signal }),
+  // FACE-02Q (#201): a whole enrollment in one request. The hub saves every
+  // sample and replaces the person's previous face set in one transaction,
+  // so it is all or nothing (an error means nothing was saved).
+  enrollBiometricPrints: (input: { person_id: string; model_id: string; samples: Array<{ embedding: number[]; captured_by?: string | null }>; replace?: boolean }, signal?: AbortSignal) =>
+    request<{ prints: BiometricPrintSummary[]; replaced: number }>("/api/biometric-prints/enrollments", { method: "POST", body: JSON.stringify(input), signal }),
   // Owner/admin only (routes/store.ts's own gate) - null means the
   // package has no active store install (bundled-only, or never
   // installed). Called lazily, on-demand for the pane's selected

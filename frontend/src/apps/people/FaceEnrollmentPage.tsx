@@ -8,7 +8,7 @@ import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { getIcon, type IconName } from "@maipai/ui/src/icons";
 import { api, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
-import { submitEmbeddings } from "@/apps/people/submitEmbeddings";
+import { submitEnrollment } from "@/apps/people/submitEmbeddings";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import {
   EnrollmentSession,
@@ -525,41 +525,32 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
       const controller = new AbortController();
       submitAbortRef.current = controller;
       try {
-        await submitEmbeddings(
+        await submitEnrollment(
           embeddings,
           controller.signal,
-          (embedding, signal) => {
+          (all, signal) => {
             const modelId = sfaceModelIdRef.current;
             if (!modelId) return Promise.reject(new Error("Face model id not resolved yet."));
-            // One POST per accepted sample (FACE-01's own one-row-per-
-            // sample design), sequentially - never batched, and never
-            // parallel either, so a partial-failure state is always an
-            // honest reflection of exactly which ones actually saved.
-            // Discards the response: only whether it resolved or
-            // rejected (including via `signal`'s own abort) matters
-            // here, submitEmbeddings.ts owns turning that into a result.
+            // FACE-02Q (#201): the whole set in ONE request. The hub
+            // saves every sample and replaces this person's previous face
+            // set in the same transaction, so the outcome is all or
+            // nothing: a failure means nothing was saved and the old set
+            // is untouched. Discards the response: only whether it
+            // resolved or rejected (including via `signal`'s own abort)
+            // matters here, submitEmbeddings.ts turns that into a result.
             return api
-              .createBiometricPrint({ person_id: target.id, model_id: modelId, embedding, captured_by: operator.id }, signal)
+              .enrollBiometricPrints(
+                { person_id: target.id, model_id: modelId, samples: all.map((embedding) => ({ embedding, captured_by: operator.id })) },
+                signal,
+              )
               .then(() => undefined);
           },
-          (embedding) => {
-            setSubmissions((rows) => {
-              const index = rows.findIndex((row) => row.embedding === embedding);
-              if (index === -1) return [...rows, { embedding, state: "pending" as const }];
-              const next = [...rows];
-              next[index] = { ...next[index]!, state: "pending", error: undefined };
-              return next;
-            });
+          (all) => {
+            setSubmissions(all.map((embedding) => ({ embedding, state: "pending" as const })));
           },
-          (embedding, result) => {
+          (result) => {
             setSubmissions((rows) =>
-              rows.map((row) =>
-                row.embedding === embedding
-                  ? result.status === "success"
-                    ? { ...row, state: "success" }
-                    : { ...row, state: "error", error: result.message }
-                  : row,
-              ),
+              rows.map((row) => (result.status === "success" ? { ...row, state: "success" as const } : { ...row, state: "error" as const, error: result.message })),
             );
           },
         );
@@ -586,7 +577,9 @@ function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; ta
 
   const retryCamera = () => setCameraRetryKey((key) => key + 1);
   const retryModels = () => setModelsRetryKey((key) => key + 1);
-  const retryFailedSubmissions = () => void submitSamples(submissions.filter((row) => row.state === "error").map((row) => row.embedding));
+  // A failed save saved nothing (all or nothing, FACE-02Q), so a retry
+  // resends the whole set.
+  const retryFailedSubmissions = () => void submitSamples(submissions.map((row) => row.embedding));
   function cancelEnrollment() {
     // Aborts whichever sample is actually in flight right now, not just
     // the ones still queued - see submitAbortRef's own comment.
@@ -772,14 +765,13 @@ function CompletionContent({
   onRetryFailed: () => void;
 }) {
   const total = submissions.length;
-  const succeeded = submissions.filter((row) => row.state === "success").length;
   const failed = submissions.filter((row) => row.state === "error");
   const pending = submissions.some((row) => row.state === "pending");
 
   if (total === 0 || pending) {
     return (
       <div className="flex flex-col items-center gap-3 py-8">
-        <Progress mode="spinner" label={`Saving ${succeeded} of ${total || "?"}…`} />
+        <Progress mode="spinner" label={`Saving ${total || "your"} face sample${total === 1 ? "" : "s"}…`} />
       </div>
     );
   }
@@ -799,14 +791,10 @@ function CompletionContent({
 
   return (
     <div className="flex flex-col items-center gap-3 py-8 text-center">
-      <p className="text-lg font-medium">
-        {succeeded} of {total} samples saved.
-      </p>
-      <p className="text-base text-destructive">
-        {failed.length} sample{failed.length === 1 ? "" : "s"} could not be saved.
-      </p>
+      <p className="text-lg font-medium">The face samples could not be saved.</p>
+      <p className="text-base text-destructive">Nothing was changed: any earlier enrollment is still in place.</p>
       <Button type="button" variant="outline" onClick={onRetryFailed}>
-        Retry the ones that failed
+        Try saving again
       </Button>
     </div>
   );

@@ -32753,6 +32753,70 @@ new reason, and the feedback wording and ring.
 
 Follow-up wording added to FACE-02K-2 in `docs/BACKLOG.md`.
 
+## FACE-02Q: a new enrollment replaces the previous face set (2026-09-29, #201)
+
+**Problem.** Every enrollment only added prints. One person on the owner's
+hub ended up with 20 live face prints from four enrollments, and the three
+older sets (captured under buggy rules) had to be tombstoned by hand. Owner's
+rule: completing a new enrollment replaces that person's previous face set.
+
+**Shape chosen: one additive batch route,
+`POST /api/biometric-prints/enrollments`.** Body `{person_id, model_id,
+samples: [{embedding, captured_by?}], replace?: true}`, response 201
+`{prints: [summary], replaced: n}` (never an embedding). The existing
+`POST /api/biometric-prints` is untouched and never replaces anything
+(org rule: API changes are additive; the robot and other clients may use
+it). The request and response are composed of existing spec records (one
+`BiometricPrint` per sample, validated by the same `BiometricPrint` schema
+and `validateBiometricPrint` as create), so no `@maipai/spec` change was
+needed.
+
+Why a hub-side batch and not the client deleting one by one: the client
+cannot make "old set gone, new set saved" atomic, and a tab closed midway
+would leave the person with fewer prints than before. Why not a `replace`
+flag on the single POST: it would need a client-side "is this the last
+sample" signal and leaves the partial-failure hole open.
+
+**Atomicity.** `enrollBiometricPrints` (`lib/biometricPrints.ts`) validates
+every sample first (authorization, model allow-list, dimension, spec
+schema), building the full records without writing, then runs one
+`db.transaction`: it reads the person's live face prints, tombstones them,
+and inserts the new set. Any invalid sample returns 400 before any write; a
+write error rolls the transaction back. Tests cover an invalid sample, an
+unknown model, an empty batch, a forced insert failure on the third sample
+(a temporary SQLite trigger), and 403 and 401, each asserting the old rows
+are byte-for-byte unchanged.
+
+**One tombstone.** `tombstonePrint` is the single implementation (embedding
+cleared, `deletedAt` and `updatedAt` set, a fresh `nextHlc()` per row),
+now used by `deleteBiometricPrint` as well as the batch, so sync and
+revocation cannot drift. A robot's next `GET /sync` returns only the new
+set.
+
+**Authorization** is create's exactly: the actor must be allowed to consent
+for the person (`canConsentFor`: self or owner/admin ladder, never a child
+for themself), so nobody can replace another person's prints without the
+rights create and delete already require. Consent fields are stamped from
+the actor, never client-supplied.
+
+**What is replaced.** Every live print of that person with modality `face`,
+whatever its `model_id`. A print from an older face model lives in a
+different embedding space, so it cannot be matched against the new set and
+would only sit live (and sync to robots) as dead weight; re-enrolling means
+"these are my face now". Voice prints and other people's prints are never
+touched. `replace: false` gives an atomic add-only batch for a client that
+wants to top up a set.
+
+**The page** (`FaceEnrollmentPage.tsx`, submit path only; the FACE-02J,
+02K, 02M and 02P capture code is unchanged) sends all samples in one
+request through `api.enrollBiometricPrints`. The outcome is all or nothing,
+so the per-sample progress rows collapse to one state: saving, saved, or
+"The face samples could not be saved. Nothing was changed: any earlier
+enrollment is still in place", with "Try saving again" resending the whole
+set. `submitEmbeddings.ts` is now `submitEnrollment` (one call, same
+real-AbortSignal cancel guarantee). The page's "re-enroll anytime" promise
+is now true; no user doc describes re-enrolling, so no user-tier note.
+
 ## MDNS-COLLISION-01 landed (#193)
 
 `lib/mdns.ts` used to publish under the household's display name and never

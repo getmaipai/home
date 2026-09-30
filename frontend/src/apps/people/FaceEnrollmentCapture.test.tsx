@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { FaceEnrollmentPage } from "@/apps/people/FaceEnrollmentPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -103,8 +103,12 @@ const originals: { getContext?: unknown; readyState?: PropertyDescriptor; videoW
 let debugSpy: ReturnType<typeof mock>;
 let infoSpy: ReturnType<typeof mock>;
 let posts = 0;
+let postedBodies: Array<{ person_id: string; samples: unknown[] }> = [];
+let failNextPost = false;
 
 beforeEach(() => {
+  postedBodies = [];
+  failNextPost = false;
   facePresent = true;
   faceSize = 190;
   pose = "frontal";
@@ -136,9 +140,15 @@ beforeEach(() => {
     if (url.includes("/api/vision/models")) {
       return Promise.resolve(Response.json({ installed: true, detectors: [{ id: "sface-test", file: "face_recognition_sface_2021dec.onnx" }] }));
     }
-    if (url.includes("/api/biometric-prints") && init?.method === "POST") {
+    if (url.includes("/api/biometric-prints/enrollments") && init?.method === "POST") {
       posts += 1;
-      return Promise.resolve(Response.json({ id: `print-${posts}` }));
+      const sent = JSON.parse(String(init.body)) as { person_id: string; samples: unknown[] };
+      postedBodies.push(sent);
+      if (failNextPost) {
+        failNextPost = false;
+        return Promise.resolve(Response.json({ error: "boom" }, { status: 500 }));
+      }
+      return Promise.resolve(Response.json({ prints: sent.samples.map((_, i) => ({ id: `print-${i + 1}` })), replaced: 0 }, { status: 201 }));
     }
     if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
     return Promise.resolve(new Response("{}", { status: 200 }));
@@ -263,7 +273,7 @@ describe("FACE-02J: the capture ring", () => {
     expect(posts).toBe(0);
   });
 
-  test("a full enrollment of sharp frames saves five prints, logs one summary line per pose, and never says soft or far", async () => {
+  test("a full enrollment of sharp frames saves the five prints in one replacing request, logs one summary line per pose, and never says soft or far", async () => {
     const { container } = renderPage();
     const prompts: Record<Pose, string> = {
       frontal: "look straight at me",
@@ -277,7 +287,10 @@ describe("FACE-02J: the capture ring", () => {
       pose = next;
       await waitFor(() => expect(view().getByText(index + 1 < order.length ? prompts[order[index + 1]!] : "5 face samples saved.")).toBeTruthy(), WAIT);
     }
-    expect(posts).toBe(5);
+    // FACE-02Q: one request carries the whole set (the hub replaces the
+    // previous set atomically), never one POST per sample.
+    expect(posts).toBe(1);
+    expect(postedBodies[0]!.samples).toHaveLength(5);
     expect(document.body.textContent).not.toContain("soft or far");
     expect(infoSpy).toHaveBeenCalledTimes(5);
     const lines = infoSpy.mock.calls.map((call) => (call as [string, { pose: string }])[1]);
@@ -287,6 +300,31 @@ describe("FACE-02J: the capture ring", () => {
       expect(line.minBoxFrac).toBeGreaterThanOrEqual(DEFAULT_QUALITY_CONFIG.minBoxFrac);
     }
     void container;
+  }, 40000);
+
+  test("a failed save says nothing was changed, and Try saving again resends the whole set", async () => {
+    failNextPost = true;
+    renderPage();
+    const prompts: Record<Pose, string> = {
+      frontal: "look straight at me",
+      left: "slowly turn your head to your left",
+      right: "slowly turn your head to your right",
+      up: "tip your chin up a little",
+      down: "tip your chin down a little",
+    };
+    const order: Pose[] = ["frontal", "left", "right", "up", "down"];
+    for (const [index, next] of order.entries()) {
+      pose = next;
+      if (index + 1 < order.length) await waitFor(() => expect(view().getByText(prompts[order[index + 1]!])).toBeTruthy(), WAIT);
+    }
+    await waitFor(() => expect(view().getByText("The face samples could not be saved.")).toBeTruthy(), WAIT);
+    expect(document.body.textContent).toContain("Nothing was changed");
+    expect(postedBodies).toHaveLength(1);
+
+    fireEvent.click(view().getByRole("button", { name: "Try saving again" }));
+    await waitFor(() => expect(view().getByText("5 face samples saved.")).toBeTruthy(), WAIT);
+    expect(postedBodies).toHaveLength(2);
+    expect(postedBodies[1]!.samples).toHaveLength(5);
   }, 40000);
 });
 

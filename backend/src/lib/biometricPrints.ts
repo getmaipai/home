@@ -92,25 +92,26 @@ export interface BiometricPrintCreate {
   captured_by?: string | null;
 }
 
-export function createBiometricPrint(actor: PersonRow, input: BiometricPrintCreate): OpResult<BiometricPrintSummary> {
-  const target = db.select({ id: people.id, role: people.role }).from(people).where(and(eq(people.id, input.person_id), isNull(people.deletedAt))).get() as
+// A db handle or a transaction handle: the same insert/update surface, so
+// the tombstone and insert helpers below serve both the single-print
+// routes (plain db) and the batch enrollment (one transaction).
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type Writer = typeof db | Tx;
+
+function findTarget(personId: string): { id: string; role: string } | undefined {
+  return db.select({ id: people.id, role: people.role }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get() as
     | { id: string; role: string }
     | undefined;
-  if (!target) return { ok: false, status: 400, error: "person_id does not name an existing person" };
+}
 
+/** Validates one sample against the allow-list and the spec, and builds the
+ * full spec record (consent stamped from the actor, a fresh hlc). Pure: it
+ * writes nothing, so a batch can validate every sample before saving any. */
+function buildPrint(actor: PersonRow, input: BiometricPrintCreate, now: string): OpResult<BiometricPrintT> {
   const known = KNOWN_MODELS[input.model_id];
   if (!known) return { ok: false, status: 400, error: `Unknown biometric model "${input.model_id}"` };
   if (input.embedding.length !== known.dim) return { ok: false, status: 400, error: `${input.model_id} embeddings must have ${known.dim} dimensions` };
 
-  if (!canConsentFor(actor, target)) {
-    return {
-      ok: false,
-      status: 403,
-      error: target.role === "child" ? "Only an owner or admin can consent to enroll a child's biometric print" : "Not allowed to enroll a biometric print for this person",
-    };
-  }
-
-  const now = new Date().toISOString();
   const candidate: BiometricPrintT = {
     id: newBiometricPrintId(),
     person_id: input.person_id,
@@ -131,28 +132,115 @@ export function createBiometricPrint(actor: PersonRow, input: BiometricPrintCrea
   if (!parsed.success) return { ok: false, status: 400, error: parsed.error.message };
   const problems = validateBiometricPrint(parsed.data);
   if (problems.length > 0) return { ok: false, status: 400, error: problems.join("; ") };
+  return { ok: true, status: 201, value: parsed.data };
+}
 
-  db.insert(biometricPrints)
+function insertPrint(writer: Writer, print: BiometricPrintT): void {
+  writer
+    .insert(biometricPrints)
     .values({
-      id: parsed.data.id,
-      personId: parsed.data.person_id,
-      modality: parsed.data.modality,
-      modelId: parsed.data.model_id,
-      modelSha256: parsed.data.model_sha256,
-      dim: parsed.data.dim,
-      embeddingEncrypted: encryptSecret(JSON.stringify(parsed.data.embedding)),
-      capturedBy: parsed.data.captured_by,
-      consentAt: parsed.data.consent_at,
-      consentedByPersonId: parsed.data.consented_by_person_id,
-      createdAt: parsed.data.created_at,
-      updatedAt: parsed.data.updated_at,
+      id: print.id,
+      personId: print.person_id,
+      modality: print.modality,
+      modelId: print.model_id,
+      modelSha256: print.model_sha256,
+      dim: print.dim,
+      embeddingEncrypted: encryptSecret(JSON.stringify(print.embedding)),
+      capturedBy: print.captured_by,
+      consentAt: print.consent_at,
+      consentedByPersonId: print.consented_by_person_id,
+      createdAt: print.created_at,
+      updatedAt: print.updated_at,
       deletedAt: null,
-      hlc: parsed.data.hlc,
+      hlc: print.hlc,
     })
     .run();
+}
 
-  const { embedding: _embedding, ...summary } = parsed.data;
+/** The one tombstone: embedding scrubbed, deletedAt and updatedAt set, a
+ * fresh hlc per row so sync and revocation stay correct. Used by revoking
+ * one print and by a replacing enrollment alike. */
+function tombstonePrint(writer: Writer, printId: string, now: string): void {
+  writer.update(biometricPrints).set({ embeddingEncrypted: null, deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(biometricPrints.id, printId)).run();
+}
+
+function consentError(target: { role: string }): { ok: false; status: 403; error: string } {
+  return {
+    ok: false,
+    status: 403,
+    error: target.role === "child" ? "Only an owner or admin can consent to enroll a child's biometric print" : "Not allowed to enroll a biometric print for this person",
+  };
+}
+
+export function createBiometricPrint(actor: PersonRow, input: BiometricPrintCreate): OpResult<BiometricPrintSummary> {
+  const target = findTarget(input.person_id);
+  if (!target) return { ok: false, status: 400, error: "person_id does not name an existing person" };
+  if (!KNOWN_MODELS[input.model_id]) return { ok: false, status: 400, error: `Unknown biometric model "${input.model_id}"` };
+  if (!canConsentFor(actor, target)) return consentError(target);
+
+  const built = buildPrint(actor, input, new Date().toISOString());
+  if (!built.ok) return built;
+  insertPrint(db, built.value);
+
+  const { embedding: _embedding, ...summary } = built.value;
   return { ok: true, status: 201, value: summary };
+}
+
+export interface BiometricEnrollmentInput {
+  person_id: string;
+  model_id: string;
+  samples: Array<{ embedding: number[]; captured_by?: string | null }>;
+  /** Default true: the new set replaces the person's previous face set. */
+  replace?: boolean;
+}
+
+/** FACE-02Q (#201): save a whole enrollment in one transaction and, unless
+ * `replace` is false, tombstone the person's previous live face prints in
+ * the same transaction. Every sample is validated before anything is
+ * written, and a write error rolls the transaction back, so a failed batch
+ * never leaves the person with fewer prints than before.
+ *
+ * What is replaced: every live print of the person with modality "face",
+ * whatever its model_id. An older face model's prints live in a different
+ * embedding space from the new set, so keeping them would leave dead
+ * weight the matcher must refuse anyway (and a robot would keep syncing
+ * it); a person who re-enrolls means "these are my face". Voice prints
+ * (modality "voice") and other people's prints are never touched.
+ *
+ * Same authorization as create: the actor must be allowed to consent for
+ * this person (never a child for themself). */
+export function enrollBiometricPrints(actor: PersonRow, input: BiometricEnrollmentInput): OpResult<{ prints: BiometricPrintSummary[]; replaced: number }> {
+  const target = findTarget(input.person_id);
+  if (!target) return { ok: false, status: 400, error: "person_id does not name an existing person" };
+  if (!KNOWN_MODELS[input.model_id]) return { ok: false, status: 400, error: `Unknown biometric model "${input.model_id}"` };
+  if (input.samples.length === 0) return { ok: false, status: 400, error: "An enrollment needs at least one sample" };
+  if (!canConsentFor(actor, target)) return consentError(target);
+
+  const now = new Date().toISOString();
+  const built: BiometricPrintT[] = [];
+  for (const sample of input.samples) {
+    const one = buildPrint(actor, { person_id: input.person_id, model_id: input.model_id, embedding: sample.embedding, captured_by: sample.captured_by }, now);
+    if (!one.ok) return one;
+    built.push(one.value);
+  }
+
+  const replace = input.replace ?? true;
+  const replaced = db.transaction((tx) => {
+    let count = 0;
+    if (replace) {
+      const old = tx
+        .select({ id: biometricPrints.id })
+        .from(biometricPrints)
+        .where(and(eq(biometricPrints.personId, input.person_id), eq(biometricPrints.modality, "face"), isNull(biometricPrints.deletedAt)))
+        .all();
+      for (const row of old) tombstonePrint(tx, row.id, now);
+      count = old.length;
+    }
+    for (const print of built) insertPrint(tx, print);
+    return count;
+  });
+
+  return { ok: true, status: 201, value: { prints: built.map(({ embedding: _e, ...summary }) => summary), replaced } };
 }
 
 /** Metadata only - see this file's own header on why the embedding never
@@ -202,8 +290,7 @@ export function deleteBiometricPrint(actor: PersonRow, printId: string): OpResul
     if (!target || !canManage(actor, target)) return { ok: false, status: 403, error: "Not allowed to revoke this biometric print" };
   }
 
-  const now = new Date().toISOString();
-  db.update(biometricPrints).set({ embeddingEncrypted: null, deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(biometricPrints.id, printId)).run();
+  tombstonePrint(db, printId, new Date().toISOString());
   return { ok: true, status: 200, value: { success: true } };
 }
 

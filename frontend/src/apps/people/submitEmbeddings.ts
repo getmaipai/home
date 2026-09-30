@@ -1,51 +1,47 @@
-// FACE-02: the enrollment flow's per-sample submission loop, pulled out
-// of FaceEnrollmentPage.tsx as its own pure function (a code review
-// found the previous shape - checking a plain `cancelledRef` boolean
-// only between loop iterations - stopped the NEXT sample but not one
-// already mid-flight: the person clicks "Cancel enrollment" while a
-// POST /api/biometric-prints is in the air, and it completes and saves
-// a print anyway, exactly the consent scenario the cancel button exists
-// to prevent). A real AbortSignal is threaded through `postOne` all the
-// way to fetch() itself (api.ts's request() already passes a caller
-// signal through untouched), so cancelling actually aborts the network
-// request, not just the JS loop around it. Kept UI-framework-free so the
-// abort race is unit-testable without mounting the whole camera/ONNX
-// flow (submitEmbeddings.test.ts).
+// FACE-02: the enrollment flow's submit step, pulled out of
+// FaceEnrollmentPage.tsx as its own pure function so the cancel race is
+// unit-testable without mounting the camera/ONNX flow
+// (submitEmbeddings.test.ts). A code review found the original per-sample
+// loop, checking a plain `cancelledRef` boolean only between iterations,
+// stopped the NEXT sample but not one already mid-flight: the person
+// clicks "Cancel enrollment" while a POST is in the air, and it completes
+// and saves a print anyway, exactly the consent scenario the cancel
+// button exists to prevent. A real AbortSignal is threaded through
+// `postAll` to fetch() itself, so cancelling aborts the network request.
+//
+// FACE-02Q (#201): the whole set now goes in ONE request to the hub's
+// enrollments route, which saves it and replaces the person's previous
+// face set in a single transaction. That makes the outcome all or
+// nothing: one success for every sample, or one error meaning nothing was
+// saved (and the old set is untouched). A retry resends the whole set.
 export type SubmitResult = { status: "success" } | { status: "error"; message: string };
 
 /**
- * Sequentially POSTs each embedding via `postOne`, never batched and
- * never parallel (FACE-01's own one-row-per-sample design - a partial
- * failure has to be an honest reflection of exactly which ones actually
- * saved). `onStart` fires right before each attempt (for a "pending" UI
- * state); `onResult` fires only for a sample that actually finished
- * (succeeded or genuinely failed) - a sample aborted mid-flight by
- * `signal` gets neither, so its row is never marked "success", matching
- * what a cancelled consent flow must guarantee.
+ * Sends every embedding through `postAll` as one call. `onStart` fires
+ * right before the attempt (for a "pending" UI state); `onResult` fires
+ * only once the call actually finished (succeeded or genuinely failed) -
+ * a call aborted mid-flight by `signal` gets neither, so the rows are
+ * never marked "success", matching what a cancelled consent flow must
+ * guarantee.
  */
-export async function submitEmbeddings(
+export async function submitEnrollment(
   embeddings: readonly number[][],
   signal: AbortSignal,
-  postOne: (embedding: number[], signal: AbortSignal) => Promise<void>,
-  onStart: (embedding: number[]) => void,
-  onResult: (embedding: number[], result: SubmitResult) => void,
+  postAll: (embeddings: readonly number[][], signal: AbortSignal) => Promise<void>,
+  onStart: (embeddings: readonly number[][]) => void,
+  onResult: (result: SubmitResult) => void,
 ): Promise<void> {
-  for (const embedding of embeddings) {
+  if (embeddings.length === 0 || signal.aborted) return;
+  onStart(embeddings);
+  try {
+    await postAll(embeddings, signal);
     if (signal.aborted) return;
-    onStart(embedding);
-    try {
-      await postOne(embedding, signal);
-      if (signal.aborted) return;
-      onResult(embedding, { status: "success" });
-    } catch (err) {
-      // An abort-triggered rejection (postOne's own fetch throwing
-      // AbortError once `signal` fires) is a cancel, not a failure -
-      // checked here, after the await settles, since that's the only
-      // point this function can tell "postOne threw because the request
-      // was aborted" apart from "postOne threw for a real reason".
-      if (signal.aborted) return;
-      const message = err instanceof Error ? err.message : "Could not save that sample.";
-      onResult(embedding, { status: "error", message });
-    }
+    onResult({ status: "success" });
+  } catch (err) {
+    // An abort-triggered rejection is a cancel, not a failure - checked
+    // after the await settles, the only point this function can tell
+    // "threw because the request was aborted" from "threw for a real reason".
+    if (signal.aborted) return;
+    onResult({ status: "error", message: err instanceof Error ? err.message : "Could not save the enrollment." });
   }
 }

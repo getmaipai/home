@@ -12,7 +12,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth, requireDeviceSession } from "@/middleware/auth";
-import { createBiometricPrint, listBiometricPrints, deleteBiometricPrint, listPrintsForSync } from "@/lib/biometricPrints";
+import { createBiometricPrint, enrollBiometricPrints, listBiometricPrints, deleteBiometricPrint, listPrintsForSync } from "@/lib/biometricPrints";
 
 export const biometricPrintsRoutes = apiRouter();
 
@@ -92,6 +92,46 @@ const createRoute_ = createRoute({
 biometricPrintsRoutes.openapi(createRoute_, (c) => {
   const actor = c.get("person");
   const result = createBiometricPrint(actor, c.req.valid("json"));
+  if (!result.ok) return c.json({ error: result.error }, createStatusFor(result.status));
+  return c.json(result.value, 201);
+});
+
+// FACE-02Q (#201): a whole enrollment in one request, replacing the
+// person's previous face set atomically. Additive: the single-sample POST
+// above is unchanged (the robot and other clients may use it) and never
+// replaces anything.
+const enrollRoute = createRoute({
+  method: "post",
+  path: "/enrollments",
+  tags: ["Biometric prints"],
+  summary: "Save a whole face enrollment at once, replacing the person's previous face set in the same transaction",
+  middleware: [requireAuth] as const,
+  request: {
+    body: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            person_id: z.string(),
+            model_id: z.string(),
+            samples: z.array(z.object({ embedding: z.array(z.number()).min(1), captured_by: z.string().nullable().optional() })).min(1).max(50),
+            replace: z.boolean().optional().default(true),
+          }),
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      content: { "application/json": { schema: z.object({ prints: z.array(SummarySchema), replaced: z.number() }) } },
+      description:
+        "All samples saved. With replace (the default) the person's previous live face prints, of any face model, were tombstoned in the same transaction; `replaced` counts them. Voice prints are never touched. All or nothing: any invalid sample or write error saves nothing and leaves the old set live.",
+    },
+    ...errorResponses({ 400: "Unknown model, wrong dimension, empty batch, or no such person", 401: "Not signed in", 403: "Not allowed to consent for this person" }),
+  },
+});
+biometricPrintsRoutes.openapi(enrollRoute, (c) => {
+  const actor = c.get("person");
+  const result = enrollBiometricPrints(actor, c.req.valid("json"));
   if (!result.ok) return c.json({ error: result.error }, createStatusFor(result.status));
   return c.json(result.value, 201);
 });

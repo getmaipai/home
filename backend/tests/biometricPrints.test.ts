@@ -324,3 +324,170 @@ describe("GET /api/biometric-prints/sync", () => {
     expect(body.prints.map((p) => p.id)).toEqual([liveId]);
   });
 });
+
+// FACE-02Q (#201): completing a new enrollment replaces the person's
+// previous face set, atomically, through one batch route.
+describe("POST /api/biometric-prints/enrollments", () => {
+  const sample = (n: number, capturedBy: string | null = null) => ({ embedding: SFACE_EMBEDDING.map((v) => v + n / 1000), captured_by: capturedBy });
+  const body = (personId: string, samples: unknown[], extra: Record<string, unknown> = {}) => ({ person_id: personId, model_id: "sface-2021dec", samples, ...extra });
+
+  function sage() {
+    return db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+  }
+  function rowsFor(personId: string) {
+    return db.select().from(biometricPrints).where(eq(biometricPrints.personId, personId)).all();
+  }
+  function liveIds(personId: string): string[] {
+    return rowsFor(personId).filter((r) => r.deletedAt === null).map((r) => r.id).sort();
+  }
+  function rawPrint(personId: string, modality: "face" | "voice", modelId = "sface-2021dec"): string {
+    const id = newBiometricPrintId();
+    const now = new Date().toISOString();
+    db.insert(biometricPrints)
+      .values({
+        id, personId, modality, modelId, modelSha256: "test-sha256", dim: 128,
+        embeddingEncrypted: encryptSecret(JSON.stringify(SFACE_EMBEDDING)),
+        capturedBy: null, consentAt: now, consentedByPersonId: personId, createdAt: now, updatedAt: now, deletedAt: null,
+        hlc: "1700000000000:0:testfix",
+      })
+      .run();
+    return id;
+  }
+
+  test("a second enrollment tombstones the first set and leaves exactly the new set live", async () => {
+    const owner = await ownerSession();
+    const me = sage();
+    const first = await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(1), sample(2), sample(3)]));
+    expect(first.status).toBe(201);
+    const firstBody = (await first.json()) as { prints: Array<{ id: string }>; replaced: number };
+    expect(firstBody.prints).toHaveLength(3);
+    expect(firstBody.replaced).toBe(0);
+    const oldIds = firstBody.prints.map((p) => p.id).sort();
+    const oldHlcs = new Map(rowsFor(me.id).map((r) => [r.id, r.hlc]));
+
+    const second = await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(4), sample(5)]));
+    expect(second.status).toBe(201);
+    const secondBody = (await second.json()) as { prints: Array<{ id: string; embedding?: unknown }>; replaced: number };
+    expect(secondBody.replaced).toBe(3);
+    expect(secondBody.prints[0]!.embedding).toBeUndefined();
+    expect(liveIds(me.id)).toEqual(secondBody.prints.map((p) => p.id).sort());
+
+    for (const row of rowsFor(me.id).filter((r) => oldIds.includes(r.id))) {
+      expect(row.embeddingEncrypted).toBeNull();
+      expect(row.deletedAt).not.toBeNull();
+      expect(row.hlc > oldHlcs.get(row.id)!).toBe(true);
+    }
+    expect(decryptBiometricPrintEmbedding(oldIds[0]!)).toBeNull();
+  });
+
+  test("the robot sync list returns only the new set afterwards", async () => {
+    const owner = await ownerSession();
+    const me = sage();
+    await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(1), sample(2)]));
+    const second = (await (await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(3)]))).json()) as { prints: Array<{ id: string }> };
+    const { listPrintsForSync } = await import("@/lib/biometricPrints");
+    expect(listPrintsForSync().map((p) => p.id)).toEqual(second.prints.map((p) => p.id));
+  });
+
+  test("another person's prints and this person's voice prints are untouched", async () => {
+    const owner = await ownerSession();
+    const me = sage();
+    const other = await addPerson(owner, "Marlow", "adult", "adultpin1");
+    const otherPrint = rawPrint(other.id, "face");
+    const myVoice = rawPrint(me.id, "voice");
+    rawPrint(me.id, "face");
+
+    const res = await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(1)]));
+    expect(res.status).toBe(201);
+    expect(liveIds(other.id)).toEqual([otherPrint]);
+    expect(liveIds(me.id)).toContain(myVoice);
+    expect(liveIds(me.id)).toHaveLength(2); // the voice print plus the one new face print
+  });
+
+  test("an older face model's prints are replaced too", async () => {
+    const owner = await ownerSession();
+    const me = sage();
+    const oldModel = rawPrint(me.id, "face", "sface-2019-old");
+    const res = await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(1)]));
+    expect(res.status).toBe(201);
+    expect(liveIds(me.id)).not.toContain(oldModel);
+  });
+
+  test("replace:false only adds", async () => {
+    const owner = await ownerSession();
+    const me = sage();
+    const existing = rawPrint(me.id, "face");
+    const res = await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(1)], { replace: false }));
+    expect(res.status).toBe(201);
+    expect(liveIds(me.id)).toContain(existing);
+    expect(liveIds(me.id)).toHaveLength(2);
+  });
+
+  test("an invalid sample anywhere in the batch saves nothing and leaves the old set live", async () => {
+    const owner = await ownerSession();
+    const me = sage();
+    const existing = rawPrint(me.id, "face");
+    const before = rowsFor(me.id);
+    const res = await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(1), { embedding: [1, 2, 3] }]));
+    expect(res.status).toBe(400);
+    expect(liveIds(me.id)).toEqual([existing]);
+    expect(rowsFor(me.id)).toEqual(before);
+  });
+
+  test("an unknown model or an empty batch is refused and changes nothing", async () => {
+    const owner = await ownerSession();
+    const me = sage();
+    const existing = rawPrint(me.id, "face");
+    expect((await owner.post("/api/biometric-prints/enrollments", { ...body(me.id, [sample(1)]), model_id: "nope" })).status).toBe(400);
+    expect((await owner.post("/api/biometric-prints/enrollments", body(me.id, []))).status).toBe(400);
+    expect(liveIds(me.id)).toEqual([existing]);
+  });
+
+  test("a failure mid-transaction rolls everything back", async () => {
+    const owner = await ownerSession();
+    const me = sage();
+    const existing = rawPrint(me.id, "face");
+    const before = rowsFor(me.id);
+    const { sqlite } = await import("@/db");
+    sqlite.exec("CREATE TRIGGER face02q_boom BEFORE INSERT ON biometric_prints WHEN NEW.captured_by = 'boom' BEGIN SELECT RAISE(ABORT, 'boom'); END");
+    try {
+      const res = await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(1), sample(2), sample(3, "boom")]));
+      expect(res.status).toBeGreaterThanOrEqual(500);
+    } finally {
+      sqlite.exec("DROP TRIGGER face02q_boom");
+    }
+    expect(liveIds(me.id)).toEqual([existing]);
+    expect(rowsFor(me.id)).toEqual(before);
+  });
+
+  test("an actor who may not enroll this person gets 403 and the old set survives", async () => {
+    const owner = await ownerSession();
+    const a = await addPerson(owner, "Marlow", "adult", "adultpin1");
+    const b = await addPerson(owner, "Nadia", "adult", "adultpin2");
+    const existing = rawPrint(b.id, "face");
+    const aClient = await sessionFor(a.id, "adultpin1");
+    const res = await aClient.post("/api/biometric-prints/enrollments", body(b.id, [sample(1)]));
+    expect(res.status).toBe(403);
+    expect(liveIds(b.id)).toEqual([existing]);
+  });
+
+  test("a child cannot replace their own set, and an unauthenticated call is 401", async () => {
+    const owner = await ownerSession();
+    const child = await addPerson(owner, "Bramble", "child");
+    const existing = rawPrint(child.id, "face");
+    const childClient = await sessionFor(child.id);
+    expect((await childClient.post("/api/biometric-prints/enrollments", body(child.id, [sample(1)]))).status).toBe(403);
+    expect(liveIds(child.id)).toEqual([existing]);
+    expect((await new TestClient().post("/api/biometric-prints/enrollments", body(child.id, [sample(1)]))).status).toBe(401);
+  });
+
+  test("the single-sample POST still works and does not replace anything", async () => {
+    const owner = await ownerSession();
+    const me = sage();
+    const existing = rawPrint(me.id, "face");
+    const res = await owner.post("/api/biometric-prints", { person_id: me.id, model_id: "sface-2021dec", embedding: SFACE_EMBEDDING });
+    expect(res.status).toBe(201);
+    expect(liveIds(me.id)).toHaveLength(2);
+    expect(liveIds(me.id)).toContain(existing);
+  });
+});

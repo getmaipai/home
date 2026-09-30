@@ -19312,6 +19312,183 @@
         }
       }
     },
+    "/api/biometric-prints/enrollments": {
+      "post": {
+        "tags": [
+          "Biometric prints"
+        ],
+        "summary": "Save a whole face enrollment at once, replacing the person's previous face set in the same transaction",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "person_id": {
+                    "type": "string"
+                  },
+                  "model_id": {
+                    "type": "string"
+                  },
+                  "samples": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "embedding": {
+                          "type": "array",
+                          "items": {
+                            "type": "number"
+                          },
+                          "minItems": 1
+                        },
+                        "captured_by": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "embedding"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 50
+                  },
+                  "replace": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "person_id",
+                  "model_id",
+                  "samples"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "All samples saved. With replace (the default) the person's previous live face prints, of any face model, were tombstoned in the same transaction; `replaced` counts them. Voice prints are never touched. All or nothing: any invalid sample or write error saves nothing and leaves the old set live.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "prints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "person_id": {
+                            "type": "string"
+                          },
+                          "modality": {
+                            "type": "string",
+                            "enum": [
+                              "face",
+                              "voice"
+                            ]
+                          },
+                          "model_id": {
+                            "type": "string"
+                          },
+                          "model_sha256": {
+                            "type": "string"
+                          },
+                          "dim": {
+                            "type": "number"
+                          },
+                          "captured_by": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "consent_at": {
+                            "type": "string"
+                          },
+                          "consented_by_person_id": {
+                            "type": "string"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          },
+                          "deleted_at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "hlc": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "person_id",
+                          "modality",
+                          "model_id",
+                          "model_sha256",
+                          "dim",
+                          "captured_by",
+                          "consent_at",
+                          "consented_by_person_id",
+                          "created_at",
+                          "updated_at",
+                          "deleted_at",
+                          "hlc"
+                        ]
+                      }
+                    },
+                    "replaced": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "prints",
+                    "replaced"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown model, wrong dimension, empty batch, or no such person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed to consent for this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/biometric-prints/{id}": {
       "delete": {
         "tags": [
