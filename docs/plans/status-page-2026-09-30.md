@@ -96,6 +96,7 @@ rule). They go in `commons/spec/` first, get a fixture and a tag, then `home` pi
 | A1 | `statusIndicator` slot prop on `Header`/`FullLayout`, kit tag `ui-v0.5.81` | commons | S | nothing yet |
 | A1b | Attributed snapshots of Kibo `Status` and Tremor `Tracker` (as `UptimeStrip`) into the kit, NOTICE, kit tag `ui-v0.5.82` | commons | S | nothing yet |
 | A2 | Indicator component in the slot; `/status` page with current state of every component; admin Restart/Stop controls moved here; Settings link card; unmount the 05a2 list from `/models` | home | M (two commits) | the dot, the page, working controls |
+| A2c | Restyle the banner to the visual target (coloured banner, icon, headline, affected-part chips, incident card from current health); no history needed | home | S | the new banner look |
 | B1 | Spec: `StatusNote`, `MaintenanceWindow` (Uptime Kuma columns, Statuspage enum), fixtures, tag | commons | S | nothing yet |
 | B2 | Tables, admin routes to post and clear a note and to create, edit and cancel maintenance windows, member read; UI; alarms suppressed inside a window | home | M (two commits) | admin posts a note and a window, everyone sees it |
 | C1 | Spec: `StatusEvent`, tag | commons | S | nothing yet |
@@ -159,6 +160,24 @@ yet verified, see slice A0):
 - **Rejected:** every whole status app (Uptime Kuma, Kener, Gatus, Checkmate, Cachet, OneUptime, Upptime,
   OpenStatus itself): separate services, wrong stack, stale, unverified licence, or phone-home;
   `@openstatus/react` and `@openstatus/sdk-node` (call openstatus.dev).
+
+## Visual target (Jesse, 2026-09-30, two incident.io status page examples)
+
+The finished page should look like a modern hosted status page, not a plain list. From Jesse's screenshots:
+- **Banner**: a full-width coloured banner with an icon and a headline. Green with a check: "We're fully operational" and a
+  subline ("We're not aware of any issues affecting our systems"). Red with a warning icon: "We're currently experiencing
+  issues", with coloured chips inside it naming the affected parts (red for down, amber for degraded). Blue/violet for
+  scheduled maintenance in progress. The headline is a plain sentence; the header dot follows the same colours.
+- **Current incident card** (under the banner while something is wrong): a title, a one-sentence plain description, and a
+  grey meta line "Investigating . Ongoing for 1 day . Affects Voice and Library". Derived from the recorded outage (C2), not
+  authored by hand in the first version; an admin's pinned note already covers hand-written text.
+- **System status card**: a header "System status" with a month-range pager (`< Jun 2026 - Sep 2026 >`); one row per part:
+  a green check or state icon, the name, a small info icon whose tooltip is the part's one-line purpose, "99.999% uptime" on
+  the right, and beneath it a dense strip of about 90 thin daily cells (green fine, yellow degraded, red outage, blue
+  maintenance, grey no data). Hover or focus on a day shows a small card: the date, the worst state, and any outage
+  or maintenance that day. Uptime percentage = operational time / (total time minus maintenance time).
+- Component: the kit `UptimeStrip` (A1b). Its data comes from C3's history view; its cell count and month pager are props.
+- Subscribe/notification links from the examples are out of scope (Home has its own notifications).
 
 ## Out of scope
 
