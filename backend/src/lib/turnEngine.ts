@@ -28,6 +28,7 @@ import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuot
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
+import { chatEngineDown } from "@/lib/llmSupervisor";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
@@ -149,7 +150,7 @@ export function projectDocumentForAudience(document: TurnArtifactValue, ageBand:
 // error. New path only (turnMachine/turnNext.ts's beginTurn()) - the
 // old path (runTurn()/runTurnStream() below) has no `ask_answer` field
 // to ever produce one.
-export type TurnFailure = { ok: false; status: 400 | 409 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable" | "temporary_mismatch" | "ask_stale"; error: string };
+export type TurnFailure = { ok: false; status: 400 | 409 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable" | "engine_unavailable" | "temporary_mismatch" | "ask_stale"; error: string };
 
 export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
 
@@ -3780,7 +3781,7 @@ export async function runTurn(
   actor: PersonRow,
   surface: Surface,
   text: string,
-  opts: { thinking?: boolean; model?: string; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; temporary?: boolean; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
+  opts: { thinking?: boolean; spoken?: boolean; model?: string; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; temporary?: boolean; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
 ): Promise<TurnOpResult> {
   // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
   if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
@@ -3809,9 +3810,27 @@ export async function runTurn(
   const lease = acquireTurnLease();
   try {
     return await runTurnHoldingLease(actor, surface, text, conversation, lease, startedAt, opts);
+  } catch (err) {
+    if (err instanceof EngineUnavailableTurnError) return { ok: false, status: 503, code: "engine_unavailable", error: err.message };
+    throw err;
   } finally {
     lease.release();
   }
+}
+
+class EngineUnavailableTurnError extends Error {}
+
+function engineUnavailableForTurn(surface: Surface, spoken = false): EngineUnavailableTurnError {
+  const message = engineUnavailableLine(surface, spoken);
+  return new EngineUnavailableTurnError(message);
+}
+
+function engineUnavailableLine(surface: Surface, spoken = false): string {
+  return spoken || surface !== "chat" ? "I can't think right now. I've told the grown-ups." : "MaiPai's AI isn't running right now.";
+}
+
+function isEngineUnavailableFailure(message: string): boolean {
+  return chatEngineDown() || message.includes("could not reach") || message.includes("connection refused") || message.includes("ForeignPortHolderError");
 }
 
 async function runTurnHoldingLease(
@@ -3821,7 +3840,7 @@ async function runTurnHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; model?: string; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
+  opts: { thinking?: boolean; spoken?: boolean; model?: string; conversationId?: string; supersedes?: string; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
 ): Promise<TurnOpResult> {
   const loaded = loadAllManifests(); // one catalog scan, shared below
   const prepared = await prepareTurn(actor, surface, text, loaded, conversation, lease, resolveSupersedes(opts.supersedes, conversation.id), undefined, false, opts.speakerEvidence ?? null, opts.present ?? null, null, opts.documentAttachments);
@@ -3916,6 +3935,7 @@ async function runTurnHoldingLease(
     generationDone = Date.now();
     const composed = answer.ok ? composedText(answer.value.text) : null;
     if (composed === null) {
+      if (!answer.ok && isEngineUnavailableFailure(answer.error)) throw engineUnavailableForTurn(surface, opts.spoken);
       console.log(`[turn] the composition on turn ${modelPrepared.turnId} ${answer.ok ? "answered nothing usable" : `failed: ${answer.error}`}; the direct replies stand`);
       modelPrepared.composed = { mode: "composition", model_calls: 1, fell_back: true, ...(plan.synthetic_ids ? { synthetic_ids: true } : {}), phase: machine.phase };
       return { ...resolved, reply: plan.fallback, ...(sources?.length ? { sources } : {}) };
@@ -3988,6 +4008,7 @@ async function runTurnHoldingLease(
     prepared.timings.first_token_ms = Date.now() - startedAt;
     generationDone = Date.now();
     if (!completion.ok) {
+      if (isEngineUnavailableFailure(completion.error)) throw engineUnavailableForTurn(surface, opts.spoken);
       return { ok: false, status: 503, code: "unavailable", error: completion.error }; // the lease releases in runTurn()'s finally
     }
 
@@ -4023,6 +4044,7 @@ async function runTurnHoldingLease(
         const retry = await complete("chat", prepared.messages, { thinking: opts.thinking, model: opts.model });
         generationDone = Date.now();
         if (!retry.ok) {
+          if (isEngineUnavailableFailure(retry.error)) throw engineUnavailableForTurn(surface, opts.spoken);
           return { ok: false, status: 503, code: "unavailable", error: retry.error };
         }
         value = answerWithSafetyAndGuards(await shapeModelText(retry.value.text, false));
@@ -4174,12 +4196,13 @@ export class StreamSafetyRefusal extends Error {
 // generator can no longer become an HTTP status - turn_meta is already
 // on the wire - so it travels as a typed throw, the same shape as
 // StreamSafetyRefusal, and routes/turn.ts emits `code: "unavailable"`
-// on the error event. The turn's lease releases as the throw passes
-// through holdLease() (CHAT-18).
+// on the error event. Connectivity failures use `engine_unavailable`; the
+// turn's lease releases as the throw passes through holdLease() (CHAT-18).
 export class StreamUnavailable extends Error {
-  readonly code = "unavailable" as const;
-  constructor(message: string) {
+  readonly code: "unavailable" | "engine_unavailable";
+  constructor(message: string, code: "unavailable" | "engine_unavailable" = "unavailable") {
     super(message);
+    this.code = code;
   }
 }
 
@@ -4581,7 +4604,7 @@ export async function runTurnStream(
   // shows up in the person's real chat history. finalizeReply() (the
   // output safety boundary) and the lease still run for it exactly as
   // for a real turn: only the log write is conditional.
-  opts: { thinking?: boolean; model?: string; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
+  opts: { thinking?: boolean; spoken?: boolean; model?: string; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] } = {},
 ): Promise<TurnStreamResult> {
   // Speaker evidence belongs only to the robot surface; other callers cannot smuggle it into a chat turn.
   if (surface !== "robot") opts = { ...opts, speakerEvidence: null, present: null };
@@ -4629,7 +4652,7 @@ async function runTurnStreamHoldingLease(
   conversation: Conversation,
   lease: TurnLease,
   startedAt: number,
-  opts: { thinking?: boolean; model?: string; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
+  opts: { thinking?: boolean; spoken?: boolean; model?: string; conversationId?: string; signal?: AbortSignal; supersedes?: string; ephemeral?: boolean; temporary?: boolean; continuation?: TurnContinuation; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; documentAttachments?: readonly DocumentTurnAttachment[] },
 ): Promise<TurnStreamResult> {
   const branchFrom = resolveSupersedes(opts.continuation?.fromTurnId, conversation.id);
   const continuation = opts.continuation ? { ...opts.continuation, ...(branchFrom ? { fromTurnId: branchFrom } : {}) } : null;
@@ -4703,6 +4726,7 @@ async function runTurnStreamHoldingLease(
     const requestSentMs = Date.now() - startedAt;
     const started = await startCompleteStream("chat", plan.messages, { thinking: false, model: opts.model }, opts.signal);
     if (!started.ok) {
+      if (isEngineUnavailableFailure(started.error)) throw new StreamUnavailable(engineUnavailableLine(surface, opts.spoken), "engine_unavailable");
       console.log(`[turn] the composition on turn ${modelTurn.turnId} failed to start: ${started.error}; the direct replies stand`);
       record(true);
       yield `${plan.fallback.text} `;
@@ -4736,6 +4760,7 @@ async function runTurnStreamHoldingLease(
         }
       }
     } catch (err) {
+      if (isEngineUnavailableFailure((err as Error).message)) throw new StreamUnavailable(engineUnavailableLine(surface, opts.spoken), "engine_unavailable");
       // Nothing on the wire yet: the direct replies stand, as on the
       // blocking path; after a delta the failure is the stream's.
       if (visibleText(sent).trim().length > 0 || opts.signal?.aborted) throw err;
@@ -5154,7 +5179,9 @@ async function runTurnStreamHoldingLease(
       // codes describe a role/messages problem this function's own prior
       // validation already ruled out for `chat` - by the time startCompleteStream
       // fails, it's a real down-engine case, not a request-shape one.
-      return { ok: false, status: 503, code: "unavailable", error: started.error };
+      return isEngineUnavailableFailure(started.error)
+        ? { ok: false, status: 503, code: "engine_unavailable", error: engineUnavailableLine(surface, opts.spoken) }
+        : { ok: false, status: 503, code: "unavailable", error: started.error };
     }
     const generation: GenerationRecord = { reason: "initial", thinking: opts.thinking === true, maxTokens: null, requestSentMs: requestSentMsNoTools, firstDeltaMs: null, stats: started.stats };
     modelTurn.generations.push(generation);
@@ -5199,7 +5226,9 @@ async function runTurnStreamHoldingLease(
     opts.signal,
   );
   if (!startResult.ok) {
-    return { ok: false, status: 503, code: "unavailable", error: startResult.error }; // released by the caller's finally
+    return isEngineUnavailableFailure(startResult.error)
+      ? { ok: false, status: 503, code: "engine_unavailable", error: engineUnavailableLine(surface, opts.spoken) }
+      : { ok: false, status: 503, code: "unavailable", error: startResult.error }; // released by the caller's finally
   }
   const started = startResult as Extract<typeof startResult, { ok: true }>;
   const initialGeneration: GenerationRecord = { reason: "initial", thinking: opts.thinking === true, maxTokens: initialMaxTokens, requestSentMs: requestSentMsInitial, firstDeltaMs: null, stats: started.stats };

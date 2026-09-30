@@ -380,12 +380,13 @@ describe("GET /api/health", () => {
     // The OpenAPI response is the public contract for this route. Keep its
     // engine list aligned with the real payload so generated clients can
     // see the background engine too.
+    type OpenApiSchemaShape = { properties?: Record<string, OpenApiSchemaShape> };
     const openapi = await (await client.get("/api/openapi.json")).json() as {
       paths: Record<string, {
         get?: {
           responses: Record<string, {
             content?: Record<string, {
-              schema?: { properties?: Record<string, { properties?: Record<string, unknown> }> };
+              schema?: OpenApiSchemaShape;
             }>;
           }>;
         };
@@ -393,8 +394,8 @@ describe("GET /api/health", () => {
     };
     const healthSchema = openapi.paths["/api/health"]?.get?.responses["200"]?.content?.["application/json"]?.schema;
     expect(healthSchema?.properties?.engines?.properties).toHaveProperty("background");
-    expect(healthSchema?.properties?.engines?.properties.chat?.properties).toHaveProperty("availability");
-    expect(healthSchema?.properties?.engines?.properties.chat?.properties).toHaveProperty("reason");
+    expect(healthSchema?.properties?.engines?.properties?.chat?.properties).toHaveProperty("availability");
+    expect(healthSchema?.properties?.engines?.properties?.chat?.properties).toHaveProperty("reason");
   });
 
   // The Health page kept saying fine while the chat engine was dead

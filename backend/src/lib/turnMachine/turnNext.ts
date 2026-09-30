@@ -218,7 +218,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
 
   if (chatEngineDown()) {
     nudgeChatEngineRecovery();
-    return { ok: false, result: { ok: false, status: 503, code: "unavailable", error: "MaiPai's AI isn't running right now." } };
+    const error = opts.spoken === true || surface !== "chat" ? "I can't think right now. I've told the grown-ups." : "MaiPai's AI isn't running right now.";
+    return { ok: false, result: { ok: false, status: 503, code: "engine_unavailable", error } };
   }
 
   const resolved = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary });
@@ -291,6 +292,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     planBasis,
     safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
     crisis: false,
+    engineUnavailable: false,
     context: [],
     messages: [],
     proposals: [],
@@ -384,6 +386,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     throw new TurnMachineTimeout(`turn machine failed: ${(err as Error).message}`);
   });
   const finalState = finalSnapshot.value as string;
+  if (state.engineUnavailable) throw new EngineUnavailableTurnError(engineUnavailableLine(state));
 
   // A code review (2026-09-22) caught TraceRecorder.skip() never
   // called anywhere - a turn that never reaches, say, `tool` (no tool
@@ -485,6 +488,14 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   return value;
 }
 
+class EngineUnavailableTurnError extends Error {
+  constructor(message: string) { super(message); }
+}
+
+function engineUnavailableLine(state: Pick<TurnState, "spoken" | "surface">): string {
+  return state.spoken || state.surface !== "chat" ? "I can't think right now. I've told the grown-ups." : "MaiPai's AI isn't running right now.";
+}
+
 export async function runTurnNext(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnStreamResult> {
   const begun = await beginTurn(actor, surface, text, opts);
   if (!begun.ok) return begun.result;
@@ -498,6 +509,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     // the trace bookkeeping) propagates uncaught, exactly as it did
     // before this file's beginTurn()/finishTurn() split, rather than
     // being silently reported as an engine outage.
+    if (err instanceof EngineUnavailableTurnError) return { ok: false, status: 503, code: "engine_unavailable", error: err.message };
     if (err instanceof TurnMachineTimeout) return { ok: false, status: 503, code: "unavailable", error: err.message };
     throw err;
   }
@@ -615,6 +627,7 @@ export async function runTurnNextStream(actor: PersonRow, surface: Surface, text
     const result = gate.result();
     if (result.refused) throw new StreamSafetyRefusal(result.refused);
     await machineDone;
+    if (state.engineUnavailable) throw new StreamUnavailable(engineUnavailableLine(state), "engine_unavailable");
     if (backgroundError) throw new StreamUnavailable(backgroundError.message);
     return result.lastFlagged;
   }

@@ -17,7 +17,7 @@ import { CATALOG } from "@/lib/modelCatalog";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { registerProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
-import { StreamSafetyRefusal, type StreamOutcome } from "@/lib/turnEngine";
+import { StreamSafetyRefusal, StreamUnavailable, type StreamOutcome } from "@/lib/turnEngine";
 import * as llm from "@/lib/llm";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import type { TurnStreamEvent } from "@/wire";
@@ -115,6 +115,73 @@ describe("turnNext.ts: a plain question, no tools", () => {
 });
 
 describe("turnNext.ts: the interim rule", () => {
+  test("search succeeds, then a dead model returns a typed status and writes no turn", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const original = llm.startCompleteStream.bind(llm);
+    const failure = spyOn(llm, "startCompleteStream").mockImplementation(async (...args) => {
+      if (args[1].some((message) => message.role === "tool")) return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: could not reach local engine" };
+      return original(...args);
+    });
+    const before = db.select().from(conversationTurns).all().length;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => request.messages.some((message) => message.role === "tool")
+            ? undefined
+            : [{ id: "call-death", name: "websearch", args: JSON.stringify({ expression: "today's headline news" }) }],
+          reply: () => "checking the news",
+        },
+        () => runTurnNext(people.owner, "chat", "what is in the news today"),
+      );
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      expect(result).toEqual({ ok: false, status: 503, code: "engine_unavailable", error: "MaiPai's AI isn't running right now." });
+      expect(db.select().from(conversationTurns).all()).toHaveLength(before);
+    } finally {
+      failure.mockRestore();
+      searxng.stop();
+    }
+  });
+
+  test("the live streaming turn emits engine_unavailable and stores no assistant turn", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const original = llm.startCompleteStream.bind(llm);
+    const failure = spyOn(llm, "startCompleteStream").mockImplementation(async (...args) => {
+      if (args[1].some((message) => message.role === "tool")) return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: could not reach local engine" };
+      return original(...args);
+    });
+    const before = db.select().from(conversationTurns).all().length;
+    try {
+      const { result, thrown } = await withStub(
+        {
+          calls: (request) => request.messages.some((message) => message.role === "tool")
+            ? undefined
+            : [{ id: "call-stream-death", name: "websearch", args: JSON.stringify({ expression: "today's headline news" }) }],
+          reply: () => "checking the news",
+        },
+        async () => {
+          const result = await runTurnNextStream(people.owner, "chat", "what is in the news today");
+          if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+          let thrown: unknown;
+          try {
+            for await (const _chunk of result.tokens) { /* engine dies before reply text */ }
+          } catch (err) {
+            thrown = err;
+          }
+          return { result, thrown };
+        },
+      );
+      expect(thrown).toBeInstanceOf(StreamUnavailable);
+      expect(thrown).toMatchObject({ code: "engine_unavailable", message: "MaiPai's AI isn't running right now." });
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      expect(db.select().from(conversationTurns).all()).toHaveLength(before);
+    } finally {
+      failure.mockRestore();
+      searxng.stop();
+    }
+  });
+
   test("a world question runs the search tool and answers with sources", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
@@ -1998,7 +2065,7 @@ describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects",
     __blockPortForTests(port, process.pid);
     try {
       const result = await runTurnNext(people.owner, "chat", message);
-      expect(result).toMatchObject({ ok: false, status: 503, code: "unavailable", error: "MaiPai's AI isn't running right now." });
+      expect(result).toMatchObject({ ok: false, status: 503, code: "engine_unavailable", error: "MaiPai's AI isn't running right now." });
       expect(searxng.queries).toHaveLength(0);
       expect(db.select().from(conversations).all()).toHaveLength(0);
       expect(db.select().from(conversationTurns).all()).toHaveLength(0);
@@ -2012,7 +2079,7 @@ describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects",
     process.env.MAIPAI_LLAMA_SERVER_PORT = String(port);
     __blockPortForTests(port, process.pid);
     const result = await runTurnNextStream(people.owner, "chat", message);
-    expect(result).toMatchObject({ ok: false, status: 503, code: "unavailable", error: "MaiPai's AI isn't running right now." });
+    expect(result).toMatchObject({ ok: false, status: 503, code: "engine_unavailable", error: "MaiPai's AI isn't running right now." });
     expect(db.select().from(conversations).all()).toHaveLength(0);
     expect(db.select().from(conversationTurns).all()).toHaveLength(0);
   });
@@ -2033,8 +2100,8 @@ describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects",
     state.manuallyStopped = true;
     let nudges = 0;
     __setChatRecoveryNudgeForTests(() => { nudges++; });
-    const result = await runTurnNext(people.owner, "chat", message);
-    expect(result).toMatchObject({ ok: false, status: 503, code: "unavailable" });
+    const result = await runTurnNext(people.owner, "chat", message, { spoken: true });
+    expect(result).toMatchObject({ ok: false, status: 503, code: "engine_unavailable", error: "I can't think right now. I've told the grown-ups." });
     expect(nudges).toBe(0);
   });
 
@@ -2060,69 +2127,32 @@ describe("turnNext.ts: DEADLINE-01, a failed generation never delivers an empty 
     return url;
   }
 
-  test("an ordinary question whose generation fails gets the model_failed fixed line, never an empty reply", async () => {
+  test("an ordinary question whose engine cannot be reached gets a typed status and no turn row", async () => {
     process.env.MAIPAI_LLAMA_SERVER_URL = await deadEngineUrl();
     __resetLlmSupervisorForTests();
+    const before = db.select().from(conversationTurns).all().length;
     const result = await runTurnNext(people.owner, "chat", "how do I make a paper airplane");
-    expect(result.ok).toBe(true);
-    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(result.value.reply.text).toBe(COMPOSE_FAILURE_LINE);
-    expect(result.value.reply.text.length).toBeGreaterThan(0);
-    // GENFAIL-01 (dev.md "generation_failed is never blind again"): the
-    // failed attempt now leaves its own row in stats.generations[],
-    // carrying the real reason (llm.ts's own caught message) rather
-    // than being absent from the trace entirely - previously the only
-    // record of this failure was the model node's own bare outcome
-    // code, with nothing saying whether the engine refused the request
-    // or was simply unreachable.
-    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
-    const stats = JSON.parse(row!.stats as unknown as string) as {
-      generations?: { error?: string | null }[];
-      nodes?: { node: string; outcome?: { ok?: boolean; code?: string; message?: string } }[];
-    };
-    expect(stats.generations?.length).toBeGreaterThan(0);
-    expect(stats.generations?.[0]?.error).toBeTruthy();
-    // The row's own second ask: not just the generation record, but
-    // stats.nodes[]'s own `model` entry too, so a reader doesn't have
-    // to cross-reference two different arrays to see why the turn
-    // failed.
-    const modelNodeEntry = (stats.nodes ?? []).find((n) => n.node === "model");
-    expect(modelNodeEntry?.outcome?.message).toBeTruthy();
-    expect(modelNodeEntry?.outcome?.message).toBe(stats.generations?.[0]?.error ?? undefined);
+    expect(result).toEqual({ ok: false, status: 503, code: "engine_unavailable", error: "MaiPai's AI isn't running right now." });
+    expect(db.select().from(conversationTurns).all()).toHaveLength(before);
   });
 
-  test("an interim-rule turn whose forced generation fails still runs the builder row's real search", async () => {
-    const searxng = startFakeSearxng();
-    setHouseholdSettingValue("search.searxng_url", searxng.url);
+  test("the spoken status uses the fixed child-safe line", async () => {
+    process.env.MAIPAI_LLAMA_SERVER_URL = await deadEngineUrl();
+    __resetLlmSupervisorForTests();
+    const result = await runTurnNext(people.owner, "chat", "what is the weather", { spoken: true });
+    expect(result).toEqual({ ok: false, status: 503, code: "engine_unavailable", error: "I can't think right now. I've told the grown-ups." });
+  });
+
+  test("an unavailable forced generation returns a typed status without history", async () => {
     process.env.MAIPAI_LLAMA_SERVER_URL = await deadEngineUrl();
     __resetLlmSupervisorForTests();
     try {
+      const before = db.select().from(conversationTurns).all().length;
       const result = await runTurnNext(people.owner, "chat", "who is the president of chile");
-      expect(result.ok).toBe(true);
-      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      // The forced call failed outright (the same dead engine), so the
-      // builder row ran the search for real - proven by the search
-      // itself, not by the final reply text (the phrasing round hits
-      // the identical dead engine and also fails, delivering the fixed
-      // model_failed line as the turn's own honest outcome - a fully
-      // dead engine breaking both rounds, not a bug in the fallback).
-      expect(searxng.queries.length).toBeGreaterThan(0);
-      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
-      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { callId: string; args?: Record<string, unknown> }[]) : [];
-      expect(outcomes.some((o) => o.callId === "builder" && o.args?.expression === "who is the president of chile")).toBe(true);
-      // A review caught the first cut marking this required_miss: true,
-      // the same flag ENGINE-CONTRACT-02 uses for "a successful
-      // generation whose cache state disagreed with required" - a
-      // genuine generation failure is a different thing and must never
-      // be counted there; the model node's own trace entry keeps the
-      // real failure code instead.
-      const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; code?: string; required_miss?: boolean } }[] };
-      const modelOutcomes = (stats.nodes ?? []).filter((n) => n.node === "model").map((n) => n.outcome ?? {});
-      expect(modelOutcomes[0]?.required_miss).toBeUndefined();
-      expect(modelOutcomes[0]?.ok).toBe(false);
-      expect(modelOutcomes[0]?.code).toBeDefined();
+      expect(result).toEqual({ ok: false, status: 503, code: "engine_unavailable", error: "MaiPai's AI isn't running right now." });
+      expect(db.select().from(conversationTurns).all()).toHaveLength(before);
     } finally {
-      searxng.stop();
+      // The closed endpoint is isolated to this test by afterEach().
     }
   });
 });

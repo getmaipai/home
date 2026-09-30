@@ -214,6 +214,26 @@
                             "alive": {
                               "type": "boolean",
                               "nullable": true
+                            },
+                            "availability": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "starting",
+                                "unavailable"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "stopped",
+                                "crashed",
+                                "blocked_port",
+                                "not_installed",
+                                "failed_start",
+                                null
+                              ]
                             }
                           },
                           "required": [
@@ -249,6 +269,26 @@
                             "alive": {
                               "type": "boolean",
                               "nullable": true
+                            },
+                            "availability": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "starting",
+                                "unavailable"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "stopped",
+                                "crashed",
+                                "blocked_port",
+                                "not_installed",
+                                "failed_start",
+                                null
+                              ]
                             }
                           },
                           "required": [
@@ -284,6 +324,26 @@
                             "alive": {
                               "type": "boolean",
                               "nullable": true
+                            },
+                            "availability": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "starting",
+                                "unavailable"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "stopped",
+                                "crashed",
+                                "blocked_port",
+                                "not_installed",
+                                "failed_start",
+                                null
+                              ]
                             }
                           },
                           "required": [
@@ -319,6 +379,26 @@
                             "alive": {
                               "type": "boolean",
                               "nullable": true
+                            },
+                            "availability": {
+                              "type": "string",
+                              "enum": [
+                                "ready",
+                                "starting",
+                                "unavailable"
+                              ]
+                            },
+                            "reason": {
+                              "type": "string",
+                              "nullable": true,
+                              "enum": [
+                                "stopped",
+                                "crashed",
+                                "blocked_port",
+                                "not_installed",
+                                "failed_start",
+                                null
+                              ]
                             }
                           },
                           "required": [

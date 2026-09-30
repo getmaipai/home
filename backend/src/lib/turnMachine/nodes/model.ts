@@ -19,6 +19,7 @@
 // contains a roster name, the same literal check subjects.ts's own
 // speakerNamedAny() already makes for this exact purpose elsewhere.
 import { startCompleteStream, envelopeToolCall } from "@/lib/llm";
+import { chatEngineDown } from "@/lib/llmSupervisor";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
@@ -701,6 +702,11 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // `answer` as if the model had genuinely said nothing.
   if (!attempt.ok) {
     settleFailedGate(gate);
+    const failureMessage = attempt.message ?? "";
+    if (chatEngineDown() || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
+      state.engineUnavailable = true;
+      return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
+    }
     return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
   }
 
@@ -740,6 +746,11 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     attempt = await runOneGeneration(state, messages, tools, tool_choice, false, retryMaxTokens, "model_retry_no_thinking", signal);
     if (!attempt.ok) {
       settleFailedGate(gate);
+      const failureMessage = attempt.message ?? "";
+      if (chatEngineDown() || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
+        state.engineUnavailable = true;
+        return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
+      }
       return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
     }
     if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) attempt = { ...attempt, toolCalls: undefined };

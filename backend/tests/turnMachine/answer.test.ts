@@ -6,6 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { answerNode } from "@/lib/turnMachine/nodes/answer";
 import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract";
+import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 
 const STATE = { outcomes: [] } as unknown as TurnState;
 const SIGNAL = new AbortController().signal;
@@ -68,6 +69,11 @@ test("answerNode: 'model_text' and 'context_quote' never carry the provenance ta
   expect(modelText.output.provenance).toBeUndefined();
   const contextQuote = await answerNode(STATE, { kind: "context_quote", quote: "a line from the window" }, SIGNAL);
   expect(contextQuote.output.provenance).toBeUndefined();
+});
+
+test("answerNode keeps the generic line for non-engine model failures", async () => {
+  const { output } = await answerNode(STATE, { kind: "model_failed" }, SIGNAL);
+  expect(output.text).toBe(COMPOSE_FAILURE_LINE);
 });
 
 // MANIFEST-REFUSAL-01 (fixes getmaipai/home#166): a manifest that fails

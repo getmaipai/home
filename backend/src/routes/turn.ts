@@ -280,8 +280,9 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
         const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, ask_answer: parsedEvidence.data.ask_answer });
         return next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the new path returned a stream result unexpectedly" } : next;
       })()
-    : await runTurn(actor, surface, body.text ?? "", {
+      : await runTurn(actor, surface, body.text ?? "", {
         thinking: dropReasoning ? false : body.thinking,
+        spoken: body.spoken === true,
         model: modelSelection.model,
         conversationId: body.conversation_id,
         supersedes: body.supersedes,
@@ -664,7 +665,7 @@ export async function* streamTurnEvents(
     // Trimmed at the edges (#99's review): a paragraph break beside a
     // sentence the guards skipped would otherwise open or close the
     // stored reply with a bare blank line the blocking path never has.
-    if (fullText.trim() && !safetyRefusal) result.finalize(fullText.trim());
+    if (fullText.trim() && !safetyRefusal && !(err instanceof StreamUnavailable && err.code === "engine_unavailable")) result.finalize(fullText.trim());
   }
 }
 
@@ -794,6 +795,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
         ? await runTurnNextStream(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, signal: abortController.signal, ask_answer: parsedEvidence.data.ask_answer })
         : await runTurnStream(actor, surface, body.text ?? "", {
             thinking: dropReasoning ? false : body.thinking,
+            spoken: body.spoken === true,
             model: modelSelection.model,
             conversationId: body.conversation_id,
             supersedes: body.supersedes,

@@ -67,6 +67,8 @@ import type { PersonRow } from "@/types";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import * as llm from "@/lib/llm";
+import { startFakeSearxng } from "../scripts/bench/conversationRunner";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 
@@ -324,6 +326,86 @@ describe("AGE-02: a worrying conversation notifies the adults", () => {
 const subjectsOfTurn = (turnId: string) => turnSubjectsOf(db.select({ subjects: conversationTurns.subjects }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!);
 
 describe("lib/turnEngine.ts runTurn()", () => {
+  test("old path: search success followed by a dead compose model returns typed status without history", async () => {
+    const { actor } = await owner();
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => request.messages.some((message) => message.role === "tool")
+        ? undefined
+        : request.tools?.some((tool) => tool.function.name === "websearch")
+          ? [{ id: "call-old-down", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "today's headline news" }) } }]
+          : undefined,
+      scriptedChatReply: () => "checking the headlines",
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    __resetLlmSupervisorForTests();
+    const original = llm.complete.bind(llm);
+    let calls = 0;
+    const failure = spyOn(llm, "complete").mockImplementation(async (...args) => {
+      calls += 1;
+      if (calls === 2) return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: could not reach local engine" };
+      return original(...args);
+    });
+    const before = db.select().from(conversationTurns).all().filter((row) => row.status === "done").length;
+    try {
+      const result = await runTurn(actor, "chat", "what is in the news today");
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      expect(result).toEqual({ ok: false, status: 503, code: "engine_unavailable", error: "MaiPai's AI isn't running right now." });
+      expect(db.select().from(conversationTurns).all().filter((row) => row.status === "done")).toHaveLength(before);
+      expect(db.select().from(conversationTurns).all().filter((row) => row.status === "running").every((row) => row.replyText === "")).toBe(true);
+    } finally {
+      failure.mockRestore();
+      await stub.stop();
+      searxng.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
+  test("old streaming path emits engine_unavailable after search and does not finalize a reply", async () => {
+    const { actor } = await owner();
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, {
+      scriptedToolCalls: (request) => request.messages.some((message) => message.role === "tool")
+        ? undefined
+        : request.tools?.some((tool) => tool.function.name === "websearch")
+          ? [{ id: "call-old-stream-down", type: "function", function: { name: "websearch", arguments: JSON.stringify({ expression: "today's headline news" }) } }]
+          : undefined,
+      scriptedChatReply: () => "checking the headlines",
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    __resetLlmSupervisorForTests();
+    const original = llm.startCompleteStream.bind(llm);
+    const failure = spyOn(llm, "startCompleteStream").mockImplementation(async (...args) =>
+      args[1].some((message) => message.role === "tool")
+        ? { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: could not reach local engine" }
+        : original(...args),
+    );
+    const before = db.select().from(conversationTurns).all().filter((row) => row.status === "done").length;
+    try {
+      const events = await (async () => {
+        const result = await runTurnStream(actor, "chat", "what is in the news today");
+        if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+        const collected = [];
+        for await (const event of streamTurnEvents(result, actor.id, 0)) collected.push(event);
+        return collected;
+      })();
+      expect(searxng.queries.length).toBeGreaterThan(0);
+      expect(events.at(-1)).toEqual({ type: "error", error: "MaiPai's AI isn't running right now.", code: "engine_unavailable" });
+      expect(db.select().from(conversationTurns).all().filter((row) => row.status === "done")).toHaveLength(before);
+    } finally {
+      failure.mockRestore();
+      await stub.stop();
+      searxng.stop();
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  });
+
   test("SURFACE-01b persists robot evidence and withholds it from chat", async () => {
     const { actor } = await owner();
     const evidence = { person: actor.id, basis: "voice" as const, level: "confirmed" as const };
@@ -823,7 +905,7 @@ describe("CHAT-18: the turn lease on every exit path", () => {
       await stub.stop(); // the engine goes away between validation and the completion call
       const result = await runTurn(actor, "chat", "good morning");
       expect(result.ok).toBe(false); // an engine failure is a typed 503, never a leak
-      if (!result.ok) expect(result.code).toBe("unavailable");
+      if (!result.ok) expect(result.code).toBe("engine_unavailable");
       expect(activeTurnCount()).toBe(0);
     });
   });

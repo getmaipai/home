@@ -35008,3 +35008,29 @@ they were. The shape belongs to Home's OpenAPI route schema and its wire mirror.
 The pinned commons spec has no `EngineHealth` shape, so this change does not
 create a spec tag or move a pin. The chat availability helper reads the new
 state instead of re-deriving it from `kind` and `alive`.
+
+## ENGINE-AVAIL-02b
+
+When a model generation fails because the chat engine is down, `model.ts`
+marks the turn as engine unavailable. The machine completes its trace but does
+not build or log a reply. Blocking turns return code `engine_unavailable` and
+the fixed line "MaiPai's AI isn't running right now." Streamed turns return the
+same code and line in the terminal error event, and the route does not
+finalize partial assistant text for this status. Spoken surfaces use the fixed
+line "I can't think right now. I've told the grown-ups."
+
+The old `turnEngine.ts` path is still selectable when `turn.pipeline.next` is
+off. Its blocking and streamed composition paths now return the typed status
+when a tool succeeded but the compose request cannot reach the model. The
+blocking path leaves only its provisional `running` row with an empty reply;
+history and memory readers use completed turns, so no assistant reply enters
+either. Its streamed path skips finalization for the typed status.
+
+The generic apology still serves non-engine failures. Its producers are
+`composer.ts` when every package outcome fails without a safe user message,
+`answer.ts` for a non-engine model failure, `outputGate.ts` for a malformed
+tool envelope or raw outcome error, and the old path's command and package
+failure branches. Their unit and integration tests remain in `composer.test.ts`,
+`turnMachine/answer.test.ts`, `turnMachine/outputGate.test.ts`, and
+`turnEngine.test.ts`. Engine connectivity failures are covered by the exact
+search-success, compose-failure regressions in both turn paths.

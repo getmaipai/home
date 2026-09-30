@@ -170,6 +170,7 @@ export interface TurnState {
   planBasis: Omit<PlanInput, "evidence">;
   safety: SafetyResult;
   crisis: boolean;
+  engineUnavailable: boolean;
   /** The filtered list; the only prompt input. */
   context: ContextItem[];
   /** Set by the `context` node (ContextOutput.temporary). Not in the
