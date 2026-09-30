@@ -34547,6 +34547,54 @@ three groups to the class list.
    decides what DATA-LOCATION-01c's live macOS test uses and what the
    first real move on the family hub is.
 
+### DATA-LOCATION-00c landed: Home's class list, and `paths.ts` derived from it
+
+`backend/src/lib/dataClasses.ts` declares Home's twenty-one classes once,
+as `DataClass` records parsed against the spec shape at import (spec pin
+`spec-v0.1.58`). `backend/src/lib/paths.ts` resolves every folder it
+exports through `classDir(id)`: the class's default base (the root, or the
+root's parent for `backups` and `received-backups`) joined with its
+subpath. There are no per-class overrides yet (the location record is
+DATA-LOCATION-01a), no folder creation, no markers and no boot change, so
+nothing on disk or in any exported value moved. The design record's two
+class tables remain the human-readable list of ids, folders and
+behaviour; a second generated table would only be a copy of
+`dataClasses.ts`, so none is kept.
+
+What the tests pin (`tests/dataClasses.test.ts`,
+`tests/pathsFromClasses.test.ts`):
+
+- The ids are exactly the design record's twenty-one, each once, and every
+  entry parses against `data-class.schema.json`.
+- No two default folders repeat or nest inside one another (`records` is
+  the root itself, so everything else is inside it by design); the two
+  backup classes are the only ones beside the root.
+- Levels, `whenMissing`, `needs`, `sensitive` and `backup` follow the
+  design record's tables; a hold class lists no degraded features.
+- Every export of `paths.ts` equals its pre-change value, checked in a
+  child process for an explicit `MAIPAI_DATA_DIR`, for that plus
+  `MAIPAI_BACKUP_DIR`, and for the default `<repo>/data`. The expected
+  values are written from literals, not from the class list.
+- `classDir(id)` for every class equals today's real folder, again from
+  literals. `MAIPAI_BACKUP_DIR` still names `backups` itself and
+  `received-backups` stays its sibling.
+
+Choices made where the record was silent or loose. `tts-models` (default
+`voice/tts`) is the one class with no folder today, since the TTS child
+writes into the service account's own caches; its folder is new by design.
+`records` carries `sensitive: biometric`, the strongest value the record's
+"personal, biometric prints, secrets" allows short of `keys`, which stays
+with the keys folder. `degrades` holds feature codes the record gives only
+as prose; they are named in `dataClasses.ts`. `largestFileBytes` is set
+only for `models` (40 GB, the record's upper bound); the record gives no
+other exact figure. Not done here, and still open in DATA-LOCATION-00c's
+own acceptance: routing the literal `join(dataDir, ...)` sites outside
+`paths.ts` (`keystore`, `householdCa`, `deviceId`, `favicons`, `sidecars`,
+`scripts/bench/labels.ts`, and the `hub.db`, `hub.lock` and
+`attachments` joins), the test that walks every `join(dataDir` in `src/`,
+and the check of the pinned engine archives for links (`engines`' `needs`
+stays `exec`).
+
 ## FLAKE-195: testing under load, what waits on wall-clock and what does not (2026-09-29, #195)
 
 Several frontend tests failed in the gate whenever another session's
