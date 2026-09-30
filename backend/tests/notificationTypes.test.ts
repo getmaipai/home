@@ -14,6 +14,18 @@ test("child.worrying_conversation is an adult-only, non-configurable notice with
   expect(rendered).not.toContain("{");
 });
 
+test("repairs.still_open is the declared adult reminder type", () => {
+  expect(getNotificationType("repairs.still_open")).toEqual({
+    id: "repairs.still_open",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "Still not fixed: {title}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  });
+});
+
 test("file.shared_with_you is a passive, configurable, person-audience notice matching memory.updated's posture", () => {
   const type = getNotificationType("file.shared_with_you");
   expect(type).toBeDefined();

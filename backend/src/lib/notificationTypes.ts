@@ -121,6 +121,15 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
+  {
+    id: "repairs.still_open",
+    level: "time_sensitive",
+    audience: "adults",
+    template: "Still not fixed: {title}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
   // SEARCH-HEALTH-01 (docs/dev.md, 2026-09-24): "the admin gets a
   // notification when search goes down and again when it recovers" -
   // built generically in `lib/issues.ts`'s `resolveIssue()`, on the

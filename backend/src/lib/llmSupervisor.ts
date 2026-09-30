@@ -293,6 +293,7 @@ function attachChatWatch(spawned: SpawnedLlamaServer): ChatBackend {
     drop: () => void restartChatBackend(),
     respawn: () => getChatClient(),
     title: "MaiPai's AI stopped unexpectedly",
+    remindAfterMs: 15 * 60_000,
   });
   return { client: spawned.client, stop: watch.stop, watch, pid: spawned.pid, kind: spawned.kind, modelId: spawned.modelId, startedAt: new Date().toISOString() };
 }
@@ -564,6 +565,7 @@ export async function getChatClient(): Promise<LlamaServerClient> {
             detail: err instanceof ForeignPortHolderError
               ? `Another program is using the port MaiPai's AI needs, so it can't start. (Technical detail: ${err.message})`
               : (err as Error).message,
+            remindAfterMs: 15 * 60_000,
           });
         }
         throw err;
@@ -583,6 +585,7 @@ function expireStalledChatStart(): boolean {
     severity: "error",
     title: "MaiPai's AI is taking too long to start",
     detail: "The chat engine startup has not completed after two minutes. A new request can retry the start; check the engine logs if it remains stuck.",
+    remindAfterMs: 15 * 60_000,
   });
 }
 

@@ -8,6 +8,8 @@ import {
   dismissIssue,
   registerFixHandler,
   __resetFixHandlersForTests,
+  __setReminderTimingForTests,
+  __resetReminderTimersForTests,
 } from "@/lib/issues";
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
@@ -18,7 +20,13 @@ import type { PersonRow } from "@/types";
 beforeEach(() => {
   resetDb();
   __resetFixHandlersForTests();
+  __resetReminderTimersForTests();
+  __setReminderTimingForTests(200);
 });
+
+async function waitForReminder(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 260));
+}
 
 async function owner(): Promise<PersonRow> {
   const { TestClient } = await import("./client");
@@ -77,6 +85,47 @@ describe("raiseIssue()", () => {
     // Re-raising the same still-open error must not notify again.
     await raiseIssue({ source: "engine", key: "oom", severity: "error", title: "Model crashed", detail: "d2" });
     expect(listPending(person)).toHaveLength(1);
+  });
+
+  test("reminds once while a timed error remains open and not dismissed", async () => {
+    const person = await owner();
+    await raiseIssue({ source: "chat-engine", key: "spawn", severity: "error", title: "AI failed", detail: "d", remindAfterMs: 200 });
+    await waitForReminder();
+    const reminders = listPending(person).filter((row) => row.typeId === "repairs.still_open");
+    expect(reminders).toHaveLength(1);
+    expect(reminders[0]!.text).toBe("Still not fixed: AI failed");
+    await waitForReminder();
+    expect(listPending(person).filter((row) => row.typeId === "repairs.still_open")).toHaveLength(1);
+  });
+
+  test("does not remind after resolve or dismissal", async () => {
+    const person = await owner();
+    const resolved = await raiseIssue({ source: "chat-engine", key: "spawn", severity: "error", title: "AI failed", detail: "d", remindAfterMs: 200 });
+    resolveIssue("chat-engine", "spawn");
+    await waitForReminder();
+    expect(listPending(person).filter((row) => row.typeId === "repairs.still_open")).toHaveLength(0);
+
+    const dismissed = await raiseIssue({ source: "chat-engine", key: "startup_stalled", severity: "error", title: "AI stalled", detail: "d", remindAfterMs: 200 });
+    dismissIssue(dismissed.id);
+    await waitForReminder();
+    expect(listPending(person).filter((row) => row.typeId === "repairs.still_open")).toHaveLength(0);
+    expect(resolved.resolved_at).toBeNull();
+  });
+
+  test("a repeated raise does not restart the one reminder timer", async () => {
+    const person = await owner();
+    await raiseIssue({ source: "chat-engine", key: "spawn", severity: "error", title: "AI failed", detail: "d", remindAfterMs: 200 });
+    await new Promise((resolve) => setTimeout(resolve, 130));
+    await raiseIssue({ source: "chat-engine", key: "spawn", severity: "error", title: "AI failed again", detail: "d2", remindAfterMs: 200 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(listPending(person).filter((row) => row.typeId === "repairs.still_open")).toHaveLength(1);
+  });
+
+  test("embed died issues do not get a reminder unless explicitly configured", async () => {
+    const person = await owner();
+    await raiseIssue({ source: "embed-engine", key: "died", severity: "error", title: "Embed died", detail: "d" });
+    await waitForReminder();
+    expect(listPending(person).filter((row) => row.typeId === "repairs.still_open")).toHaveLength(0);
   });
 
   test("info and warning severities never notify", async () => {
@@ -275,4 +324,3 @@ describe("dismissIssue()", () => {
     expect(result.ok).toBe(false);
   });
 });
-

@@ -18,6 +18,10 @@ Bun runs all test files in one process, so a blocked chat port could leak from `
 
 The live Repairs history showed 42 `repairs.new` notifications for the chat engine in 16 days against 5 resolves. Each crash opened a `died` issue before its automatic respawn, so a successful self-heal then resolved an issue the household had already been told about. A crash now waits 60 seconds before opening that issue. A successful respawn or a deliberate stop cancels the pending notice, so short flaps send no notification. The five-respawns-in-ten-minutes cap and a rejected respawn still raise immediately. When a foreign process holds the chat port, the Repair explains in plain words that another program is using MaiPai's AI port and keeps the raw error in a technical detail.
 
+## ENGINE-AVAIL-03b
+
+An open chat-engine Repair gets one additional `repairs.still_open` notification 15 minutes after it first opens, if it remains unresolved and not dismissed. Repeated health checks do not restart the timer, and the timer is cleared when the issue resolves or a person dismisses it. Other engine roles do not receive reminders. One reminder gives the adults a useful follow-up without turning a persistent outage into a notification loop. A plain timer fits this one bounded reminder: the issue row is re-read when it fires, while `hotReloadState` keeps its handle reachable across development reloads.
+
 ## SEARCH-FALLBACK-01: a second front door, Wikipedia's own official API (2026-09-24)
 
 **Objective.** `docs/plans/search-resilience-2026-09-24.md`'s item 3:

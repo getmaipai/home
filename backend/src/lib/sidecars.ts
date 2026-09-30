@@ -646,6 +646,7 @@ export interface EngineWatchOptions {
   respawn: () => Promise<unknown>;
   /** Dad-language Repairs title, e.g. "MaiPai's AI stopped unexpectedly". */
   title: string;
+  remindAfterMs?: number;
 }
 
 export interface EngineWatch {
@@ -837,6 +838,7 @@ export function watchEngine(opts: EngineWatchOptions): EngineWatch {
         detail:
           `${sentence} MaiPai started it again ${recent.length} times in the last ${RESPAWN_WINDOW_MS / 60_000} minutes and it keeps stopping, ` +
           `so it is not trying again on its own. Something on this machine is ending it, or it is running out of memory.`,
+        ...(opts.remindAfterMs === undefined ? {} : { remindAfterMs: opts.remindAfterMs }),
         fix: { label: "Start it again", action: `restart_engine:${role}` },
       });
       return;
@@ -859,6 +861,7 @@ export function watchEngine(opts: EngineWatchOptions): EngineWatch {
           severity: "error",
           title: opts.title,
           detail: `${sentence} MaiPai is starting it again now.`,
+          ...(opts.remindAfterMs === undefined ? {} : { remindAfterMs: opts.remindAfterMs }),
         });
       }, diedNoticeDelayMs);
       pendingDiedNoticeTimers.set(role, noticeTimer);

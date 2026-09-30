@@ -17,6 +17,7 @@ import { newIssueId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { trigger } from "@/lib/notifications";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
+import { hotReloadState } from "@/lib/hotReloadState";
 import { Issue } from "@maipai/spec/gen/ts/issue.js";
 
 export type IssueSeverity = Issue["severity"];
@@ -56,6 +57,25 @@ export interface RaiseIssueInput {
   detail: string;
   fix?: IssueFix | null;
   learnMore?: string | null;
+  remindAfterMs?: number;
+}
+
+const reminderTimers = hotReloadState<Map<string, ReturnType<typeof setTimeout>>>("issueReminderTimers", () => new Map());
+let reminderTimingOverride: number | undefined;
+const reminderTimerKey = (source: string, key: string): string => `${source}/${key}`;
+
+function clearReminderTimer(source: string, key: string): void {
+  const timerKey = reminderTimerKey(source, key);
+  const timer = reminderTimers.get(timerKey);
+  if (timer) clearTimeout(timer);
+  reminderTimers.delete(timerKey);
+}
+
+export function __setReminderTimingForTests(ms: number): void { reminderTimingOverride = ms; }
+export function __resetReminderTimersForTests(): void {
+  for (const timer of reminderTimers.values()) clearTimeout(timer);
+  reminderTimers.clear();
+  reminderTimingOverride = undefined;
 }
 
 function findRow(source: string, key: string): IssueRow | undefined {
@@ -129,6 +149,22 @@ export async function raiseIssue(input: RaiseIssueInput): Promise<Issue> {
 
   if (isNewOpenError) {
     await trigger("repairs.new", { title: input.title });
+    if (input.remindAfterMs !== undefined) {
+      clearReminderTimer(input.source, input.key);
+      const timerKey = reminderTimerKey(input.source, input.key);
+      const timer = setTimeout(async () => {
+        if (reminderTimers.get(timerKey) !== timer) return;
+        reminderTimers.delete(timerKey);
+        const current = findRow(input.source, input.key);
+        if (!current || current.resolvedAt || current.dismissedAt) return;
+        trackBackgroundWork(
+          trigger("repairs.still_open", { title: current.title }).catch((err) => {
+            console.error(`[issues] repairs.still_open notification failed for ${input.source}/${input.key}: ${(err as Error).message}`);
+          }),
+        );
+      }, reminderTimingOverride ?? input.remindAfterMs);
+      reminderTimers.set(timerKey, timer);
+    }
   }
 
   return toIssue(row);
@@ -154,6 +190,7 @@ export async function raiseIssue(input: RaiseIssueInput): Promise<Issue> {
  * than thrown into a caller that never awaited this in the first
  * place. */
 export function resolveIssue(source: string, key: string): void {
+  clearReminderTimer(source, key);
   const existing = findRow(source, key);
   if (!existing || existing.resolvedAt) return;
   const wasOpenError = existing.severity === "error" && !existing.dismissedAt;
@@ -253,6 +290,7 @@ export function dismissIssue(id: string): IssueOpResult<{ id: string }, 404> {
   const row = getRow(id);
   if (!row) return { ok: false, status: 404, error: `no issue ${id}` };
   if (!row.dismissedAt) {
+    clearReminderTimer(row.source, row.key);
     db.update(issues)
       .set({ dismissedAt: new Date().toISOString(), hlc: nextHlc() })
       .where(eq(issues.id, id))
