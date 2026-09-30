@@ -6,6 +6,14 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## SETTINGS-S1
+
+The profile page's Edit dialog now uses the reusable `ProfileForm`, so the Settings > Me profile card can use
+the same fields and save path. The dialog keeps its name, bio, accent color, photo opt-in note, 160-character
+bio limit, PATCH payload, pending state, server error sentence, query refresh, and close behavior. The old
+dialog did not show a success toast, so this extraction does not add one. `ProfileForm` also supports a page
+layout with one Save button for the next Settings slice. The person API shape does not expose birthdate.
+
 ## ENGINE-AVAIL-05a (frontend)
 
 Settings > Household > Health gives owners and admins a Restart button on

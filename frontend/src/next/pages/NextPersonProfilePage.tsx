@@ -1,22 +1,17 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Person } from "@maipai/spec/gen/ts/person.js";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { MediaGrid, type MediaGridItem } from "@maipai/ui/src/primitives/MediaGrid";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
-import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
-import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
-import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
-import { Textarea } from "@maipai/ui/src/dashboard/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, ApiError, isOwnerOrAdminRole, type BiometricPrintSummary, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
-import { ACCENT_RING_CLASS, ACCENT_SELECT_LABELS, ACCENT_SELECT_OPTIONS, canManagePerson, NO_ACCENT, ROLE_LABELS } from "@/apps/people/roles";
+import { api, isOwnerOrAdminRole, type BiometricPrintSummary, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
+import { ACCENT_RING_CLASS, canManagePerson, ROLE_LABELS } from "@/apps/people/roles";
+import { ProfileForm } from "@/apps/people/ProfileForm";
 import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
@@ -204,73 +199,20 @@ function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { p
 
 function EditProfileDialog({ profile, open, onOpenChange, onPersonChange }: { profile: ProfileEntry; open: boolean; onOpenChange: (open: boolean) => void; onPersonChange: () => void | Promise<void> }) {
   const queryClient = useQueryClient();
-  const [displayName, setDisplayName] = useState(profile.display_name);
-  const [bio, setBio] = useState(profile.bio ?? "");
-  const [accent, setAccent] = useState<string>(profile.accent ?? NO_ACCENT);
-  const [photoOptIn, setPhotoOptIn] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    setDisplayName(profile.display_name);
-    setBio(profile.bio ?? "");
-    setAccent(profile.accent ?? NO_ACCENT);
-    setPhotoOptIn(false);
-    setError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- profile is refetched as a fresh object; only reset on opening or changing profile.
-  }, [open, profile.id]);
-  const trimmedName = displayName.trim();
-  const canSave = trimmedName.length > 0 && !submitting;
-  const isSupervised = profile.role === "child";
-
-  async function handleSave(event: FormEvent) {
-    event.preventDefault();
-    if (!canSave) return;
-    setError(null);
-    setSubmitting(true);
-    try {
-      const edit: { displayName?: string; bio?: string | null; accent?: Person["accent"] } = {};
-      if (trimmedName !== profile.display_name) edit.displayName = trimmedName;
-      const nextBio = bio.trim() || null;
-      if (nextBio !== (profile.bio ?? null)) edit.bio = nextBio;
-      const nextAccent = accent === NO_ACCENT ? null : accent as Person["accent"];
-      if (nextAccent !== (profile.accent ?? null)) edit.accent = nextAccent;
-      if (Object.keys(edit).length > 0) {
-        await api.updatePerson(profile.id, edit);
-        await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]);
-      }
-      onOpenChange(false);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not save those changes.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader><DialogTitle>Edit {profile.display_name}&rsquo;s profile</DialogTitle></DialogHeader>
-        <form onSubmit={handleSave} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2"><Label htmlFor="profile-display-name">Name</Label><Input id="profile-display-name" value={displayName} onChange={(event) => setDisplayName(event.target.value)} disabled={submitting} /></div>
-          <div className="flex flex-col gap-2"><Label htmlFor="profile-bio">Bio</Label><Textarea id="profile-bio" value={bio} onChange={(event) => setBio(event.target.value.slice(0, 160))} maxLength={160} placeholder="A line about you" disabled={submitting} /><p className="text-sm text-muted-foreground">{bio.length}/160</p></div>
-          <div className="flex flex-col gap-2">
-            <Label>Accent color</Label>
-            <Select value={accent} onValueChange={(value) => { if (value !== null) setAccent(value); }} disabled={submitting}>
-              <SelectTrigger aria-label="Accent color"><SelectValue>{ACCENT_SELECT_LABELS[accent] ?? accent}</SelectValue></SelectTrigger>
-              <SelectContent>{[...ACCENT_SELECT_OPTIONS].map((value) => <SelectItem key={value} value={value}>{ACCENT_SELECT_LABELS[value] ?? value}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-2 rounded-lg border p-3">
-            <div className="flex items-center justify-between gap-3"><Label htmlFor="profile-photo-opt-in">Use a real photo</Label><Switch id="profile-photo-opt-in" checked={photoOptIn} onCheckedChange={setPhotoOptIn} disabled={submitting} /></div>
-            {photoOptIn ? <p className="text-sm text-muted-foreground">{isSupervised ? `An admin needs to approve a real photo for ${profile.display_name} before it shows anywhere.` : "Photo uploads aren't wired up yet. This will use MaiPai Home's own storage once it ships."}</p> : null}
-          </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
-          <DialogFooter>
-            <Button type="submit" disabled={!canSave}>{submitting ? "Saving…" : "Save"}</Button>
-            <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>Cancel</Button>
-          </DialogFooter>
-        </form>
+        <ProfileForm
+          key={`${profile.id}-${open}`}
+          person={profile}
+          canEdit
+          layout="dialog"
+          onSaved={async () => {
+            await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]);
+          }}
+          onCancel={() => onOpenChange(false)}
+        />
       </DialogContent>
     </Dialog>
   );
