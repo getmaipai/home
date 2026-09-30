@@ -10,7 +10,7 @@ import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
 import { parseModelLink } from "@/lib/modelLink";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
-import { RecommendationCard } from "@maipai/ui/src/elements/recommendation-card";
+import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { describeFitPlan, type FitPanelRow } from "@/lib/fitPanel";
 import type { FitPlanResponse } from "@/lib/api";
 
@@ -499,7 +499,7 @@ function DetailsFitPanel({ modelUrl, contextTokens, legacyBytes }: { modelUrl: s
 function FitPanel({ response }: { response: FitPlanResponse }) {
   if (!response.plan) return null;
   const { rows, remedy } = describeFitPlan(response.plan);
-  return <div className="flex flex-col gap-3 pt-2"><SpecSheet title="Fit details" rows={rows.map(({ label, value }) => ({ label, value }))} visibleCount={rows.length} />{rows.filter((row) => row.source && row.source !== "unknown").map((row) => <FitSource key={row.label} row={row} />)}{remedy ? <RecommendationCard question="What would help?" state="idle" confidenceLabel="Based on this plan" acceptedLabel="" onAlternatives={() => {}} onAccept={() => {}}>{remedy}</RecommendationCard> : null}</div>;
+  return <div className="flex flex-col gap-3 pt-2"><SpecSheet title="Fit details" rows={rows.map(({ label, value }) => ({ label, value }))} visibleCount={rows.length} />{rows.filter((row) => row.source && row.source !== "unknown").map((row) => <FitSource key={row.label} row={row} />)}{remedy ? <Alert><AlertTitle>What would help?</AlertTitle><AlertDescription>{remedy}</AlertDescription></Alert> : null}</div>;
 }
 
 function FitSource({ row }: { row: FitPanelRow }) {

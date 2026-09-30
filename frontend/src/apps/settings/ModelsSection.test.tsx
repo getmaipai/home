@@ -182,6 +182,8 @@ describe("ModelsSection", () => {
       await findByText("Use this");
       fireEvent.click(getByText("Details"));
       await findByText("It needs about 6 GB more memory. A smaller version of this model, or a shorter conversation memory, would help.");
+      expect(document.querySelector('[data-slot="recommendation-card"]')).toBeNull();
+      expect(document.querySelector('[role="alert"]')).not.toBeNull();
     } finally { restore(); }
   });
 

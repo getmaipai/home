@@ -26,6 +26,14 @@ describe("describeFitPlan", () => {
       expect(result.rows[0]?.asOf).toBe(source.total.as_of);
     }
   });
+  test("says a no plan does not fit even when a listed CPU path fits", () => {
+    const source = plan("no");
+    source.paths = [{ path: "cpu", fits: true, verdict: "yes" }];
+    expect(describeFitPlan(source).rows.find((row) => row.label === "How it would run")?.value).toBe("It does not fit here");
+  });
+  test("says the run path is not known for an unknown plan", () => {
+    expect(describeFitPlan(plan("unknown")).rows.find((row) => row.label === "How it would run")?.value).toBe("Not known yet");
+  });
   test("reports unknown figures without inventing values", () => {
     const source = plan("unknown");
     source.total = unknownFigure();

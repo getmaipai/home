@@ -25,7 +25,7 @@ export function describeFitPlan(plan: StackFitPlan): { rows: FitPanelRow[]; reme
     { label: "Memory it needs", value: range(plan.total.low, plan.total.high), source: plan.total.source, asOf: plan.total.as_of },
     { label: "Memory it can use", value: plan.cap.high === null ? "Not known yet" : `about ${wholeGb(plan.cap.high)} GB`, source: plan.cap.source, asOf: plan.cap.as_of },
     { label: "What limits it", value: bottleneckNames[plan.bottleneck] },
-    { label: "How it would run", value: pathNames[plan.paths.find((p) => p.verdict === "yes" || p.verdict === "slow")?.path ?? "cpu"] },
+    { label: "How it would run", value: plan.verdict === "no" ? "It does not fit here" : plan.verdict === "unknown" ? "Not known yet" : pathNames[plan.paths.find((p) => p.verdict === "yes" || p.verdict === "slow")?.path ?? "cpu"] },
     ...plan.roles.map((role) => ({ label: roleNames[role.role], value: range(role.peak.low, role.peak.high), source: role.peak.source, asOf: role.peak.as_of })),
   ];
   let remedy: string | null = null;
