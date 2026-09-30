@@ -36,6 +36,10 @@ open Me > Profile. A parent or admin viewing someone else keeps the existing
 Edit dialog and sees that person's Face recognition card. The card reads the
 same `/api/biometric-prints` status used by the former profile section.
 
+## SETTINGS-S5
+
+Owners and admins can open a Limits tab on a child's profile. It uses the shared settings renderer for the child's nine daily time limits and storage caps. The tab is hidden on the viewer's own profile, on adult profiles, and on teen profiles. The interim Me > Limits section is removed, so a teen's daily-minute limits are currently set by nobody: Me no longer shows them, and owners/admins cannot reach a teen's settings under the deliberate privacy rule in `backend/src/lib/access.ts`. Jesse's open decision is whether to keep teens private or allow owners/admins to set teen limits through a dedicated limits-only path, which would need a backend change and review.
+
 ## SETTINGS-S1
 
 The profile page's Edit dialog now uses the reusable `ProfileForm`, so the Settings > Me profile card can use

@@ -243,6 +243,7 @@ const nextTableRolloutReview = process.argv.includes("--next-table-rollout-revie
 const nextSettingsReview = process.argv.includes("--next-settings-review");
 const nextSettingsS2Review = process.argv.includes("--next-settings-s2-review");
 const nextSettingsS3Review = process.argv.includes("--next-settings-s3-review");
+const nextSettingsS5Review = process.argv.includes("--next-settings-s5-review");
 const nextSettingsS6Review = process.argv.includes("--next-settings-s6-review");
 const nextLaneA13Review = process.argv.includes("--next-lane-a-13-review");
 const nextPersonalManagementReview = process.argv.includes("--next-personal-management-review");
@@ -3151,6 +3152,51 @@ async function captureNextSettingsS3Review(browser: Browser, ownerSession: strin
   }
 }
 
+async function captureNextSettingsS5Review(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "../home/data-scratch/screens/settings-s5");
+  mkdirSync(outDir, { recursive: true });
+  const response = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
+  if (!response.ok) throw new Error(`SETTINGS-S5: household lookup failed: ${response.status}`);
+  const people = await response.json() as Array<{ id: string; display_name: string; role: string }>;
+  const owner = people.find((person) => person.role === "owner");
+  const child = people.find((person) => person.display_name === "Nova" && person.role === "child");
+  if (!owner || !child) throw new Error("SETTINGS-S5: seeded owner and child Nova are required");
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, ownerSession);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        const profileResponse = await page.goto(`${BASE_URL}/people/${child.id}?tab=limits`);
+        if (!profileResponse?.ok()) throw new Error(`SETTINGS-S5: Nova's profile returned ${profileResponse?.status() ?? "no response"}`);
+        await page.getByRole("tab", { name: "Limits", exact: true }).waitFor({ state: "visible" });
+        await page.locator('[id="settings-person.allowance"]').waitFor({ state: "visible" });
+        await page.locator('[id="settings-person.storage"]').waitFor({ state: "visible" });
+        await settleAnimations(page);
+        const childPath = join(outDir, `settings-s5-nova-limits-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path: childPath, fullPage: true });
+        console.log(`Wrote ${childPath}`);
+
+        const settingsResponse = await page.goto(`${BASE_URL}/settings?tab=me`);
+        if (!settingsResponse?.ok()) throw new Error(`SETTINGS-S5: owner's Settings returned ${settingsResponse?.status() ?? "no response"}`);
+        await page.locator("#profile-display-name").waitFor({ state: "visible" });
+        const limitsTab = page.getByRole("tab", { name: "Limits", exact: true });
+        const limitsOption = page.locator('select[aria-label="Settings section"] option[value="limits"]');
+        if (await limitsTab.count() > 0 || await limitsOption.count() > 0) throw new Error("SETTINGS-S5: the owner's Me navigation still has a Limits entry");
+        await settleAnimations(page);
+        const mePath = join(outDir, `settings-s5-owner-me-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path: mePath, fullPage: true });
+        console.log(`Wrote ${mePath}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureNextSettingsS6Review(browser: Browser, ownerSession: string): Promise<void> {
   const outDir = join(ROOT, "../home/data-scratch/screens/settings-s6");
   mkdirSync(outDir, { recursive: true });
@@ -4208,6 +4254,11 @@ async function main() {
     if (nextSettingsS3Review) {
       await captureNextSettingsS3Review(browser, sessionValue);
       console.log("completed named review: --next-settings-s3-review");
+      return;
+    }
+    if (nextSettingsS5Review) {
+      await captureNextSettingsS5Review(browser, sessionValue);
+      console.log("completed named review: --next-settings-s5-review");
       return;
     }
     if (nextSettingsS6Review) {

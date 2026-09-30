@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maip
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
 import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
 import { ProfileForm } from "@/apps/people/ProfileForm";
-import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster } from "@/lib/api";
+import { api, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { SettingsSectionFrame, type SettingsSection } from "@/next/pages/settings/SettingsSectionFrame";
 
@@ -21,7 +21,6 @@ const sections = [
 
 export function NextMeSettings({ person, onPersonChange = () => {} }: { person: Roster; onPersonChange?: () => void | Promise<void> }) {
   const queryClient = useQueryClient();
-  const isAdmin = isOwnerOrAdminRole(person.role);
   function renderSection(id: typeof sections[number]["id"]) {
     if (id === "profile") {
       return <><ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} /><FaceEnrollmentCard profile={person} viewer={person} /></>;
@@ -48,7 +47,6 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
     description: item.description,
     render: renderSection(item.id),
   }));
-  if (isAdmin) content.push({ id: "limits", label: "Limits", description: "Manage daily time and storage limits.", render: <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.allowance", "person.storage"]} /> });
   return <SettingsSectionFrame sections={content} defaultSection="profile" />;
 }
 

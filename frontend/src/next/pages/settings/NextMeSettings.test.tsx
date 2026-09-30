@@ -8,7 +8,7 @@ import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 afterEach(cleanup);
 
-const beforeGroupIds = ["profile.appearance", "person.allowance", "person.notifications", "person.persona", "person.search", "person.voice", "person.storage"];
+const beforeGroupIds = ["profile.appearance", "person.notifications", "person.persona", "person.search", "person.voice"];
 
 function makePerson(role: Roster["role"] = "child"): Roster {
   return { id: "person-abc123", display_name: "Nova", nickname: null, role, avatar_seed: "person-abc123", source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true } as Roster;
@@ -58,21 +58,24 @@ describe("NextMeSettings", () => {
     } finally { restore(); }
   });
 
-  test("admins see Limits and every former group remains rendered", async () => {
+  test("admins no longer see Limits or its allowance and storage groups in Me", async () => {
     const { restore } = setup("admin");
     try {
-      await waitFor(() => expect(document.body.textContent).toContain("Limits"));
-      fireEvent.click(Array.from(document.querySelectorAll("[role=tab]")).find((tab) => tab.textContent === "Limits")!);
-      await waitFor(() => expect(document.body.textContent).toContain("Allowance"));
-      expect(document.body.textContent).toContain("My storage");
-      for (const id of ["person.allowance", "person.storage"]) expect(document.getElementById(`settings-${id}`)).not.toBeNull();
+      await waitFor(() => expect(document.querySelector("input#profile-display-name")).not.toBeNull());
+      expect(document.body.textContent).not.toContain("Limits");
+      expect(document.body.textContent).not.toContain("Allowance");
+      expect(document.body.textContent).not.toContain("My storage");
+      expect(document.getElementById("settings-person.allowance")).toBeNull();
+      expect(document.getElementById("settings-person.storage")).toBeNull();
       const sectionForGroup: Record<string, string> = {
         "profile.appearance": "Appearance", "person.persona": "Voice and AI", "person.search": "Voice and AI",
-        "person.voice": "Voice and AI", "person.notifications": "Notifications", "person.allowance": "Limits", "person.storage": "Limits",
+        "person.voice": "Voice and AI", "person.notifications": "Notifications",
       };
       for (const id of beforeGroupIds) {
         const title = sectionForGroup[id]!;
-        fireEvent.click(Array.from(document.querySelectorAll("[role=tab]")).find((tab) => tab.textContent === title)!);
+        const sectionTab = Array.from(document.querySelectorAll("[role=tab]")).find((tab) => tab.textContent === title)!;
+        fireEvent.click(sectionTab);
+        await waitFor(() => expect(sectionTab.getAttribute("aria-selected")).toBe("true"));
         if (title === "Notifications") {
           const disclosure = await waitFor(() => Array.from(document.querySelectorAll('[data-slot="collapsible-trigger"]')).find((trigger) => trigger.textContent?.includes("Advanced")) as HTMLElement);
           fireEvent.click(disclosure);

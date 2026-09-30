@@ -15,6 +15,8 @@ import { ProfileForm } from "@/apps/people/ProfileForm";
 import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
+import { PERSON_LIMIT_GROUP_IDS } from "@/next/pages/settings/personLimits";
 
 const PencilIcon = getIcon("pencil");
 type ProfileEntry = PersonRosterEntry | Roster;
@@ -30,15 +32,20 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
   useDocumentTitle("Profile");
   const { id } = useParams<{ id: string }>();
   const [params, setParams] = useSearchParams();
+  const rosterQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
   const viewingSelf = id === person.id;
   const canViewMemories = viewingSelf || isOwnerOrAdminRole(person.role);
-  const activeTab = params.get("tab") === "memories" && canViewMemories ? "memories" : "overview";
-  const rosterQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
-
+  const canViewLimits = !viewingSelf && isOwnerOrAdminRole(person.role)
+    && rosterQuery.data?.some((entry) => entry.id === id && entry.role === "child") === true;
+  const activeTab = params.get("tab") === "memories" && canViewMemories
+    ? "memories"
+    : params.get("tab") === "limits" && canViewLimits
+      ? "limits"
+      : "overview";
   function onTabChange(value: string) {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
-      if (value === "memories") next.set("tab", value);
+      if (value === "memories" || value === "limits") next.set("tab", value);
       else next.delete("tab");
       return next;
     }, { replace: true });
@@ -65,6 +72,7 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
               </div>
             );
           }
+          const showLimits = canViewLimits && profile.role === "child" && canManagePerson(person.role, person.id, { id: profile.id, role: profile.role });
           return (
             <>
               <ProfileHeaderCard profile={profile} viewer={person} viewingSelf={viewingSelf} onPersonChange={onPersonChange} />
@@ -72,6 +80,7 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
               <TabsList className="h-auto min-h-14 p-1">
                 <TabsTrigger value="overview" className="min-h-12">Overview</TabsTrigger>
                   {canViewMemories ? <TabsTrigger value="memories" className="min-h-12">Memories</TabsTrigger> : null}
+                  {showLimits ? <TabsTrigger value="limits" className="min-h-12">Limits</TabsTrigger> : null}
                 </TabsList>
                 <TabsContent value="overview" className="flex flex-col gap-4 py-2">
                   <p className="text-sm text-muted-foreground">{viewingSelf ? "This is your own profile." : `${profile.display_name}'s profile in this household.`}</p>
@@ -83,6 +92,12 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
                     {viewingSelf
                       ? <OwnMemories filterIds={idsFilter(params)} actorIsAdult={person.role === "adult"} />
                       : <OtherPersonMemories personId={profile.id} personName={profile.display_name} />}
+                  </TabsContent>
+                ) : null}
+                {showLimits ? (
+                  <TabsContent value="limits" className="flex flex-col gap-4 py-2">
+                    <p className="text-sm text-muted-foreground">Daily time limits for {profile.display_name}.</p>
+                    <NextSettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} />
                   </TabsContent>
                 ) : null}
               </Tabs>

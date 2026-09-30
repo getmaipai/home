@@ -3,7 +3,8 @@ import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { NextPersonProfilePage } from "@/next/pages/NextPersonProfilePage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { MemoryRecord, PersonRosterEntry, Roster } from "@/lib/api";
+import type { MemoryRecord, PersonRosterEntry, ResolvedSetting, Roster } from "@/lib/api";
+import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 afterEach(cleanup);
 
@@ -67,6 +68,41 @@ function renderProfile(path: string, who: Roster = viewer()) {
   );
 }
 
+function limitSettings() {
+  const registry: SettingsKey[] = [
+    ...Array.from({ length: 9 }, (_, i) => ({
+      key: `allowance.${i}.daily_minutes`, scope: "person", selector: "number", label: `Allowance ${i + 1}`,
+      level: "basic", secret: false, lives_in: "person.allowance", honoured_by: ["home"], range: { min: 0, max: 1440 },
+    } as SettingsKey)),
+    ...["storage.cap", "storage.cap_warning"].map((key) => ({
+      key, scope: "person", selector: "number", label: key, level: "basic", secret: false,
+      lives_in: "person.storage", honoured_by: ["home"], range: { min: 0, max: 100000 },
+    } as SettingsKey)),
+  ];
+  const values: ResolvedSetting[] = registry.map((setting) => ({ key: setting.key, value: 30, source: "default", label: setting.label, level: setting.level, secret: false }));
+  return { registry, values };
+}
+
+function stubProfileAndLimitsFetch(puts: Array<{ url: string; method: string; body: unknown }> = []) {
+  const original = globalThis.fetch;
+  const { registry, values } = limitSettings();
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/api/people")) return Promise.resolve(Response.json(people));
+    if (url.includes("/api/files")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
+    if (url.includes("/api/settings?scope=")) return Promise.resolve(Response.json(values));
+    if (url.endsWith("/api/settings") && init?.method === "PUT") {
+      const body = JSON.parse(String(init.body));
+      puts.push({ url, method: init.method, body });
+      return Promise.resolve(Response.json({ key: body.key, value: body.value, source: "user", label: body.key, level: "basic", secret: false }));
+    }
+    throw new Error(`unstubbed fetch: ${url}`);
+  }) as unknown as typeof fetch;
+  return () => { globalThis.fetch = original; };
+}
+
 describe("NextPersonProfilePage", () => {
   test("shows a person's overview and profile details", async () => {
     const restore = stubFetch({});
@@ -108,6 +144,66 @@ describe("NextPersonProfilePage", () => {
       expect(await view.findByText("Bramble")).toBeTruthy();
       expect(view.queryByRole("tab", { name: "Memories" })).toBeNull();
       expect(view.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true");
+    } finally { restore(); }
+  });
+
+  test("an owner sees a child's Limits tab with all nine allowance rows", async () => {
+    const restore = stubProfileAndLimitsFetch();
+    try {
+      const view = renderProfile("/people/person-bramble?tab=limits", viewer({ role: "owner" }));
+      expect(await view.findByRole("tab", { name: "Limits" })).toBeTruthy();
+      expect(view.getByRole("tab", { name: "Limits" }).getAttribute("aria-selected")).toBe("true");
+      expect(await view.findByText("Daily time limits for Bramble.")).toBeTruthy();
+      expect(document.querySelectorAll('[id="settings-person.allowance"] input[type="number"]').length).toBe(9);
+      expect(document.querySelector('[id="settings-person.storage"]')).toBeTruthy();
+    } finally { restore(); }
+  });
+
+  test("an owner does not see Limits on their own profile", async () => {
+    const restore = stubFetch({});
+    try {
+      const view = renderProfile("/people/person-sage", viewer({ role: "owner" }));
+      await view.findByText("Sage");
+      expect(view.queryByRole("tab", { name: "Limits" })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("an owner does not see Limits on a teen's profile", async () => {
+    const restore = stubFetch({});
+    try {
+      const teen = rosterEntry({ id: "person-nova", display_name: "Nova", role: "teen" });
+      const original = globalThis.fetch;
+      globalThis.fetch = mock((input: RequestInfo | URL) => String(input).includes("/api/people")
+        ? Promise.resolve(Response.json([...people.slice(0, 2), teen]))
+        : Promise.resolve(Response.json([]))) as unknown as typeof fetch;
+      const view = renderProfile("/people/person-nova", viewer({ role: "owner" }));
+      await view.findByText("Nova");
+      expect(view.queryByRole("tab", { name: "Limits" })).toBeNull();
+      globalThis.fetch = original;
+    } finally { restore(); }
+  });
+
+  test("a member cannot see Limits on another child's profile", async () => {
+    const restore = stubFetch({});
+    try {
+      const view = renderProfile("/people/person-bramble", viewer({ role: "adult" }));
+      await view.findByText("Bramble");
+      expect(view.queryByRole("tab", { name: "Limits" })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("changing an allowance writes to the child's person settings", async () => {
+    const puts: Array<{ url: string; method: string; body: unknown }> = [];
+    const restore = stubProfileAndLimitsFetch(puts);
+    try {
+      const view = renderProfile("/people/person-bramble?tab=limits", viewer({ role: "owner" }));
+      const row = await view.findByLabelText("Allowance 1");
+      const allowanceName = ["allowance", "0", "daily_minutes"].join(".");
+      fireEvent.change(row, { target: { value: "45" } });
+      fireEvent.blur(row);
+      await waitFor(() => expect(puts).toContainEqual({
+        url: "/api/settings", method: "PUT", body: { scope: "person:person-bramble", key: allowanceName, value: 45 },
+      }));
     } finally { restore(); }
   });
 
