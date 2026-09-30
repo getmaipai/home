@@ -7,7 +7,7 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { __resetLlmSupervisorForTests, __setChatRecoveryNudgeForTests } from "@/lib/llmSupervisor";
 import { __blockPortForTests, __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { createBenchPeople, startRecordingProxy, startFakeSearxng, type BenchPeople, type FakeSearxng } from "../../scripts/bench/conversationRunner";
@@ -1984,6 +1984,7 @@ describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects",
 
   beforeEach(() => {
     __resetPortOwnershipForTests();
+    __resetLlmSupervisorForTests();
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     process.env.MAIPAI_LLAMA_SERVER_PORT = testChatPort;
     setHouseholdSettingValue("search.searxng_url", "");
@@ -1994,7 +1995,7 @@ describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects",
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     const port = Number(testChatPort);
     process.env.MAIPAI_LLAMA_SERVER_PORT = String(port);
-    __blockPortForTests(port, 12345);
+    __blockPortForTests(port, process.pid);
     try {
       const result = await runTurnNext(people.owner, "chat", message);
       expect(result).toMatchObject({ ok: false, status: 503, code: "unavailable", error: "MaiPai's AI isn't running right now." });
@@ -2009,11 +2010,32 @@ describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects",
   test("blocked local chat port refuses a streaming turn before turn storage", async () => {
     const port = Number(testChatPort);
     process.env.MAIPAI_LLAMA_SERVER_PORT = String(port);
-    __blockPortForTests(port, 12345);
+    __blockPortForTests(port, process.pid);
     const result = await runTurnNextStream(people.owner, "chat", message);
     expect(result).toMatchObject({ ok: false, status: 503, code: "unavailable", error: "MaiPai's AI isn't running right now." });
     expect(db.select().from(conversations).all()).toHaveLength(0);
     expect(db.select().from(conversationTurns).all()).toHaveLength(0);
+  });
+
+  test("a refusal nudges recovery once, then throttles another refusal within 30 seconds", async () => {
+    const port = Number(testChatPort);
+    process.env.MAIPAI_LLAMA_SERVER_PORT = String(port);
+    __blockPortForTests(port, process.pid);
+    let nudges = 0;
+    __setChatRecoveryNudgeForTests(() => { nudges++; });
+    expect((await runTurnNext(people.owner, "chat", message)).ok).toBe(false);
+    expect((await runTurnNext(people.owner, "chat", message)).ok).toBe(false);
+    expect(nudges).toBe(1);
+  });
+
+  test("an intentional stop refuses without nudging the engine", async () => {
+    const state = (globalThis as typeof globalThis & { __maipai_llmSupervisor?: { manuallyStopped: boolean } }).__maipai_llmSupervisor!;
+    state.manuallyStopped = true;
+    let nudges = 0;
+    __setChatRecoveryNudgeForTests(() => { nudges++; });
+    const result = await runTurnNext(people.owner, "chat", message);
+    expect(result).toMatchObject({ ok: false, status: 503, code: "unavailable" });
+    expect(nudges).toBe(0);
   });
 
   test("none means on-demand startup and does not refuse a turn", async () => {

@@ -4,12 +4,14 @@ import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
 import { listIssues, resolveIssue } from "@/lib/issues";
-import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests } from "@/lib/sidecars";
+import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests, blockedPortReason } from "@/lib/sidecars";
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
 import { __resetStackEngineForTests } from "@/lib/stackEngine";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 
 const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
 
@@ -54,11 +56,27 @@ describe("llmSupervisor chatEngineDown()", () => {
     state.manuallyStopped = false;
     const port = Number(testChatPort);
     process.env.MAIPAI_LLAMA_SERVER_PORT = String(port);
-    __blockPortForTests(port, 12345);
+    __blockPortForTests(port, process.pid);
     expect(chatEngineDown()).toBe(true);
     __resetSidecarsForTests();
     __failEngineForTests("chat");
     expect(chatEngineDown()).toBe(true);
+  });
+
+  test("a blocked port stays down while its recorded holder pid is alive", () => {
+    const port = Number(testChatPort);
+    __blockPortForTests(port, process.pid);
+    expect(chatEngineDown()).toBe(true);
+  });
+
+  test("a dead blocked-port holder clears its marker and no longer reports down", async () => {
+    const child = spawn("true", [], { stdio: "ignore" });
+    if (!child.pid) throw new Error("expected the short child to have a pid");
+    await once(child, "exit");
+    const port = Number(testChatPort);
+    __blockPortForTests(port, child.pid);
+    expect(chatEngineDown()).toBe(false);
+    expect(blockedPortReason(port)).toBeUndefined();
   });
 
   test("skips the local supervisor for an explicit URL or the routed Stack", () => {

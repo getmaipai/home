@@ -108,6 +108,24 @@ export function blockedPortReason(port: number): { pid: number; command: string;
   return blockedPorts.get(port);
 }
 
+/** True only while the recorded foreign port holder still exists. A dead
+ * holder's stale entry is removed so the next chat turn may start again. */
+export function blockedPortHolderAlive(port: number): boolean {
+  const holder = blockedPorts.get(port);
+  if (!holder) return false;
+  try {
+    process.kill(holder.pid, 0);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EPERM") return true;
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") {
+      blockedPorts.delete(port);
+      return false;
+    }
+    return true;
+  }
+}
+
 /** Test-only: lets a test simulate "this install already spawned
  * something on this port" without going through a real spawn +
  * health-check round trip - sidecars.test.ts's own freePort() tests

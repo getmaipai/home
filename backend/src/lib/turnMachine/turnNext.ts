@@ -29,7 +29,7 @@ import { buildTurnStats } from "@/lib/turnStats";
 import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
-import { chatEngineDown } from "@/lib/llmSupervisor";
+import { chatEngineDown, nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { postProjectResult } from "@/lib/projects/post";
 import { StatusChannel } from "@/lib/statusChannel";
@@ -217,6 +217,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   if (invalid) return { ok: false, result: invalid };
 
   if (chatEngineDown()) {
+    nudgeChatEngineRecovery();
     return { ok: false, result: { ok: false, status: 503, code: "unavailable", error: "MaiPai's AI isn't running right now." } };
   }
 

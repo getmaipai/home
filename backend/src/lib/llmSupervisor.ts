@@ -39,12 +39,17 @@ import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFla
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
-import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, expireStalledStart, cancelEngineRespawn, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, expireStalledStart, cancelEngineRespawn, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { getStackUrl } from "@/lib/stackEngine";
+
+let lastChatRecoveryNudgeAt = 0;
+let chatRecoveryNudge: () => void = () => {
+  void getChatClient().catch(() => {});
+};
 
 export type BackendKind = "url" | "override" | "selection" | "stub";
 
@@ -644,7 +649,25 @@ export function chatEngineDown(): boolean {
   if (process.env.MAIPAI_LLAMA_SERVER_URL || getStackUrl()) return false;
   const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
   const kind = engineHealthKind("chat", getEngineStatus().kind, port);
-  return kind === "stopped" || kind === "blocked" || kind === "failed";
+  if (kind === "blocked") return blockedPortHolderAlive(port);
+  return kind === "stopped" || kind === "failed";
+}
+
+/** Ask the supervisor to retry a refused turn in the background, rate
+ * limited so repeated messages cannot cause a spawn storm. */
+export function nudgeChatEngineRecovery(): void {
+  if (getEngineStatus().kind === "stopped") return;
+  const now = Date.now();
+  if (now - lastChatRecoveryNudgeAt < 30_000) return;
+  lastChatRecoveryNudgeAt = now;
+  chatRecoveryNudge();
+}
+
+/** Test-only seam for counting recovery nudges without spawning an engine. */
+export function __setChatRecoveryNudgeForTests(nudge: (() => void) | null): void {
+  chatRecoveryNudge = nudge ?? (() => {
+    void getChatClient().catch(() => {});
+  });
 }
 
 /** ENGINE-HOST-01: the chat engine's identity for the [turn] line: the
@@ -690,6 +713,10 @@ export function getChatLivePid(): number | null {
  * server) and clear the cached client, the same reset-between-test-files
  * shape as resetDb()/__clearSessionCacheForTests. */
 export function __resetLlmSupervisorForTests(): void {
+  lastChatRecoveryNudgeAt = 0;
+  chatRecoveryNudge = () => {
+    void getChatClient().catch(() => {});
+  };
   cancelEngineRespawn("chat");
   state.generation++;
   state.chatBackend?.stop();
