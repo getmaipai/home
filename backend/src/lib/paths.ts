@@ -1,5 +1,6 @@
 import { resolve, join } from "node:path";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import { dataClassById } from "./dataClasses";
 
 // The bundled packages' own source directory - checked into git, never
 // per-household data, so it lives here (not under dataDir below) even
@@ -48,6 +49,21 @@ export const defaultDataDir = join(repoRoot, "data");
 export const dataDirIsExplicit = Boolean(process.env.MAIPAI_DATA_DIR);
 export const dataDir = process.env.MAIPAI_DATA_DIR || defaultDataDir;
 
+// DATA-LOCATION-00c: every folder below is a data class (lib/dataClasses.ts,
+// the one list) resolved here, never hand-joined. With no location record
+// yet (DATA-LOCATION-01a adds per-class overrides), a class's folder is its
+// declared default: the root (`dataDir`) or the root's parent for the two
+// backup classes, joined with the class's subpath. `MAIPAI_BACKUP_DIR`
+// stays the one existing override: it names the `backups` folder itself,
+// and `received-backups` remains its sibling, exactly as before.
+export function classDir(id: string): string {
+  const { default: def } = dataClassById(id);
+  if (id === "backups" && process.env.MAIPAI_BACKUP_DIR !== undefined) return process.env.MAIPAI_BACKUP_DIR;
+  if (id === "received-backups") return resolve(classDir("backups"), "..", ...def.subpath.split("/"));
+  const base = def.base === "root" ? dataDir : resolve(dataDir, "..");
+  return resolve(base, ...def.subpath.split("/"));
+}
+
 // Backups (2.5) land in a sibling of data/, not inside it: the whole
 // point of a backup target is to be somewhere a lost or corrupted data/
 // doesn't take it down too, even for this pass's `local` target (a real
@@ -57,8 +73,7 @@ export const dataDir = process.env.MAIPAI_DATA_DIR || defaultDataDir;
 // throwaway directory, so a test run's backups can never collide with
 // another's in the same way a shared `../backups` off two different
 // temp data dirs would.
-export const backupDir =
-  process.env.MAIPAI_BACKUP_DIR ?? resolve(dataDir, "..", "backups");
+export const backupDir = classDir("backups");
 
 // Step 8: "hub as the interface a robot will use" - a paired device's own
 // already-encrypted backup archive, pushed here for cold storage. A
@@ -72,7 +87,7 @@ export const backupDir =
 // backup key) - one bug away from being swept into this household's own
 // retention/prune math if it ever sat in the same flat directory, quite
 // apart from the directory-vs-file cleanup hazard.
-export const receivedBackupsDir = resolve(backupDir, "..", "received-backups");
+export const receivedBackupsDir = classDir("received-backups");
 
 // Downloaded GGUF weights and llama-server engine binaries (4.11's
 // deferred download-job queue): both real household data in the sense
@@ -81,8 +96,8 @@ export const receivedBackupsDir = resolve(backupDir, "..", "received-backups");
 // supervisor, so they get their own subdirectories under data/ rather
 // than crowding hub.db's world. `MAIPAI_DATA_DIR` already covers test
 // isolation for both (they resolve from dataDir, not a separate env var).
-export const modelsDir = resolve(dataDir, "models");
-export const enginesDir = resolve(dataDir, "engines");
+export const modelsDir = classDir("models");
+export const enginesDir = classDir("engines");
 
 // KIWIX-SIDECAR-01: the kiwix-tools binary (kiwix-serve/kiwix-manage),
 // same shape as enginesDir above - a pinned, re-fetchable download, not
@@ -104,15 +119,15 @@ export const enginesDir = resolve(dataDir, "engines");
 // re-provisionable cache like every other engine/model directory), but
 // which a person may point at an external drive or a NAS mount - the
 // tool binary never moves with it.
-export const kiwixToolsDir = resolve(dataDir, "sidecars", "kiwix-tools");
-export const defaultReferenceLibraryDir = resolve(dataDir, "reference");
+export const kiwixToolsDir = resolve(classDir("sidecars"), "kiwix-tools");
+export const defaultReferenceLibraryDir = classDir("reference");
 
 // Fix A5 (docs/dev.md's 2026-09-07 incident note): the hub's own
 // structured logs (lib/log.ts), rotated by size and days. Not synced or
 // backed up - operational history, not household data - so this stays a
 // plain subdirectory of dataDir rather than getting its own env-var
 // override the way modelsDir/enginesDir's genuinely large downloads do.
-export const logsDir = resolve(dataDir, "logs");
+export const logsDir = classDir("logs");
 
 // The wake-word pipeline's shared feature models (melspectrogram +
 // embedding) plus per-phrase detectors (2026-09-04, the wake-word plan
@@ -120,16 +135,16 @@ export const logsDir = resolve(dataDir, "logs");
 // matching the legacy hub's own directory name exactly (`home-legacy.git`
 // download.ts's `WAKEWORD_DIR_REL`) since nothing about that path is
 // legacy-specific.
-export const wakewordDir = resolve(dataDir, "voice", "wakewords");
+export const wakewordDir = classDir("wakeword-models");
 
 // Downloaded face detection and embedding models, served to browser clients.
-export const visionDir = resolve(dataDir, "vision", "models");
+export const visionDir = classDir("vision-models");
 
 // Session C step 5 (session-c-brain-and-voice.md): the STT program's own
 // re-downloadable models - the Silero VAD onnx file (utterance
 // endpointing, lib/sttSession.ts) and the Moonshine tiny-en archive
 // (transcription, lib/stt.ts). Same shape as wakewordDir above.
-export const sttDir = resolve(dataDir, "voice", "stt");
+export const sttDir = classDir("stt-models");
 
 // PROJECT-RUN-01: each project's own artifact files, one subdirectory per
 // project id under here. Never synced/backed up on its own - the artifact
@@ -137,14 +152,14 @@ export const sttDir = resolve(dataDir, "voice", "stt");
 // verdict) is the projects table row; per-project subdirectories mean a
 // cancelled or failed project's partial files stay isolated from every
 // other project's.
-export const projectsDir = resolve(dataDir, "projects");
+export const projectsDir = classDir("projects");
 
 // A package's own cached fetch responses (session-d-packages-and-store.md
 // step 3, `lib/packageCache.ts`): one subdirectory per package id under
 // here, never a spec-shaped record and never synced or backed up - a cache
 // entry is, by definition, reconstructible from the third-party service it
 // came from.
-export const cacheDir = resolve(dataDir, "cache");
+export const cacheDir = classDir("cache");
 
 // A Tier 1 package's own writable state (session-d-packages-and-store.md
 // step 5, `lib/denoHost.ts`) - node:sqlite files, anything the sandboxed
@@ -165,7 +180,7 @@ export const cacheDir = resolve(dataDir, "cache");
 // could persist a backdoor into its own manifest.json/handler.ts across
 // restarts). `state/` sits beside `versions/` and `.staging/` below,
 // never inside either.
-export const tier1PackageDataDir = (packageId: string): string => resolve(dataDir, "packages", packageId, "state");
+export const tier1PackageDataDir = (packageId: string): string => resolve(classDir("packages"), packageId, "state");
 
 // Step 6's real install layout (`lib/store.ts`): a store-installed
 // package's own unpacked SOURCE, one directory per version so a
@@ -175,7 +190,7 @@ export const tier1PackageDataDir = (packageId: string): string => resolve(dataDi
 // directory above, never a parent or child of it - see that constant's
 // own comment for why the distinction is load-bearing, not cosmetic.
 export const installedPackageVersionDir = (packageId: string, version: string): string =>
-  resolve(dataDir, "packages", packageId, "versions", version);
+  resolve(classDir("packages"), packageId, "versions", version);
 
 // Where a package's tarball is verified and unpacked before it becomes
 // the active install - unpacking straight into `installedPackageVersionDir`
@@ -185,18 +200,18 @@ export const installedPackageVersionDir = (packageId: string, version: string): 
 // here, runs the smoke test against ITS OWN resolved path, and only then
 // renames it into place - the identical stage-then-rename shape
 // `scripts/refresh-bundled-packages.ts` already uses for the bundled set.
-export const installStagingDir = (packageId: string): string => resolve(dataDir, "packages", packageId, ".staging");
+export const installStagingDir = (packageId: string): string => resolve(classDir("packages"), packageId, ".staging");
 
 // A household member's own uploaded voice-cloning sample (2026-09-04):
 // real, irreplaceable family data (unlike wakewordDir's re-downloadable
 // base models), but still not synced/backed up yet - lib/backup.ts's
 // VACUUM INTO only covers hub.db, a real documented gap (docs/dev.md).
-export const clonedVoicesDir = resolve(dataDir, "voice", "cloned");
+export const clonedVoicesDir = classDir("cloned-voices");
 
 // ATT-01a: local upload bytes, grouped by person below the household data
 // directory. The complete relative path is validated by lib/attachments.ts
 // before it is resolved or used.
-export const attachmentsDir = resolve(dataDir, "people");
+export const attachmentsDir = classDir("people-files");
 
 // ensureDataDir and statMtimeMs themselves live in @maipai/core/src/paths
 // now (core-v0.1.0, since neither reads a product's data layout);
