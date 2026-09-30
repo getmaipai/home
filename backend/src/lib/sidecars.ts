@@ -27,6 +27,7 @@ import { hotReloadState } from "@/lib/hotReloadState";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import { createLogger } from "@maipai/core/src/log";
 import { logsDir, dataDir } from "@/lib/paths";
+import { readProcessFacts, type ProcessFacts } from "@/lib/instanceLock";
 import type { EngineHealthEntry, EngineHealthKind } from "@/wire";
 
 const execFileAsync = promisify(execFile);
@@ -156,6 +157,80 @@ export function __failEngineForTests(role: string): void {
 export function __resetPortOwnershipForTests(): void {
   writeOwnedPorts({});
   blockedPorts.clear();
+  freePortProcessScanForTests = null;
+  freePortProcessFactsForTests = null;
+  freePortKillForTests = null;
+}
+
+type FreePortFactsReader = (pid: number) => ProcessFacts | null;
+type FreePortKill = (pid: number, signal: NodeJS.Signals | 0) => unknown;
+let freePortProcessScanForTests: (() => Promise<PsMatch[]>) | null = null;
+let freePortProcessFactsForTests: FreePortFactsReader | null = null;
+let freePortKillForTests: FreePortKill | null = null;
+
+export function __setFreePortProcessScanForTests(scan: (() => Promise<PsMatch[]>) | null): void {
+  freePortProcessScanForTests = scan;
+}
+export function __setFreePortProcessFactsForTests(facts: FreePortFactsReader | null): void {
+  freePortProcessFactsForTests = facts;
+}
+export function __setFreePortKillForTests(kill: FreePortKill | null): void {
+  freePortKillForTests = kill;
+}
+
+type KillIdentityResult = "gone" | "identity_changed" | "killed" | "still_alive" | "not_permitted";
+const factsForFreePort = (pid: number): ProcessFacts | null => (freePortProcessFactsForTests ?? readProcessFacts)(pid);
+const killForFreePort = (pid: number, signal: NodeJS.Signals | 0): unknown => (freePortKillForTests ?? process.kill)(pid, signal);
+
+/** Signal only the same process observed during the port scan. */
+export async function killWithIdentityCheck(
+  pid: number,
+  expected: { command: string; startedAtMs: number },
+  opts: { termTimeoutMs?: number; killTimeoutMs?: number } = {},
+): Promise<KillIdentityResult> {
+  const current = factsForFreePort(pid);
+  if (current === null) return "gone";
+  if (
+    current.command !== expected.command || current.startedAtMs === null ||
+    Math.abs(current.startedAtMs - expected.startedAtMs) > 1_000
+  ) return "identity_changed";
+
+  const signal = (sig: NodeJS.Signals | 0): KillIdentityResult | null => {
+    try {
+      killForFreePort(pid, sig);
+      return null;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ESRCH") return "gone";
+      if (code === "EPERM") return "not_permitted";
+      return "still_alive";
+    }
+  };
+  const termError = signal("SIGTERM");
+  if (termError) return termError;
+
+  const waitForExit = async (ms: number): Promise<boolean> => {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      try {
+        killForFreePort(pid, 0);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ESRCH") return true;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    try {
+      killForFreePort(pid, 0);
+      return false;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ESRCH";
+    }
+  };
+  if (await waitForExit(opts.termTimeoutMs ?? 2_000)) return "killed";
+
+  const killError = signal("SIGKILL");
+  if (killError) return killError;
+  return (await waitForExit(opts.killTimeoutMs ?? 1_000)) ? "killed" : "still_alive";
 }
 
 /** A live process is holding `port` and this install's own record does
@@ -359,63 +434,48 @@ async function findPidsMatching(pattern: RegExp): Promise<PsMatch[]> {
   }
 }
 
-/** ENGINE-PORT-01: only ever kills a pid THIS install's own on-disk
- * record (recordOwnedPort(), above) names for `port` - a real orphan,
- * left over from this exact install's previous instance (a crash, a
- * dev reload, a restart that never got to clean up after itself). A
- * live pid on the port the record does NOT name is a foreign holder:
- * never killed, logged with its pid and reason, and left on
- * `blockedPorts` for spawnAndWaitHealthy() to refuse the spawn over
- * and a caller's own health status to report - the household's own
- * hub, running as a completely separate OS process from whatever else
- * asked for this port, must never be a casualty of someone else
- * wanting the same default port free. */
+function ageLabel(startedAtMs: number): string {
+  const seconds = Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000));
+  return seconds < 60 ? `${seconds}s` : seconds < 3600 ? `${Math.floor(seconds / 60)}m` : `${Math.floor(seconds / 3600)}h`;
+}
+
+/** Home owns its engine ports. Reap holders after checking their process
+ * identity, while protecting this hub and its parent from the scan. */
 export async function freePort(port: number): Promise<void> {
   // Anchored to a word boundary after the number: a plain substring test
   // ("--port 8788".includes(...)) would also match "--port 87889" and
   // kill an unrelated process whose port has this one as a numeric
   // prefix (a real bug a code review caught in the original version).
   const portPattern = new RegExp(`--port[= ]${port}\\b`);
-  const matches = await findPidsMatching(portPattern);
+  const matches = await (freePortProcessScanForTests?.() ?? findPidsMatching(portPattern));
   if (matches.length === 0) {
     blockedPorts.delete(port);
     return;
   }
 
-  // A code review caught the bootstrap gap: an install that upgrades to
-  // this fix has no record yet for a port it has spawned onto for
-  // months, so a genuine crash orphan sitting there the moment this
-  // ships would read as "foreign" and stay stuck forever, a real
-  // regression from the old (unsafe, but self-healing) behavior. `null`
-  // ("no record was ever written for this port") and "a record names a
-  // DIFFERENT pid than what's there now" are different states: only the
-  // second is real evidence of a foreign holder. The first successful
-  // spawn after this ships records ownership (spawnAndWaitHealthy,
-  // below), so this fallback is a one-time bootstrap window per port,
-  // never the steady state the live incident actually happened in.
   const owned = ownedPid(port);
-  const toKill = owned === null ? matches : matches.filter((m) => m.pid === owned);
-  const foreign = owned === null ? [] : matches.filter((m) => m.pid !== owned);
-
-  for (const match of toKill) {
-    const reason = owned === null ? "no ownership record exists yet for this port (a pre-ENGINE-PORT-01 install, or the very first spawn) - treated as a legacy orphan" : "an orphan this install spawned previously";
-    console.error(`[sidecars] freePort(${port}): killing pid ${match.pid} (${reason}: ${match.command})`);
-    try {
-      process.kill(match.pid, "SIGKILL");
-    } catch {
-      // already gone
+  let attemptedReap = false;
+  for (const match of matches) {
+    if (match.pid === process.pid || match.pid === process.ppid) continue;
+    const snapshot = factsForFreePort(match.pid);
+    if (!snapshot || snapshot.startedAtMs === null) continue;
+    const expected = { command: match.command, startedAtMs: snapshot.startedAtMs };
+    const result = await killWithIdentityCheck(match.pid, expected);
+    if (owned === match.pid) {
+      console.error(`[sidecars] freePort(${port}): killing pid ${match.pid} (an orphan this install spawned previously: ${match.command})`);
+    } else {
+      console.error(`[sidecars] freePort(${port}): reaped pid ${match.pid} (${ageLabel(expected.startedAtMs)} old, ${match.command}): it held an engine port and is not this install's engine`);
     }
-  }
-
-  if (foreign.length > 0) {
-    const first = foreign[0]!;
-    console.error(`[sidecars] port ${port} is held by pid ${first.pid}, not ours: set MAIPAI_LLAMA_SERVER_PORT, MAIPAI_BACKGROUND_PORT and MAIPAI_EMBED_PORT (command: ${first.command})`);
-    blockedPorts.set(port, { pid: first.pid, command: first.command, at: new Date().toISOString() });
-    throw new ForeignPortHolderError(port, first.pid);
+    attemptedReap = true;
+    if (result === "still_alive" || result === "not_permitted") {
+      blockedPorts.set(port, { pid: match.pid, command: match.command, at: new Date().toISOString() });
+      console.error(`[sidecars] port ${port} is held by pid ${match.pid}, not ours: set MAIPAI_LLAMA_SERVER_PORT, MAIPAI_BACKGROUND_PORT and MAIPAI_EMBED_PORT (command: ${match.command})`);
+      throw new ForeignPortHolderError(port, match.pid);
+    }
   }
   blockedPorts.delete(port);
 
-  if (toKill.length === 0) return;
+  if (!attemptedReap) return;
 
   // Give the OS a moment to actually release the socket before the
   // caller tries to bind it again - SIGKILL is immediate but the kernel's
@@ -1229,6 +1289,9 @@ export function __resetSidecarsForTests(): void {
   }
   registry.clear();
   blockedPorts.clear();
+  freePortProcessScanForTests = null;
+  freePortProcessFactsForTests = null;
+  freePortKillForTests = null;
   for (const timer of engineWatchTimers) clearInterval(timer);
   engineWatchTimers.clear();
   for (const timer of pendingRespawnTimers.values()) clearTimeout(timer);

@@ -33530,6 +33530,14 @@ The hub shutdown list previously stopped chat, embed and background engines but 
 
 On 2026-09-29, `bun stop` terminated the hub immediately while the chat, embedding and voice engine processes remained alive. The sidecar and Deno host SIGTERM handlers were registered before `index.ts`'s shutdown handler, and each called `process.exit(0)` after synchronous cleanup. That ended the process before the later handler could await `shutdownEngines()`. The module handlers now perform synchronous cleanup only; `index.ts` owns SIGINT/SIGTERM shutdown and process exit, allowing the bounded engine shutdown to finish first.
 
+## ENGINE-AVAIL-04c
+
+Home owns the chat, voice, embedding and background engine ports. Before an engine starts, `freePort()` scans for holders and reaps each matching process except the hub and its parent. It checks the command and start time again immediately before signaling, sends SIGTERM, then SIGKILL if needed, and waits for the port to free. A process that changed identity is never signaled. Reaps log the pid, age, command and reason; a recorded engine pid keeps its existing ownership log wording.
+
+Jesse decided that any non-Home process holding an engine port may be killed without asking. The coordinator dropped per-role lock files: the hub already has a single-instance lock, 04b now stops its engines on exit, and the port reap handles stragglers. `freePort()` still throws `ForeignPortHolderError` when a holder remains alive after both signals or signaling is denied. The port is marked blocked so the availability and Repair paths continue to report it. Identity changes and processes that disappear during the scan are not signaled.
+
+The blocked-port Repair test now injects EPERM for its listener, because an ordinary foreign holder is reaped under this policy; this keeps the test focused on the plain Repair sentence and its technical detail when Home cannot remove the holder.
+
 ## DATA-LOCATION: where the household's data lives, choosing it at install and moving it later (design, 2026-09-29)
 
 **Revision 2026-09-30.** The first version grouped the data into three

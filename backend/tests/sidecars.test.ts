@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import {
   registerSidecar,
   getSidecar,
@@ -22,6 +22,10 @@ import {
   ForeignPortHolderError,
   __recordOwnedPortForTests,
   __resetPortOwnershipForTests,
+  __setFreePortProcessScanForTests,
+  __setFreePortProcessFactsForTests,
+  __setFreePortKillForTests,
+  killWithIdentityCheck,
 } from "@/lib/sidecars";
 import { listIssues, fixIssue, __resetFixHandlersForTests } from "@/lib/issues";
 import { db } from "@/db";
@@ -834,32 +838,62 @@ describe("freePort", () => {
     }
   }, 10_000);
 
-  // ENGINE-PORT-01's own real fix, once ownership IS established (every
-  // successful spawn records it - the actual live incident's own
-  // steady state, an install that has spawned onto this port many
-  // times already): a live process on the port whose pid the record
-  // does NOT name - Fable's live diagnosis, dev.md 2026-09-23, was
-  // exactly this shape, a perfectly healthy process on its own
-  // production port a second, unrelated process's freePort() call
-  // killed anyway - must survive. A record naming a pid that is NOT
-  // the one currently there (the previously-owned pid already exited
-  // on its own, something else now holds the port) is exactly as
-  // foreign as no record at all being wrong would be; only an EXACT
-  // pid match is ever killed.
-  test("refuses to kill a live process a recorded (but non-matching) owner names, and reports it as blocked", async () => {
+  // ENGINE-AVAIL-04c deliberately changes ENGINE-PORT-01: Home owns its
+  // engine ports and reaps a different, identity-checked holder.
+  test("reaps a live listener when the ownership record names a different pid", async () => {
     const port = reserveFreePort();
     const child = await spawnRealListener(port, "not the recorded pid");
     try {
       __recordOwnedPortForTests(port, child.pid + 1);
 
-      await expect(freePort(port)).rejects.toThrow(ForeignPortHolderError);
-
-      const res = await fetch(`http://127.0.0.1:${port}`);
-      expect(await res.text()).toBe("not the recorded pid");
-
-      const blocked = blockedPortReason(port);
-      expect(blocked?.pid).toBe(child.pid);
+      await freePort(port);
+      await expect(fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(1000) })).rejects.toThrow();
+      expect(blockedPortReason(port)).toBeUndefined();
     } finally {
+      child.kill();
+    }
+  }, 10_000);
+
+  test("leaves a non-permitted holder blocked", async () => {
+    const port = reserveFreePort();
+    const child = await spawnRealListener(port, "cannot be reaped");
+    try {
+      __recordOwnedPortForTests(port, child.pid + 1);
+      __setFreePortKillForTests(() => { throw Object.assign(new Error("denied"), { code: "EPERM" }); });
+      await expect(freePort(port)).rejects.toThrow(ForeignPortHolderError);
+      expect(blockedPortReason(port)?.pid).toBe(child.pid);
+    } finally {
+      child.kill();
+    }
+  }, 10_000);
+
+  test("does not signal when the process identity changes after the scan", async () => {
+    const signals: unknown[][] = [];
+    __setFreePortProcessFactsForTests(() => ({ command: "different process", startedAtMs: 1000 }));
+    __setFreePortKillForTests((pid, signal) => { signals.push([pid, signal]); });
+    await expect(killWithIdentityCheck(424242, { command: "bun --port 1234", startedAtMs: 1000 })).resolves.toBe("identity_changed");
+    expect(signals).toHaveLength(0);
+  });
+
+  test("never signals the hub process even if the scan matches it", async () => {
+    const signals: unknown[][] = [];
+    __setFreePortProcessScanForTests(async () => [{ pid: process.pid, command: "bun --port 1234" }]);
+    __setFreePortProcessFactsForTests(() => ({ command: "bun --port 1234", startedAtMs: Date.now() - 1000 }));
+    __setFreePortKillForTests((pid, signal) => { signals.push([pid, signal]); });
+    await freePort(1234);
+    expect(signals).toHaveLength(0);
+  });
+
+  test("keeps the owned pid log wording", async () => {
+    const port = reserveFreePort();
+    const child = await spawnRealListener(port, "owned wording");
+    const error = spyOn(console, "error").mockImplementation(() => {});
+    try {
+      __recordOwnedPortForTests(port, child.pid);
+      await freePort(port);
+      expect(error.mock.calls.some(([line]) => String(line).includes(`killing pid ${child.pid}`) && String(line).includes("an orphan this install spawned previously"))).toBe(true);
+    } finally {
+      error.mockRestore();
       child.kill();
     }
   }, 10_000);
@@ -927,6 +961,7 @@ describe("engineHealthKind: a blocked port reports \"blocked\"", () => {
       // state has (ownership already established) - the bootstrap
       // fallback above would otherwise just kill this and never block.
       __recordOwnedPortForTests(port, child.pid + 1);
+      __setFreePortKillForTests(() => { throw Object.assign(new Error("denied"), { code: "EPERM" }); });
       await expect(freePort(port)).rejects.toThrow(ForeignPortHolderError);
       expect(engineHealthKind("chat", "spawned", port)).toBe("blocked");
     } finally {

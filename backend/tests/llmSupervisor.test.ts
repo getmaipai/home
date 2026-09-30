@@ -4,7 +4,7 @@ import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
 import { listIssues, resolveIssue } from "@/lib/issues";
-import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests, blockedPortReason, __recordOwnedPortForTests } from "@/lib/sidecars";
+import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests, blockedPortReason, __recordOwnedPortForTests, __setFreePortKillForTests } from "@/lib/sidecars";
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
@@ -261,6 +261,10 @@ describe("llmSupervisor tier 3: the household's selected chat model", () => {
     const port = Number(testChatPort);
     const holder = Bun.spawn(["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("holder") }); setTimeout(() => {}, 60000);`, "--port", String(port)], { stdout: "ignore", stderr: "ignore" });
     __recordOwnedPortForTests(port, holder.pid + 1);
+    __setFreePortKillForTests((pid, signal) => {
+      if (pid === holder.pid) throw Object.assign(new Error("denied"), { code: "EPERM" });
+      return process.kill(pid, signal);
+    });
     process.env.MAIPAI_LLAMA_SERVER_BIN = "true";
     process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
     try {

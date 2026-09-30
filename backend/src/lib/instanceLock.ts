@@ -46,7 +46,7 @@ export class HubAlreadyRunningError extends Error {
 
 export class DataDirPlacementError extends Error {}
 
-type ProcessFacts = { command: string; startedAtMs: number | null };
+export type ProcessFacts = { command: string; startedAtMs: number | null };
 
 function psField(pid: number, field: string): string | null {
   const out = Bun.spawnSync(["ps", "-p", String(pid), "-o", `${field}=`], { stdout: "pipe", stderr: "ignore" });
@@ -55,7 +55,7 @@ function psField(pid: number, field: string): string | null {
   return text === "" ? null : text;
 }
 
-function readProcessFacts(pid: number): ProcessFacts | null {
+export function readProcessFacts(pid: number): ProcessFacts | null {
   if (process.platform === "win32") return null;
   const command = psField(pid, "command");
   if (command === null) return null;
