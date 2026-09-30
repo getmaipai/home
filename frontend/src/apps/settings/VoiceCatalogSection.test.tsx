@@ -2,6 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
 import { readMicDevicePreference } from "@/lib/voice/micDevicePreference";
+import { waitForGone } from "../../../tests/waitForGone";
 
 // `@testing-library/dom`'s global `screen` singleton is computed once at
 // module-load time, before Bun's test preload finishes registering
@@ -194,7 +195,7 @@ describe("VoiceCatalogSection", () => {
     try {
       const { findByText, queryByText, unmount } = render(<VoiceCatalogSection personId="person-1" />);
       await findByText("Browse the full community voice catalog (2,000+ voices)");
-      await waitFor(() => expect(queryByText("Microphone")).toBeNull());
+      await waitForGone(() => queryByText("Microphone"));
       unmount();
       // The mic-enumerating effect's own unmount cleanup
       // (navigator.mediaDevices.removeEventListener) runs as a passive

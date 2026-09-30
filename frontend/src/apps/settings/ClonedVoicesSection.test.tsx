@@ -2,6 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
 import type { Roster } from "@/lib/api";
+import { waitForGone } from "../../../tests/waitForGone";
 
 // `@testing-library/dom`'s global `screen` singleton is computed once at
 // module-load time, before Bun's test preload finishes registering
@@ -167,7 +168,7 @@ describe("ClonedVoicesSection", () => {
       await findByText("Dad's voice");
       fireEvent.click((await findAllByText("Delete"))[0]!);
       await waitFor(() => expect(deletedId).toBe("voice-abc"));
-      await waitFor(() => expect(queryByText("Dad's voice")).toBeNull());
+      await waitForGone(() => queryByText("Dad's voice"));
     } finally {
       globalThis.fetch = originalFetch;
     }

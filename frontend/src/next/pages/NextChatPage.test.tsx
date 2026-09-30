@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, mock, test } from "bun:test";
 import type { ReactElement } from "react";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -14,6 +14,7 @@ import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
 import type { NotificationDeliveryView, Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 import { ndjsonStream, staggeredNdjsonStream } from "../../../tests/ndjsonStream";
+import { waitForGone } from "../../../tests/waitForGone";
 
 // CHAT-UI-03 (6): the rail's own default-collapsed state now reads
 // `window.matchMedia("(max-width: 1024px)")` on mount - happy-dom's own
@@ -910,8 +911,22 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
       );
       restore = await openArtifact(view);
       await view.findByText("Every Friday night.");
-      fireEvent.click(view.getByRole("button", { name: "Close the canvas" }));
-      await waitFor(() => expect(view.queryByText("Every Friday night.")).toBeNull(), { timeout: 2000 });
+      // The 750ms backstop (CANVAS_CLOSE_BACKSTOP_MS) is the component's
+      // own timer, so the test drives it instead of sleeping through it
+      // (FLAKE-195: a real wait plus a 2s ceiling failed under load).
+      // Fake timers go on only now, after everything asynchronous the
+      // page needed to open the artifact has finished, so the timer
+      // the close effect schedules is the only one they capture.
+      jest.useFakeTimers();
+      try {
+        fireEvent.click(view.getByRole("button", { name: "Close the canvas" }));
+        act(() => {
+          jest.advanceTimersByTime(750);
+        });
+      } finally {
+        jest.useRealTimers();
+      }
+      expect(view.queryByText("Every Friday night.")).toBeNull();
     } finally {
       restore();
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
@@ -954,7 +969,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
       // A genuine outside click still closes it.
       fireEvent.pointerDown(document.body, { bubbles: true, button: 0, pointerId: 1, pointerType: "mouse" });
       fireEvent.click(document.body, { bubbles: true, button: 0 });
-      await waitFor(() => expect(view.queryByRole("heading", { name: "Document" })).toBeNull());
+      await waitForGone(() => view.queryByRole("heading", { name: "Document" }));
       expect(view.getByText("Wrote it.")).toBeVisible();
     } finally {
       restore();

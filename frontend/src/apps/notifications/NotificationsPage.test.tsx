@@ -4,6 +4,7 @@ import { NotificationsPage } from "@/apps/notifications/NotificationsPage";
 import { NOTIFICATIONS_HISTORY_QUERY_KEY } from "@/shell/NotificationBell";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { NotificationDeliveryView } from "@/lib/api";
+import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
 
@@ -151,7 +152,7 @@ describe("NotificationsPage", () => {
     try {
       const { findByRole, queryByRole } = renderPage();
       fireEvent.click(await findByRole("button", { name: "Clear all" }));
-      await waitFor(() => expect(queryByRole("button", { name: "Clear all" })).toBeNull());
+      await waitForGone(() => queryByRole("button", { name: "Clear all" }));
       expect(bodies).toHaveLength(1);
       expect(bodies[0]).toEqual({ ids: ["notif-1", "notif-2"] });
     } finally {

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { DeviceInfo } from "@/lib/api";
+import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
 
@@ -101,7 +102,7 @@ describe("RobotPasswordSection", () => {
       fireEvent.click(await findByRole("button", { name: "Rotate" }));
 
       await waitFor(() => expect(calls).toEqual([{ host: "192.0.2.10", currentPassword: "vendor-default" }]));
-      await waitFor(() => expect(queryByPlaceholderText("Robot's LAN address")).toBeNull());
+      await waitForGone(() => queryByPlaceholderText("Robot's LAN address"));
     } finally {
       restore();
     }

@@ -5,6 +5,7 @@ import { NotificationBell, NotificationToaster } from "@/shell/NotificationBell"
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { NotificationDeliveryView } from "@/lib/api";
+import { waitForGone } from "../../tests/waitForGone";
 
 afterEach(async () => {
   cleanup();
@@ -119,17 +120,19 @@ describe("NotificationBell", () => {
       fireEvent.click(await findByRole("button", { name: /Notifications/ }));
       getByText("Model download ready");
       fireEvent.click(getByRole("button", { name: "Dismiss" }));
-      // getmaipai/home#123: hit bun's 5000ms default exactly once inside
-      // the full frontend gate (real machine contention from everything
-      // else running that same gate) - passes reliably in isolation, so
-      // this is a real budget problem under load, not a hang, same shape
-      // as the "Dismiss all" test below which already carries its own
-      // explicit waitFor + test timeout for the identical reason.
-      await waitFor(() => expect(queryByText("Model download ready")).toBeNull(), { timeout: 15_000 });
+      // getmaipai/home#123 raised this test's timeouts to 15s and 20s
+      // after it hit bun's 5000ms default inside the full gate. The
+      // budget was never the problem (FLAKE-195): each retry of
+      // `expect(queryByText(...)).toBeNull()` that still found the row
+      // made bun format the whole DOM node for a failure message that
+      // was thrown away, which cost seconds of CPU per retry. The
+      // absence check throws a plain Error instead, so the test does
+      // its real work in milliseconds and the default timeouts hold.
+      await waitForGone(() => queryByText("Model download ready"));
     } finally {
       globalThis.fetch = original;
     }
-  }, 20_000);
+  });
 
   test("dismissing here also invalidates NotificationsPage's own history cache, not just this popover's", async () => {
     // The regression this guards: an earlier version's dismissMutation
@@ -306,15 +309,13 @@ describe("NotificationBell", () => {
       getByText("First");
       getByText("Second");
       fireEvent.click(getByRole("button", { name: "Dismiss all" }));
-      await waitFor(() => {
-        expect(queryByText("First")).toBeNull();
-        expect(queryByText("Second")).toBeNull();
-        expect(sawBody).toEqual({ all: true });
-      }, { timeout: 15_000 });
+      await waitForGone(() => queryByText("First"));
+      await waitForGone(() => queryByText("Second"));
+      expect(sawBody).toEqual({ all: true });
     } finally {
       globalThis.fetch = original;
     }
-  }, 20_000);
+  });
 
   test("Dismiss all also invalidates NotificationsPage's own history cache", async () => {
     const original = globalThis.fetch;

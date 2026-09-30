@@ -2,6 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { BackupsSection } from "@/apps/settings/BackupsSection";
 import type { BackupInfo, PendingRestore, Roster } from "@/lib/api";
+import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
 
@@ -93,7 +94,7 @@ describe("restoring a backup", () => {
       fireEvent.click(await findByRole("button", { name: /Restore the backup from/ }));
       fireEvent.click(getByRole("button", { name: "Keep things as they are" }));
 
-      await waitFor(() => expect(queryByText(/Everyone in your household/)).toBeNull());
+      await waitForGone(() => queryByText(/Everyone in your household/));
       expect(calls.some((c) => c.startsWith("POST") && c.includes("/restore"))).toBe(false);
     } finally {
       restore();
@@ -148,7 +149,7 @@ describe("restoring a backup", () => {
     try {
       const { findByRole, queryByText } = render(<BackupsSection person={makePerson("owner")} />);
       fireEvent.click(await findByRole("button", { name: "Cancel restore" }));
-      await waitFor(() => expect(queryByText("Ready to restore")).toBeNull());
+      await waitForGone(() => queryByText("Ready to restore"));
     } finally {
       restore();
     }

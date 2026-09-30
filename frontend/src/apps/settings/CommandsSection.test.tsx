@@ -2,6 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
 import type { Roster, CommandRow } from "@/lib/api";
+import { waitForGone } from "../../../tests/waitForGone";
 
 // `@testing-library/dom`'s global `screen` singleton is computed once at
 // module-load time, before Bun's test preload finishes registering
@@ -131,7 +132,7 @@ describe("CommandsSection", () => {
       await findByText('"movie night"');
       fireEvent.click(await findByText("Delete"));
       await waitFor(() => expect(deletedId).toBe("cmd-abc"));
-      await waitFor(() => expect(queryByText('"movie night"')).toBeNull());
+      await waitForGone(() => queryByText('"movie night"'));
     } finally {
       globalThis.fetch = originalFetch;
     }

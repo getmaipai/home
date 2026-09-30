@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { SessionLockGate } from "@/shell/sessionLockContext";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { SignedInPerson } from "@/lib/api";
+import { waitForGone } from "../../tests/waitForGone";
 
 afterEach(() => {
   cleanup();
@@ -107,7 +108,7 @@ describe("SessionLockGate", () => {
       await act(async () => {
         fireEvent.click(button);
       });
-      await waitFor(() => expect(document.body.querySelector('input[type="password"]')).toBeNull());
+      await waitForGone(() => document.body.querySelector('input[type="password"]'));
     } finally {
       restore();
     }

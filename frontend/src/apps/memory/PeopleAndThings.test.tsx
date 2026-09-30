@@ -3,6 +3,7 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { PeopleAndThings } from "@/apps/memory/PeopleAndThings";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { Entity, Relationship, PersonRosterEntry } from "@/lib/api";
+import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
 
@@ -213,7 +214,7 @@ describe("PeopleAndThings (lane 11 item 2)", () => {
       const { findAllByText, queryByText } = render("adult");
       const [confirmButton] = await findAllByText("Confirm");
       fireEvent.click(confirmButton!);
-      await waitFor(() => expect(queryByText("Unconfirmed")).toBeNull());
+      await waitForGone(() => queryByText("Unconfirmed"));
       expect(sawBody).toEqual({ confirm: true });
     } finally {
       globalThis.fetch = original;

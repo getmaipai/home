@@ -1,6 +1,7 @@
 import { describe, test, expect, mock, afterEach } from "bun:test";
-import { render, cleanup, fireEvent, act, waitFor } from "@testing-library/react";
+import { render, cleanup, fireEvent, act } from "@testing-library/react";
 import { ModelsSection, formatEta } from "@/apps/settings/ModelsSection";
+import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
 
@@ -290,7 +291,7 @@ describe("ModelsSection", () => {
       await act(async () => {
         fireEvent.click(getByText("Use this"));
       });
-      await waitFor(() => expect(queryByText("Use this")).toBeNull());
+      await waitForGone(() => queryByText("Use this"));
       expect(queryByText("Downloading the model…")).toBeNull();
     } finally {
       restore();

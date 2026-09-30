@@ -4,6 +4,7 @@ import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { PersonProfilePage } from "@/apps/people/PersonProfilePage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { MemoryRecord, Roster } from "@/lib/api";
+import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
 
@@ -212,7 +213,7 @@ describe("PersonProfilePage", () => {
     const restore = stubFetch({ "/api/people": ROSTER });
     try {
       const { queryByRole } = renderProfile("/people/person-bramble?tab=memories", defaultPerson({ id: "person-sage", role: "adult" }));
-      await waitFor(() => expect(queryByRole("tab", { name: "Memories" })).toBeNull());
+      await waitForGone(() => queryByRole("tab", { name: "Memories" }));
     } finally {
       restore();
     }
@@ -291,7 +292,7 @@ describe("PersonProfilePage", () => {
         await findByText("Forget every one of your 2 memories? This cannot be undone.");
         fireEvent.click(await findByRole("button", { name: "Yes, forget all" }));
         await waitFor(() => expect(forgottenIds).toEqual(["mem1-abc123", "mem2-def456"]));
-        await waitFor(() => expect(queryByText("Likes dinosaurs")).toBeNull());
+        await waitForGone(() => queryByText("Likes dinosaurs"));
       } finally {
         globalThis.fetch = original;
       }

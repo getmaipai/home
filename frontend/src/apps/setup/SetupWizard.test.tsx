@@ -3,6 +3,7 @@ import { render, cleanup, fireEvent, waitFor, act } from "@testing-library/react
 import { MemoryRouter } from "react-router-dom";
 import { SetupWizard } from "@/apps/setup/SetupWizard";
 import type { HardwareInfo, ModelFit } from "@/lib/api";
+import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
 
@@ -339,7 +340,7 @@ describe("SetupWizard", () => {
     const restore = stubFetch({ "/api/auth/profiles": [{ id: "p1", display_name: "Sage", hasSecret: true }] });
     try {
       const rendered = renderWizard();
-      await waitFor(() => expect(rendered.container.querySelector("h1")).toBeNull());
+      await waitForGone(() => rendered.container.querySelector("h1"));
     } finally {
       restore();
     }

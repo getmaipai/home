@@ -1,8 +1,9 @@
-import { describe, test, expect, mock, afterEach } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { describe, test, mock, afterEach } from "bun:test";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { OwnMemories } from "@/apps/memory/PersonMemories";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { MemoryRecord } from "@/lib/api";
+import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
 
@@ -75,7 +76,7 @@ describe("OwnMemories", () => {
       const { findByRole, queryByText } = renderWithQueryClient(<OwnMemories filterIds={null} actorIsAdult={false} />);
       const archiveButton = await findByRole("button", { name: 'Archive "Riff prefers oat milk in coffee"' });
       fireEvent.click(archiveButton);
-      await waitFor(() => expect(queryByText("Riff prefers oat milk in coffee")).toBeNull(), { timeout: 5_000 });
+      await waitForGone(() => queryByText("Riff prefers oat milk in coffee"));
     } finally {
       globalThis.fetch = original;
     }

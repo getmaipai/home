@@ -34542,3 +34542,92 @@ three groups to the class list.
    which classes go where? The design supports any answer; the answer
    decides what DATA-LOCATION-01c's live macOS test uses and what the
    first real move on the family hub is.
+
+## FLAKE-195: testing under load, what waits on wall-clock and what does not (2026-09-29, #195)
+
+Several frontend tests failed in the gate whenever another session's
+benchmark held the machine at a load of 15 to 30: the Incognito
+explanation, both artifact-close tests in `NextChatPage.test.tsx`, the
+Notifications "clear all", the bell's Dismiss tests, "archiving a
+memory", and two backup-restore tests. They passed alone and on a quiet
+machine, so the first guess was wall-clock waits. Measured, that was
+mostly wrong.
+
+### What actually made them slow
+
+`await waitFor(() => expect(queryByText("x")).toBeNull())` looks like a
+cheap poll. It is not: each retry that still finds the element makes
+`expect` build a failure message, and bun formats the whole happy-dom
+node it was given, which is seconds of CPU on a page-sized DOM. That
+cost is thrown away on every retry, and it is CPU time, so it scales
+with load. Timing one Dismiss test with the retries swapped for a plain
+5 ms loop: the row was gone after 8 polls, 0.3 s for the whole test,
+against 4 s for the `waitFor` form on a quiet machine. The same swap took
+the Incognito test from 4.4 s to 0.25 s (its `Got it` step had spent 3.5
+s of that in retries). Earlier fixes (`{ timeout: 15_000 }`, `20_000`
+test timeouts, `10_000`) only moved the ceiling above a cost that grows
+with load.
+
+A timed-out test also leaks into the next one: the phone/tablet Sheet
+test failed in every loaded run of the old suite only because the
+desktop test before it timed out and its render was still running.
+
+### The rules now
+
+- Waiting for something to disappear is `waitForGone(() => queryBy...())`
+  from `frontend/tests/waitForGone.ts`, never `waitFor(() =>
+  expect(queryBy...()).toBeNull())`. Nineteen sites in 15 files moved.
+  Appearing is unchanged (`findBy*`, or `expect(...).not.toBeNull()`,
+  which formats `null`, not a node).
+- A timer the component owns is driven, not slept through. The canvas
+  close backstop (`CANVAS_CLOSE_BACKSTOP_MS`, 750 ms) is advanced with
+  `jest.useFakeTimers()` and `jest.advanceTimersByTime(750)` inside
+  `act`, turned on only after the page has finished its own async
+  setup, so the close effect's timer is the only one captured, and off
+  again straight after. Advancing 749 instead fails the test, so it
+  really is that timer doing the work. No component change was needed.
+- No blind ceilings: the raised `timeout` and test-timeout numbers on
+  these tests are gone, because the work they covered now takes
+  milliseconds and the defaults leave a hundredfold margin.
+- Fake timers are opt-in per test and never in a `beforeEach`; every
+  other wait in the suite still runs on the real clock.
+
+### The single-file PNG failure
+
+`bun test src/next/pages/NextChatPage.test.tsx` on its own died at
+import with "Unexpected" at the kit's `user-1.png:1:1`. The suite's
+normal run was fine, and so was the very first single-file run after
+clearing bun's transpiler cache. It is a bun 1.3.14 runtime-transpiler
+cache bug: with a warm cache the PNG's bytes are parsed as JavaScript
+(`BUN_RUNTIME_TRANSPILER_CACHE_PATH` pointed at an empty directory
+passes once, then fails on the second run). `tests/preload.ts` now
+registers a loader for image imports that returns the file's path, the
+same value the Vite build gives, so the answer no longer depends on the
+cache. A single-file run of that file passes 84 of 84 on a warm cache.
+
+### How it was measured
+
+Controlled load was 50 background `yes` processes on a 14-core machine
+(load average 65 to 206 during the runs, other sessions included),
+started and killed by the script around the runs. Full frontend suite,
+before and after, three loaded and three quiet runs each:
+
+| Test | Before, loaded (3 runs) | After, loaded (3 runs) |
+|---|---|---|
+| Incognito explanation | fail, fail, fail | pass, pass, pass |
+| Artifact close, desktop | fail, fail, fail | pass, pass, pass |
+| Artifact Sheet, phone/tablet | fail, fail, fail (cascade) | pass, pass, pass |
+| Notifications clear all | pass, fail, fail | pass, pass, pass |
+| Archiving a memory | fail, fail, fail | pass, pass, pass |
+| Backup restore, cancel staged | pass, fail, pass | pass, pass, pass |
+| Backup restore, refused reason | pass, fail, pass | pass, pass, pass |
+
+Quiet runs were 983 pass, 0 fail both before and after. The bell's
+Dismiss tests failed in the earlier exploratory run (5 failures,
+"Dismiss all" timed out at 20 s) and passed in the three before-runs, so
+they are the flakiest of the family and are covered by the same fix.
+
+Still on the real clock, on purpose: every wait that is not an absence
+check. The start_project polling test in `NextChatPage.test.tsx` runs a
+real 2 s poll cycle; it passed in every run and is the next candidate if
+the family returns.
