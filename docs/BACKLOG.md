@@ -16,12 +16,12 @@ Design: [settings redesign plan](plans/settings-redesign-2026-09-30.md).
 
 - [x] **S1: Shared `ProfileForm` extracted from the profile page's Edit dialog (same fields, same API, tests), used by both** (S, committed): one definition of "edit a person".
 - [x] **S2: Me shell: left section list (desktop) / select (phone), routes `?section=`, sections Appearance and Privacy and data; remove allowance, storage caps from Me** (committed, live check pending): the new frame and the short sections.
-- [ ] **S3: Me > Profile section: profile card (S1 form) + Face recognition card (status, Enroll, sounds switch); person's profile page gets a link to Settings > Profile and keeps its read view**: profile editing and enrollment under Me.
+- [x] **S3: Me > Profile section: profile card (S1 form) + Face recognition card (status, Enroll, sounds switch); person's profile page gets a link to Settings > Profile and keeps its read view** (committed, live check pending): profile editing and enrollment under Me.
 - [x] **S4: Me > Voice and AI and Notifications sections; Telegram folded and shown only when configured** (done in S2, card merging is in S7): the last two sections.
 - [x] **S5: Person page "Limits" tab for owners and admins of a child (allowance and storage cap groups)** (committed, live check pending): allowance leaves Me and lives on the child's profile.
-- [ ] **SETTINGS-DECISION-TEEN-LIMITS: teens own daily-minute limits are set by nobody today (Me no longer shows them; owner/admin cannot reach a teen's settings by a deliberate privacy rule in backend/src/lib/access.ts). Jesse to decide: keep teens private, or let owners/admins set teen limits through a dedicated limits-only path (needs a backend change and a review).**
+- [x] **SETTINGS-DECISION-TEEN-LIMITS: Decided by Jesse 2026-09-30: teens stay private; no admin path to a teen's settings; teen daily limits are set by nobody, by design.**
 - [x] **S6: Household shell: six grouped sections with the existing cards and link cards** (committed, live check pending): Household grouped.
-- [ ] **S7: Screenshot review (`scripts/screenshot.ts --next-settings-review`), fix, retire dead code (`SETTINGS.md`-obsolete sections, old page bits)**: polish and cleanup.
+- [x] **S7: Screenshot review, fixes, and dead code review** (committed, live check pending): the Settings and Status polish pass is complete. See `docs/dev.md`.
 
 ## The chat rebuild (2026-09-22)
 

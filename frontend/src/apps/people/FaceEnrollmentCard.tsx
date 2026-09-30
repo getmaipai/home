@@ -25,7 +25,7 @@ export function FaceEnrollmentCard({ viewer, profile, viewingSelf = viewer.id ==
           return <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{label}</p>{canEnroll ? <Link to={`/people/${profile.id}/enroll-face`}><Button type="button" variant="outline" className="min-h-12">{faces.length ? "Re-enroll" : "Enroll"}</Button></Link> : viewingSelf && profile.role === "child" ? <p className="text-sm text-muted-foreground">Ask an admin to set this up.</p> : null}</div>;
         }}
       </AsyncState>
-      {canEnroll ? <NextSettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={["profile.appearance"]} includeKeys={["ui.enrollment_sounds"]} /> : null}
+      {canEnroll ? <NextSettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={["profile.appearance"]} includeKeys={["ui.enrollment_sounds"]} plainRows /> : null}
     </CardContent>
   </Card>;
 }

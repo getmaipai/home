@@ -93,6 +93,12 @@ describe("StatusComponents", () => {
     }
   });
 
+  test("online banner uses the compact phone spacing classes", () => {
+    const view = renderWithQuery(<OverallBanner summary={{ level: "online", problems: [] }} health={health()} />);
+    expect(view.getByRole("alert").className).toContain("py-1 sm:py-2");
+    expect(view.getByText("Everything is running. Up for 1 hour 1 minute.").className).toContain("text-base");
+  });
+
   test("a dead engine reads as not answering, and the headline says so", async () => {
     const restore = stubHealth(
       health({ ok: false, engines: { ...health().engines, chat: { kind: "selection", pid: 4242, alive: false } } }),

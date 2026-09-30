@@ -97,7 +97,7 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
                 {showLimits ? (
                   <TabsContent value="limits" className="flex flex-col gap-4 py-2">
                     <p className="text-sm text-muted-foreground">Daily time limits for {profile.display_name}.</p>
-                    <NextSettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} />
+                    <NextSettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} titleOverrides={{ "person.storage": "Storage" }} />
                   </TabsContent>
                 ) : null}
               </Tabs>
@@ -138,7 +138,7 @@ function SharedMediaSection({ profile, viewingSelf }: { profile: ProfileEntry; v
 function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { profile: ProfileEntry; viewer: Roster; viewingSelf: boolean; onPersonChange: () => void | Promise<void> }) {
   const [editOpen, setEditOpen] = useState(false);
   const canEdit = canManagePerson(viewer.role, viewer.id, { id: profile.id, role: profile.role });
-  const showManageLink = isOwnerOrAdminRole(viewer.role) && !viewingSelf;
+  const showManageLink = viewingSelf && isOwnerOrAdminRole(viewer.role);
   const accentClass = profile.accent ? ACCENT_RING_CLASS[profile.accent] : null;
   return (
     <Card className={accentClass ? `ring-2 ring-offset-2 ring-offset-background ${accentClass}` : undefined}>
@@ -151,7 +151,7 @@ function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { p
         </div>
         <div className="flex basis-full flex-row items-center justify-end gap-4 sm:w-auto sm:basis-auto sm:flex-col sm:items-end sm:gap-2">
           {viewingSelf && canEdit ? <Link to="/settings?tab=me&section=profile" className="min-h-12 content-center text-sm text-primary underline">Edit in Settings</Link> : canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="min-h-12 gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
-          {showManageLink ? <Link to="/settings?tab=household" className="text-sm text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Manage in Settings</Link> : null}
+          {showManageLink ? <Link to="/settings?tab=me&section=profile" className="min-h-12 content-center text-sm text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Manage in Settings</Link> : null}
         </div>
       </CardContent>
       {canEdit && !viewingSelf ? <EditProfileDialog profile={profile} open={editOpen} onOpenChange={setEditOpen} onPersonChange={onPersonChange} /> : null}

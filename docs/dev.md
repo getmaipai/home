@@ -38,7 +38,13 @@ same `/api/biometric-prints` status used by the former profile section.
 
 ## SETTINGS-S5
 
-Owners and admins can open a Limits tab on a child's profile. It uses the shared settings renderer for the child's nine daily time limits and storage caps. The tab is hidden on the viewer's own profile, on adult profiles, and on teen profiles. The interim Me > Limits section is removed, so a teen's daily-minute limits are currently set by nobody: Me no longer shows them, and owners/admins cannot reach a teen's settings under the deliberate privacy rule in `backend/src/lib/access.ts`. Jesse's open decision is whether to keep teens private or allow owners/admins to set teen limits through a dedicated limits-only path, which would need a backend change and review.
+Owners and admins can open a Limits tab on a child's profile. It uses the shared settings renderer for the child's nine daily time limits and storage caps. The tab is hidden on the viewer's own profile, on adult profiles, and on teen profiles. The interim Me > Limits section is removed. Decided by Jesse 2026-09-30: teens stay private; no admin path to a teen's settings; teen daily limits are set by nobody, by design.
+
+## SETTINGS-S7
+
+The polish pass fixes the profile Settings link so it appears only on the viewer's own profile, labels another person's storage card "Storage", renders enrollment sounds as a plain row inside Face recognition, combines Personality, Search, and Voice into one Voice and AI card, and labels the collapsed notification fold "Telegram options" with its setup helper when Telegram is not configured. The phone Status banner uses tighter vertical spacing. Household and Me tab labels keep their existing min-width 48 px trigger spacing. The latest available screenshots, `settings-s5-owner-me-390-light.png` and `settings-s5-owner-me-1440-light.png`, show both labels fully with even padding. The S7 captures could not be refreshed because the screenshot script's temporary backend cannot import the missing generated `maintenance-window.js` from the pinned spec package.
+
+Dead-code review: `grep -rn 'PersonalManagementLinks' frontend/src` returned no matches. `grep -rn 'from "@/apps/settings/SettingsPage"' frontend/src --include='*.tsx' --include='*.ts'` found the test import in `frontend/src/apps/settings/SettingsPage.test.tsx`; the old `SettingsPage.tsx` stays because that test imports it. `grep -rn 'from "@/next/pages/settings/NextMeSettings"' frontend/src/next --include='*.tsx' --include='*.ts'` found imports in `NextMeSettings.test.tsx` and the live route page `NextSettingsPage.tsx`. `ManagementLinks` is used by `NextMeSettings.tsx` for Voices, Commands, and Devices. No files were deleted because the candidates are still imported or exercised by tests.
 
 ## SETTINGS-S1
 

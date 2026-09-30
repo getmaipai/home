@@ -3086,7 +3086,7 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
  * child to prove the admin-only Limits section is absent. The output
  * directory can be supplied for review artifacts outside this checkout. */
 async function captureNextSettingsS2Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = process.env.MAIPAI_SETTINGS_S2_SCREEN_DIR || join(ROOT, "data-scratch", "screenshots", "settings-s2");
+  const outDir = process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || process.env.MAIPAI_SETTINGS_S2_SCREEN_DIR || join(ROOT, "data-scratch", "screenshots", "settings-s2");
   mkdirSync(outDir, { recursive: true });
   const peopleResponse = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
   if (!peopleResponse.ok) throw new Error(`SETTINGS-S2: household lookup failed: ${peopleResponse.status}`);
@@ -3169,7 +3169,7 @@ async function captureNextSettingsS2Review(browser: Browser, ownerSession: strin
 }
 
 async function captureNextSettingsS3Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = join(ROOT, "../home/data-scratch/screens/settings-s3");
+  const outDir = process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || join(ROOT, "../home/data-scratch/screens/settings-s3");
   mkdirSync(outDir, { recursive: true });
   const response = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
   if (!response.ok) throw new Error(`SETTINGS-S3: household lookup failed: ${response.status}`);
@@ -3214,7 +3214,7 @@ async function captureNextSettingsS3Review(browser: Browser, ownerSession: strin
 }
 
 async function captureNextSettingsS5Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = join(ROOT, "../home/data-scratch/screens/settings-s5");
+  const outDir = process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || join(ROOT, "../home/data-scratch/screens/settings-s5");
   mkdirSync(outDir, { recursive: true });
   const response = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
   if (!response.ok) throw new Error(`SETTINGS-S5: household lookup failed: ${response.status}`);
@@ -3259,7 +3259,7 @@ async function captureNextSettingsS5Review(browser: Browser, ownerSession: strin
 }
 
 async function captureNextSettingsS6Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = join(ROOT, "../home/data-scratch/screens/settings-s6");
+  const outDir = process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || join(ROOT, "../home/data-scratch/screens/settings-s6");
   mkdirSync(outDir, { recursive: true });
   const sections = [
     ["general", "General"], ["people", "People"], ["ai", "AI"],
@@ -4446,7 +4446,7 @@ async function main() {
       return;
     }
     if (statusA2bReview) {
-      const outDir = join(ROOT, "data-scratch", "screens", "status-a2b");
+      const outDir = process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || join(ROOT, "data-scratch", "screens", "status-a2b");
       mkdirSync(outDir, { recursive: true });
       for (const viewport of [VIEWPORTS.find((item) => item.slug === "desktop")!, VIEWPORTS.find((item) => item.slug === "phone")!]) {
         for (const theme of THEMES) {

@@ -22,6 +22,9 @@ interface NextSettingsRendererProps {
   only?: readonly string[];
   includeKeys?: readonly string[];
   expandAdvanced?: boolean;
+  titleOverrides?: Readonly<Record<string, string>>;
+  plainRows?: boolean;
+  mergeGroups?: boolean;
 }
 
 const REGISTRY_QUERY_KEY = ["settings-registry"];
@@ -41,7 +44,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
-export function NextSettingsRenderer({ scope, scopeValue, only, includeKeys, expandAdvanced = false }: NextSettingsRendererProps) {
+export function NextSettingsRenderer({ scope, scopeValue, only, includeKeys, expandAdvanced = false, titleOverrides = {}, plainRows = false, mergeGroups = false }: NextSettingsRendererProps) {
   // NOTIFY-SHARE-02: NextSettingField's own PersonMultiSelect control
   // needs the viewer's own id to drop from its option list -
   // `scopeValue` is already exactly "person:<id>" for a person-scope
@@ -150,12 +153,21 @@ export function NextSettingsRenderer({ scope, scopeValue, only, includeKeys, exp
       >
         {({ registry, values }: { registry: SettingsKey[]; values: ResolvedSetting[] }) => {
           const allGroups: SettingsGroup[] = groupSettings(registry, values, scope, "home");
-          const groups = (only ? allGroups.filter((g) => only.includes(g.id)) : allGroups).map((group) => includeKeys ? { ...group, basic: group.basic.filter((item) => includeKeys.includes(item.def.key)), advanced: group.advanced.filter((item) => includeKeys.includes(item.def.key)) } : group).filter((group) => group.basic.length + group.advanced.length > 0);
+          let groups = (only ? allGroups.filter((g) => only.includes(g.id)) : allGroups).map((group) => includeKeys ? { ...group, basic: group.basic.filter((item) => includeKeys.includes(item.def.key)), advanced: group.advanced.filter((item) => includeKeys.includes(item.def.key)) } : group).filter((group) => group.basic.length + group.advanced.length > 0);
+          if (mergeGroups && groups.length > 1) {
+            const first = groups[0];
+            if (first) groups = [{ ...first, basic: groups.flatMap((group) => group.basic), advanced: groups.flatMap((group) => group.advanced), foldAdvanced: false }];
+          }
           return groups.length === 0 ? (
             <p className="text-sm text-muted-foreground">No settings yet.</p>
           ) : (
             <>
-              {groups.map((group) => (
+              {groups.map((group) => plainRows ? (
+                <div key={group.id} id={`settings-${group.id}`} className="flex flex-col divide-y divide-border">
+                  {group.basic.map((s) => <NextSettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />)}
+                  {group.advanced.map((s) => <NextSettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />)}
+                </div>
+              ) : (
                 <Card
                   key={group.id}
                   // The old shell's own SettingsPage.tsx names a scroll
@@ -170,7 +182,7 @@ export function NextSettingsRenderer({ scope, scopeValue, only, includeKeys, exp
                   }}
                 >
                   <CardHeader>
-                    <CardTitle>{sectionTitle(group.id)}</CardTitle>
+                    <CardTitle>{titleOverrides[group.id] ?? sectionTitle(group.id)}</CardTitle>
                   </CardHeader>
                   <CardContent className="flex flex-col divide-y divide-border">
                     {group.basic.map((s) => (

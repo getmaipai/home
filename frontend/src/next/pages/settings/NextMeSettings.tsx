@@ -23,7 +23,7 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
   const queryClient = useQueryClient();
   function renderSection(id: typeof sections[number]["id"]) {
     if (id === "profile") {
-      return <><ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} /><FaceEnrollmentCard profile={person} viewer={person} /></>;
+      return <><ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} /><FaceEnrollmentCard profile={person} viewer={person} /> </>;
     }
     if (id === "appearance") {
       return <>
@@ -33,7 +33,7 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
         </Collapsible>
       </>;
     }
-    if (id === "voice-ai") return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.persona", "person.voice", "person.search"]} /><ManagementLinks links={["Voices", "Commands"]} /></>;
+    if (id === "voice-ai") return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.persona", "person.voice", "person.search"]} titleOverrides={{ "person.persona": "Voice and AI", "person.voice": "Voice and AI", "person.search": "Voice and AI" }} mergeGroups /><ManagementLinks links={["Voices", "Commands"]} /></>;
     if (id === "notifications") return <NotificationSettings person={person} />;
     return <><ManagementLinks links={["Devices"]} /><div className="grid gap-4 sm:grid-cols-2">
       <LinkCard title="Storage" description="Usage against your storage limit." to="/storage" />
@@ -57,7 +57,7 @@ function NotificationSettings({ person }: { person: Roster }) {
 }
 
 function TelegramAdvanced({ person, configured }: { person: Roster; configured: boolean }) {
-  return <Collapsible defaultOpen={false}><Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">{configured ? "Advanced" : "Advanced, set up Telegram to use these options"}<span aria-hidden>⌄</span></CollapsibleTrigger></CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.notifications"]} includeKeys={telegramNotificationKeys} expandAdvanced /></CardContent></CollapsibleContent></Card></Collapsible>;
+  return <Collapsible defaultOpen={false}><Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Telegram options<span aria-hidden>⌄</span></CollapsibleTrigger>{!configured ? <p className="text-sm text-muted-foreground">Set up Telegram first to use these.</p> : null}</CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.notifications"]} includeKeys={telegramNotificationKeys} expandAdvanced /></CardContent></CollapsibleContent></Card></Collapsible>;
 }
 
 function ManagementLinks({ links }: { links: readonly ("Voices" | "Commands" | "Devices")[] }) {

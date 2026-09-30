@@ -156,6 +156,8 @@ describe("NextPersonProfilePage", () => {
       expect(await view.findByText("Daily time limits for Bramble.")).toBeTruthy();
       expect(document.querySelectorAll('[id="settings-person.allowance"] input[type="number"]').length).toBe(9);
       expect(document.querySelector('[id="settings-person.storage"]')).toBeTruthy();
+      expect(view.getByText("Storage")).toBeTruthy();
+      expect(view.queryByText("My storage")).toBeNull();
     } finally { restore(); }
   });
 
@@ -231,12 +233,12 @@ describe("NextPersonProfilePage", () => {
       const self = renderProfile("/people/person-sage", viewer({ role: "owner" }));
       const edit = await self.findByRole("link", { name: "Edit in Settings" });
       expect(edit.getAttribute("href")).toBe("/settings?tab=me&section=profile");
-      expect(self.getByRole("link", { name: "Manage in Settings" }).getAttribute("href")).toBe("/settings?tab=me&section=profile");
+      expect(self.getAllByRole("link", { name: "Manage in Settings" })[0]?.getAttribute("href")).toBe("/settings?tab=me&section=profile");
       cleanup();
       const other = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
       expect(await other.findByRole("button", { name: "Edit" })).toBeTruthy();
       expect(await other.findByText("Face recognition")).toBeTruthy();
-      expect(other.getByRole("link", { name: "Manage in Settings" }).getAttribute("href")).toContain("/settings?tab=household");
+      expect(other.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
     } finally { restore(); }
   });
 
