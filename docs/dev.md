@@ -32313,11 +32313,11 @@ yellow when it is soft, and a shot registers only on green.
 **Design gap named (no-hand-built-UI rule).** The kit has no camera-frame
 or ring component. The smallest composition of shipped parts: the preview
 box that already existed, with a 4 px border colored from the kit's own
-status hues (`status.ts`: "ready" is `--hue-teal`, "warning" is
+status hues (`status.ts`: "ready" was `--hue-teal`, "warning" was
 `--hue-orange`), plus the existing status line with the kit's `check` and
-`alert-triangle` icons. The kit has no literal green or yellow token, so the
-"green" is the kit's teal and the "yellow" is its orange; a truer green or
-yellow would be a token added in `commons` first. Color is never the only
+`alert-triangle` icons. The kit had no literal green or yellow token, so the
+"green" was the kit's teal and the "yellow" its orange until FACE-02L added
+`--hue-green` and `--hue-yellow` to `commons` (see that section). Color is never the only
 signal: the status line (`role="status"`, so a screen reader announces it)
 carries the same verdict in words with an icon, and the ring exposes
 `data-capture-ring`.
@@ -32341,9 +32341,9 @@ console numbers. Raising the bar is FACE-02K's job, decided from data, never
 from the legacy figures. (The first cut of this item used 0.14 and 90 as the
 single bar; that raised the accept bar and was corrected the same day.)
 
-**The ring colours are the kit's teal and orange.** Jesse asked for green
-and yellow. The kit has no green or yellow token, so `--hue-teal` and
-`--hue-orange` stand in; the token follow-up is its own BACKLOG item.
+**The ring colours were the kit's teal and orange, briefly.** Jesse asked for
+green and yellow. The kit had no green or yellow token, so `--hue-teal` and
+`--hue-orange` stood in until FACE-02L (below) added the real ones.
 
 **Box-fraction arithmetic (estimates, not measurements).** `boxFrac` is the
 detector's box area over the frame area, so the 480 px downscale does not
@@ -32381,6 +32381,45 @@ next pose, soft is yellow with "a bit soft" and registers nothing, far is
 yellow with "closer", no face is neutral, the debug line appears, and a full
 five-pose walk saves five prints, logs five summary lines and never shows
 the "soft or far" text.
+
+## FACE-02L: the ring is truly green and truly yellow (2026-09-29, commons `ui-v0.5.80`)
+
+**The gap, named first (no-hand-built-UI rule).** The capture ring needs a
+true green and a true yellow. The kit's hue set (blue, violet, teal,
+orange, pink, red) has neither, so FACE-02J stood teal and orange in.
+Nothing shipped draws a status ring either, so the composition stays what
+FACE-02J made (the preview box with a 4 px border and the status line); only
+the colors change. The smallest addition, decided and recorded in
+`commons/docs/dev.md` ("FACE-02L"): two new kit tokens, `--hue-green` and
+`--hue-yellow`, and no change to `statusMap`, so no existing pill or dot
+recolors. Redefining teal or orange was rejected for that reason.
+
+**Themed pair.** A bright yellow or green is 1.4:1 to 2.1:1 against the
+light page, under the 3:1 non-text floor, so each token has a bright dark-theme
+value and a deeper light-theme one. Measured contrast (WCAG relative
+luminance), ring color against the page, the card, and the black preview:
+
+| Token | Theme | Value | Page | Panel | Black preview |
+|---|---|---|---|---|---|
+| `--hue-green` | dark | `#22c55e` | 8.31 | 7.05 | 9.22 |
+| `--hue-green` | light | `#1a9c48` | 3.32 | 3.56 | 5.89 |
+| `--hue-yellow` | dark | `#facc15` | 12.36 | 10.48 | 13.71 |
+| `--hue-yellow` | light | `#b58700` | 3.04 | 3.27 | 6.43 |
+
+Before, the teal ring measured 1.55:1 and the orange 2.19:1 on the light page,
+so the light theme was under the floor as well as off-hue. The status text and
+icon still carry the verdict, so color is never the only signal.
+
+**What changed here.** The `ui` pin moved from `ui-v0.5.79` to `ui-v0.5.80`
+(`scripts/check.sh` and `frontend/package.json`, then `bun install --force`).
+`RING_CLASS` in `FaceEnrollmentPage.tsx` points at `--hue-green` and
+`--hue-yellow`, and the green inner glow in `captureMotion` reads
+`--hue-green` (the `motion-safe:` classes, the status text and the
+`aria-live` line are untouched). The FACE-02J tests that asserted the old
+variable names assert the new ones.
+
+**Screenshots** (headless, the built app's own CSS, the ring markup with the
+real classes): `data-scratch/screenshots/face-02l-ring-{green,yellow}-{light,dark}.png`.
 
 ## FACE-02K: the quality bar and the pitch baseline, set from a real webcam (2026-09-29, #199)
 
@@ -32582,7 +32621,7 @@ No new dependency and no per-frame JS.
 | any | border colour eases over 300 ms instead of snapping |
 | none | a soft band over the preview pulses while no face is found |
 | yellow | steady, the icon fades in |
-| green | a teal inner glow pulses; the check icon pops in (zoom from 50 percent, 300 ms) |
+| green | a green inner glow pulses; the check icon pops in (zoom from 50 percent, 300 ms) |
 
 The step indicator's advance easing belongs to the kit's Wizard, outside
 this item's files, and is not changed.

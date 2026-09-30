@@ -49,7 +49,7 @@ export function captureRing(reason: string): CaptureRing {
  * kit's tw-animate-css (`animate-in`, `zoom-in-50`, `fade-in`), each behind
  * `motion-safe:` so a person who asked for reduced motion gets the colour
  * change alone. `overlay` is a decorative layer over the preview (empty
- * means none): a soft band pulsing while no face is found, a teal glow
+ * means none): a soft band pulsing while no face is found, a green glow
  * pulsing while green. `icon` is the status icon's entrance, re-run each
  * time the ring changes (the page keys the icon by ring): a check that pops
  * in when a shot registers. The status text and aria-live line are
@@ -57,7 +57,7 @@ export function captureRing(reason: string): CaptureRing {
 export function captureMotion(ring: CaptureRing): { overlay: string; icon: string } {
   if (ring === "green") {
     return {
-      overlay: "shadow-[inset_0_0_36px_var(--hue-teal)] motion-safe:animate-pulse",
+      overlay: "shadow-[inset_0_0_36px_var(--hue-green)] motion-safe:animate-pulse",
       icon: "motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:fade-in motion-safe:duration-300",
     };
   }

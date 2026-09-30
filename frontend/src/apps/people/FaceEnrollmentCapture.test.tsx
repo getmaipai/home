@@ -231,7 +231,7 @@ describe("FACE-02J: the capture ring", () => {
   test("a sharp frame turns the ring green, says so in words, and registers the shot", async () => {
     const { container } = renderPage();
     await waitFor(() => expect(ring(container)?.getAttribute("data-capture-ring")).toBe("green"), WAIT);
-    expect(ring(container)?.className).toContain("--hue-teal");
+    expect(ring(container)?.className).toContain("--hue-green");
     const status = view().getByRole("status");
     expect(status.textContent).toContain("Got it");
     // Registered: the wizard moved on to the next pose.
@@ -242,7 +242,7 @@ describe("FACE-02J: the capture ring", () => {
     pixels = "soft";
     const { container } = renderPage();
     await waitFor(() => expect(ring(container)?.getAttribute("data-capture-ring")).toBe("yellow"), WAIT);
-    expect(ring(container)?.className).toContain("--hue-orange");
+    expect(ring(container)?.className).toContain("--hue-yellow");
     expect(view().getByRole("status").textContent).toContain("soft");
     await new Promise((resolve) => setTimeout(resolve, 900));
     expect(view().getByText("look straight at me")).toBeTruthy();

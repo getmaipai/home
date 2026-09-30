@@ -51,12 +51,13 @@ const CAPTURE_MAX_WIDTH = 480;
 // does not flash it away before anyone sees it.
 const ACCEPTED_HOLD_MS = 1200;
 
-// Kit status hues (status.ts): "ready" is --hue-teal, "warning" is
-// --hue-orange. Written out whole because Tailwind only sees literal class
-// names.
+// The kit's themed --hue-green and --hue-yellow (commons ui-v0.5.80,
+// FACE-02L): a true green and a true yellow, deeper in the light theme so
+// each clears 3:1 on the page. Written out whole because Tailwind only sees
+// literal class names.
 const RING_CLASS: Record<CaptureRing, string> = {
-  green: "border-[var(--hue-teal)]",
-  yellow: "border-[var(--hue-orange)]",
+  green: "border-[var(--hue-green)]",
+  yellow: "border-[var(--hue-yellow)]",
   none: "border-border",
 };
 
@@ -719,8 +720,8 @@ function CaptureContent({
       {/* The capture ring (FACE-02J). The kit has no camera-frame or ring
           component (gap named in docs/dev.md), so this is the smallest
           composition of shipped parts: the existing preview box with a
-          border colored from the kit's own status hues (status.ts maps
-          "ready" to --hue-teal and "warning" to --hue-orange), plus the
+          border colored from the kit's --hue-green and --hue-yellow
+          (added to the kit for this ring, FACE-02L), plus the
           status line below, which carries the same verdict in words and an
           icon so color is never the only signal. */}
       <div
