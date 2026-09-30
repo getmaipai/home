@@ -117,15 +117,14 @@ uses it:
 
 ### E. Preventing it
 
-1. **Reap engine orphans safely.** `sweepOrphanEngineProcesses()` already exists.
-   Extend the foreign-holder decision from "did this install spawn it" to
-   "is it one of our engine binaries with no live owner": the process is our
-   `llama-server` build, its parent is launchd (pid 1), and no live MaiPai
-   daemon lock names it or its data directory. Then it is an orphan and the
-   supervisor reaps it on its own, logs what it reaped and why, and raises
-   nothing. A holder that is not our engine binary (a real stranger on the
-   port) is still refused, still raises the Repair, and is the only case the
-   admin fix button ever appears for.
+1. **Own the engine ports with a lock, and reap anything else on them.**
+   `sweepOrphanEngineProcesses()` already exists. Replace "did this install spawn
+   it" with "does the role's lock name it": a per-role single-instance lock
+   (see "Decided by Jesse"), taken before the supervisor binds anything. A
+   process on an engine port that the lock does not name is reaped, logged, and
+   raises nothing. Only a holder the supervisor cannot kill (a permission
+   error) raises the Repair, and that is the only case the admin fix button
+   appears for.
 2. **Retry while blocked.** Today a blocked port is tried on boot and on the next
    message. While `blocked_port`, re-probe every 30 seconds and resolve the
    Repair the moment the port frees.
@@ -144,15 +143,28 @@ uses it:
 - The outage message is a typed status with a fixed line, never assistant text and
   never the generic apology.
 - No new notification system: `repairs.new` with debounce, push and one reminder.
-- Auto-reaping applies only to our own engine binary with no live owner. Anything
-  else stays a refusal plus an admin fix with the process shown first.
+- Home owns the engine ports; a per-role lock names the one legitimate holder and
+  anything else on the port is reaped (decided by Jesse, 2026-09-29).
 
-## Left for Jesse (genuinely his)
+## Decided by Jesse, 2026-09-29
 
-1. Auto-reap orphaned engine binaries without asking (recommended), or always ask
-   through the Repair card first.
-2. Browser push as a default channel for this one notification type (recommended),
-   or keep `in_app` only and rely on the badge.
+1. **Home owns its engines, in its own folders.** The chat, embedding, voice and
+   background engines, their binaries and their models live under Home's data
+   folder and are started, stopped and restarted only by Home. Nothing else
+   starts an engine on Home's ports.
+2. **Engines are single-instance, like the app.** Each engine role takes a lock
+   in Home's state folder (pid, start time, port, data folder, the same shape as
+   the hub's `instanceLock.ts` in SERVICES.md "One instance"), and the port
+   belongs to the lock. A process on an engine port that the lock does not name
+   is not a stranger to be respected: it is reaped, whether it is our own
+   `llama-server` build, another data folder's copy, or a different program
+   entirely (Jesse's own example that day: a `pocket-tts` server on the voice
+   port). The reap logs what it killed, why, and how old it was.
+3. **Auto-reap without asking is approved** (this replaces the earlier
+   "ask first" option). The admin fix button in section D stays only as the
+   fallback for a holder the supervisor could not reap (a permission error).
+4. **Still open (Jesse):** browser push as a default channel for the
+   engine-problem notification.
 
 ## Out of scope
 
