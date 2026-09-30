@@ -52,8 +52,8 @@ export function NextMeSettings({ person }: { person: Roster }) {
         {sections.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.title}</NativeSelectOption>)}
         {isAdmin ? <NativeSelectOption value="limits">Limits</NativeSelectOption> : null}
       </NativeSelect>
-      <Tabs orientation="vertical" value={section} onValueChange={changeSection} className="w-full md:w-56 md:shrink-0">
-        <TabsList aria-label="Settings sections" className="hidden h-auto w-full items-stretch gap-1 bg-transparent p-0 md:flex">
+      <Tabs orientation="vertical" value={section} onValueChange={changeSection} className="w-full md:flex-1">
+        <TabsList aria-label="Settings sections" className="hidden h-auto w-full items-stretch gap-1 bg-transparent p-0 md:flex md:w-56 md:shrink-0">
           {sections.map((item) => <TabsTrigger key={item.id} value={item.id} className="min-h-12 justify-start px-3 text-left">{item.title}</TabsTrigger>)}
           {isAdmin ? <TabsTrigger value="limits" className="min-h-12 justify-start px-3 text-left">Limits</TabsTrigger> : null}
         </TabsList>

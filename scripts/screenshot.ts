@@ -241,6 +241,7 @@ const nextDashboardReview = process.argv.includes("--next-dashboard-review");
 const nextProfileSheetReview = process.argv.includes("--next-profile-sheet-review");
 const nextTableRolloutReview = process.argv.includes("--next-table-rollout-review");
 const nextSettingsReview = process.argv.includes("--next-settings-review");
+const nextSettingsS2Review = process.argv.includes("--next-settings-s2-review");
 const nextLaneA13Review = process.argv.includes("--next-lane-a-13-review");
 const nextPersonalManagementReview = process.argv.includes("--next-personal-management-review");
 const nextPrivacyReview = process.argv.includes("--next-privacy-review");
@@ -3016,6 +3017,93 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
   }
 }
 
+/** SETTINGS-S2 review: capture the new Me frame at both requested widths
+ * and themes, for the seeded owner across every section and for a seeded
+ * child to prove the admin-only Limits section is absent. The output
+ * directory can be supplied for review artifacts outside this checkout. */
+async function captureNextSettingsS2Review(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = process.env.MAIPAI_SETTINGS_S2_SCREEN_DIR || join(ROOT, "data-scratch", "screenshots", "settings-s2");
+  mkdirSync(outDir, { recursive: true });
+  const peopleResponse = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
+  if (!peopleResponse.ok) throw new Error(`SETTINGS-S2: household lookup failed: ${peopleResponse.status}`);
+  const people = await peopleResponse.json() as Array<{ id: string; display_name: string; role: string }>;
+  const child = people.find((person) => person.display_name === "Nova" && person.role === "child");
+  if (!child) throw new Error("SETTINGS-S2: seeded child Nova was not found");
+  const childSignIn = await fetch(`${BASE_URL}/api/auth/select`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ personId: child.id }),
+  });
+  if (!childSignIn.ok) throw new Error(`SETTINGS-S2: signing in as Nova failed: ${childSignIn.status}`);
+  const childSession = childSignIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("SETTINGS-S2: Nova's sign-in carried no session cookie");
+
+  const ownerPages = [
+    { id: "me", path: "/settings?tab=me", heading: "Profile" },
+    { id: "profile", path: "/settings?tab=me&section=profile", heading: "Profile" },
+    { id: "appearance", path: "/settings?tab=me&section=appearance", heading: "Appearance" },
+    { id: "voice-ai", path: "/settings?tab=me&section=voice-ai", heading: "Voice and AI" },
+    { id: "notifications", path: "/settings?tab=me&section=notifications", heading: "Notifications" },
+    { id: "privacy-data", path: "/settings?tab=me&section=privacy-data", heading: "Privacy and data" },
+    { id: "limits", path: "/settings?tab=me&section=limits", heading: "Limits" },
+  ] as const;
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      for (const [person, session, pages] of [
+        ["owner", ownerSession, ownerPages],
+        ["member", childSession, [{ id: "me", path: "/settings?tab=me", heading: "Profile" }]],
+      ] as const) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          for (const entry of pages) {
+            const response = await page.goto(`${BASE_URL}/settings`);
+            if (!response?.ok()) throw new Error(`SETTINGS-S2: ${entry.path} returned ${response?.status() ?? "no response"}`);
+            await page.waitForLoadState("networkidle");
+            const meTab = page.getByRole("tab", { name: "Me", exact: true });
+            if (await meTab.count() > 0) await meTab.click();
+            if (person === "owner" && await meTab.count() === 0) throw new Error("SETTINGS-S2: owner Me tab was not rendered");
+            if (person !== "member") await meTab.waitFor({ state: "visible" });
+            const requestedUrl = new URL(entry.path, BASE_URL);
+            await page.evaluate((url) => { history.pushState(history.state, "", url); window.dispatchEvent(new PopStateEvent("popstate")); }, requestedUrl.pathname + requestedUrl.search);
+            if (entry.id !== "me") {
+              if (slug === "phone") await page.locator('select[aria-label="Settings section"]').selectOption(entry.id);
+              else await page.getByRole("tab", { name: entry.heading, exact: true }).last().click();
+            }
+            if (entry.id === "profile" || entry.id === "me") await page.getByText("Your profile", { exact: true }).waitFor({ state: "visible" });
+            if (entry.id === "appearance") await page.locator('[id="settings-profile.appearance"]').waitFor({ state: "visible" });
+            if (entry.id === "voice-ai") await page.locator('[id="settings-person.persona"]').waitFor({ state: "visible" });
+            if (entry.id === "notifications") await page.getByRole("button", { name: /Advanced/ }).waitFor({ state: "visible" });
+            if (entry.id === "privacy-data") await page.getByRole("link", { name: "Privacy" }).waitFor({ state: "visible" });
+            if (entry.id === "limits") {
+              await page.locator('[id="settings-person.allowance"]').waitFor({ state: "visible" });
+              await page.locator('[id="settings-person.storage"]').waitFor({ state: "visible" });
+            }
+            if (person === "member") {
+              const limitsTab = page.locator('[data-slot="tabs-trigger"]').filter({ hasText: /^Limits$/ });
+              const limitsOption = page.locator('[data-slot="native-select-option"][value="limits"]');
+              if (await limitsTab.count() !== 0 || await limitsOption.count() !== 0) {
+                throw new Error("SETTINGS-S2: the child sees an admin-only Limits entry");
+              }
+            }
+            await settleAnimations(page);
+            const file = `settings-s2-${person}-${entry.id}-${viewport.width}-${theme}.png`;
+            const path = join(outDir, file);
+            await page.screenshot({ path, fullPage: slug === "phone" });
+            console.log(`Wrote ${path}`);
+          }
+          await page.close();
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
+}
+
 /** Lane B-13 review: each newly migrated personal management page and
  * Settings > Me at 1440/390 in both themes. Output stays in data-scratch. */
 async function captureNextPersonalManagementReview(browser: Browser, sessionValue: string): Promise<void> {
@@ -4035,6 +4123,11 @@ async function main() {
 
     const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch();
     browser = launchedBrowser;
+    if (nextSettingsS2Review) {
+      await captureNextSettingsS2Review(browser, sessionValue);
+      console.log("completed named review: --next-settings-s2-review");
+      return;
+    }
     if (shell09DocsMatrixReview) {
       await captureShell09DocsMatrixReview(browser, sessionValue);
       return;
