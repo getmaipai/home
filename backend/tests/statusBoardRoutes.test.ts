@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { app } from "@/app";
 import { db } from "@/db";
-import { maintenanceWindows, statusNotes } from "@/db/schema";
+import { maintenanceWindows, statusEvents, statusNotes } from "@/db/schema";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
-beforeEach(() => { resetDb(); db.delete(statusNotes).run(); db.delete(maintenanceWindows).run(); });
+beforeEach(() => { resetDb(); db.delete(statusNotes).run(); db.delete(maintenanceWindows).run(); db.delete(statusEvents).run(); });
 
 async function ownerClient(): Promise<TestClient> {
   const client = new TestClient();
@@ -14,6 +14,29 @@ async function ownerClient(): Promise<TestClient> {
 }
 
 describe("status routes", () => {
+  test("history requires sign-in and is available to a child without event details", async () => {
+    expect((await new TestClient().get("/api/status/history")).status).toBe(401);
+    const owner = await ownerClient();
+    const created = await owner.post("/api/people", { displayName: "Marlow", role: "child", secret: "0000" });
+    const person = await created.json() as { id: string };
+    const child = new TestClient();
+    expect((await child.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" })).status).toBe(200);
+    const res = await child.get("/api/status/history?days=30");
+    expect(res.status).toBe(200);
+    const body = await res.json() as { days: number; components: Array<{ days: unknown[]; uptime_percent: number | null; current: object }>; incidents: unknown[] };
+    expect(body.days).toBe(30);
+    expect(body.components[0]?.days).toHaveLength(30);
+    expect(body.components.every((part) => part.uptime_percent === null)).toBe(true);
+    expect(JSON.stringify(body)).not.toContain("detail");
+  });
+
+  test("invalid history day counts return a plain sentence", async () => {
+    const owner = await ownerClient();
+    const res = await owner.get("/api/status/history?days=0");
+    expect(res.status).toBe(400);
+    expect(await res.text()).toContain("days");
+  });
+
   test("signed-out board is rejected", async () => {
     expect((await new TestClient().get("/api/status/board")).status).toBe(401);
   });

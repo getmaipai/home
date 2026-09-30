@@ -156,6 +156,29 @@ and maintenance states at 1440 and 390 pixels in light and dark themes under
 the browser's own health response; the maintenance window uses the isolated
 backend's owner route.
 
+## STATUS-C3a
+
+`GET /api/status/history?days=90` gives any signed-in household member,
+including children, a read-only reliability view. It returns the six fixed
+components, one UTC day bucket per requested day (oldest first, ending today),
+each component's current state and start time, uptime percentages, and up to
+twenty recent outage incidents. Event details, HLCs, and record ids are never
+included.
+
+The view reads each component's transitions in the requested window plus its
+newest transition before the window. A state lasts until that component's next
+transition or the injected current time. Before its first transition, the
+state is unknown, so those minutes are not counted. Daily totals use whole
+minute boundaries in UTC; this keeps the day strips stable across household
+time zones and makes midnight transitions land in the new UTC day. The worst
+day state is outage, degraded, maintenance, then operational; a day with no
+known minutes is `none`. Uptime is operational minutes divided by known
+non-maintenance minutes, rounded to three decimals; maintenance is removed
+from both totals. A null percentage means no eligible minutes. Incidents are
+contiguous outage periods, newest first, with an open end while an outage is
+ongoing. `now` is injectable so the history rules can be tested without fake
+timers.
+
 ## ENGINE-AVAIL-02 (first half)
 
 `beginTurn()` in `backend/src/lib/turnMachine/turnNext.ts` refuses a turn before resolving or creating a conversation when the locally supervised chat AI is stopped, blocked by a foreign process on its port, or has exhausted automatic restarts. The synchronous check runs before any tool or turn storage, so the failure returns as a 503 status instead of being saved as assistant reply text. Explicit `MAIPAI_LLAMA_SERVER_URL` and configured Stack routes skip the local check, while an engine that has not started remains eligible to start on demand. The chat adapter shows “MaiPai's AI isn't running right now. Try again in a moment.” A blocked-port refusal checks whether the recorded process still exists and clears the stale marker if it has exited. Each refusal also nudges a background supervisor retry, throttled to once every 30 seconds, unless an admin intentionally stopped the engine.

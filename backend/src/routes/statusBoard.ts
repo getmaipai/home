@@ -7,6 +7,7 @@ import { clearNote, createMaintenance, getActiveNote, listMaintenance, postNote,
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { MaintenanceWindow } from "@maipai/spec/gen/ts/maintenance-window.js";
 import { StatusNote } from "@maipai/spec/gen/ts/status-note.js";
+import { buildStatusHistory } from "@/lib/statusHistory";
 
 export const statusBoardRoutes = apiRouter();
 const NoteInput = z.object({ body: z.string().min(1).max(500), expires_at: z.string().datetime({ offset: true }).optional() });
@@ -18,6 +19,21 @@ const BoardMaintenance = z.object({ id: z.string(), title: z.string(), descripti
   starts_at: z.string(), ends_at: z.string(), status: z.enum(["cancelled", "scheduled", "in_progress", "completed"]) });
 const BoardResponse = z.object({ note: BoardNote.nullable(), maintenance: z.array(BoardMaintenance) });
 const IdParam = idParamSchema("id", "maint-a1b2c3");
+const HistoryState = z.enum(["operational", "degraded", "outage", "maintenance", "none"]);
+const HistoryComponent = z.enum(["chat", "embed", "background", "voice", "library", "hub"]);
+const HistoryDay = z.object({ date: z.string(), worst: HistoryState, minutes: z.object({ operational: z.number(), degraded: z.number(), outage: z.number(), maintenance: z.number() }) });
+const HistoryResponse = z.object({ generated_at: z.string(), days: z.number(), components: z.array(z.object({ component: HistoryComponent, uptime_percent: z.number().nullable(), days: z.array(HistoryDay), current: z.object({ state: HistoryState, since: z.string().nullable() }) })), incidents: z.array(z.object({ component: HistoryComponent, started_at: z.string(), ended_at: z.string().nullable(), minutes: z.number(), ongoing: z.boolean() })) });
+
+const historyRoute = createRoute({ method: "get", path: "/history", tags: ["Status"], summary: "Read component reliability history",
+  middleware: [requireAuth] as const, request: { query: z.object({ days: z.string().optional() }) },
+  responses: { 200: { content: { "application/json": { schema: HistoryResponse } }, description: "Daily reliability history and recent outage incidents." },
+    400: { description: "Invalid days value." }, ...errorResponses({ 401: "Not signed in" }) } });
+statusBoardRoutes.openapi(historyRoute, (c) => {
+  const raw = c.req.valid("query").days;
+  const days = raw === undefined ? 90 : /^\d+$/.test(raw) ? Number(raw) : NaN;
+  if (!Number.isInteger(days) || days < 1 || days > 90) return c.text("days must be an integer from 1 to 90.", 400);
+  return c.json(buildStatusHistory(days), 200);
+});
 
 const boardRoute = createRoute({ method: "get", path: "/board", tags: ["Status"], summary: "Read the household status board",
   middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: BoardResponse } }, description: "Current status note and scheduled maintenance." },

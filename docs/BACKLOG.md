@@ -603,7 +603,8 @@ Design: [docs/plans/status-page-2026-09-30.md](plans/status-page-2026-09-30.md).
 - [x] **STATUS-B3: suppress alarms during scheduled maintenance** (home, M). Keep matching issue rows visible while deferring their new and still-open notifications until the maintenance window ends; resolving or dismissing clears the deferred check. **Committed; live check needs a real outage during a window.**
 - [x] **STATUS-C1: status event record** (commons, S). Add the `StatusEvent` schema and a tag. **Landed as spec-v0.1.62.**
 - [x] **STATUS-C2: record status history** (home, M). Record heartbeats, state changes, and gaps while the hub is stopped. Keep 90 days and exclude maintenance time. **Committed; live check needs time to pass.**
-- [ ] **STATUS-C3: reliability history page** (home, M). Add `GET /api/status`, 30-day status bars and uptime percentages, and recent problems.
+- [x] **STATUS-C3a: reliability history API** (home, backend). Add the authenticated `GET /api/status/history` view with UTC day buckets, uptime percentages, current state, and recent outage incidents. **Committed.**
+- [ ] **STATUS-C3b: reliability history page** (home, frontend). Render daily status strips, uptime percentages, and recent problems from the history API.
 
 ## Projects (2026-09-26)
 

@@ -7741,6 +7741,203 @@
         }
       }
     },
+    "/api/status/history": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Read component reliability history",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Daily reliability history and recent outage incidents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "generated_at": {
+                      "type": "string"
+                    },
+                    "days": {
+                      "type": "number"
+                    },
+                    "components": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "component": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "embed",
+                              "background",
+                              "voice",
+                              "library",
+                              "hub"
+                            ]
+                          },
+                          "uptime_percent": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "days": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "date": {
+                                  "type": "string"
+                                },
+                                "worst": {
+                                  "type": "string",
+                                  "enum": [
+                                    "operational",
+                                    "degraded",
+                                    "outage",
+                                    "maintenance",
+                                    "none"
+                                  ]
+                                },
+                                "minutes": {
+                                  "type": "object",
+                                  "properties": {
+                                    "operational": {
+                                      "type": "number"
+                                    },
+                                    "degraded": {
+                                      "type": "number"
+                                    },
+                                    "outage": {
+                                      "type": "number"
+                                    },
+                                    "maintenance": {
+                                      "type": "number"
+                                    }
+                                  },
+                                  "required": [
+                                    "operational",
+                                    "degraded",
+                                    "outage",
+                                    "maintenance"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "date",
+                                "worst",
+                                "minutes"
+                              ]
+                            }
+                          },
+                          "current": {
+                            "type": "object",
+                            "properties": {
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "operational",
+                                  "degraded",
+                                  "outage",
+                                  "maintenance",
+                                  "none"
+                                ]
+                              },
+                              "since": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "state",
+                              "since"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "component",
+                          "uptime_percent",
+                          "days",
+                          "current"
+                        ]
+                      }
+                    },
+                    "incidents": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "component": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "embed",
+                              "background",
+                              "voice",
+                              "library",
+                              "hub"
+                            ]
+                          },
+                          "started_at": {
+                            "type": "string"
+                          },
+                          "ended_at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "minutes": {
+                            "type": "number"
+                          },
+                          "ongoing": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "component",
+                          "started_at",
+                          "ended_at",
+                          "minutes",
+                          "ongoing"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "generated_at",
+                    "days",
+                    "components",
+                    "incidents"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid days value."
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/status/board": {
       "get": {
         "tags": [

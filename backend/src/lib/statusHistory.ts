@@ -11,6 +11,82 @@ import { randomSuffix } from "@maipai/core/src/id";
 export type StatusState = StatusEventRecord["state"];
 type ComponentStateMap = Partial<Record<StatusComponent, StatusState>>;
 const components: StatusComponent[] = ["chat", "embed", "background", "voice", "library", "hub"];
+type HistoryState = StatusState | "none";
+const statePriority: Record<StatusState, number> = { operational: 1, maintenance: 2, degraded: 3, outage: 4 };
+
+/** Build the public, detail-free UTC history view from component transitions. */
+export function buildStatusHistory(days: number, now: Date = new Date()) {
+  const end = now.getTime();
+  const todayStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const windowStart = todayStart - (days - 1) * 86_400_000;
+  const startIso = new Date(windowStart).toISOString();
+  const rows = db.select({ component: statusEvents.component, state: statusEvents.state, at: statusEvents.at })
+    .from(statusEvents).orderBy(statusEvents.at).all();
+  const generated_at = now.toISOString();
+  const output = components.map((component) => {
+    const all = rows.filter((row) => row.component === component);
+    const prior = all.filter((row) => row.at < startIso).at(-1);
+    const inWindow = all.filter((row) => row.at >= startIso && Date.parse(row.at) <= end);
+    const first = prior ?? inWindow[0];
+    const currentRow = all.filter((row) => Date.parse(row.at) <= end).at(-1);
+    const buckets = Array.from({ length: days }, (_, index) => ({
+      date: new Date(windowStart + index * 86_400_000).toISOString().slice(0, 10),
+      worst: "none" as HistoryState,
+      minutes: { operational: 0, degraded: 0, outage: 0, maintenance: 0 },
+    }));
+    let operational = 0;
+    let known = 0;
+    let maintenance = 0;
+    if (first) {
+      const timeline = all.filter((row) => Date.parse(row.at) <= end);
+      for (let i = 0; i < timeline.length; i++) {
+        const row = timeline[i]!;
+        const from = Math.max(windowStart, Date.parse(row.at));
+        const next = timeline[i + 1];
+        const to = Math.min(end, next ? Date.parse(next.at) : end);
+        if (to <= from) continue;
+        let cursor = from;
+        while (cursor < to) {
+          const dayIndex = Math.floor((cursor - windowStart) / 86_400_000);
+          if (dayIndex < 0 || dayIndex >= days) break;
+          const segmentEnd = Math.min(to, windowStart + (dayIndex + 1) * 86_400_000);
+          const minutes = Math.floor(segmentEnd / 60_000) - Math.floor(cursor / 60_000);
+          if (minutes <= 0) { cursor = segmentEnd; continue; }
+          const bucket = buckets[dayIndex]!;
+          bucket.minutes[row.state] += minutes;
+          bucket.worst = bucket.worst === "none" || statePriority[row.state] > statePriority[bucket.worst as StatusState] ? row.state : bucket.worst;
+          known += minutes;
+          if (row.state === "operational") operational += minutes;
+          if (row.state === "maintenance") maintenance += minutes;
+          cursor = segmentEnd;
+        }
+      }
+    }
+    return {
+      component,
+      uptime_percent: known - maintenance > 0 ? Number((operational / (known - maintenance) * 100).toFixed(3)) : null,
+      days: buckets,
+      current: currentRow ? { state: currentRow.state as HistoryState, since: currentRow.at } : { state: "none" as const, since: null },
+    };
+  });
+
+  const incidents: Array<{ component: StatusComponent; started_at: string; ended_at: string | null; minutes: number; ongoing: boolean }> = [];
+  for (const component of components) {
+    const timeline = rows.filter((row) => row.component === component && Date.parse(row.at) <= end);
+    for (let i = 0; i < timeline.length; i++) {
+      const row = timeline[i]!;
+      if (row.state !== "outage") continue;
+      const next = timeline.slice(i + 1).find((candidate) => candidate.state !== "outage");
+      const from = Math.max(windowStart, Date.parse(row.at));
+      const to = Math.min(end, next ? Date.parse(next.at) : end);
+      if (to <= from) continue;
+      incidents.push({ component, started_at: row.at, ended_at: next?.at ?? null,
+        minutes: Math.round((to - Math.max(windowStart, Date.parse(row.at))) / 60_000), ongoing: !next });
+    }
+  }
+  incidents.sort((a, b) => b.started_at.localeCompare(a.started_at));
+  return { generated_at, days, components: output, incidents: incidents.slice(0, 20) };
+}
 
 // Keep this mapping aligned with frontend/src/apps/chat/chatAvailability.ts.
 // That function is the UI's single definition of engine availability.
