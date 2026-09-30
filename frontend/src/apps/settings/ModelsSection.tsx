@@ -12,7 +12,7 @@ import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
 import { modelLinkName, parseModelLink } from "@/lib/modelLink";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
-import { ComparisonCard } from "@maipai/ui/src/elements/comparison-card";
+import { Card } from "@maipai/ui/src/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { describeFitPlan, type FitPanelRow } from "@/lib/fitPanel";
 import type { ComputerMemoryResponse } from "@/lib/api";
@@ -537,9 +537,19 @@ function CompareCard({ recommended, checked, hardware }: { recommended: { name: 
     ...checked.filter((item) => item.response.plan !== null),
   ];
   if (comparable.length < 2) return null;
-  const options = comparable.map((item, index) => {
-    const need = item.response.plan ? describeFitPlan(item.response.plan).rows.find((row) => row.label === "Memory it needs")?.value ?? "Not known yet" : "Not known yet";
-    return { id: index === 0 ? "recommended" : `checked-${index}`, name: item.name, headline: item.response.wording.headline, traits: [need] };
+  const cards = comparable.map((item) => {
+    const need = describeFitPlan(item.response.plan!).rows.find((row) => row.label === "Memory it needs")?.value ?? "Not known yet";
+    const status = { yes: "online", slow: "degraded", no: "offline", unknown: "maintenance" }[item.response.wording.verdict] as "online" | "degraded" | "offline" | "maintenance";
+    return (
+      <Card key={item.name} className="gap-3 p-4">
+        <h4 className="break-words text-base font-medium">{item.name}</h4>
+        <Status status={status} className="w-fit">{item.response.wording.headline}</Status>
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-[var(--muted-foreground)]">Memory it needs</span>
+          <span className="break-words text-base tabular-nums">{need}</span>
+        </div>
+      </Card>
+    );
   });
   const usableGb = recommended.response?.plan?.cap.high === null || recommended.response?.plan?.cap.high === undefined
     ? null
@@ -564,7 +574,7 @@ function CompareCard({ recommended, checked, hardware }: { recommended: { name: 
   return (
     <RoleCardShell title="Compare">
       <div className="flex flex-col gap-3">
-        <ComparisonCard traitLabels={["Memory it needs"]} options={options} recommendedId="recommended" reason="The recommended model and the models checked on this page." />
+        <div data-slot="compare-models" className="flex flex-col gap-3">{cards}</div>
         <Button type="button" variant="secondary" className="w-fit" onClick={() => void copySummary()}>{copied ? "Copied" : "Copy summary"}</Button>
         {copyFailed ? <div className="flex flex-col gap-2"><p className="text-base text-[var(--muted-foreground)]">Could not copy. Select the text below instead.</p><Textarea aria-label="Summary to copy" readOnly rows={Math.min(12, summary.split("\n").length)} value={summary} /></div> : null}
       </div>
