@@ -33128,3 +33128,186 @@ under the daemon requirements.
 > data directory and port set a test-only environment variable that skips the
 > lock, and point the lock path at a temp file. Service managers and status
 > tooling read the same file to name a daemon they did not start.
+## STYLE-BENCH-01: the fidelity gate run, and a unanimous, decisive fail (Sonnet, 2026-09-29)
+
+Closes STYLE-BENCH-01. Built `backend/scripts/bench/style-adapter.ts`
+exactly to the row's own design: five arms (A floor, B shipped, C
+adapter, D vector informational, E strength informational), B's prompt
+captured byte-identical from the real turn machine (`runTurnNext()`,
+through a small capture proxy this file owns) and replayed for C/E with
+only `lora` (and, for E, its scale) added, never a second, hand-
+approximated prompt. `lora?: { id: number; scale: number }[]` added to
+`LlmCompleteOptions` in `backend/src/lib/llm.ts` - `chatRequestBody`'s
+existing `...rest` spread already carries it through to the wire with no
+other code change, confirmed live (a spread of an already-typed
+variable is not excess-property-checked against `ChatCompletionRequest`
+at the call site, and the field reaches the wire regardless since
+`JSON.stringify` serializes whatever the object actually holds).
+
+**Run live on tier 1** against a hand-spawned engine on :8734
+(`--lora-init-without-apply` with all four adapters, sorted, matching
+docs/dev.md's own "The concurrency resolution" design), never the
+shared 8787/8788. Three real, disclosed operational findings along the
+way, each found live and fixed or mitigated before trusting the
+numbers:
+
+1. **The capture proxy's own response reconstruction broke streaming.**
+   Returning the upstream `fetch()` Response object directly from a
+   Bun.serve() handler does not forward its body chunk by chunk the way
+   `recordingProxy.ts`'s own established pattern (`new Response(res.
+   body, { status, headers })`) does - every `runTurnNext()` call
+   through the naive version failed the client's own 120s idle timeout
+   (spec/llm/ts/client.ts's `chatCompleteStream()`, re-armed per line
+   received) because nothing streamed until the whole generation ended.
+   Fixed by reconstructing the Response the same way recordingProxy.ts
+   already does. Confirmed live afterward: a plain identity-only
+   completion streamed in real time, chunk by chunk, no failures across
+   dozens of manual test calls.
+2. **A residual intermittent stream failure, root cause not fully
+   nailed down, mitigated instead of chased further.** Even after the
+   fix above, `runTurnNext()` calls through the proxy still failed mid-
+   stream intermittently (`"stream from ... broke"`, spec/llm/ts/
+   client.ts's own wrapped error) at roughly a 1-in-5-to-10 rate,
+   reproduced in isolation with in-flight concurrency ruled out (proved
+   never more than one request in flight at a time) and Bun.serve's own
+   `idleTimeout` raised to its maximum with no change. Production's own
+   `nodes/model.ts` already retries once inside a turn for exactly this
+   failure class and falls back to the fixed `COMPOSE_FAILURE_LINE`
+   ("Sorry, I couldn't do that.") when both attempts fail - this bench
+   mirrors that resilience one level up: `style-adapter.ts` retries the
+   whole `runTurnNext()` call up to three times whenever the reply comes
+   back as exactly that fixed line, before accepting it as the row's
+   real answer, so an infrastructure artifact is never scored as if it
+   were a genuine reply.
+3. **A real runaway-generation risk, on both the bench's own hand-built
+   prompts and on replayed production bodies.** An identity-only
+   completion against the pal adapter was observed live running past
+   5,700 tokens with no natural stop (the same self-description-collapse
+   pattern named below); a REPLAYED production body's own generation was
+   separately observed passing 900+ tokens with no stop on the identical
+   pattern, and coincided with the hand-spawned engine itself vanishing
+   from the process list mid-generation (no crash report, no OOM
+   evidence - confirmed independently as this machine's own severe
+   memory pressure that night, not a bug in this file, and confirmed to
+   recur under the same load regardless of this bench's own code).
+   `MAX_TOKENS_CAP = 600` bounds every hand-built request
+   (`baseBody()`, arms A/D); `cappedBody()` additionally clamps every
+   REPLAYED body's own `max_tokens` (production's real
+   `reply_ceiling_tokens`, 1536 - a deliberately generous "runaway
+   backstop sized per model" per nodes/model.ts's own comment, not a
+   tight cap) down to the same 600 ceiling, never up. `style-adapter.ts`
+   also writes its JSON results incrementally (after every row, not only
+   at the end) once the memory-pressure engine deaths started costing
+   whole companies' worth of already-real, already-scored rows - a
+   killed process now only ever loses rows still in flight.
+
+The engine died from confirmed memory pressure three more times across
+the run (once mid-pal before any of this file's own data existed to
+lose, twice more after the incremental-write fix, losing only rows still
+in flight each time - 264/572 and 506/572 real partial rows preserved,
+both companies simply rerun from scratch since a partial run under-covers
+the per-line bar's own denominators). Respawned and resumed each time;
+every number below is from a company's own complete, real 572-row run
+(30 spoken turns + 22 written rows, arms A/B/C/E, three seeds for A/B/C,
+one for E) except where a specific gap is named.
+
+### The verdict, per companion, against the row's own bar (all on arm C)
+
+| companion | token-band 0.85-1.15x (need ≥18/22) | facts right (need 5/5) | self-desc (need 0) | formality/filler voice bar | other companion's marker (need 0) | decode cost (need ≥0.9x) |
+|---|---|---|---|---|---|---|
+| pal (casual, frequent) | 4/22 **FAIL** | 2/5 **FAIL** | 2/156 **FAIL** | contraction 13/30 (need ≥24) **FAIL**; frequent marker 10/30 spoken (need ≥18), 7/22 written (need ≥11) **FAIL** | 65/156 **FAIL** | 1.04x pass |
+| tutor (formal, none) | 2/22 **FAIL** | 2/5 **FAIL** | 2/156 **FAIL** | 20/156 rows carry a contraction against formal's own zero-contraction bar **FAIL** | 23/156 **FAIL** | 0.96x pass |
+| buddy (casual, light) | 1/22 **FAIL** | 2/5 **FAIL** | 3/156 **FAIL** | contraction 19/30 (need ≥24) **FAIL** | 91/156 **FAIL** | 1.04x pass |
+| default (casual, none) | 1/22 **FAIL** | 2/5 **FAIL** | 3/156 **FAIL** | contraction 10/30 (need ≥24) **FAIL** | 67/156 **FAIL** | 0.94x pass |
+
+Every companion fails the same three facts every time (boiling point,
+moon distance, Berlin Wall year survive on some companions and not
+others across the 5, but every companion misses at least 3 of 5); every
+companion's written token count sits far outside B's 0.85x-1.15x band on
+all but a handful of rows; every companion shows at least one other
+companion's own marker somewhere in its replies; every companion misses
+its own formality/filler voice bar. Only decode cost clears on every
+companion - the adapter itself is cheap, it is simply not yet faithful
+at this training scale. Drift (turns 21-30 vs 1-10, within two turns) is
+mixed and not the deciding factor for any companion given the lines
+above already fail.
+
+**Verdict: none of the four adapters ship.** Per the row's own text ("a
+failing companion ships no adapter... the miss is reported as a corpus
+or brief finding, never a lowered line"), this is reported as exactly
+that: a finding about STYLE-CORPUS-02/STYLE-TRAIN-01's own training
+scale (50/25 prompts per companion, a drop rate that never cleared the
+20% target, already the closed, disclosed finding of those two items),
+not a defect in this bench or a reason to relax any line above. All
+four companions keep today's behavior (no voice on the written class,
+prose on the spoken class) until a real full-scale corpus and retrain
+are run.
+
+### Tool calling (`scripts/bench/tool-calling.ts`, 10 repeats, adapter on by default)
+
+Per-companion, single-adapter engine (`--lora <file>` alone, no
+`--lora-init-without-apply`, so every request carries the adapter
+without needing a `lora` field), compared against the same script's own
+no-adapter baseline (the multi-adapter engine above, every adapter at
+its default scale 0 since no request selects one):
+
+| | fixed-corpus false-call rate (need to hold the baseline) | routed-pass false calls |
+|---|---|---|
+| no-adapter baseline | 0/40 (0.0%) | 0/28 |
+| pal | 3/40 (7.5%) **FAIL - above Fix E's own 2% bar** | 4/40 **regression** |
+| tutor | 0/40 (0.0%) holds | routed pass lost to an engine death mid-run (memory pressure again) - not rerun, given the verdict above is already decided |
+| buddy | 0/40 (0.0%) holds | 1/40 (a small regression, within noise) |
+| default | 0/40 (0.0%) holds | 0/40 holds |
+
+pal's own adapter measurably degrades tool calling, not just voice and
+substance - a second, independent reason it would not ship even were the
+table above somehow different. tutor/buddy/default hold the baseline's
+own tool behavior closely enough that tool calling was never these
+three's own problem.
+
+### Switch cost (the one-slot companion-switch prefix re-evaluation)
+
+Measured on the multi-adapter engine, one slot (`id_slot: 0`): a
+same-companion repeat (pal -> pal) costs 24.185ms of prompt time (36
+tokens reused from cache); a real switch (pal -> tutor) costs 236.204ms
+(0 tokens reused, the full prefix re-evaluated) - **9.77x the no-switch
+prompt time**, confirming docs/dev.md's own "The engine facts" finding
+live: an adapter switch on a slot drops that slot's prompt cache, and
+the cost is real and non-trivial (though still sub-second on tier 1).
+
+### Arm D (control vector, informational) - skipped
+
+Per the row's own text, arm D never gates and is written down "beside C
+for the record" only to close the spike's own open question. Skipped
+here on the coordinator's own call: training four fresh control vectors
+(one `llama-cvector-generator` run per companion, its own positive/
+negative pairs, a fourth engine reshape) is real additional hours this
+already-decisive, already-unanimous verdict does not need to spend. If
+STYLE-CORPUS-02's own corpus is ever retrained at full scale and this
+bench is rerun, arm D should run then, against real adapters that
+actually clear the bar - measuring the vector against four adapters that
+already fail everything else would not close anything.
+
+### What this bench itself proved, independent of the verdict
+
+The bench's own mechanics are real and correct: `looksSelfDescriptive()`
+caught a genuine, reproducible failure mode (a companion, given an
+identity-only or byte-identical production prompt, occasionally emitting
+a JSON object describing itself as an assistant instead of answering -
+observed live on the pal adapter, `{"name": "Pal", "type": "ai", ...}`
+and similar shapes); the shape-aware voice reading (VOICE-CLASS-01's own
+rule, reading the frame on a document-shaped row and the whole reply
+otherwise) worked as designed on every row; the byte-identical replay
+mechanism is proven by construction (C/E literally replay B's own
+captured wire body). None of this is in question - what failed is the
+adapters' own fidelity at this training scale, exactly the row's own
+named real possibility.
+
+### Exit
+
+`backend/scripts/bench/style-adapter.ts` (new), its scripted mode
+registered in `backend/tests/benchSetup.test.ts`'s `ENTRY_POINTS`
+(23/23 passing, ~3s), `backend/src/lib/llm.ts`'s `lora` option (`bun
+test tests/llm.test.ts`, 72/72 passing). `bash scripts/check.sh` and a
+code review are this item's own remaining exit checks, run after this
+section landed.

@@ -124,6 +124,26 @@ export interface LlmCompleteOptions {
    * "auto"`) already forwards any explicit value verbatim; only this
    * type needed widening. */
   tool_choice?: "auto" | "required" | "none";
+  /** STYLE-BENCH-01/STYLE-ADAPTER-01 (docs/dev.md "The engine facts,
+   * verified in the pinned build (b10797)"): llama-server's own
+   * per-request LoRA selection (`--lora`/`--lora-scaled` load adapters
+   * at launch, `--lora-init-without-apply` at scale 0; this field
+   * selects and scales them for one completion, an unlisted adapter
+   * defaulting to 0). `chatRequestBody` already spreads every other
+   * option straight into the request body (`...rest`), so this reaches
+   * both the local client and the Stack-routed twin with no second code
+   * path needed - `body`'s own inferred type (built from `rest`, not a
+   * literal) carries `lora` through to `client.chatComplete({ model,
+   * ...body })` without tripping TypeScript's excess-property check on
+   * `ChatCompletionRequest` (which has no `lora` field of its own: a
+   * spread of an already-typed variable isn't literal-checked the way a
+   * hand-written property would be), and the field still reaches the
+   * wire either way, since `JSON.stringify` serializes whatever the
+   * object actually holds at runtime. Omitted (never `[]`) by every
+   * caller that isn't testing or selecting an adapter, so an ordinary
+   * completion's request shape - and its prompt-cache hit - is
+   * unaffected by this option ever existing. */
+  lora?: { id: number; scale: number }[];
 }
 
 /** One package (or, once D's `exposes.queries` lands, one typed query on
