@@ -1512,7 +1512,7 @@ async function captureChatContinueReview(browser: Browser, sessionValue: string)
 /** HOME-FIT-02B's dedicated review for the recommended model's fit verdict.
  * Only selection and fit-plan are stubbed at the browser boundary; the
  * remaining model card data comes from the throwaway demo backend. */
-async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable" | "checked-yes" | "checked-no" | "checked-error"): Promise<void> {
+async function captureFitVerdictCard(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark", state: "yes" | "slow" | "no" | "unknown" | "unavailable" | "checked-yes" | "checked-no" | "checked-error" | "checked-notfound"): Promise<void> {
   const context = await newContext(browser, viewport, theme, sessionValue);
   try {
     const page = await context.newPage();
@@ -1523,28 +1523,29 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       body: JSON.stringify({ modelId: null }),
     }));
     const answers = {
-      yes: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of your 24 GB." },
+      yes: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of the 24 GB this computer can give to models." },
       slow: { verdict: "slow", headline: "Runs, but slowly", detail: "It fits only by using the processor, so answers will be slower." },
       no: { verdict: "no", headline: "Won't fit", detail: "Needs about 6 GB more memory." },
       unknown: { verdict: "unknown", headline: "Can't tell yet", detail: "Nobody has measured a model like this on a computer like yours yet." },
       unavailable: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." },
+      notfound: { verdict: "unknown", headline: "Can't find that model", detail: "Check the link and try again." },
     } as const;
     await page.route("**/api/fit-plan", (route) => {
-      const answerState = state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state;
+      const answerState = state === "checked-yes" ? "yes" : state === "checked-no" ? "no" : state === "checked-notfound" ? "notfound" : state;
       const wording = answerState in answers ? answers[answerState as keyof typeof answers] : answers.yes;
       // The card only checks plan !== null; schema: 1 is enough for this browser review.
       return route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ plan: state === "unavailable" ? null : { schema: 1 }, wording }),
+        body: JSON.stringify({ plan: state === "unavailable" || state === "checked-notfound" ? null : { schema: 1 }, wording }),
       });
     });
     await page.goto(`${BASE_URL}/models`);
-    if (state === "checked-yes" || state === "checked-no" || state === "checked-error") {
-      const link = state === "checked-error" ? "not a link" : "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf";
+    if (state === "checked-yes" || state === "checked-no" || state === "checked-error" || state === "checked-notfound") {
+      const link = state === "checked-error" ? "not a link" : state === "checked-notfound" ? "https://huggingface.co/example-org/no-such-model" : "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf";
       await page.getByRole("textbox", { name: "Hugging Face model link" }).fill(link);
       await page.getByRole("button", { name: "Check", exact: true }).click();
-      await page.getByText(state === "checked-yes" ? answers.yes.headline : state === "checked-no" ? answers.no.headline : "That does not look like a Hugging Face model link.", { exact: true }).waitFor();
+      await page.getByText(state === "checked-yes" ? answers.yes.headline : state === "checked-no" ? answers.no.headline : state === "checked-notfound" ? answers.notfound.headline : "That does not look like a Hugging Face model link.", { exact: true }).waitFor();
       await settleAnimations(page);
       const screenshot = `fit-check-${state}-${viewport.slug}-light.png`;
       await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
@@ -4426,7 +4427,7 @@ async function main() {
         for (const state of ["yes", "slow", "no", "unknown", "unavailable"] as const) {
           await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
         }
-        for (const state of ["checked-yes", "checked-no", "checked-error"] as const) {
+        for (const state of ["checked-yes", "checked-no", "checked-error", "checked-notfound"] as const) {
           await captureFitVerdictCard(browser, sessionValue, viewport, "light", state);
         }
       }

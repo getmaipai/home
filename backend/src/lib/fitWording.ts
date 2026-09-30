@@ -19,7 +19,7 @@ export function fitWording(plan: StackFitPlan): { verdict: "yes" | "slow" | "no"
     }
     case "yes":
       detail = typeof plan.total.high === "number" && typeof plan.cap.high === "number"
-        ? `About ${Math.max(1, Math.ceil(plan.total.high / 1024 ** 3))} GB of your ${Math.floor(plan.cap.high / 1024 ** 3)} GB.`
+        ? `About ${Math.max(1, Math.ceil(plan.total.high / 1024 ** 3))} GB of the ${Math.floor(plan.cap.high / 1024 ** 3)} GB this computer can give to models.`
         : "There is room for it.";
       break;
     case "slow":
@@ -37,5 +37,13 @@ export function fitUnavailableWording(): { verdict: "unknown"; headline: string;
     verdict: "unknown",
     headline: "Can't check right now",
     detail: "The model size checker did not answer. Try again in a moment.",
+  };
+}
+
+export function fitNotFoundWording(): { verdict: "unknown"; headline: string; detail: string } {
+  return {
+    verdict: "unknown",
+    headline: "Can't find that model",
+    detail: "Check the link and try again.",
   };
 }

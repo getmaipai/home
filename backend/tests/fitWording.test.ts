@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fitWording } from "@/lib/fitWording";
+import { fitNotFoundWording, fitWording } from "@/lib/fitWording";
 import { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 import { makePlan } from "./fixtures/fitPlanFixtures";
 
@@ -23,9 +23,13 @@ describe("fit wording", () => {
   test("words the yes memory figures and falls back for null figures", () => {
     const GiB = 1024 ** 3;
     const plan = makePlan("yes");
-    expect(fitWording(plan).detail).toBe(`About ${Math.max(1, Math.ceil(3 * GiB / 1024 ** 3))} GB of your ${Math.floor(16 * GiB / 1024 ** 3)} GB.`);
+    expect(fitWording(plan).detail).toBe(`About ${Math.max(1, Math.ceil(3 * GiB / 1024 ** 3))} GB of the ${Math.floor(16 * GiB / 1024 ** 3)} GB this computer can give to models.`);
     const nullPlan = StackFitPlan.parse({ ...plan, total: { low: null, high: null, source: "unknown", as_of: plan.total.as_of } });
     expect(fitWording(nullPlan).detail).toBe("There is room for it.");
+  });
+
+  test("words a model the Stack could not find", () => {
+    expect(fitNotFoundWording()).toEqual({ verdict: "unknown", headline: "Can't find that model", detail: "Check the link and try again." });
   });
 
   test("does not throw for an empty paths list", () => {

@@ -3,7 +3,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { getStackClient } from "@/lib/stackEngine";
 import { StackError } from "@/lib/stack/errors";
-import { fitUnavailableWording, fitWording } from "@/lib/fitWording";
+import { fitNotFoundWording, fitUnavailableWording, fitWording } from "@/lib/fitWording";
 import { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 
 export const fitPlanRoutes = apiRouter();
@@ -39,6 +39,9 @@ fitPlanRoutes.openapi(route, async (c) => {
     const plan = await getStackClient().fitPlan(body);
     return c.json({ plan, wording: fitWording(plan) }, 200);
   } catch (error) {
+    if (error instanceof StackError && error.status === 404) {
+      return c.json({ plan: null, wording: fitNotFoundWording() }, 200);
+    }
     if (error instanceof StackError && error.status === 400) {
       return c.json({ error: error.message }, 400);
     }

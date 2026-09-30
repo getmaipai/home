@@ -42,6 +42,12 @@ describe("POST /api/fit-plan", () => {
     expect(await response.json()).toEqual({ plan: null, wording: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." } });
   });
 
+  test("returns not found wording when the Stack reports a missing model", async () => {
+    const response = await postFit(new StackError("unexpected", "not found", { status: 404 }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ plan: null, wording: { verdict: "unknown", headline: "Can't find that model", detail: "Check the link and try again." } });
+  });
+
   test("maps a Stack bad source to Home 400", async () => {
     const response = await postFit(new StackError("unknown", "bad source", { status: 4 * 100 }));
     expect(response.status).toBe(4 * 100);

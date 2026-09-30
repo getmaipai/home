@@ -75,7 +75,7 @@ function chatFit(overrides: Partial<{ fits: boolean; implemented: boolean; url: 
 const NO_SELECTION = { modelId: null };
 const NO_ENGINE = { kind: "none", modelId: null, pid: null, startedAt: null };
 const RUNNING_ENGINE = { kind: "selection", modelId: "qwen3-8b-instruct-q4-k-m", pid: 4242, startedAt: "2026-09-04T10:00:00.000Z" };
-const FIT_YES = { plan: { schema: 1 }, wording: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of your 24 GB." } };
+const FIT_YES = { plan: { schema: 1 }, wording: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of the 24 GB this computer can give to models." } };
 const FIT_UNKNOWN = { plan: { schema: 1 }, wording: { verdict: "unknown", headline: "Can't tell yet", detail: "Nobody has measured a model like this on a computer like yours yet." } };
 const FIT_UNAVAILABLE = { plan: null, wording: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." } };
 const GGUF_LINK = "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf";
@@ -388,7 +388,7 @@ describe("ModelsSection", () => {
 
   test("the Stack verdict replaces both legacy lines and sends the pinned URL and context", async () => {
     const fit = chatFit({ fits: false });
-    const response = { plan: {} as NonNullable<import("@maipai/spec/gen/ts/stack-fit-plan.js").StackFitPlan>, wording: { verdict: "yes" as const, headline: "Runs well on this computer", detail: "About 3 GB of your 16 GB." } };
+    const response = { plan: {} as NonNullable<import("@maipai/spec/gen/ts/stack-fit-plan.js").StackFitPlan>, wording: { verdict: "yes" as const, headline: "Runs well on this computer", detail: "About 3 GB of the 16 GB this computer can give to models." } };
     const fitPlan = mock(() => Promise.resolve(response));
     const original = api.fitPlan;
     api.fitPlan = fitPlan as typeof api.fitPlan;
