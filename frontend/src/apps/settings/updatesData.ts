@@ -1,13 +1,20 @@
 import type { UpdateProjection } from "@/lib/api";
 
 export interface UpdateRow {
-  kind: "app" | "engine" | "model" | "reference";
+  kind: "app" | "engine" | "model" | "reference" | "robot";
   id: string;
   name: string;
   installed: string | null;
   available: string | null;
   lastChecked: string | null;
   notes: string | null;
+  /** Robot rows only: the hub's own verdict, since a robot with an unknown
+   * installed version must never read as behind. */
+  updateAvailable?: boolean;
+  /** Robot rows only: why no action is offered. */
+  blockedBy?: string | null;
+  /** Robot rows only: secondary detail (the body's software version). */
+  detail?: string | null;
 }
 
 export function rowsFrom(projection: UpdateProjection): UpdateRow[] {
@@ -27,9 +34,24 @@ export function rowsFrom(projection: UpdateProjection): UpdateRow[] {
       rows.push({ kind: "reference", id: `reference:${reference.id}`, name: reference.name, installed: reference.installed, available: reference.available, lastChecked: reference.lastChecked, notes: reference.notes });
     }
   }
+  for (const robot of projection.robots ?? []) {
+    rows.push({
+      kind: "robot",
+      id: `robot:${robot.id}`,
+      name: robot.name,
+      installed: robot.installed,
+      available: robot.latest,
+      lastChecked: robot.lastChecked,
+      notes: null,
+      updateAvailable: robot.updateAvailable,
+      blockedBy: robot.blockedBy,
+      detail: robot.daemonVersion ? `Body software ${robot.daemonVersion}` : null,
+    });
+  }
   return rows;
 }
 
 export function hasUpdate(row: UpdateRow): boolean {
+  if (row.kind === "robot") return row.updateAvailable === true;
   return row.available !== null && row.available !== row.installed;
 }

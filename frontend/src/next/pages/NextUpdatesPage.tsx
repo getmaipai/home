@@ -35,13 +35,23 @@ interface Row extends Record<string, unknown> {
   status: string;
 }
 
+function statusFor(row: UpdateRow): string {
+  if (row.kind === "robot") {
+    if (hasUpdate(row)) return row.blockedBy ? `Update available. ${row.blockedBy}` : "Update available";
+    if (row.installed === null) return "Version unknown";
+    if (row.available === null) return row.lastChecked ? "No release published yet" : "Not checked yet";
+    return "Up to date";
+  }
+  return hasUpdate(row) ? "Update available" : "Up to date";
+}
+
 function toRow(row: UpdateRow): Row {
   return {
-    name: row.name,
-    installed: row.installed ?? "-",
+    name: row.detail ? `${row.name} (${row.detail.charAt(0).toLowerCase()}${row.detail.slice(1)})` : row.name,
+    installed: row.installed ?? (row.kind === "robot" ? "Unknown" : "-"),
     available: row.available ?? (row.kind === "engine" ? "Unknown" : "-"),
     lastChecked: row.lastChecked ? new Date(row.lastChecked).toLocaleString() : "Never",
-    status: hasUpdate(row) ? "Update available" : "Up to date",
+    status: statusFor(row),
   };
 }
 
@@ -134,6 +144,9 @@ export function NextUpdatesPage({ person }: { person: Roster }) {
             );
           }}
         </AsyncState>
+      )}
+      {canManage && query.data?.robotsError && (
+        <p className="text-sm text-destructive">Couldn't check for robot updates: {query.data.robotsError}</p>
       )}
       {canManage && query.data?.referenceError && (
         <p className="text-sm text-destructive">Couldn't read installed reference sets for updates: {query.data.referenceError}</p>

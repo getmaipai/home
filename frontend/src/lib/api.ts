@@ -192,6 +192,7 @@ export interface RobotDeviceState {
   on_battery?: boolean | null;
   battery_level?: number | null;
   daemon_version?: string | null;
+  app_version?: string | null;
   reachable: boolean;
   unreachableSince: string | null;
 }
@@ -271,6 +272,21 @@ export interface UpdateProjection extends AppUpdateProjection {
   stackError: string | null;
   reference: ReferenceUpdatesProjection | null;
   referenceError: string | null;
+  robots: RobotUpdate[];
+  robotsError: string | null;
+}
+
+// ROBOT-UPDATES-01: one entry per paired robot, hand-typed to match
+// backend/src/routes/updates.ts's RobotUpdateSchema.
+export interface RobotUpdate {
+  id: string;
+  name: string;
+  installed: string | null;
+  latest: string | null;
+  daemonVersion: string | null;
+  updateAvailable: boolean;
+  blockedBy: string | null;
+  lastChecked: string | null;
 }
 
 // GET /api/plugins's real row shape (backend/src/routes/plugins.ts):

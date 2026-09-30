@@ -82,7 +82,8 @@ export function RobotCard({
             {battery !== null && battery !== undefined ? (
               <Progress value={Math.round(battery * 100)} aria-label="Battery level" />
             ) : null}
-            <Row label="Software version">{state.daemon_version ?? "Unknown"}</Row>
+            <Row label="MaiPai version">{state.app_version ?? "Unknown"}</Row>
+            <Row label="Body software">{state.daemon_version ?? "Unknown"}</Row>
           </dl>
         )}
       </CardContent>

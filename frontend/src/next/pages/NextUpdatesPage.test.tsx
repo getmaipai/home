@@ -111,6 +111,58 @@ describe("NextUpdatesPage", () => {
     }
   });
 
+  const robotRow = (overrides: Record<string, unknown> = {}) => ({
+    id: "device-1",
+    name: "Riff",
+    installed: "0.1.0",
+    latest: "v0.2.0",
+    daemonVersion: "1.4.2",
+    updateAvailable: true,
+    blockedBy: "Installing robot updates from Home isn't built yet.",
+    lastChecked: "2026-09-29T12:00:00.000Z",
+    ...overrides,
+  });
+
+  test("a paired robot behind the latest Bot release gets its own row with the honest block and no action", async () => {
+    const { restore } = mockUpdatesFetch(makeProjection({ robots: [robotRow()] }));
+    try {
+      renderWithQueryClient(<NextUpdatesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Riff"));
+      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((candidate) => candidate.textContent?.includes("Riff"))! as HTMLElement;
+      expect(row.textContent).toContain("0.1.0");
+      expect(row.textContent).toContain("v0.2.0");
+      expect(row.textContent).toContain("body software 1.4.2");
+      expect(row.textContent).toContain("Update available");
+      expect(row.textContent).toContain("Installing robot updates from Home isn't built yet.");
+      expect(within(row).queryByRole("button", { name: "More actions" })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a robot that never reported its MaiPai version reads unknown, never an update", async () => {
+    const { restore } = mockUpdatesFetch(makeProjection({ robots: [robotRow({ installed: null, updateAvailable: false, blockedBy: null })] }));
+    try {
+      renderWithQueryClient(<NextUpdatesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Riff"));
+      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((candidate) => candidate.textContent?.includes("Riff"))! as HTMLElement;
+      expect(row.textContent).toContain("Unknown");
+      expect(row.textContent).not.toContain("Update available");
+    } finally {
+      restore();
+    }
+  });
+
+  test("a failed Bot release check is said out loud under the table", async () => {
+    const { restore } = mockUpdatesFetch(makeProjection({ robots: [robotRow({ latest: null, updateAvailable: false, blockedBy: null })], robotsError: "connection refused" }));
+    try {
+      renderWithQueryClient(<NextUpdatesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Couldn't check for robot updates: connection refused"));
+    } finally {
+      restore();
+    }
+  });
+
   test("a failed fetch shows an error and a retry button, never a stuck loading state", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;

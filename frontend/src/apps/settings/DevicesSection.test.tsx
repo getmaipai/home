@@ -144,6 +144,7 @@ describe("DevicesSection", () => {
             on_battery: null,
             battery_level: null,
             daemon_version: "1.4.2",
+            app_version: "0.1.0",
             reachable: true,
             unreachableSince: null,
           },
@@ -157,7 +158,11 @@ describe("DevicesSection", () => {
       await findByText("Listening");
       expect(card.textContent).toContain("Muted");
       expect(card.textContent).toContain("Level unknown");
+      expect(card.textContent).toContain("MaiPai version");
+      expect(card.textContent).toContain("0.1.0");
+      expect(card.textContent).toContain("Body software");
       expect(card.textContent).toContain("1.4.2");
+      expect(card.textContent).not.toContain("Software version");
     } finally {
       restore();
     }
@@ -187,6 +192,8 @@ describe("DevicesSection", () => {
       await findByText("Not responding");
       const card = await findByTestId("robot-card");
       expect(card.textContent).toContain("Last heard from");
+      expect(card.textContent).toContain("MaiPai versionUnknown");
+      expect(card.textContent).toContain("Body softwareUnknown");
       expect(card.textContent).toContain("50%");
     } finally {
       restore();
