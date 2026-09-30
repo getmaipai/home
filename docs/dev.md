@@ -33510,6 +33510,10 @@ section landed.
 The chat composer disables typing and shows an availability notice when `/api/health` reports that MaiPai's AI is unavailable, then restores itself as health recovers. It reads `/api/health` because the signed-in chat page can already access the authenticated health endpoint, and no new backend route is needed.
 The New Thread button and its Cmd/Ctrl+Shift+O shortcut are also disabled while chat is unavailable.
 
+## ENGINE-AVAIL-04a
+
+The hub shutdown list previously stopped chat, embed and background engines but left the voice engine running, so its process kept port 8793 occupied and prevented the next hub boot from starting voice. The default shutdown list now calls `restartTtsBackend()` to cancel respawn and stop the voice engine on both signal and fatal shutdown paths.
+
 ## DATA-LOCATION: where the household's data lives, choosing it at install and moving it later (design, 2026-09-29)
 
 **Revision 2026-09-30.** The first version grouped the data into three
