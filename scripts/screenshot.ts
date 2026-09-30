@@ -3718,7 +3718,7 @@ async function captureStatusEngineControlsReview(browser: Browser, ownerSession:
   const ownerHeaders = { "Content-Type": "application/json", Cookie: `session=${ownerSession}` };
   const created = await fetch(`${BASE_URL}/api/people`, {
     method: "POST", headers: ownerHeaders,
-    body: JSON.stringify({ displayName: "Controls Reviewer", role: "adult", secret: "review-controls-secret" }),
+    body: JSON.stringify({ displayName: "Controls Reviewer", role: "teen", secret: "review-controls-secret" }),
   });
   if (!created.ok) throw new Error(`engine controls review adult setup failed: ${created.status} ${await created.text()}`);
   const person = await created.json() as { id: string };
@@ -3739,17 +3739,18 @@ async function captureStatusEngineControlsReview(browser: Browser, ownerSession:
         const health = await response.json() as { engines: Record<string, { kind: string; pid: number | null; alive: boolean | null }> };
         health.engines = {
           chat: { kind: "spawned", pid: 4242, alive: true },
-          embed: { kind: "stopped", pid: null, alive: null },
+          embed: { kind: "stopped", pid: null, alive: false },
           background: { kind: "spawned", pid: 4244, alive: true },
-          voice: { kind: "stopped", pid: null, alive: null },
+          voice: { kind: "stopped", pid: null, alive: false },
         };
         await route.fulfill({ response, json: health });
       });
       await page.goto(`${BASE_URL}/status`);
-      await page.getByText("Components", { exact: true }).waitFor();
+      await page.getByText("Parts", { exact: true }).waitFor();
       if (admin) {
         await page.getByRole("button", { name: "Stop" }).first().waitFor();
-        if (await page.getByRole("button", { name: "Stop" }).count() !== 2 || await page.getByRole("button", { name: "Start" }).count() !== 2 || await page.getByRole("button", { name: "Restart" }).count() !== 4) throw new Error("admin status capture does not show two Stop, two Start and four Restart controls");
+        const controls = { stop: await page.getByRole("button", { name: "Stop" }).count(), start: await page.getByRole("button", { name: "Start" }).count(), restart: await page.getByRole("button", { name: "Restart" }).count() };
+        if (controls.stop !== 2 || controls.start !== 6 || controls.restart !== 4) throw new Error(`admin status capture controls mismatch: ${JSON.stringify(controls)}`);
       } else if (await page.getByRole("button", { name: "Stop" }).count() || await page.getByRole("button", { name: "Start" }).count() || await page.getByRole("button", { name: "Restart" }).count()) {
         throw new Error("non-admin status capture shows engine controls");
       }
