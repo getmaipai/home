@@ -6,6 +6,10 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## ENGINE-AVAIL-02 (first half)
+
+`beginTurn()` in `backend/src/lib/turnMachine/turnNext.ts` refuses a turn before resolving or creating a conversation when the locally supervised chat AI is stopped, blocked by a foreign process on its port, or has exhausted automatic restarts. The synchronous check runs before any tool or turn storage, so the failure returns as a 503 status instead of being saved as assistant reply text. Explicit `MAIPAI_LLAMA_SERVER_URL` and configured Stack routes skip the local check, while an engine that has not started remains eligible to start on demand. The chat adapter shows “MaiPai's AI isn't running right now. Try again in a moment.”
+
 ## SEARCH-FALLBACK-01: a second front door, Wikipedia's own official API (2026-09-24)
 
 **Objective.** `docs/plans/search-resilience-2026-09-24.md`'s item 3:

@@ -1,14 +1,17 @@
-import { describe, expect, test, afterEach } from "bun:test";
-import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, getChatEngineIdentity, getChatLivePid, sweepOrphanEngineProcesses, reportChatBackendUnreachable, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { describe, expect, test, afterEach, beforeEach } from "bun:test";
+import { getChatClient, restartChatBackend, stopChatBackend, getEngineStatus, getChatEngineIdentity, getChatLivePid, sweepOrphanEngineProcesses, reportChatBackendUnreachable, chatEngineDown, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
 import { listIssues, resolveIssue } from "@/lib/issues";
-import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly } from "@/lib/sidecars";
+import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests } from "@/lib/sidecars";
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
+import { __resetStackEngineForTests } from "@/lib/stackEngine";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
+
+const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
@@ -18,11 +21,60 @@ afterEach(() => {
   __setCrashBootHoldForTests(null);
   delete process.env.MAIPAI_LLAMA_SERVER_BIN;
   delete process.env.MAIPAI_CHAT_MODEL_PATH;
+  delete process.env.MAIPAI_LLAMA_SERVER_URL;
+  process.env.MAIPAI_LLAMA_SERVER_PORT = testChatPort;
   // household settings persist in the one shared test-process db (bun
   // test runs every file in-process): reset explicitly so a later file's
   // "nothing configured" assumption isn't quietly broken by this one.
   setHouseholdSettingValue("chat.model_id", "");
+  setHouseholdSettingValue("engines.stack.url", "");
 });
+
+describe("llmSupervisor chatEngineDown()", () => {
+  beforeEach(() => {
+    __resetSidecarsForTests();
+    __resetLlmSupervisorForTests();
+    __resetStackEngineForTests();
+    delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    process.env.MAIPAI_LLAMA_SERVER_PORT = testChatPort;
+  });
+
+  test("returns true only for stopped, blocked, and failed; none and starting stay available", () => {
+    expect(chatEngineDown()).toBe(false);
+    const state = (globalThis as typeof globalThis & {
+      __maipai_llmSupervisor?: { startingPromise: Promise<never> | null; startingStartedAtMs: number | null; startupStalled: boolean; manuallyStopped: boolean };
+    }).__maipai_llmSupervisor!;
+    state.startingPromise = new Promise<never>(() => {});
+    state.startingStartedAtMs = Date.now();
+    expect(chatEngineDown()).toBe(false);
+    state.startingPromise = null;
+    state.startingStartedAtMs = null;
+    state.manuallyStopped = true;
+    expect(chatEngineDown()).toBe(true);
+    state.manuallyStopped = false;
+    const port = Number(testChatPort);
+    process.env.MAIPAI_LLAMA_SERVER_PORT = String(port);
+    __blockPortForTests(port, 12345);
+    expect(chatEngineDown()).toBe(true);
+    __resetSidecarsForTests();
+    __failEngineForTests("chat");
+    expect(chatEngineDown()).toBe(true);
+  });
+
+  test("skips the local supervisor for an explicit URL or the routed Stack", () => {
+    process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1";
+    expect(chatEngineDown()).toBe(false);
+    delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:12345");
+    stateStopped();
+    expect(chatEngineDown()).toBe(false);
+  });
+});
+
+function stateStopped(): void {
+  const state = (globalThis as typeof globalThis & { __maipai_llmSupervisor?: { manuallyStopped: boolean } }).__maipai_llmSupervisor!;
+  state.manuallyStopped = true;
+}
 
 describe("llmSupervisor getChatClient()", () => {
   test("an orphaned startup becomes stalled once, raises Repairs, then clears after retry succeeds", async () => {

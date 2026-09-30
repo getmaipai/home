@@ -118,6 +118,19 @@ export function __recordOwnedPortForTests(port: number, pid: number, command = "
   recordOwnedPort(port, pid, command);
 }
 
+/** Test-only: mark a port as held by a foreign process without needing
+ * a real listener or process lookup. The turn availability tests use
+ * this to exercise the same blocked-port state freePort() records. */
+export function __blockPortForTests(port: number, pid: number): void {
+  blockedPorts.set(port, { pid, command: "test", at: new Date().toISOString() });
+}
+
+/** Test-only: set the same terminal auto-restart state real sidecar
+ * retries write after their backoff budget is exhausted. */
+export function __failEngineForTests(role: string): void {
+  respawnState[role] = "gave_up";
+}
+
 /** Test-only: clears both the on-disk ownership record and the
  * in-memory blocked-ports map, so one test's port numbers (often
  * reused across files) never leak an owned/blocked reading into the

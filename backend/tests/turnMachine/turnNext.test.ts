@@ -8,6 +8,7 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { __blockPortForTests, __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { createBenchPeople, startRecordingProxy, startFakeSearxng, type BenchPeople, type FakeSearxng } from "../../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
@@ -23,7 +24,7 @@ import type { TurnStreamEvent } from "@/wire";
 import { getPendingAsk } from "@/lib/conversationHistory";
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
-import { conversationTurns } from "@/db/schema";
+import { conversationTurns, conversations } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
@@ -34,6 +35,7 @@ import { identityLine } from "@/lib/turnEngine";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 let people: BenchPeople;
+const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
 
 // FLAKE-FORCED-01 (issue #137): the searxng/web-fetch token bucket
 // (packageHost.ts's own SEARXNG_RATE_LIMIT, module-global, capacity
@@ -58,6 +60,7 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
+  __resetPortOwnershipForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
 
@@ -1973,6 +1976,49 @@ describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-te
       CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
       searxng.stop();
     }
+  });
+});
+
+describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects", () => {
+  const message = "who is the president of chile";
+
+  beforeEach(() => {
+    __resetPortOwnershipForTests();
+    delete process.env.MAIPAI_LLAMA_SERVER_URL;
+    process.env.MAIPAI_LLAMA_SERVER_PORT = testChatPort;
+    setHouseholdSettingValue("search.searxng_url", "");
+  });
+
+  test("blocked local chat port refuses a non-streaming turn before search, conversation, or turn storage", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const port = Number(testChatPort);
+    process.env.MAIPAI_LLAMA_SERVER_PORT = String(port);
+    __blockPortForTests(port, 12345);
+    try {
+      const result = await runTurnNext(people.owner, "chat", message);
+      expect(result).toMatchObject({ ok: false, status: 503, code: "unavailable", error: "MaiPai's AI isn't running right now." });
+      expect(searxng.queries).toHaveLength(0);
+      expect(db.select().from(conversations).all()).toHaveLength(0);
+      expect(db.select().from(conversationTurns).all()).toHaveLength(0);
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("blocked local chat port refuses a streaming turn before turn storage", async () => {
+    const port = Number(testChatPort);
+    process.env.MAIPAI_LLAMA_SERVER_PORT = String(port);
+    __blockPortForTests(port, 12345);
+    const result = await runTurnNextStream(people.owner, "chat", message);
+    expect(result).toMatchObject({ ok: false, status: 503, code: "unavailable", error: "MaiPai's AI isn't running right now." });
+    expect(db.select().from(conversations).all()).toHaveLength(0);
+    expect(db.select().from(conversationTurns).all()).toHaveLength(0);
+  });
+
+  test("none means on-demand startup and does not refuse a turn", async () => {
+    const result = await withStub({ reply: () => "The scripted answer." }, () => runTurnNext(people.owner, "chat", "hi"));
+    expect(result.ok).toBe(true);
   });
 });
 

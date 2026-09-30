@@ -1212,18 +1212,14 @@ describe("Lane 11 item 1: the transient activity line (chatTurnActivity.ts)", ()
 });
 
 describe("createChatModelAdapter errors", () => {
-  // A code review (2026-09-04) found a mid-stream "error" event thrown as
-  // a plain Error, which the friendly-message check below could never
-  // match - the actionable "check Household → AI models" message never
-  // showed, only the generic fallback.
-  test("a mid-stream error event surfaces the same friendly down-state message as a request-time failure", async () => {
+  test("a mid-stream error event surfaces the friendly down-state message", async () => {
     const env = stubEnvironment(
       ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "chat model unavailable: llama-server crashed" }]),
     );
     try {
       const { error } = await collect([fakeUserMessage("hi")]);
       expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toMatch(/check Household/);
+      expect((error as Error).message).toBe("MaiPai's AI isn't running right now. Try again in a moment.");
     } finally {
       env.restore();
     }
@@ -1237,7 +1233,7 @@ describe("createChatModelAdapter errors", () => {
     try {
       const { error } = await collect([fakeUserMessage("hi")]);
       expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toMatch(/check Household/);
+      expect((error as Error).message).toBe("MaiPai's AI isn't running right now. Try again in a moment.");
     } finally {
       env.restore();
     }

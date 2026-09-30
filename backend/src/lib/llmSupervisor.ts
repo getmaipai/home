@@ -44,6 +44,7 @@ import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
+import { getStackUrl } from "@/lib/stackEngine";
 
 export type BackendKind = "url" | "override" | "selection" | "stub";
 
@@ -631,6 +632,19 @@ export function getEngineStatus(): EngineStatus {
   }
   if (state.startupStalled) return { kind: "stalled", modelId: null, pid: null, startedAt: null };
   return { kind: "none", modelId: null, pid: null, startedAt: null };
+}
+
+/** A synchronous, local-only backstop for turns: refuse only when the
+ * supervised chat engine is deliberately stopped, blocked by a foreign
+ * port holder, or has exhausted its restart attempts. The URL override
+ * and configured Stack follow complete()'s own routing decision and do
+ * not use this supervisor; `none` and `starting` remain valid because
+ * the local engine starts on demand. */
+export function chatEngineDown(): boolean {
+  if (process.env.MAIPAI_LLAMA_SERVER_URL || getStackUrl()) return false;
+  const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
+  const kind = engineHealthKind("chat", getEngineStatus().kind, port);
+  return kind === "stopped" || kind === "blocked" || kind === "failed";
 }
 
 /** ENGINE-HOST-01: the chat engine's identity for the [turn] line: the
