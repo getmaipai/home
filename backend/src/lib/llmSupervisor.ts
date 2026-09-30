@@ -39,7 +39,7 @@ import { resolveLaunchFlags, launchFlagsToArgs, type LaunchFlags, type LaunchFla
 import { runPostLoadCheck, type PostLoadCheckResult } from "@/lib/enginePostLoadCheck";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
-import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, expireStalledStart, cancelEngineRespawn, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
+import { spawnAndWaitHealthy, freePort, sweepOrphanProcesses, watchEngine, probeAlive, engineHealthKind, blockedPortHolderAlive, expireStalledStart, cancelEngineRespawn, ForeignPortHolderError, type EngineWatch, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
 import { startResourceGovernor } from "@/lib/resourceGovernor";
@@ -561,7 +561,9 @@ export async function getChatClient(): Promise<LlamaServerClient> {
             key: "spawn",
             severity: "error",
             title: "MaiPai's AI failed to start",
-            detail: (err as Error).message,
+            detail: err instanceof ForeignPortHolderError
+              ? `Another program is using the port MaiPai's AI needs, so it can't start. (Technical detail: ${err.message})`
+              : (err as Error).message,
           });
         }
         throw err;

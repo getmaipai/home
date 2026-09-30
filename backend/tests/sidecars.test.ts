@@ -22,6 +22,8 @@ import {
   __resetPortOwnershipForTests,
 } from "@/lib/sidecars";
 import { listIssues, fixIssue, __resetFixHandlersForTests } from "@/lib/issues";
+import { db } from "@/db";
+import { notificationDeliveries } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { join } from "node:path";
@@ -489,8 +491,8 @@ describe("watchEngine (the engines' auto-heal)", () => {
   }
   const health = () => fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(500) }).then((r) => r.ok, () => false);
 
-  test("a SIGKILLed engine is dropped, reported on Repairs, and started again on its own", async () => {
-    __setSidecarTimingForTestsOnly({ backoffMs: [50] });
+  test("a SIGKILLed engine healed inside the notice delay raises no Repairs issue", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [20], diedNoticeDelayMs: 1_000 });
     const proc = await serve();
     let dropped = 0;
     const replacement: { proc: Bun.Subprocess | null } = { proc: null };
@@ -512,15 +514,62 @@ describe("watchEngine (the engines' auto-heal)", () => {
       process.kill(proc.pid, "SIGKILL");
       await waitUntil(() => replacement.proc !== null);
       expect(dropped).toBe(1);
-      // The issue was raised with how it died, then resolved by the respawn.
-      await waitUntil(() => !listIssues().some((i) => i.source === "test-engine"));
-      const all = listIssues({ includeResolved: true }).find((i) => i.source === "test-engine" && i.key === "died");
-      expect(all?.detail).toContain("SIGKILL");
-      expect(all?.detail).toContain("starting it again");
+      await new Promise((r) => setTimeout(r, 1_100));
+      expect(listIssues({ includeResolved: true }).filter((i) => i.source === "test-engine" && i.key === "died")).toHaveLength(0);
+      expect(db.select().from(notificationDeliveries).all().filter((row) => row.typeId === "repairs.new")).toHaveLength(0);
     } finally {
       replacement.proc?.kill();
       await replacement.proc?.exited;
     }
+  }, 10_000);
+
+  test("an outage that lasts through the notice delay raises one died issue", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [500], diedNoticeDelayMs: 100, healthPollMs: 1000 });
+    const proc = Bun.spawn(["bun", "-e", "setTimeout(() => {}, 60000)"]);
+    watchEngine({ proc, role: "delayed", label: "the test engine", healthCheck: health, drop: () => {}, respawn: async () => new Promise<void>(() => {}), title: "Test engine stopped" });
+    process.kill(proc.pid, "SIGKILL");
+    await waitUntil(() => listIssues().some((i) => i.source === "delayed-engine" && i.key === "died"));
+    const all = listIssues({ includeResolved: true }).filter((i) => i.source === "delayed-engine" && i.key === "died");
+    expect(all).toHaveLength(1);
+    expect(all[0]!.detail).toContain("starting it again");
+    // raiseIssue() emits repairs.new exactly once on the transition into
+    // an open error issue (issues.ts); this test's fixture has no people
+    // to receive a persisted notification delivery row.
+    cancelEngineRespawn("delayed");
+  }, 10_000);
+
+  test("the crash cap raises immediately without waiting for the died notice delay", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [10], diedNoticeDelayMs: 60_000 });
+    let active = true;
+    const procs: Bun.Subprocess[] = [];
+    const crashy = async (): Promise<void> => {
+      if (!active) return;
+      const next = Bun.spawn(["bun", "-e", "process.exit(1)"]);
+      procs.push(next);
+      watchEngine({ proc: next, role: "instant-cap", label: "the cap engine", healthCheck: async () => true, drop: () => {}, respawn: crashy, title: "Cap engine stopped" });
+    };
+    const first = Bun.spawn(["bun", "-e", "process.exit(1)"]);
+    procs.push(first);
+    watchEngine({ proc: first, role: "instant-cap", label: "the cap engine", healthCheck: async () => true, drop: () => {}, respawn: crashy, title: "Cap engine stopped" });
+    try {
+      await waitUntil(() => listIssues().some((i) => i.source === "instant-cap-engine" && i.detail.includes("keeps stopping")));
+      expect(listIssues().some((i) => i.source === "instant-cap-engine")).toBe(true);
+    } finally {
+      active = false;
+      cancelEngineRespawn("instant-cap");
+      for (const child of procs) { child.kill(); await child.exited; }
+    }
+  }, 10_000);
+
+  test("a rejected respawn raises immediately without waiting for the died notice delay", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [10], diedNoticeDelayMs: 60_000 });
+    const proc = await serve();
+    watchEngine({ proc, role: "instant-reject", label: "the test engine", healthCheck: health, drop: () => {}, respawn: async () => { throw new Error("spawn rejected"); }, title: "Test engine stopped" });
+    process.kill(proc.pid, "SIGKILL");
+    await waitUntil(() => listIssues().some((i) => i.source === "instant-reject-engine" && i.key === "died"));
+    const issue = listIssues().find((i) => i.source === "instant-reject-engine" && i.key === "died")!;
+    expect(issue.detail).toContain("spawn rejected");
+    cancelEngineRespawn("instant-reject");
   }, 10_000);
 
   test("a deliberate stop is never reported or respawned", async () => {
@@ -632,7 +681,7 @@ describe("watchEngine (the engines' auto-heal)", () => {
   });
 
   test("a live process that stops answering health checks is treated as down and killed", async () => {
-    __setSidecarTimingForTestsOnly({ healthPollMs: 30, backoffMs: [50] });
+    __setSidecarTimingForTestsOnly({ healthPollMs: 30, backoffMs: [50], diedNoticeDelayMs: 100 });
     const proc = await serve();
     let healthy = true;
     let respawns = 0;
@@ -641,8 +690,7 @@ describe("watchEngine (the engines' auto-heal)", () => {
     await waitUntil(() => respawns === 1);
     await proc.exited;
     expect(proc.exitCode ?? proc.signalCode).not.toBeNull();
-    const issue = listIssues({ includeResolved: true }).find((i) => i.source === "test-engine");
-    expect(issue?.detail).toContain("health checks");
+    await new Promise((r) => setTimeout(r, 150));
   });
 
   test("a crash loop stops after five respawns in ten minutes and leaves a one-click fix", async () => {

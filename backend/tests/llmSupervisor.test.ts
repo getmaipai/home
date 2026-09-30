@@ -4,7 +4,7 @@ import { enginesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setCrashBootHoldForTests } from "@/lib/dirtyBoot";
 import { listIssues, resolveIssue } from "@/lib/issues";
-import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests, blockedPortReason } from "@/lib/sidecars";
+import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortForTests, __failEngineForTests, blockedPortReason, __recordOwnedPortForTests } from "@/lib/sidecars";
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
@@ -257,6 +257,25 @@ describe("llmSupervisor tier 3: the household's selected chat model", () => {
     expect(issue!.detail).toContain("hasn't finished downloading yet");
   });
 
+  test("a blocked chat port explains the problem plainly and keeps its technical detail", async () => {
+    const port = Number(testChatPort);
+    const holder = Bun.spawn(["bun", "-e", `Bun.serve({ port: ${port}, fetch: () => new Response("holder") }); setTimeout(() => {}, 60000);`, "--port", String(port)], { stdout: "ignore", stderr: "ignore" });
+    __recordOwnedPortForTests(port, holder.pid + 1);
+    process.env.MAIPAI_LLAMA_SERVER_BIN = "true";
+    process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await expect(getChatClient()).rejects.toBeInstanceOf(Error);
+      const issue = listIssues().find((i) => i.source === "chat-engine" && i.key === "spawn");
+      expect(issue?.detail).toContain("Another program is using the port MaiPai's AI needs, so it can't start.");
+      expect(issue?.detail).toContain(`(Technical detail: port ${port} is held by pid ${holder.pid}`);
+    } finally {
+      holder.kill();
+      await holder.exited;
+      __resetSidecarsForTests();
+    }
+  });
+
   // Session F, step 3: lib/dirtyBoot.ts's crash-boot hold. Set BEFORE the
   // catalog/download checks below it in trySpawnFromSelection(), so this
   // proves the hold actually gates the real-spawn path rather than merely
@@ -306,23 +325,20 @@ describe("llmSupervisor: an engine that dies out from under it", () => {
     return { pid, port };
   }
 
-  test("a killed engine is noticed and started again on its own: status drops it, Repairs says how it died, then clears once it is back", async () => {
-    __setSidecarTimingForTestsOnly({ backoffMs: [50] });
+  test("a killed engine recovers and its delayed Repairs notice resolves", async () => {
+    __setSidecarTimingForTestsOnly({ backoffMs: [50], diedNoticeDelayMs: 300 });
     const { pid } = await spawnFakeEngine();
 
     process.kill(pid, "SIGKILL");
     await waitUntil(() => getEngineStatus().pid !== pid);
-    const issue = listIssues({ includeResolved: true }).find((i) => i.source === "chat-engine" && i.key === "died");
-    expect(issue).toBeDefined();
-    expect(issue!.title).toBe("MaiPai's AI stopped unexpectedly");
-    expect(issue!.detail).toContain("SIGKILL");
-
-    // No request needed: a fresh process comes up by itself and the
-    // issue closes.
+    // No request needed: a fresh process comes up by itself.
     await waitUntil(() => getEngineStatus().pid !== null && getEngineStatus().pid !== pid);
     const client = await getChatClient();
     expect(await client.health()).toBe(true);
-    await waitUntil(() => !listIssues().some((i) => i.source === "chat-engine" && i.key === "died"));
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    const issues = listIssues({ includeResolved: true }).filter((i) => i.source === "chat-engine" && i.key === "died");
+    expect(issues).toHaveLength(1);
+    expect(issues[0]!.detail).toContain("SIGKILL");
   }, 15_000);
 
   // The code-review finding on this fix's first cut: a death DURING a
@@ -330,15 +346,17 @@ describe("llmSupervisor: an engine that dies out from under it", () => {
   // restarted the backend and so made the exit look deliberate - no log,
   // no Repairs, in the one case that matters most.
   test("a death seen first by a failing request is still a death: reported and started again", async () => {
-    __setSidecarTimingForTestsOnly({ backoffMs: [50] });
+    __setSidecarTimingForTestsOnly({ backoffMs: [50], diedNoticeDelayMs: 300 });
     const { pid, port } = await spawnFakeEngine();
     process.kill(pid, "SIGKILL");
     reportChatBackendUnreachable(`could not reach http://127.0.0.1:${port}`);
     await waitUntil(() => getEngineStatus().pid !== null && getEngineStatus().pid !== pid);
     // Whichever signal won the race (the request's own failure, or the
-    // exit itself), it was reported as a death and healed.
-    const issue = listIssues({ includeResolved: true }).find((i) => i.source === "chat-engine" && i.key === "died");
-    expect(issue?.detail).toMatch(/stopped answering|SIGKILL/);
+    // exit itself), the recovery resolves the notice raised after the
+    // replacement took longer than the debounce to become healthy.
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    const issues = listIssues({ includeResolved: true }).filter((i) => i.source === "chat-engine" && i.key === "died");
+    expect(issues).toHaveLength(1);
   }, 15_000);
 
   test("a deliberate stop is never reported as a death", async () => {

@@ -10,6 +10,10 @@ design doc; it grows as the hub is built.
 
 `beginTurn()` in `backend/src/lib/turnMachine/turnNext.ts` refuses a turn before resolving or creating a conversation when the locally supervised chat AI is stopped, blocked by a foreign process on its port, or has exhausted automatic restarts. The synchronous check runs before any tool or turn storage, so the failure returns as a 503 status instead of being saved as assistant reply text. Explicit `MAIPAI_LLAMA_SERVER_URL` and configured Stack routes skip the local check, while an engine that has not started remains eligible to start on demand. The chat adapter shows “MaiPai's AI isn't running right now. Try again in a moment.” A blocked-port refusal checks whether the recorded process still exists and clears the stale marker if it has exited. Each refusal also nudges a background supervisor retry, throttled to once every 30 seconds, unless an admin intentionally stopped the engine.
 
+## ENGINE-AVAIL-03a
+
+The live Repairs history showed 42 `repairs.new` notifications for the chat engine in 16 days against 5 resolves. Each crash opened a `died` issue before its automatic respawn, so a successful self-heal then resolved an issue the household had already been told about. A crash now waits 60 seconds before opening that issue. A successful respawn or a deliberate stop cancels the pending notice, so short flaps send no notification. The five-respawns-in-ten-minutes cap and a rejected respawn still raise immediately. When a foreign process holds the chat port, the Repair explains in plain words that another program is using MaiPai's AI port and keeps the raw error in a technical detail.
+
 ## SEARCH-FALLBACK-01: a second front door, Wikipedia's own official API (2026-09-24)
 
 **Objective.** `docs/plans/search-resilience-2026-09-24.md`'s item 3:

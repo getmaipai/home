@@ -22,7 +22,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { raiseIssue, resolveIssue, registerFixHandler, type RaiseIssueInput } from "@/lib/issues";
+import { raiseIssue, resolveIssue, listIssues, registerFixHandler, type RaiseIssueInput } from "@/lib/issues";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import { createLogger } from "@maipai/core/src/log";
@@ -234,6 +234,7 @@ const NO_HEALTH_URL_GRACE_MS = 500;
 // spawning and health-checking they exercise is real either way).
 let healthPollMs = 10_000;
 let backoffMs = DEFAULT_BACKOFF_MS;
+let diedNoticeDelayMs = 60_000;
 
 const registry = new Map<string, SidecarEntry>();
 
@@ -697,6 +698,9 @@ const engineWatchTimers = new Set<ReturnType<typeof setInterval>>();
 const pendingRespawnTimers = hotReloadState<
   Map<string, ReturnType<typeof setTimeout>>
 >("engineRespawnTimers", () => new Map());
+const pendingDiedNoticeTimers = hotReloadState<
+  Map<string, ReturnType<typeof setTimeout>>
+>("engineDiedNoticeTimers", () => new Map());
 // Bumped by cancelEngineRespawn() and by every watchEngine() call: the
 // respawn a backoff timer eventually settles is only allowed to write
 // respawnState or raise/resolve an issue if the role's generation hasn't
@@ -726,6 +730,9 @@ export function cancelEngineRespawn(role: string): void {
   const timer = pendingRespawnTimers.get(role);
   if (timer) clearTimeout(timer);
   pendingRespawnTimers.delete(role);
+  const noticeTimer = pendingDiedNoticeTimers.get(role);
+  if (noticeTimer) clearTimeout(noticeTimer);
+  pendingDiedNoticeTimers.delete(role);
   respawnState[role] = undefined;
   respawnGeneration[role] = (respawnGeneration[role] ?? 0) + 1;
 }
@@ -770,7 +777,9 @@ export function watchEngine(opts: EngineWatchOptions): EngineWatch {
     }
   });
   cancelEngineRespawn(role);
-  resolveIssue(source, "died");
+  if (listIssues({ includeResolved: true }).some((issue) => issue.source === source && issue.key === "died" && !issue.resolved_at)) {
+    resolveIssue(source, "died");
+  }
   const timer = setInterval(() => void poll(), healthPollMs);
   engineWatchTimers.add(timer);
 
@@ -816,6 +825,9 @@ export function watchEngine(opts: EngineWatchOptions): EngineWatch {
     respawnHistory[role] = recent;
     const sentence = `${label[0]!.toUpperCase()}${label.slice(1)} ${reason}.`;
     if (recent.length >= MAX_AUTO_RESPAWNS) {
+      const noticeTimer = pendingDiedNoticeTimers.get(role);
+      if (noticeTimer) clearTimeout(noticeTimer);
+      pendingDiedNoticeTimers.delete(role);
       respawnState[role] = "gave_up";
       void raiseIssue({
         source,
@@ -831,17 +843,26 @@ export function watchEngine(opts: EngineWatchOptions): EngineWatch {
     }
     const delay = backoffMs[Math.min(recent.length, backoffMs.length - 1)]!;
     recent.push(now);
-    respawnState[role] = "pending";
-    void raiseIssue({
-      source,
-      key: "died",
-      severity: "error",
-      title: opts.title,
-      detail: `${sentence} MaiPai is starting it again now.`,
-    });
-    cancelEngineRespawn(role);
+    const oldRespawnTimer = pendingRespawnTimers.get(role);
+    if (oldRespawnTimer) clearTimeout(oldRespawnTimer);
+    pendingRespawnTimers.delete(role);
+    respawnGeneration[role] = (respawnGeneration[role] ?? 0) + 1;
     respawnState[role] = "pending";
     const myGeneration = respawnGeneration[role] ?? 0;
+    if (!pendingDiedNoticeTimers.has(role)) {
+      const noticeTimer = setTimeout(() => {
+        if (pendingDiedNoticeTimers.get(role) !== noticeTimer) return;
+        pendingDiedNoticeTimers.delete(role);
+        void raiseIssue({
+          source,
+          key: "died",
+          severity: "error",
+          title: opts.title,
+          detail: `${sentence} MaiPai is starting it again now.`,
+        });
+      }, diedNoticeDelayMs);
+      pendingDiedNoticeTimers.set(role, noticeTimer);
+    }
     const timer = setTimeout(() => {
       pendingRespawnTimers.delete(role);
       // A rejection here never produced a process (the engine is
@@ -856,6 +877,9 @@ export function watchEngine(opts: EngineWatchOptions): EngineWatch {
           // a respawn that resolved to something unwatched (the tier
           // changed underneath to a URL or the stub) still counts as back.
           if (respawnState[role] === "pending") respawnState[role] = undefined;
+          const noticeTimer = pendingDiedNoticeTimers.get(role);
+          if (noticeTimer) clearTimeout(noticeTimer);
+          pendingDiedNoticeTimers.delete(role);
           resolveIssue(source, "died");
         },
         (err: unknown) => {
@@ -902,6 +926,7 @@ export function watchEngine(opts: EngineWatchOptions): EngineWatch {
     async stop(timeoutMs = 5_000): Promise<void> {
       deliberate = true;
       dispose();
+      cancelEngineRespawn(role);
       proc.kill();
       const exited = proc.exited.then(() => true, () => true);
       const within = (ms: number) => Promise.race([exited, new Promise<boolean>((resolve) => setTimeout(() => resolve(false), ms))]);
@@ -1204,11 +1229,14 @@ export function __resetSidecarsForTests(): void {
   engineWatchTimers.clear();
   for (const timer of pendingRespawnTimers.values()) clearTimeout(timer);
   pendingRespawnTimers.clear();
+  for (const timer of pendingDiedNoticeTimers.values()) clearTimeout(timer);
+  pendingDiedNoticeTimers.clear();
   for (const role of Object.keys(respawnHistory)) delete respawnHistory[role];
   for (const role of Object.keys(respawnGeneration)) delete respawnGeneration[role];
   for (const role of Object.keys(respawnState)) delete respawnState[role];
   healthPollMs = 10_000;
   backoffMs = DEFAULT_BACKOFF_MS;
+  diedNoticeDelayMs = 60_000;
 }
 
 /** Test-only: real timers, sped way up - a health-poll and restart-backoff
@@ -1218,7 +1246,9 @@ export function __resetSidecarsForTests(): void {
 export function __setSidecarTimingForTestsOnly(opts: {
   healthPollMs?: number;
   backoffMs?: number[];
+  diedNoticeDelayMs?: number;
 }): void {
   if (opts.healthPollMs !== undefined) healthPollMs = opts.healthPollMs;
   if (opts.backoffMs !== undefined) backoffMs = opts.backoffMs;
+  if (opts.diedNoticeDelayMs !== undefined) diedNoticeDelayMs = opts.diedNoticeDelayMs;
 }
