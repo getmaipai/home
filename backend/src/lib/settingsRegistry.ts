@@ -9,6 +9,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { AI_SETTINGS_KEYS } from "@/settings/aiKeys";
 import { SPEC_DIR } from "./specDir.js";
 import { areWakewordAssetsInstalled } from "@/lib/wakewordAssets";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
@@ -17,7 +18,12 @@ const REGISTRY_PATH = join(SPEC_DIR, "settings", "keys.json");
 
 function loadRegistry(): SettingsKey[] {
   const raw = JSON.parse(readFileSync(REGISTRY_PATH, "utf-8")) as unknown[];
-  return raw.map((entry) => SettingsKey.parse(entry));
+  const parsed = raw.map((entry) => SettingsKey.parse(entry));
+  // AI declarations ship with Home's backend, while the shared settings
+  // snapshot is pinned independently. Include newly added Home AI keys
+  // until the shared snapshot is advanced.
+  const keys = new Set(parsed.map((entry) => entry.key));
+  return [...parsed, ...AI_SETTINGS_KEYS.filter((entry) => !keys.has(entry.key))];
 }
 
 let cached: SettingsKey[] | null = null;

@@ -20,7 +20,7 @@ import { existsSync } from "node:fs";
 import sherpaOnnx from "sherpa-onnx-node";
 import { ensureSttAssets, isSttInstalled, sileroVadPath, moonshinePath } from "@/lib/sttAssets";
 import { encodeWav } from "@/lib/sttSession";
-import { getStackUrl, getStackClient, resolveStackOffline, reportStackFailure } from "@/lib/stackEngine";
+import { isStackRoleEnabled, getStackClient, resolveStackOffline, reportStackFailure } from "@/lib/stackEngine";
 
 interface OfflineStream {
   acceptWaveform(input: { sampleRate: number; samples: Float32Array }): void;
@@ -143,7 +143,7 @@ async function transcribeViaStack(samples: Float32Array, sampleRate: number): Pr
 
 export async function transcribeUtterance(samples: Float32Array, sampleRate: number): Promise<string> {
   if (testBackend) return testBackend(samples, sampleRate);
-  if (getStackUrl()) return transcribeViaStack(samples, sampleRate);
+  if (isStackRoleEnabled("stt")) return transcribeViaStack(samples, sampleRate);
   return transcribe(samples, sampleRate);
 }
 

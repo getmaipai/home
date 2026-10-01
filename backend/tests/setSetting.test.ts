@@ -34,6 +34,13 @@ test("writes a real household setting, readable back", () => {
   expect(again.stdout).toContain('"http://127.0.0.1:8771"');
 });
 
+test("--get reports empty for a fresh URL and the stored value after a write", () => {
+  dataDir = mkdtempSync(join(tmpdir(), "maipai-set-setting-"));
+  expect(run(["--get", "engines.stack.url"])).toMatchObject({ stdout: '""', exitCode: 0 });
+  run(["engines.stack.url", "http://127.0.0.1:8770"]);
+  expect(run(["--get", "engines.stack.url"])).toMatchObject({ stdout: '"http://127.0.0.1:8770"', exitCode: 0 });
+});
+
 test("--only-if-empty-or-prefix writes when the current value is empty", () => {
   dataDir = mkdtempSync(join(tmpdir(), "maipai-set-setting-"));
   const result = run(["engines.stack.url", "http://127.0.0.1:8770", "--only-if-empty-or-prefix", "http://127.0.0.1:"]);

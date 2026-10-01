@@ -14,8 +14,12 @@
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "../src/lib/settings";
 
 const [key, value, ...rest] = process.argv.slice(2);
+if (key === "--get" && value) {
+  console.log(JSON.stringify(getHouseholdSettingValue(value) ?? ""));
+  process.exit(0);
+}
 if (!key || value === undefined) {
-  console.error("usage: bun run backend/scripts/set-setting.ts <key> <value> [--only-if-empty-or-prefix <prefix>]");
+  console.error("usage: bun run backend/scripts/set-setting.ts <key> <value> [--only-if-empty-or-prefix <prefix>] | --get <key>");
   process.exit(1);
 }
 

@@ -21,7 +21,7 @@ import type { ChatRole, ChatCompletionRequest, ChatCompletionChunk, ToolDefiniti
 import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 import { seedFields } from "@/lib/benchSampling";
-import { getStackUrl, getStackClient, recordStackChatIdentity, stackFailureResult, resolveStackOffline } from "@/lib/stackEngine";
+import { isStackRoleEnabled, getStackClient, recordStackChatIdentity, stackFailureResult, resolveStackOffline } from "@/lib/stackEngine";
 import { identityFromHeaders } from "@/lib/stack/client";
 
 // Session C step 0 (wave-2.md): a person every couple of seconds, burst
@@ -466,7 +466,7 @@ export async function complete(
   // clear a leftover engines.stack.url row that would otherwise win
   // over this env var - this ordering means a new test calling
   // complete()/startCompleteStream() never needs to rediscover that.
-  if (!process.env.MAIPAI_LLAMA_SERVER_URL && getStackUrl()) return completeViaStack(role, messages, opts);
+  if (!process.env.MAIPAI_LLAMA_SERVER_URL && isStackRoleEnabled("chat")) return completeViaStack(role, messages, opts);
 
   let client;
   try {
@@ -656,7 +656,7 @@ export async function startCompleteStream(
 
   // getmaipai/home#151: the same MAIPAI_LLAMA_SERVER_URL-before-Stack
   // ordering as complete() above, and for the identical reason.
-  if (!process.env.MAIPAI_LLAMA_SERVER_URL && getStackUrl()) return startCompleteStreamViaStack(role, messages, opts, signal);
+  if (!process.env.MAIPAI_LLAMA_SERVER_URL && isStackRoleEnabled("chat")) return startCompleteStreamViaStack(role, messages, opts, signal);
 
   let client;
   try {
@@ -748,7 +748,7 @@ export async function embed(texts: string[]): Promise<EmbedOpResult> {
   // ordering and reasoning as complete()'s own MAIPAI_LLAMA_SERVER_URL
   // check above - its own tier 1 (embedSupervisor.ts) already treats
   // it as the explicit override.
-  if (!process.env.MAIPAI_EMBED_URL && getStackUrl()) return embedViaStack(texts);
+  if (!process.env.MAIPAI_EMBED_URL && isStackRoleEnabled("embeddings")) return embedViaStack(texts);
 
   let client;
   try {

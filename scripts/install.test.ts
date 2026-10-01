@@ -1,6 +1,8 @@
 import { describe, test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 // HOME-STACK-01: install.sh's Stack functions are pure bash, sourced
 // (not executed - see the script's own "am I sourced" guard at the
@@ -30,6 +32,45 @@ describe("stack_install_service_command", () => {
   test("names every env var install-service actually needs, in one line a test or a log can assert on", () => {
     const out = bashCall('stack_install_service_command /opt/maipai-home/stack/maipai-stack-darwin-arm64 /opt/maipai-home/stack/data 8770 /opt/maipai-home/.bun/bin/bun').stdout;
     expect(out).toBe("STACK_DATA_DIR=/opt/maipai-home/stack/data PORT=8770 STACK_BUN_BIN=/opt/maipai-home/.bun/bin/bun /opt/maipai-home/stack/maipai-stack-darwin-arm64 install-service");
+  });
+});
+
+describe("stack_roles_are_fresh_setup", () => {
+  test("fresh setup explicitly disables role routing", () => {
+    expect(bashCall('stack_roles_are_fresh_setup \'""\' && echo fresh || echo upgrade').stdout).toBe("fresh");
+  });
+
+  test("upgrade leaves every role setting untouched", () => {
+    expect(bashCall('stack_roles_are_fresh_setup \'"http://127.0.0.1:8770"\' && echo fresh || echo upgrade').stdout).toBe("upgrade");
+  });
+});
+
+describe("write_fresh_stack_role_defaults", () => {
+  test("writes four explicit false values on a fresh install and none on upgrade", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-install-roles-"));
+    const backend = join(root, "backend");
+    const fakeBun = join(root, "bun");
+    mkdirSync(backend);
+    writeFileSync(fakeBun, "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$ROLE_LOG\"\n", { mode: 0o755 });
+    try {
+      const fresh = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; write_fresh_stack_role_defaults '""' "${root}" "${fakeBun}"`], {
+        env: { ...process.env, ROLE_LOG: join(root, "fresh.log") },
+      });
+      expect(fresh.exitCode).toBe(0);
+      expect(readFileSync(join(root, "fresh.log"), "utf8").trim().split(/\r?\n/)).toEqual([
+        "run scripts/set-setting.ts engines.stack.use_chat false",
+        "run scripts/set-setting.ts engines.stack.use_embeddings false",
+        "run scripts/set-setting.ts engines.stack.use_stt false",
+        "run scripts/set-setting.ts engines.stack.use_tts false",
+      ]);
+      const upgrade = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; write_fresh_stack_role_defaults '\"http://127.0.0.1:8770\"' "${root}" "${fakeBun}"`], {
+        env: { ...process.env, ROLE_LOG: join(root, "upgrade.log") },
+      });
+      expect(upgrade.exitCode).toBe(0);
+      expect(existsSync(join(root, "upgrade.log"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -87,6 +128,7 @@ describe("--dry-run", () => {
     expect(stdout).toContain("install-service");
     expect(stdout).toContain("would poll http://127.0.0.1:8770/healthz");
     expect(stdout).toContain("would run: bun run backend/scripts/set-setting.ts engines.stack.url http://127.0.0.1:8770 --only-if-empty-or-prefix http://127.0.0.1:");
+    expect(stdout).toContain("would read engines.stack.url first; if empty, explicitly write engines.stack.use_chat, use_embeddings, use_stt, and use_tts as false");
   });
 
   test("makes no network call at all - find_free_port() (a real loopback socket probe) never runs", () => {

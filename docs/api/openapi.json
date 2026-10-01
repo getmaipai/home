@@ -8644,6 +8644,14 @@
                         }
                       ],
                       "default": null
+                    },
+                    "rrule": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "until": {
+                      "type": "string",
+                      "format": "date"
                     }
                   },
                   "required": [
@@ -8657,7 +8665,7 @@
                     "hlc"
                   ],
                   "additionalProperties": false,
-                  "description": "Scheduled maintenance. Status is derived at read time from the clock and cancelled_at (scheduled -> in_progress -> completed, or cancelled), never stored. ends_at must be after starts_at; JSON Schema cannot express this, so the hub enforces it. Recurrence is deliberately not modeled yet; a later shape may add strategy."
+                  "description": "Scheduled maintenance. Status is derived at read time from the clock and cancelled_at (scheduled -> in_progress -> completed, or cancelled), never stored. ends_at must be after starts_at; JSON Schema cannot express this, so the hub enforces it. Recurring windows store an RFC 5545 RRULE in rrule, an optional inclusive end date in until, and the occurrence duration is ends_at minus starts_at."
                 }
               }
             }
@@ -8781,6 +8789,14 @@
                         }
                       ],
                       "default": null
+                    },
+                    "rrule": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "until": {
+                      "type": "string",
+                      "format": "date"
                     }
                   },
                   "required": [
@@ -8794,7 +8810,7 @@
                     "hlc"
                   ],
                   "additionalProperties": false,
-                  "description": "Scheduled maintenance. Status is derived at read time from the clock and cancelled_at (scheduled -> in_progress -> completed, or cancelled), never stored. ends_at must be after starts_at; JSON Schema cannot express this, so the hub enforces it. Recurrence is deliberately not modeled yet; a later shape may add strategy."
+                  "description": "Scheduled maintenance. Status is derived at read time from the clock and cancelled_at (scheduled -> in_progress -> completed, or cancelled), never stored. ends_at must be after starts_at; JSON Schema cannot express this, so the hub enforces it. Recurring windows store an RFC 5545 RRULE in rrule, an optional inclusive end date in until, and the occurrence duration is ends_at minus starts_at."
                 }
               }
             }

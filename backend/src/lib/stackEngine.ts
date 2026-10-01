@@ -7,7 +7,7 @@
 // hf-token route) needs identically: reading the setting, one cached
 // client per URL, and mapping a StackError the same way everywhere
 // (never inventing a cause the Stack itself didn't state).
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, getHouseholdSettingSource, setHouseholdSettingValue } from "@/lib/settings";
 import { createStackClient, type StackClient } from "@/lib/stack/client";
 import { StackError, type StackErrorKind } from "@/lib/stack/errors";
 import { hostLabel, type EngineIdentity } from "@/lib/engineIdentity";
@@ -40,6 +40,24 @@ export function getStackUrl(): string | null {
 
 export function isStackConfigured(): boolean {
   return testClient !== null || getStackUrl() !== null;
+}
+
+export type StackRole = "chat" | "embeddings" | "stt" | "tts";
+
+export function isStackRoleEnabled(role: StackRole): boolean {
+  return testClient !== null || (isStackConfigured() && getHouseholdSettingValue(`engines.stack.use_${role}`) === true);
+}
+
+/** Existing configured hubs retain their former all-role behavior once, at boot. */
+export function backfillStackRoleSettings(): void {
+  const url = getHouseholdSettingValue("engines.stack.url");
+  if (typeof url !== "string" || url.trim().length === 0) return;
+  const roles: StackRole[] = ["chat", "embeddings", "stt", "tts"];
+  if (roles.some((role) => {
+    const source = getHouseholdSettingSource(`engines.stack.use_${role}`);
+    return source !== undefined && source !== "default";
+  })) return;
+  for (const role of roles) setHouseholdSettingValue(`engines.stack.use_${role}`, true);
 }
 
 let cachedClient: StackClient | null = null;
@@ -91,7 +109,7 @@ export function recordStackChatIdentity(identity: EngineIdentity | null): void {
  * probe of the engine it spawned. Neither side needs to know about the
  * other. */
 export function getActiveChatEngineIdentity(): EngineIdentity | null {
-  if (isStackConfigured()) return stackChatIdentity;
+  if (isStackRoleEnabled("chat")) return stackChatIdentity;
   return getChatEngineIdentity();
 }
 

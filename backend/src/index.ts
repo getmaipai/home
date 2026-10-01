@@ -33,6 +33,7 @@ import { shutdownEngines } from "@/lib/hubShutdown";
 import { ensureSecretPepperReady } from "@/lib/secret";
 import { KeystoreProtectionFailedError } from "@/lib/keystore";
 import { recordBootGap, recordStatusSample, pruneStatusEvents } from "@/lib/statusHistory";
+import { backfillStackRoleSettings } from "@/lib/stackEngine";
 
 const configuredPort = Number(process.env.PORT ?? 8787);
 installConsoleFileMirror();
@@ -70,6 +71,7 @@ setWarmupPrompt(() => ({ system: buildOldPathStablePrefix(), tools: ordinaryTool
 // module-load seeding, still there - see lib/hlc.ts's own header on why
 // the wider seed lives here instead of scattered per-table).
 seedHlcFromDatabase();
+backfillStackRoleSettings();
 await recordBootGap();
 void recordStatusSample();
 

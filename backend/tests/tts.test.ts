@@ -173,6 +173,26 @@ describe("lib/tts.ts routed through a configured Stack", () => {
     fixture?.stop();
   });
 
+  test("tts switch off keeps synthesis on Home with a configured Stack", async () => {
+    let calls = 0;
+    fixture = startStackFixture({ "POST /v1/audio/speech": async () => { calls++; return new Response(new Uint8Array(44)); } });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    setHouseholdSettingValue("engines.stack.use_tts", false);
+    const result = await synthesizeSpeech("good morning");
+    expect(result.ok).toBe(true);
+    expect(calls).toBe(0);
+  });
+
+  test("tts switch on routes through the configured Stack client", async () => {
+    let calls = 0;
+    fixture = startStackFixture({ "POST /v1/audio/speech": async () => { calls++; return new Response(new Uint8Array(44)); } });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    setHouseholdSettingValue("engines.stack.use_tts", true);
+    const result = await synthesizeSpeech("good morning");
+    expect(result.ok).toBe(true);
+    expect(calls).toBe(1);
+  });
+
   test("streams the Stack's audio and forwards text/voice_url", async () => {
     const received: { text: string | null; voiceUrl: string | null } = { text: null, voiceUrl: null };
     fixture = startStackFixture({

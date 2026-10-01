@@ -443,6 +443,12 @@ export function getHouseholdSettingValue(key: string): unknown {
   return resolveStoredValue("household", keyDef);
 }
 
+/** Whether a household key has an explicitly stored value, including false. */
+export function getHouseholdSettingSource(key: string): string | undefined {
+  return db.select({ source: settingsValues.source }).from(settingsValues)
+    .where(and(eq(settingsValues.scope, "household"), eq(settingsValues.key, key))).get()?.source;
+}
+
 /** The signed-in actor's OWN person-scope setting, resolved with no
  * separate authorization check - safe by construction, not just by
  * convention: a code review (2026-09-04) found the original version took

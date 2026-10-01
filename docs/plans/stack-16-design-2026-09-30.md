@@ -24,11 +24,11 @@ What is in the way:
 
 ### One setting for where, one for which
 
-`engines.stack.url` stays what it is: where the Stack lives. A new setting, `engines.stack.roles`, says which roles go through it, a list of any of chat, embeddings, judge, speech to text and text to speech. It is declared once in Home's settings declaration, with the same scope and level as the address, and every screen draws from that declaration. An empty list means "the Stack runs, and Home's own engines still do the work". The address alone no longer moves anything.
+`engines.stack.url` stays what it is: where the Stack lives. Four household booleans, `engines.stack.use_chat`, `engines.stack.use_embeddings`, `engines.stack.use_stt` and `engines.stack.use_tts`, independently decide which model roles go through it. They are declared once in Home's settings declaration. Each defaults off, so the Stack can run beside Home while Home's own engines keep doing the work. The memory judge and background worker follow chat because they share chat's model.
 
-This one change fixes three things at once. The installer sets the address and never the list, so installing no longer flips anything. A Stack can run beside the hub for sizing, health, updates, the Engines page and Check a model while chat and voice stay exactly as they are (this is what the owner asked for on 2026-09-30 when Check a model said it needed a Stack). And a role moves on its own, which is what makes the order below possible.
+This one change fixes three things at once. The installer sets the address and explicitly writes all four switches off on a fresh setup. On upgrade, a one-time backfill turns all four on for an existing configured hub unless any switch already has a stored value. A Stack can run beside the hub for sizing, health, updates, the Engines page and Check a model while chat and voice stay exactly as they are (this is what the owner asked for on 2026-09-30 when Check a model said it needed a Stack). And a role moves on its own, which is what makes the order below possible.
 
-One known limit while roles are still on Home's engines: the Stack's memory budget only sees what the Stack loaded, so "Memory right now" and the fit verdicts will undercount what Home's engines use until those roles move. The page says so in one line whenever the list is not full.
+One known limit while roles are still on Home's engines: the Stack's memory budget only sees what the Stack loaded, so "Memory right now" and the fit verdicts will undercount what Home's engines use until those roles move. The page says so in one line whenever any role switch is off.
 
 ### Proving a role before it moves
 
@@ -56,7 +56,7 @@ A role moves to the Stack on the family's hub only on Jesse's word for that role
 
 ### Undoing it
 
-Removing a role from `engines.stack.roles` moves it back to Home's own engine on the next request. That works because Home's engine code is not deleted until the very last item. A call already running on the Stack when a role is removed is left to finish or fail, and is not moved mid-way. When the Stack itself stops, a Repairs entry opens (already built) and the Engines page gets one button, "Use this computer's own engine for this", that does exactly the removal. There is no automatic fallback: a fallback that hides a broken Stack is how a household ends up on the wrong engine for a month without knowing.
+Turning a role's `engines.stack.use_*` switch off moves it back to Home's own engine on the next request. That works because Home's engine code is not deleted until the very last item. A call already running on the Stack when a role is removed is left to finish or fail, and is not moved mid-way. When the Stack itself stops, a Repairs entry opens (already built) and the Engines page gets one button, "Use this computer's own engine for this", that does exactly the removal. There is no automatic fallback: a fallback that hides a broken Stack is how a household ends up on the wrong engine for a month without knowing.
 
 ### Deleting Home's engines
 
@@ -70,8 +70,8 @@ The Stack's own backlog puts the Studio proof before any of this reaches the hou
 
 | Id | What | Size | Needs |
 |---|---|---|---|
-| STACK16-A | The `engines.stack.roles` setting, every route and call site reads it, Engines page shows it, an empty list changes nothing | M | nothing |
-| STACK16-B | The installer writes the address and never the list; an existing install is migrated by writing the full list if the address was already set, so nobody's hub changes behaviour on update | S | STACK16-A |
+| STACK16-A | Four independent role switches route model calls; the memory judge and background worker follow chat | M | nothing |
+| STACK16-B | Fresh install writes all role switches off; an existing configured hub is backfilled to all on unless a switch was already stored | S | STACK16-A |
 | STACK16-C | Speech to text through a Stack gets the same scripted-Stack test chat, search and text to speech already have | S | nothing |
 | STACK-75 | The Stack contract suite, run in Home's gate | M | nothing (existing item) |
 | STACK16-D | The proof harness and the recorded inputs (from the demo household's own seed, never real recordings) | M | A and C |
@@ -83,4 +83,4 @@ A and B are what make "start a Stack beside the hub" safe to do now; they are th
 
 ## What this note does not decide
 
-Whether the Studio runs the household's hub (the owner's call, recorded 2026-09-17). Which models the Studio profile pins (that is STACK-14's output). Whether the robot uses the same setting (the robot is not built yet; the list is a Home setting and the robot's runtime reads the Stack directly).
+Whether the Studio runs the household's hub (the owner's call, recorded 2026-09-17). Which models the Studio profile pins (that is STACK-14's output). Whether the robot uses the same setting (the robot is not built yet; the switches are Home settings and the robot's runtime reads the Stack directly).

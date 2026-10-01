@@ -813,6 +813,34 @@ describe("lib/llm.ts routed through a configured Stack", () => {
     fixture?.stop();
   });
 
+  test("chat and embeddings switches off keep inference on Home with a configured Stack", async () => {
+    let calls = 0;
+    fixture = startStackFixture({
+      "POST /v1/chat/completions": async () => { calls++; return Response.json({ choices: [{ message: { role: "assistant", content: "unexpected Stack reply" } }] }); },
+      "POST /v1/embeddings": async () => { calls++; return Response.json({ data: [{ index: 0, embedding: [0.1] }] }); },
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    setHouseholdSettingValue("engines.stack.use_chat", false);
+    setHouseholdSettingValue("engines.stack.use_embeddings", false);
+
+    const chat = await complete("chat", [{ role: "user", content: "hello" }]);
+    const vectors = await embed(["hello"]);
+    expect(chat.ok).toBe(true);
+    if (chat.ok) expect(chat.value.text).not.toBe("unexpected Stack reply");
+    expect(vectors.ok).toBe(true);
+    expect(calls).toBe(0);
+  });
+
+  test("embeddings switch on routes through the configured Stack client", async () => {
+    let calls = 0;
+    fixture = startStackFixture({ "POST /v1/embeddings": async () => { calls++; return Response.json({ data: [{ index: 0, embedding: [0.7] }] }); } });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    setHouseholdSettingValue("engines.stack.use_embeddings", true);
+    const result = await embed(["hello"]);
+    expect(result.ok).toBe(true);
+    expect(calls).toBe(1);
+  });
+
   test("complete() answers through the Stack and records the reply's identity", async () => {
     fixture = startStackFixture({
       "POST /v1/chat/completions": async () =>
@@ -821,7 +849,8 @@ describe("lib/llm.ts routed through a configured Stack", () => {
           { headers: IDENTITY_HEADERS },
         ),
     });
-    configureStack();
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    setHouseholdSettingValue("engines.stack.use_chat", true);
 
     const result = await complete("chat", [{ role: "user", content: "hi" }]);
     expect(result.ok).toBe(true);

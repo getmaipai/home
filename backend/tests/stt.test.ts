@@ -163,6 +163,25 @@ describe("lib/stt.ts routed through a configured Stack", () => {
     fixture?.stop();
   });
 
+  test("stt switch off keeps transcription on Home with a configured Stack", async () => {
+    let calls = 0;
+    fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => { calls++; return Response.json({ text: "unexpected Stack reply" }); } });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    setHouseholdSettingValue("engines.stack.use_stt", false);
+    __setSttBackendForTests(async () => "Home's own test engine");
+    expect(await transcribeUtterance(new Float32Array(1600), 16_000)).toBe("Home's own test engine");
+    expect(calls).toBe(0);
+  });
+
+  test("stt switch on routes through the configured Stack client", async () => {
+    let calls = 0;
+    fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => { calls++; return Response.json({ text: "Stack heard this" }); } });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    setHouseholdSettingValue("engines.stack.use_stt", true);
+    expect(await transcribeUtterance(new Float32Array(1600), 16_000)).toBe("Stack heard this");
+    expect(calls).toBe(1);
+  });
+
   test("transcribes through the Stack, sending a real WAV file", async () => {
     let receivedFile: File | null = null;
     fixture = startStackFixture({

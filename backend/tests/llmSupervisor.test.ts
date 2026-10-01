@@ -51,6 +51,15 @@ describe("llmSupervisor chatEngineDown()", () => {
     process.env.MAIPAI_LLAMA_SERVER_PORT = testChatPort;
   });
 
+  test("Stack chat suppresses local chat availability only when the chat switch is on", () => {
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    setHouseholdSettingValue("engines.stack.use_chat", false);
+    stateStopped();
+    expect(chatEngineDown()).toBe(true);
+    setHouseholdSettingValue("engines.stack.use_chat", true);
+    expect(chatEngineDown()).toBe(false);
+  });
+
   test("returns true only for stopped, blocked, and failed; none and starting stay available", () => {
     expect(chatEngineDown()).toBe(false);
     const state = (globalThis as typeof globalThis & {
@@ -156,6 +165,7 @@ describe("llmSupervisor chatEngineDown()", () => {
     expect(chatEngineDown()).toBe(false);
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:12345");
+    setHouseholdSettingValue("engines.stack.use_chat", true);
     stateStopped();
     expect(chatEngineDown()).toBe(false);
   });

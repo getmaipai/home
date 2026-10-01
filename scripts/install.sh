@@ -315,6 +315,19 @@ stack_install_service_command() {
   echo "${args[*]}"
 }
 
+stack_roles_are_fresh_setup() {
+  [ "$1" = '""' ]
+}
+
+write_fresh_stack_role_defaults() {
+  local previous_url="$1" install_root="$2" bun_bin="$3" stack_role
+  stack_roles_are_fresh_setup "$previous_url" || return 0
+  for stack_role in chat embeddings stt tts; do
+    (cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts "engines.stack.use_${stack_role}" false) \
+      || { log "Could not turn off Stack ${stack_role} routing for a fresh setup."; return 1; }
+  done
+}
+
 install_stack_service() {
   local install_root="$1" bun_bin="$2" os="$3" arch="$4" dry_run="$5"
   local stack_dir="${install_root}/stack"
@@ -336,6 +349,7 @@ install_stack_service() {
     [ "$os" = "linux" ] && log "[dry-run] would run: loginctl enable-linger ${stack_user:-<no console user found>}"
     log "[dry-run] would poll http://127.0.0.1:${STACK_PORT_BASE}/healthz (or that higher port)"
     log "[dry-run] would run: bun run backend/scripts/set-setting.ts engines.stack.url http://127.0.0.1:${STACK_PORT_BASE} --only-if-empty-or-prefix http://127.0.0.1: (port as above)"
+    log "[dry-run] would read engines.stack.url first; if empty, explicitly write engines.stack.use_chat, use_embeddings, use_stt, and use_tts as false"
     return 0
   fi
 
@@ -387,8 +401,12 @@ install_stack_service() {
   # through the settings UI keeps that choice on the next upgrade,
   # rather than this installer silently overwriting it back to its own
   # local port every time.
+  local previous_stack_url
+  previous_stack_url=$(cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts --get engines.stack.url) \
+    || { log "Could not read engines.stack.url before setup."; return 1; }
   (cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts engines.stack.url "http://127.0.0.1:${stack_port}" --only-if-empty-or-prefix "http://127.0.0.1:") \
     || { log "Could not write engines.stack.url. The Stack is running but Home will not call it until this is fixed and the setting is set by hand."; return 1; }
+  write_fresh_stack_role_defaults "$previous_stack_url" "$install_root" "$bun_bin" || return 1
 }
 
 setup_stack() {

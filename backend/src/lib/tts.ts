@@ -5,7 +5,7 @@
 // right status code for.
 import { getTtsClient } from "@/lib/ttsSupervisor";
 import { TtsClientError } from "@maipai/spec/voice/ts/client.js";
-import { getStackUrl, getStackClient, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
+import { isStackRoleEnabled, getStackClient, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 
 // A very long chat reply synthesized in one call would tie up the one
 // spawned Pocket TTS process for a long time - bounded generously above
@@ -61,7 +61,7 @@ export async function synthesizeSpeech(text: string, voiceUrl?: string): Promise
   // embed() already got - its own tier 1 (ttsSupervisor.ts) already
   // treats it as the explicit override, and a review of that fix found
   // this exact same ordering bug still live here.
-  if (!process.env.MAIPAI_TTS_URL && getStackUrl()) return synthesizeViaStack(text, voiceUrl);
+  if (!process.env.MAIPAI_TTS_URL && isStackRoleEnabled("tts")) return synthesizeViaStack(text, voiceUrl);
 
   let client;
   try {
