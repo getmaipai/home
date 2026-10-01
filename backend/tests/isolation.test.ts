@@ -10,7 +10,6 @@ function fakeEnv(): Record<string, string | undefined> {
     MAIPAI_DATA_DIR: "/tmp/maipai-home-test-abc",
     MAIPAI_BACKUP_DIR: "/tmp/maipai-home-test-backups-abc",
     MAIPAI_KEYSTORE_BACKEND: "file",
-    MAIPAI_TTS_DISABLE_SPAWN: "1",
     MAIPAI_LLAMA_SERVER_PORT: "39302",
     MAIPAI_BACKGROUND_PORT: "39303",
     MAIPAI_EMBED_PORT: "39304",
@@ -88,14 +87,12 @@ describe("test isolation guard", () => {
     expect(env.MAIPAI_EMBED_PORT).toBe("39304");
   });
 
-  test("a changed data dir or a real TTS spawn is reported and restored", () => {
+  test("a changed data dir is reported and restored", () => {
     const env = fakeEnv();
     const expected = snapshotTestIsolation(env);
     env.MAIPAI_DATA_DIR = "/Users/someone/real/data";
-    delete env.MAIPAI_TTS_DISABLE_SPAWN;
     const names: string[] = checkTestIsolation(env, expected).map((v) => v.name).sort();
-    expect(names).toEqual(["MAIPAI_DATA_DIR", "MAIPAI_TTS_DISABLE_SPAWN"]);
+    expect(names).toEqual(["MAIPAI_DATA_DIR"]);
     expect(env.MAIPAI_DATA_DIR).toBe("/tmp/maipai-home-test-abc");
-    expect(read(env, "MAIPAI_TTS_DISABLE_SPAWN")).toBe("1");
   });
 });

@@ -1,7 +1,7 @@
 // The `stt` role (session-c-brain-and-voice.md step 5): sherpa-onnx with
 // Moonshine tiny-en for English, "the robot's choice, one runtime for
 // both" per the plan. Unlike `tts` (a separate Python process,
-// ttsSupervisor.ts's own lazy-spawn-or-stub shape), sherpa-onnx-node is
+// the local speech supervisor's own lazy-spawn-or-stub shape), sherpa-onnx-node is
 // a real, in-process native addon - verified live this session under
 // Bun (no segfault, a real transcription came back from a real model)
 // before committing to this shape. There is no external process here to
@@ -11,7 +11,7 @@
 // ships real Node bindings, not a Python sidecar like Pocket TTS. This
 // file is a lazy-init, in-process singleton instead - the same
 // "resolve once, cache, clear on restart" shape as llmSupervisor.ts and
-// ttsSupervisor.ts, just with nothing to spawn or health-poll.
+// the local speech supervisor, just with nothing to spawn or health-poll.
 import { existsSync } from "node:fs";
 // sherpa-onnx-node ships no .d.ts (plain JS package) - minimal local
 // types for exactly the surface this file uses, the same posture

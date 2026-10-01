@@ -4847,19 +4847,8 @@ async function main() {
     backend = Bun.spawn({
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
-      // MAIPAI_TTS_DISABLE_SPAWN (the same flag tests/preload.ts and
-      // CHAT-22's bench setup already use): this backend's own speech
-      // engine binds a FIXED port (8793, ttsSupervisor.ts), so a second
-      // one - a real hub already running on the box, or another spare-
-      // port backend - collides with it. Found live (2026-09-13): check.sh's
-      // own a11y step spawned this backend while another was already up,
-      // the losing engine died (SIGKILL), and Repairs rendered an
-      // engine-issue badge the matrix then flagged for real contrast, a
-      // false "the a11y gate found a defect" that was actually "the gate
-      // depends on the box being empty." This matrix never needs real
-      // speech, so the engine should never spawn at all, not just not
-      // collide.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_TTS_DISABLE_SPAWN: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
+      // This matrix never calls speech; all speech requests go to the Stack.
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
       stdout: "pipe",
       stderr: "inherit",
     });

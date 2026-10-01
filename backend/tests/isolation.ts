@@ -35,7 +35,7 @@ export const PRODUCTION_EMBED_PORT = "8794";
  * household's data); a port key only has to stay isolated - a test may
  * pick its own throwaway port (resourceGovernor.test.ts does), it just
  * can't unset it or point it at the production default. */
-const EXACT_KEYS = ["MAIPAI_DATA_DIR", "MAIPAI_BACKUP_DIR", "MAIPAI_KEYSTORE_BACKEND", "MAIPAI_TTS_DISABLE_SPAWN"] as const;
+const EXACT_KEYS = ["MAIPAI_DATA_DIR", "MAIPAI_BACKUP_DIR", "MAIPAI_KEYSTORE_BACKEND"] as const;
 const PORT_KEYS: readonly { key: string; productionDefault: string }[] = [
   { key: "MAIPAI_LLAMA_SERVER_PORT", productionDefault: PRODUCTION_CHAT_PORT },
   { key: "MAIPAI_BACKGROUND_PORT", productionDefault: PRODUCTION_BACKGROUND_PORT },

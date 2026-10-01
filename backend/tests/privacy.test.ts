@@ -134,19 +134,11 @@ describe("the hub's own connections", () => {
     expect(library?.what).toContain("third-party download mirror");
   });
 
-  // A code review (2026-09-05) found the whole speaking-voice path
-  // missing from a page that tells families "if it is not on this list,
-  // it does not happen": `uvx pocket-tts serve` installs from PyPI and
-  // downloads a voice model, carrying the household's Hugging Face token
-  // if they saved one. A credential leaving the house is the single most
-  // important row this table can have, so it gets its own test.
-  test("the speaking voice's real outbound traffic is listed, token and all", () => {
-    const byId = new Map(platformConnections().map((r) => [r.id, r]));
-    expect(byId.get("platform:tts-program")?.destination).toContain("pypi.org");
-    expect(byId.get("platform:tts-voice-files")?.destination).toContain("huggingface.co");
-    const model = byId.get("platform:tts-model");
-    expect(model?.destination).toContain("huggingface.co");
-    expect(model?.what).toContain("Hugging Face access token");
+  test("Home declares no downloads for its deleted speech engine", () => {
+    const ids = platformConnections().map((row) => row.id);
+    expect(ids).not.toContain("platform:tts-program");
+    expect(ids).not.toContain("platform:tts-model");
+    expect(ids).not.toContain("platform:tts-voice-files");
   });
 
   // Session C step 8 (session-c-brain-and-voice.md): "listed on the

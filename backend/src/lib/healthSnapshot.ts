@@ -1,5 +1,4 @@
 import { getEngineStatus } from "@/lib/llmSupervisor";
-import { getTtsBackendKind } from "@/lib/ttsSupervisor";
 import { listSidecars } from "@/lib/sidecars";
 import { roleHealth, roleHealthEntry, localRoleHealthEntry } from "@/lib/roleHealth";
 
@@ -20,7 +19,7 @@ export async function collectHealth() {
   const ok =
     [chat, embed, background, voice].every((e) => e.alive !== false && e.kind !== "failed" && e.kind !== "restarting" && e.kind !== "blocked" && e.kind !== "stalled") &&
     sidecars.every((s) => s.status !== "unhealthy" && s.status !== "crashed");
-  return { sidecars, brain: getEngineStatus().kind, voice: getTtsBackendKind(), ok, engines: { chat, embed, background, voice }, uptimeSeconds: process.uptime() };
+  return { sidecars, brain: getEngineStatus().kind, voice: "stack", ok, engines: { chat, embed, background, voice }, uptimeSeconds: process.uptime() };
 }
 
 export type HealthSnapshot = Awaited<ReturnType<typeof collectHealth>>;

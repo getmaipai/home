@@ -962,8 +962,8 @@ describe("freePort", () => {
 
 // ENGINE-PORT-01's own BACKLOG row: "the health list carries the
 // condition" - engineHealthKind() is what every probe*Engine() function
-// (llmSupervisor.ts, embedSupervisor.ts, backgroundSupervisor.ts,
-// ttsSupervisor.ts) calls to build GET /api/health's own per-engine
+// (llmSupervisor.ts, embedSupervisor.ts, backgroundSupervisor.ts)
+// calls to build GET /api/health's own per-engine
 // `kind`, so this is the one place that check is provable without a
 // live spawn.
 describe("engineHealthKind: a blocked port reports \"blocked\"", () => {

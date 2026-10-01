@@ -7764,7 +7764,6 @@
               "enum": [
                 "chat",
                 "embed",
-                "voice",
                 "background"
               ]
             },
@@ -7786,7 +7785,6 @@
                       "enum": [
                         "chat",
                         "embed",
-                        "voice",
                         "background"
                       ]
                     },
@@ -7861,7 +7859,6 @@
               "enum": [
                 "chat",
                 "embed",
-                "voice",
                 "background"
               ]
             },
@@ -7883,7 +7880,6 @@
                       "enum": [
                         "chat",
                         "embed",
-                        "voice",
                         "background"
                       ]
                     },
@@ -7958,7 +7954,6 @@
               "enum": [
                 "chat",
                 "embed",
-                "voice",
                 "background"
               ]
             },
@@ -7980,7 +7975,6 @@
                       "enum": [
                         "chat",
                         "embed",
-                        "voice",
                         "background"
                       ]
                     },
@@ -9412,7 +9406,7 @@
             }
           },
           "400": {
-            "description": "Token is required, or unknown settings key",
+            "description": "Token is required",
             "content": {
               "application/json": {
                 "schema": {
@@ -9442,7 +9436,7 @@
             }
           },
           "503": {
-            "description": "The Stack did not answer",
+            "description": "The Stack is required or did not answer",
             "content": {
               "application/json": {
                 "schema": {
@@ -9460,7 +9454,7 @@
           "Voice"
         ],
         "summary": "Remove the Hugging Face API token",
-        "description": "Removes the household's voice.hf_token and restarts the TTS backend.",
+        "description": "Removes the Stack's text to speech Hugging Face token.",
         "responses": {
           "200": {
             "description": "The updated setting record.",
@@ -9547,7 +9541,7 @@
             }
           },
           "503": {
-            "description": "The Stack did not answer",
+            "description": "The Stack is required or did not answer",
             "content": {
               "application/json": {
                 "schema": {
@@ -9920,7 +9914,7 @@
           "Voice"
         ],
         "summary": "Download a cloned voice file",
-        "description": "Serves the raw audio file of a cloned voice. Deliberately NOT behind requireAuth: the pocket-tts serve process fetches voice_url by plain HTTP GET with no session cookie. Safe because the id is an unguessable 83-bit token.",
+        "description": "Serves the raw audio file of a cloned voice. Deliberately NOT behind requireAuth: the Stack fetches voice_url by plain HTTP GET with no session cookie. Safe because the id is an unguessable 83-bit token.",
         "parameters": [
           {
             "schema": {

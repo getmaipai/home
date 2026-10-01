@@ -142,7 +142,7 @@ export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpRe
   db.delete(clonedVoices).where(eq(clonedVoices.id, id)).run();
   // Found live (2026-09-04): deleting a voice someone currently has
   // selected left their `tts.voice_id` pointing at a URL that now
-  // 404s - pocket-tts's own /tts call would fail with no obvious cause.
+  // 404s - the Stack's own speech call would fail with no obvious cause.
   // Matches by the id's own path segment, not the full stored URL: a
   // code review caught that comparing the whole `clonedVoiceUrl(id)`
   // string would silently stop matching if the hub were ever restarted

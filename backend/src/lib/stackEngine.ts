@@ -1,7 +1,7 @@
 // HOME-STACK-02b: the one setting (engines.stack.url) that decides
 // whether Home's model calls go through a MaiPai Stack instead of its
 // own built-in supervisors (llmSupervisor.ts, embedSupervisor.ts,
-// ttsSupervisor.ts, stt.ts's in-process recognizer) - empty, the
+// local speech engine, stt.ts's in-process recognizer) - empty, the
 // default, means nothing here changes. Centralizes the three things
 // every rewired call site (llm.ts, tts.ts, stt.ts, routes/voice.ts's
 // hf-token route) needs identically: reading the setting, one cached

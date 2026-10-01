@@ -14,12 +14,11 @@ import {
   wakewordAssetPath,
 } from "@/lib/wakewordAssets";
 import { getVoiceCatalog, isVoiceCatalogPath } from "@/lib/voiceCatalog";
-import { setPersonTtsVoiceUnchecked, setValue, resetValue, resolveForResponse } from "@/lib/settings";
+import { setPersonTtsVoiceUnchecked, resolveForResponse } from "@/lib/settings";
 import { getRegistryKey } from "@/lib/settingsRegistry";
-import { getStackUrl, getStackClient, stackFailureResult } from "@/lib/stackEngine";
+import { getStackUrl, getStackClient, stackFailureResult, isStackConfigured } from "@/lib/stackEngine";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { ResolvedSettingSchema } from "@/routes/settings";
-import { restartTtsBackend } from "@/lib/ttsSupervisor";
 import {
   listClonedVoices,
   saveClonedVoice,
@@ -222,17 +221,7 @@ voiceRoutes.openapi(catalogSelectRoute, async (c) => {
   return c.json(result.value, 200);
 });
 
-// voice.hf_token has a side effect the generic PUT /api/settings route has
-// no hook for: an already-running `pocket-tts serve` process read this
-// setting once, at spawn time, and never again, so a saved or removed
-// token only takes effect once ttsSupervisor.ts's cache is cleared and the
-// next call re-spawns. This mirrors chat.model_id's own dedicated-route
-// precedent (routes/host.ts's startSelectJob, for the identical reason -
-// a setting change here needs a spawn side effect a plain write can't
-// carry). setValue()/resetValue() are the same actor-gated functions the
-// generic route itself calls, so the owner/admin check for a household
-// key is enforced exactly once, in lib/settings.ts, not re-implemented
-// here as a second requireRole gate that could drift from it.
+// The Stack owns the speech engine and its token.
 const hfTokenRoute = createRoute({
   method: "post",
   path: "/hf-token",
@@ -256,7 +245,7 @@ const hfTokenRoute = createRoute({
       content: { "application/json": { schema: ResolvedSettingSchema } },
       description: "The updated setting record.",
     },
-    ...errorResponses({ 400: "Token is required, or unknown settings key", 401: "Not signed in", 403: "Not allowed", 503: "The Stack did not answer" }),
+    ...errorResponses({ 400: "Token is required", 401: "Not signed in", 403: "Not allowed", 503: "The Stack is required or did not answer" }),
   },
 });
 
@@ -268,14 +257,8 @@ voiceRoutes.openapi(hfTokenRoute, async (c) => {
     return c.json({ error: "token is required" }, 400);
   }
 
-  // HOME-STACK-02b: a Stack owns its own tts engine and the token it
-  // needs to clone a voice, so a configured Stack gets the write
-  // instead of Home's own env-fed TTS process - Home's household
-  // voice.hf_token key is never populated at all in this mode (there is
-  // nothing here for it to feed). Same owner/admin gate as the
-  // household-setting path below (setValue()'s own assertCanAccessScope) -
-  // this branch bypasses setValue() entirely, so the check has to be
-  // made explicitly here instead of inherited from it.
+  // The Stack owns the speech engine and its token. Keep the owner/admin
+  // gate explicit because this path writes directly to the Stack.
   if (getStackUrl()) {
     if (!isOwnerOrAdmin(actor)) {
       return c.json({ error: "only owner or admin may change household settings" }, 403);
@@ -289,12 +272,14 @@ voiceRoutes.openapi(hfTokenRoute, async (c) => {
     return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, token, "user"), 200);
   }
 
-  const result = setValue(actor, "household", "voice.hf_token", token);
-  if (!result.ok) {
-    return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
+  if (!isStackConfigured()) return c.json({ error: "the MaiPai Stack is required for text to speech" }, 503);
+  try {
+    await getStackClient().applySettings({ "stack.engines.tts.hf_token": token });
+    return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, token, "user"), 200);
+  } catch (err) {
+    const failure = stackFailureResult(err, "tts");
+    return c.json({ error: failure.error }, failure.status);
   }
-  await restartTtsBackend();
-  return c.json(result.value, 200);
 });
 
 const hfTokenRemoveRoute = createRoute({
@@ -302,15 +287,14 @@ const hfTokenRemoveRoute = createRoute({
   path: "/hf-token/remove",
   tags: ["Voice"],
   summary: "Remove the Hugging Face API token",
-  description:
-    "Removes the household's voice.hf_token and restarts the TTS backend.",
+  description: "Removes the Stack's text to speech Hugging Face token.",
   middleware: [requireAuth] as const,
   responses: {
     200: {
       content: { "application/json": { schema: ResolvedSettingSchema } },
       description: "The updated setting record.",
     },
-    ...errorResponses({ 400: "Unknown settings key", 401: "Not signed in", 403: "Not allowed", 503: "The Stack did not answer" }),
+    ...errorResponses({ 400: "Unknown settings key", 401: "Not signed in", 403: "Not allowed", 503: "The Stack is required or did not answer" }),
   },
 });
 
@@ -328,13 +312,7 @@ voiceRoutes.openapi(hfTokenRemoveRoute, async (c) => {
     }
     return c.json(resolveForResponse(getRegistryKey("voice.hf_token")!, "", "default"), 200);
   }
-
-  const result = resetValue(actor, "household", "voice.hf_token");
-  if (!result.ok) {
-    return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
-  }
-  await restartTtsBackend();
-  return c.json(result.value, 200);
+  return c.json({ error: "the MaiPai Stack is required for text to speech" }, 503);
 });
 
 // Voice cloning (2026-09-04, the follow-up to voice.hf_token): a real
@@ -521,8 +499,7 @@ voiceRoutes.openapi(clonedDeleteRoute, async (c) => {
   return c.json({ success: true } as { success: true }, 200);
 });
 
-// Deliberately NOT behind requireAuth: `pocket-tts serve` is a separate,
-// unauthenticated local process that fetches `voice_url` by plain HTTP
+// Deliberately NOT behind requireAuth: the Stack fetches `voice_url` by plain HTTP
 // GET (spec/voice/ts/client.ts) - it has no session cookie to send and
 // never will. Safe because `id` is an unguessable 83-bit token
 // (lib/id.ts's newClonedVoiceId()) checked against the real table, the
@@ -535,7 +512,7 @@ const clonedFileRoute = createRoute({
   summary: "Download a cloned voice file",
   description:
     "Serves the raw audio file of a cloned voice. Deliberately NOT behind " +
-    "requireAuth: the pocket-tts serve process fetches voice_url by plain " +
+    "requireAuth: the Stack fetches voice_url by plain " +
     "HTTP GET with no session cookie. Safe because the id is an unguessable " +
     "83-bit token.",
   request: {

@@ -3,14 +3,9 @@
 // client failure into a typed result a route can translate straight into
 // an HTTP response, instead of a thrown error a caller has to guess the
 // right status code for.
-import { getTtsClient } from "@/lib/ttsSupervisor";
-import { TtsClientError } from "@maipai/spec/voice/ts/client.js";
-import { isStackRoleEnabled, getStackClient, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
+import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 
-// A very long chat reply synthesized in one call would tie up the one
-// spawned Pocket TTS process for a long time - bounded generously above
-// any real chat reply's length rather than tuned to a measured worst
-// case, since nothing here has one yet.
+// Bound a speech request generously above any real reply length.
 const MAX_TEXT_LENGTH = 4_000;
 
 export interface TtsSynthesizeValue {
@@ -29,10 +24,7 @@ export type TtsOpResult =
  * parameter existed, since which values are even reachable here is
  * already restricted by that setting key's own `select` options, not
  * anything this function re-checks. */
-/** HOME-STACK-02b: the Stack's /v1/audio/speech takes spec/voice's own
- * form (stack/backend/src/routes/v1.ts's SpeechFormSchema) - the same
- * `text`/`voice_url` fields ttsSupervisor.ts's own client already sends
- * a locally-spawned engine, just posted to the Stack instead. */
+/** The Stack's /v1/audio/speech accepts text and voice_url. */
 async function synthesizeViaStack(text: string, voiceUrl?: string): Promise<TtsOpResult> {
   const form = new FormData();
   form.append("text", text);
@@ -56,25 +48,13 @@ export async function synthesizeSpeech(text: string, voiceUrl?: string): Promise
     return { ok: false, status: 400, code: "invalid_input", error: `text must be ${MAX_TEXT_LENGTH} characters or fewer` };
   }
 
-  // getmaipai/home#151: MAIPAI_TTS_URL before the Stack, the same
-  // ordering fix and reasoning llm.ts's complete()/startCompleteStream()/
-  // embed() already got - its own tier 1 (ttsSupervisor.ts) already
-  // treats it as the explicit override, and a review of that fix found
-  // this exact same ordering bug still live here.
-  if (!process.env.MAIPAI_TTS_URL && isStackRoleEnabled("tts")) return synthesizeViaStack(text, voiceUrl);
-
-  let client;
-  try {
-    client = await getTtsClient();
-  } catch (err) {
-    return { ok: false, status: 503, code: "unavailable", error: `voice unavailable: ${(err as Error).message}` };
+  if (!isStackConfigured()) {
+    return { ok: false, status: 503, code: "unavailable", error: "voice unavailable: the MaiPai Stack is required for text to speech" };
   }
 
   try {
-    const result = await client.synthesizeStream(text, voiceUrl);
-    return { ok: true, value: { stream: result.body, contentType: result.contentType } };
+    return await synthesizeViaStack(text, voiceUrl);
   } catch (err) {
-    const message = err instanceof TtsClientError ? err.message : (err as Error).message;
-    return { ok: false, status: 503, code: "unavailable", error: `voice unavailable: ${message}` };
+    return { ok: false, status: 503, code: "unavailable", error: `voice unavailable: ${(err as Error).message}` };
   }
 }

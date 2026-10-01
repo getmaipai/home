@@ -14,7 +14,6 @@ import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/li
 import { buildOldPathStablePrefix, ordinaryToolSpecs } from "@/lib/turnEngine";
 import { toToolDefinition } from "@/lib/llm";
 import { getEmbedClient, getEmbedLivePid } from "@/lib/embedSupervisor";
-import { getTtsClient, getTtsLivePid } from "@/lib/ttsSupervisor";
 import { getBackgroundLivePid } from "@/lib/backgroundSupervisor";
 import { engineWarmupsForStackRoles } from "@/lib/engineBoot";
 import { runAllSmokeTests } from "@/lib/smoke";
@@ -209,7 +208,7 @@ registerDenoHostGracefulExit();
 // memory engine (MEM-01's background supervisor) runs the same binary
 // from the same engines directory, so without its pid here a reload
 // swept the judge's engine mid-extraction.
-await sweepOrphanEngineProcesses([getEmbedLivePid(), getTtsLivePid(), getBackgroundLivePid()]);
+await sweepOrphanEngineProcesses([getEmbedLivePid(), getBackgroundLivePid()]);
 await initCrashBootHold();
 // KIWIX-SIDECAR-01: registers (installing the pinned binary on first
 // boot only) and starts, fire-and-forget like startAllSidecars() below
@@ -220,32 +219,10 @@ await initCrashBootHold();
 // harmless either way.
 void startKiwixSidecar();
 void startAllSidecars();
-// A latency review (2026-09-06) found none of the three engines were
-// ever touched at boot: every getChatClient()/getEmbedClient()/
-// getTtsClient() call spawns lazily on FIRST USE, so a household's very
-// first message after a restart pays the chat spawn (up to a 60 s health
-// timeout), the embed spawn (60 s) and the Pocket TTS spawn (up to 180 s)
-// in series, on that one "hi." Fire-and-forget, not top-level-awaited
-// (unlike sweepOrphanEngineProcesses()/initCrashBootHold() above, which
-// gate what can spawn next): the point is to have the real engines
-// already warm behind the stub/nothing by the time a real turn arrives,
-// never to make every boot wait up to ~5 minutes for the slowest of the
-// three. A start failure here (no model selected yet, a broken
-// selection, engine files still downloading) is exactly the same
-// failure the first real request would have hit anyway - logged, not
-// fatal to boot, and the next real caller still gets the same clear
-// error getChatClient()/getEmbedClient()/getTtsClient() always throw.
-//
-// Fix A3 (docs/dev.md's 2026-09-07 incident note): "spawns lazily on
-// FIRST USE" above is only true the first time a process ever calls
-// this. After a `bun --hot` reload, each getXClient() call here reads
-// its own module's globalThis-backed state (Fix A1) and, when a healthy
-// backend is already sitting there from before the reload, returns it
-// synchronously with no spawn, no health-timeout wait, and no line in
-// the log below - already "warm" by construction, nothing further to do
-// here.
+// Warm the remaining Home owned engines in the background. Text to
+// speech always runs through the Stack.
 for (const role of engineWarmupsForStackRoles()) {
-  const warmup = role === "chat" ? getChatClient : role === "embed" ? getEmbedClient : getTtsClient;
+  const warmup = role === "chat" ? getChatClient : getEmbedClient;
   void warmup().catch((err: unknown) => console.error(`[boot] ${role} engine warm-up: ${(err as Error).message}`));
 }
 // Step 5: idle Tier 1 sandbox processes get closed after ten minutes -

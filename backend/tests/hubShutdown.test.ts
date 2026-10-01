@@ -1,19 +1,10 @@
 // #73: the hub's one shutdown path (lib/hubShutdown.ts).
 import { describe, expect, test, afterEach } from "bun:test";
-import { shutdownEngines, __resetHubShutdownForTests, __setTtsStopForTests } from "@/lib/hubShutdown";
+import { shutdownEngines, __resetHubShutdownForTests } from "@/lib/hubShutdown";
 
 afterEach(() => __resetHubShutdownForTests());
 
 describe("hub shutdown", () => {
-  test("the default stop list stops the voice engine", async () => {
-    const stopped: string[] = [];
-    __setTtsStopForTests(async () => {
-      stopped.push("tts");
-    });
-    await shutdownEngines();
-    expect(stopped).toEqual(["tts"]);
-  });
-
   test("stops chat, embed, and background engines once, in order, and a second call joins the first", async () => {
     const stopped: string[] = [];
     const stops = ["chat", "embed", "background"].map((name) => async () => {

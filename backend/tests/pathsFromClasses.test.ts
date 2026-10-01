@@ -22,7 +22,6 @@ const EXPECTED_IDS = [
   "reference",
   "wakeword-models",
   "stt-models",
-  "tts-models",
   "vision-models",
   "logs",
   "cache",
@@ -126,8 +125,6 @@ describe("classDir resolves each class's default folder to today's real path", (
   const data = "/tmp/maipai-paths-regression/data";
   // Written from the code's own literals (paths.ts constants and the
   // modules that join(dataDir, ...) by hand), never from the class list.
-  // tts-models has no folder today (the TTS child writes into the service
-  // account's own caches); its folder is new in this design.
   const today: Record<string, string> = {
     records: data,
     keys: join(data, "keys"),
@@ -141,7 +138,6 @@ describe("classDir resolves each class's default folder to today's real path", (
     reference: join(data, "reference"),
     "wakeword-models": join(data, "voice", "wakewords"),
     "stt-models": join(data, "voice", "stt"),
-    "tts-models": join(data, "voice", "tts"),
     "vision-models": join(data, "vision", "models"),
     logs: join(data, "logs"),
     cache: join(data, "cache"),

@@ -123,7 +123,7 @@ describe("embedSupervisor getEmbedClient()", () => {
   // between starting and awaiting getEmbedClient() runs synchronously,
   // strictly before the in-flight spawn's own `.then()` (always a
   // microtask) can fire - the same deterministic microtask-ordering
-  // trick ttsSupervisor.test.ts's own equivalent race test uses. A first
+  // equivalent race test uses. A first
   // pass fixed only "the stale backend must never populate the module
   // cache"; a second review pass (2026-09-04) found that alone still let
   // THIS caller's own already-in-flight promise resolve to `.client` of

@@ -2,7 +2,6 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
 import { synthesizeSpeech } from "@/lib/tts";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
@@ -15,21 +14,15 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  __resetTtsSupervisorForTests();
   __resetStackEngineForTests();
 });
 
 describe("lib/tts.ts synthesizeSpeech()", () => {
-  test("returns a real WAV stream from the stub backend (no real engine in tests)", async () => {
+  test("requires the Stack", async () => {
     const result = await synthesizeSpeech("good morning");
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.contentType).toBe("audio/wav");
-      const audio = new Uint8Array(await new Response(result.value.stream).arrayBuffer());
-      expect(audio.byteLength).toBeGreaterThan(44); // header + some samples
-    }
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(503);
   });
-
   test("rejects an empty string", async () => {
     const result = await synthesizeSpeech("");
     expect(result.ok).toBe(false);
@@ -56,17 +49,6 @@ describe("POST /api/tts", () => {
     expect(res.status).toBe(401);
   });
 
-  test("returns real audio/wav bytes for a signed-in person", async () => {
-    const owner = new TestClient();
-    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-
-    const res = await owner.post("/api/tts", { text: "good morning" });
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toBe("audio/wav");
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    expect(Buffer.from(bytes.slice(0, 4)).toString("ascii")).toBe("RIFF");
-  });
-
   test("returns 400 with a code for empty text", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -77,40 +59,26 @@ describe("POST /api/tts", () => {
     expect(body.code).toBe("invalid_input");
   });
 
-  // A code review-adjacent gap this feature could otherwise hide: a test
-  // only checking "the route returns 200 audio/wav" would pass even if
-  // the route never looked at the signed-in person's own tts.voice_id
-  // setting at all. `MAIPAI_TTS_URL` pointed at a one-off fixture (real
-  // HTTP, not a mock of ttsSupervisor.ts) that records exactly what
-  // `voice_url` it received proves this route actually resolves and
-  // forwards the person's real choice, not just that a request succeeds.
-  describe("resolving the signed-in person's own tts.voice_id", () => {
-    let fixtureServer: ReturnType<typeof Bun.serve> | undefined;
+  describe("resolving the signed-in person's own tts.voice_id through the Stack", () => {
+    let fixture: StackFixture;
     let receivedVoiceUrls: (string | null)[] = [];
-    let originalTtsUrl: string | undefined;
 
     beforeEach(() => {
       receivedVoiceUrls = [];
-      fixtureServer = Bun.serve({
-        port: 0,
-        fetch: async (req) => {
-          const url = new URL(req.url);
-          if (url.pathname === "/health") return Response.json({ status: "healthy" });
+      fixture = startStackFixture({
+        "POST /v1/audio/speech": async (req) => {
           const form = await req.formData();
           receivedVoiceUrls.push((form.get("voice_url") as string | null) ?? null);
-          return new Response(new Uint8Array(44), { headers: { "content-type": "audio/wav" } });
+          return new Response(new Uint8Array(44), { headers: { "content-type": "audio/wav", ...IDENTITY_HEADERS } });
         },
       });
-      originalTtsUrl = process.env.MAIPAI_TTS_URL;
-      process.env.MAIPAI_TTS_URL = `http://127.0.0.1:${fixtureServer.port}`;
-      __resetTtsSupervisorForTests();
+      setHouseholdSettingValue("engines.stack.url", fixture.url);
+      __setStackClientForTests(fixture.client);
     });
 
     afterEach(() => {
-      fixtureServer?.stop(true);
-      if (originalTtsUrl === undefined) delete process.env.MAIPAI_TTS_URL;
-      else process.env.MAIPAI_TTS_URL = originalTtsUrl;
-      __resetTtsSupervisorForTests();
+      fixture.stop();
+      __resetStackEngineForTests();
     });
 
     test("sends the registry default (alba) when the person never chose a voice", async () => {
@@ -174,15 +142,6 @@ describe("lib/tts.ts routed through a configured Stack", () => {
   });
 
   test("configured Stack serves speech regardless of the retired switch", async () => {
-    let calls = 0;
-    fixture = startStackFixture({ "POST /v1/audio/speech": async () => { calls++; return new Response(new Uint8Array(44)); } });
-    setHouseholdSettingValue("engines.stack.url", fixture.url);
-    const result = await synthesizeSpeech("good morning");
-    expect(result.ok).toBe(true);
-    expect(calls).toBe(1);
-  });
-
-  test("configured Stack routes speech through its client", async () => {
     let calls = 0;
     fixture = startStackFixture({ "POST /v1/audio/speech": async () => { calls++; return new Response(new Uint8Array(44)); } });
     setHouseholdSettingValue("engines.stack.url", fixture.url);

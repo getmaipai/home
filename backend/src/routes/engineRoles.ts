@@ -4,21 +4,19 @@ import { requireRole } from "@/middleware/auth";
 import { restartChatAndWait } from "@/routes/host";
 import { stopChatBackend } from "@/lib/llmSupervisor";
 import { restartEmbedBackend, stopEmbedBackend, startEmbedBackendNow, getEmbedClient } from "@/lib/embedSupervisor";
-import { restartTtsBackend, stopTtsBackend, startTtsBackendNow, getTtsClient } from "@/lib/ttsSupervisor";
 import { restartBackgroundBackend, stopBackgroundBackend, startBackgroundBackendNow, getBackgroundClient } from "@/lib/backgroundSupervisor";
 
-const RoleSchema = z.enum(["chat", "embed", "voice", "background"]).openapi({ param: { name: "role", in: "path" } });
+const RoleSchema = z.enum(["chat", "embed", "background"]).openapi({ param: { name: "role", in: "path" } });
 const RestartResponseSchema = z.object({ role: RoleSchema, restarted: z.literal(true) });
 
 type Action = "restart" | "stop" | "start";
-type Actions = Record<"chat" | "embed" | "voice" | "background", Record<Action, () => Promise<void>>>;
+type Actions = Record<"chat" | "embed" | "background", Record<Action, () => Promise<void>>>;
 let testActions: Actions | null = null;
 export function __setEngineRoleActionsForTests(actions: Actions | null): void { testActions = actions; }
 
 const actions: Actions = {
   chat: { restart: restartChatAndWait, stop: stopChatBackend, start: restartChatAndWait },
   embed: { restart: async () => { await restartEmbedBackend(); void getEmbedClient().catch(() => {}); }, stop: stopEmbedBackend, start: async () => { void startEmbedBackendNow().catch(() => {}); } },
-  voice: { restart: async () => { await restartTtsBackend(); void getTtsClient().catch(() => {}); }, stop: stopTtsBackend, start: async () => { void startTtsBackendNow().catch(() => {}); } },
   background: { restart: async () => { await restartBackgroundBackend(); void getBackgroundClient().catch(() => {}); }, stop: stopBackgroundBackend, start: async () => { void startBackgroundBackendNow().catch(() => {}); } },
 };
 

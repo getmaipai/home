@@ -1,7 +1,6 @@
 import { probeBackgroundEngine } from "@/lib/backgroundSupervisor";
 import { probeEmbedEngine } from "@/lib/embedSupervisor";
 import { chatAvailabilityState, probeChatEngine } from "@/lib/llmSupervisor";
-import { getTtsBackendKind, probeTtsEngine } from "@/lib/ttsSupervisor";
 import { getStackClient, isStackRoleEnabled, type StackRole } from "@/lib/stackEngine";
 import type { EngineHealthEntry } from "@/wire";
 
@@ -19,7 +18,7 @@ export async function localRoleHealthEntry(role: HealthRole): Promise<EngineHeal
   if (role === "chat") return await probeChatEngine();
   if (role === "embed") return await probeEmbedEngine();
   if (role === "background") return await probeBackgroundEngine();
-  return { kind: getTtsBackendKind(), pid: null, alive: null };
+  return { kind: "none", pid: null, alive: null };
 }
 
 /** The single source for per-role runtime health. Stack-owned roles use
@@ -50,7 +49,8 @@ export async function roleHealth(role: HealthRole): Promise<RoleHealth> {
     }
   }
   if (role === "chat" && process.env.MAIPAI_LLAMA_SERVER_URL) return chatAvailabilityState();
-  const engine = role === "chat" ? await probeChatEngine() : role === "embed" ? await probeEmbedEngine() : role === "background" ? await probeBackgroundEngine() : await probeTtsEngine();
+  if (role === "voice") return { availability: "unavailable", reason: "stack_unreachable" };
+  const engine = role === "chat" ? await probeChatEngine() : role === "embed" ? await probeEmbedEngine() : await probeBackgroundEngine();
   if (engine.availability === "unavailable") return { availability: "unavailable", reason: engine.reason ?? "failed_start" };
   if (engine.kind === "starting" || engine.kind === "restarting") return { availability: "starting", reason: null };
   if (["blocked", "failed", "stalled", "stopped"].includes(engine.kind) || (["url", "override", "selection", "spawned"].includes(engine.kind) && engine.alive === false))

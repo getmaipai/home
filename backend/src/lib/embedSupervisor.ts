@@ -1,6 +1,6 @@
 // The router skeleton for platform plan 4.11's `embed` role, the same
 // lazy-start-once shape llmSupervisor.ts set for `chat` and
-// ttsSupervisor.ts scaled down for `tts` - here scaled down for a THIRD
+// the former local speech supervisor scaled down for `tts` - here scaled down for a THIRD
 // role with a real, but even narrower, need: no catalog entry, no
 // download job, no household selection (there is exactly one pinned
 // model, embedAssets.ts). "Engine is llama-server, only" (4.11) means
@@ -65,7 +65,7 @@ interface EmbedSupervisorState {
   startingStartedAtMs: number | null;
   startupStalled: boolean;
   // Bumped on every restart/reset - guards the exact race a code review
-  // (2026-09-04) found and fixed in ttsSupervisor.ts's identical shape: a
+  // (2026-09-04) found and fixed in speech supervisor's identical shape: a
   // spawn already in flight when a restart lands must never re-populate
   // the cache afterward. See that file's own comment for the full
   // reasoning; applied here from the start rather than re-discovered later.
@@ -182,8 +182,7 @@ async function startEmbedBackend(): Promise<EmbedBackend> {
 /** Lazily starts (once) and returns the client for the `embed` role.
  * Concurrent first callers share one in-flight start; a failed start
  * clears `startingPromise` so the next call retries fresh, the same fix
- * llmSupervisor.ts's getChatClient() and ttsSupervisor.ts's
- * getTtsClient() already carry. */
+ * llmSupervisor.ts's getChatClient() already carries. */
 export async function getEmbedClient(): Promise<LlamaServerClient> {
   if (isStackRoleEnabled("embeddings") && !process.env.MAIPAI_EMBED_URL) throw new Error("embedding model unavailable: embeddings are served by the MaiPai Stack");
   if (state.manuallyStopped) throw new Error("the embed engine is stopped");

@@ -1,6 +1,6 @@
 // The `embed` role's one pinned model (platform plan 4.11, 2026-09-04):
 // no catalog entry, no download job, no household selection - the same
-// "one thing to run, nothing to choose between" scope ttsSupervisor.ts's
+// "one thing to run, nothing to choose between" scope the Stack owned speech engine's
 // own header comment already carries for `tts`. Nomic AI's own GGUF
 // conversion, not a community re-conversion: Apache-2.0, not gated,
 // confirmed live via the HF API (`gated: false`), a well-known and

@@ -14,15 +14,12 @@
 import { stopChatBackend } from "@/lib/llmSupervisor";
 import { restartEmbedBackend } from "@/lib/embedSupervisor";
 import { restartBackgroundBackend } from "@/lib/backgroundSupervisor";
-import { restartTtsBackend } from "@/lib/ttsSupervisor";
 
 export const SHUTDOWN_DEADLINE_MS = 20_000;
 
 let shutdownPromise: Promise<void> | null = null;
-let stopTts: () => void | Promise<void> = restartTtsBackend;
-
 export async function shutdownEngines(
-  stops: Array<() => void | Promise<void>> = [stopChatBackend, restartEmbedBackend, restartBackgroundBackend, stopTts],
+  stops: Array<() => void | Promise<void>> = [stopChatBackend, restartEmbedBackend, restartBackgroundBackend],
   deadlineMs = SHUTDOWN_DEADLINE_MS,
 ): Promise<void> {
   shutdownPromise ??= (async () => {
@@ -50,9 +47,4 @@ export async function shutdownEngines(
 
 export function __resetHubShutdownForTests(): void {
   shutdownPromise = null;
-  stopTts = restartTtsBackend;
-}
-
-export function __setTtsStopForTests(stop: () => void | Promise<void>): void {
-  stopTts = stop;
 }

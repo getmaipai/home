@@ -11,14 +11,17 @@ import { startWyomingServer, type WyomingServerHandle } from "@/lib/wyomingServe
 import { WyomingFramer, encodeWyomingMessage, type WyomingMessage } from "@/lib/wyoming";
 import { issueApiToken } from "@/lib/apiToken";
 import { __setSttBackendForTests, __resetSttForTests } from "@/lib/stt";
-import { __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { sqlite } from "@/db";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { startStackFixture, IDENTITY_HEADERS, type StackFixture } from "./stackFixture";
 
 let server: WyomingServerHandle;
+let speechStack: StackFixture | undefined;
 
 beforeEach(() => {
   resetDb();
@@ -29,8 +32,10 @@ beforeEach(() => {
 afterEach(() => {
   __resetLlmSupervisorForTests();
   __resetSttForTests();
-  __resetTtsSupervisorForTests();
   server?.stop();
+  speechStack?.stop();
+  speechStack = undefined;
+  __resetStackEngineForTests();
 });
 
 function makePerson(): string {
@@ -164,9 +169,23 @@ describe("the Wyoming satellite server", () => {
     client.end();
   });
 
-  test("synthesize returns real framed audio-start/audio-chunk/audio-stop, decoded from the real (stub-backed) TTS WAV output", async () => {
+  test("synthesize returns Stack audio as framed audio-start/audio-chunk/audio-stop", async () => {
     const personId = makePerson();
     const token = issueApiToken(personId);
+    const pcm = new Uint8Array(320);
+    const wav = new Uint8Array(44 + pcm.length);
+    const view = new DataView(wav.buffer);
+    view.setUint32(0, 0x52494646, false); view.setUint32(4, wav.length - 8, true);
+    view.setUint32(8, 0x57415645, false); view.setUint32(12, 0x666d7420, false);
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, 16_000, true); view.setUint32(28, 32_000, true);
+    view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+    view.setUint32(36, 0x64617461, false); view.setUint32(40, pcm.length, true); wav.set(pcm, 44);
+    speechStack = startStackFixture({
+      "POST /v1/audio/speech": async () => new Response(wav, { headers: { "content-type": "audio/wav", ...IDENTITY_HEADERS } }),
+    });
+    setHouseholdSettingValue("engines.stack.url", speechStack.url);
+    __setStackClientForTests(speechStack.client);
     server = startWyomingServer(0);
     const client = new ScriptedWyomingClient();
     await client.connect(server.port);

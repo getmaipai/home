@@ -138,7 +138,7 @@ export async function registerKiwixSidecar(bins: { serveBin: string; manageBin: 
     // -M: reloads library.xml automatically, so a REFERENCE-LIBRARY-01
     // install later doesn't need to restart this sidecar to appear.
     // -i 127.0.0.1: loopback only, the same explicit-address shape
-    // embedSupervisor.ts/ttsSupervisor.ts already use, never kiwix-
+    // embedSupervisor.ts already use, never kiwix-
     // serve's own "all" default.
     command: [serveBin, "--port", String(KIWIX_SERVE_PORT), "-i", "127.0.0.1", "--library", libraryPath, "-M"],
     port: KIWIX_SERVE_PORT,

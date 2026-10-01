@@ -1,5 +1,5 @@
 // The hub's own base URL, as reachable from a sibling local process on
-// this same machine (2026-09-04, voice cloning): `pocket-tts serve`
+// this same machine (2026-09-04, voice cloning): the speech service
 // fetches a cloned voice's audio by plain HTTP URL
 // (routes/voice.ts's `GET /cloned/:id/file`), so that URL has to point
 // back at wherever THIS process is actually listening, not an assumed

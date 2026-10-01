@@ -3,7 +3,6 @@ import { existsSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
-import { getTtsBackendKind, getTtsClient, __resetTtsSupervisorForTests } from "@/lib/ttsSupervisor";
 import { clonedVoicesDir } from "@/lib/paths";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
@@ -20,7 +19,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  __resetTtsSupervisorForTests();
   __resetStackEngineForTests();
 });
 
@@ -45,7 +43,7 @@ describe("POST /api/voice/hf-token", () => {
     await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const res = await adultClient.post("/api/voice/hf-token", { token: "hf_x" });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(503);
   });
 
   test("rejects a missing token", async () => {
@@ -60,22 +58,9 @@ describe("POST /api/voice/hf-token", () => {
     expect(res.status).toBe(400);
   });
 
-  test("saves the token and clears the already-running tts backend's cache", async () => {
+  test("requires the Stack when no speech service is configured", async () => {
     const owner = await ownerClient();
-    // Establish a running (stub, in tests) backend first, the way a real
-    // household's process would already be spawned before they ever visit
-    // Settings to paste a token.
-    await getTtsClient();
-    expect(getTtsBackendKind()).toBe("stub");
-
-    const res = await owner.post("/api/voice/hf-token", { token: "hf_realtoken123" });
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { isSet: boolean };
-    expect(body.isSet).toBe(true);
-
-    // restartTtsBackend() cleared the cache: the next getTtsClient() call
-    // re-resolves from scratch rather than reusing the pre-save instance.
-    expect(getTtsBackendKind()).toBe("none");
+    expect((await owner.post("/api/voice/hf-token", { token: "hf_realtoken123" })).status).toBe(503);
   });
 });
 
@@ -93,23 +78,13 @@ describe("POST /api/voice/hf-token/remove", () => {
     await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
     const res = await adultClient.post("/api/voice/hf-token/remove");
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(503);
   });
 
-  test("removes a saved token and clears the already-running tts backend's cache", async () => {
+  test("requires the Stack to remove its token", async () => {
     const owner = await ownerClient();
-    const saveRes = await owner.post("/api/voice/hf-token", { token: "hf_realtoken123" });
-    expect(saveRes.status).toBe(200);
-
-    await getTtsClient();
-    expect(getTtsBackendKind()).toBe("stub");
-
     const res = await owner.post("/api/voice/hf-token/remove");
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { isSet: boolean };
-    expect(body.isSet).toBe(false);
-
-    expect(getTtsBackendKind()).toBe("none");
+    expect(res.status).toBe(503);
   });
 });
 
@@ -224,8 +199,7 @@ describe("cloned voices", () => {
     const selected = (await selectRes.json()) as { value: string };
     expect(selected.value).toMatch(new RegExp(`/api/voice/cloned/${uploaded.id}/file$`));
 
-    // The file-serving route is real and unauthenticated - exactly what
-    // a separate pocket-tts process fetching by plain URL needs.
+    // The file-serving route is real and unauthenticated for the Stack's voice fetch.
     const fileRes = await new TestClient().get(`/api/voice/cloned/${uploaded.id}/file`);
     expect(fileRes.status).toBe(200);
     // Bun's own multipart parser reports "sample.wav" as "audio/x-wav",

@@ -18,7 +18,7 @@ const KEY = "voice.hf_token";
 //
 // Saves/removes go through the dedicated /api/voice/hf-token routes, not
 // the generic setSetting/resetSetting - the generic PUT route has no hook
-// to restart the already-running pocket-tts process afterward, and a
+// to update the Stack speech service afterward, and a
 // saved-but-not-yet-applied token would silently do nothing until the
 // backend happened to restart some other way (see routes/voice.ts).
 export function HuggingFaceTokenSection() {
@@ -78,7 +78,7 @@ export function HuggingFaceTokenSection() {
   return (
     <Section heading="Hugging Face token (for voice cloning)">
       <p className="text-base text-[var(--muted-foreground)]">
-        Needed to clone a voice from a recording. Accept the terms at huggingface.co/kyutai/pocket-tts, then create a
+        Needed by the Stack to clone a voice from a recording. Create a
         read token at huggingface.co/settings/tokens and paste it below.
       </p>
       {loadError ? <p className="text-base text-[var(--destructive)]">{loadError}</p> : null}

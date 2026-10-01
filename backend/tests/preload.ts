@@ -47,13 +47,7 @@ process.env.MAIPAI_LLAMA_SERVER_PORT = String(reserveFreePort());
 // already takes.
 process.env.MAIPAI_BACKGROUND_PORT = String(reserveFreePort());
 process.env.MAIPAI_EMBED_PORT = String(reserveFreePort());
-// Same guarantee for the `tts` role: without this, ttsSupervisor.ts's
-// real-spawn tier would shell out to `uvx pocket-tts serve` on any
-// machine that has `uv` installed (Jesse's dev Mac included) the moment a
-// test exercises getTtsClient(), pulling a real Python process and a
-// real HF-cached model into what must stay a deterministic, offline
-// suite (.github/CLAUDE.md > Testing standards).
-process.env.MAIPAI_TTS_DISABLE_SPAWN = "1";
+// Text to speech is served by the Stack, so tests start no local engine.
 // SEARCH-FALLBACK-01: packageHost.ts's own Wikipedia fallback has no
 // household setting for its own base URL (Wikipedia's official API,
 // never bring-your-own like SearXNG) - without this, any test whose

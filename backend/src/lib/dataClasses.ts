@@ -11,9 +11,8 @@ import { DataClass } from "@maipai/spec/gen/ts/data-class.js";
 // backup will read it too (DATA-LOCATION-01x, -02x, -03).
 //
 // Every `default` equals the layout Home had before locations existed, so
-// adopting an existing hub moves no file. The one exception is
-// `tts-models`, a folder that is new in the design (the TTS engine's
-// caches sit in the service account's own home today).
+// adopting an existing hub moves no file. Stack owned engine data lives
+// with the Stack.
 //
 // The `degrades` entries are feature codes (the design record gives the
 // features in prose; the codes are named here, once).
@@ -248,25 +247,6 @@ export const DATA_CLASSES: DataClass[] = [
     needs: [],
     whenMissing: "degrade",
     degrades: ["voice-input"],
-    move: "online",
-    refetch: true,
-    backup: "exclude",
-  },
-  {
-    id: "tts-models",
-    title: "Speech voice models",
-    help: "The speech engine, its packages and voice model that read replies aloud. They download again if lost.",
-    level: "advanced",
-    default: { base: "root", subpath: "voice/tts" },
-    holds: "the TTS engine's Python, packages and model weights",
-    size: "1 to 3 GB",
-    access: "written once, read at engine start",
-    durability: "rebuildable",
-    rebuild: "download",
-    sensitive: "none",
-    needs: ["exec", "symlinks"],
-    whenMissing: "degrade",
-    degrades: ["spoken-replies"],
     move: "online",
     refetch: true,
     backup: "exclude",

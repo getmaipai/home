@@ -120,11 +120,9 @@ describe("/api/engines", () => {
     expect(body.engines).toEqual([]);
     expect(body.budget).toBeNull();
     const byId = Object.fromEntries(body.roles.map((r) => [r.id, r.state.state]));
-    // chat/tts/embed: always startable, the stub-fallback tier every
-    // one of their own supervisors guarantees (llmSupervisor.ts's/
-    // ttsSupervisor.ts's/embedSupervisor.ts's own header comments).
+    // chat/embed: always startable, the stub-fallback tier their
+    // supervisors guarantee.
     expect(byId.chat).toBe("ready");
-    expect(byId.tts).toBe("ready");
     expect(byId.embed).toBe("ready");
     // stt: no stub fallback exists - real assets or nothing, and
     // nothing is staged in this fresh test data dir.

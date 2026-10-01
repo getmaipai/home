@@ -112,27 +112,6 @@ export function platformConnections(): PrivacyConnection[] {
       when: "the first time someone uses speech to text (push-to-talk)",
       what: DOWNLOAD_CARRIES,
     }),
-    // The three rows below are the ones a code review (2026-09-05) found
-    // missing while this page told every family "if it is not on this
-    // list, it does not happen". Turning on the speaking voice runs
-    // `uvx pocket-tts serve` (ttsSupervisor.ts), which installs a Python
-    // package and then downloads a voice model - and, if the household
-    // saved a Hugging Face token so cloned voices work, that token goes
-    // with it. A credential leaving the house is the single most
-    // important thing this table can say, and it was not saying it.
-    row("platform:tts-program", "pypi.org, files.pythonhosted.org", {
-      when: "the first time someone turns on the speaking voice",
-      what: DOWNLOAD_CARRIES,
-    }),
-    row("platform:tts-model", "huggingface.co", {
-      when: "the first time the hub speaks out loud, and again after an update",
-      what:
-        "the name of the voice model being downloaded, your home's internet address, and - only if an adult saved a Hugging Face access token in Settings so cloned voices work - that token. Nothing anyone in the house said, and no recording of anyone's voice.",
-    }),
-    row("platform:tts-voice-files", "huggingface.co", {
-      when: "when someone picks a voice, to fetch that one voice's sample",
-      what: "the name of the chosen voice file, and your home's internet address. No recording of anyone in the house.",
-    }),
     // Memory recall uses this embedder (memory.ts: embed() on every
     // remember() and recall query), so the row reflects current use,
     // not the retired keyword scorer. #112.

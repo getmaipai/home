@@ -1925,9 +1925,9 @@ Home leading silence and 0.226 seconds of extra Home trailing silence in
 the comparison is a difference between the two engine setups, not the
 measured run to run noise.
 
-The Home launch uses `uvx pocket-tts serve` without a version pin
-([ttsSupervisor.ts](/Users/jessetorres/Developer/github.com/getmaipai/home-c-100/backend/src/lib/ttsSupervisor.ts:125)).
-The Stack launches its managed Pocket TTS binary with the same `serve`,
+Text to speech now runs on the Stack only. Home streams the Stack's audio
+through `/api/tts` and starts no speech engine itself. The Stack launches
+its managed Pocket TTS binary with `serve`,
 `--host`, and `--port` options
 ([pocketTts.ts](/Users/jessetorres/Developer/github.com/getmaipai/stack-codex/backend/src/speech/pocketTts.ts:63));
 neither launch adds padding, trimming, or frame options. The Stack
@@ -20704,14 +20704,14 @@ The home backend now talks to the Stack directly, through `src/lib/stack/`: a ty
 
 The household setting `engines.stack.url` names the Stack. The four `engines.stack.use_*` switches are retired and ignored. A configured Stack serves every role, including the memory judge and background worker; Home keeps its own engines only until the later role by role deletions. Admin and information features can use the Stack whenever its address is configured.
 
-At boot, Home warms its own chat, embedding and speech engines only when no Stack is configured. A configured Stack serves every role, and local client getters refuse to start Home's engine when requested for any of those roles.
+Text to speech runs on the Stack only. Home streams its audio through the same route used by the chat and voice satellite paths, and never starts a speech engine.
 
 `backend/src/lib/stackEngine.ts` (new) is the one place every rewired call site shares: `getStackUrl()`/`isStackConfigured()` read the setting fresh on every call (no restart semantics - HOME-STACK-01's installer is the real, planned writer) and fail safe to "not configured" when the stored value isn't even a loopback-shaped URL (`hostLabel()` from `engineIdentity.ts`, which never throws) rather than handing garbage straight to `createStackClient()` - found live, the hard way: adding this key to the registry made `safety.test.ts`'s own "every real settings key, stressed to its most permissive value" sweep set it to a plain non-URL string and break chat entirely, which then cascaded into an unrelated-looking `backup.test.ts` failure later in the same test run. Two isolation runs (this item's own new tests set aside; a clean `origin/main` checkout) both came back fully green before `--bail=1` pointed at the real failing test - a reminder that a downstream symptom in a seemingly-unrelated file is worth one more isolation run before calling it pre-existing; `getStackClient()` lazily builds and caches one `StackClient` per URL, with `__setStackClientForTests()` for injection; `stackFailureResult()` maps any `StackError` to the one `{ok:false, status:503, code:"unavailable", error}` shape every caller here already returns for "the model didn't answer" - a scripted 503 raises (or refreshes) a `source: "stack"` Repairs entry keyed `offline.<role>` carrying the Stack's own `offline_reason`, and answers with the companion's own "I can't think right now" for the `chat` role specifically (embed/tts/stt fail silently to a person - memory, speech, an internal call - so they keep the plain "`<role>` model unavailable" wording); every other `StackError` kind (409/400/499/504/unreachable/unexpected) keeps the Stack's own stated message, never a guessed cause.
 
 **The four call sites**, an inventory:
 
 - `lib/llm.ts`'s `complete()` (chat AND the judge - `personaJudge.ts`/`memoryJudge.ts` both call `complete("chat", ...)` already; there is no separate judge role anywhere in this file, only a different prompt), `startCompleteStream()` and `embed()` each check `getStackUrl()` first and branch to a `*ViaStack()` twin. `chatRequestBody()` (new, factored out of `complete()`'s own request construction) is shared by the local and Stack paths so the two can never drift on what a completion actually asks for - the local path's own request-building code was refactored to use it too, verified behavior-identical by the full existing test suite passing unchanged.
-- `lib/tts.ts`'s `synthesizeSpeech()` posts `spec/voice`'s own form (`text`, `voice_url`) to the Stack's `/v1/audio/speech` - the identical field names `ttsSupervisor.ts`'s own client already sends a locally-spawned engine.
+- `lib/tts.ts`'s `synthesizeSpeech()` always posts `text` and `voice_url` to the Stack's `/v1/audio/speech`; Home has no local speech engine.
 - `lib/stt.ts`'s `transcribeUtterance()` (only when no test backend is set - `__setSttBackendForTests()` still wins, unchanged) posts a WAV file (`sttSession.ts`'s existing `encodeWav()`, not a second encoder) to `/v1/audio/transcriptions`, matching `stack/backend/src/routes/v1.ts`'s `TranscriptionFormSchema` (`file`, a WAV; `model`).
 - `routes/voice.ts`'s `/api/voice/hf-token` and `/hf-token/remove` write `stack.engines.tts.hf_token` through `getStackClient().applySettings()` instead of Home's own household `voice.hf_token` key when a Stack is configured - still owner/admin-gated explicitly (this branch bypasses `setValue()`'s own `assertCanAccessScope` entirely, so the check has to be made here instead of inherited from it - found while writing the route's own test for a non-admin adult). The response is built with `resolveForResponse()` against `voice.hf_token`'s own registry entry (one definition, not a second hand-written label/help pair) so the household still sees an honest, correctly-labeled `ResolvedSetting` back, secret-masked, even though nothing was actually written to Home's own settings table.
 

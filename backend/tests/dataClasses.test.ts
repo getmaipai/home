@@ -19,7 +19,6 @@ const EXPECTED_IDS = [
   "reference",
   "wakeword-models",
   "stt-models",
-  "tts-models",
   "vision-models",
   "logs",
   "cache",
@@ -78,8 +77,7 @@ describe("Home's class list", () => {
         "sidecars",
         "wakeword-models",
         "stt-models",
-        "tts-models",
-        "vision-models",
+              "vision-models",
         "received-backups",
         "logs",
       ].sort(),
@@ -95,8 +93,7 @@ describe("Home's class list", () => {
     for (const id of [
       "models",
       "engines",
-      "tts-models",
-      "reference",
+          "reference",
       "people-files",
       "backups",
     ]) {
@@ -144,7 +141,6 @@ describe("Home's class list", () => {
     expect(needs("packages")).toEqual(["sqlite"]);
     expect(needs("models")).toEqual(["large-files"]);
     expect(needs("engines")).toEqual(["exec"]);
-    expect(needs("tts-models")).toEqual(["exec", "symlinks"]);
     expect(needs("logs")).toEqual([]);
   });
 

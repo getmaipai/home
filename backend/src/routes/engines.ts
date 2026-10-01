@@ -232,7 +232,7 @@ const overviewRoute = createRoute({
 enginesRoutes.openapi(overviewRoute, async (c) => {
   // VOICE-LIVE-01b: `roles` used to be unconditionally empty here - the
   // common household case (no Stack) could never read any role as
-  // ready, no matter how healthy Home's own chat/tts/stt/embed
+  // ready, no matter how healthy Home's own chat/stt/embed
   // supervisors really were. homeSupervisorRoles.ts is the same
   // RoleInfo shape, the other source (docs/dev.md's own VOICE-LIVE-01b
   // note has the full trace).

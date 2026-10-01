@@ -582,7 +582,7 @@ export interface SpawnAndWaitOptions {
   /** Freed via freePort() before spawning, when given. */
   port?: number;
   /** Bun.spawn's own env option REPLACES process.env rather than merging
-   * with it - a caller that needs to add to the environment (ttsSupervisor.ts's
+   * with it - a caller that needs to add to the environment (the speech supervisor's
    * HF_TOKEN, say) must spread process.env into this itself. Omitted, the
    * spawned process inherits process.env unchanged (Bun.spawn's default),
    * exactly the prior behavior for callers that never needed this. */
@@ -660,7 +660,7 @@ export async function spawnAndWaitHealthy(
   // this call (never caught here) - a live process this install did not
   // spawn already answers on `opts.port`, so the spawn below never
   // happens at all. Every caller (llmSupervisor.ts, embedSupervisor.ts,
-  // ttsSupervisor.ts) already turns a thrown spawn failure into its own
+  // the speech supervisor) already turns a thrown spawn failure into its own
   // "unavailable"/health-list reporting; this is one more real reason
   // for that same path, not a new one to build.
   if (opts.port) await freePort(opts.port);

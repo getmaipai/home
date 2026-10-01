@@ -42,7 +42,7 @@ export function newConversationId(): string {
 // Not a spec-shaped id either. Longer than the other ids here (16 chars,
 // ~83 bits, vs. their 10/~52) on purpose: this one doubles as a bearer
 // capability for routes/voice.ts's unauthenticated `GET /cloned/:id/file`
-// route (pocket-tts, a separate unauthenticated process, has to fetch it
+// route (the speech service, a separate unauthenticated process, fetches it
 // by plain URL) - guessing it has to stay implausible, not merely
 // unlikely, the same reasoning session.ts's own 32-byte token uses for
 // the same class of problem.

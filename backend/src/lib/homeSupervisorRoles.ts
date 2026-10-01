@@ -3,26 +3,25 @@
 // (routes/engines.ts's own early return) - the common household case,
 // since this hub runs its own supervisors instead. Every frontend gate
 // reading `roles` (`readyRole()`, engineRoles.ts) could therefore never
-// see stt/tts/chat/embed as ready on a non-Stack hub, no matter how
+// see stt/chat/embed as ready on a non-Stack hub, no matter how
 // healthy they really were - found live (Jesse: no waveform button on
 // 8787, this hub has no Stack). This file is the missing half: the
 // SAME RoleInfo shape the Stack already returns, built from Home's own
 // supervisors instead, so a caller never needs to know which source
 // answered (SERVICES.md's "one health list" principle - one shape, two
-// sources, never a second concept for "is this hub's own tts ready").
+// sources, never a second concept for role readiness).
 import { probeChatEngine, getEngineStatus } from "@/lib/llmSupervisor";
-import { probeTtsEngine } from "@/lib/ttsSupervisor";
 import { probeEmbedEngine } from "@/lib/embedSupervisor";
 import { sttAssetsInstalled } from "@/lib/stt";
 import type { EngineHealth } from "@/lib/sidecars";
 import type { RoleInfo, RoleState } from "@/lib/stack/types";
 
-/** `probeXEngine()` (llmSupervisor.ts/ttsSupervisor.ts/embedSupervisor.ts)
+/** `probeXEngine()` (llmSupervisor.ts/embedSupervisor.ts)
  * is the exact function `GET /api/health` already builds its own
  * admin-facing read from (app.ts's healthRoute) - reused here rather
  * than re-derived, so this route can never show "ready" for an engine
  * Health shows red for at the same moment (a review finding: an
- * earlier version of this file reported chat/tts/embed ready
+ * earlier version of this file reported chat/embed ready
  * unconditionally, on the true but incomplete reasoning that each
  * supervisor's own last tier is a stub that never fails to START - it
  * missed that a manually-stopped engine, or one crash-looping after a
@@ -80,23 +79,6 @@ async function chatRole(): Promise<RoleInfo> {
   };
 }
 
-async function ttsRole(): Promise<RoleInfo> {
-  const health = await probeTtsEngine();
-  return {
-    id: "tts",
-    label: "Text to speech",
-    wire: "speech",
-    residency: "jit",
-    endpoints: [`http://localhost:${process.env.MAIPAI_TTS_PORT ?? 8793}`],
-    quality: ["everyday"],
-    sharesModelWith: null,
-    state: stateFromProbe(health),
-    reason: null,
-    model: null,
-    check: NO_CHECK,
-  };
-}
-
 async function embedRole(): Promise<RoleInfo> {
   const health = await probeEmbedEngine();
   return {
@@ -116,7 +98,7 @@ async function embedRole(): Promise<RoleInfo> {
 
 /** stt has no stub fallback and no separate process to supervise
  * (lib/stt.ts's own header: sherpa-onnx-node is an in-process native
- * addon, so there is no `probeSttEngine()` the way chat/tts/embed each
+ * addon, so there is no `probeSttEngine()` the way chat/embed each
  * have) - it is real assets on disk or it is nothing, checked directly
  * rather than through a probe. */
 function sttRole(): RoleInfo {
@@ -161,13 +143,13 @@ function imageRole(): RoleInfo {
 }
 
 /** `GET /api/engines`'s own roles source when no Stack is configured -
- * chat/tts/embed each do the identical live probe `GET /api/health`
+ * chat/embed each do the identical live probe `GET /api/health`
  * already makes (no new network behavior, and the two routes can no
  * longer disagree about the same engine's own state); stt and image
  * are synchronous, side-effect-free reads (no probe to make - see each
  * one's own comment for why). Nothing here ever spawns anything, the
  * same posture the route's Stack-configured path already has. */
 export async function getHomeSupervisorRoles(): Promise<RoleInfo[]> {
-  const [chat, tts, embed] = await Promise.all([chatRole(), ttsRole(), embedRole()]);
-  return [chat, tts, sttRole(), embed, imageRole()];
+  const [chat, embed] = await Promise.all([chatRole(), embedRole()]);
+  return [chat, sttRole(), embed, imageRole()];
 }

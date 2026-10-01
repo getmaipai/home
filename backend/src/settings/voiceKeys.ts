@@ -22,7 +22,7 @@
 // there is no public listing endpoint, so this list has to be copied,
 // not fetched). Every name resolves to a real, non-gated `hf://` file
 // Pocket TTS downloads and caches itself the first time it's used
-// (confirmed live: `voice_url=vera` on a running `pocket-tts serve`
+// (confirmed live: `voice_url=vera` on a running Stack speech service
 // synthesized real audio in ~1.5s including that first download).
 // `default: "alba"` rather than an empty "no choice yet" sentinel:
 // "alba" is Pocket TTS's own built-in fallback (`DEFAULT_VOICE_FALLBACK`),
@@ -38,7 +38,7 @@
 // this key from ever becoming an arbitrary-URL field a household member
 // (or a compromised session) could point at an internal address - Pocket
 // TTS's real `/tts` endpoint accepts any `http://`/`https://`/`hf://`
-// URL for `voice_url`, and the local `pocket-tts serve` process would
+// URL for `voice_url`, and the speech service would
 // fetch whatever it's given.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
@@ -85,8 +85,7 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     honoured_by: ["home"],
   }),
   // Voice cloning (2026-09-04, the last open Pocket TTS follow-up):
-  // needs the gated `kyutai/pocket-tts` checkpoint, which the default
-  // `kyutai/pocket-tts-without-voice-cloning` model this hub actually
+  // may need a gated checkpoint, depending on the model the Stack uses
   // runs never grew (docs/dev.md's TTS decision entry). The gate is
   // auto-approved on accepting Kyutai's terms (confirmed live,
   // 2026-09-04: `gated: "auto"`, not a manual review queue), so a
@@ -103,9 +102,8 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
   // The generic PUT /api/settings route can still technically write this
   // key directly (setValue() has no per-key side-effect hook), skipping
   // the dedicated POST /api/voice/hf-token route's restartTtsBackend()
-  // call - a saved value would then sit unapplied until the tts backend
-  // happened to restart some other way. A code review (2026-09-04) flagged
-  // this; not closed, on the same accepted-risk terms `chat.model_id`
+  // call - a saved value would then sit unapplied until the Stack reads
+  // it. A code review (2026-09-04) flagged this; not closed, on the same accepted-risk terms `chat.model_id`
   // already documents for the identical shape (aiKeys.ts): the frontend
   // has no path to it (SettingField.tsx never renders an editable control
   // for `secret: true`), and closing it generally needs a settings-key-

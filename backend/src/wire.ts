@@ -488,7 +488,7 @@ export interface ModelJob {
 export type EngineKind = "url" | "override" | "selection" | "stub" | "stopped" | "starting" | "stalled" | "none";
 
 /** The three kinds an engine's Repairs-page auto-heal can add on top of
- * a supervisor's own EngineKind - "spawned" is ttsSupervisor.ts's/
+ * a supervisor's own EngineKind - "spawned" is the local speech supervisor's/
  * embedSupervisor.ts's own literal, not in EngineKind above (that union
  * predates them). Declared once here (2026-09-07) so app.ts's schema,
  * sidecars.ts's engineHealthKind(), and HealthSection.tsx's badge all

@@ -729,8 +729,7 @@ export const api = {
       body: JSON.stringify({ path }),
     }),
   // Dedicated routes, not the generic setSetting/resetSetting: saving or
-  // removing voice.hf_token has to restart the tts backend so the
-  // already-running pocket-tts process picks up the change (see
+  // removing voice.hf_token updates the Stack speech service (see
   // routes/voice.ts's own comment on why the generic PUT route has no
   // hook for that).
   setHfToken: (token: string) =>
@@ -1069,7 +1068,7 @@ export const api = {
   // Returns the raw Response so the caller (sentenceSpeechScheduler.ts,
   // chatListenStore.ts) can read the streamed audio/wav body directly.
   // 185s: a first spawn of the Pocket TTS sidecar can take a while
-  // (ttsSupervisor.ts's 180s health wait); only bounds waiting for the
+  // Stack's speech request wait); only bounds waiting for the
   // response to begin, per rawStreamPost's own doc comment. `signal`
   // (step 4, a code review 2026-09-05): chatListenStore.ts's own
   // requestId guard stops updating state for a superseded "Listen"

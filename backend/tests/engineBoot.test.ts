@@ -15,8 +15,8 @@ describe("engine boot warm-ups", () => {
     expect(engineWarmupsForStackRoles()).toEqual([]);
   });
 
-  test("keeps Home warm-ups when no Stack is configured", () => {
+  test("warms only Home owned roles when no Stack is configured", () => {
     setHouseholdSettingValue("engines.stack.url", "");
-    expect(engineWarmupsForStackRoles()).toEqual(["chat", "embed", "tts"]);
+    expect(engineWarmupsForStackRoles()).toEqual(["chat", "embed"]);
   });
 });

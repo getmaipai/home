@@ -11,7 +11,6 @@ beforeEach(() => {
   __setEngineRoleActionsForTests({
     chat: { restart: async () => { calls.push("chat:restart"); }, stop: async () => { calls.push("chat:stop"); }, start: async () => { calls.push("chat:start"); } },
     embed: { restart: async () => { calls.push("embed:restart"); }, stop: async () => { calls.push("embed:stop"); }, start: async () => { calls.push("embed:start"); } },
-    voice: { restart: async () => { calls.push("voice:restart"); }, stop: async () => { calls.push("voice:stop"); }, start: async () => { calls.push("voice:start"); } },
     background: { restart: async () => { calls.push("background:restart"); }, stop: async () => { calls.push("background:stop"); }, start: async () => { calls.push("background:start"); } },
   });
 });
@@ -25,7 +24,7 @@ async function ownerClient(): Promise<TestClient> {
 }
 
 describe("POST /api/host/engines/{role}/restart", () => {
-  for (const role of ["chat", "embed", "voice", "background"] as const) {
+  for (const role of ["chat", "embed", "background"] as const) {
     test(`${role} restart returns the contract body`, async () => {
       const client = await ownerClient();
       const res = await client.post(`/api/host/engines/${role}/restart`, {});
@@ -55,11 +54,15 @@ describe("POST /api/host/engines/{role}/restart", () => {
     expect(res.status).toBe(400);
   });
 
+  test("does not list a Home owned speech engine", async () => {
+    const res = await (await ownerClient()).post("/api/host/engines/voice/restart", {});
+    expect(res.status).toBe(400);
+  });
+
   test("chat timeout returns 503 with an error", async () => {
     __setEngineRoleActionsForTests({
       chat: { restart: async () => { throw new Error("chat did not return in time"); }, stop: async () => {}, start: async () => {} },
       embed: { restart: async () => {}, stop: async () => {}, start: async () => {} },
-      voice: { restart: async () => {}, stop: async () => {}, start: async () => {} },
       background: { restart: async () => {}, stop: async () => {}, start: async () => {} },
     });
     const res = await (await ownerClient()).post("/api/host/engines/chat/restart", {});
@@ -69,7 +72,7 @@ describe("POST /api/host/engines/{role}/restart", () => {
 });
 
 describe("POST /api/host/engines/{role}/{stop,start}", () => {
-  for (const action of ["stop", "start"] as const) for (const role of ["chat", "embed", "voice", "background"] as const) {
+  for (const action of ["stop", "start"] as const) for (const role of ["chat", "embed", "background"] as const) {
     test(`${role} ${action} is owner/admin-only and reaches its supervisor`, async () => {
       const client = await ownerClient();
       const res = await client.post(`/api/host/engines/${role}/${action}`, {});
@@ -85,7 +88,7 @@ describe("POST /api/host/engines/{role}/{stop,start}", () => {
     const person = (await created.json()) as { id: string };
     const adult = new TestClient();
     await adult.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
-    for (const role of ["chat", "embed", "voice", "background"] as const) {
+    for (const role of ["chat", "embed", "background"] as const) {
       for (const action of ["stop", "start"] as const) expect((await adult.post(`/api/host/engines/${role}/${action}`, {})).status).toBe(403);
     }
     expect(calls).toEqual([]);

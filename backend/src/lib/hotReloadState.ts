@@ -3,7 +3,7 @@
 // `bun --hot` reload" - wyomingServer.ts's own `__maipaiWyomingBoundPorts`
 // set the precedent (a top-level `let` resets to its initializer on every
 // reload's fresh module instance, but the same OS process's `globalThis`
-// does not), then llmSupervisor.ts/embedSupervisor.ts/ttsSupervisor.ts
+// does not), then llmSupervisor.ts/embedSupervisor.ts
 // each hand-copied the identical `interface + (globalThis as
 // {...}).key ??= {...}` shape for their own engine-backend state. A code
 // review on this fix (2026-09-07) caught the duplication against
