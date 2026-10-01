@@ -8303,6 +8303,12 @@
                           "ends_at": {
                             "type": "string"
                           },
+                          "rrule": {
+                            "type": "string"
+                          },
+                          "until": {
+                            "type": "string"
+                          },
                           "status": {
                             "type": "string",
                             "enum": [
@@ -8563,6 +8569,15 @@
                   "ends_at": {
                     "type": "string",
                     "format": "date-time"
+                  },
+                  "rrule": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1000
+                  },
+                  "until": {
+                    "type": "string",
+                    "format": "date"
                   }
                 },
                 "required": [

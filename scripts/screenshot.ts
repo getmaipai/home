@@ -255,6 +255,7 @@ const statusA2bReview = process.argv.includes("--status-a2b-review");
 const statusA2cReview = process.argv.includes("--status-a2c-review");
 const statusC3bReview = process.argv.includes("--status-c3b-review");
 const statusB2bReview = process.argv.includes("--status-b2b-review");
+const statusD1Review = process.argv.includes("--status-d1-review");
 const statusEngineControlsReview = process.argv.includes("--status-engine-controls-review");
 const browserAlertsReview = process.argv.includes("--browser-alerts-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
@@ -3616,6 +3617,58 @@ async function captureStatusB2bReview(browser: Browser, ownerSession: string): P
   console.log("The completed window starts yesterday and ends just before capture because the real API rejects past end times.");
 }
 
+async function captureStatusD1Review(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screens", "status-d1");
+  mkdirSync(outDir, { recursive: true });
+  const headers = { "Content-Type": "application/json", Cookie: `session=${ownerSession}` };
+  const nextFriday = new Date();
+  const daysUntilFriday = (5 - nextFriday.getDay() + 7) % 7 || 7;
+  nextFriday.setDate(nextFriday.getDate() + daysUntilFriday);
+  nextFriday.setHours(2, 0, 0, 0);
+  const finish = new Date(nextFriday.getTime() + 60 * 60_000);
+  const until = new Date(nextFriday.getTime() + 28 * 86_400_000).toISOString().slice(0, 10);
+  const created = await fetch(`${BASE_URL}/api/status/maintenance`, {
+    method: "POST", headers,
+    body: JSON.stringify({
+      title: "Weekly voice updates", description: "Voice restarts each Friday during this short update.",
+      components: ["voice"], starts_at: nextFriday.toISOString(), ends_at: finish.toISOString(),
+      rrule: "FREQ=WEEKLY;BYDAY=FR", until,
+    }),
+  });
+  if (!created.ok) throw new Error(`STATUS-D1 seed recurring window failed: ${created.status} ${await created.text()}`);
+
+  const localInput = (date: Date) => {
+    const pad = (value: number) => String(value).padStart(2, "0");
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+  for (const slug of ["phone", "desktop"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    const context = await newContext(browser, { ...viewport, height: 1200 }, "light", ownerSession);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/status`);
+      await page.getByText("Weekly voice updates", { exact: true }).waitFor();
+      await page.getByText("Scheduled", { exact: true }).waitFor();
+      await page.getByText(`Repeats until ${until}`, { exact: true }).waitFor();
+      const statusPath = join(outDir, `status-owner-${viewport.width}.png`);
+      await page.screenshot({ path: statusPath, fullPage: true });
+      console.log(`Wrote ${statusPath}`);
+
+      await page.getByRole("button", { name: "Schedule maintenance" }).click();
+      await page.getByRole("dialog").waitFor();
+      await page.getByLabel("Title").fill("Weekly voice updates");
+      await page.getByLabel("Starts").fill(localInput(nextFriday));
+      await page.getByLabel("Ends").fill(localInput(finish));
+      await page.getByRole("checkbox").nth(3).check();
+      await page.getByLabel("Repeat").click();
+      await page.getByRole("option", { name: "Monthly" }).waitFor();
+      const formPath = join(outDir, `maintenance-form-owner-${viewport.width}.png`);
+      await page.screenshot({ path: formPath, fullPage: true });
+      console.log(`Wrote ${formPath}`);
+    } finally { await context.close(); }
+  }
+}
+
 async function captureStatusEngineControlsReview(browser: Browser, ownerSession: string): Promise<void> {
   const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/avail-05b";
   mkdirSync(outDir, { recursive: true });
@@ -4715,6 +4768,11 @@ async function main() {
     if (statusB2bReview) {
       await captureStatusB2bReview(browser, sessionValue);
       console.log("completed named review: --status-b2b-review");
+      return;
+    }
+    if (statusD1Review) {
+      await captureStatusD1Review(browser, sessionValue);
+      console.log("completed named review: --status-d1-review");
       return;
     }
     if (statusEngineControlsReview) {

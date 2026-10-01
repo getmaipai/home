@@ -10,6 +10,7 @@ import { componentStatesFrom, recordBootGap, recordStatusSample, pruneStatusEven
 import type { HealthSnapshot } from "@/lib/healthSnapshot";
 import type { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
 import { activeMaintenanceComponents, createMaintenance, type MaintenanceInput } from "@/lib/statusBoard";
+import { buildStatusHistory } from "@/lib/statusHistory";
 import { resetDb } from "./reset-db";
 
 type EngineKind = HealthSnapshot["engines"]["chat"]["kind"];
@@ -61,6 +62,22 @@ describe("componentStatesFrom", () => {
 });
 
 describe("status event recording", () => {
+  test("a recurring maintenance occurrence is recorded as maintenance minutes and excluded from uptime", async () => {
+    const start = new Date("2026-10-01T12:00:00.000Z");
+    const finish = new Date("2026-10-01T14:00:00.000Z");
+    const actor = { id: "person-owner0001", displayName: "Sage" };
+    const input: MaintenanceInput = { title: "Daily restart", components: ["chat"], startsAt: start.toISOString(), endsAt: new Date(start.getTime() + 60 * 60_000).toISOString(), rrule: "FREQ=DAILY", until: "2026-10-03" };
+    createMaintenance(actor, input, new Date("2026-10-01T11:00:00.000Z"));
+    __setStatusHistoryHealthForTests(baseHealth());
+    await recordStatusSample(start);
+    await recordStatusSample(new Date(start.getTime() + 60 * 60_000));
+    const chat = buildStatusHistory(1, finish).components.find((part) => part.component === "chat")!;
+    expect(chat.days[0]?.minutes.maintenance).toBe(60);
+    expect(chat.days[0]?.minutes.operational).toBe(60);
+    expect(chat.days[0]?.minutes.outage).toBe(0);
+    expect(chat.uptime_percent).toBe(100);
+  });
+
   test("first sample writes one row per component with a state", async () => {
     const now = new Date("2026-09-30T12:00:00.000Z");
     __setStatusHistoryHealthForTests(baseHealth());

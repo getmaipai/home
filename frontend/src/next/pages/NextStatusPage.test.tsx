@@ -176,7 +176,7 @@ describe("NextStatusPage", () => {
       expect(admin.getByRole("button", { name: "Clear" })).toBeTruthy();
       expect(admin.getByRole("button", { name: "Post a note" })).toBeTruthy();
       expect(admin.getByRole("button", { name: "Schedule maintenance" })).toBeTruthy();
-      for (const status of ["Upcoming", "In progress", "Done", "Cancelled"]) expect(admin.getByText(status)).toBeTruthy();
+      for (const status of ["Scheduled", "In maintenance", "Done", "Cancelled"]) expect(admin.getByText(status)).toBeTruthy();
       cleanup();
       const member = renderWithQueryClient(<NextStatusPage person={makePerson("child")} />);
       expect(await member.findByText("Voice is getting an update.")).toBeTruthy();
@@ -322,6 +322,103 @@ describe("NextStatusPage", () => {
       expect(voice.closest("[data-status]")?.getAttribute("data-status")).toBe("maintenance");
       await waitFor(() => expect(view.getByText("Scheduled maintenance is in progress")).toBeTruthy(), statusAsyncTimeout);
       expect(view.queryByText("Voice isn't running")).toBeNull();
+    } finally { globalThis.fetch = original; }
+  }, 30_000);
+
+  test("an admin can schedule daily recurring maintenance", async () => {
+    const original = globalThis.fetch;
+    let submitted: Record<string, unknown> | undefined;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health")) return Promise.resolve(Response.json(body()));
+      if (url.includes("/api/status/board")) return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+      if (url.endsWith("/api/status/maintenance") && init?.method === "POST") {
+        submitted = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return Promise.resolve(Response.json({ id: "window-weekly" }));
+      }
+      return Promise.reject(new Error(`Unexpected request ${url}`));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<NextStatusPage person={makePerson("admin")} />);
+      fireEvent.click(await view.findByRole("button", { name: "Schedule maintenance" }, statusAsyncTimeout));
+      const dialog = await view.findByRole("dialog", undefined, statusAsyncTimeout);
+      fireEvent.change(view.getByLabelText("Title"), { target: { value: "Weekly voice updates" } });
+      fireEvent.change(view.getByLabelText("Starts"), { target: { value: "2026-10-02T10:00" } });
+      fireEvent.change(view.getByLabelText("Ends"), { target: { value: "2026-10-02T11:00" } });
+      fireEvent.click(within(dialog).getAllByRole("checkbox")[3]!);
+      fireEvent.click(view.getByLabelText("Repeat"));
+      const daily = await view.findByRole("option", { name: "Daily" }, statusAsyncTimeout);
+      await act(async () => {
+        fireEvent.pointerDown(daily, { pointerId: 1, pointerType: "mouse", button: 0 });
+        fireEvent.pointerUp(daily, { pointerId: 1, pointerType: "mouse", button: 0 });
+        fireEvent.click(daily);
+      });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Schedule" }));
+      await waitFor(() => expect(submitted).toBeDefined(), statusAsyncTimeout);
+      expect(submitted).toMatchObject({ rrule: "FREQ=DAILY", components: ["voice"] });
+      expect(submitted).not.toHaveProperty("until");
+    } finally { globalThis.fetch = original; }
+  }, 30_000);
+
+  test("an admin can choose weekly days and an end date", async () => {
+    const original = globalThis.fetch;
+    let submitted: Record<string, unknown> | undefined;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health")) return Promise.resolve(Response.json(body()));
+      if (url.includes("/api/status/board")) return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+      if (url.endsWith("/api/status/maintenance") && init?.method === "POST") {
+        submitted = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return Promise.resolve(Response.json({ id: "window-weekly" }));
+      }
+      return Promise.reject(new Error(`Unexpected request ${url}`));
+    }) as unknown as typeof fetch;
+    try {
+      const start = new Date();
+      start.setDate(start.getDate() + ((5 - start.getDay() + 7) % 7 || 7));
+      start.setHours(10, 0, 0, 0);
+      const end = new Date(start.getTime() + 60 * 60_000);
+      const until = new Date(start.getTime() + 28 * 86_400_000);
+      const localDateTime = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+      const untilString = [until.getFullYear(), String(until.getMonth() + 1).padStart(2, "0"), String(until.getDate()).padStart(2, "0")].join("-");
+      const view = renderWithQueryClient(<NextStatusPage person={makePerson("admin")} />);
+      fireEvent.click(await view.findByRole("button", { name: "Schedule maintenance" }, statusAsyncTimeout));
+      const dialog = await view.findByRole("dialog", undefined, statusAsyncTimeout);
+      fireEvent.change(view.getByLabelText("Title"), { target: { value: "Weekly voice updates" } });
+      fireEvent.change(view.getByLabelText("Starts"), { target: { value: localDateTime(start) } });
+      fireEvent.change(view.getByLabelText("Ends"), { target: { value: localDateTime(end) } });
+      fireEvent.click(within(dialog).getAllByRole("checkbox")[3]!);
+      async function chooseOption(label: string, name: string) {
+        fireEvent.click(view.getByLabelText(label));
+        const option = await view.findByRole("option", { name }, statusAsyncTimeout);
+        await act(async () => {
+          const pointer = { pointerId: 1, pointerType: "mouse", button: 0 };
+          fireEvent.pointerDown(option, pointer);
+          fireEvent.pointerUp(option, pointer);
+          fireEvent.click(option);
+        });
+      }
+      await chooseOption("Repeat", "Weekly");
+      const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      fireEvent.click(within(dialog).getByText(weekdayLabels[new Date(localDateTime(start)).getDay()]!, { exact: true }));
+      fireEvent.click(within(dialog).getByText("Wed", { exact: true }));
+      await chooseOption("Repeat ends", "Until a date");
+      const untilTrigger = dialog.querySelector<HTMLButtonElement>("#maintenance-repeat-until");
+      if (!untilTrigger) throw new Error("Repeat-until calendar trigger is missing.");
+      fireEvent.click(untilTrigger);
+      const untilMonth = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(until);
+      for (let month = 0; month < 12; month++) {
+        const caption = document.querySelector("[data-slot='calendar'] .cn-calendar-caption-label");
+        if (caption?.textContent?.includes(untilMonth)) break;
+        const next = document.querySelector("[data-slot='calendar'] .rdp-button_next");
+        if (!next) throw new Error("Calendar next-month control is missing.");
+        fireEvent.click(next);
+      }
+      const monthName = untilMonth.split(" ")[0];
+      fireEvent.click(await view.findByRole("button", { name: new RegExp(monthName + " " + until.getDate()) }, statusAsyncTimeout));
+      fireEvent.click(within(dialog).getByRole("button", { name: "Schedule" }));
+      await waitFor(() => expect(submitted).toBeDefined(), statusAsyncTimeout);
+      expect(submitted).toMatchObject({ rrule: "FREQ=WEEKLY;BYDAY=WE", until: untilString, components: ["voice"] });
     } finally { globalThis.fetch = original; }
   }, 30_000);
 });

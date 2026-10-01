@@ -120,8 +120,9 @@ An admin posts a maintenance window: title, description, start, end, and which c
 The page shows it as upcoming, in progress or completed, computed from the clock at read time (not stored).
 While a window is in progress, the affected components show "under maintenance" and count as neither up nor
 down: they do not turn the indicator red, do not raise a Repair notification, and are excluded from the
-uptime percentage. One-off windows first. Recurring windows only if asked later, using the `rrule-temporal`
-package (MIT) and never a hand-written recurrence parser.
+uptime percentage. One-off windows shipped first. STATUS-D1 adds recurrence using a stored RFC 5545 RRULE,
+the `rrule-temporal` package (MIT), and an optional inclusive end date. The hub derives occurrences in its
+local IANA time zone so wall-clock times survive daylight saving changes; no recurrence parser is hand-written.
 
 ## Reuse, from the 2026-09-30 survey (do not hand-build what is maintained)
 

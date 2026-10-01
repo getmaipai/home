@@ -932,6 +932,8 @@ export const maintenanceWindows = sqliteTable("maintenance_windows", {
   components: text("components").notNull(),
   startsAt: text("starts_at").notNull(),
   endsAt: text("ends_at").notNull(),
+  rrule: text("rrule"),
+  until: text("until"),
   cancelledAt: text("cancelled_at"),
   createdBy: text("created_by").notNull(),
   createdAt: text("created_at").notNull(),

@@ -13,10 +13,13 @@ export const statusBoardRoutes = apiRouter();
 const NoteInput = z.object({ body: z.string().min(1).max(500), expires_at: z.string().datetime({ offset: true }).optional() });
 const MaintenanceInput = z.object({ title: z.string().min(1).max(120), description: z.string().max(1000).optional(),
   components: z.array(z.enum(["chat", "embed", "background", "voice", "library", "hub"])).min(1),
-  starts_at: z.string().datetime({ offset: true }), ends_at: z.string().datetime({ offset: true }) });
+  starts_at: z.string().datetime({ offset: true }), ends_at: z.string().datetime({ offset: true }),
+  rrule: z.string().min(1).max(1000).refine((value) => !/[\r\n]/.test(value), "Enter one recurrence rule." ).optional(),
+  until: z.string().date().optional() });
 const BoardNote = z.object({ id: z.string(), body: z.string(), posted_at: z.string(), posted_by_name: z.string() });
 const BoardMaintenance = z.object({ id: z.string(), title: z.string(), description: z.string(), components: z.array(z.string()),
-  starts_at: z.string(), ends_at: z.string(), status: z.enum(["cancelled", "scheduled", "in_progress", "completed"]) });
+  starts_at: z.string(), ends_at: z.string(), rrule: z.string().optional(), until: z.string().optional(),
+  status: z.enum(["cancelled", "scheduled", "in_progress", "completed"]) });
 const BoardResponse = z.object({ note: BoardNote.nullable(), maintenance: z.array(BoardMaintenance) });
 const IdParam = idParamSchema("id", "maint-a1b2c3");
 const HistoryState = z.enum(["operational", "degraded", "outage", "maintenance", "none"]);
@@ -41,7 +44,7 @@ const boardRoute = createRoute({ method: "get", path: "/board", tags: ["Status"]
 statusBoardRoutes.openapi(boardRoute, (c) => {
   const note = getActiveNote();
   const poster = note ? db.select({ displayName: people.displayName }).from(people).where(eq(people.id, note.posted_by)).get() : undefined;
-  const maintenance = listMaintenance().map(({ id, title, description, components, starts_at, ends_at, status }) => ({ id, title, description, components, starts_at, ends_at, status }));
+  const maintenance = listMaintenance().map(({ id, title, description, components, starts_at, ends_at, rrule, until, status }) => ({ id, title, description, components, starts_at, ends_at, ...(rrule ? { rrule } : {}), ...(until ? { until } : {}), status }));
   return c.json({ note: note && poster ? { id: note.id, body: note.body, posted_at: note.posted_at, posted_by_name: poster.displayName } : null, maintenance }, 200);
 });
 
@@ -68,7 +71,7 @@ const createMaintenanceRoute = createRoute({ method: "post", path: "/maintenance
   responses: { 201: { content: { "application/json": { schema: MaintenanceWindow } }, description: "The scheduled maintenance window." }, ...errorResponses({ 400: "The maintenance window is invalid", 401: "Not signed in", 403: "Owner/admin only" }) } });
 statusBoardRoutes.openapi(createMaintenanceRoute, (c) => {
   const input = c.req.valid("json"); const actor = c.get("person");
-  try { return c.json(createMaintenance({ id: actor.id, displayName: actor.displayName }, { title: input.title, description: input.description, components: input.components, startsAt: input.starts_at, endsAt: input.ends_at }), 201); }
+  try { return c.json(createMaintenance({ id: actor.id, displayName: actor.displayName }, { title: input.title, description: input.description, components: input.components, startsAt: input.starts_at, endsAt: input.ends_at, rrule: input.rrule, until: input.until }), 201); }
   catch (error) { return errorResponse(c, error) as never; }
 });
 

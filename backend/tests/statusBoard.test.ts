@@ -42,6 +42,45 @@ describe("status board records", () => {
     expect(listMaintenance(new Date("2026-10-10T13:00:00.000Z"))).toHaveLength(0);
   });
 
+  test("recurring maintenance returns the next occurrence, activates on its clock, cancels the series, and leaves one-offs intact", () => {
+    const series = createMaintenance(actor, {
+      title: "Weekly updates", components: ["chat"], startsAt: "2026-10-02T12:00:00.000Z", endsAt: "2026-10-02T13:00:00.000Z",
+      rrule: "FREQ=WEEKLY;BYDAY=FR", until: "2026-10-30",
+    } as never, t0);
+    const oneOff = createMaintenance(actor, { title: "One off", components: ["hub"], startsAt: "2026-10-03T12:00:00.000Z", endsAt: "2026-10-03T13:00:00.000Z" }, t0);
+
+    const next = listMaintenance(t0).find((row) => row.id === series.id)!;
+    expect(next).toMatchObject({ status: "scheduled", rrule: "FREQ=WEEKLY;BYDAY=FR", starts_at: "2026-10-02T12:00:00.000Z", ends_at: "2026-10-02T13:00:00.000Z" });
+    expect(listMaintenance(new Date("2026-10-03T12:00:00.000Z")).find((row) => row.id === series.id)).toMatchObject({
+      status: "scheduled", starts_at: "2026-10-09T12:00:00.000Z", ends_at: "2026-10-09T13:00:00.000Z",
+    });
+    const activeNow = new Date("2026-10-09T12:30:00.000Z");
+    expect(listMaintenance(activeNow).find((row) => row.id === series.id)).toMatchObject({ status: "in_progress", starts_at: "2026-10-09T12:00:00.000Z", ends_at: "2026-10-09T13:00:00.000Z" });
+    expect(activeMaintenanceComponents(activeNow)).toEqual(new Set(["chat"]));
+
+    cancelMaintenance(actor, series.id, activeNow);
+    expect(listMaintenance(new Date("2026-10-16T12:30:00.000Z")).find((row) => row.id === series.id)).toMatchObject({ status: "cancelled" });
+    expect(listMaintenance(t0).find((row) => row.id === oneOff.id)?.status).toBe("scheduled");
+    expect(listMaintenance(t0).find((row) => row.id === oneOff.id)?.rrule).toBeUndefined();
+    const monthly = createMaintenance(actor, {
+      title: "Monthly updates", components: ["hub"], startsAt: "2026-10-15T12:00:00.000Z", endsAt: "2026-10-15T13:00:00.000Z",
+      rrule: "FREQ=MONTHLY", until: "2026-12-31",
+    }, t0);
+    expect(listMaintenance(new Date("2026-10-16T12:00:00.000Z")).find((row) => row.id === monthly.id)).toMatchObject({
+      status: "scheduled", starts_at: "2026-11-15T12:00:00.000Z", ends_at: "2026-11-15T13:00:00.000Z",
+    });
+  });
+
+  test("recurrence preserves the scheduled household wall clock across daylight saving", () => {
+    const window = createMaintenance(actor, {
+      title: "Daily restart", components: ["chat"], startsAt: "2027-03-13T14:00:00.000Z", endsAt: "2027-03-13T14:30:00.000Z",
+      rrule: "FREQ=DAILY", until: "2027-03-15", timeZone: "America/New_York",
+    } as never, new Date("2027-03-13T12:00:00.000Z"));
+    expect(listMaintenance(new Date("2027-03-14T13:15:00.000Z"), "America/New_York").find((row) => row.id === window.id)).toMatchObject({
+      status: "in_progress", starts_at: "2027-03-14T13:00:00.000Z", ends_at: "2027-03-14T13:30:00.000Z",
+    });
+  });
+
   test("migration creates both tables on the test database", () => {
     const tables = sqlite.query("select name from sqlite_master where type='table'").all() as { name: string }[];
     expect(tables.map((row) => row.name)).toContain("status_notes");

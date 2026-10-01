@@ -35010,6 +35010,35 @@ and child captures at 1440 and 390 pixels in both themes under
 `data-scratch/screens/status-c3d/`. The history response is fixed in the
 capture for repeatability. The frontend reads the STATUS-C3a history route.
 
+## STATUS-D1
+
+Home pins `spec-v0.1.66`, which adds optional `rrule` and `until` fields to
+`MaintenanceWindow` alongside the browser alert setting. The hub stores an
+RFC 5545 rule and optional final date on each recurring window; its duration
+comes from `ends_at - starts_at`. Occurrences are derived with the MIT
+`rrule-temporal` package at read time. One-off rows keep both new columns
+null. The additive migration leaves existing windows unchanged.
+
+The recurrence uses the hub process's local IANA time zone for its DTSTART,
+so a daily or weekly job keeps its household wall-clock time across daylight
+saving changes. Home has no separate household time-zone setting yet. The
+host's configured zone is therefore the time-zone source, with UTC as the
+fallback. `until` is an inclusive calendar date; without it, the rule has no
+end date. Weekly schedules store the selected weekdays in the RRULE.
+
+The status board returns the current or next occurrence as `In maintenance`
+or `Scheduled`. Cancelling a recurring row cancels the series. Status
+history records active occurrences as maintenance minutes and excludes those
+minutes from the uptime denominator. The admin form uses the kit's Select,
+Field, Input, and Calendar components for the repeat schedule and end date.
+
+The focused backend tests cover daily, weekly, and monthly expansion, the
+next occurrence, active and cancelled series, one-off compatibility, a DST
+change, and uptime exclusion. The headless review mode is
+`bun run screenshots --status-d1-review`; it writes owner captures of the
+open maintenance form and the scheduled status page at 390 and 1440 pixels to
+`data-scratch/screens/status-d1/` using the script-owned temporary backend.
+
 ## ENGINE-AVAIL-01
 
 `llmSupervisor.ts` derives the chat engine's `ready`, `starting`, or

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { maintenanceWindows, statusNotes } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { randomSuffix } from "@/lib/id";
+import { maintenanceOccurrence, validateMaintenanceRecurrence } from "@/lib/maintenanceRecurrence";
 import { MaintenanceWindow } from "@maipai/spec/gen/ts/maintenance-window.js";
 import { StatusNote } from "@maipai/spec/gen/ts/status-note.js";
 
@@ -12,7 +13,7 @@ export class StatusBoardError extends Error {
 }
 export type MaintenanceStatus = "cancelled" | "scheduled" | "in_progress" | "completed";
 export type MaintenanceView = MaintenanceWindow & { status: MaintenanceStatus };
-export type MaintenanceInput = { title: string; description?: string; components: string[]; startsAt: string; endsAt: string };
+export type MaintenanceInput = { title: string; description?: string; components: string[]; startsAt: string; endsAt: string; rrule?: string; until?: string; timeZone?: string };
 
 function timestamp(date: Date): string { return date.toISOString(); }
 function noteFromRow(row: typeof statusNotes.$inferSelect): StatusNote {
@@ -22,6 +23,7 @@ function noteFromRow(row: typeof statusNotes.$inferSelect): StatusNote {
 function maintenanceFromRow(row: typeof maintenanceWindows.$inferSelect): MaintenanceWindow {
   return MaintenanceWindow.parse({ id: row.id, title: row.title, description: row.description,
     components: JSON.parse(row.components), starts_at: row.startsAt, ends_at: row.endsAt,
+    ...(row.rrule ? { rrule: row.rrule } : {}), ...(row.until ? { until: row.until } : {}),
     cancelled_at: row.cancelledAt, created_by: row.createdBy, created_at: row.createdAt, hlc: row.hlc });
 }
 function activeNoteRows(now: Date): (typeof statusNotes.$inferSelect)[] {
@@ -59,11 +61,16 @@ export function createMaintenance(actor: StatusActor, input: MaintenanceInput, n
   if (end <= start) throw new StatusBoardError("Maintenance must end after it starts.");
   if (end < now.getTime()) throw new StatusBoardError("Maintenance cannot end in the past.");
   if (start > now.getTime() + 90 * 24 * 60 * 60 * 1000) throw new StatusBoardError("Maintenance cannot start more than 90 days ahead.");
+  if (input.until && !input.rrule) throw new StatusBoardError("Choose a repeat schedule before setting an end date.");
   const parsed = MaintenanceWindow.parse({ id: `maint-${randomSuffix(10)}`, title: input.title,
     description: input.description ?? "", components: input.components, starts_at: input.startsAt,
-    ends_at: input.endsAt, cancelled_at: null, created_by: actor.id, created_at: timestamp(now), hlc: nextHlc() });
+    ends_at: input.endsAt, ...(input.rrule ? { rrule: input.rrule } : {}), ...(input.until ? { until: input.until } : {}),
+    cancelled_at: null, created_by: actor.id, created_at: timestamp(now), hlc: nextHlc() });
+  try { validateMaintenanceRecurrence(parsed, input.timeZone); }
+  catch { throw new StatusBoardError("The repeat schedule is invalid."); }
   db.insert(maintenanceWindows).values({ id: parsed.id, title: parsed.title, description: parsed.description,
     components: JSON.stringify(parsed.components), startsAt: parsed.starts_at, endsAt: parsed.ends_at,
+    rrule: parsed.rrule ?? null, until: parsed.until ?? null,
     cancelledAt: null, createdBy: parsed.created_by, createdAt: parsed.created_at, hlc: parsed.hlc }).run();
   return parsed;
 }
@@ -71,24 +78,24 @@ export function createMaintenance(actor: StatusActor, input: MaintenanceInput, n
 export function cancelMaintenance(actor: StatusActor, id: string, now: Date = new Date()): MaintenanceWindow {
   const row = db.select().from(maintenanceWindows).where(eq(maintenanceWindows.id, id)).get();
   if (!row) throw new StatusBoardError("Maintenance window was not found.", 404);
-  if (row.cancelledAt || Date.parse(row.endsAt) <= now.getTime()) throw new StatusBoardError("Completed or cancelled maintenance cannot be cancelled.", 409);
+  const record = maintenanceFromRow(row);
+  if (maintenanceOccurrence(record, now).status === "completed" || row.cancelledAt) throw new StatusBoardError("Completed or cancelled maintenance cannot be cancelled.", 409);
   db.update(maintenanceWindows).set({ cancelledAt: timestamp(now), hlc: nextHlc() }).where(eq(maintenanceWindows.id, id)).run();
   return maintenanceFromRow({ ...row, cancelledAt: timestamp(now) });
 }
 
-export function listMaintenance(now: Date = new Date()): MaintenanceView[] {
+export function listMaintenance(now: Date = new Date(), timeZone?: string): MaintenanceView[] {
   const cutoff = now.getTime() - 7 * 24 * 60 * 60 * 1000;
   const rows = db.select().from(maintenanceWindows).all().map((row) => {
     const record = maintenanceFromRow(row);
-    const status: MaintenanceStatus = record.cancelled_at ? "cancelled" : now.getTime() < Date.parse(record.starts_at) ? "scheduled"
-      : now.getTime() < Date.parse(record.ends_at) ? "in_progress" : "completed";
-    return { record, status };
-  }).filter(({ record, status }) => (status !== "completed" && status !== "cancelled") || Date.parse(record.ends_at) >= cutoff);
+    const occurrence = maintenanceOccurrence(record, now, timeZone);
+    return { record, occurrence };
+  }).filter(({ occurrence }) => (occurrence.status !== "completed" && occurrence.status !== "cancelled") || Date.parse(occurrence.ends_at) >= cutoff);
   const rank: Record<MaintenanceStatus, number> = { in_progress: 0, scheduled: 1, completed: 2, cancelled: 3 };
-  rows.sort((a, b) => rank[a.status] - rank[b.status] || (a.status === "scheduled"
-    ? Date.parse(a.record.starts_at) - Date.parse(b.record.starts_at)
-    : Date.parse(b.record.starts_at) - Date.parse(a.record.starts_at)));
-  return rows.map(({ record, status }) => ({ ...record, status }));
+  rows.sort((a, b) => rank[a.occurrence.status] - rank[b.occurrence.status] || (a.occurrence.status === "scheduled"
+    ? Date.parse(a.occurrence.starts_at) - Date.parse(b.occurrence.starts_at)
+    : Date.parse(b.occurrence.starts_at) - Date.parse(a.occurrence.starts_at)));
+  return rows.map(({ record, occurrence }) => ({ ...record, starts_at: occurrence.starts_at, ends_at: occurrence.ends_at, status: occurrence.status }));
 }
 
 export function activeMaintenanceComponents(now: Date = new Date()): Set<string> {
