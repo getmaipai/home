@@ -35479,6 +35479,19 @@ menu data is edited. `StatusAppsResponse` is shared with the backend route
 schema through its alias-free wire contract; the endpoint returns an array,
 and each need includes its purpose and `waiting` need state.
 
+## STATUS-SVC-07 (2026-10-01)
+
+Each installed app row has a short plain-language summary and a kit Collapsible.
+Owners and admins can expand a row to see needs grouped under Needs attention,
+Working, and a muted No recent use count whose service names expand on demand.
+Rows with known need problems open by default; fine and unknown-only rows stay
+closed. Unknown needs do not affect the summary. The pure summary helper
+prioritizes required problems and uses household wording for engine, service,
+and internet states. Household members receive no expander or dependency names.
+Need diagnostics show last success and error class when available. Both
+expanders use 48 px minimum targets. Fixture captures cover admin and member
+views at desktop and phone sizes for Chat down and all fine.
+
 ## STATUS-LIVE-01 (2026-10-01)
 
 The weather service events at 12:25 and 13:25 UTC align with the installed

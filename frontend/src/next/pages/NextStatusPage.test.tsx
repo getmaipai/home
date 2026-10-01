@@ -15,13 +15,13 @@ const apps: StatusAppsResponse = [
   ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational" as const, reason: null, needs: [{ kind: "engine" as const, id: "chat", name: "Brain", purpose: "Chat model", state: "operational" as const, required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: "operational" as const, uptime: 100 })), uptimePercent: 100 })),
 ];
 
-function mockStatus() {
+function mockStatus(includeNeeds: boolean) {
   const original = globalThis.fetch;
   const paths: string[] = [];
   globalThis.fetch = mock((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
     paths.push(url.split("?")[0] ?? "");
-    if (url.includes("/api/status/apps")) return Promise.resolve(Response.json(apps));
+    if (url.includes("/api/status/apps")) return Promise.resolve(Response.json(includeNeeds ? apps : apps.map(({ needs: _needs, ...app }) => app)));
     if (url.includes("/api/health")) return Promise.resolve(Response.json({
       brain: "selection", voice: "spawned", ok: true, uptimeSeconds: 60,
       engines: { chat: { kind: "selection", pid: null, alive: true }, embed: { kind: "spawned", pid: null, alive: true }, background: { kind: "spawned", pid: null, alive: true }, voice: { kind: "spawned", pid: null, alive: true } }, sidecars: [],
@@ -35,7 +35,7 @@ function mockStatus() {
 
 describe("NextStatusPage app-first view", () => {
   test("members get app rows, reason, and bars without dependency names, controls, or raw-part requests", async () => {
-    const { paths, restore } = mockStatus();
+    const { paths, restore } = mockStatus(false);
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("adult")} />);
       expect(await view.findByText("Apps")).toBeTruthy();
@@ -53,13 +53,14 @@ describe("NextStatusPage app-first view", () => {
   });
 
   test("admins get each app's needs and the original raw parts and controls below them", async () => {
-    const { paths, restore } = mockStatus();
+    const { paths, restore } = mockStatus(true);
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("admin")} />);
       expect(await view.findByText("Apps")).toBeTruthy();
-      expect(await view.findByText("Needs: Brain (down)")).toBeTruthy();
+      expect(await view.findByText("Chat isn't working: Brain isn't running.")).toBeTruthy();
+      expect(await view.findByText("Needs attention")).toBeTruthy();
       expect(await view.findByText("Behind the scenes")).toBeTruthy();
-      expect(await view.findByText("Brain", { exact: true })).toBeTruthy();
+      expect((await view.findAllByText("Brain", { exact: true })).length).toBeGreaterThan(0);
       expect(view.getAllByRole("button", { name: "Restart" })).toHaveLength(4);
       expect(paths).toContain("/api/health");
       expect(paths).toContain("/api/status/history");

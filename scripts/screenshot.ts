@@ -258,6 +258,7 @@ const statusB2bReview = process.argv.includes("--status-b2b-review");
 const statusD1Review = process.argv.includes("--status-d1-review");
 const statusEngineControlsReview = process.argv.includes("--status-engine-controls-review");
 const statusAppsReview = process.argv.includes("--status-apps-review");
+const statusExpandReview = process.argv.includes("--status-expand-review");
 const browserAlertsReview = process.argv.includes("--browser-alerts-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
@@ -3863,6 +3864,85 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
   console.log("Fixture capture shows Chat down with Brain down for the admin, and the plain reason without engine names for a household member.");
 }
 
+async function captureStatusExpandReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-expand";
+  mkdirSync(outDir, { recursive: true });
+  const created = await fetch(`${BASE_URL}/api/people`, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: `session=${ownerSession}` },
+    body: JSON.stringify({ displayName: "Status Expand Reviewer", role: "teen", secret: "review-status-expand-secret" }),
+  });
+  if (!created.ok) throw new Error(`status expand reviewer setup failed: ${created.status} ${await created.text()}`);
+  const person = await created.json() as { id: string };
+  const signedIn = await fetch(`${BASE_URL}/api/auth/verify-secret`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ personId: person.id, secret: "review-status-expand-secret" }),
+  });
+  if (!signedIn.ok) throw new Error(`status expand reviewer sign-in failed: ${signedIn.status}`);
+  const memberSession = signedIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!memberSession) throw new Error("status expand reviewer sign-in carried no session cookie");
+
+  const today = new Date();
+  const historyFor = (down: boolean) => Array.from({ length: 90 }, (_, index) => {
+    const date = new Date(today.getTime() - (89 - index) * 86_400_000).toISOString().slice(0, 10);
+    return { date, state: down && index === 89 ? "down" : "operational", uptime: down && index === 89 ? 50 : 100 };
+  });
+  const needs = [
+    { kind: "engine", id: "chat", name: "MaiPai's AI", purpose: "Required chat model", required: true, state: "down", last_success_at: new Date(today.getTime() - 3_600_000).toISOString(), last_error_class: "process_stopped" },
+    { kind: "engine", id: "understanding", name: "Understanding", purpose: "Intent understanding", required: false, state: "degraded", last_success_at: new Date(today.getTime() - 7_200_000).toISOString(), last_error_class: "timeout" },
+    { kind: "engine", id: "memory", name: "Memory", purpose: "Recall", required: false, state: "operational" },
+    { kind: "engine", id: "voice", name: "Voice", purpose: "Speech", required: false, state: "degraded", last_success_at: new Date(today.getTime() - 5_400_000).toISOString(), last_error_class: "unavailable" },
+    { kind: "service", id: "websearch", name: "Household web search", purpose: "Search", required: false, state: "degraded", last_success_at: new Date(today.getTime() - 1_800_000).toISOString(), last_error_class: "http_503" },
+    ...["MusicBrainz", "Wikipedia", "Wikidata", "Open-Meteo", "Open-Meteo geocoding", "MLB Stats API", "NPR"].map((name) => ({ kind: "service", id: name.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-"), name, purpose: "Optional outside service", required: false, state: "unknown" })),
+  ];
+  const appFixture = (admin: boolean, down: boolean) => {
+    const history = historyFor(down);
+    return [
+      { id: "chat", name: "Chat", state: down ? "down" : "operational", reason: down ? "Chat isn't working right now." : null, ...(admin ? { needs: down ? needs : needs.map((need) => ({ ...need, state: "operational", last_error_class: undefined })) } : {}), history, uptimePercent: down ? 99.5 : 100 },
+      ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, ...(admin ? { needs: [] } : {}), history: historyFor(false), uptimePercent: 100 })),
+    ];
+  };
+
+  for (const state of ["chat-down", "all-fine"] as const) {
+    const down = state === "chat-down";
+    for (const [role, session, admin] of [["admin", ownerSession, true], ["non-admin", memberSession, false]] as const) {
+      for (const [viewportName, width] of [["desktop", 1440], ["phone", 390]] as const) {
+        const viewport = VIEWPORTS.find((item) => item.slug === viewportName)!;
+        const context = await newContext(browser, viewport, "light", session);
+        try {
+          const page = await context.newPage();
+          await page.route("**/api/status/apps", (route) => route.fulfill({ status: 200, json: appFixture(admin, down) }));
+          await page.route("**/api/health", async (route) => {
+            const response = await route.fetch();
+            const health = await response.json() as { ok: boolean; engines: Record<string, { kind: string; pid: number | null; alive: boolean | null }> };
+            health.ok = !down;
+            health.engines.chat = { kind: down ? "selection" : "spawned", pid: down ? 4242 : null, alive: !down };
+            await route.fulfill({ response, json: health });
+          });
+          await page.goto(`${BASE_URL}/status`);
+          await page.getByText("Apps", { exact: true }).waitFor({ timeout: 15000 });
+          await page.getByText(down && !admin ? "Chat isn't working right now." : down ? "Chat isn't working: MaiPai's AI isn't running." : "All fine.", { exact: true }).first().waitFor();
+          if (admin && down) {
+            await page.getByRole("heading", { name: "Needs attention", exact: true }).waitFor();
+            await page.getByRole("heading", { name: "Working", exact: true }).waitFor();
+            const noRecent = page.getByRole("button", { name: "No recent use: 7 services" });
+            await noRecent.waitFor();
+            await noRecent.click();
+            await page.getByText("MusicBrainz", { exact: true }).waitFor();
+          }
+          if (!admin) {
+            if (await page.getByText("Behind the scenes", { exact: true }).count()) throw new Error("non-admin status capture shows Behind the scenes");
+            if (await page.getByText("MaiPai's AI", { exact: true }).count()) throw new Error("non-admin status capture exposed an engine name");
+          }
+          const path = join(outDir, `status-expand-${state}-${role}-${width}.png`);
+          await page.screenshot({ path, fullPage: true });
+          console.log(`Wrote ${path}`);
+        } finally { await context.close(); }
+      }
+    }
+  }
+  console.log("Captured Chat down and all-fine app rows for admin and household-member roles at desktop and phone widths.");
+}
+
 async function captureBrowserAlertsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screens", "avail-06a");
   mkdirSync(outDir, { recursive: true });
@@ -4929,6 +5009,11 @@ async function main() {
     if (statusAppsReview) {
       await captureStatusAppsReview(browser, sessionValue);
       console.log("completed named review: --status-apps-review");
+      return;
+    }
+    if (statusExpandReview) {
+      await captureStatusExpandReview(browser, sessionValue);
+      console.log("completed named review: --status-expand-review");
       return;
     }
     if (browserAlertsReview) {

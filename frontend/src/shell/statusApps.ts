@@ -1,4 +1,4 @@
-import type { StatusAppState } from "@/lib/api";
+import type { StatusAppNeed, StatusAppState } from "@/lib/api";
 import type { StatusApp } from "@/lib/api";
 
 export function appStatusPresentation(state: StatusAppState): { status: "online" | "degraded" | "offline"; label: string } {
@@ -38,4 +38,55 @@ export function statusAppsSummary(apps: readonly { name: string; state: StatusAp
   const messages = affected.map((app) => app.reason).filter((reason): reason is string => Boolean(reason));
   const names = affected.map((app) => app.name);
   return { level, text: level === "offline" ? "Something is down" : "Degraded", problems: names, message: messages.join(" ") || `${names.join(", ")} need attention.` };
+}
+
+function problemPriority(state: StatusAppNeed["state"]): number {
+  if (state === "down") return 3;
+  if (state === "waiting") return 2;
+  if (state === "degraded") return 1;
+  return 0;
+}
+
+function plainNeedName(need: StatusAppNeed): string {
+  if (need.kind === "internet" || need.name.toLocaleLowerCase() === "internet") return "the internet";
+  if (need.name === "Household web search") return "search";
+  return need.name;
+}
+
+function needProblemWords(need: StatusAppNeed): string {
+  const name = plainNeedName(need);
+  if (need.state === "waiting") return "the internet is having trouble";
+  if (need.kind === "engine") {
+    if (need.state === "down") return `${name} isn't running`;
+    if (need.state === "degraded") return `${name} is still starting`;
+  }
+  if (need.state === "down") return `${name} isn't reachable`;
+  return `${name} is having trouble`;
+}
+
+/** Summarizes known need state without counting services that have not been used recently. */
+export function summarizeStatusApp(app: StatusApp, includeNeedNames = true): string {
+  const needs = app.needs;
+  if (!includeNeedNames || !needs) {
+    if (app.state === "operational") return "All fine.";
+    return app.reason ?? `${app.name} needs attention.`;
+  }
+
+  const problems = needs
+    .filter((need) => need.state !== "operational" && need.state !== "unknown")
+    .sort((a, b) => Number(b.required) - Number(a.required) || problemPriority(b.state) - problemPriority(a.state));
+  const problem = problems[0];
+  if (!problem) return needs.some((need) => need.state === "unknown") ? "No recent problems." : "All fine.";
+
+  if (problem.state === "waiting") {
+    return problem.required
+      ? `${app.name} is waiting for the internet.`
+      : `${app.name} is working, but the internet is having trouble.`;
+  }
+
+  const cause = needProblemWords(problem);
+  if (!problem.required) return `${app.name} is working, but ${cause}.`;
+  if (problem.state === "down") return `${app.name} isn't working: ${cause}.`;
+  if (problem.kind === "engine") return `${app.name} is slow to start: ${cause}.`;
+  return `${app.name} is working slowly: ${cause}.`;
 }
