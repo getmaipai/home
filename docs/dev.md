@@ -1674,6 +1674,33 @@ weights revision `d29db7978e464fb90cb3359ee0c69a273b9142cc`; its pinned
 Alba voice is revision `e81d79e8194ad4c7ce879c87a4258ef20cbf2487`. Home's
 engine build and model revision were not reported by its service.
 
+#### Text to speech, listening check and bars, 2026-10-01
+
+The owner listened to three paired samples, each the same line from Home's
+engine and the Stack's. The voices sound the same, and the Stack's reads as
+more natural. The measured edge silence is the likely reason: the Stack's
+clips carry about 0.2 seconds less leading and trailing silence than Home's,
+steady within each engine.
+
+Home's engine is launched unpinned through `uvx pocket-tts`. The shared uv
+cache holds Pocket TTS 3.1.0, 3.2.0 and 3.3.0, while the Stack pins 3.1.0.
+A different build is the likeliest cause of the padding difference, but this
+is not proven: the engine has no version flag and Home's replies carry no
+version.
+
+The proposed 5 percent duration bar was a guess. The controls showed that
+each engine differs from itself by about plus or minus 10 percent. For text
+to speech, the pass bars are now: no clipping above 0.1 percent of samples;
+first audio at most 1.25 times Home's at the median; the spoken part's median
+ratio within 0.9 to 1.1; the Stack's edge silence no longer than Home's; and a
+person's listening check for the same voice and no odd gaps. The listening
+check was passed. The fixed 5 percent total duration bar is retired for this
+role.
+
+Text to speech passes the laptop dry run on the corrected bars and the
+listening check. The Studio run stays owed with STACK-14. Moving the role on
+the household's hub still needs the owner's word.
+
 | Run | Ratio | Min | P05 | Median | P95 | Max | Within 5 / 8 / 12 percent |
 |---|---|---:|---:|---:|---:|---:|---:|
 | Home against itself | Total duration | 0.855 | 0.912 | 1.000 | 1.074 | 1.128 | 22 / 26 / 28 |

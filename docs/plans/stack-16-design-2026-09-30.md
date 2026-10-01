@@ -36,13 +36,15 @@ A role is proven by a script, not by a feeling. The proof harness lives in Home 
 
 | Role | Inputs | Must match | Must not regress |
 |---|---|---|---|
-| Text to speech | 30 recorded lines across every voice in use | duration within 5 percent, no silence or clipping in the audio, same voice id honoured | time to first audio no worse than 1.25 times Home's |
+| Text to speech | 30 recorded lines across every voice in use | no clipping above 0.1 percent of samples; spoken part's median ratio within 0.9 to 1.1; Stack edge silence no longer than Home's; same voice by listening check, with no odd gaps | median time to first audio at most 1.25 times Home's |
 | Speech to text | 30 recorded clips | word error rate no worse than Home's by more than 1 point | time to final text no worse than 1.25 times |
 | Embeddings | 200 recorded texts | cosine similarity at least 0.999 against Home's vectors for the same model file | throughput no worse than 0.8 times |
 | Judge | 50 recorded memory and safety decisions | same yes or no on every decision (a difference is read by a person, never averaged away) | no added refusal or crisis-path failure |
 | Chat | the chat replay set | same model file and sampling, reply quality read by a person against the bare-model floor, every crisis and child-safety row unchanged | time to first token no worse than 1.25 times, memory at most what the Stack's own plan said |
 
 Every run records the engine builds, the model files and a sanitized hardware line. A role passes only when the whole table row passes on the machine it will run on, so the first runs happen on the laptop bench and the real proof on the Studio.
+
+Every bar is set from a control run (the same engine against itself) and a listening check, never from a guess (learned on text to speech, 2026-10-01).
 
 ### The order
 
