@@ -13248,6 +13248,18 @@
                                   "gb"
                                 ]
                               }
+                            },
+                            "homeOwnedRoles": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "chat",
+                                  "embeddings",
+                                  "stt",
+                                  "tts"
+                                ]
+                              }
                             }
                           },
                           "required": [
@@ -13256,7 +13268,8 @@
                             "freeGb",
                             "pressure",
                             "pressureText",
-                            "loaded"
+                            "loaded",
+                            "homeOwnedRoles"
                           ]
                         }
                       },

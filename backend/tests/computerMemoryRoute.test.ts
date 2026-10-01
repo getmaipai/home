@@ -8,10 +8,10 @@ const value = { totalMemoryBytes: 32 * 1024 ** 3, capBytes: 16 * 1024 ** 3, free
 describe("GET /api/computer-memory", () => {
   beforeEach(() => resetDb());
   afterEach(() => __resetStackEngineForTests());
-  test("returns available memory figures", async () => {
+  test("includes an empty Home-owned role list when the test client owns every role", async () => {
     __setStackClientForTests({ budget: async () => value } as unknown as StackClient);
     const { client } = await owner();
-    expect(await (await client.get("/api/computer-memory")).json()).toEqual({ available: true, memory: { usableGb: 16, usedGb: 5, freeGb: 11, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [{ id: "chat", label: "Chat", gb: 5 }] } });
+    expect(await (await client.get("/api/computer-memory")).json()).toEqual({ available: true, memory: { usableGb: 16, usedGb: 5, freeGb: 11, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [{ id: "chat", label: "Chat", gb: 5 }], homeOwnedRoles: [] } });
   });
   test("reports unavailable when the Stack throws", async () => {
     __setStackClientForTests({ budget: async () => { throw new Error("offline"); } } as unknown as StackClient);

@@ -534,7 +534,7 @@ export async function* readBareCompareStream(response: Response): AsyncGenerator
   }
 }
 
-export type ComputerMemory = { usableGb: number; usedGb: number; freeGb: number; pressure: "normal" | "warn" | "critical"; pressureText: string; loaded: Array<{ id: string; label: string; gb: number }> };
+export type ComputerMemory = { usableGb: number; usedGb: number; freeGb: number; pressure: "normal" | "warn" | "critical"; pressureText: string; loaded: Array<{ id: string; label: string; gb: number }>; homeOwnedRoles: Array<"chat" | "embeddings" | "stt" | "tts"> };
 export type ComputerMemoryResponse = { available: true; memory: ComputerMemory } | { available: false };
 
 export type FitPlanResponse = { plan: StackFitPlan | null; wording: { verdict: "yes" | "slow" | "no" | "unknown"; headline: string; detail: string } };

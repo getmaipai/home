@@ -43,9 +43,15 @@ export function isStackConfigured(): boolean {
 }
 
 export type StackRole = "chat" | "embeddings" | "stt" | "tts";
+export const STACK_ROLES: readonly StackRole[] = ["chat", "embeddings", "stt", "tts"];
 
 export function isStackRoleEnabled(role: StackRole): boolean {
   return testClient !== null || (isStackConfigured() && getHouseholdSettingValue(`engines.stack.use_${role}`) === true);
+}
+
+/** Home's own engines still own every role that the Stack does not route. */
+export function getHomeOwnedRoles(): StackRole[] {
+  return STACK_ROLES.filter((role) => !isStackRoleEnabled(role));
 }
 
 /** Existing configured hubs retain their former all-role behavior once, at boot. */

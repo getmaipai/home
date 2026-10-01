@@ -5,6 +5,15 @@ export type FitPanelRow = { label: string; value: string; source?: "measured" | 
 export const roleNames: Record<StackFitPlan["roles"][number]["role"], string> = {
   chat: "Chat", router: "Routing", embed: "Search", rerank: "Ranking", vision: "Vision", image: "Pictures", video: "Video", music: "Music", coding: "Coding", judge: "Safety checks", tts: "Speaking", stt: "Listening", wakeword: "Wake word", "turn-signal": "Turn signal",
 };
+export const homeOwnedRoleNames: Record<"chat" | "embeddings" | "stt" | "tts", string> = {
+  chat: "chat", embeddings: "search", stt: "listening", tts: "speaking",
+};
+
+export function describeHomeOwnedRoles(roles: Array<keyof typeof homeOwnedRoleNames>): string {
+  const names = roles.map((role) => homeOwnedRoleNames[role]);
+  if (names.length < 2) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
 const pathNames: Record<StackFitPlan["paths"][number]["path"], string> = {
   unified: "In the computer's shared memory", gpu: "On the graphics card", "multi-gpu": "Across the graphics cards", "cpu-offload": "Partly on the processor (slower)", cpu: "On the processor only (slow)",
 };

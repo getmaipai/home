@@ -14,7 +14,7 @@ import { modelLinkName, parseModelLink } from "@/lib/modelLink";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { Card } from "@maipai/ui/src/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
-import { describeFitPlan, type FitPanelRow } from "@/lib/fitPanel";
+import { describeFitPlan, describeHomeOwnedRoles, type FitPanelRow } from "@/lib/fitPanel";
 import type { ComputerMemoryResponse } from "@/lib/api";
 import type { FitPlanResponse } from "@/lib/api";
 import { summarizeFits } from "@/lib/fitSummary";
@@ -469,9 +469,9 @@ function FitLine({ fitPlan, legacyWarning }: { fitPlan: ReturnType<typeof useFit
   return <p className="flex items-start gap-1.5 text-base text-[var(--muted-foreground)]"><AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> This may run slowly on this computer.</p>;
 }
 
-function FitResult({ headline, detail, verdict }: { headline: string; detail: string; verdict: "yes" | "slow" | "no" | "unknown" }) {
+function FitResult({ headline, detail, verdict, sizedModel }: { headline: string; detail: string; verdict: "yes" | "slow" | "no" | "unknown"; sizedModel?: string | null }) {
   const status = { yes: "online", slow: "degraded", no: "offline", unknown: "maintenance" }[verdict] as "online" | "degraded" | "offline" | "maintenance";
-  return <div className="flex flex-col items-start gap-1"><Status status={status}>{headline}</Status><p className="text-base text-[var(--muted-foreground)]">{detail}</p></div>;
+  return <div className="flex flex-col items-start gap-1"><Status status={status}>{headline}</Status><p className="text-base text-[var(--muted-foreground)]">{detail}</p>{sizedModel ? <p className="text-base text-[var(--muted-foreground)]">Sized from {sizedModel}.</p> : null}</div>;
 }
 
 function CheckModelCard({ onChecked }: { onChecked: (name: string, response: FitPlanResponse) => void }) {
@@ -510,7 +510,7 @@ function CheckModelCard({ onChecked }: { onChecked: (name: string, response: Fit
       </form>
       {error ? <p className="mt-2 text-base text-[var(--muted-foreground)]">{error}</p> : null}
       {busy ? <div className="mt-2"><Progress mode="spinner" label="Checking this computer" /></div> : null}
-      {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} />{response.plan ? <Disclosure open={showPlan} onToggle={() => setShowPlan((open) => !open)} label="How this was worked out" icon={getIcon("chevron-down")}><FitPanel response={response} /></Disclosure> : null}</div> : null}
+      {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} sizedModel={response.plan && typeof response.plan.model === "string" && response.plan.model.length > 0 ? response.plan.model : null} />{response.plan ? <Disclosure open={showPlan} onToggle={() => setShowPlan((open) => !open)} label="How this was worked out" icon={getIcon("chevron-down")}><FitPanel response={response} /></Disclosure> : null}</div> : null}
     </RoleCardShell>
   );
 }
@@ -598,7 +598,8 @@ function ComputerMemoryCard({ response }: { response: ComputerMemoryResponse }) 
         <div className="flex items-center gap-3"><IconTile icon="cpu" hue="--hue-blue" /><p className="text-lg font-medium tabular-nums">{memory.usedGb} GB in use of {memory.usableGb} GB</p></div>
         <p className="text-base text-[var(--muted-foreground)]">{memory.pressureText}</p>
         <Progress mode="determinate" value={percent} label="Memory used" />
-        {memory.loaded.length ? <SpecSheet title="Models using memory" rows={memory.loaded.map((item) => ({ label: item.label, value: `${item.gb} GB` }))} visibleCount={memory.loaded.length} /> : <p className="text-base text-[var(--muted-foreground)]">Nothing is loaded right now.</p>}
+        {memory.loaded.length ? <SpecSheet title="Models using memory" rows={memory.loaded.map((item) => ({ label: item.label, value: `${item.gb} GB` }))} visibleCount={memory.loaded.length} /> : <p className="text-base text-[var(--muted-foreground)]">{memory.homeOwnedRoles.length ? "The Stack has nothing loaded." : "Nothing is loaded right now."}</p>}
+        {memory.homeOwnedRoles.length ? <p className="text-sm text-[var(--muted-foreground)]">This counts only what the Stack has loaded. Home&apos;s own engines still run: {describeHomeOwnedRoles(memory.homeOwnedRoles)}.</p> : null}
       </div>
     </RoleCardShell>
   );

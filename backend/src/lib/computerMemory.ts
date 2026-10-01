@@ -1,4 +1,5 @@
 import type { BudgetResponse } from "@/lib/stack/types";
+import type { StackRole } from "@/lib/stackEngine";
 
 const gib = 1024 ** 3;
 const roleNames: Record<string, string> = {
@@ -6,13 +7,14 @@ const roleNames: Record<string, string> = {
 };
 
 /** The backend counterpart of frontend/src/lib/fitPanel.ts's roleNames. */
-export function describeComputerMemory(budget: BudgetResponse): {
+export function describeComputerMemory(budget: BudgetResponse, homeOwnedRoles: StackRole[] = []): {
   usableGb: number;
   usedGb: number;
   freeGb: number;
   pressure: "normal" | "warn" | "critical";
   pressureText: string;
   loaded: Array<{ id: string; label: string; gb: number }>;
+  homeOwnedRoles: StackRole[];
 } {
   const round = (bytes: number) => Math.round(bytes / gib * 10) / 10;
   const used = budget.loaded.reduce((sum, item) => sum + item.peakBytes, 0);
@@ -23,5 +25,6 @@ export function describeComputerMemory(budget: BudgetResponse): {
     pressure: budget.pressure,
     pressureText: { normal: "Plenty of room right now.", warn: "Memory is getting tight.", critical: "Memory is very tight." }[budget.pressure],
     loaded: budget.loaded.map(({ id, peakBytes }) => ({ id, label: roleNames[id] ?? id, gb: round(peakBytes) })),
+    homeOwnedRoles,
   };
 }

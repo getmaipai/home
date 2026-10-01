@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { getStackClient } from "@/lib/stackEngine";
+import { getHomeOwnedRoles, getStackClient } from "@/lib/stackEngine";
 import { describeComputerMemory } from "@/lib/computerMemory";
 import { requireAuth } from "@/middleware/auth";
 
@@ -9,6 +9,7 @@ const MemorySchema = z.object({
   usableGb: z.number(), usedGb: z.number(), freeGb: z.number(),
   pressure: z.enum(["normal", "warn", "critical"]), pressureText: z.string(),
   loaded: z.array(z.object({ id: z.string(), label: z.string(), gb: z.number() })),
+  homeOwnedRoles: z.array(z.enum(["chat", "embeddings", "stt", "tts"])),
 });
 const route = createRoute({
   method: "get", path: "/", tags: ["Models"], summary: "What model memory this computer is using right now",
@@ -21,7 +22,7 @@ const route = createRoute({
 computerMemoryRoutes.openapi(route, async (c) => {
   try {
     const budget = await getStackClient().budget();
-    return c.json({ available: true as const, memory: describeComputerMemory(budget) }, 200);
+    return c.json({ available: true as const, memory: describeComputerMemory(budget, getHomeOwnedRoles()) }, 200);
   } catch {
     return c.json({ available: false as const }, 200);
   }

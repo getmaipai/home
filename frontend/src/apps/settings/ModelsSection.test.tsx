@@ -322,19 +322,31 @@ describe("ModelsSection", () => {
     } finally { restore(); }
   });
 
-  test("a checked model result offers the worked out plan disclosure", async () => {
+  test("a checked model result names the file used to size a plan", async () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES);
     try {
-      const { findByRole, getByRole } = render(<ModelsSection />);
+      const { findByRole, findByText, getByRole } = render(<ModelsSection />);
       fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      await findByText("Sized from example.");
       await findByRole("button", { name: "How this was worked out" });
+    } finally { restore(); }
+  });
+
+  test("a checked model result without a plan does not name a sized file", async () => {
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNAVAILABLE);
+    try {
+      const { findByRole, findByText, getByRole, queryByText } = render(<ModelsSection />);
+      fireEvent.change(await findByRole("textbox", { name: "Hugging Face model link" }), { target: { value: GGUF_LINK } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      await findByText("Can't check right now");
+      expect(queryByText(/Sized from /)).toBeNull();
     } finally { restore(); }
   });
 
 
   test("shows Memory right now, its figure, and a loaded model line", async () => {
-    const memory = { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }] } };
+    const memory = { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }], homeOwnedRoles: [] } };
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
     try {
       const { findByText } = render(<ModelsSection />);
@@ -345,10 +357,24 @@ describe("ModelsSection", () => {
     } finally { restore(); }
   });
 
-  test("shows the empty loaded-memory message", async () => {
-    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [] } };
+  test("shows the empty Stack message and names the roles still running on Home", async () => {
+    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [], homeOwnedRoles: ["chat", "embeddings", "stt", "tts"] as Array<"chat" | "embeddings" | "stt" | "tts"> } };
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
-    try { await render(<ModelsSection />).findByText("Nothing is loaded right now."); } finally { restore(); }
+    try {
+      const { findByText } = render(<ModelsSection />);
+      await findByText("The Stack has nothing loaded.");
+      await findByText("This counts only what the Stack has loaded. Home's own engines still run: chat, search, listening and speaking.");
+    } finally { restore(); }
+  });
+
+  test("shows the original empty-memory lines when no roles still run on Home", async () => {
+    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [], homeOwnedRoles: [] } };
+    const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
+    try {
+      const { findByText, queryByText } = render(<ModelsSection />);
+      await findByText("Nothing is loaded right now.");
+      expect(queryByText(/This counts only what the Stack has loaded/)).toBeNull();
+    } finally { restore(); }
   });
 
   test("renders no memory card when the Stack is unavailable", async () => {

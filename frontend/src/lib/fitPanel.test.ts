@@ -1,9 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import { StackFitPlan, type StackFitPlan as Plan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
-import { describeFitPlan } from "@/lib/fitPanel";
+import { describeFitPlan, describeHomeOwnedRoles } from "@/lib/fitPanel";
 
 const measured = (low: number, high: number) => ({ low: Math.round(low), high: Math.round(high), source: "measured" as const, as_of: "2026-09-30" });
 const unknownFigure = () => ({ low: null, high: null, source: "unknown" as const, as_of: "2026-09-30" });
+
+describe("describeHomeOwnedRoles", () => {
+  test("describes an empty list", () => expect(describeHomeOwnedRoles([])).toBe(""));
+  test("describes one role", () => expect(describeHomeOwnedRoles(["chat"])).toBe("chat"));
+  test("joins two roles with and", () => expect(describeHomeOwnedRoles(["chat", "embeddings"])).toBe("chat and search"));
+  test("joins four roles in the given order", () => expect(describeHomeOwnedRoles(["chat", "embeddings", "stt", "tts"])).toBe("chat, search, listening and speaking"));
+});
 function plan(verdict: Plan["verdict"]): Plan {
   return StackFitPlan.parse({
     schema: 1, model: "example", context_tokens: 8192, kv_cache_type: "f16",
