@@ -2,6 +2,7 @@ export type AppNeed = { kind: "engine" | "service" | "internet"; id: string; nam
 export type AppState = "operational" | "degraded" | "down" | "waiting_for_internet";
 export type NeedState = "operational" | "degraded" | "down" | "waiting" | "unknown";
 import { serviceState } from "@/lib/serviceHealth";
+import { roleHealth } from "@/lib/roleHealth";
 export type StatusApp = { id: string; name: string; needs: AppNeed[] };
 export type StatusEventLike = { component: string; state: string; at: string };
 
@@ -158,10 +159,24 @@ export function appResponse(app: StatusApp, events: StatusEventLike[], showNeeds
   };
 }
 
+export async function appResponseWithLiveRoleHealth(app: StatusApp, events: StatusEventLike[], showNeeds: boolean, now = new Date()) {
+  const response = appResponse(app, events, showNeeds, now);
+  const needs = await Promise.all(currentNeedStates(app, events).map(async (need) => {
+    const role = need.kind === "engine" ? ({ chat: "chat", understanding: "embed", memory: "background", voice: "voice" } as Record<string, "chat" | "embed" | "background" | "voice">)[need.id] : undefined;
+    if (!role) return need;
+    const health = await roleHealth(role);
+    return { ...need, state: health.availability === "unavailable" ? "down" as const : health.availability === "starting" ? "degraded" as const : "operational" as const };
+  }) ?? []);
+  const state = deriveAppState(needs);
+  const visibleNeeds = needs.map((need) => ({ ...need, state: state === "waiting_for_internet" && need.kind !== "internet" ? "waiting" as const : need.state }));
+  return { ...response, state, reason: appReason(app, state, needs), ...(showNeeds ? { needs: visibleNeeds } : {}) };
+}
+
 export function appReason(app: StatusApp, state: AppState, needs: Array<AppNeed & { state: NeedState }>): string | null {
   if (state === "operational") return null;
   if (state === "waiting_for_internet") return `${app.name} is waiting for the internet.`;
   const failed = needs.find((need) => need.required && need.state === "down");
+  if (failed?.kind === "engine") return `${app.name} isn't working: MaiPai's AI isn't running.`;
   if (!failed && needs.some((need) => need.required && need.state === "degraded")) return `${app.name} is starting up.`;
   const limited = needs.find((need) => need.kind === "service" && need.state === "degraded");
   if (limited) return `${limited.name} is limiting requests from this home for a while.`;

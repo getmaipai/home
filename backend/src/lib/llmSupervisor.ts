@@ -388,7 +388,7 @@ function deriveChatAvailability(kind: EngineHealth["kind"], alive: boolean | nul
 }
 
 export function chatAvailabilityState(): ChatAvailabilityState {
-  if (process.env.MAIPAI_LLAMA_SERVER_URL || isStackRoleEnabled("chat")) return { availability: "ready", reason: null };
+  if (process.env.MAIPAI_LLAMA_SERVER_URL) return { availability: "ready", reason: null };
   const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
   const status = getEngineStatus();
   const kind = engineHealthKind("chat", status.kind, port);

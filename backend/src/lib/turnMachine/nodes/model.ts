@@ -19,7 +19,7 @@
 // contains a roster name, the same literal check subjects.ts's own
 // speakerNamedAny() already makes for this exact purpose elsewhere.
 import { startCompleteStream, envelopeToolCall } from "@/lib/llm";
-import { chatEngineDown } from "@/lib/llmSupervisor";
+import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
@@ -703,7 +703,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   if (!attempt.ok) {
     settleFailedGate(gate);
     const failureMessage = attempt.message ?? "";
-    if (chatEngineDown() || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
+    if ((await roleHealth("chat")).availability === "unavailable" || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
       state.engineUnavailable = true;
       return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
     }
@@ -747,7 +747,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     if (!attempt.ok) {
       settleFailedGate(gate);
       const failureMessage = attempt.message ?? "";
-      if (chatEngineDown() || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
+      if ((await roleHealth("chat")).availability === "unavailable" || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
         state.engineUnavailable = true;
         return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
       }

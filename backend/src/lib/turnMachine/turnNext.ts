@@ -29,7 +29,8 @@ import { buildTurnStats } from "@/lib/turnStats";
 import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
-import { chatEngineDown, nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
+import { nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
+import { roleHealth } from "@/lib/roleHealth";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { postProjectResult } from "@/lib/projects/post";
 import { StatusChannel } from "@/lib/statusChannel";
@@ -216,7 +217,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const invalid = validateTurnInput(surface, text);
   if (invalid) return { ok: false, result: invalid };
 
-  if (chatEngineDown()) {
+  if ((await roleHealth("chat")).availability === "unavailable") {
     nudgeChatEngineRecovery();
     const error = opts.spoken === true || surface !== "chat" ? "I can't think right now. I've told the grown-ups." : "MaiPai's AI isn't running right now.";
     return { ok: false, result: { ok: false, status: 503, code: "engine_unavailable", error } };

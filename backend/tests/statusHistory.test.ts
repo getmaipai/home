@@ -13,6 +13,7 @@ import { activeMaintenanceComponents, createMaintenance, type MaintenanceInput }
 import { buildStatusHistory } from "@/lib/statusHistory";
 import { resetDb } from "./reset-db";
 import { __resetServiceHealthForTests } from "@/lib/serviceHealth";
+import { __setRoleHealthForTests } from "@/lib/roleHealth";
 
 type EngineKind = HealthSnapshot["engines"]["chat"]["kind"];
 
@@ -30,8 +31,9 @@ beforeEach(() => {
   db.delete(statusHeartbeat).run();
   db.delete(maintenanceWindows).run();
   __setStatusHistoryHealthForTests(undefined);
+  __setRoleHealthForTests({});
 });
-afterEach(() => __setStatusHistoryHealthForTests(undefined));
+afterEach(() => { __setStatusHistoryHealthForTests(undefined); __setRoleHealthForTests({}); });
 
 describe("componentStatesFrom", () => {
   test.each(kinds.flatMap((kind) => aliveValues.map((alive) => ({ kind, alive }))))("engine $kind with alive=$alive follows chatAvailability", ({ kind, alive }) => {
@@ -114,7 +116,7 @@ describe("status event recording", () => {
     const health = baseHealth();
     __setStatusHistoryHealthForTests(health);
     await recordStatusSample(now);
-    health.engines.chat = { kind: "failed", alive: false, pid: null };
+    __setRoleHealthForTests({ chat: { availability: "unavailable", reason: "failed_start" } });
     await recordStatusSample(new Date(now.getTime() + 30_000));
     expect(db.select().from(statusEvents).all().filter((row) => row.component === "chat")).toHaveLength(2);
   });

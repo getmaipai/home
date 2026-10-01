@@ -28,7 +28,6 @@ import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuot
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
 import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
-import { chatEngineDown } from "@/lib/llmSupervisor";
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
@@ -3830,7 +3829,7 @@ function engineUnavailableLine(surface: Surface, spoken = false): string {
 }
 
 function isEngineUnavailableFailure(message: string): boolean {
-  return chatEngineDown() || message.includes("could not reach") || message.includes("connection refused") || message.includes("ForeignPortHolderError");
+  return message.includes("could not reach") || message.includes("connection refused") || message.includes("ForeignPortHolderError");
 }
 
 async function runTurnHoldingLease(

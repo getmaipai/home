@@ -10,6 +10,7 @@ import { randomSuffix } from "@maipai/core/src/id";
 import type { InternetState } from "@/lib/internetProbe";
 import { knownServiceComponents } from "@/lib/serviceHealth";
 import { reconcileServiceBlockIssues, serviceState } from "@/lib/serviceHealth";
+import { roleHealth } from "@/lib/roleHealth";
 
 export type StatusState = StatusEventRecord["state"];
 type ComponentStateMap = Partial<Record<StatusComponent, StatusState>>;
@@ -97,10 +98,9 @@ export function buildStatusHistory(days: number, now: Date = new Date()) {
 export function componentStatesFrom(health: HealthSnapshot, maintenanceParts: Set<string>): ComponentStateMap {
   const result: ComponentStateMap = {};
   for (const role of ["chat", "embed", "background", "voice"] as const) {
-    const { kind, alive } = health.engines[role];
+    const { kind, alive } = health.engines[role]!;
     const state: StatusState = ["blocked", "failed", "stalled", "stopped"].includes(kind) ||
-      (["url", "override", "selection", "spawned"].includes(kind) && alive === false)
-      ? "outage"
+      (["url", "override", "selection", "spawned"].includes(kind) && alive === false) ? "outage"
       : ["starting", "restarting"].includes(kind) ? "degraded" : "operational";
     result[role] = maintenanceParts.has(role) ? "maintenance" : state;
   }
@@ -115,6 +115,17 @@ export function componentStatesFrom(health: HealthSnapshot, maintenanceParts: Se
     if (libraryState) result.library = libraryState;
   }
   result.hub = maintenanceParts.has("hub") ? "maintenance" : "operational";
+  return result;
+}
+
+async function liveComponentStatesFrom(health: HealthSnapshot, maintenanceParts: Set<string>): Promise<ComponentStateMap> {
+  const result = componentStatesFrom(health, maintenanceParts);
+  for (const role of ["chat", "embed", "background", "voice"] as const) {
+    const availability = await roleHealth(role);
+    if (maintenanceParts.has(role)) result[role] = "maintenance";
+    else result[role] = availability.availability === "unavailable" ? "outage"
+      : availability.availability === "starting" ? "degraded" : "operational";
+  }
   return result;
 }
 
@@ -151,7 +162,7 @@ export async function recordStatusSample(now: Date = new Date(), internet?: Inte
   try {
     const health = healthForTests ?? await collectHealth();
     const maintenance = activeMaintenanceComponents(now);
-    const states = componentStatesFrom(health, maintenance);
+    const states = await liveComponentStatesFrom(health, maintenance);
     const serviceComponents = knownServiceComponents();
     for (const component of [...baseComponents, ...new Set(serviceComponents)] as StatusComponent[]) {
       const service = component.startsWith("service:") ? serviceState(component, now.getTime()) : null;

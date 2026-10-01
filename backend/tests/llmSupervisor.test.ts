@@ -9,7 +9,8 @@ import { __resetSidecarsForTests, __setSidecarTimingForTestsOnly, __blockPortFor
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
-import { __resetStackEngineForTests } from "@/lib/stackEngine";
+import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
+import { roleHealth } from "@/lib/roleHealth";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 import { componentStatesFrom } from "@/lib/statusHistory";
 import type { HealthSnapshot } from "@/lib/healthSnapshot";
@@ -53,13 +54,15 @@ describe("llmSupervisor chatEngineDown()", () => {
     process.env.MAIPAI_LLAMA_SERVER_PORT = testChatPort;
   });
 
-  test("Stack chat suppresses local chat availability only when the chat switch is on", () => {
+  test("the shared helper reads Stack state while chatEngineDown remains a local supervisor backstop", async () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
     setHouseholdSettingValue("engines.stack.use_chat", false);
     stateStopped();
     expect(chatEngineDown()).toBe(true);
     setHouseholdSettingValue("engines.stack.use_chat", true);
-    expect(chatEngineDown()).toBe(false);
+    __setStackClientForTests({ roles: async () => ({ roles: [{ id: "chat", state: { state: "ready", since: "now" }, reason: null }] }) } as never);
+    expect(chatEngineDown()).toBe(true);
+    expect(await roleHealth("chat")).toEqual({ availability: "ready", reason: null });
   });
 
   test("returns true only for stopped, blocked, and failed; none and starting stay available", () => {
@@ -162,14 +165,16 @@ describe("llmSupervisor chatEngineDown()", () => {
     expect(blockedPortReason(port)).toBeUndefined();
   });
 
-  test("skips the local supervisor for an explicit URL or the routed Stack", () => {
+  test("local backstop skips an explicit URL; shared role health checks Stack routing", async () => {
     process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1";
     expect(chatEngineDown()).toBe(false);
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:12345");
     setHouseholdSettingValue("engines.stack.use_chat", true);
     stateStopped();
-    expect(chatEngineDown()).toBe(false);
+    expect(chatEngineDown()).toBe(true);
+    __setStackClientForTests({ roles: async () => ({ roles: [{ id: "chat", state: { state: "ready", since: "now" }, reason: null }] }) } as never);
+    expect(await roleHealth("chat")).toEqual({ availability: "ready", reason: null });
   });
 
   test("health ignores stale local chat startup while chat is Stack-owned", async () => {
