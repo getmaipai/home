@@ -1636,6 +1636,25 @@ engine, and an optional directory for WAV files. Audio stays in memory
 unless that directory is supplied. This harness is run by hand and never
 by `check.sh`.
 
+#### Text to speech, laptop dry run, 2026-10-01
+
+Hardware: Apple M4 Pro, 26 GB unified memory (arm64).
+
+The Stack used `local pocket-tts-3.1.0`, weights revision
+`d29db7978e464fb90cb3359ee0c69a273b9142cc`, tokenizer revision
+`d29db7978e464fb90cb3359ee0c69a273b9142cc`, and Alba voice revision
+`e81d79e8194ad4c7ce879c87a4258ef20cbf2487`. Home's `uvx pocket-tts`
+version and the harness's Stack Pocket TTS version both reported unknown;
+the Stack response headers identified Pocket TTS 3.1.0 and the weights
+revision above. Aggregate checks: duration 14 pass, 16 fail (median
+ratio 0.957, worst high ratio 1.100, lowest ratio 0.736); clipping 30
+pass, 0 fail; edge silence 29 pass, 1 fail (Home line 25 exceeds the 0.6 second absolute limit); first audio 30 pass, 0 fail
+(median ratio 1.143, worst ratio 1.248). The laptop dry run fails the
+duration and edge silence bars, so the text to speech role does not clear
+the bar; the Studio run is still owed with STACK-14. A person still needs
+to listen to both outputs because voice similarity cannot be judged by
+these measurements.
+
 The alternatives rejected are a two-card layout, because there is no second
 card; a static memory reservation, because it wastes idle unified memory;
 CUDA-only MTP, because it is not a verified Metal dependency on the pinned
