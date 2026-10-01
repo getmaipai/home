@@ -770,9 +770,14 @@ function NextChatWelcome() {
           </p>
         </div>
       ) : (
-        <p className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-2xl font-medium tracking-tight duration-200">
-          How can I help you today?
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-2xl font-medium tracking-tight duration-200">
+            How can I help you today?
+          </p>
+          <p className="text-muted-foreground fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-sm duration-200">
+            Runs on your own hub. Your chats stay at home.
+          </p>
+        </div>
       )}
     </div>
   );

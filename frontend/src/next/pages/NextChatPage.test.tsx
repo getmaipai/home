@@ -196,6 +196,39 @@ async function sendMessage(view: ReturnType<typeof render>, text: string): Promi
 }
 
 describe("NextChatPage (SHELL-02's first slice)", () => {
+  test("ordinary new chat shows the quiet home line under the greeting", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await view.findByText("How can I help you today?")).toBeVisible();
+      expect(await view.findByText("Runs on your own hub. Your chats stay at home.")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test("temporary new chat keeps its own welcome lines without the quiet home line", async () => {
+    const restore = stubFetch();
+    writeIncognitoCache(true);
+    localStorage.setItem("maipai.incognito-explanation-seen", "true");
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      expect(await view.findByText("Temporary chat")).toBeVisible();
+      expect(await view.findByText("This chat won't be saved to your history.")).toBeVisible();
+      expect(view.queryByText("Runs on your own hub. Your chats stay at home.")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
   // findByLabelText (not getByLabelText): AuiProvider's own mount does an
   // async state update (the same "assistant-ui async init" ChatPage.test.tsx
   // already works around with findBy queries) - a synchronous get here
