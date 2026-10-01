@@ -1719,6 +1719,48 @@ judge bars unmeasured. No same-day run against Home's own engine exists
 because this machine cannot hold two 8B copies; the cited baseline is an
 older run on a different model. The Studio run is still owed.
 
+#### Chat and the judge, side by side, 2026-10-01
+
+Hardware: Apple M4 Pro, 24 GB memory. Both paths used llama-server
+build b10797 and Qwen3 8B Instruct Q4_K_M
+(`qwen3-8b-instruct-q4-k-m`) for chat and the shared judge. Home's engine
+identity reported `b10797-832fd6f17`; embeddings used
+`nomic-embed-text-v1.5.Q4_K_M.gguf` on b10797.
+
+| Measure | A, Home engine | B, Stack |
+|---|---:|---:|
+| Failed-block replay rows passing all three repeats | 4/12 | 4/12 |
+| Control replay rows passing all three repeats | 16/19 | 16/19 |
+| Judge extraction precision | 33.3% | 33.3% |
+| Judge extraction recall | 40.0% | 40.0% |
+| Judge seconds per turn | 1.617 s | 1.837 s |
+| Median replay first delta | 143.5 ms | 143.5 ms |
+| Mean generation rate from engine logs | 43.1 tokens/s | not recorded |
+
+All 31 replay row outcomes matched between the paths. The same 11 rows
+failed because the model made no websearch call: eight failed-block rows
+and three controls. The isolated replay creates a fresh database but does
+not seed `search.searxng_url`; the websearch host refuses to run without
+that setting (`backend/src/lib/packageHost.ts:563-567`). The harness
+therefore cannot execute websearch on either engine path. This leaves
+search quality unmeasured. The owner replay data has no safety, privacy,
+crisis, or child-safety rows. Its honesty row
+`president-of-chile-hallucinated-name-followup` failed 0/3 on both paths
+with the missing websearch; `control-grand-canyon-no-search` passed 3/3
+on both.
+
+Chat verdict: the Stack path matches Home's own engine launch on replay
+outcomes, with 4/12 failed-block rows and 16/19 controls passing all
+repeats on each path; both miss the replay bar because the isolated
+harness cannot execute websearch.
+
+Judge verdict: the Stack path matches Home's own engine scores exactly
+at 33.3% precision and 40.0% recall, with 1.837 versus 1.617 seconds
+per turn; both miss the older baseline bars of 66.7% precision and 100%
+recall. The 2026-09-13 baseline used 1.7B Q8_0 and scored 2.59 seconds
+per turn; these are the first same-scorer 8B figures. The Studio run is
+still owed.
+
 The text to speech harness in `backend/scripts/bench/tts-stack16-d.ts`
 compares 30 fixed English lines spoken by Home's Pocket TTS service and
 the Stack's speech route in the same preset voice. It checks duration
