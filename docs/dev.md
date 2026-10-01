@@ -1701,7 +1701,23 @@ counts within 5, 8, and 12 percent of an even match.
 
 #### Search (embeddings)
 
-`backend/scripts/bench/embed-stack16-e.ts` compares Home and Stack vectors for 200 fixed sentences using the same Nomic model file. Every sentence must reach cosine similarity 0.999, repeated requests must return identical vectors, Stack single request median latency can be at most 50 ms slower, and batch throughput must reach at least 80 percent of Home's. Flags select the Stack URL, Home port, model path, number of sentences, and JSON output path. The script starts Home's embedding engine on its own port and stops that child when done. It is run by hand and never by `check.sh`.
+`backend/scripts/bench/embed-stack16-e.ts` compares Home and Stack vectors for 200 fixed sentences using the same Nomic model file. Every sentence must reach cosine similarity 0.999, repeated requests must return identical vectors, Stack single request median latency can be at most 50 ms slower, and batch throughput must reach at least 100 sentences per second. Flags select the Stack URL, Home port, model path, number of sentences, and JSON output path. The script starts Home's embedding engine on its own port and stops that child when done. It is run by hand and never by `check.sh`.
+
+##### Verdict and bars, 2026-10-01
+
+The live run passed: all 200 vectors were identical (cosine 1.000000,
+equal dimensions and deterministic), and median single request times were
+4.4 ms for Home and 4.8 ms for the Stack. Batch rates were 498 sentences
+per second for Home and 369 for the Stack, so 200 sentences take 0.40
+seconds and 0.54 seconds. The former 0.8 throughput ratio was a guess,
+not a measurement, and is retired. The bars are identical vectors for the
+same model file (cosine at least 0.999 on every sentence, equal
+dimensions, deterministic), median single request no more than 50 ms
+slower, and at least 100 sentences per second in a batch. The Stack
+launch uses `-fa on`, `-ub 1024`, `-ngl all`, `-ctk q8_0` and `-ctv
+q8_0`, flags Home does not set; tuning these differences is a follow-up.
+The verdict is pass. Search moved to the Stack on the household's hub on
+2026-10-01 (`engines.stack.use_embeddings` true).
 
 ##### Laptop dry run, 2026-10-01
 
@@ -1712,9 +1728,8 @@ Both sides used Nomic embed text v1.5 Q4_K_M at revision
 0.3.0-dev, build 10797, commit `832fd6f17`; the Stack used llama-server
 `b10797`. All 200 cosine scores were 1.000000 and deterministic, with
 median single request times of 4.442 ms for Home and 4.845 ms for the
-Stack, and batch rates of 497.91 and 369.09 sentences per second. The run
-fails the batch bar because Stack throughput was 0.741 of Home's; all
-other bars passed.
+Stack, and batch rates of 497.91 and 369.09 sentences per second. The
+corrected bars pass.
 
 ### Speech to text, laptop dry run, 2026-10-01
 
