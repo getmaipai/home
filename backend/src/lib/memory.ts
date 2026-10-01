@@ -19,7 +19,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { tokenize } from "@/lib/text";
 import { isBareAcknowledgment } from "@/lib/guards";
 import { embed, EMBED_PREPROCESS } from "@/lib/llm";
-import { getEmbedBackendKind } from "@/lib/embedSupervisor";
+import { __hasInjectedStackClientForTests } from "@/lib/stackEngine";
 import { nextHlc } from "@/lib/hlc";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { retireOrphanSubjects } from "@/lib/subjects";
@@ -501,17 +501,13 @@ const MEMORY_MIN_CONTENT_WORDS = 2;
  * a test holds the relation so a future edit cannot drop a floor under
  * the noise without re-measuring. */
 export const MEASURED_NULL_FLOOR = { durable: { p95: 0.545, max: 0.558 }, episodic: { p95: 0.523, max: 0.549 }, weakestSignal: 0.807 } as const;
-// The embed supervisor's stub tier (spec/llm/ts/stubServer.ts, the
-// in-process fallback when no engine and no binary exist, and every
-// test run) makes bag-of-words vectors with a cosine distribution of its
-// own, nothing like nomic's; its floors are legacy's unmeasured values,
-// kept so the deterministic suite keeps exercising the ranking, and
-// they are not a measurement of any model.
+// Test-injected clients use the scripted stub's calibrated floors. A
+// household Stack uses the model thresholds measured for the Stack model.
 const STUB_EPISODIC_MIN_COSINE = 0.55;
 const STUB_DURABLE_MIN_COSINE = 0.37;
 
 function minCosineForTier(tier: string): number {
-  if (getEmbedBackendKind() === "stub") return tier === "durable" ? STUB_DURABLE_MIN_COSINE : STUB_EPISODIC_MIN_COSINE;
+  if (__hasInjectedStackClientForTests()) return tier === "durable" ? STUB_DURABLE_MIN_COSINE : STUB_EPISODIC_MIN_COSINE;
   return tier === "durable" ? DURABLE_MIN_COSINE : EPISODIC_MIN_COSINE;
 }
 

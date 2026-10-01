@@ -22,11 +22,14 @@ import { installedPackageVersionDir } from "@/lib/paths";
 import { db } from "@/db";
 import { scheduledJobs, packageInstalls } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
+import { useDefaultScriptedStack } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
+  useDefaultScriptedStack();
 });
 
 describe("the bundled remember package", () => {
@@ -367,6 +370,7 @@ describe("POST /api/plugins/recall/run", () => {
     const client = await owner();
     const remembered = await client.post("/api/plugins/remember/run", { fact: "the wifi password is on the fridge" });
     expect(remembered.status).toBe(200);
+    await __drainBackgroundWorkForTests();
 
     const res = await client.post("/api/plugins/recall/run", { topic: "wifi password" });
     expect(res.status).toBe(200);

@@ -3,6 +3,7 @@
 // person-scoping rule). Backend-only per the item's own scope.
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
+import { restoreDefaultScriptedStack } from "./stackFixture";
 import { resetDb } from "./reset-db";
 import { owner, teen } from "./support/testAuth";
 import { db } from "@/db";
@@ -19,6 +20,7 @@ beforeEach(() => {
   resetDb();
   __resetFixHandlersForTests();
 });
+afterEach(() => restoreDefaultScriptedStack());
 
 async function child(ownerClient: TestClient): Promise<{ client: TestClient; row: PersonRow }> {
   const created = await ownerClient.post("/api/people", { displayName: "Pippa", role: "child" });
@@ -54,6 +56,7 @@ describe("GET /api/dashboard", () => {
   });
 
   test("owner/admin gets repairs_open (0) and engines (null, no Stack configured)", async () => {
+    __setStackClientForTests(null);
     const { client } = await owner();
     const res = await client.get("/api/dashboard");
     expect(res.status).toBe(200);
@@ -94,6 +97,7 @@ describe("GET /api/dashboard", () => {
   });
 
   test("a child's own turn is visible to owner/admin, but a teen's or another adult's own turn never is", async () => {
+    restoreDefaultScriptedStack();
     const { client: ownerClient, row: ownerRow } = await owner();
     const { row: childRow } = await child(ownerClient);
     const teenClient = await teen(ownerClient);

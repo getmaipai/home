@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
+import { restoreDefaultScriptedStack } from "./stackFixture";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { listIssues } from "@/lib/issues";
 import { STACK_REQUIREMENT_ISSUE, syncStackRequirementIssue } from "@/lib/stackRequirement";
 
-beforeEach(() => resetDb());
-afterEach(() => __resetStackEngineForTests());
+beforeEach(() => { resetDb(); __setStackClientForTests(null); });
+afterEach(() => { __resetStackEngineForTests(); restoreDefaultScriptedStack(); });
 
 describe("Stack requirement Repairs entry", () => {
   test("raises stack.not-configured when no Stack is configured", async () => {

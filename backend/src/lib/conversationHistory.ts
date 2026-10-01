@@ -44,8 +44,7 @@ import { canAccessPerson, canHaveTemporaryChat } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
-import { complete, type LlmMessage } from "@/lib/llm";
-import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSupervisor";
+import { complete, type LlmMessage, completeBackground } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
 import { recordEpisodes, deleteEpisodesForTurns, contentTerms } from "@/lib/episodes";
@@ -2164,7 +2163,6 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
   // engine's kind is irrelevant here; an unresolved background backend
   // is resolved by the call itself, and the post-call check below
   // catches the "resolved to the stub just now" case.
-  if (getBackgroundBackendKind() === "stub") return;
 
   // CHAT-03: read-side redaction. Item 1b: a guard-replaced turn reads
   // as its note here too, so the honesty vocabulary reaches neither the
@@ -2189,7 +2187,6 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
       console.log(`[conversationHistory] summary refresh skipped for ${conversationId}: unavailable`);
       return;
     }
-    if (getBackgroundBackendKind() === "stub") return; // resolved to the stub only just now (this process's first completion ever)
     db.update(conversations)
       .set({
         summary: result.text,
@@ -2310,7 +2307,7 @@ const MAX_SUMMARY_INPUT_CHARS = 8_000;
  * already knows it's on the stub, the common case on every retention
  * tick after the first) and AFTER each call (the only way to know for a
  * process's very first completion ever, since getChatClient() resolves
- * lazily - `getBackgroundBackendKind()` only reports "none" beforehand, and
+ * lazily - `"stack"` only reports "none" beforehand, and
  * complete() itself is what decides real-vs-stub). A real model that's
  * merely slow, or a completion that fails for any other reason, is
  * treated the same way: logged, not thrown, since runRetention()'s own
@@ -2335,7 +2332,6 @@ export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promis
   // engine's kind is irrelevant here; an unresolved background backend
   // is resolved by the call itself, and the post-call check below
   // catches the "resolved to the stub just now" case.
-  if (getBackgroundBackendKind() === "stub") return;
 
   for (const [personId, personRows] of byPerson) {
     // isNull(deletedAt), not a bare id match: a code review (2026-09-04)
@@ -2366,12 +2362,6 @@ export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promis
       if (!result.ok) {
         console.log(`[conversationHistory] retention summary skipped for ${personId}: unavailable`);
         continue;
-      }
-      if (getBackgroundBackendKind() === "stub") {
-        // Resolved to the stub for the first time just now (this
-        // process's very first completion ever) - a canned reply is
-        // worse than no summary; skip the rest of this batch too.
-        return;
       }
       const written = remember(person, {
         record_kind: "episode",

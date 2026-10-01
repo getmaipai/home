@@ -19,6 +19,8 @@ import { once } from "node:events";
 
 const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
 
+beforeEach(() => __setStackClientForTests(null));
+
 async function waitForTest(check: () => boolean | Promise<boolean>, timeoutMs = 5_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -50,6 +52,7 @@ describe("llmSupervisor chatEngineDown()", () => {
     __resetSidecarsForTests();
     __resetLlmSupervisorForTests();
     __resetStackEngineForTests();
+    __setStackClientForTests(null);
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     process.env.MAIPAI_LLAMA_SERVER_PORT = testChatPort;
   });
@@ -302,13 +305,11 @@ describe("llmSupervisor getChatClient()", () => {
     expect(await client.health()).toBe(true);
   });
 
-  // COR-1 (code review, 2026-09-06): embedSupervisor.ts's identical
-  // getEmbedClient() already had this generation guard; getChatClient()
   // didn't. restartChatBackend()/stopChatBackend() have no `await` inside,
   // so calling one between starting and awaiting getChatClient() runs
   // synchronously, strictly before the in-flight spawn's own `.then()`
   // (always a microtask) can fire - the same deterministic
-  // microtask-ordering trick embedSupervisor.test.ts's own equivalent
+  // microtask-ordering trick former Home embedding supervisor.test.ts's own equivalent
   // race test uses.
   test("a caller mid-flight when a restart lands still gets back a real, live client, not a stale one", async () => {
     const clientPromise = getChatClient();
@@ -534,52 +535,7 @@ describe("sweepOrphanEngineProcesses", () => {
     await expect(sweepOrphanEngineProcesses([999_002, null])).resolves.toBe(0);
   });
 
-  // JOIN-02 (docs/BACKLOG.md's 2026-09-12 chat block): the memory engine
-  // (backgroundSupervisor.ts) runs the same llama-server binary as chat
-  // and embed, so index.ts passes its live pid into the sweep the same
-  // way it passes embed's and tts's. Proven the way tests/sidecars.test.ts
-  // proves the exclusion itself: a real spawned process, registered as
-  // the background backend, survives a sweep that would otherwise kill it.
-  test("excludes the background (memory) engine's own live pid, read through getBackgroundLivePid()", async () => {
-    const { getBackgroundLivePid } = await import("@/lib/backgroundSupervisor");
-    const { sweepOrphanProcesses } = await import("@/lib/sidecars");
-    const marker = `maipai-join02-${Date.now()}`;
-    const survivor = Bun.spawn(["bun", "-e", `/* ${marker} */ setTimeout(() => {}, 60000);`], { stdout: "ignore", stderr: "ignore" });
-    const registry = (globalThis as { __maipai_backgroundSupervisor?: { backgroundBackend: unknown } }).__maipai_backgroundSupervisor;
-    expect(registry).toBeDefined();
-    const previous = registry!.backgroundBackend;
-    registry!.backgroundBackend = { pid: survivor.pid, kind: "spawned", stop: () => {} } as unknown as never;
-    try {
-      // FLAKE-PORT-01 (issue 137): a fixed 200ms sleep for `ps` to see
-      // the new process passed reliably alone, but under two full
-      // `bun test` processes actually running at once (each spawning
-      // many real child processes, real CPU contention) `ps`'s own
-      // latency to reflect a brand-new pid could exceed it, so
-      // getBackgroundLivePid() still read null/stale and the exclusion
-      // list came up empty - not a fixed port, but the identical class
-      // of "the test's own timing assumption doesn't hold under real
-      // concurrent load." Polled instead, deterministic timeout kept.
-      const deadline = Date.now() + 5_000;
-      while (Date.now() < deadline && getBackgroundLivePid() !== survivor.pid) {
-        await new Promise((r) => setTimeout(r, 25));
-      }
-      expect(getBackgroundLivePid()).toBe(survivor.pid);
-      // The exclusion index.ts builds from getBackgroundLivePid(), against
-      // the marker the survivor carries in its own command line. This
-      // proves the mechanism through the same functions; index.ts's own
-      // call list is not exercised by any test (boot is not unit-run).
-      const killed = await sweepOrphanProcesses(marker, { excludePids: [getBackgroundLivePid()].filter((pid): pid is number => typeof pid === "number") });
-      expect(killed).toBe(0);
-      expect(survivor.exitCode).toBeNull();
-      // And without the exclusion the same sweep does kill it: the test
-      // proves the pid is what protected it, not that nothing matched.
-      const killedNow = await sweepOrphanProcesses(marker, { excludePids: [] });
-      expect(killedNow).toBe(1);
-    } finally {
-      registry!.backgroundBackend = previous;
-      survivor.kill();
-    }
-  }, 10_000);
+
 });
 
 describe("tier 2 (override) with MAIPAI_CHAT_MODEL_ID (FAST-01)", () => {

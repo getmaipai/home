@@ -112,7 +112,6 @@ interface LlmSupervisorState {
   startingStartedAtMs: number | null;
   startupStalled: boolean;
   lastPostLoadCheck: (PostLoadCheckResult & { modelId: string }) | null;
-  // COR-1 (code review, 2026-09-06): embedSupervisor.ts's identical shape
   // already carried this generation guard "from the start" (its own
   // comment cites the 2026-09-04 review that found and fixed the race here
   // first) - this module never got the same fix. Bumped by every
@@ -219,7 +218,6 @@ async function warmChatPrefix(client: LlamaServerClient): Promise<void> {
 // function used to hand-roll both moved to lib/sidecars.ts as
 // spawnAndWaitHealthy() - the shared primitive every process-shaped
 // supervisor in this codebase now spawns through, including
-// embedSupervisor.ts's identical shape. See that file's own header for
 // the freePort() incident writeup; freePort() itself is re-exported here
 // so this module's existing test suite and callers don't need to know it
 // moved.
@@ -407,7 +405,6 @@ export function chatAvailabilityState(): ChatAvailabilityState {
  * binary alone would treat a crash-interrupted install (the main archive
  * extracted, a required extra like the Windows CUDA runtime didn't) as
  * ready, spawning a binary missing what it needs to actually run.
- * Exported for embedSupervisor.ts (2026-09-04): "engine is llama-server,
  * only" means every role shares this one installed binary - `embed`
  * needing to check the identical thing chat already does is the whole
  * point of that rule, not a coincidence to re-derive a second way. */
@@ -587,15 +584,14 @@ export async function getChatClient(): Promise<LlamaServerClient> {
           // ORIGINAL caller (already committed to awaiting this exact
           // promise) recurses into getChatClient() so it transparently
           // lands on whatever the CURRENT generation resolves to - the
-          // same embedSupervisor.ts fix, applied here.
           //
-          // Unlike embedSupervisor's own spawn, tier 3 here
+          // Unlike former Home embedding supervisor's own spawn, tier 3 here
           // (trySpawnFromSelection) has already run a real side effect by
           // this point - lastPostLoadCheck, read by the Household -> AI
           // models status page - for whichever backend this generation
           // check just discarded (a background review of this fix caught
           // it: porting the guard didn't account for a side effect
-          // embedSupervisor's own spawn never had). Nulled rather than
+          // former Home embedding supervisor's own spawn never had). Nulled rather than
           // left stale; the recursive getChatClient() call below sets a
           // fresh one if the new generation also reaches tier 3.
           if (backend.kind === "selection") state.lastPostLoadCheck = null;

@@ -5,7 +5,6 @@
 // drives real turns through runTurnStream() and nothing threads a
 // per-call option from there down to llm.ts; the app never sets it
 // (production chat stays at CHAT_SAMPLING's 0.7 with no seed), and the
-// name says who may. Read by llm.ts (chat) and backgroundSupervisor.ts
 // (the judge) on every request.
 let pinnedSeed: number | null = null;
 // The prompt's own clock ("Local time: ..." at the end of the context

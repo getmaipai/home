@@ -104,6 +104,16 @@ export async function startBench(): Promise<void> {
   for (const [name, url] of [["MAIPAI_LLAMA_SERVER_URL", process.env.MAIPAI_LLAMA_SERVER_URL], ["MAIPAI_EMBED_URL", process.env.MAIPAI_EMBED_URL]] as const) {
     if (!url || !(await new LlamaServerClient(url).health())) refuse(`no engine answers at ${name} (${sanitizeEngineUrl(url)}); a bench needs an engine that is already running and ready.`);
   }
+  const roleUpstream = process.env.MAIPAI_BACKGROUND_URL && process.env.MAIPAI_BACKGROUND_URL !== CLOSED_PORT_URL
+    ? process.env.MAIPAI_BACKGROUND_URL
+    : process.env.MAIPAI_EMBED_URL;
+  if (roleUpstream) {
+    // Bench processes keep the historical plain OpenAI-compatible URL
+    // contract. The Stack adapter remains an explicit recording-proxy
+    // option; either way this points only at the caller-supplied engine.
+    const { setHouseholdSettingValue } = await import("@/lib/settings");
+    setHouseholdSettingValue("engines.stack.url", roleUpstream);
+  }
 }
 if (!process.env.MAIPAI_BACKGROUND_URL) process.env.MAIPAI_BACKGROUND_URL = CLOSED_PORT_URL;
 // The remaining ways a bench could reach outside its directory,

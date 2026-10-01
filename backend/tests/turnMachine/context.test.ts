@@ -17,12 +17,14 @@ import { contextNode, MEMORY_CONTEXT_MIN_SCORE } from "@/lib/turnMachine/nodes/c
 import type { TurnState } from "@/lib/turnMachine/contract";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import { injectVector } from "../fixtures/injectVector";
+import { useDefaultScriptedStack } from "../stackFixture";
 
 let people: BenchPeople;
 
 beforeEach(() => {
   resetDb();
   people = createBenchPeople();
+  useDefaultScriptedStack();
 });
 
 const SIGNAL = new AbortController().signal;
@@ -55,7 +57,6 @@ describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor g
     const seeded = remember(people.owner, { text, category: "fact", tier: "durable", scope: "person", person: people.owner.id, source: "test", importance: 0.5 });
     if (!seeded.ok) throw new Error("setup failed");
     await embedMemoryRecordSafely(seeded.value.id, text);
-
     const { output } = await contextNode(stateFor(people.owner), { utterance: "I'm feeling kind of down" }, SIGNAL);
     expect(output.items.some((item) => item.source === "memory" && item.text === text)).toBe(true);
   });
@@ -121,7 +122,6 @@ describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor g
 // is up, slow, or races `remember()`'s own unawaited embed-on-write -
 // deterministic without depending on that race's outcome (a re-review
 // of the first cut of these tests found the stub backend genuinely
-// running in this suite, `getEmbedBackendKind() === "stub"`, so a
 // version relying on `embedQueryForRecall()` simply failing here was
 // wrong on the mechanism, even though its pass/fail outcome happened
 // to be stable).

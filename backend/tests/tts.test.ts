@@ -11,6 +11,7 @@ import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __setStackClientForTests(null);
 });
 
 afterEach(() => {

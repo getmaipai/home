@@ -15,11 +15,14 @@ import { eq } from "drizzle-orm";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { remember } from "@/lib/memory";
 import { listIssues } from "@/lib/issues";
+import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
+import { useDefaultScriptedStack } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
+  useDefaultScriptedStack();
   // SEARCH-PACE-01: the searxng rate limit tightened to {capacity: 3,
   // refillPerSecond: 1/6} (from {10, 0.5}) - this file's own many
   // sequential real-searxng tests shared one bucket with no reset
@@ -94,6 +97,7 @@ describe("packageHost memory.remember", () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
     const id = host.memory.remember("the wifi password is on the fridge", "fact", "household");
+    await __drainBackgroundWorkForTests();
     expect(typeof id).toBe("string");
 
     const listed = await createHost(actor, manifest({ permissions: ["memory:read"] })).memory.recall("wifi password");
@@ -181,6 +185,7 @@ describe("packageHost memory.remember", () => {
     const own = seedMemory(actor, "I dislike cilantro", actor.id);
     const sibling = seedMemory(actor, "Bramble dislikes cilantro", child.id);
     const shared = seedMemory(actor, "The household buys cilantro on Fridays", null, "household");
+    await __drainBackgroundWorkForTests();
     const host = createHost(actor, manifest({ permissions: ["memory:read"] }));
 
     const found = await host.memory.recall("cilantro");

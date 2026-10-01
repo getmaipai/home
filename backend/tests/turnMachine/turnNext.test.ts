@@ -8,6 +8,8 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests, __setChatRecoveryNudgeForTests } from "@/lib/llmSupervisor";
+import { __setStackClientForTests } from "@/lib/stackEngine";
+import { restoreDefaultScriptedStack } from "../stackFixture";
 import { __blockPortForTests, __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { createBenchPeople, startRecordingProxy, startFakeSearxng, type BenchPeople, type FakeSearxng } from "../../scripts/bench/conversationRunner";
@@ -33,6 +35,7 @@ import { remember, embedMemoryRecordSafely, PROFILE_SOURCE } from "@/lib/memory"
 import { DEFAULT_PERSONA, resolvePersona } from "@/lib/persona";
 import { identityLine } from "@/lib/turnEngine";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
+import { useDefaultScriptedStack } from "../stackFixture";
 
 let people: BenchPeople;
 const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
@@ -2052,10 +2055,13 @@ describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects",
   beforeEach(() => {
     __resetPortOwnershipForTests();
     __resetLlmSupervisorForTests();
+    __setStackClientForTests(null);
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     process.env.MAIPAI_LLAMA_SERVER_PORT = testChatPort;
     setHouseholdSettingValue("search.searxng_url", "");
   });
+
+  afterEach(() => restoreDefaultScriptedStack());
 
   test("blocked local chat port refuses a non-streaming turn before search, conversation, or turn storage", async () => {
     const searxng = startFakeSearxng();
@@ -2106,6 +2112,7 @@ describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects",
   });
 
   test("none means on-demand startup and does not refuse a turn", async () => {
+    restoreDefaultScriptedStack();
     const result = await withStub({ reply: () => "The scripted answer." }, () => runTurnNext(people.owner, "chat", "hi"));
     expect(result.ok).toBe(true);
   });

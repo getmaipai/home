@@ -10,9 +10,11 @@ import { conversationTurns } from "@/db/schema";
 import { newConversationTurnId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import type { TurnStats } from "@/wire";
+import { __setStackClientForTests } from "@/lib/stackEngine";
 
 beforeEach(() => {
   resetDb();
+  __setStackClientForTests(null);
 });
 
 function insertTurn(personId: string, createdAt: string, stats: TurnStats | null): void {

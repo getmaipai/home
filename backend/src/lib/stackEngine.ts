@@ -1,6 +1,5 @@
 // HOME-STACK-02b: the one setting (engines.stack.url) that decides
 // whether Home's model calls go through a MaiPai Stack instead of its
-// own built-in supervisors (llmSupervisor.ts, embedSupervisor.ts,
 // Home's former local speech recognizer) - empty, the
 // default, means nothing here changes. Centralizes the three things
 // every rewired call site (llm.ts, tts.ts, stt.ts, routes/voice.ts's
@@ -57,6 +56,7 @@ export function getHomeOwnedRoles(): StackRole[] {
 let cachedClient: StackClient | null = null;
 let cachedUrl: string | null = null;
 let testClient: StackClient | null = null;
+let defaultTestClient: StackClient | null = null;
 
 /** Lazily builds (and reuses) one client per URL - a URL change (a rare
  * admin action, never mid-turn) invalidates the cache the same way a
@@ -81,8 +81,20 @@ export function __setStackClientForTests(client: StackClient | null): void {
   cachedUrl = null;
 }
 
+/** Set once by the test preload. Resetting per-test Stack observations
+ * restores this client so ordinary tests continue through the shared
+ * scripted Stack. Tests for an unconfigured Stack clear it explicitly. */
+export function __setDefaultStackClientForTests(client: StackClient): void {
+  defaultTestClient = client;
+  __setStackClientForTests(client);
+}
+
+export function __hasInjectedStackClientForTests(): boolean {
+  return testClient !== null;
+}
+
 export function __resetStackEngineForTests(): void {
-  testClient = null;
+  testClient = defaultTestClient;
   cachedClient = null;
   cachedUrl = null;
   stackChatIdentity = null;

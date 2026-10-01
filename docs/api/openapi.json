@@ -7762,9 +7762,7 @@
             "schema": {
               "type": "string",
               "enum": [
-                "chat",
-                "embed",
-                "background"
+                "chat"
               ]
             },
             "required": true,
@@ -7783,9 +7781,7 @@
                     "role": {
                       "type": "string",
                       "enum": [
-                        "chat",
-                        "embed",
-                        "background"
+                        "chat"
                       ]
                     },
                     "restarted": {
@@ -7857,9 +7853,7 @@
             "schema": {
               "type": "string",
               "enum": [
-                "chat",
-                "embed",
-                "background"
+                "chat"
               ]
             },
             "required": true,
@@ -7878,9 +7872,7 @@
                     "role": {
                       "type": "string",
                       "enum": [
-                        "chat",
-                        "embed",
-                        "background"
+                        "chat"
                       ]
                     },
                     "stopped": {
@@ -7952,9 +7944,7 @@
             "schema": {
               "type": "string",
               "enum": [
-                "chat",
-                "embed",
-                "background"
+                "chat"
               ]
             },
             "required": true,
@@ -7973,9 +7963,7 @@
                     "role": {
                       "type": "string",
                       "enum": [
-                        "chat",
-                        "embed",
-                        "background"
+                        "chat"
                       ]
                     },
                     "started": {

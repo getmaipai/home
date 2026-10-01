@@ -15,8 +15,6 @@ import { CATALOG } from "@/lib/modelCatalog";
 import { ENGINE_BINARIES } from "@/lib/engineCatalog";
 import { KIWIX_BINARIES } from "@/lib/kiwixCatalog";
 import { KIWIX_CATALOG_URL } from "@/lib/referenceLibrary";
-import { EMBED_MODEL_URL } from "@/lib/embedAssets";
-import { BACKGROUND_MODEL_URL, BACKGROUND_MODEL_SMALL_URL } from "@/lib/backgroundAssets";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
 import { VISION_ALL_ASSETS } from "@/lib/visionAssets";
 import { SILERO_VAD_ASSET } from "@/lib/sttAssets";
@@ -107,21 +105,6 @@ export function platformConnections(): PrivacyConnection[] {
     // endpointing; transcription model downloads belong to the Stack.
     row("platform:stt-models", sttHosts, {
       when: "the first time someone uses streaming speech input, when Home downloads its small voice-activity model to cut speech into sentences; speech recognition runs on the Stack",
-      what: DOWNLOAD_CARRIES,
-    }),
-    // Memory recall uses this embedder (memory.ts: embed() on every
-    // remember() and recall query), so the row reflects current use,
-    // not the retired keyword scorer. #112.
-    row("platform:text-embedding-model", hostsOf([EMBED_MODEL_URL]), {
-      when: "when the hub needs the small text-to-numbers model that memory recall uses to find related memories; downloaded once",
-      what: DOWNLOAD_CARRIES,
-    }),
-    // #112: the background memory helper's own model download was missing
-    // from this table - the page told families "if it is not on this
-    // list, it does not happen" while the helper downloads ~2.5 GB on
-    // first use.
-    row("platform:background-model", hostsOf([BACKGROUND_MODEL_URL, BACKGROUND_MODEL_SMALL_URL]), {
-      when: "the first time the hub needs its memory helper, the small model that decides what to remember and writes conversation summaries",
       what: DOWNLOAD_CARRIES,
     }),
     // Home Assistant doesn't get a row here (it's the household's own LAN

@@ -52,12 +52,11 @@ const { logTurn, createConversation, maybeRefreshConversationSummary } = await i
 const { classifyTurnSignal, fallbackSignal } = await import("@/lib/turnSignal");
 const { judgeStatusAtInsert } = await import("@/lib/turnEngine");
 const { runJudgeBatch } = await import("@/lib/memoryJudge");
+const { completeBackground } = await import("@/lib/llm");
 const { evaluateSafety } = await import("@/lib/safety");
 const { speakerAgeBand } = await import("@/lib/ageBand");
-const { getBackgroundClient, probeBackgroundEngine, completeBackground } = await import("@/lib/backgroundSupervisor");
 const { __setTurnActivityClockForTests } = await import("@/lib/turnActivity");
 const { __setSamplingSeedForBench, __setPromptClockForBench } = await import("@/lib/benchSampling");
-const { __resetEmbedSupervisorForTests } = await import("@/lib/embedSupervisor");
 const { newPersonId, randomSuffix } = await import("@/lib/id");
 const { nextHlc } = await import("@/lib/hlc");
 const { sqlite, db } = await import("@/db");
@@ -511,12 +510,8 @@ async function commitHash(): Promise<string> {
 
 async function main() {
   await startBench();
-  await getBackgroundClient();
-  const judge = await probeBackgroundEngine();
-  if (!judge.alive) {
-    console.error(`replay setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${sanitizeEngineUrl(process.env.MAIPAI_BACKGROUND_URL)}); the replay needs the judge for ingestion.`);
-    process.exit(2);
-  }
+  const judgeUrl = process.env.MAIPAI_BACKGROUND_URL;
+  if (!judgeUrl || !(await new (await import("@maipai/spec/llm/ts/client.js")).LlamaServerClient(judgeUrl).health())) throw new Error("No judge answers at MAIPAI_BACKGROUND_URL; provide a running engine URL.");
 
   const registryDataset = dataset === "locomo" ? "locomo" : "longmemeval-cleaned";
   const entry = registryEntry(registryDataset);
@@ -590,7 +585,6 @@ async function main() {
     executed = results.length;
   }
 
-  __resetEmbedSupervisorForTests();
   return { executed };
 }
 

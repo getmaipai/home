@@ -1,57 +1,7 @@
-// VOICE-LIVE-01b: `GET /api/engines`'s overview route used to answer
-// `roles: []` unconditionally whenever no Stack was configured
-// (routes/engines.ts's own early return) - the common household case,
-// since this hub runs its own supervisors instead. Every frontend gate
-// reading `roles` (`readyRole()`, engineRoles.ts) could therefore never
-// see stt/chat/embed as ready on a non-Stack hub, no matter how
-// healthy they really were - found live (Jesse: no waveform button on
-// 8787, this hub has no Stack). This file is the missing half: the
-// SAME RoleInfo shape the Stack already returns, built from Home's own
-// supervisors instead, so a caller never needs to know which source
-// answered (SERVICES.md's "one health list" principle - one shape, two
-// sources, never a second concept for role readiness).
-import { probeChatEngine, getEngineStatus } from "@/lib/llmSupervisor";
-import { probeEmbedEngine } from "@/lib/embedSupervisor";
-import type { EngineHealth } from "@/lib/sidecars";
+// When Home has no Stack configured, report that dependency directly.
+// There is no Home-owned model supervisor to report as a fallback.
 import type { RoleInfo, RoleState } from "@/lib/stack/types";
 
-/** `probeXEngine()` (llmSupervisor.ts/embedSupervisor.ts)
- * is the exact function `GET /api/health` already builds its own
- * admin-facing read from (app.ts's healthRoute) - reused here rather
- * than re-derived, so this route can never show "ready" for an engine
- * Health shows red for at the same moment (a review finding: an
- * earlier version of this file reported chat/embed ready
- * unconditionally, on the true but incomplete reasoning that each
- * supervisor's own last tier is a stub that never fails to START - it
- * missed that a manually-stopped engine, or one crash-looping after a
- * real spawn attempt, is a genuinely different, already-tracked state
- * (`kind: "stopped"/"failed"/"restarting"`, sidecars.ts's own
- * `engineHealthKind()`) that Health already surfaces and this route
- * now has to agree with). A second re-review caught the same gap for
- * `kind: "starting"` (a JIT spawn actually in flight, `alive` still
- * null because no client exists yet to probe) - it was falling into
- * the same bucket as "never tried this boot," reporting `ready` at the
- * exact moment Health's own badge reads "starting up." `loaded` is the
- * one `RoleState` already has for "in progress, not confirmed
- * answering yet" (NextEnginesPage.tsx's own `ROLE_STATE_LABEL`: "in
- * progress" is not ambiguous with either `installed`, which this route
- * never has an unambiguous signal for since it does not track download
- * state, or `ready`). `alive === null` outside of `"starting"` (no
- * client yet, and no spawn in flight either - the common "hasn't been
- * asked anything yet this boot" case) is not itself a failure: the
- * supervisor's own guaranteed stub tier means it would answer if
- * asked, so only a REAL negative or in-progress signal (a
- * failed/restarting/stopped/starting kind, or a probe that came back
- * false) reads as anything other than `ready` here. */
-export function stateFromProbe(health: EngineHealth): RoleState {
-  const now = new Date().toISOString();
-  if (health.kind === "failed") return { state: "offline", since: now, checkedAt: now, reason: "This engine keeps failing to start." };
-  if (health.kind === "restarting") return { state: "offline", since: now, checkedAt: now, reason: "Restarting after a crash." };
-  if (health.kind === "stopped") return { state: "offline", since: now, checkedAt: now, reason: "Manually stopped." };
-  if (health.kind === "starting") return { state: "loaded", since: now, checkedAt: now, reason: "Starting up." };
-  if (health.alive === false) return { state: "offline", since: now, checkedAt: now, reason: "Not answering right now." };
-  return { state: "ready", since: now, checkedAt: now };
-}
 
 function notInstalledRoleState(reason: string): RoleState {
   const now = new Date().toISOString();
@@ -60,38 +10,12 @@ function notInstalledRoleState(reason: string): RoleState {
 
 const NO_CHECK = { state: "skipped" as const, at: null, reason: null, stale: false };
 
-async function chatRole(): Promise<RoleInfo> {
-  const health = await probeChatEngine();
-  const status = getEngineStatus();
+function chatRole(): RoleInfo {
   return {
-    id: "chat",
-    label: "Chat",
-    wire: "chat",
-    residency: "jit",
-    endpoints: [`http://localhost:${process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788}`],
-    quality: ["everyday"],
+    id: "chat", label: "Chat", wire: "chat", residency: "jit", endpoints: [], quality: [],
     sharesModelWith: null,
-    state: stateFromProbe(health),
-    reason: null,
-    model: status.modelId ? { id: status.modelId, sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true } : null,
-    check: NO_CHECK,
-  };
-}
-
-async function embedRole(): Promise<RoleInfo> {
-  const health = await probeEmbedEngine();
-  return {
-    id: "embed",
-    label: "Embeddings",
-    wire: "embeddings",
-    residency: "jit",
-    endpoints: [`http://localhost:${process.env.MAIPAI_EMBED_PORT ?? 8794}`],
-    quality: ["everyday"],
-    sharesModelWith: null,
-    state: stateFromProbe(health),
-    reason: null,
-    model: null,
-    check: NO_CHECK,
+    state: { state: "offline", since: new Date().toISOString(), checkedAt: new Date().toISOString(), reason: "The MaiPai Stack is not configured." },
+    reason: "The MaiPai Stack is not configured.", model: null, check: NO_CHECK,
   };
 }
 
@@ -117,15 +41,13 @@ function imageRole(): RoleInfo {
   };
 }
 
-/** `GET /api/engines`'s own roles source when no Stack is configured -
- * chat/embed each do the identical live probe `GET /api/health`
- * already makes (no new network behavior, and the two routes can no
- * longer disagree about the same engine's own state); image is a
+/** `GET /api/engines`'s own roles source when no Stack is configured.
+ * Chat uses the live probe `GET /api/health` already makes, so the two
+ * routes cannot disagree about its state. Image is a
  * synchronous, side-effect-free read. STT belongs to the configured
  * Stack and is omitted when no Stack is configured. Nothing here ever
  * spawns anything, the same posture the route's Stack-configured path
  * already has. */
 export async function getHomeSupervisorRoles(): Promise<RoleInfo[]> {
-  const [chat, embed] = await Promise.all([chatRole(), embedRole()]);
-  return [chat, embed, imageRole()];
+  return [chatRole(), imageRole()];
 }

@@ -1,9 +1,24 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { startStackFixture as makeStackFixture, type StackFixture, offlineResponse } from "./stackFixture";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { useDefaultScriptedStack } from "./stackFixture";
+
+const backgroundFixtures: StackFixture[] = [];
+const conversationStubs: Array<{ stop(): Promise<void> }> = [];
+function useBackgroundStack(upstream: string): void {
+  const fixture = makeStackFixture({
+    "POST /v1/chat/completions": async (req) => { try { return await fetch(`${upstream}/v1/chat/completions`, { method: "POST", headers: req.headers, body: await req.text() }); } catch { return offlineResponse("judge", "the scripted judge is unavailable"); } },
+    "POST /v1/embeddings": async (req) => { try { return await fetch(`${upstream}/v1/embeddings`, { method: "POST", headers: req.headers, body: await req.text() }); } catch { return offlineResponse("embed", "the scripted embedder is unavailable"); } },
+  });
+  backgroundFixtures.push(fixture);
+  __setStackClientForTests(fixture.client);
+  setHouseholdSettingValue("engines.stack.url", fixture.url);
+}
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { runTurn, __setSummaryRefreshDelayForTests } from "@/lib/turnEngine";
 import {
   list,
@@ -54,11 +69,15 @@ const SAFE: TurnValue["safety"] = {
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  useDefaultScriptedStack();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  for (const stub of conversationStubs.splice(0)) await stub.stop();
   __resetLlmSupervisorForTests();
-  __resetBackgroundSupervisorForTests();
+  for (const fixture of backgroundFixtures) fixture.stop();
+  backgroundFixtures.length = 0;
+  __resetStackEngineForTests();
   delete process.env.MAIPAI_BACKGROUND_URL;
 });
 
@@ -565,6 +584,8 @@ describe("summarizeBeforeDelete()", () => {
   });
 
   test("never stores a canned reply as a memory when only the stub backend is available", async () => {
+    __setStackClientForTests(null);
+    setHouseholdSettingValue("engines.stack.url", "");
     const { actor } = await owner();
     await runTurn(actor, "chat", "good morning"); // falls through to the stub chat backend
     const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all();
@@ -581,11 +602,11 @@ describe("summarizeBeforeDelete()", () => {
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    useBackgroundStack(stub.url);
     try {
       await summarizeBeforeDelete(rows);
     } finally {
-      await stub.stop();
+      conversationStubs.push(stub);
     }
 
     const episodes = db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all();
@@ -610,7 +631,7 @@ describe("summarizeBeforeDelete()", () => {
     // exercising the `!result.ok` branch, not summarizeBeforeDelete()'s
     // own outer catch (a separate, more defensive guard against
     // anything else in this loop throwing, e.g. remember() itself).
-    process.env.MAIPAI_BACKGROUND_URL = "http://127.0.0.1:1"; // never reachable
+    useBackgroundStack("http://127.0.0.1:1"); // never reachable
     await expect(summarizeBeforeDelete(rows)).resolves.toBeUndefined();
 
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all().length).toBe(0);
@@ -634,11 +655,11 @@ describe("summarizeBeforeDelete()", () => {
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    useBackgroundStack(stub.url);
     try {
       await summarizeBeforeDelete(rows);
     } finally {
-      await stub.stop();
+      conversationStubs.push(stub);
     }
 
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.recordKind, "episode")).all().length).toBe(0);
@@ -792,7 +813,7 @@ describe("runRetention()", () => {
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    useBackgroundStack(stub.url);
     try {
       const result = runRetention();
       // The delete already happened synchronously, before any
@@ -809,7 +830,7 @@ describe("runRetention()", () => {
       }
       expect(episodes.length).toBe(1);
     } finally {
-      await stub.stop();
+      conversationStubs.push(stub);
       delete process.env.MAIPAI_BACKGROUND_URL;
     }
   });
@@ -1196,12 +1217,12 @@ describe("#88: retention never summarizes a replaced turn into a durable memory"
         return "They discussed a dentist appointment.";
       },
     });
-    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    useBackgroundStack(stub.url);
     try {
       runRetention();
       await new Promise((r) => setTimeout(r, 300)); // the summary batch is fire-and-forget
     } finally {
-      await stub.stop();
+      conversationStubs.push(stub);
       delete process.env.MAIPAI_BACKGROUND_URL;
     }
     expect(seen.join("")).toContain("Tuesday"); // the batch was summarized
@@ -1250,11 +1271,11 @@ describe("CHAT-03 (#89): a stored summary is redacted on every read", () => {
         return "A short summary.";
       },
     });
-    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    useBackgroundStack(stub.url);
     try {
       await maybeRefreshConversationSummary(conv.value.id);
     } finally {
-      await stub.stop();
+      conversationStubs.push(stub);
       delete process.env.MAIPAI_BACKGROUND_URL;
     }
     expect(seen.join("")).not.toContain(value);
@@ -1575,6 +1596,8 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
   });
 
   test("skips entirely on the stub model - a canned reply is worse than no summary", async () => {
+    __setStackClientForTests(null);
+    setHouseholdSettingValue("engines.stack.url", "");
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
@@ -1597,11 +1620,11 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    useBackgroundStack(stub.url);
     try {
       await maybeRefreshConversationSummary(conv.value.id);
     } finally {
-      await stub.stop();
+      conversationStubs.push(stub);
     }
 
     const row = getConversation(actor, conv.value.id);
@@ -1622,7 +1645,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
 
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    useBackgroundStack(stub.url);
     try {
       // First batch: 8 turns triggers a first summary covering the 4
       // oldest (turn-anchor0..3); summary_through_turn lands on turn-anchor3.
@@ -1665,7 +1688,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
       expect(summary.split("first batch msg 2").length - 1).toBe(1);
       expect(summary).toContain("edited anchor message");
     } finally {
-      await stub.stop();
+      conversationStubs.push(stub);
     }
   });
 
@@ -1685,10 +1708,9 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
       logTurn(actor, "chat", `msg ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-delay${i}` });
     }
 
-    __resetBackgroundSupervisorForTests();
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer();
-    process.env.MAIPAI_BACKGROUND_URL = stub.url;
+    useBackgroundStack(stub.url);
     // A generous delay and generous margins around it, the same "jitter
     // margin two orders of magnitude wider than a real test runner ever
     // needs" philosophy tests/rateLimiter.test.ts's own issue #13 fix
@@ -1727,7 +1749,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
       expect(row.value.summary).not.toBeNull();
     } finally {
       __setSummaryRefreshDelayForTests(null);
-      await stub.stop();
+      conversationStubs.push(stub);
     }
   });
 

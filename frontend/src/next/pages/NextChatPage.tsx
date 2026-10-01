@@ -2695,7 +2695,7 @@ export function NextChatPage({ person }: { person: Roster }) {
               <AlertTitle>MaiPai's AI isn't running right now</AlertTitle>
               <AlertDescription>
                 You can't send messages until it's back.{" "}
-                {isOwnerOrAdminRole(person.role) ? <Link to="/repairs">Open Repairs to see what's wrong.</Link> : null}
+                {isOwnerOrAdminRole(person.role) ? <Link to="/repairs" className="inline-flex min-h-12 items-center">Open Repairs to see what's wrong.</Link> : null}
               </AlertDescription>
             </Alert>
           ) : null}

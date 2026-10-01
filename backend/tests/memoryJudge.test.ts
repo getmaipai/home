@@ -3,7 +3,6 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { resolveOrCreateConversation, logTurn, turnSignalOf, insertProvisionalTurn } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { judgeTurn, runJudgeBatch, runConsolidation, judgeQueueStats } from "@/lib/memoryJudge";
@@ -21,15 +20,28 @@ import type { TurnValue } from "@/wire";
 import type { PersonRow } from "@/types";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { SubjectRef } from "@/lib/unknownNames";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { startStackFixture } from "./stackFixture";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { useDefaultScriptedStack } from "./stackFixture";
+
+let judgeFixture: ReturnType<typeof startStackFixture> | null = null;
+let embeddingStub: { stop(): Promise<void> } | null = null;
+
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  useDefaultScriptedStack();
 });
 
-afterEach(() => {
+afterEach(async () => {
+  judgeFixture?.stop();
+  judgeFixture = null;
+  await embeddingStub?.stop();
+  embeddingStub = null;
+  __resetStackEngineForTests();
   __resetLlmSupervisorForTests();
-  __resetBackgroundSupervisorForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
   delete process.env.MAIPAI_BACKGROUND_URL;
 });
@@ -77,21 +89,24 @@ function makeTurn(actor: PersonRow, userText: string, replyText: string, opts: {
  * normal turn-generation call (which never sets response_format at all
  * and so always falls through to the default echo reply here). */
 async function withScriptedJudge<T>(reply: (schemaName: string | undefined, request: ChatCompletionRequest) => unknown, fn: () => Promise<T>): Promise<T> {
-  __resetBackgroundSupervisorForTests();
+  judgeFixture?.stop();
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-  const stub = startStubLlmServer(0, {
-    scriptedChatReply: (request) => {
+  const embeddings = startStubLlmServer(0);
+  embeddingStub = embeddings;
+  const fixture = startStackFixture({
+    "POST /v1/chat/completions": async (req) => {
+      const request = await req.json() as ChatCompletionRequest;
       const schemaName = request.response_format?.type === "json_schema" ? request.response_format.json_schema.name : undefined;
-      if (!schemaName) return undefined; // a normal turn-generation call - fall through to the default echo
-      return reply(schemaName, request);
+      const scripted = await reply(schemaName, request);
+      const value = scripted ?? (schemaName === "memory_extraction" ? { facts: [] } : schemaName === "memory_dedupe" ? { action: "ADD" } : { text: "" });
+      return Response.json({ model: "scripted-judge", choices: [{ message: { role: "assistant", content: JSON.stringify(value) } }] });
     },
+    "POST /v1/embeddings": async (req) => fetch(`${embeddings.url}/v1/embeddings`, { method: "POST", headers: req.headers, body: await req.arrayBuffer() }),
   });
-  process.env.MAIPAI_BACKGROUND_URL = stub.url;
-  try {
-    return await fn();
-  } finally {
-    await stub.stop();
-  }
+  judgeFixture = fixture;
+  __setStackClientForTests(fixture.client);
+  setHouseholdSettingValue("engines.stack.url", fixture.url);
+  return await fn();
 }
 
 // The fixtures below say "anchovies", not the prompt's own "cilantro"
@@ -580,6 +595,7 @@ describe("judgeTurn() - the poison guard", () => {
     const turn = makeTurn(actor, "hello", "hi there");
 
     __resetLlmSupervisorForTests();
+    __setStackClientForTests(null);
     process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1"; // never reachable
 
     const first = await judgeTurn(turn);
@@ -706,6 +722,7 @@ describe("item 4b: a turn skipped while the judge is on it stays skipped and wri
       async (schemaName) => {
         if (schemaName === "memory_extraction") return { facts: [{ text: "Marlow lives in Boston", category: "fact", scope: "person", importance: 0.6 }] };
         if (schemaName === "memory_dedupe") {
+          console.log("DEDUPE CALLBACK");
           dedupeCalled = true;
           await skip(turn.id);
           return { action: "ADD" };

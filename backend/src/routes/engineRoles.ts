@@ -3,21 +3,17 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { restartChatAndWait } from "@/routes/host";
 import { stopChatBackend } from "@/lib/llmSupervisor";
-import { restartEmbedBackend, stopEmbedBackend, startEmbedBackendNow, getEmbedClient } from "@/lib/embedSupervisor";
-import { restartBackgroundBackend, stopBackgroundBackend, startBackgroundBackendNow, getBackgroundClient } from "@/lib/backgroundSupervisor";
 
-const RoleSchema = z.enum(["chat", "embed", "background"]).openapi({ param: { name: "role", in: "path" } });
+const RoleSchema = z.enum(["chat"]).openapi({ param: { name: "role", in: "path" } });
 const RestartResponseSchema = z.object({ role: RoleSchema, restarted: z.literal(true) });
 
 type Action = "restart" | "stop" | "start";
-type Actions = Record<"chat" | "embed" | "background", Record<Action, () => Promise<void>>>;
+type Actions = Record<"chat", Record<Action, () => Promise<void>>>;
 let testActions: Actions | null = null;
 export function __setEngineRoleActionsForTests(actions: Actions | null): void { testActions = actions; }
 
 const actions: Actions = {
   chat: { restart: restartChatAndWait, stop: stopChatBackend, start: restartChatAndWait },
-  embed: { restart: async () => { await restartEmbedBackend(); void getEmbedClient().catch(() => {}); }, stop: stopEmbedBackend, start: async () => { void startEmbedBackendNow().catch(() => {}); } },
-  background: { restart: async () => { await restartBackgroundBackend(); void getBackgroundClient().catch(() => {}); }, stop: stopBackgroundBackend, start: async () => { void startBackgroundBackendNow().catch(() => {}); } },
 };
 
 const restartRoute = createRoute({

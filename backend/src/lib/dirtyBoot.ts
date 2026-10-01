@@ -177,7 +177,6 @@ export function isInCrashBootHold(): boolean {
 }
 
 /** Every real-engine-spawn gate (llmSupervisor.ts's tiers 2 and 3,
- * embedSupervisor.ts's real spawn) throws through here rather than each
  * writing its own copy of this message - a code review (2026-09-06)
  * found the string duplicated verbatim across two files, one edit away
  * from drifting. A no-op when the hold has lapsed. */

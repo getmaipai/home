@@ -87,7 +87,7 @@ describe("the hub's own connections", () => {
     expect(byId.get("platform:wake-word-models")?.destination).toContain("github.com");
     expect(byId.get("platform:face-vision-models")?.destination).toContain("huggingface.co");
     expect(byId.get("platform:face-vision-models")?.destination).toContain("githubusercontent.com");
-    expect(byId.get("platform:text-embedding-model")?.destination).toContain("huggingface.co");
+    expect(byId.has("platform:text-embedding-model")).toBe(false);
   });
 
   // ROBOT-UPDATES-01: the daily update check also reads MaiPai Bot's
@@ -99,16 +99,10 @@ describe("the hub's own connections", () => {
     expect(row?.what).toContain("robot is paired");
   });
 
-  // #112: the background memory helper's model download was missing from
-  // this table, and the embedding row still described a retired keyword
-  // scorer instead of the embedder memory recall now uses.
-  test("the memory helper's model download is listed, and the embedding row reflects current use", () => {
+  test("Home declares no downloads for the deleted embedding and background engines", () => {
     const byId = new Map(platformConnections().map((r) => [r.id, r]));
-    const background = byId.get("platform:background-model");
-    expect(background).toBeDefined();
-    expect(background?.destination).toContain("huggingface.co");
-    expect(background?.when).toContain("memory helper");
-    expect(byId.get("platform:text-embedding-model")?.when).not.toContain("Nothing in MaiPai");
+    expect(byId.has("platform:background-model")).toBe(false);
+    expect(byId.has("platform:text-embedding-model")).toBe(false);
   });
 
   // Home still downloads Silero for streaming speech endpointing. The

@@ -11,7 +11,6 @@ import { newMemoryRecordId } from "@/lib/memoryId";
 import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import { detectCredential, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { isOwnerOrAdmin } from "@/lib/access";
-import { getEmbedBackendKind } from "@/lib/embedSupervisor";
 import { embed, type EmbedOpResult } from "@/lib/llm";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 
@@ -296,12 +295,8 @@ export function ingestMemory(input: IngestInput): IngestResult {
   if (input.precomputedEmbedding) {
     storeEmbeddingInTx(memoryId, input.precomputedEmbedding.space, input.precomputedEmbedding.vector, input.precomputedEmbedding.preprocess);
   } else {
-    const backend = getEmbedBackendKind();
-    if (backend === "none" || backend === "starting") {
-      queuePendingWork(memoryId, "embed_failed");
-    } else {
-      trackBackgroundWork(
-        (async () => {
+    trackBackgroundWork(
+      (async () => {
           const result: EmbedOpResult = await embed([text]);
           if (result.ok) {
             storeEmbeddingInTx(memoryId, result.value.model, result.value.vectors[0]!, result.value.preprocess);
@@ -312,7 +307,6 @@ export function ingestMemory(input: IngestInput): IngestResult {
           queuePendingWork(memoryId, "embed_failed");
         }),
       );
-    }
   }
 
   return { ok: true, record, deduped: false };
@@ -414,12 +408,8 @@ export function supersedeMemory(input: SupersedeInput): SupersedeResult {
   if (input.precomputedEmbedding) {
     storeEmbeddingInTx(memoryId, input.precomputedEmbedding.space, input.precomputedEmbedding.vector, input.precomputedEmbedding.preprocess);
   } else {
-    const backend = getEmbedBackendKind();
-    if (backend === "none" || backend === "starting") {
-      queuePendingWork(memoryId, "embed_failed");
-    } else {
-      trackBackgroundWork(
-        (async () => {
+    trackBackgroundWork(
+      (async () => {
           const res: EmbedOpResult = await embed([text]);
           if (res.ok) {
             storeEmbeddingInTx(memoryId, res.value.model, res.value.vectors[0]!, res.value.preprocess);
@@ -430,7 +420,6 @@ export function supersedeMemory(input: SupersedeInput): SupersedeResult {
           queuePendingWork(memoryId, "embed_failed");
         }),
       );
-    }
   }
 
   return { ok: true, record: result.record };
@@ -458,11 +447,6 @@ export async function drainPendingWork(): Promise<DrainResult> {
       if (!record || record.status !== "active") {
         clearPendingWork(row.memoryId);
         cleared++;
-        continue;
-      }
-      const backend = getEmbedBackendKind();
-      if (backend === "none" || backend === "starting") {
-        stillPending++;
         continue;
       }
       try {

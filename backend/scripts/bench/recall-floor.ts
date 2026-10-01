@@ -21,7 +21,6 @@ import { people, memoryRecords, memoryEmbeddings } from "@/db/schema";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { remember, drainPendingEmbeddings, embedQueryForRecall, cosineSimilarity, bufferToVector } from "@/lib/memory";
-import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { logTurn, createConversation } from "@/lib/conversationHistory";
 import { embedPendingEpisodes, recallEpisodes, contentTerms, sharedContentTerms, episodeQueryEligible, LEXICAL_MIN_SHARED_TERMS } from "@/lib/episodes";
 import { episodes, episodeEmbeddings } from "@/db/schema";
@@ -379,6 +378,5 @@ try {
   summary = await main();
 } finally {
   cleanup();
-  __resetEmbedSupervisorForTests();
 }
 finishBench(summary);

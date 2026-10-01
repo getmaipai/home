@@ -5,7 +5,7 @@ import { __resetStackEngineForTests, __setStackClientForTests, isStackRoleEnable
 
 const roles: StackRole[] = ["chat", "embeddings", "stt", "tts"];
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); __setStackClientForTests(null); });
 afterEach(() => __resetStackEngineForTests());
 
 describe("Stack role routing", () => {

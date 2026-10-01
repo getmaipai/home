@@ -3,7 +3,6 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { complete, startCompleteStream, embed, envelopeToolCall, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall, CHAT_SAMPLING } from "@/lib/llm";
 import { clampMaxTokens } from "@/routes/llm";
@@ -12,16 +11,17 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests, getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { listIssues } from "@/lib/issues";
 import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
+import { useDefaultScriptedStack } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetRateLimiterForTests();
+  useDefaultScriptedStack();
 });
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
-  __resetEmbedSupervisorForTests();
   __resetStackEngineForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
@@ -715,14 +715,39 @@ describe("POST /api/llm/chat", () => {
   });
 });
 
+function scriptedEmbeddingStack(): StackFixture {
+  const fixture = startStackFixture({
+    "GET /stack/v1/roles": async () => Response.json({ roles: [
+      { id: "chat", label: "Chat", wire: "chat", residency: "jit", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: new Date().toISOString(), checkedAt: new Date().toISOString() }, reason: null, model: null, check: { state: "skipped", at: null, reason: null, stale: false } },
+      { id: "embed", label: "Embeddings", wire: "embeddings", residency: "jit", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: new Date().toISOString(), checkedAt: new Date().toISOString() }, reason: null, model: null, check: { state: "skipped", at: null, reason: null, stale: false } },
+      { id: "judge", label: "Judge", wire: "chat", residency: "jit", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: new Date().toISOString(), checkedAt: new Date().toISOString() }, reason: null, model: null, check: { state: "skipped", at: null, reason: null, stale: false } },
+    ] }),
+    "POST /v1/embeddings": async (req) => {
+      const body = await req.json() as { input: string[] };
+      return Response.json({ model: "scripted-embed", data: body.input.map((_, index) => ({ index, embedding: Array.from({ length: 768 }, (_, i) => (i + 1) * (index + 1)) })) });
+    },
+    "POST /v1/chat/completions": async (req) => {
+      const body = await req.json() as { stream?: boolean };
+      if (body.stream) return new Response('data: {"choices":[{"delta":{"content":"hello"},"finish_reason":null}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream", "x-maipai-engine": "local scripted", "x-maipai-model": "scripted-chat" } });
+      return Response.json({ choices: [{ message: { role: "assistant", content: "hello" } }] });
+    },
+  });
+  setHouseholdSettingValue("engines.stack.url", fixture.url);
+  __setStackClientForTests(fixture.client);
+  return fixture;
+}
+
 describe("lib/llm.ts embed()", () => {
-  test("returns a real vector per input, from the stub backend (no engine configured in tests)", async () => {
+  let fixture: StackFixture;
+  beforeEach(() => { fixture = scriptedEmbeddingStack(); });
+  afterEach(() => fixture.stop());
+  test("returns vectors per input from the scripted Stack", async () => {
     const result = await embed(["hello", "world"]);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.vectors.length).toBe(2);
-    expect(result.value.vectors[0]!.length).toBe(768);
+    expect(result.value.vectors).toHaveLength(2);
     expect(result.value.vectors[0]).not.toEqual(result.value.vectors[1]);
+    expect(fixture.calls).toEqual(["POST /v1/embeddings"]);
   });
 
   test("rejects an empty array", async () => {
@@ -739,6 +764,9 @@ describe("lib/llm.ts embed()", () => {
 });
 
 describe("POST /api/llm/embed", () => {
+  let fixture: StackFixture;
+  beforeEach(() => { fixture = scriptedEmbeddingStack(); });
+  afterEach(() => fixture.stop());
   test("requires a signed-in person", async () => {
     const res = await new TestClient().post("/api/llm/embed", { texts: ["hi"] });
     expect(res.status).toBe(401);
@@ -753,7 +781,6 @@ describe("POST /api/llm/embed", () => {
   test("returns real vectors for a signed-in person", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-
     const res = await owner.post("/api/llm/embed", { texts: ["good morning", "good night"] });
     expect(res.status).toBe(200);
     const body = (await res.json()) as { vectors: number[][]; model: string };
@@ -820,6 +847,7 @@ describe("lib/llm.ts routed through a configured Stack", () => {
       "POST /v1/embeddings": async () => { calls++; return Response.json({ data: [{ index: 0, embedding: [0.1] }] }); },
     });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
 
     const chat = await complete("chat", [{ role: "user", content: "hello" }]);
     const vectors = await embed(["hello"]);
@@ -833,6 +861,7 @@ describe("lib/llm.ts routed through a configured Stack", () => {
     let calls = 0;
     fixture = startStackFixture({ "POST /v1/embeddings": async () => { calls++; return Response.json({ data: [{ index: 0, embedding: [0.7] }] }); } });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
     const result = await embed(["hello"]);
     expect(result.ok).toBe(true);
     expect(calls).toBe(1);
@@ -847,6 +876,7 @@ describe("lib/llm.ts routed through a configured Stack", () => {
         ),
     });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
 
     const result = await complete("chat", [{ role: "user", content: "hi" }]);
     expect(result.ok).toBe(true);
@@ -1016,26 +1046,21 @@ describe("lib/llm.ts routed through a configured Stack", () => {
     }
   });
 
-  test("MAIPAI_EMBED_URL wins over a configured Stack, not the other way around", async () => {
+  test("embeddings use the Stack even when MAIPAI_EMBED_URL is set", async () => {
+    let calls = 0;
     fixture = startStackFixture({
       "POST /v1/embeddings": async () => {
-        throw new Error("the Stack must never be reached - the env var override should have won");
+        calls++;
+        return Response.json({ data: [{ index: 0, embedding: [0.4] }] });
       },
     });
     configureStack();
-
-    // The stub's own /v1/embeddings has no scripting option (unlike
-    // chat's scriptedChatReply) - its always-on deterministic default
-    // is enough here: the Stack fixture above throws unconditionally,
-    // so `result.ok` alone proves the local stub answered instead.
-    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const stub = startStubLlmServer(0);
-    process.env.MAIPAI_EMBED_URL = stub.url;
+    process.env.MAIPAI_EMBED_URL = "http://127.0.0.1:1";
     try {
       const result = await embed(["hi"]);
       expect(result.ok).toBe(true);
+      expect(calls).toBe(1);
     } finally {
-      await stub.stop();
       delete process.env.MAIPAI_EMBED_URL;
     }
   });

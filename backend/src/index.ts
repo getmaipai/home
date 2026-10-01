@@ -13,8 +13,6 @@ import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/lib/llmSupervisor";
 import { buildOldPathStablePrefix, ordinaryToolSpecs } from "@/lib/turnEngine";
 import { toToolDefinition } from "@/lib/llm";
-import { getEmbedClient, getEmbedLivePid } from "@/lib/embedSupervisor";
-import { getBackgroundLivePid } from "@/lib/backgroundSupervisor";
 import { engineWarmupsForStackRoles } from "@/lib/engineBoot";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
@@ -208,7 +206,7 @@ registerDenoHostGracefulExit();
 // memory engine (MEM-01's background supervisor) runs the same binary
 // from the same engines directory, so without its pid here a reload
 // swept the judge's engine mid-extraction.
-await sweepOrphanEngineProcesses([getEmbedLivePid(), getBackgroundLivePid()]);
+await sweepOrphanEngineProcesses([]);
 await initCrashBootHold();
 // KIWIX-SIDECAR-01: registers (installing the pinned binary on first
 // boot only) and starts, fire-and-forget like startAllSidecars() below
@@ -219,10 +217,9 @@ await initCrashBootHold();
 // harmless either way.
 void startKiwixSidecar();
 void startAllSidecars();
-// Warm the remaining Home owned engines in the background. Text to
-// speech always runs through the Stack.
+// Warm Home-owned chat when the Stack does not serve it.
 for (const role of engineWarmupsForStackRoles()) {
-  const warmup = role === "chat" ? getChatClient : getEmbedClient;
+  const warmup = getChatClient;
   void warmup().catch((err: unknown) => console.error(`[boot] ${role} engine warm-up: ${(err as Error).message}`));
 }
 // Step 5: idle Tier 1 sandbox processes get closed after ten minutes -

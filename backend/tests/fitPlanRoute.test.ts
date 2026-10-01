@@ -7,10 +7,11 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { owner } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 import { makePlan } from "./fixtures/fitPlanFixtures";
+import { restoreDefaultScriptedStack } from "./stackFixture";
 
 describe("POST /api/fit-plan", () => {
   beforeEach(() => resetDb());
-  afterEach(() => __resetStackEngineForTests());
+  afterEach(() => { __resetStackEngineForTests(); restoreDefaultScriptedStack(); });
 
   async function postFit(value: StackFitPlan | Error, body: unknown = { source: { repo: "Qwen/Qwen3-8B", revision: "main" } }, status?: number) {
     const clientStub = { fitPlan: async () => { if (value instanceof Error) throw value; return value; } } as unknown as StackClient;
@@ -29,7 +30,7 @@ describe("POST /api/fit-plan", () => {
 
   test("explains no Stack is set up without calling a Stack client", async () => {
     setHouseholdSettingValue("engines.stack.url", "");
-    __resetStackEngineForTests();
+    __setStackClientForTests(null);
     const { client } = await owner();
     const response = await client.post("/api/fit-plan", { source: { repo: "Qwen/Qwen3-8B" } });
     expect(response.status).toBe(200);

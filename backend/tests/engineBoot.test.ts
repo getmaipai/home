@@ -1,12 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { engineWarmupsForStackRoles } from "@/lib/engineBoot";
-import { __resetStackEngineForTests } from "@/lib/stackEngine";
+import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { resetDb } from "./reset-db";
+import { restoreDefaultScriptedStack } from "./stackFixture";
 import { setHouseholdSettingValue } from "@/lib/settings";
 
 afterEach(() => {
   resetDb();
   __resetStackEngineForTests();
+  restoreDefaultScriptedStack();
 });
 
 describe("engine boot warm-ups", () => {
@@ -15,8 +17,9 @@ describe("engine boot warm-ups", () => {
     expect(engineWarmupsForStackRoles()).toEqual([]);
   });
 
-  test("warms only Home owned roles when no Stack is configured", () => {
+  test("warms no Home owned roles when no Stack is configured", () => {
     setHouseholdSettingValue("engines.stack.url", "");
-    expect(engineWarmupsForStackRoles()).toEqual(["chat", "embed"]);
+    __setStackClientForTests(null);
+    expect(engineWarmupsForStackRoles()).toEqual([]);
   });
 });

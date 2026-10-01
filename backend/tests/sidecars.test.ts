@@ -33,6 +33,8 @@ import { db } from "@/db";
 import { notificationDeliveries } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
+import { restoreDefaultScriptedStack } from "./stackFixture";
+import { __setStackClientForTests } from "@/lib/stackEngine";
 import { join } from "node:path";
 import { getChatClient, getChatLivePid, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { logsDir } from "@/lib/paths";
@@ -42,6 +44,7 @@ beforeEach(() => {
   resetDb();
   __resetFixHandlersForTests();
   __resetSidecarsForTests();
+  restoreDefaultScriptedStack();
 });
 
 afterEach(() => {
@@ -359,7 +362,8 @@ describe("registerGracefulExit", () => {
 });
 
 describe("GET /api/health", () => {
-  test("requires a signed-in person and reports every registered sidecar", async () => {
+  test("requires a signed-in person and reports registered sidecars without local engines", async () => {
+    __setStackClientForTests(null);
     const client = new TestClient();
     const anon = await client.get("/api/health");
     expect(anon.status).toBe(401);
@@ -370,13 +374,15 @@ describe("GET /api/health", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { sidecars: unknown[]; ok: boolean; engines: Record<string, { kind: string; alive: boolean | null; availability?: string; reason?: string | null }> };
     expect(body.sidecars).toEqual([{ id: "reported", status: "stopped", baseUrl: "http://127.0.0.1:12345" }]);
-    // Nothing has been asked to start yet, so there is nothing to probe
-    // and nothing wrong: `alive` is null (not false) and the page reads ok.
-    expect(body.ok).toBe(true);
-    expect(body.engines.chat!.alive).toBeNull();
-    expect(body.engines.chat!.availability).toBe("ready");
-    expect(body.engines.chat!.reason).toBeNull();
-    expect(body.engines.background).toBeDefined();
+    // No Stack is configured, so model roles are unavailable even though
+    // the unrelated registered sidecar is merely stopped.
+    expect(body.ok).toBe(false);
+    expect(body.engines.chat!.alive).toBe(false);
+    expect(body.engines.chat!.kind).toBe("failed");
+    expect(body.engines.chat!.availability).toBe("unavailable");
+    expect(body.engines.chat!.reason).toBe("failed_start");
+    expect(body.engines.embed!.kind).toBe("failed");
+    expect(body.engines.background!.kind).toBe("failed");
 
     // The OpenAPI response is the public contract for this route. Keep its
     // engine list aligned with the real payload so generated clients can
@@ -399,53 +405,24 @@ describe("GET /api/health", () => {
     expect(healthSchema?.properties?.engines?.properties?.chat?.properties).toHaveProperty("reason");
   });
 
-  // The Health page kept saying fine while the chat engine was dead
-  // (2026-09-07): it showed the engine's configured kind, never a probe.
-  test("reports a dead chat engine as not alive and the hub as not ok", async () => {
+  test("reports that the Stack is required when none is configured", async () => {
+    __setStackClientForTests(null);
     const client = new TestClient();
     await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    process.env.MAIPAI_LLAMA_SERVER_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
-    process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
-    // FLAKE-PORT-01 (issue 137): a fresh port reserved right here, not
-    // preload.ts's one port held "reserved" but unbound for this whole
-    // 200+-file test run - a real spawn on that stale value can lose a
-    // bind race to any other process on the machine. Restored after
-    // (never deleted: isolation.ts's own 2026-09-07 finding, deleting
-    // this var instead of restoring it let a later test's real spawn
-    // fall through to the production port and kill the real household
-    // engine).
-    const priorPort = process.env.MAIPAI_LLAMA_SERVER_PORT;
-    process.env.MAIPAI_LLAMA_SERVER_PORT = String(reserveFreePort());
-    try {
-      await getChatClient();
-      const up = (await (await client.get("/api/health")).json()) as { ok: boolean; engines: { chat: { alive: boolean | null; pid: number | null } } };
-      expect(up.ok).toBe(true);
-      expect(up.engines.chat.alive).toBe(true);
-
-      // Kill it and wait for the watch's own drop to land - a fixed sleep
-      // here flaked under load (a code review, 2026-09-07): too short and
-      // the exit hadn't been observed yet, too long and the default
-      // backoff timer could already have fired.
-      process.kill(up.engines.chat.pid!, "SIGKILL");
-      await waitUntil(() => engineRespawnState("chat") === "pending");
-      const down = (await (await client.get("/api/health")).json()) as { ok: boolean; engines: { chat: { kind: string; alive: boolean | null } } };
-      // The watch has already dropped the dead backend by now and is in
-      // its backoff: the route says so by name, never "not started yet".
-      expect(down.ok).toBe(false);
-      expect(down.engines.chat.kind).toBe("restarting");
-    } finally {
-      __resetLlmSupervisorForTests();
-      delete process.env.MAIPAI_LLAMA_SERVER_BIN;
-      delete process.env.MAIPAI_CHAT_MODEL_PATH;
-      process.env.MAIPAI_LLAMA_SERVER_PORT = priorPort;
-    }
-  }, 15_000);
+    const body = (await (await client.get("/api/health")).json()) as { ok: boolean; engines: { chat: { kind: string; alive: boolean | null; availability: string; reason: string | null } } };
+    expect(body.ok).toBe(false);
+    expect(body.engines.chat.kind).toBe("failed");
+    expect(body.engines.chat.alive).toBe(false);
+    expect(body.engines.chat.availability).toBe("unavailable");
+    expect(body.engines.chat.reason).toBe("failed_start");
+  });
 });
 
 describe("probeAlive (what the Health page asks)", () => {
   // The 2026-09-07 Health-page bug in one assertion: a cached client to a
   // process that has since died must probe false, not read as fine.
   test("a stale client to a killed process probes false", async () => {
+    __setStackClientForTests(null);
     process.env.MAIPAI_LLAMA_SERVER_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
     process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
     // FLAKE-PORT-01 (issue 137): see the same note above - a fresh port
@@ -962,7 +939,6 @@ describe("freePort", () => {
 
 // ENGINE-PORT-01's own BACKLOG row: "the health list carries the
 // condition" - engineHealthKind() is what every probe*Engine() function
-// (llmSupervisor.ts, embedSupervisor.ts, backgroundSupervisor.ts)
 // calls to build GET /api/health's own per-engine
 // `kind`, so this is the one place that check is provable without a
 // live spawn.

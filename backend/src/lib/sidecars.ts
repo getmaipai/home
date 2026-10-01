@@ -426,7 +426,6 @@ export function getSidecarLogs(id: string): string[] {
  * the next spawn attempt then either fails to bind or, worse, silently
  * polls as if it were the fresh one). Every sidecar-shaped spawn in this
  * codebase - the declarative registry below AND llmSupervisor.ts/
- * embedSupervisor.ts's own lazy, tiered spawns - now calls this one
  * implementation instead of each hand-rolling its own.
  *
  * `ps`, not `lsof`: proved unreliably slow on the machine this was first
@@ -591,7 +590,6 @@ export interface SpawnAndWaitOptions {
   timeoutMs?: number;
   /** Minimum time the process must stay alive (exitCode still null)
    * before a passing `healthCheck` is trusted. Real health checks
-   * (llmSupervisor.ts/embedSupervisor.ts's `client.health()`, a sidecar's
    * `healthUrl`) don't need this - a check that only starts passing once
    * the server is genuinely serving requests already proves aliveness.
    * It matters for a caller with no real health signal at all
@@ -651,7 +649,6 @@ async function pipeAndLog(stream: ReadableStream<Uint8Array>, terminal: NodeJS.W
  * codebase now spawns through: free the port if one is claimed, spawn,
  * poll `healthCheck` until it passes (failing fast if the process exits
  * first, not just on timeout), return the live process. Callers that need
- * a client wrapped around the result (llmSupervisor.ts, embedSupervisor.ts)
  * build that themselves - this only proves the process is up. */
 export async function spawnAndWaitHealthy(
   opts: SpawnAndWaitOptions,
@@ -659,7 +656,6 @@ export async function spawnAndWaitHealthy(
   // ENGINE-PORT-01: a ForeignPortHolderError propagates straight out of
   // this call (never caught here) - a live process this install did not
   // spawn already answers on `opts.port`, so the spawn below never
-  // happens at all. Every caller (llmSupervisor.ts, embedSupervisor.ts,
   // the speech supervisor) already turns a thrown spawn failure into its own
   // "unavailable"/health-list reporting; this is one more real reason
   // for that same path, not a new one to build.

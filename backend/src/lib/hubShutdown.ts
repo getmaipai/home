@@ -12,14 +12,12 @@
 // the fatal handler that awaits it would otherwise raise a second
 // unhandled rejection into the same handler.
 import { stopChatBackend } from "@/lib/llmSupervisor";
-import { restartEmbedBackend } from "@/lib/embedSupervisor";
-import { restartBackgroundBackend } from "@/lib/backgroundSupervisor";
 
 export const SHUTDOWN_DEADLINE_MS = 20_000;
 
 let shutdownPromise: Promise<void> | null = null;
 export async function shutdownEngines(
-  stops: Array<() => void | Promise<void>> = [stopChatBackend, restartEmbedBackend, restartBackgroundBackend],
+  stops: Array<() => void | Promise<void>> = [stopChatBackend],
   deadlineMs = SHUTDOWN_DEADLINE_MS,
 ): Promise<void> {
   shutdownPromise ??= (async () => {

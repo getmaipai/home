@@ -118,7 +118,6 @@ import { extractModelText } from "./recordingProxy";
 import { replyShape, splitFrame } from "../voice/corpus";
 import { WRITTEN_QUESTIONS } from "./written-set";
 import { getEngineStatus, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import type { PersonRow } from "@/types";
 
@@ -864,7 +863,6 @@ async function main(): Promise<{ executed: number; engine: string }> {
 
   cleanupBenchPerson();
   __resetLlmSupervisorForTests();
-  __resetEmbedSupervisorForTests();
 
   if (results.length > 0) {
     console.log("\n## Per-row table (company/row/arm/seed -> tokens, cached, tok/s, heading/list, lowercase, self-desc, contraction, markers, other-markers, fact)\n");

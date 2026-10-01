@@ -48,7 +48,6 @@ import { runTurn } from "@/lib/turnEngine";
 import { setValue } from "@/lib/settings";
 import { PERSONAS } from "@/lib/persona";
 import { getEngineStatus } from "@/lib/llmSupervisor";
-import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { judgePersonaConsistency, type JudgedExchange } from "@/lib/personaJudge";
 import type { PersonRow } from "@/types";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
@@ -202,7 +201,6 @@ try {
   cleanup(); // this bench's own rows only, in its own disposable database
   // A shared engine is never stopped: the URL tier's stop is a no-op, and
   // CHAT-22's setup admits nothing but the URL tier.
-  __resetEmbedSupervisorForTests();
 }
 // CHAT-22: see naturalness.ts on why the bench exits explicitly.
 finishBench({ executed, engine: `chat ${getEngineStatus().kind} at ${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)}` });

@@ -14,7 +14,6 @@
 // forcing embed through validate()'s chat-shaped checks would be the
 // wrong kind of code reuse, not real sharing.
 import { getChatClient, reportChatBackendUnreachable } from "@/lib/llmSupervisor";
-import { getEmbedClient } from "@/lib/embedSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError, type ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
 import type { ChatRole, ChatCompletionRequest, ChatCompletionChunk, ToolDefinition, ToolCallWire } from "@maipai/spec/llm/ts/types.js";
@@ -711,6 +710,18 @@ export async function startCompleteStream(
   return { ok: true, tokens: tokens(), stats };
 }
 
+export type BackgroundResult = { ok: true; text: string } | { ok: false; unavailable: true };
+
+/** Runs memory extraction and summaries through the configured Stack judge. */
+export async function completeBackground(messages: LlmMessage[], options: LlmCompleteOptions = {}): Promise<BackgroundResult> {
+  const { body } = chatRequestBody(messages, options);
+  const result = await completeViaStackRequest("background", { model: options.model ?? "judge", ...body });
+  if (!result.ok) return { ok: false, unavailable: true };
+  const data = result.data as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content;
+  return typeof content === "string" ? { ok: true, text: content } : { ok: false, unavailable: true };
+}
+
 export interface EmbedValue {
   /** One vector per input text, in the SAME order as the request - never
    * trusts llama-server's own response order, which the OpenAI-compatible
@@ -738,8 +749,7 @@ export const EMBED_PREPROCESS = "v1";
 
 /** 4.11's `embed` role: text in, one real vector per input out. No
  * `role` parameter (unlike complete()) - there is exactly one embedding
- * model, embedAssets.ts's pinned nomic-embed-text-v1.5, with no
- * catalog/selection to route between yet. */
+ * model, the Stack's pinned embedding model, selected by role. */
 async function embedViaStack(texts: string[]): Promise<EmbedOpResult> {
   try {
     const client = getStackClient();
@@ -758,25 +768,5 @@ export async function embed(texts: string[]): Promise<EmbedOpResult> {
     return { ok: false, status: 400, code: "invalid_input", error: "texts must be a non-empty array of non-empty strings" };
   }
 
-  // getmaipai/home#151: MAIPAI_EMBED_URL before the Stack, the same
-  // ordering and reasoning as complete()'s own MAIPAI_LLAMA_SERVER_URL
-  // check above - its own tier 1 (embedSupervisor.ts) already treats
-  // it as the explicit override.
-  if (!process.env.MAIPAI_EMBED_URL && isStackRoleEnabled("embeddings")) return embedViaStack(texts);
-
-  let client;
-  try {
-    client = await getEmbedClient();
-  } catch (err) {
-    return { ok: false, status: 503, code: "unavailable", error: `embed model unavailable: ${(err as Error).message}` };
-  }
-
-  try {
-    const response = await client.embed({ model: "embed", input: texts });
-    const vectors = [...response.data].sort((a, b) => a.index - b.index).map((d) => d.embedding);
-    return { ok: true, value: { vectors, model: response.model, preprocess: EMBED_PREPROCESS } };
-  } catch (err) {
-    const message = err instanceof LlmClientError ? err.message : (err as Error).message;
-    return { ok: false, status: 503, code: "unavailable", error: `embed model unavailable: ${message}` };
-  }
+  return embedViaStack(texts);
 }

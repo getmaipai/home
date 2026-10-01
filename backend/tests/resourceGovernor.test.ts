@@ -10,6 +10,7 @@ import {
 import { listIssues, __resetFixHandlersForTests } from "@/lib/issues";
 import { resetDb } from "./reset-db";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
+import { __setStackClientForTests } from "@/lib/stackEngine";
 
 // The tier-2 (developer override) spawn path is the only real, non-mocked
 // way to get llmSupervisor.ts's private chatBackend state (and so
@@ -35,6 +36,7 @@ let TEST_CHAT_PORT: string | null = null;
 
 beforeEach(() => {
   resetDb();
+  __setStackClientForTests(null);
   __resetFixHandlersForTests();
   __resetLlmSupervisorForTests();
   // Fast enough to reach a sustained breach in well under a second, and a

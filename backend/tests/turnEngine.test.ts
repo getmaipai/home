@@ -4254,12 +4254,9 @@ describe("POST /api/turn/stream", () => {
 
     test("cancels an in-flight stream and aborts the upstream request", async () => {
       const { client } = await owner();
-      let releaseModel: () => void = () => {};
-      const modelGate = new Promise<void>((resolve) => { releaseModel = resolve; });
+      const scriptedStack = (await import("./stackFixture")).getDefaultScriptedStack();
+      const priorAborts = scriptedStack.aborted();
       __resetLlmSupervisorForTests();
-      const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-      const stub = startStubLlmServer(0, { scriptedChatReply: async () => { await modelGate; return "A delayed answer."; } });
-      process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
       try {
         const streamResponse = await client.post("/api/turn/stream", { text: "wait for me" });
         expect(streamResponse.status).toBe(200);
@@ -4271,7 +4268,6 @@ describe("POST /api/turn/stream", () => {
         const cancelResponse = await client.post(`/api/turn/${firstEvent.turn_id}/cancel`, {});
         expect(cancelResponse.status).toBe(200);
         expect(await cancelResponse.json()).toEqual({ cancelled: true });
-        releaseModel();
         const events = await readNdjson(new Response(new ReadableStream({
           async start(controller) {
             for (;;) {
@@ -4284,13 +4280,9 @@ describe("POST /api/turn/stream", () => {
         })));
         expect(events.at(-1)).toMatchObject({ type: "error", code: "turn_cancelled" });
         const deadline = Date.now() + 5_000;
-        while (stub.aborted() === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
-        await stub.stop();
-        expect(stub.aborted()).toBeGreaterThan(0);
+        while (scriptedStack.aborted() === priorAborts && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(scriptedStack.aborted()).toBeGreaterThan(priorAborts);
       } finally {
-        releaseModel();
-        await stub.stop();
-        delete process.env.MAIPAI_LLAMA_SERVER_URL;
         __resetLlmSupervisorForTests();
       }
     }, 10_000);

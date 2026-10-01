@@ -10,8 +10,6 @@ beforeEach(() => {
   calls.length = 0;
   __setEngineRoleActionsForTests({
     chat: { restart: async () => { calls.push("chat:restart"); }, stop: async () => { calls.push("chat:stop"); }, start: async () => { calls.push("chat:start"); } },
-    embed: { restart: async () => { calls.push("embed:restart"); }, stop: async () => { calls.push("embed:stop"); }, start: async () => { calls.push("embed:start"); } },
-    background: { restart: async () => { calls.push("background:restart"); }, stop: async () => { calls.push("background:stop"); }, start: async () => { calls.push("background:start"); } },
   });
 });
 afterEach(() => __setEngineRoleActionsForTests(null));
@@ -24,7 +22,7 @@ async function ownerClient(): Promise<TestClient> {
 }
 
 describe("POST /api/host/engines/{role}/restart", () => {
-  for (const role of ["chat", "embed", "background"] as const) {
+  for (const role of ["chat"] as const) {
     test(`${role} restart returns the contract body`, async () => {
       const client = await ownerClient();
       const res = await client.post(`/api/host/engines/${role}/restart`, {});
@@ -34,8 +32,13 @@ describe("POST /api/host/engines/{role}/restart", () => {
     });
   }
 
+  test("does not expose Stack-owned engine actions", async () => {
+    const client = await ownerClient();
+    for (const role of ["embed", "background"] as const) expect((await client.post(`/api/host/engines/${role}/restart`, {})).status).toBe(400);
+  });
+
   test("refuses a signed-out caller", async () => {
-    expect((await new TestClient().post("/api/host/engines/embed/restart", {})).status).toBe(401);
+    expect((await new TestClient().post("/api/host/engines/chat/restart", {})).status).toBe(401);
   });
 
   test("refuses a non-admin adult without restarting anything", async () => {
@@ -44,7 +47,7 @@ describe("POST /api/host/engines/{role}/restart", () => {
     const person = (await created.json()) as { id: string };
     const adult = new TestClient();
     await adult.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
-    const res = await adult.post("/api/host/engines/embed/restart", {});
+    const res = await adult.post("/api/host/engines/chat/restart", {});
     expect(res.status).toBe(403);
     expect(calls).toEqual([]);
   });
@@ -62,8 +65,6 @@ describe("POST /api/host/engines/{role}/restart", () => {
   test("chat timeout returns 503 with an error", async () => {
     __setEngineRoleActionsForTests({
       chat: { restart: async () => { throw new Error("chat did not return in time"); }, stop: async () => {}, start: async () => {} },
-      embed: { restart: async () => {}, stop: async () => {}, start: async () => {} },
-      background: { restart: async () => {}, stop: async () => {}, start: async () => {} },
     });
     const res = await (await ownerClient()).post("/api/host/engines/chat/restart", {});
     expect(res.status).toBe(503);
@@ -72,7 +73,7 @@ describe("POST /api/host/engines/{role}/restart", () => {
 });
 
 describe("POST /api/host/engines/{role}/{stop,start}", () => {
-  for (const action of ["stop", "start"] as const) for (const role of ["chat", "embed", "background"] as const) {
+  for (const action of ["stop", "start"] as const) for (const role of ["chat"] as const) {
     test(`${role} ${action} is owner/admin-only and reaches its supervisor`, async () => {
       const client = await ownerClient();
       const res = await client.post(`/api/host/engines/${role}/${action}`, {});
@@ -88,7 +89,7 @@ describe("POST /api/host/engines/{role}/{stop,start}", () => {
     const person = (await created.json()) as { id: string };
     const adult = new TestClient();
     await adult.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
-    for (const role of ["chat", "embed", "background"] as const) {
+    for (const role of ["chat"] as const) {
       for (const action of ["stop", "start"] as const) expect((await adult.post(`/api/host/engines/${role}/${action}`, {})).status).toBe(403);
     }
     expect(calls).toEqual([]);

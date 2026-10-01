@@ -72,8 +72,7 @@ import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import { db, sqlite } from "@/db";
 import { conversationTurns, people, memoryRecords } from "@/db/schema";
-import { complete, embed, type LlmMessage } from "@/lib/llm";
-import { completeBackground, getBackgroundBackendKind } from "@/lib/backgroundSupervisor";
+import { complete, embed, completeBackground, type LlmMessage } from "@/lib/llm";
 import {
   remember,
   supersede,

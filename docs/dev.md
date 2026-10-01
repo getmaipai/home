@@ -34038,7 +34038,7 @@ On 2026-09-29, `bun stop` terminated the hub immediately while the chat, embeddi
 
 ## ENGINE-AVAIL-04c
 
-Home owns the chat, voice, embedding and background engine ports. Before an engine starts, `freePort()` scans for holders and reaps each matching process except the hub and its parent. It checks the command and start time again immediately before signaling, sends SIGTERM, then SIGKILL if needed, and waits for the port to free. A process that changed identity is never signaled. Reaps log the pid, age, command and reason; a recorded engine pid keeps its existing ownership log wording.
+At the time of this incident, Home owned the chat, voice, embedding and background engine ports. Home now starts only chat itself. Embedding and background judge requests run through the configured Stack, and Home no longer starts or downloads those engines. The chat supervisor still checks its port before starting and reports a blocked port through Health and Repairs.
 
 Jesse decided that any non-Home process holding an engine port may be killed without asking. The coordinator dropped per-role lock files: the hub already has a single-instance lock, 04b now stops its engines on exit, and the port reap handles stragglers. `freePort()` still throws `ForeignPortHolderError` when a holder remains alive after both signals or signaling is denied. The port is marked blocked so the availability and Repair paths continue to report it. Identity changes and processes that disappear during the scan are not signaled.
 
@@ -34054,13 +34054,13 @@ While chat availability is `unavailable/blocked_port`, the supervisor retries po
 
 ## ENGINE-AVAIL-05b
 
-The role routes now include owner/admin-only `POST /api/host/engines/{role}/stop` and `/start` alongside `/restart`. Chat delegates to its existing Stop and restart-and-wait functions. Embed, voice and background keep a process-local manual-stop flag: a stop invalidates an in-flight start, cancels the watchdog retry, shuts down the owned child through the identity-checked watcher, and makes health report `stopped`; client requests do not silently start it again. Start clears the flag and starts the selected backend. Restart clears the flag, stops the old backend and starts a fresh one. The flag starts clear on hub boot. The status page shows Stop for running engines, Start for inactive ones, and Restart for all four roles to owners and admins.
+At the time this route was added, it exposed owner/admin-only Stop, Start and Restart actions for Home's chat, embedding, voice and background engines. HOME-DEL-EMBED-BG removed the Home-owned embedding and background actions; the route now accepts only `chat`, while embedding and judge operation belong to the Stack.
 
 ## ENGINE-AVAIL-05c
 
-The only engine launcher in `backend/scripts/` or `scripts/` was the training helper `backend/scripts/train/engines.ts`, called by `turn-signal-heads.ts:215` and `:239`. It now reserves an ephemeral localhost port per run, starts the engine in its own process group through `backend/scripts/train/processGroup.ts`, and kills the group after health failure, SIGINT, SIGTERM or normal completion. The health timeout and early-exit paths also reap the group. Other bench scripts connect to configured or household engines; they do not launch an engine. The `.github` standards core now runs `engine-port-check.sh` and its fixture test rejects launch scripts with Home's literal default engine ports (`8788`, `8789`, `8793`, `8794`).
+The training helper `backend/scripts/train/engines.ts` and its caller `turn-signal-heads.ts` were the remaining tools that launched Home-owned embedding and background models. HOME-DEL-EMBED-BG removed both because their training workflow depended on Home downloading and launching those models. Bench scripts use configured engine URLs or the Stack recording adapter; they do not launch Home engines. The `.github` standards core checks engine launch scripts for Home's literal default engine ports (`8788`, `8789`, `8793`, `8794`).
 
-The process-group regression starts a headless server, kills its group, and checks that the listener stopped answering and `lsof` shows no listener on that port. `bash scripts/check.sh` is the Home gate.
+The former process-group regression started a headless server, stopped its group, and checked that the listener was gone. `bash scripts/check.sh` is the Home gate.
 
 ## UI-LOGO-PHONE
 
@@ -34193,8 +34193,8 @@ writes markers and a record and moves no file.
 | `cloned-voices` | `voice/cloned/` | voice samples people uploaded for cloning | MB | written once, read by TTS |
 | `projects` | `projects/` | each project run's artifact files | MB to GB | bursts of writes during a run |
 | `packages` | `packages/` | per package: `state/` (a Tier 1 package's own files, often SQLite), `versions/` (store-installed source), `.staging/` | MB to hundreds of MB | small random writes in `state/`; installs by rename |
-| `models` | `models/` | GGUF chat, embedding and background-image weights | 4 to 40 GB each | written once by download, read in large runs at engine start |
-| `engines` | `engines/` | `llama-server` builds | hundreds of MB | written once, executed |
+| `models` | `models/` | GGUF chat and background-image weights | 4 to 40 GB each | written once by download, read in large runs at engine start |
+| `engines` | `engines/` | `llama-server` builds for Home chat | hundreds of MB | written once, executed |
 | `sidecars` | `sidecars/` | `kiwix-tools` binaries | tens of MB | written once, executed |
 | `reference` | `reference/` | offline reference archives (ZIM files) and `library.xml` | 1 GB to over 100 GB | written once, random reads during search |
 | `wakeword-models` | `voice/wakewords/` | wake-word feature models and detectors | MB | written once, read at start |
@@ -34222,7 +34222,7 @@ marker does not match. "Move" is how (c) moves it.
 | `cloned-voices` | irreplaceable | biometric | none beyond writing | a person's cloned voice falls back to the household's default preset voice | offline | hot |
 | `projects` | the household's own work | personal | none beyond writing | project runs refused, artifact files unavailable | offline | hot |
 | `packages` | package state is irreplaceable; versions download again | personal (package state) | `sqlite` | Tier 1 and store-installed packages do not load; bundled Tier 0 packages run | offline | per package manifest (`hot`, `cold`, `exclude`) |
-| `models` | downloads again from pins | none | `large-files` | chat, memory embedding and background images unavailable | online, or download again | exclude |
+| `models` | downloads again from pins | none | `large-files` | chat and background images unavailable | online, or download again | exclude |
 | `engines` | downloads again | none | `exec` | the same as `models` | online, or download again | exclude |
 | `sidecars` | downloads again | none | `exec` | reference search unavailable | online, or download again | exclude |
 | `reference` | downloads again, possibly 100 GB | none | `large-files` | reference search unavailable | online, or download again | library (listed, not copied) |

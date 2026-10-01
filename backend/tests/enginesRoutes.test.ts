@@ -1,5 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
+import { restoreDefaultScriptedStack } from "./stackFixture";
 import { resetDb } from "./reset-db";
 import { owner, teen } from "./support/testAuth";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -78,6 +79,7 @@ describe("/api/engines", () => {
   afterEach(() => {
     fixture?.stop();
     __resetStackEngineForTests();
+    restoreDefaultScriptedStack();
   });
 
   function configure(routes: Record<string, (req: Request) => Response | Promise<Response>>): void {
@@ -106,21 +108,21 @@ describe("/api/engines", () => {
   // found live (Jesse: no waveform button on 8787, which runs no
   // Stack). Real handlers throughout, no mocked overview - the exact
   // gap that let the original bug ship unnoticed.
-  test("GET / with no Stack configured reads real roles from Home's own supervisors, never an error", async () => {
+  test("GET / with no Stack configured declares the Stack required, never a Home engine", async () => {
+    __setStackClientForTests(null);
     // No configure() call: engines.stack.url stays unset, the default
     // every household starts in. STT is Stack-owned.
     const { client } = await owner();
     const res = await client.get("/api/engines");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { configured: boolean; roles: Array<{ id: string; state: { state: string } }>; engines: unknown[]; budget: unknown };
+    const body = (await res.json()) as { configured: boolean; roles: Array<{ id: string; state: { state: string; reason?: string | null } }>; engines: unknown[]; budget: unknown };
     expect(body.configured).toBe(false);
     expect(body.engines).toEqual([]);
     expect(body.budget).toBeNull();
     const byId = Object.fromEntries(body.roles.map((r) => [r.id, r.state.state]));
-    // chat/embed: always startable, the stub-fallback tier their
-    // supervisors guarantee.
-    expect(byId.chat).toBe("ready");
-    expect(byId.embed).toBe("ready");
+    expect(byId.chat).toBe("offline");
+    expect(body.roles.find((r) => r.id === "chat")?.state.reason).toContain("MaiPai Stack is not configured");
+    expect(byId.embed).toBeUndefined();
     // STT is omitted because it is not a Home-owned role.
     expect(byId.stt).toBeUndefined();
     // image: nothing implemented on the Home side at all yet.
@@ -134,7 +136,8 @@ describe("/api/engines", () => {
   // same moment. stopChatBackend() is the real admin Stop control
   // (routes calling it are the Household -> AI models page's own
   // handler), so this proves the two surfaces now agree.
-  test("GET / with no Stack configured reads a manually-stopped chat engine as offline, matching /api/health", async () => {
+  test("GET / with no Stack configured reports the required Stack as offline", async () => {
+    __setStackClientForTests(null);
     await stopChatBackend();
     try {
       const { client } = await owner();
@@ -142,7 +145,7 @@ describe("/api/engines", () => {
       const body = (await res.json()) as { roles: Array<{ id: string; state: { state: string; reason?: string | null } }> };
       const chat = body.roles.find((r) => r.id === "chat")!;
       expect(chat.state.state).toBe("offline");
-      expect(chat.state.reason).toBe("Manually stopped.");
+      expect(chat.state.reason).toContain("MaiPai Stack is not configured.");
     } finally {
       __resetLlmSupervisorForTests();
     }
@@ -242,6 +245,7 @@ describe("/api/engines", () => {
   });
 
   test("GET /health with no Stack configured reads configured: false, an empty list, never an error", async () => {
+    __setStackClientForTests(null);
     const { client } = await owner();
     const res = await client.get("/api/engines/health");
     expect(res.status).toBe(200);

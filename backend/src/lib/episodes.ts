@@ -6,7 +6,6 @@ import { detectCredential } from "@/lib/memoryContentPolicy";
 import { db, sqlite } from "@/db";
 import { episodes, episodeEmbeddings, pendingEpisodeEmbeddings, conversationTurns } from "@/db/schema";
 import { embed } from "@/lib/llm";
-import { getEmbedClient } from "@/lib/embedSupervisor";
 import { nextHlc } from "@/lib/hlc";
 import { newEpisodeId } from "@/lib/id";
 import { vectorToBuffer, bufferToVector, cosineSimilarity, type QueryVector } from "@/lib/memory";

@@ -37,8 +37,6 @@ import { nextHlc } from "@/lib/hlc";
 import { resolveOrCreateConversation, logTurn } from "@/lib/conversationHistory";
 import { runJudgeBatch } from "@/lib/memoryJudge";
 import { recall, embedQueryForRecall } from "@/lib/memory";
-import { getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
-import { getBackgroundBackendKind, getBackgroundClient, probeBackgroundEngine, __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import type { PersonRow } from "@/types";
 import type { TurnValue } from "@/wire";
 import { deleteEpisodesForTurns } from "@/lib/episodes";
@@ -114,17 +112,12 @@ async function main(): Promise<{ executed: number; engine: string }> {
   seedTurn(actor, conv.value.id, "I'll call the dentist tomorrow", "Okay.", 0, "commissive", [["dentist"]]);
   seedTurn(actor, conv.value.id, "add oat milk to the shopping list", "Added.", 0, "directive only", []);
 
-  console.log(`Background engine (judge): ${getBackgroundBackendKind()}`);
-  // The setup's default MAIPAI_BACKGROUND_URL is a closed port; this
-  // bench is the one that needs the judge, so it refuses rather than
-  // scoring a batch the judge never processed (a code review on CHAT-22).
-  await getBackgroundClient(); // selects the URL tier; the probe reads what is selected
-  const probe = await probeBackgroundEngine();
-  if (!probe.alive) {
-    console.error(`bench setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${sanitizeEngineUrl(process.env.MAIPAI_BACKGROUND_URL)}); judge-eval needs a running background engine.`);
+  const judgeUrl = process.env.MAIPAI_BACKGROUND_URL;
+  if (!judgeUrl || !(await new (await import("@maipai/spec/llm/ts/client.js")).LlamaServerClient(judgeUrl).health())) {
+    console.error(`bench setup refused: no judge answers at MAIPAI_BACKGROUND_URL (${sanitizeEngineUrl(judgeUrl ?? "")}); configure a running Stack URL.`);
     process.exit(2);
   }
-  const engine = `background ${probe.kind} at ${sanitizeEngineUrl(process.env.MAIPAI_BACKGROUND_URL)}`; // before the reset below
+  const engine = `judge at ${sanitizeEngineUrl(judgeUrl)}`;
 
   const startTime = Date.now();
   const batchResult = await runJudgeBatch();
@@ -173,7 +166,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
 
   const retrievalPass = Number(knowledgeUpdateOk) + Number(abstentionOk);
 
-  console.log(`\nEmbed backend: ${getEmbedBackendKind()}`);
+  console.log(`\nEmbedding engine URL: ${sanitizeEngineUrl(process.env.MAIPAI_EMBED_URL)}`);
   console.log(`\n=== BENCHMARK RESULTS ===`);
   console.log(`Extraction precision: ${formatPercent(extractionScore.precision)} (tp ${extractionScore.truePositives}, fp ${extractionScore.falsePositives})`);
   console.log(`Extraction recall: ${formatPercent(extractionScore.recall)} (tp ${extractionScore.truePositives}, missed ${extractionScore.misses})`);
@@ -193,7 +186,5 @@ try {
   // CHAT-22's setup admits nothing but the URL tier (MAIPAI_BACKGROUND_URL
   // must name the running memory engine; the setup's default is a closed
   // port, which the probe above reports as unreachable).
-  __resetEmbedSupervisorForTests();
-  __resetBackgroundSupervisorForTests();
 }
 finishBench(summary);

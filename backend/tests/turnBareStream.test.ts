@@ -16,8 +16,10 @@ import { runBareTurnStream, BareModeForbidden } from "@/lib/turnBareStream";
 import { activeTurnCount } from "@/lib/turnActivity";
 import type { PersonRow } from "@/types";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+import { __setStackClientForTests } from "@/lib/stackEngine";
+import { useDefaultScriptedStack } from "./stackFixture";
 
-beforeEach(() => resetDb());
+beforeEach(() => { resetDb(); __setStackClientForTests(null); });
 afterEach(() => {
   __resetLlmSupervisorForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
@@ -149,11 +151,14 @@ describe("POST /api/turn/stream with bare: true - the durable marker and the jud
   test("an ordinary (non-bare) turn in the same conversation still gets judged normally", async () => {
     const { client, actor } = await owner();
     await withStubReply("Sure, here you go.", async () => {
+      useDefaultScriptedStack();
       const res = await client.post("/api/turn/stream", { text: "hello, plainly" });
+      expect(res.status).toBe(200);
       await readNdjson(res);
     });
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).get();
     expect(row?.bare).toBe(false);
+    expect(row?.judgeStatus).not.toBe("skipped");
   });
 
   // A review caught this: finalize() built the TurnValue's own `safety`

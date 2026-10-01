@@ -86,7 +86,7 @@ describe("CHAT-22: the bench setup refuses anything but a fresh temp directory a
     const dir = mkdtempSync(join(tmpdir(), "maipai-bench-nojudge-"));
     const { code, out } = await runBench("judge-eval.ts", { ...stubEnv(), MAIPAI_BACKGROUND_URL: undefined, MAIPAI_DATA_DIR: dir });
     expect(code).toBe(2);
-    expect(out).toContain("no memory judge answers");
+    expect(out).toContain("no judge answers");
     expect(out).not.toContain("bench finished");
   });
 
@@ -166,7 +166,7 @@ describe("CHAT-22: every entry point runs isolated against a stub and leaves it 
       async () => {
         const dir = mkdtempSync(join(tmpdir(), "maipai-bench-run-"));
         const { code, out } = await runBench(entry, { ...stubEnv(), MAIPAI_DATA_DIR: dir });
-        expect(out).toMatch(/bench finished: engine (?:(?:chat|embed|background) (?!none\b)\S+ at http\S+|literal-pattern corpus [1-9]\d*\/[1-9]\d*); executed [1-9]\d* cases/);
+        expect(out).toMatch(/bench finished: engine (?:(?:chat|embed|background) (?!none\b)\S+ at http\S+|(?:embedding|judge) at http\S+|literal-pattern corpus [1-9]\d*\/[1-9]\d*); executed [1-9]\d* cases/);
         expect(code).toBe(0);
         expect(existsSync(join(dir, "hub.db"))).toBe(true); // its own database, nobody else's
         const alive = await fetch(`${stub.url}/health`);

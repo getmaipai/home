@@ -37,7 +37,6 @@ import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { remember, recall, embedQueryForRecall } from "@/lib/memory";
 import { buildSystemPrompt } from "@/lib/turnEngine";
-import { getEmbedBackendKind, __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import type { PersonRow } from "@/types";
 
 const now = new Date();
@@ -190,10 +189,10 @@ async function main(): Promise<{ executed: number; engine: string }> {
   // Force the embed backend selection to finish before reporting which
   // one this run actually used: right after seeding, remember()'s own
   // fire-and-forget embed calls have only just started it, and
-  // getEmbedBackendKind() would still read back "starting".
+  // "configured URL" would still read back "starting".
   await embedQueryForRecall("warm the embed backend");
-  console.log(`Embed backend: ${getEmbedBackendKind()}`);
-  const engine = `embed ${getEmbedBackendKind()} at ${sanitizeEngineUrl(process.env.MAIPAI_EMBED_URL)}`; // before the reset below
+  console.log(`Embedding engine URL: ${sanitizeEngineUrl(process.env.MAIPAI_EMBED_URL)}`);
+  const engine = `embedding at ${sanitizeEngineUrl(process.env.MAIPAI_EMBED_URL)}`;
   console.log(`Running ${CASES.length} recall probes...\n`);
   let pass = 0;
   for (const c of CASES) {
@@ -231,10 +230,8 @@ try {
   // is a real Bun.serve() HTTP listener) that nothing ever stopped, so
   // this script's own process never exited on its own - three earlier
   // runs sat as zombies for HOURS, silently contending for the same
-  // SQLite file this exact run needed. __resetEmbedSupervisorForTests()
   // isn't test-only in effect, just in name (it really calls .stop() on
   // whatever's running); every bench script that touches embed/chat now
   // calls its own supervisor's real stop function here.
-  __resetEmbedSupervisorForTests();
 }
 finishBench(summary);

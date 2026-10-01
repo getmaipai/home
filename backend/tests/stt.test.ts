@@ -16,6 +16,7 @@ let fixture: StackFixture | undefined;
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+  __setStackClientForTests(null);
 });
 
 afterEach(() => {

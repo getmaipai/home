@@ -35,7 +35,6 @@ import { nextHlc } from "@/lib/hlc";
 import { complete, type LlmMessage, type ToolSpec } from "@/lib/llm";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import { getEngineStatus, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 import { SPEC_DIR } from "@/lib/specDir";
@@ -409,6 +408,5 @@ try {
 } finally {
   cleanup();
   __resetLlmSupervisorForTests();
-  __resetEmbedSupervisorForTests();
 }
 finishBench(summary);

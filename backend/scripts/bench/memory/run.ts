@@ -30,7 +30,6 @@ import { nextHlc } from "@/lib/hlc";
 import { remember, supersede } from "@/lib/memory";
 import { runTurn } from "@/lib/turnEngine";
 import { getEngineStatus } from "@/lib/llmSupervisor";
-import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import { KNOWLEDGE_UPDATE_CASES, ABSTENTION_CASES, TEMPORAL_CASES, MULTI_SESSION_CASES, EPISODE_CASES, type KnowledgeUpdateSeed } from "./fixture";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { recallEpisodes, embedPendingEpisodes, deleteEpisodesForPerson } from "@/lib/episodes";
@@ -233,6 +232,5 @@ try {
   cleanup(); // this bench's own rows only, in its own disposable database
   // A shared engine is never stopped: the URL tier's stop is a no-op, and
   // CHAT-22's setup admits nothing but the URL tier.
-  __resetEmbedSupervisorForTests();
 }
 finishBench(summary);

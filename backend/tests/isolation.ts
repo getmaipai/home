@@ -17,12 +17,8 @@ import { afterEach } from "bun:test";
 
 /** The production defaults a test spawn must never resolve to -
  * llmSupervisor.ts's own `MAIPAI_LLAMA_SERVER_PORT ?? 8788`, and
- * ENGINE-PORT-01's own two siblings (backgroundSupervisor.ts's
- * `MAIPAI_BACKGROUND_PORT ?? 8789`, embedSupervisor.ts's
  * `MAIPAI_EMBED_PORT ?? 8794`) - the identical gap for both, found live
  * only once Fable traced a real household outage to it (dev.md
- * 2026-09-23), because nothing had exercised getBackgroundClient()/
- * getEmbedClient() in a test that also happened to be missing the
  * override. `PRODUCTION_CHAT_PORT` stays its own export (existing
  * tests read it by name); the other two are exported the same way for
  * the same reason. */

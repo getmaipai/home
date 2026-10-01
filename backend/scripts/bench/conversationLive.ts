@@ -37,7 +37,6 @@ const score = await import("./conversationScore");
 const { CONVERSATIONS } = await import("./conversationFixture");
 const { runJudgeBatch } = await import("@/lib/memoryJudge");
 const { __setTurnActivityClockForTests } = await import("@/lib/turnActivity");
-const { getBackgroundClient, probeBackgroundEngine } = await import("@/lib/backgroundSupervisor");
 const { loadAllManifests, ordinaryToolIds } = await import("@/lib/turnEngine");
 const { CHAT_SAMPLING } = await import("@/lib/llm");
 const { __setSamplingSeedForBench, __setPromptClockForBench } = await import("@/lib/benchSampling");
@@ -99,7 +98,6 @@ __setSamplingSeedForBench(benchSeed);
 // the run happens on. Unpinned when the seed is.
 const BENCH_PROMPT_INSTANT = new Date(2026, 8, 13, 12, 0, 0);
 if (benchSeed !== null) __setPromptClockForBench(() => BENCH_PROMPT_INSTANT);
-const { __resetEmbedSupervisorForTests } = await import("@/lib/embedSupervisor");
 
 interface EngineProps {
   build_info?: string;
@@ -161,12 +159,8 @@ async function drainJudge(): Promise<void> {
 
 async function main(): Promise<{ executed: number; engine: string }> {
   await startBench();
-  await getBackgroundClient();
-  const judge = await probeBackgroundEngine();
-  if (!judge.alive) {
-    console.error(`bench setup refused: no memory judge answers at MAIPAI_BACKGROUND_URL (${sanitizeEngineUrl(process.env.MAIPAI_BACKGROUND_URL)}); the baseline bench needs the judge for its recall rows.`);
-    process.exit(2);
-  }
+  const judgeUrl = process.env.MAIPAI_BACKGROUND_URL;
+  if (!judgeUrl || !(await new (await import("@maipai/spec/llm/ts/client.js")).LlamaServerClient(judgeUrl).health())) throw new Error("No judge answers at MAIPAI_BACKGROUND_URL; provide a running engine URL.");
 
   const chat = await engineProps(upstream!);
   const background = await engineProps(process.env.MAIPAI_BACKGROUND_URL!);
@@ -284,7 +278,6 @@ async function main(): Promise<{ executed: number; engine: string }> {
   console.log("\n## Question rate (finding 23)\n");
   console.log(questionRateSummary(scores.map((s) => ({ reply: s.observed.reply, act: s.observed.signal?.primary_act ?? null }))));
   runner.cleanupBenchPeople(people); // after the output: the table is the run's product, the cleanup a courtesy
-  __resetEmbedSupervisorForTests();
   console.log(`\nturns ${scores.length}; median first delta ${Math.round(median(timed.map((s) => s.observed.firstDeltaMs!)))} ms; median total ${Math.round(median(scores.map((s) => s.observed.totalMs)))} ms; wall ${Math.round((Date.now() - started) / 1000)} s`);
   return { executed: scores.length, engine: `chat ${header.chat.build} ${header.chat.model}; judge ${header.judge.model}; seed ${benchSeed ?? "none"}` };
 }

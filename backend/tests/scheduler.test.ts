@@ -12,7 +12,7 @@ import { listPending } from "@/lib/notifications";
 import { listIssues } from "@/lib/issues";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
-import { startStackFixture, IDENTITY_HEADERS, type StackFixture } from "./stackFixture";
+import { startStackFixture, IDENTITY_HEADERS, type StackFixture, restoreDefaultScriptedStack } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
@@ -314,9 +314,11 @@ describe("runDueJobs", () => {
     afterEach(() => {
       fixture?.stop();
       __resetStackEngineForTests();
+      restoreDefaultScriptedStack();
     });
 
     test("does nothing when no Stack is configured", async () => {
+      __setStackClientForTests(null);
       ensureCoreJob("stack.updates.maintenance", "every:1d");
       db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).run();
       const result = await runDueJobs(runPlugin);

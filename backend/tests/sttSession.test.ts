@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { SttSession, encodeWav, decodeWav, isLikelySpeech, __setSileroLoaderForTests, __resetSileroLoaderForTests } from "@/lib/sttSession";
-import { __resetStackEngineForTests } from "@/lib/stackEngine";
+import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { startStackFixture, type StackFixture } from "./stackFixture";
 import type { SttWireEvent } from "@maipai/spec/voice/ts/sttTypes.js";
@@ -45,6 +45,7 @@ afterEach(() => {
   fixture?.stop();
   fixture = undefined;
   __resetStackEngineForTests();
+  __setStackClientForTests(null);
   __resetSileroLoaderForTests();
 });
 
@@ -53,6 +54,7 @@ beforeEach(() => __setSileroLoaderForTests(async () => null));
 function scriptTranscript(text: string): void {
   fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => Response.json({ text }) });
   setHouseholdSettingValue("engines.stack.url", fixture.url);
+  __setStackClientForTests(fixture.client);
 }
 
 describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", () => {

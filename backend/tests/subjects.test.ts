@@ -6,18 +6,20 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { __resetBackgroundSupervisorForTests } from "@/lib/backgroundSupervisor";
 import { resolveOrCreateConversation, logTurn, listOpenQuestions } from "@/lib/conversationHistory";
 import { judgeTurn } from "@/lib/memoryJudge";
 import { recall, archiveByProvenance, forgetByIds, forget, supersede } from "@/lib/memory";
 import { buildPromptParts } from "@/lib/turnEngine";
 import { subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { db } from "@/db";
+import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import { people, conversationTurns, memoryRecords, entities, relationships } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnValue } from "@/wire";
 import type { PersonRow } from "@/types";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { startStackFixture, IDENTITY_HEADERS } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
@@ -26,7 +28,6 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
-  __resetBackgroundSupervisorForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
   delete process.env.MAIPAI_BACKGROUND_URL;
 });
@@ -48,21 +49,38 @@ function makeTurn(actor: PersonRow, userText: string, replyText: string) {
   return db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
 }
 
-async function withScriptedJudge<T>(reply: (schemaName: string | undefined, request: ChatCompletionRequest) => unknown, fn: () => Promise<T>): Promise<T> {
-  __resetBackgroundSupervisorForTests();
+async function withScriptedJudge<T>(reply: (schemaName: string | undefined, request: ChatCompletionRequest) => unknown, fn: () => Promise<T>, embedding?: number[]): Promise<T> {
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-  const stub = startStubLlmServer(0, {
-    scriptedChatReply: (request) => {
+  const engine = startStubLlmServer(0);
+  const fixture = startStackFixture({
+    "POST /v1/chat/completions": async (req) => {
+      const request = await req.json() as ChatCompletionRequest;
       const schemaName = request.response_format?.type === "json_schema" ? request.response_format.json_schema.name : undefined;
-      if (!schemaName) return undefined;
-      return reply(schemaName, request);
+      const scripted = schemaName ? reply(schemaName, request) : undefined;
+      const echoed = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "(no user message)";
+      const content = scripted === undefined
+        ? `[stub model: no real model loaded, this is a canned reply] ${echoed}`
+        : typeof scripted === "string" ? scripted : JSON.stringify(scripted);
+      return Response.json({ id: "scripted", model: "judge", choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }] }, { headers: IDENTITY_HEADERS });
+    },
+    "POST /v1/embeddings": async (req) => {
+      if (embedding) {
+        const body = await req.json() as { input: string | string[] };
+        const inputs = Array.isArray(body.input) ? body.input : [body.input];
+        return Response.json({ model: "scripted", data: inputs.map((_, index) => ({ index, embedding })) }, { headers: IDENTITY_HEADERS });
+      }
+      const body = await req.arrayBuffer();
+      const response = await fetch(`${engine.url}/v1/embeddings`, { method: "POST", headers: req.headers, body });
+      return new Response(response.body, { status: response.status, headers: { ...Object.fromEntries(response.headers), ...IDENTITY_HEADERS } });
     },
   });
-  process.env.MAIPAI_BACKGROUND_URL = stub.url;
+  __setStackClientForTests(fixture.client);
   try {
     return await fn();
   } finally {
-    await stub.stop();
+    fixture.stop();
+    await engine.stop();
+    __resetStackEngineForTests();
   }
 }
 
@@ -267,8 +285,9 @@ describe("the review's cases", () => {
     const { remember } = await import("@/lib/memory");
     const pinned = remember(actor, { text: "Raven is the family's dentist", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.6, pinned: true });
     if (!pinned.ok) throw new Error("setup failed");
+    await __drainBackgroundWorkForTests();
     const { sqlite } = await import("@/db");
-    sqlite.query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')").run(pinned.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+    sqlite.query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'scripted', 4, ?, 'test-hlc', 'v1') ON CONFLICT(memory_id) DO UPDATE SET space = excluded.space, dims = excluded.dims, vector = excluded.vector, preprocess = excluded.preprocess").run(pinned.value.id, Buffer.from(new Float32Array([0.8, 0.6, 0, 0]).buffer));
     const turn = makeTurn(child, "Raven is not our dentist anymore", "Okay.");
     await withScriptedJudge(
       (name) => {
@@ -277,6 +296,7 @@ describe("the review's cases", () => {
         return undefined;
       },
       () => judgeTurn(turn),
+      [1, 0, 0, 0],
     );
     const ravens = db.select().from(entities).where(eq(entities.name, "Raven")).all();
     expect(ravens.length).toBe(1);

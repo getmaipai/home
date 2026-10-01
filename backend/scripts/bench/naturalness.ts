@@ -33,7 +33,6 @@ import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { runTurn } from "@/lib/turnEngine";
 import { getEngineStatus } from "@/lib/llmSupervisor";
-import { __resetEmbedSupervisorForTests } from "@/lib/embedSupervisor";
 import type { PersonRow } from "@/types";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { SPEC_DIR } from "@/lib/specDir";
@@ -119,7 +118,6 @@ try {
   cleanup(); // this bench's own rows only, in its own disposable database
   // A shared engine is never stopped: the URL tier's stop is a no-op, and
   // CHAT-22's setup admits nothing but the URL tier.
-  __resetEmbedSupervisorForTests();
 }
 // CHAT-22: the explicit exit is also what stops the process hanging on
 // the timers the turn engine's imports start (FAST-06's finding).

@@ -1,5 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test";
 import { TestClient } from "./client";
+import { restoreDefaultScriptedStack } from "./stackFixture";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -289,9 +290,11 @@ describe("GET /api/updates, with a configured Stack", () => {
   afterEach(() => {
     fixture?.stop();
     __resetStackEngineForTests();
+    restoreDefaultScriptedStack();
   });
 
   test("stack is null with no Stack configured", async () => {
+    __setStackClientForTests(null);
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const emptyLibraryDir = join(process.env.MAIPAI_DATA_DIR!, "updates-empty-reference");

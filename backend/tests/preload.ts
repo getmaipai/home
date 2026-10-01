@@ -9,6 +9,9 @@ import { afterEach } from "bun:test";
 import { installTestIsolationGuard } from "./isolation";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
+import type { StackFixture } from "./stackFixture";
+
+let defaultScriptedStack: StackFixture;
 
 // SINGLE-INSTANCE-02 (#196): a hub booted by a test (or by a script a test
 // runs) has its own throwaway data directory and port, and must never
@@ -36,7 +39,6 @@ process.env.MAIPAI_LLAMA_SERVER_PORT = String(reserveFreePort());
 // was a killed engine, not a prompt shape"): the identical gap for the
 // OTHER two roles with a fixed production default - background (8789)
 // and embed (8794) never got this override at all, so a test exercising
-// getBackgroundClient()/getEmbedClient() on this shared machine could
 // still freePort() the household's real background or embed engine
 // exactly the way the 2026-09-07 incident above describes for chat,
 // just unnoticed until Fable's own live diagnosis traced a real outage
@@ -60,6 +62,14 @@ process.env.MAIPAI_EMBED_PORT = String(reserveFreePort());
 // override-then-restore shape every test already uses for
 // MAIPAI_BENCH_KEEP_READ_PAGE and friends).
 process.env.MAIPAI_WIKIPEDIA_BASE_URL = "http://127.0.0.1:1";
+
+// Defer imports that reach the database until after MAIPAI_DATA_DIR is set.
+const [{ __setDefaultStackClientForTests }, { startDefaultScriptedStack, setDefaultScriptedStackFixture }] = await Promise.all([
+  import("@/lib/stackEngine"), import("./stackFixture"),
+]);
+defaultScriptedStack = startDefaultScriptedStack();
+setDefaultScriptedStackFixture(defaultScriptedStack);
+__setDefaultStackClientForTests(defaultScriptedStack.client);
 
 // Everything above is only a guarantee while it stays set. Found live
 // 2026-09-07: a test file's own afterEach deleted MAIPAI_LLAMA_SERVER_PORT
@@ -91,4 +101,5 @@ installTestIsolationGuard();
 // registration order can get wrong.
 afterEach(async () => {
   await __drainBackgroundWorkForTests();
+  __setDefaultStackClientForTests(defaultScriptedStack.client);
 });
