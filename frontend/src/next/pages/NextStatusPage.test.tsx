@@ -11,8 +11,8 @@ function makePerson(role: Roster["role"]): Roster {
 }
 
 const apps: StatusAppsResponse = [
-  { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", needs: [{ kind: "engine", id: "chat", name: "Brain", purpose: "Chat model", state: "down", required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100 })), uptimePercent: 99.5 },
-  ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational" as const, reason: null, needs: [{ kind: "engine" as const, id: "chat", name: "Brain", purpose: "Chat model", state: "operational" as const, required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: "operational" as const, uptime: 100 })), uptimePercent: 100 })),
+  { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", needs: [{ kind: "engine", id: "chat", name: "Brain", purpose: "Chat model", state: "down", required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100, minutes: { operational: index === 89 ? 1439 : 1440, degraded: 0, outage: index === 89 ? 1 : 0, maintenance: 0 } })), uptimePercent: 99.5 },
+  ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational" as const, reason: null, needs: [{ kind: "engine" as const, id: "chat", name: "Brain", purpose: "Chat model", state: "operational" as const, required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: "operational" as const, uptime: 100, minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } })), uptimePercent: 100 })),
 ];
 
 function mockStatus(includeNeeds: boolean) {

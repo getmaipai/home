@@ -35492,6 +35492,23 @@ Need diagnostics show last success and error class when available. Both
 expanders use 48 px minimum targets. Fixture captures cover admin and member
 views at desktop and phone sizes for Chat down and all fine.
 
+## STATUS-SVC-08 (2026-10-01)
+
+App rows with admin-visible needs use the kit Button inside the kit Collapsible.
+The control says Show details or Hide details, shows a rotating chevron, and
+keeps its expanded state and controlled panel available to assistive technology.
+Rows without needs and household-member rows have no control.
+
+App history buckets include operational, degraded, outage, and maintenance
+minutes. Fractional minutes are kept to two decimal places so short startup
+blips remain visible in the tooltip. Outage minutes reduce uptime; degraded
+minutes and maintenance do not. The day color thresholds live in
+`frontend/src/next/pages/status/statusAppHistory.ts`: red starts at one outage
+minute, amber starts at five degraded minutes, and shorter slow periods remain
+green. Tooltips use the browser's locale date format and describe slow time,
+outages, maintenance, or missing data in plain words. The existing detailed
+history endpoint already returns the same four minute buckets.
+
 ## STATUS-LIVE-01 (2026-10-01)
 
 The weather service events at 12:25 and 13:25 UTC align with the installed

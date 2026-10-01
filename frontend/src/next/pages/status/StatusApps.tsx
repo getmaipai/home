@@ -1,17 +1,16 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
+import { Button } from "@maipai/ui/src/ui/button";
 import { Status } from "@maipai/ui/src/ui/status";
 import { UptimeStrip } from "@maipai/ui/src/ui/uptime-strip";
+import { getIcon } from "@maipai/ui/src/icons";
 import { isOwnerOrAdminRole, type Roster, type StatusApp, type StatusAppNeed } from "@/lib/api";
 import { appStatusPresentation, summarizeStatusApp } from "@/shell/statusApps";
+import { statusAppDayData } from "@/next/pages/status/statusAppHistory";
 
 function appStripData(app: StatusApp) {
-  return app.history.map((day) => ({
-    status: day.state === "operational" ? "up" as const : day.state === "down" ? "down" as const : "degraded" as const,
-    label: day.date,
-    detail: `${day.uptime}% of the day working`,
-  }));
+  return app.history.map((day) => statusAppDayData(day));
 }
 
 function appStripSummary(app: StatusApp) {
@@ -63,15 +62,18 @@ function AppNeeds({ appId, needs }: { appId: string; needs: StatusAppNeed[] }) {
 }
 
 function AppRow({ app, canExpand }: { app: StatusApp; canExpand: boolean }) {
+  const hasDetails = canExpand && (app.needs?.length ?? 0) > 0;
+  const [open, setOpen] = useState(() => appHasKnownProblem(app));
   const presentation = appStatusPresentation(app.state);
   const summary = summarizeStatusApp(app, canExpand);
+  const detailsId = `app-needs-${app.id}`;
   const summaryContent = <>
     <p className="text-sm text-muted-foreground">{summary}</p>
     <div data-status-strip className="w-full min-w-0 overflow-hidden"><UptimeStrip data={appStripData(app)} summary={appStripSummary(app)} /></div>
   </>;
   const details = app.needs?.length ? <AppNeeds appId={app.id} needs={app.needs} /> : null;
 
-  if (!canExpand) return <div className="flex flex-col gap-2 py-3">
+  if (!hasDetails) return <div className="flex flex-col gap-2 py-3">
     <div className="flex min-h-12 flex-wrap items-center justify-between gap-3">
       <span className="font-medium">{app.name}</span>
       <div className="flex min-h-12 flex-wrap items-center gap-2">
@@ -82,18 +84,24 @@ function AppRow({ app, canExpand }: { app: StatusApp; canExpand: boolean }) {
     {summaryContent}
   </div>;
 
-  return <Collapsible defaultOpen={appHasKnownProblem(app)}>
+  const ChevronDown = getIcon("chevron-down");
+  return <Collapsible open={open} onOpenChange={setOpen}>
     <div className="flex flex-col gap-2 py-3">
-      <CollapsibleTrigger className="flex min-h-12 w-full flex-wrap items-center justify-between gap-3 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="font-medium">{app.name}</span>
-        <span className="flex flex-wrap items-center gap-2">
+      <div className="flex min-h-12 flex-wrap items-center gap-3">
+        <span className="mr-auto font-medium">{app.name}</span>
+        <span className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
           <span className="text-sm text-muted-foreground">{app.uptimePercent.toFixed(3)}% uptime</span>
           <Status status={presentation.status}>{presentation.label}</Status>
-          <span aria-hidden="true" className="text-muted-foreground">⌄</span>
+          <span className="inline-flex min-h-12 items-center">
+            <CollapsibleTrigger aria-controls={detailsId} render={<Button type="button" variant="outline" size="sm" />}>
+              {open ? "Hide details" : "Show details"}
+              <ChevronDown data-testid="app-details-chevron" className={`size-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+            </CollapsibleTrigger>
+          </span>
         </span>
-      </CollapsibleTrigger>
+      </div>
       {summaryContent}
-      {details ? <CollapsibleContent>{details}</CollapsibleContent> : null}
+      {details ? <CollapsibleContent id={detailsId} keepMounted>{details}</CollapsibleContent> : null}
     </div>
   </Collapsible>;
 }

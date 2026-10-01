@@ -934,5 +934,5 @@ export interface Performance {
 
 /** Status apps GET wire contract, shared by the OpenAPI route and frontend. */
 export type StatusAppNeedWire = { kind: "engine" | "service" | "internet"; id: string; name: string; purpose: string; required: boolean; state: "operational" | "degraded" | "down" | "waiting" | "unknown"; last_success_at?: string | null; last_error_class?: string | null };
-export type StatusAppWire = { id: string; name: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; reason: string | null; needs?: StatusAppNeedWire[]; history: Array<{ date: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; uptime: number }>; uptimePercent: number };
+export type StatusAppWire = { id: string; name: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; reason: string | null; needs?: StatusAppNeedWire[]; history: Array<{ date: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; uptime: number; minutes: { operational: number; degraded: number; outage: number; maintenance: number } }>; uptimePercent: number };
 export type StatusAppsWire = StatusAppWire[];

@@ -10,12 +10,13 @@ import type { StatusAppsWire } from "../wire";
 
 export const statusAppsRoutes = apiRouter();
 const NeedSchema = z.object({ kind: z.enum(["engine", "service", "internet"]), id: z.string(), name: z.string(), purpose: z.string(), required: z.boolean(), state: z.enum(["operational", "degraded", "down", "waiting", "unknown"]), last_success_at: z.string().nullable().optional(), last_error_class: z.string().nullable().optional(), success_count: z.number().optional(), failure_count: z.number().optional() });
-const AppSchema = z.object({ id: z.string(), name: z.string(), state: z.enum(["operational", "degraded", "down", "waiting_for_internet"]), reason: z.string().nullable(), needs: z.array(NeedSchema).optional(), history: z.array(z.object({ date: z.string(), state: z.enum(["operational", "degraded", "down", "waiting_for_internet"]), uptime: z.number() })).length(90), uptimePercent: z.number() });
+const AppDayMinutesSchema = z.object({ operational: z.number(), degraded: z.number(), outage: z.number(), maintenance: z.number() });
+const AppSchema = z.object({ id: z.string(), name: z.string(), state: z.enum(["operational", "degraded", "down", "waiting_for_internet"]), reason: z.string().nullable(), needs: z.array(NeedSchema).optional(), history: z.array(z.object({ date: z.string(), state: z.enum(["operational", "degraded", "down", "waiting_for_internet"]), uptime: z.number(), minutes: AppDayMinutesSchema })).length(90), uptimePercent: z.number() });
 const ResponseSchema = z.array(AppSchema) satisfies z.ZodType<StatusAppsWire>;
 
 export const appsRoute = createRoute({ method: "get", path: "/apps", tags: ["Status"], summary: "Read app health derived from declared needs",
   middleware: [requireAuth] as const,
-  responses: { 200: { content: { "application/json": { schema: ResponseSchema } }, description: "App health and ninety daily uptime buckets. Needs are visible to owners and admins." }, ...errorResponses({ 401: "Not signed in" }) } });
+  responses: { 200: { content: { "application/json": { schema: ResponseSchema } }, description: "App health and ninety daily uptime buckets with minutes by state. Needs are visible to owners and admins." }, ...errorResponses({ 401: "Not signed in" }) } });
 
 export type StatusAppsRoute = typeof appsRoute;
 

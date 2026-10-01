@@ -117,10 +117,14 @@ export function buildAppHistory(needs: AppNeed[], events: StatusEventLike[], now
   });
   const knownStart = required.length > 0 ? Math.max(...knownStarts) : end;
   const maintenance = unionRequiredDowntime(maintenanceGroups);
+  const plannedMaintenance = maintenance;
   let down = unionRequiredDowntime(downGroups);
   if (required.some((item) => item.kind === "internet")) down = subtractIntervals(down, internetDown);
   down = subtractIntervals(down, maintenance);
-  const degraded = unionRequiredDowntime([...optionalIssueGroups, ...requiredDegradedGroups]);
+  const degraded = subtractIntervals(
+    unionRequiredDowntime([...optionalIssueGroups, ...requiredDegradedGroups, internetDown]),
+    [...down, ...plannedMaintenance],
+  );
   const duration = (intervals: number[][], from: number, to: number) => intervals.reduce((total, [a, b]) => total + Math.max(0, Math.min(to, b!) - Math.max(from, a!)), 0);
   const buckets = Array.from({ length: days }, (_, index) => {
     const from = start + index * 86_400_000;
@@ -133,7 +137,16 @@ export function buildAppHistory(needs: AppNeed[], events: StatusEventLike[], now
     const internetWaiting = required.some((item) => item.kind === "internet") && internetDown.some(([a, b]) => Math.min(to, b!) > Math.max(from, a!));
     const degradedToday = degraded.some(([a, b]) => Math.min(to, b!) > Math.max(from, a!));
     const state: AppState = internetWaiting ? "waiting_for_internet" : downtime > 0 ? "down" : degradedToday ? "degraded" : "operational";
-    return { date: new Date(from).toISOString().slice(0, 10), state, uptime };
+    const asMinutes = (milliseconds: number) => Number((Math.max(0, milliseconds) / 60_000).toFixed(2));
+    const knownMinutes = asMinutes(to - knownFrom);
+    const outageMinutes = asMinutes(downtime);
+    const degradedMinutes = asMinutes(duration(degraded, knownFrom, to));
+    const maintenanceMinutes = asMinutes(maintenanceMs);
+    const operationalMinutes = Number(Math.max(0, knownMinutes - outageMinutes - degradedMinutes - maintenanceMinutes).toFixed(2));
+    return {
+      date: new Date(from).toISOString().slice(0, 10), state, uptime,
+      minutes: { operational: operationalMinutes, degraded: degradedMinutes, outage: outageMinutes, maintenance: maintenanceMinutes },
+    };
   });
   const eligible = Math.max(0, end - knownStart - duration(maintenance, knownStart, end));
   const downtime = duration(down, knownStart, end);

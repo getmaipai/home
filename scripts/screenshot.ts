@@ -259,6 +259,7 @@ const statusD1Review = process.argv.includes("--status-d1-review");
 const statusEngineControlsReview = process.argv.includes("--status-engine-controls-review");
 const statusAppsReview = process.argv.includes("--status-apps-review");
 const statusExpandReview = process.argv.includes("--status-expand-review");
+const statusPolishReview = process.argv.includes("--status-polish-review");
 const browserAlertsReview = process.argv.includes("--browser-alerts-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
@@ -629,10 +630,11 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       const history = Array.from({ length: 90 }, (_, index) => ({
         date: new Date(today.getTime() - (89 - index) * 86_400_000).toISOString().slice(0, 10),
         state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100,
+        minutes: { operational: index === 89 ? 1439 : 1440, degraded: 0, outage: index === 89 ? 1 : 0, maintenance: 0 },
       }));
       await page.route("**/api/status/apps", (request) => request.fulfill({ status: 200, json: [
         { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true, purpose: "Chat model" }], history, uptimePercent: 99.5 },
-        ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, needs: [], history: history.map((day) => ({ ...day, state: "operational", uptime: 100 })), uptimePercent: 100 })),
+        ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, needs: [], history: history.map((day) => ({ ...day, state: "operational", uptime: 100, minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } })), uptimePercent: 100 })),
       ] }));
     }
     await page.goto(`${BASE_URL}${route.path}`);
@@ -3797,11 +3799,11 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
   const today = new Date();
   const history = Array.from({ length: 90 }, (_, index) => {
     const date = new Date(today.getTime() - (89 - index) * 86_400_000).toISOString().slice(0, 10);
-    return { date, state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100 };
+    return { date, state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100, minutes: { operational: index === 89 ? 1439 : 1440, degraded: 0, outage: index === 89 ? 1 : 0, maintenance: 0 } };
   });
   const appFixture = (admin: boolean) => [
     { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", ...(admin ? { needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true, purpose: "Chat model" }] } : {}), history, uptimePercent: 99.5 },
-    ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, ...(admin ? { needs: [] } : {}), history: history.map((day) => ({ ...day, state: "operational", uptime: 100 })), uptimePercent: 100 })),
+    ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, ...(admin ? { needs: [] } : {}), history: history.map((day) => ({ ...day, state: "operational", uptime: 100, minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } })), uptimePercent: 100 })),
   ];
 
   for (const [role, session, admin] of [["admin", ownerSession, true], ["non-admin", memberSession, false]] as const) {
@@ -3941,6 +3943,89 @@ async function captureStatusExpandReview(browser: Browser, ownerSession: string)
     }
   }
   console.log("Captured Chat down and all-fine app rows for admin and household-member roles at desktop and phone widths.");
+}
+
+async function captureStatusPolishReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-polish";
+  mkdirSync(outDir, { recursive: true });
+  const today = new Date();
+  const history = Array.from({ length: 90 }, (_, index) => {
+    const date = new Date(today.getTime() - (89 - index) * 86_400_000).toISOString().slice(0, 10);
+    const shortSlowDay = index === 44;
+    return {
+      date, state: shortSlowDay ? "degraded" : "operational", uptime: 100,
+      minutes: { operational: shortSlowDay ? 1438 : 1440, degraded: shortSlowDay ? 2 : 0, outage: 0, maintenance: 0 },
+    };
+  });
+  const apps = [
+    { id: "chat", name: "Chat", state: "operational", reason: null, needs: [{ kind: "engine", id: "chat", name: "MaiPai's AI", state: "operational", required: true, purpose: "Chat model" }], history, uptimePercent: 100 },
+    ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({
+      id: name.toLowerCase(), name, state: "operational", reason: null, needs: [],
+      history: history.map((day) => ({ ...day, state: "operational", uptime: 100, minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } })), uptimePercent: 100,
+    })),
+  ];
+  const desktop = VIEWPORTS.find((item) => item.slug === "desktop")!;
+  const phone = VIEWPORTS.find((item) => item.slug === "phone")!;
+
+  for (const viewport of [desktop, phone]) {
+    const context = await newContext(browser, viewport, "light", ownerSession);
+    try {
+      const page = await context.newPage();
+      await page.route("**/api/status/apps", (route) => route.fulfill({ status: 200, json: apps }));
+      await page.route("**/api/status/history?days=90", (route) => route.fulfill({ status: 200, json: { generated_at: new Date().toISOString(), days: 90, components: [], incidents: [] } }));
+      await page.route("**/api/health", async (route) => {
+        const response = await route.fetch();
+        const health = await response.json() as { ok: boolean; engines: Record<string, { kind: string; pid: number | null; alive: boolean | null }>; sidecars: unknown[] };
+        health.ok = true;
+        for (const role of Object.keys(health.engines)) health.engines[role] = { kind: "spawned", pid: null, alive: true };
+        health.sidecars = [];
+        await route.fulfill({ response, json: health });
+      });
+      await page.goto(`${BASE_URL}/status`);
+      const showDetails = page.getByRole("button", { name: "Show details" });
+      await showDetails.waitFor();
+      if (await showDetails.getAttribute("aria-expanded") !== "false") throw new Error("STATUS-SVC-08 collapsed fixture opened unexpectedly");
+      await showDetails.focus();
+      await page.keyboard.press("Enter");
+      await page.getByRole("button", { name: "Hide details" }).waitFor();
+      await page.keyboard.press("Space");
+      await page.getByRole("button", { name: "Show details" }).waitFor();
+      const collapsedPath = join(outDir, `status-polish-collapsed-${viewport.width}.png`);
+      await page.screenshot({ path: collapsedPath, fullPage: true });
+      console.log(`Wrote ${collapsedPath}`);
+
+      await showDetails.click();
+      const hideDetails = page.getByRole("button", { name: "Hide details" });
+      await hideDetails.waitFor();
+      if (await hideDetails.getAttribute("aria-expanded") !== "true") throw new Error("STATUS-SVC-08 expanded fixture did not open");
+      const expandedPath = join(outDir, `status-polish-expanded-${viewport.width}.png`);
+      await page.screenshot({ path: expandedPath, fullPage: true });
+      console.log(`Wrote ${expandedPath}`);
+    } finally { await context.close(); }
+  }
+
+  const context = await newContext(browser, desktop, "light", ownerSession);
+  try {
+    const page = await context.newPage();
+    await page.route("**/api/status/apps", (route) => route.fulfill({ status: 200, json: apps }));
+    await page.route("**/api/status/history?days=90", (route) => route.fulfill({ status: 200, json: { generated_at: new Date().toISOString(), days: 90, components: [], incidents: [] } }));
+    await page.route("**/api/health", async (route) => {
+      const response = await route.fetch();
+      const health = await response.json() as { ok: boolean; engines: Record<string, { kind: string; pid: number | null; alive: boolean | null }>; sidecars: unknown[] };
+      health.ok = true;
+      for (const role of Object.keys(health.engines)) health.engines[role] = { kind: "spawned", pid: null, alive: true };
+      health.sidecars = [];
+      await route.fulfill({ response, json: health });
+    });
+    await page.goto(`${BASE_URL}/status`);
+    const slowDay = page.locator('[data-status-strip]').first().locator('[data-slot="tooltip-trigger"]').nth(44);
+    await slowDay.hover();
+    await page.getByText("slow for 2 minutes, otherwise fine.", { exact: true }).waitFor();
+    const path = join(outDir, "status-polish-tooltip-slow-day-1440.png");
+    await page.screenshot({ path, fullPage: true });
+    console.log(`Wrote ${path}`);
+  } finally { await context.close(); }
+  console.log("Captured the app row control in both states at desktop and phone widths, plus the green short-slow-day tooltip.");
 }
 
 async function captureBrowserAlertsReview(browser: Browser, sessionValue: string): Promise<void> {
@@ -5003,6 +5088,11 @@ async function main() {
     if (statusExpandReview) {
       await captureStatusExpandReview(browser, sessionValue);
       console.log("completed named review: --status-expand-review");
+      return;
+    }
+    if (statusPolishReview) {
+      await captureStatusPolishReview(browser, sessionValue);
+      console.log("completed named review: --status-polish-review");
       return;
     }
     if (browserAlertsReview) {

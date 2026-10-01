@@ -8869,7 +8869,7 @@
         "summary": "Read app health derived from declared needs",
         "responses": {
           "200": {
-            "description": "App health and ninety daily uptime buckets. Needs are visible to owners and admins.",
+            "description": "App health and ninety daily uptime buckets with minutes by state. Needs are visible to owners and admins.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8975,12 +8975,36 @@
                             },
                             "uptime": {
                               "type": "number"
+                            },
+                            "minutes": {
+                              "type": "object",
+                              "properties": {
+                                "operational": {
+                                  "type": "number"
+                                },
+                                "degraded": {
+                                  "type": "number"
+                                },
+                                "outage": {
+                                  "type": "number"
+                                },
+                                "maintenance": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "operational",
+                                "degraded",
+                                "outage",
+                                "maintenance"
+                              ]
                             }
                           },
                           "required": [
                             "date",
                             "state",
-                            "uptime"
+                            "uptime",
+                            "minutes"
                           ]
                         }
                       },
