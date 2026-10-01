@@ -35383,6 +35383,6 @@ app is not working, and its title uses the app's reason sentence.
 `@maipai/ui` is pinned to `ui-v0.5.84` for the `FullLayout` status resolver
 slot. The kit passes that resolver to the sidebar renderer and places the
 result through the existing SidebarMenuBadge component. No vendored layout or
-menu data is edited. The status page and menu tests use an app fixture while
-the backend route is in its separate lane; the live route shape is taken from
-the route schema when that lane is integrated.
+menu data is edited. `StatusAppsResponse` is shared with the backend route
+schema through its alias-free wire contract; the endpoint returns an array,
+and each need includes its purpose and `waiting` need state.
