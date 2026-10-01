@@ -353,6 +353,12 @@ export function reportChatBackendUnreachable(message: string): void {
  * process behind it, so a dead engine reads as down rather than as its
  * kind label. */
 export async function probeChatEngine(): Promise<EngineHealth> {
+  // Stack-owned chat never uses the local supervisor. A boot warm-up from
+  // before the role was routed, or a stale local start in flight, must not
+  // leak into /api/health and status history as a local startup transition.
+  if (isStackRoleEnabled("chat") && !process.env.MAIPAI_LLAMA_SERVER_URL) {
+    return { kind: "stub", pid: null, alive: null, availability: "ready", reason: null };
+  }
   const status = getEngineStatus();
   const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
   if (blockedPortReason(port)) blockedPortHolderAlive(port);

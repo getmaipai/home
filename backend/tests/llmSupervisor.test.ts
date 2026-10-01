@@ -11,6 +11,8 @@ import { join } from "node:path";
 import { resetDb } from "./reset-db";
 import { __resetStackEngineForTests } from "@/lib/stackEngine";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
+import { componentStatesFrom } from "@/lib/statusHistory";
+import type { HealthSnapshot } from "@/lib/healthSnapshot";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 
@@ -168,6 +170,31 @@ describe("llmSupervisor chatEngineDown()", () => {
     setHouseholdSettingValue("engines.stack.use_chat", true);
     stateStopped();
     expect(chatEngineDown()).toBe(false);
+  });
+
+  test("health ignores stale local chat startup while chat is Stack-owned", async () => {
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:12345");
+    setHouseholdSettingValue("engines.stack.use_chat", true);
+    const state = (globalThis as typeof globalThis & {
+      __maipai_llmSupervisor?: { startingPromise: Promise<never> | null; startingStartedAtMs: number | null };
+    }).__maipai_llmSupervisor!;
+    try {
+      state.startingPromise = new Promise<never>(() => {});
+      state.startingStartedAtMs = Date.now();
+
+      const health = await probeChatEngine();
+      expect(health.kind).toBe("stub");
+      expect(health.availability).toBe("ready");
+      expect(health.reason).toBeNull();
+      const snapshot = {
+        sidecars: [], brain: "none", voice: "none", ok: true, uptimeSeconds: 1,
+        engines: { chat: health, embed: health, background: health, voice: health },
+      } as HealthSnapshot;
+      expect(componentStatesFrom(snapshot, new Set()).chat).toBe("operational");
+    } finally {
+      state.startingPromise = null;
+      state.startingStartedAtMs = null;
+    }
   });
 });
 
