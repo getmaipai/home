@@ -1,6 +1,6 @@
 # What to learn from ODS: a whole-product review (2026-10-01)
 
-For Jesse. Design record, coordinator: Fable 5.1. Docs only, nothing here is built and no backlog item below is filed yet.
+For Jesse. Design record, coordinator: Fable 5.1. Docs only, nothing here is built. The items below are filed in docs/BACKLOG.md under "From the ODS review (2026-10-01)".
 
 ODS (github.com/Osmantic/ODS, Apache-2.0 apart from `vendor/pixel`, which was never read) is a one-command local AI stack for a single technical operator: a shell installer, about thirty bundled Docker services, a dashboard, a model catalog and a large test and release apparatus. It solves many of the problems Home, the Stack and the Catalog are about to meet, and it has made several mistakes in public that we can skip. This record says what we take, what we change, what we refuse, and where each decision lands.
 
@@ -252,18 +252,18 @@ One contradiction in our own standard surfaced here: the table in UPDATES.md say
 
 Verdict: our structure is the one more likely to survive, because it has fewer moving parts and a real joint between app and engine. It will fail in the same way theirs did if re-proving a pin stays manual. Theirs fails by surface area; ours would fail by throughput.
 
-## Open decisions that are Jesse's
+## Decisions, made by Jesse on 2026-10-01
 
-1. **A starter model on first run.** The wizard downloads the floor chat model first so the family can talk within minutes, shows a plain banner while the proposed model downloads, then swaps. Recommended: yes. The cost is a weak first impression from a small model, which the banner has to own in words.
-2. **A Linux container image of Home as a second delivery.** Recommended: build it now for our own install testing, publish it after the native installer is proven on all three systems.
-3. **A software bill of materials on Home releases, and provenance attestation later.** Recommended: the bill of materials now, produced locally by the release skill (one new pinned tool); attestation when a public tag workflow exists.
-4. **"Erase this hub".** Uninstall keeps the data folder by design, so a family that wants everything gone must delete a folder by hand. Recommended: a separate, typed-confirm action in Settings for the owner, not an uninstall flag.
-5. **Which of the items below to file.** None is filed. Say "file them" or name the ones you want.
-6. **Run the assembled Open WebUI stack beside Home as a yardstick.** Recommended: yes, for a week, on the same model, with a short written comparison. It is a measuring stick, never the product.
+1. **A starter model on first run: yes.** The wizard downloads the floor chat model first so the family can talk within minutes, shows a plain banner while the proposed model downloads, then swaps. Filed as SETUP-START-01 and STACK-START-01.
+2. **A Linux container image of Home: backlogged.** Native stays the main path on every system; Docker is not the primary approach. The priority is getting the core and its dependencies running. Filed as HOME-IMAGE-01, later.
+3. **A bill of materials on Home releases: backlogged.** Filed as RELEASE-SBOM-01, later.
+4. **"Erase this hub": backlogged.** Filed as ERASE-HUB-01, later.
+5. **Which items to file: all of them,** in Home's BACKLOG under "From the ODS review (2026-10-01)", the seven that get the core and its dependencies running marked next and the rest later.
+6. **Running the assembled Open WebUI stack beside Home as a yardstick: no.**
 
 Resolved by reading, not asked: the environment editor, the pre-commit framework, shell hooks in manifests, several chat surfaces, and release notes carrying caveats are all rejected on existing rules. The LaunchAgent versus LaunchDaemon conflict is a measurement for the Studio runbook.
 
-## Proposed BACKLOG items (not filed)
+## BACKLOG items (filed in docs/BACKLOG.md on 2026-10-01)
 
 Each is in the org template. Sizes: S a session or less, M days. Lane and model floor are suggestions.
 
