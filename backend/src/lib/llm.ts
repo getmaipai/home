@@ -21,8 +21,9 @@ import type { ChatRole, ChatCompletionRequest, ChatCompletionChunk, ToolDefiniti
 import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 import { seedFields } from "@/lib/benchSampling";
-import { isStackRoleEnabled, getStackClient, recordStackChatIdentity, stackFailureResult, resolveStackOffline } from "@/lib/stackEngine";
+import { isStackRoleEnabled, getStackClient, recordStackChatIdentity, stackFailureResult, resolveStackOffline, type StackFailureResult } from "@/lib/stackEngine";
 import { identityFromHeaders } from "@/lib/stack/client";
+import type { RoleRequest } from "@/lib/stack/types";
 
 // Session C step 0 (wave-2.md): a person every couple of seconds, burst
 // of a few - Session A's own per-person limit (its step 11) hadn't
@@ -423,27 +424,40 @@ function withSynthesizedThink(content: string, reasoningContent?: string | null)
  * "chat" - there is no separate judge role on the wire, only a different
  * prompt), sent to the Stack as its own `model` per the role wire so a
  * differently-sized model can answer it there. */
-async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: LlmCompleteOptions): Promise<LlmOpResult> {
-  const { offering, body } = chatRequestBody(messages, opts);
+export type StackChatResult =
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; failure: StackFailureResult };
+
+/** Shared non-streaming Stack chat call for ordinary chat and the
+ * background worker's judge request. Keeps identity and Repairs handling
+ * in the same path for every caller. */
+export async function completeViaStackRequest(role: string, request: RoleRequest): Promise<StackChatResult> {
   try {
     const client = getStackClient();
-    const result = await client.chat({ model: opts.model ?? role, ...body });
+    const result = await client.chat(request);
     if ("stream" in result) {
       // complete() never asks for stream: true; a Stack that streamed
       // anyway is a contract break worth a loud, distinct failure rather
       // than silently reading `undefined` fields below.
-      return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: the Stack streamed a non-streaming request" };
+      return { ok: false, failure: { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: the Stack streamed a non-streaming request" } };
     }
     recordStackChatIdentity(result.identity);
     resolveStackOffline(role);
-    const data = result.data as { choices?: Array<{ message: { content: string; reasoning_content?: string | null; tool_calls?: ToolCallWire[] } }>; model?: string };
+    return { ok: true, data: result.data };
+  } catch (err) {
+    return { ok: false, failure: stackFailureResult(err, role) };
+  }
+}
+
+async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: LlmCompleteOptions): Promise<LlmOpResult> {
+  const { offering, body } = chatRequestBody(messages, opts);
+  const result = await completeViaStackRequest(role, { model: opts.model ?? role, ...body });
+  if (!result.ok) return result.failure;
+  const data = result.data as { choices?: Array<{ message: { content: string; reasoning_content?: string | null; tool_calls?: ToolCallWire[] } }>; model?: string };
     const choice = data.choices?.[0];
     if (!choice) return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
     return { ok: true, value: { text: withSynthesizedThink(choice.message.content, choice.message.reasoning_content), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
-  } catch (err) {
-    return stackFailureResult(err, role);
-  }
 }
 
 export async function complete(

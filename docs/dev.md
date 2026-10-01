@@ -12674,6 +12674,11 @@ Measured live: download 80 s; first spawn healthy inside the judge's own
 tick; resident set 2.86 GB; prefill 368 to 426 tokens per second, decode
 70 to 89 tokens per second on four CPU threads.
 
+When `engines.stack.use_chat` is on, background extraction and summaries
+send their requests to the Stack's `judge` role through the shared chat
+path; Home does not start its local background engine. With the switch
+off, the local background worker behaves as before.
+
 **MEM-02, the judge on that engine.** Extraction, dedupe, contradiction,
 profile rewrites, the rolling summary, and the retention summary all go
 through `completeBackground()`. `runJudgeBatch()` drains: it keeps taking

@@ -3,13 +3,19 @@ import { getBackgroundClient, getBackgroundBackendKind, getBackgroundEngineIdent
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { ENGINE_START_STALL_TIMEOUT_MS } from "@/lib/sidecars";
 import { listIssues, resolveIssue } from "@/lib/issues";
+import { resetDb } from "./reset-db";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __resetStackEngineForTests } from "@/lib/stackEngine";
+import { IDENTITY_HEADERS, offlineResponse, startStackFixture, type StackFixture } from "./stackFixture";
 
 beforeEach(() => {
+  resetDb();
   __resetBackgroundSupervisorForTests();
 });
 
 afterEach(() => {
   __resetBackgroundSupervisorForTests();
+  __resetStackEngineForTests();
   delete process.env.MAIPAI_BACKGROUND_URL;
 });
 
@@ -105,6 +111,41 @@ describe("backgroundSupervisor getBackgroundClient()", () => {
 });
 
 describe("backgroundSupervisor completeBackground()", () => {
+  let stack: StackFixture | undefined;
+
+  afterEach(() => {
+    stack?.stop();
+    stack = undefined;
+  });
+
+  test("routes judge requests through Stack chat with the given options and returns its reply", async () => {
+    let requestBody: Record<string, unknown> | undefined;
+    stack = startStackFixture({
+      "POST /v1/chat/completions": async (req) => {
+        requestBody = await req.json() as Record<string, unknown>;
+        return Response.json({ choices: [{ message: { role: "assistant", content: "judged by the Stack" } }] }, { headers: IDENTITY_HEADERS });
+      },
+    });
+    setHouseholdSettingValue("engines.stack.url", stack.url);
+    setHouseholdSettingValue("engines.stack.use_chat", true);
+    const responseFormat = { type: "json_object" as const };
+    const { completeBackground } = await import("@/lib/backgroundSupervisor");
+    const result = await completeBackground([{ role: "user", content: "summarize" }], { temperature: 0.2, max_tokens: 77, response_format: responseFormat });
+    expect(result).toEqual({ ok: true, text: "judged by the Stack" });
+    expect(requestBody).toMatchObject({ model: "judge", temperature: 0.2, max_tokens: 77, response_format: responseFormat, chat_template_kwargs: { enable_thinking: false }, messages: [{ role: "user", content: "summarize" }] });
+    expect(getBackgroundBackendKind()).toBe("none");
+  });
+
+  test("returns unavailable and raises chat Repairs when the Stack judge answers 503", async () => {
+    stack = startStackFixture({ "POST /v1/chat/completions": async () => offlineResponse("judge", "the judge role is offline") });
+    setHouseholdSettingValue("engines.stack.url", stack.url);
+    setHouseholdSettingValue("engines.stack.use_chat", true);
+    const { completeBackground } = await import("@/lib/backgroundSupervisor");
+    expect(await completeBackground([{ role: "user", content: "summarize" }])).toEqual({ ok: false, unavailable: true });
+    expect(listIssues().find((issue) => issue.source === "stack" && issue.key === "offline.chat")?.detail).toBe("the judge role is offline");
+    expect(getBackgroundBackendKind()).toBe("none");
+  });
+
   // BENCH-01: the bench's pinned seed reaches the judge's requests too,
   // and an unpinned request carries none.
   test("carries the bench's pinned sampler seed, and none otherwise", async () => {

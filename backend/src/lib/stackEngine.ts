@@ -127,7 +127,7 @@ export function getActiveChatEngineIdentity(): EngineIdentity | null {
  * member or a log line can act on. */
 const OFFLINE_COMPANION_LINE = "I can't think right now.";
 
-interface StackFailureResult {
+export interface StackFailureResult {
   ok: false;
   status: 503;
   code: "unavailable";

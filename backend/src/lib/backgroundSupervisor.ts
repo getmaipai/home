@@ -26,6 +26,8 @@ import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import type { ChatMessage } from "@maipai/spec/llm/ts/types.js";
 import { seedFields } from "@/lib/benchSampling";
 import { resolveIssue } from "@/lib/issues";
+import { isStackRoleEnabled } from "@/lib/stackEngine";
+import { completeViaStackRequest } from "@/lib/llm";
 
 export type BackgroundBackendKind = "url" | "spawned" | "stub";
 
@@ -181,6 +183,7 @@ async function startBackgroundBackend(): Promise<BackgroundBackend> {
 }
 
 export async function getBackgroundClient(): Promise<LlamaServerClient> {
+  if (isStackRoleEnabled("chat")) throw new Error("the Stack judge serves background work while Stack chat is enabled");
   if (state.manuallyStopped) throw new Error("the background engine is stopped");
   if (state.backgroundBackend) return state.backgroundBackend.client;
   expireStalledBackgroundStart();
@@ -266,6 +269,21 @@ export async function completeBackground(
     response_format?: { type: "json_schema"; json_schema: Record<string, unknown> } | { type: "json_object"; schema?: Record<string, unknown> };
   }
 ): Promise<{ ok: true; text: string } | { ok: false; unavailable: true }> {
+  if (isStackRoleEnabled("chat")) {
+    const response = await completeViaStackRequest("chat", {
+      model: "judge",
+      messages,
+      temperature: opts?.temperature,
+      ...seedFields(),
+      max_tokens: opts?.max_tokens ?? 1024,
+      response_format: opts?.response_format as any,
+      chat_template_kwargs: { enable_thinking: false },
+    });
+    if (!response.ok) return { ok: false, unavailable: true };
+    const data = response.data as { choices?: Array<{ message: { content: string } }> };
+    const choice = data.choices?.[0];
+    return choice ? { ok: true, text: choice.message.content } : { ok: false, unavailable: true };
+  }
   try {
     const client = await getBackgroundClient();
     const response = await client.chatComplete({
