@@ -889,6 +889,15 @@ describe("MEM-06: a fact is grounded in the speaker's words", () => {
     expect(rejectUngrounded([fact("The dog barks at night")], "Sage", date, "the dog barks at night").kept.length).toBe(1);
     expect(rejectUngrounded([fact("The dog Rover barks at night")], "Sage", date, "the dog barks at night").dropped.length).toBe(1);
   });
+
+  test("a copied turn date grounds its day number only inside that date", async () => {
+    const { rejectUngrounded, turnDateFor } = await import("@/lib/memoryJudge");
+    const date = turnDateFor(new Date(2026, 9, 1, 12).toISOString());
+    const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
+    const userText = "we were in Mexico visiting my wife's family";
+    expect(rejectUngrounded([fact(`Marlow was in Mexico visiting his wife's family, ${date}`)], "Marlow", date, userText).kept.length).toBe(1);
+    expect(rejectUngrounded([fact(`Marlow was in Mexico visiting his wife's family, ${date}; 2 trips`)], "Marlow", date, userText).dropped.length).toBe(1);
+  });
 });
 
 describe("MEM-06 (c): a fact cites the eligible clause it came from", () => {

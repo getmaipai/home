@@ -546,11 +546,18 @@ export function rejectUngrounded(
     const words = contentWords(fact.text);
     const content = [...words].filter((w) => !skip.has(w));
     const shared = content.filter((w) => said.has(w)).length;
+    const turnDateStart = fact.text.indexOf(turnDate);
+    const turnDateEnd = turnDateStart < 0 ? -1 : turnDateStart + turnDate.length;
     const grounded =
       content.length > 0 &&
       shared >= Math.ceil(content.length / 2) &&
       properNounsIn(fact.text).every((noun) => skip.has(noun) || said.has(noun)) &&
-      [...fact.text.matchAll(/\d+/g)].every((m) => skip.has(m[0]!) || said.has(m[0]!));
+      [...fact.text.matchAll(/\d+/g)].every((m) => {
+        const start = m.index ?? -1;
+        const end = start + m[0]!.length;
+        const isInCopiedTurnDate = turnDateStart >= 0 && start >= turnDateStart && end <= turnDateEnd;
+        return isInCopiedTurnDate || skip.has(m[0]!) || said.has(m[0]!);
+      });
     if (!grounded) {
       dropped.push({ fact, reason: "ungrounded" });
       continue;
