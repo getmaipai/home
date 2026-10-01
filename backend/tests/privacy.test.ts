@@ -191,6 +191,15 @@ describe("the hub's own connections", () => {
       expect(row.who.toLowerCase()).not.toContain("maipai");
     }
   });
+
+  test("the once-a-minute internet check describes its DNS lookup and empty connection", () => {
+    const row = platformConnections().find((r) => r.id === "platform:internet-probe");
+    expect(row?.when).toContain("once a minute");
+    expect(row?.what).toContain("DNS name lookup");
+    expect(row?.what).toContain("empty TCP connection");
+    expect(row?.destination).toContain("example.com");
+    expect(row?.destination).toContain("1.1.1.1:443");
+  });
 });
 
 describe("GET /api/privacy", () => {

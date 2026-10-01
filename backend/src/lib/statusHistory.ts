@@ -7,10 +7,11 @@ import { collectHealth, type HealthSnapshot } from "@/lib/healthSnapshot";
 import { activeMaintenanceComponents } from "@/lib/statusBoard";
 import { nextHlc } from "@/lib/hlc";
 import { randomSuffix } from "@maipai/core/src/id";
+import type { InternetState } from "@/lib/internetProbe";
 
 export type StatusState = StatusEventRecord["state"];
 type ComponentStateMap = Partial<Record<StatusComponent, StatusState>>;
-const components: StatusComponent[] = ["chat", "embed", "background", "voice", "library", "hub"];
+const baseComponents: StatusComponent[] = ["chat", "embed", "background", "voice", "library", "hub", "internet"];
 type HistoryState = StatusState | "none";
 const statePriority: Record<StatusState, number> = { operational: 1, maintenance: 2, degraded: 3, outage: 4 };
 
@@ -22,6 +23,7 @@ export function buildStatusHistory(days: number, now: Date = new Date()) {
   const startIso = new Date(windowStart).toISOString();
   const rows = db.select({ component: statusEvents.component, state: statusEvents.state, at: statusEvents.at })
     .from(statusEvents).orderBy(statusEvents.at).all();
+  const components = [...baseComponents, ...new Set(rows.map((row) => row.component).filter((component) => component.startsWith("service:")))] as StatusComponent[];
   const generated_at = now.toISOString();
   const output = components.map((component) => {
     const all = rows.filter((row) => row.component === component);
@@ -143,14 +145,19 @@ function lastState(component: StatusComponent): StatusState | undefined {
 }
 
 /** Store only state transitions and keep the heartbeat fresh. Sampling must never interrupt startup or the interval caller. */
-export async function recordStatusSample(now: Date = new Date()): Promise<void> {
+export async function recordStatusSample(now: Date = new Date(), internet?: InternetState | null): Promise<void> {
   try {
     const health = healthForTests ?? await collectHealth();
-    const states = componentStatesFrom(health, activeMaintenanceComponents(now));
-    for (const component of components) {
+    const maintenance = activeMaintenanceComponents(now);
+    const states = componentStatesFrom(health, maintenance);
+    for (const component of baseComponents) {
       const state = states[component];
       if (!state || state === lastState(component)) continue;
       writeEvent(component, state, now, state === "maintenance" ? "maintenance" : "sample");
+    }
+    if (internet) {
+      const state: StatusState = maintenance.has("internet") ? "maintenance" : internet === "down" ? "outage" : internet;
+      if (state !== lastState("internet")) writeEvent("internet", state, now, "sample");
     }
     upsertHeartbeat(now);
   } catch (err) {

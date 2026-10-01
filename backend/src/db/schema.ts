@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, real, blob, primaryKey, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+import type { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
 
 // Mirrors spec/schemas/person.schema.json (spec/gen/ts/person.ts is the
 // validated shape; this is its storage). `role` and `source` are the
@@ -943,7 +944,7 @@ export const maintenanceWindows = sqliteTable("maintenance_windows", {
 // STATUS-C2: append-only state changes behind the public uptime strips.
 export const statusEvents = sqliteTable("status_events", {
   id: text("id").primaryKey(),
-  component: text("component", { enum: ["chat", "embed", "background", "voice", "library", "hub"] }).notNull(),
+  component: text("component").$type<StatusComponent>().notNull(),
   state: text("state", { enum: ["operational", "degraded", "outage", "maintenance"] }).notNull(),
   at: text("at").notNull(),
   source: text("source", { enum: ["sample", "boot_gap", "maintenance"] }).notNull(),

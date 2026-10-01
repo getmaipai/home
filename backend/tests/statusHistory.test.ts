@@ -62,6 +62,18 @@ describe("componentStatesFrom", () => {
 });
 
 describe("status event recording", () => {
+  test("recordStatusSample records internet probe transitions as an internet component", async () => {
+    __setStatusHistoryHealthForTests(baseHealth());
+    const now = new Date("2026-10-01T12:00:00.000Z");
+    await recordStatusSample(now, "down");
+    await recordStatusSample(new Date(now.getTime() + 60_000), "down");
+    await recordStatusSample(new Date(now.getTime() + 120_000), "operational");
+    expect(db.select({ component: statusEvents.component, state: statusEvents.state }).from(statusEvents).all().filter((row) => row.component === "internet")).toEqual([
+      { component: "internet", state: "outage" },
+      { component: "internet", state: "operational" },
+    ]);
+  });
+
   test("a recurring maintenance occurrence is recorded as maintenance minutes and excluded from uptime", async () => {
     const start = new Date("2026-10-01T12:00:00.000Z");
     const finish = new Date("2026-10-01T14:00:00.000Z");

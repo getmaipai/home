@@ -14,6 +14,29 @@ async function ownerClient(): Promise<TestClient> {
 }
 
 describe("status routes", () => {
+  test("app status is signed-in for everyone and need details are owner/admin only", async () => {
+    expect((await new TestClient().get("/api/status/apps")).status).toBe(401);
+    const owner = await ownerClient();
+    const ownerResponse = await owner.get("/api/status/apps");
+    expect(ownerResponse.status).toBe(200);
+    const ownerApps = await ownerResponse.json() as Array<{ id: string; needs?: unknown[]; history: unknown[] }>;
+    expect(ownerApps.map((app) => app.id)).toEqual(["home", "chat"]);
+    expect(ownerApps.every((app) => app.needs && app.history.length === 90)).toBe(true);
+    const created = await owner.post("/api/people", { displayName: "Marlow", role: "child", secret: "0000" });
+    const person = await created.json() as { id: string };
+    const child = new TestClient();
+    expect((await child.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" })).status).toBe(200);
+    const childApps = await (await child.get("/api/status/apps")).json() as Array<{ needs?: unknown[] }>;
+    expect(childApps.every((app) => !("needs" in app))).toBe(true);
+  });
+
+  test("maintenance accepts the expanded shared status component vocabulary", async () => {
+    const owner = await ownerClient();
+    const result = await owner.post("/api/status/maintenance", { title: "Internet provider work", components: ["internet", "service:youtube"], starts_at: "2026-10-02T12:00:00Z", ends_at: "2026-10-02T13:00:00Z" });
+    expect(result.status).toBe(201);
+    expect((await result.json() as { components: string[] }).components).toEqual(["internet", "service:youtube"]);
+  });
+
   test("history requires sign-in and is available to a child without event details", async () => {
     expect((await new TestClient().get("/api/status/history")).status).toBe(401);
     const owner = await ownerClient();

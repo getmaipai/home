@@ -14,6 +14,15 @@ import { nextHlc, compareHlc, seedHlc, __resetHlcForTests } from "@/lib/hlc";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { people, settingsValues } from "@/db/schema";
+import { CORE_SETTINGS_KEYS, INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME_KEY, INTERNET_PROBE_TCP_ADDRESS_KEY, INTERNET_PROBE_TCP_PORT_KEY } from "@/settings/coreKeys";
+
+test("internet probe settings are household general controls and default on", () => {
+  const keys = new Map(CORE_SETTINGS_KEYS.map((key) => [key.key, key]));
+  expect(keys.get(INTERNET_PROBE_ENABLED_KEY)).toMatchObject({ default: true, lives_in: "household.system" });
+  expect(keys.get(INTERNET_PROBE_DNS_NAME_KEY)?.default).toBe("example.com");
+  expect(keys.get(INTERNET_PROBE_TCP_ADDRESS_KEY)?.default).toBe("1.1.1.1");
+  expect(keys.get(INTERNET_PROBE_TCP_PORT_KEY)?.default).toBe(443);
+});
 
 beforeEach(() => {
   resetDb();

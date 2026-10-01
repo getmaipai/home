@@ -35186,6 +35186,35 @@ change, and uptime exclusion. The headless review mode is
 open maintenance form and the scheduled status page at 390 and 1440 pixels to
 `data-scratch/screens/status-d1/` using the script-owned temporary backend.
 
+## STATUS-SVC-01/02/05 backend contract
+
+Home pins `spec-v0.1.70`. The spec adds optional manifest `needs` entries
+for engines, outside services, and the internet, and status components for
+`internet` and validated `service:<id>` names. The latter tag also carries
+the generated household settings registry entries for the internet probe.
+
+`GET /api/status/apps` is available to every signed-in person. It derives
+Home and Chat state from `status_events`, returns 90 UTC daily buckets and
+uptime, and never stores per-app health. Owners and admins receive each
+need's kind, id, name, purpose, required flag, and state; other roles receive
+no `needs` property and see a plain sentence for trouble. Internet failure
+makes dependent needs `waiting` and the app `waiting_for_internet`.
+
+The internet probe runs at boot and once a minute, by default. Household
+General settings control the enable switch, neutral DNS name, TCP IP address,
+and port. It sends one resolver lookup and an empty TCP connect, then closes
+the socket. Three combined failures mark Internet down; one or two mark it
+degraded. Probe transitions go through `recordStatusSample` and the existing
+event table. The privacy page names both destinations and the data sent.
+
+Built-in app needs have one source in `backend/src/lib/appNeeds.ts`. The
+current shell nav has Home and Chat as app destinations. No bundled package
+has `kind: "app"`; the bundled Music and Media Lookup packages are turn
+plugins, not destinations. `/api/status/board` keeps its existing payload.
+This backend slice leaves the current top banner on its existing health
+summary; it does not derive the banner from apps. The front-end status page
+is delivered in its separate lane.
+
 ## ENGINE-AVAIL-01
 
 `llmSupervisor.ts` derives the chat engine's `ready`, `starting`, or

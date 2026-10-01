@@ -25,6 +25,8 @@ import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
 import { telegramConfigured } from "@/lib/telegramChannel";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME_KEY, INTERNET_PROBE_TCP_ADDRESS_KEY, INTERNET_PROBE_TCP_PORT_KEY } from "@/settings/coreKeys";
 
 /** The host a URL actually reaches, so a row can never name a different
  * service from the one the code connects to. */
@@ -75,6 +77,10 @@ export function platformConnections(): PrivacyConnection[] {
   const visionHosts = hostsOf(VISION_ALL_ASSETS.map((a) => a.url));
   const voiceHost = hostsOf([voiceCatalogUrl()]);
   const sttHosts = hostsOf([SILERO_VAD_ASSET.url, MOONSHINE_ARCHIVE.url]);
+  const internetProbeOn = getHouseholdSettingValue(INTERNET_PROBE_ENABLED_KEY) !== false;
+  const internetProbeDns = String(getHouseholdSettingValue(INTERNET_PROBE_DNS_NAME_KEY) ?? "example.com");
+  const internetProbeAddress = String(getHouseholdSettingValue(INTERNET_PROBE_TCP_ADDRESS_KEY) ?? "1.1.1.1");
+  const internetProbePort = Number(getHouseholdSettingValue(INTERNET_PROBE_TCP_PORT_KEY) ?? 443);
 
   const rows: (PrivacyConnection | null)[] = [
     row("platform:language-models", modelHosts, {
@@ -161,6 +167,10 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:update-check", "api.github.com", {
       when: "automatically, at most once a day",
       what: "a request for this project's latest release information, and, only when a MaiPai robot is paired, a second request for MaiPai Bot's latest release information, plus your home's internet address. No name or device ID goes with either. Nothing anyone in the house said, asked, or saved.",
+    }),
+    row("platform:internet-probe", `DNS resolver (${internetProbeDns}) and ${internetProbeAddress}:${internetProbePort}`, {
+      when: internetProbeOn ? "automatically, once a minute; turn it off under Household, General" : "not while the internet check is turned off under Household, General",
+      what: "one DNS name lookup and an empty TCP connection that sends no data, only your home's internet address. Nothing anyone in the house said or saved is sent.",
     }),
     // KIWIX-SIDECAR-01's own gap: kiwix-serve itself sends nothing (it
     // only listens on this computer), but installing it in the first

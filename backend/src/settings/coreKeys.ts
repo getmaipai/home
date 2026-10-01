@@ -9,6 +9,11 @@
 // at generation time), not silently at some later read.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
+export const INTERNET_PROBE_ENABLED_KEY = "status.internet_probe.enabled" as const;
+export const INTERNET_PROBE_DNS_NAME_KEY = "status.internet_probe.dns_name" as const;
+export const INTERNET_PROBE_TCP_ADDRESS_KEY = "status.internet_probe.tcp_address" as const;
+export const INTERNET_PROBE_TCP_PORT_KEY = "status.internet_probe.tcp_port" as const;
+
 // Household locale: referenced by name in docs/ENGINEERING.md's Language
 // and locale rule ("Dates, units, and currency come from household
 // locale, never hard-coded") and 6.7's multi-language design, but nothing
@@ -95,4 +100,12 @@ export const CORE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.system",
     honoured_by: ["home"],
   }),
+  SettingsKey.parse({ key: INTERNET_PROBE_ENABLED_KEY, scope: "household", selector: "boolean", default: true,
+    label: "Check whether the internet is reachable", help: "Once a minute, MaiPai looks up a neutral name and opens an empty connection to the chosen address. Turn this off to stop those checks.", level: "basic", lives_in: "household.system", honoured_by: ["home"] }),
+  SettingsKey.parse({ key: INTERNET_PROBE_DNS_NAME_KEY, scope: "household", selector: "text", default: "example.com",
+    label: "Internet check name", help: "The name MaiPai looks up once a minute to check whether internet name lookups work.", level: "advanced", lives_in: "household.system", honoured_by: ["home"] }),
+  SettingsKey.parse({ key: INTERNET_PROBE_TCP_ADDRESS_KEY, scope: "household", selector: "text", default: "1.1.1.1",
+    label: "Internet check address", help: "The public IP address MaiPai connects to once a minute without sending data.", level: "advanced", lives_in: "household.system", honoured_by: ["home"] }),
+  SettingsKey.parse({ key: INTERNET_PROBE_TCP_PORT_KEY, scope: "household", selector: "number", range: { min: 1, max: 65535 }, default: 443,
+    label: "Internet check port", help: "The port MaiPai opens and immediately closes without sending data.", level: "advanced", lives_in: "household.system", honoured_by: ["home"] }),
 ];

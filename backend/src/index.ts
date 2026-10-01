@@ -33,6 +33,7 @@ import { shutdownEngines } from "@/lib/hubShutdown";
 import { ensureSecretPepperReady } from "@/lib/secret";
 import { KeystoreProtectionFailedError } from "@/lib/keystore";
 import { recordBootGap, recordStatusSample, pruneStatusEvents } from "@/lib/statusHistory";
+import { runConfiguredInternetProbe } from "@/lib/internetProbe";
 import { backfillStackRoleSettings } from "@/lib/stackEngine";
 
 const configuredPort = Number(process.env.PORT ?? 8787);
@@ -265,6 +266,17 @@ setInterval(() => {
 setInterval(() => void sampleEngineStats(), 60_000);
 const statusSampleInterval = setInterval(() => void recordStatusSample(), 30_000);
 statusSampleInterval.unref();
+const internetProbeSample = async () => {
+  try {
+    const state = await runConfiguredInternetProbe();
+    if (state) await recordStatusSample(new Date(), state);
+  } catch (error) {
+    console.error(`[status-history] internet probe failed: ${(error as Error).message}`);
+  }
+};
+void internetProbeSample();
+const internetProbeInterval = setInterval(() => void internetProbeSample(), 60_000);
+internetProbeInterval.unref();
 const statusPruneInterval = setInterval(() => pruneStatusEvents(), 6 * 60 * 60_000);
 statusPruneInterval.unref();
 // lib/householdCa.ts's own "rotation as a Repairs item" - once a day is
