@@ -35509,6 +35509,8 @@ green. Tooltips use the browser's locale date format and describe slow time,
 outages, maintenance, or missing data in plain words. The existing detailed
 history endpoint already returns the same four minute buckets.
 
+Follow-ups: [tooltip contrast](BACKLOG.md#status-svc-09-verify-and-fix-status-day-tooltip-contrast), [live owner review](BACKLOG.md#status-live-02-owner-review-of-the-live-status-page), [failure drills](BACKLOG.md#status-drill-01-exercise-app-and-engine-failure-signals-on-an-isolated-hub), and [app registry coverage](BACKLOG.md#status-apps-reg-01-cover-every-shell-destination-in-the-status-app-registry). A new app declares its needs.
+
 ## STATUS-LIVE-01 (2026-10-01)
 
 The weather service events at 12:25 and 13:25 UTC align with the installed
