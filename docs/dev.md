@@ -1663,6 +1663,82 @@ the bar; the Studio run is still owed with STACK-14. A person still needs
 to listen to both outputs because voice similarity cannot be judged by
 these measurements.
 
+#### Text to speech, noise floor, 2026-10-01
+
+Hardware: Apple M4 Pro, 26 GB unified memory (arm64).
+
+The harness ran each of its 30 lines twice through Home and twice through
+the Stack, then compared a second Home run with a second Stack run. Each
+recording was 24 kHz mono. The Stack identified Pocket TTS 3.1.0 and
+weights revision `d29db7978e464fb90cb3359ee0c69a273b9142cc`; its pinned
+Alba voice is revision `e81d79e8194ad4c7ce879c87a4258ef20cbf2487`. Home's
+engine build and model revision were not reported by its service.
+
+| Run | Ratio | Min | P05 | Median | P95 | Max | Within 5 / 8 / 12 percent |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Home against itself | Total duration | 0.855 | 0.912 | 1.000 | 1.074 | 1.128 | 22 / 26 / 28 |
+| Home against itself | Voiced duration | 0.833 | 0.903 | 1.008 | 1.090 | 1.235 | 17 / 23 / 28 |
+| Stack against itself | Total duration | 0.878 | 0.894 | 1.000 | 1.089 | 1.114 | 15 / 21 / 29 |
+| Stack against itself | Voiced duration | 0.878 | 0.893 | 0.989 | 1.094 | 1.121 | 19 / 22 / 28 |
+| Home against Stack | Total duration | 0.595 | 0.687 | 0.952 | 1.041 | 1.118 | 14 / 18 / 22 |
+| Home against Stack | Voiced duration | 0.809 | 0.932 | 1.057 | 1.147 | 1.313 | 10 / 22 / 25 |
+
+First audio ratio p05, median, p95, and maximum were 0.883, 0.993, 1.422,
+and 1.737 for Home against itself; 0.567, 0.976, 1.062, and 1.135 for the
+Stack against itself; and 1.036, 1.140, 1.242, and 2.049 for Home against
+the Stack. The duration, clipping, silence, and first audio checks passed
+22, 30, 26, and 28 Home control rows; 15, 30, 30, and 30 Stack control
+rows; and 14, 30, 27, and 29 comparison rows.
+
+Home's self control had median leading and trailing silence of 0.246 and
+0.503 seconds on the first render, and 0.229 and 0.511 seconds on the
+second. The Stack's values were 0.056 and 0.248 seconds on the first
+render, and 0.066 and 0.249 seconds on the second. In the comparison,
+Home's median leading and trailing silence was 0.216 and 0.510 seconds;
+the Stack's was 0.051 and 0.284 seconds.
+
+Home's own total duration ratios ranged from 0.855 to 1.128, with the
+central 90 percent between 0.912 and 1.074. Its voiced duration ratios
+ranged from 0.833 to 1.235, with the central 90 percent between 0.903 and
+1.090. The Stack's total duration ratios ranged from 0.878 to 1.114, with
+the central 90 percent between 0.894 and 1.089. Its voiced duration
+ratios ranged from 0.878 to 1.121, with the central 90 percent between
+0.893 and 1.094.
+
+The Stack against Home falls outside the self control spreads. The
+comparison's total duration p05 was 0.687, below both control p05 values
+of 0.912 and 0.894. Its voiced duration p95 was 1.147, above both control
+p95 values of 1.090 and 1.094, and its full voiced ratio range of 0.809
+to 1.313 exceeds both self control ranges. The difference in edge silence
+is also absent from both controls, so the roughly 0.165 seconds of extra
+Home leading silence and 0.226 seconds of extra Home trailing silence in
+the comparison is a difference between the two engine setups, not the
+measured run to run noise.
+
+The Home launch uses `uvx pocket-tts serve` without a version pin
+([ttsSupervisor.ts](/Users/jessetorres/Developer/github.com/getmaipai/home-c-100/backend/src/lib/ttsSupervisor.ts:125)).
+The Stack launches its managed Pocket TTS binary with the same `serve`,
+`--host`, and `--port` options
+([pocketTts.ts](/Users/jessetorres/Developer/github.com/getmaipai/stack-codex/backend/src/speech/pocketTts.ts:63));
+neither launch adds padding, trimming, or frame options. The Stack
+resolves Alba to its verified local preset before forwarding the same
+text and voice form to the engine
+([v1.ts](/Users/jessetorres/Developer/github.com/getmaipai/stack-codex/backend/src/routes/v1.ts:145)).
+Different package builds or voice and weight files could change the audio;
+Home does not report its build or model revision, so the cause is not
+isolated by this run. Both services returned the same WAV format.
+
+For the coordinator, a candidate total duration distribution bar is a
+comparison p05 to p95 within the combined self control envelope of 0.894
+to 1.089. For voiced duration, the corresponding envelope is 0.893 to
+1.094. Keep the existing clipping limit while all control renders remain
+unclipped. Candidate p95 edge limits are 0.43 seconds leading and 0.61
+seconds trailing for Home, and 0.16 seconds leading and 0.33 seconds
+trailing for the Stack; the control p95 absolute paired edge differences
+were 0.21 seconds leading and 0.10 seconds trailing. A candidate first
+audio bar is a comparison p95 no higher than 1.42, the larger self control
+p95. These are proposals only and do not change the harness pass bars.
+
 The alternatives rejected are a two-card layout, because there is no second
 card; a static memory reservation, because it wastes idle unified memory;
 CUDA-only MTP, because it is not a verified Metal dependency on the pinned
