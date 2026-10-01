@@ -546,6 +546,14 @@ export type StatusHistoryIncident = { component: "chat" | "embed" | "background"
 export type StatusHistoryComponent = { component: StatusHistoryIncident["component"]; uptime_percent: number | null; days: StatusHistoryDay[]; current: { state: StatusHistoryState; since: string | null } };
 export type StatusHistory = { generated_at: string; days: number; components: StatusHistoryComponent[]; incidents: StatusHistoryIncident[] };
 
+// STATUS-SVC-05 draft wire types, replaced with the route schema's inferred
+// response when the backend lane lands.
+export type StatusAppState = "operational" | "degraded" | "down" | "waiting_for_internet";
+export type StatusAppNeed = { kind: "engine" | "service" | "internet"; id: string; name: string; state: StatusAppState; required: boolean };
+export type StatusAppHistoryDay = { date: string; state: StatusAppState; uptime: number };
+export type StatusApp = { id: string; name: string; state: StatusAppState; reason: string | null; needs?: StatusAppNeed[]; history: StatusAppHistoryDay[]; uptimePercent: number };
+export type StatusAppsResponse = { apps: StatusApp[] };
+
 export const api = {
   profiles: () => request<Roster[]>("/api/auth/profiles"),
   setup: (displayName: string, secret: string) =>
@@ -1031,6 +1039,7 @@ export const api = {
   // has ever needed.
   health: () => request<HealthStatus>("/api/health", { timeoutMs: 8_000 }),
   statusBoard: () => request<StatusBoard>("/api/status/board"),
+  statusApps: () => request<StatusAppsResponse>("/api/status/apps"),
   statusHistory: async (days = 90) => {
     const history = await request<StatusHistory>(`/api/status/history?days=${days}`);
     if (!Array.isArray(history.components) || !Array.isArray(history.incidents)) throw new Error("Status history is not available.");

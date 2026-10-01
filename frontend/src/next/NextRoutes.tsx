@@ -34,6 +34,8 @@ import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } fro
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { StatusIndicator } from "@/shell/StatusIndicator";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
+import { useStatusApps } from "@/shell/useStatusApps";
+import { sidebarItemStatus } from "@/shell/statusApps";
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -111,6 +113,7 @@ function NextRoutesInner({ person, onPersonChange }: { person: Roster; onPersonC
 }
 
 function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
+  const statusAppsQuery = useStatusApps();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
 
   const onIncognitoChange = (on: boolean) => {
@@ -178,7 +181,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
         {/* THEME-TOGGLE-01 (2026-09-26): light/dark already lives at
             Settings > Me > Appearance (ui.appearance) - the header's
             own shortcut duplicated it, so it's off here. */}
-        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} statusIndicator={<StatusIndicator />} />}>
+        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} statusIndicator={<StatusIndicator />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data?.apps ?? [], item)} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />

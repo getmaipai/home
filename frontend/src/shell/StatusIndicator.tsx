@@ -1,23 +1,22 @@
 import { useQuery } from "@tanstack/react-query";
 import { Status, StatusIndicator as StatusDot } from "@maipai/ui/src/ui/status";
 import { Link } from "react-router-dom";
-import { api, type HealthStatus } from "@/lib/api";
-import { statusSummary } from "@/shell/statusSummary";
+import { api } from "@/lib/api";
 import { STATUS_BOARD_QUERY_KEY } from "@/next/pages/status/StatusBoard";
 import { activeMaintenanceParts } from "@/next/pages/status/statusBoardFormat";
 import type { StatusBoard } from "@/lib/api";
+import { useStatusApps } from "@/shell/useStatusApps";
+import { statusAppsSummary } from "@/shell/statusApps";
 
 export function StatusIndicator() {
   const board = useQuery<StatusBoard>({ queryKey: STATUS_BOARD_QUERY_KEY, queryFn: () => api.statusBoard(), refetchInterval: 30_000 });
   const underMaintenance = activeMaintenanceParts(Array.isArray(board.data?.maintenance) ? board.data.maintenance : undefined);
-  const query = useQuery<HealthStatus>({
-    queryKey: ["health"],
-    queryFn: () => api.health(),
-    retry: false,
-    refetchInterval: (current) => statusSummary(current.state.data, underMaintenance).level === "online" ? 15_000 : 5_000,
-  });
-  const summary = statusSummary(query.data, underMaintenance);
-  const title = summary.problems.length > 0 ? `Problems: ${summary.problems.join(", ")}` : summary.text;
+  const appsQuery = useStatusApps();
+  const appsSummary = statusAppsSummary(appsQuery.data?.apps ?? []);
+  const summary = appsSummary.level === "online" && underMaintenance.length > 0
+    ? { ...appsSummary, level: "maintenance" as const, text: "Maintenance" }
+    : appsSummary;
+  const title = appsSummary.level === "online" ? summary.text : appsSummary.message;
 
   return (
     <Link

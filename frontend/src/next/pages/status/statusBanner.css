@@ -19,3 +19,13 @@
   background-color: color-mix(in srgb, var(--hue-blue) 12%, transparent);
   color: var(--hue-blue);
 }
+
+[data-status-banner="offline"] > div:first-child,
+[data-status-banner="offline"] [data-slot="badge"] {
+  color: color-mix(in srgb, var(--destructive) 58%, black);
+}
+
+.dark [data-status-banner="offline"] > div:first-child,
+.dark [data-status-banner="offline"] [data-slot="badge"] {
+  color: color-mix(in srgb, var(--destructive) 76%, white);
+}

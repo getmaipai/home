@@ -257,6 +257,7 @@ const statusC3bReview = process.argv.includes("--status-c3b-review");
 const statusB2bReview = process.argv.includes("--status-b2b-review");
 const statusD1Review = process.argv.includes("--status-d1-review");
 const statusEngineControlsReview = process.argv.includes("--status-engine-controls-review");
+const statusAppsReview = process.argv.includes("--status-apps-review");
 const browserAlertsReview = process.argv.includes("--browser-alerts-review");
 const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
@@ -622,6 +623,17 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
   const page = await context.newPage();
   page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
   try {
+    if (route.slug === "status") {
+      const today = new Date();
+      const history = Array.from({ length: 90 }, (_, index) => ({
+        date: new Date(today.getTime() - (89 - index) * 86_400_000).toISOString().slice(0, 10),
+        state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100,
+      }));
+      await page.route("**/api/status/apps", (request) => request.fulfill({ status: 200, json: { apps: [
+        { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true }], history, uptimePercent: 99.5 },
+        ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, needs: [], history: history.map((day) => ({ ...day, state: "operational", uptime: 100 })), uptimePercent: 100 })),
+      ] } }));
+    }
     await page.goto(`${BASE_URL}${route.path}`);
     // `chat-list` (`?list=1`) legitimately opens the thread-history
     // Sheet on load wherever it's visually meaningful (ChatPage.tsx's
@@ -3761,6 +3773,79 @@ async function captureStatusEngineControlsReview(browser: Browser, ownerSession:
   }
 }
 
+/** STATUS-SVC-05/06 fixture capture. The isolated backend owns identity and
+ * the normal shell routes; only the new apps response is fixture-backed so
+ * this can prove the UI before lane A's live route is integrated. */
+async function captureStatusAppsReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-apps";
+  mkdirSync(outDir, { recursive: true });
+  const created = await fetch(`${BASE_URL}/api/people`, {
+    method: "POST", headers: { "Content-Type": "application/json", Cookie: `session=${ownerSession}` },
+    body: JSON.stringify({ displayName: "Status Reviewer", role: "teen", secret: "review-status-secret" }),
+  });
+  if (!created.ok) throw new Error(`status apps reviewer setup failed: ${created.status} ${await created.text()}`);
+  const person = await created.json() as { id: string };
+  const signedIn = await fetch(`${BASE_URL}/api/auth/verify-secret`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ personId: person.id, secret: "review-status-secret" }),
+  });
+  if (!signedIn.ok) throw new Error(`status apps reviewer sign-in failed: ${signedIn.status}`);
+  const memberSession = signedIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!memberSession) throw new Error("status apps reviewer sign-in carried no session cookie");
+
+  const today = new Date();
+  const history = Array.from({ length: 90 }, (_, index) => {
+    const date = new Date(today.getTime() - (89 - index) * 86_400_000).toISOString().slice(0, 10);
+    return { date, state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100 };
+  });
+  const appFixture = (admin: boolean) => ({ apps: [
+    { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", ...(admin ? { needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true }] } : {}), history, uptimePercent: 99.5 },
+    ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, ...(admin ? { needs: [] } : {}), history: history.map((day) => ({ ...day, state: "operational", uptime: 100 })), uptimePercent: 100 })),
+  ] });
+
+  for (const [role, session, admin] of [["admin", ownerSession, true], ["non-admin", memberSession, false]] as const) {
+    for (const [viewportName, width] of [["desktop", 1440], ["phone", 390]] as const) {
+      const viewport = VIEWPORTS.find((item) => item.slug === viewportName)!;
+      const context = await newContext(browser, viewport, "light", session);
+      try {
+        const page = await context.newPage();
+        await page.route("**/api/status/apps", (route) => route.fulfill({ status: 200, json: appFixture(admin) }));
+        await page.route("**/api/health", async (route) => {
+          const response = await route.fetch();
+          const health = await response.json() as { ok: boolean; engines: Record<string, { kind: string; pid: number | null; alive: boolean | null }> };
+          health.ok = false;
+          health.engines.chat = { kind: "selection", pid: 4242, alive: false };
+          await route.fulfill({ response, json: health });
+        });
+        await page.goto(`${BASE_URL}/status`);
+        await page.getByText("Apps", { exact: true }).waitFor({ timeout: 15000 });
+        await page.getByRole("region", { name: "Overall status" }).getByText("Chat isn't working right now.", { exact: true }).waitFor();
+        if (admin) {
+          await page.getByText("Needs: Brain (down)", { exact: true }).waitFor();
+          await page.getByText("Behind the scenes", { exact: true }).waitFor();
+        } else {
+          if (await page.getByText("Behind the scenes", { exact: true }).count()) throw new Error("non-admin status capture shows Behind the scenes");
+          if (await page.getByText("Brain", { exact: true }).count()) throw new Error("non-admin status capture exposed the Brain engine name");
+          const chatReason = await page.getByText("Chat isn't working right now.", { exact: true }).first().textContent();
+          if (chatReason?.includes("Brain")) throw new Error("non-admin reason sentence exposed an engine name");
+          const statusLinkTitle = await page.locator('a[href="/status"]').getAttribute("title");
+          if (statusLinkTitle?.includes("Brain")) throw new Error("non-admin status indicator tooltip exposed an engine name");
+        }
+        const path = join(outDir, `status-apps-${role}-${width}.png`);
+        await page.screenshot({ path, fullPage: true });
+        console.log(`Wrote ${path}`);
+        if (viewportName === "desktop") {
+          const chatLink = page.locator('[aria-label="Primary navigation"] a[href="/next/chat"]');
+          await chatLink.waitFor({ timeout: 5000 });
+          if (await chatLink.getAttribute("aria-label") !== "Chat: not working") throw new Error(`${role} status menu label did not expose Chat status: ${await chatLink.getAttribute("aria-label")}`);
+          if (await chatLink.getAttribute("title") !== "Chat isn't working right now.") throw new Error(`${role} status tooltip did not use the app reason sentence`);
+        }
+      } finally { await context.close(); }
+    }
+  }
+  console.log("Fixture capture shows Chat down with Brain down for the admin, and the plain reason without engine names for a household member.");
+}
+
 async function captureBrowserAlertsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screens", "avail-06a");
   mkdirSync(outDir, { recursive: true });
@@ -4822,6 +4907,11 @@ async function main() {
     if (statusEngineControlsReview) {
       await captureStatusEngineControlsReview(browser, sessionValue);
       console.log("completed named review: --status-engine-controls-review");
+      return;
+    }
+    if (statusAppsReview) {
+      await captureStatusAppsReview(browser, sessionValue);
+      console.log("completed named review: --status-apps-review");
       return;
     }
     if (browserAlertsReview) {

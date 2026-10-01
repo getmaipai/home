@@ -35362,3 +35362,27 @@ widths, the duplicate header wordmark is hidden while the chat header slot is
 active; the sidebar keeps its logo. The adjacent actions target has an 8px
 gap. Header tests assert the real height and minimum width classes. A focused
 chat and chat-list phone/dark scan passes with zero violations and overflow.
+
+## STATUS-SVC-05 and STATUS-SVC-06
+
+The status page reads the installed apps from `GET /api/status/apps` first.
+Each app uses the shared Status badge and UptimeStrip, and shows its plain
+reason sentence when it needs attention. Owners and admins also see the app's
+needs and the existing parts rows, status history, and controls below
+"Behind the scenes". Other household members do not fetch or render raw part
+health or history.
+
+The shell and status page share one `status-apps` React Query entry. Its poll
+interval follows the status indicator cadence: 15 seconds while all apps are
+working and 5 seconds when an app needs attention. A menu item matches its
+installed app by display name. Healthy apps add no marker; degraded or
+internet-waiting apps add the kit's amber SidebarMenuBadge, and down apps add
+the red badge. The link keeps its destination, its accessible name says which
+app is not working, and its title uses the app's reason sentence.
+
+`@maipai/ui` is pinned to `ui-v0.5.84` for the `FullLayout` status resolver
+slot. The kit passes that resolver to the sidebar renderer and places the
+result through the existing SidebarMenuBadge component. No vendored layout or
+menu data is edited. The status page and menu tests use an app fixture while
+the backend route is in its separate lane; the live route shape is taken from
+the route schema when that lane is integrated.
