@@ -32,6 +32,7 @@ import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { readEngineIdentity, formatEngineIdentity, identityIncomplete, type EngineIdentity } from "@/lib/engineIdentity";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import { resolveIssue } from "@/lib/issues";
+import { isStackRoleEnabled } from "@/lib/stackEngine";
 
 export type EmbedBackendKind = "url" | "spawned" | "stub";
 
@@ -184,6 +185,7 @@ async function startEmbedBackend(): Promise<EmbedBackend> {
  * llmSupervisor.ts's getChatClient() and ttsSupervisor.ts's
  * getTtsClient() already carry. */
 export async function getEmbedClient(): Promise<LlamaServerClient> {
+  if (isStackRoleEnabled("embeddings") && !process.env.MAIPAI_EMBED_URL) throw new Error("embedding model unavailable: embeddings are served by the MaiPai Stack");
   if (state.manuallyStopped) throw new Error("the embed engine is stopped");
   if (state.embedBackend) return state.embedBackend.client;
   expireStalledEmbedStart();

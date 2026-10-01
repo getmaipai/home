@@ -558,6 +558,7 @@ async function startChatBackend(): Promise<ChatBackend> {
  * failure (a briefly-wrong model path, a taken port, a slow first load
  * past the health timeout) until the whole process restarted. */
 export async function getChatClient(): Promise<LlamaServerClient> {
+  if (isStackRoleEnabled("chat") && !process.env.MAIPAI_LLAMA_SERVER_URL) throw new Error("chat model unavailable: chat is served by the MaiPai Stack");
   if (state.manuallyStopped) {
     throw new Error("the chat engine is stopped - restart it from Household → AI models");
   }

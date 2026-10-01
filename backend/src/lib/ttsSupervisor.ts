@@ -28,6 +28,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { spawnAndWaitHealthy, watchEngine, probeAlive, engineHealthKind, cancelEngineRespawn, type EngineHealth } from "@/lib/sidecars";
 import { hotReloadState } from "@/lib/hotReloadState";
 import { assertNotInCrashBootHold } from "@/lib/dirtyBoot";
+import { isStackRoleEnabled } from "@/lib/stackEngine";
 
 export type TtsBackendKind = "url" | "spawned" | "stub";
 
@@ -181,6 +182,7 @@ async function startTtsBackend(): Promise<TtsBackend> {
  * carries for the same class of bug (a stale rejected promise permanently
  * wedging the role after one transient failure). */
 export async function getTtsClient(): Promise<PocketTtsClient> {
+  if (isStackRoleEnabled("tts") && !process.env.MAIPAI_TTS_URL) throw new Error("voice model unavailable: speech is served by the MaiPai Stack");
   if (state.manuallyStopped) throw new Error("the voice engine is stopped");
   if (state.ttsBackend) return state.ttsBackend.client;
   if (!state.startingPromise) {

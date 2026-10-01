@@ -16,6 +16,7 @@ import { toToolDefinition } from "@/lib/llm";
 import { getEmbedClient, getEmbedLivePid } from "@/lib/embedSupervisor";
 import { getTtsClient, getTtsLivePid } from "@/lib/ttsSupervisor";
 import { getBackgroundLivePid } from "@/lib/backgroundSupervisor";
+import { engineWarmupsForStackRoles } from "@/lib/engineBoot";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, onLeafRenewed, registerRenewFixHandler } from "@/lib/householdCa";
@@ -243,9 +244,10 @@ void startAllSidecars();
 // synchronously with no spawn, no health-timeout wait, and no line in
 // the log below - already "warm" by construction, nothing further to do
 // here.
-void getChatClient().catch((err: unknown) => console.error(`[boot] chat engine warm-up: ${(err as Error).message}`));
-void getEmbedClient().catch((err: unknown) => console.error(`[boot] embed engine warm-up: ${(err as Error).message}`));
-void getTtsClient().catch((err: unknown) => console.error(`[boot] TTS engine warm-up: ${(err as Error).message}`));
+for (const role of engineWarmupsForStackRoles()) {
+  const warmup = role === "chat" ? getChatClient : role === "embed" ? getEmbedClient : getTtsClient;
+  void warmup().catch((err: unknown) => console.error(`[boot] ${role} engine warm-up: ${(err as Error).message}`));
+}
 // Step 5: idle Tier 1 sandbox processes get closed after ten minutes -
 // nothing is running yet at boot (every Deno process starts lazily, on
 // a package's first real call), so this just arms the sweep.
