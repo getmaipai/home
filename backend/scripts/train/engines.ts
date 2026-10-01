@@ -15,12 +15,13 @@
 // engines happen to be doing right now. Every process this file starts,
 // it stops itself.
 import { existsSync } from "node:fs";
+import { createServer } from "node:net";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { embedModelPath, ensureEmbedModel, EMBED_MODEL_FILE, EMBED_MODEL_SHA256, EMBED_MODEL_DIMENSIONS } from "@/lib/embedAssets.js";
 import { backgroundModelPath, ensureBackgroundModel, BACKGROUND_MODEL_FILE, BACKGROUND_MODEL_SHA256 } from "@/lib/backgroundAssets.js";
 import { backgroundLaunchArgs } from "@/lib/backgroundSupervisor.js";
 import { engineBinaryPath } from "@/lib/llmSupervisor.js";
-import { spawnAndWaitHealthy } from "@/lib/sidecars.js";
+import { spawnProcessGroup, terminateProcessGroup } from "./processGroup.js";
 import { detectHardware } from "@/lib/hardware.js";
 
 export { EMBED_MODEL_FILE, EMBED_MODEL_SHA256, EMBED_MODEL_DIMENSIONS, BACKGROUND_MODEL_FILE, BACKGROUND_MODEL_SHA256 };
@@ -31,30 +32,58 @@ export interface EngineHandle {
   stop: () => Promise<void>;
 }
 
-// Dedicated ports, distinct from the hub's own (8788 chat, 8794 embed)
-// and from the emotion-only draft's own training port (18894 embed),
-// so a stray leftover process from any of those can never be mistaken
-// for this run's.
-const TRAINING_CHAT_PORT = Number(process.env.MAIPAI_TRAIN_CHAT_PORT ?? 18788);
-const TRAINING_EMBED_PORT = Number(process.env.MAIPAI_TRAIN_EMBED_PORT ?? 18795);
+const runningEngines = new Map<number, () => Promise<void>>();
+let signalCleanupStarted = false;
+function installSignalCleanup(): void {
+  if (signalCleanupStarted) return;
+  signalCleanupStarted = true;
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      void Promise.allSettled([...runningEngines.values()].map((stop) => stop())).finally(() => {
+        process.exit(signal === "SIGINT" ? 130 : 143);
+      });
+    });
+  }
+}
+
+async function ephemeralPort(): Promise<number> {
+  const server = createServer();
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("could not allocate an ephemeral training engine port");
+  const port = address.port;
+  await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  return port;
+}
 
 async function spawnEngine(opts: { binPath: string; modelPath: string; port: number; extraArgs: string[]; label: string; description: string }): Promise<EngineHandle> {
   const client = new LlamaServerClient(`http://127.0.0.1:${opts.port}`);
-  const proc = await spawnAndWaitHealthy({
-    command: [opts.binPath, "--model", opts.modelPath, "--port", String(opts.port), "--host", "127.0.0.1", ...opts.extraArgs],
-    port: opts.port,
-    healthCheck: () => client.health(),
-    timeoutMs: 120_000,
-    label: opts.label,
-  });
-  return {
-    client,
-    description: opts.description,
-    stop: async () => {
-      proc.kill();
-      await proc.exited;
-    },
+  const proc = spawnProcessGroup([opts.binPath, "--model", opts.modelPath, "--port", String(opts.port), "--host", "127.0.0.1", ...opts.extraArgs]);
+  let stopped = false;
+  const stop = async () => {
+    if (stopped) return;
+    stopped = true;
+    runningEngines.delete(proc.pid);
+    await terminateProcessGroup(proc.pid, proc.exited);
   };
+  runningEngines.set(proc.pid, stop);
+  installSignalCleanup();
+  void proc.exited.finally(() => runningEngines.delete(proc.pid));
+  try {
+    const deadline = Date.now() + 120_000;
+    while (Date.now() < deadline) {
+      if (proc.exitCode !== null) throw new Error(`${opts.label} exited early (code ${proc.exitCode}) before becoming healthy`);
+      if (await client.health()) return { client, description: opts.description, stop };
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    throw new Error(`${opts.label} did not become healthy within 120000ms`);
+  } catch (error) {
+    await stop();
+    throw error;
+  }
 }
 
 /** The embed engine (nomic-embed-text-v1.5), spawned fresh for this run. */
@@ -67,10 +96,10 @@ export async function startEmbedEngine(): Promise<EngineHandle> {
   return spawnEngine({
     binPath,
     modelPath: embedModelPath(),
-    port: TRAINING_EMBED_PORT,
+    port: await ephemeralPort(),
     extraArgs: ["--embedding"],
     label: "llama-server (embed, training-only)",
-    description: `spawned local llama-server --embedding on :${TRAINING_EMBED_PORT}, pinned ${EMBED_MODEL_FILE}, for this run only`,
+    description: `spawned local llama-server --embedding on an ephemeral port, pinned ${EMBED_MODEL_FILE}, for this run only`,
   });
 }
 
@@ -86,16 +115,17 @@ export async function startChatEngine(): Promise<EngineHandle> {
   const hw = await detectHardware();
   const binPath = engineBinaryPath(hw);
   if (!binPath || !existsSync(binPath)) throw new Error("no llama-server engine binary is installed - start the hub once to install one");
-  const fullArgs = backgroundLaunchArgs(binPath, backgroundModelPath(), TRAINING_CHAT_PORT, 0);
+  const port = await ephemeralPort();
+  const fullArgs = backgroundLaunchArgs(binPath, backgroundModelPath(), port, 0);
   // backgroundLaunchArgs returns [binPath, "--model", modelPath, "--port", port, "--host", host, ...flags] -
   // spawnEngine already supplies binPath/model/port/host, so only the flags after them are reused here.
   const flagsOnly = fullArgs.slice(7);
   return spawnEngine({
     binPath,
     modelPath: backgroundModelPath(),
-    port: TRAINING_CHAT_PORT,
+    port,
     extraArgs: flagsOnly,
     label: "llama-server (chat/4B, training-only)",
-    description: `spawned local llama-server on :${TRAINING_CHAT_PORT}, pinned ${BACKGROUND_MODEL_FILE}, for this run only`,
+    description: `spawned local llama-server on an ephemeral port, pinned ${BACKGROUND_MODEL_FILE}, for this run only`,
   });
 }

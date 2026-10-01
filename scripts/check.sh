@@ -238,9 +238,9 @@ if [ "$SCOPE" != "docs" ]; then
 fi
 
 STANDARDS_REPO="${MAIPAI_STANDARDS_DIR:-../.github}"
-STD_TAG="std-v0.3.0"
+STD_TAG="std-v0.3.1"
 if [ ! -x "$STANDARDS_REPO/standards/bin/ensure-tag.sh" ]; then
-  echo "getmaipai/.github is missing at $STANDARDS_REPO or older than std-v0.3.0 (set MAIPAI_STANDARDS_DIR to a checkout that has standards/bin/ensure-tag.sh)"
+  echo "getmaipai/.github is missing at $STANDARDS_REPO or older than std-v0.3.1 (set MAIPAI_STANDARDS_DIR to a checkout that has standards/bin/ensure-tag.sh)"
   exit 1
 fi
 STANDARDS_DIR="$(bash "$STANDARDS_REPO/standards/bin/ensure-tag.sh" "$STD_TAG")"
