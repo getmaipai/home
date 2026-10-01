@@ -2,15 +2,16 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { arch, cpus, totalmem } from "node:os";
 import { performance } from "node:perf_hooks";
-import { parseWav, clipFraction, edgeSilence, compareLine, renderTable, type LineMetrics, type ProofRow } from "./ttsProofMetrics";
+import { parseWav, clipFraction, edgeSilence, voicedSeconds, compareLine, buildControlRow, renderTable, type LineMetrics, type ProofRow } from "./ttsProofMetrics";
 import { TTS_PROOF_LINES } from "./tts-proof-lines";
 
-interface Args { homePort: number; stackUrl: string; voice: string; lines: number; out: string; spawnHome: boolean; keepAudio?: string }
+interface Args { homePort: number; stackUrl: string; voice: string; lines: number; out: string; spawnHome: boolean; control?: "home" | "stack"; keepAudio?: string }
 export function parseArgs(argv: string[]): Args {
   const args: Args = { homePort: 8795, stackUrl: "http://127.0.0.1:8770", voice: "alba", lines: 30, out: "./tts-stack16-d-results.json", spawnHome: false };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i]!;
     if (flag === "--spawn-home") { args.spawnHome = true; continue; }
+    if (flag === "--control") { const value = argv[++i]; if (value !== "home" && value !== "stack") throw new Error("--control must be home or stack"); args.control = value; continue; }
     if (!["--home-port", "--stack-url", "--voice", "--lines", "--out", "--keep-audio"].includes(flag)) throw new Error(`Unknown flag: ${flag}`);
     const value = argv[++i];
     if (!value) throw new Error(`Missing value for ${flag}`);
@@ -56,7 +57,7 @@ async function capture(url: string, text: string, voice: string, side: string, k
   const edges = edgeSilence(wav.samples, wav.sampleRate);
   if (keepAudio) { await mkdir(keepAudio, { recursive: true }); await writeFile(`${keepAudio}/${side}-${crypto.randomUUID()}.wav`, all); }
   const headers = Object.fromEntries([...response.headers.entries()].filter(([key]) => key.startsWith("x-stack-") || key.startsWith("x-maipai-")));
-  return { bytes: all, headers, metrics: { durationSeconds: wav.durationSeconds, clipFraction: clipFraction(wav.samples), ...edges, firstAudioMs } };
+  return { bytes: all, headers, metrics: { durationSeconds: wav.durationSeconds, voicedSeconds: voicedSeconds(wav.durationSeconds, edges.leadingSeconds, edges.trailingSeconds), sampleRate: wav.sampleRate, channels: wav.channels, clipFraction: clipFraction(wav.samples), ...edges, firstAudioMs } };
 }
 
 async function ready(url: string): Promise<boolean> { try { const response = await fetch(url); return response.ok; } catch { return false; } }
@@ -74,13 +75,16 @@ function versionFrom(text: string): string { return text.trim() || "unknown"; }
 async function main(): Promise<void> {
   const args = parseArgs(Bun.argv.slice(2));
   const base = args.stackUrl.replace(/\/$/, "");
-  const roleResponse = await fetch(`${base}/stack/v1/roles`);
-  if (!roleResponse.ok) throw new Error(`Stack roles preflight failed: ${roleResponse.status}`);
-  const roles = await roleResponse.json() as { roles?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
-  const rows = Array.isArray(roles) ? roles : roles.roles ?? [];
-  const tts = rows.find((row) => row.id === "tts");
-  const state = (tts?.state as { state?: string } | undefined)?.state;
-  if (!tts || state === "notInstalled" || !state) { console.error("The Stack's text to speech is not installed. Install it first (the next item does that)."); process.exitCode = 2; return; }
+  let tts: Record<string, unknown> | undefined;
+  if (args.control !== "home") {
+    const roleResponse = await fetch(`${base}/stack/v1/roles`);
+    if (!roleResponse.ok) throw new Error(`Stack roles preflight failed: ${roleResponse.status}`);
+    const roles = await roleResponse.json() as { roles?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
+    const rows = Array.isArray(roles) ? roles : roles.roles ?? [];
+    tts = rows.find((row) => row.id === "tts");
+    const state = (tts?.state as { state?: string } | undefined)?.state;
+    if (!tts || state === "notInstalled" || !state) { console.error("The Stack's text to speech is not installed."); process.exitCode = 2; return; }
+  }
   const pressure = await Bun.$`memory_pressure`.text();
   const match = pressure.match(/System-wide memory free percentage:\s*(\d+(?:\.\d+)?)%/i);
   if (!match) throw new Error("Could not parse System-wide memory free percentage from memory_pressure");
@@ -95,24 +99,40 @@ async function main(): Promise<void> {
       await waitHealthy(homeBase, homeChild);
     }
     const stackSpeech = `${base}/v1/audio/speech`;
-    await capture(`${homeBase}/tts`, "Warm up the voice.", args.voice, "home", args.keepAudio);
-    await capture(stackSpeech, "Warm up the voice.", args.voice, "stack", args.keepAudio);
+    if (args.control === "home") await capture(`${homeBase}/tts`, "Warm up the voice.", args.voice, "home", args.keepAudio);
+    else if (args.control === "stack") await capture(stackSpeech, "Warm up the voice.", args.voice, "stack", args.keepAudio);
+    else {
+      await capture(`${homeBase}/tts`, "Warm up the voice.", args.voice, "home", args.keepAudio);
+      await capture(stackSpeech, "Warm up the voice.", args.voice, "stack", args.keepAudio);
+    }
     const results: ProofRow[] = [];
     for (const [index, text] of TTS_PROOF_LINES.slice(0, args.lines).entries()) {
-      const home = await capture(`${homeBase}/tts`, text, args.voice, "home", args.keepAudio);
-      const stack = await capture(stackSpeech, text, args.voice, "stack", args.keepAudio);
-      const comparison = compareLine(home.metrics, stack.metrics);
-      results.push({ line: index + 1, text, home: home.metrics, stack: stack.metrics, comparison });
+      let home: Awaited<ReturnType<typeof capture>>; let stack: Awaited<ReturnType<typeof capture>>;
+      if (args.control === "home") {
+        home = await capture(`${homeBase}/tts`, text, args.voice, "home", args.keepAudio);
+        stack = await capture(`${homeBase}/tts`, text, args.voice, "home", args.keepAudio);
+      } else if (args.control === "stack") {
+        home = await capture(stackSpeech, text, args.voice, "stack", args.keepAudio);
+        stack = await capture(stackSpeech, text, args.voice, "stack", args.keepAudio);
+      } else {
+        home = await capture(`${homeBase}/tts`, text, args.voice, "home", args.keepAudio);
+        stack = await capture(stackSpeech, text, args.voice, "stack", args.keepAudio);
+      }
+      const row = args.control ? buildControlRow(index + 1, text, home.metrics, stack.metrics) : { line: index + 1, text, home: home.metrics, stack: stack.metrics, comparison: compareLine(home.metrics, stack.metrics) };
+      results.push(row);
       console.log(`line ${index + 1} Home headers: ${JSON.stringify(home.headers)} Stack headers: ${JSON.stringify(stack.headers)}`);
     }
     let stackVersion: unknown = "unknown"; let stackTtsVersion: unknown = "unknown";
-    try { const health = await (await fetch(`${base}/healthz`)).json() as Record<string, unknown>; stackVersion = health.version ?? "unknown"; } catch { /* reported as unknown */ }
-    const roleState = tts as Record<string, unknown>;
-    stackTtsVersion = roleState.engineVersion ?? roleState.version ?? "unknown";
+    if (args.control !== "home") {
+      try { const health = await (await fetch(`${base}/healthz`)).json() as Record<string, unknown>; stackVersion = health.version ?? "unknown"; } catch { /* reported as unknown */ }
+      const roleState = tts!;
+      stackTtsVersion = roleState.engineVersion ?? roleState.version ?? "unknown";
+    }
     let homeVersion = "unknown";
     try { homeVersion = versionFrom((await Bun.$`uvx --offline pocket-tts --version`.text())); } catch { /* no network attempt */ }
-    const output = { versions: { stack: stackVersion, stackPocketTts: stackTtsVersion, homePocketTts: homeVersion }, hardware: { arch: arch(), cpu: cpus()[0]?.model ?? "unknown", totalMemoryGb: Number((totalmem() / 1e9).toFixed(2)) }, rows: results };
+    const output = { control: args.control ? `${args.control} against itself` : null, versions: { stack: stackVersion, stackPocketTts: stackTtsVersion, homePocketTts: homeVersion }, hardware: { arch: arch(), cpu: cpus()[0]?.model ?? "unknown", totalMemoryGb: Number((totalmem() / 1e9).toFixed(2)) }, rows: results };
     await writeFile(args.out, JSON.stringify(output, null, 2));
+    console.log(args.control ? `control: ${args.control} against itself` : "comparison: Home against Stack");
     console.log(renderTable(results));
     const passed = results.every((row) => Object.values(row.comparison).filter((value) => typeof value === "boolean").every(Boolean));
     process.exitCode = passed ? 0 : 1;

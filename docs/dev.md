@@ -1636,6 +1636,14 @@ engine, and an optional directory for WAV files. Audio stays in memory
 unless that directory is supplied. This harness is run by hand and never
 by `check.sh`.
 
+The `--control home` and `--control stack` options speak each line twice
+through the same engine, then compare the first and second render. Home's
+control needs a running Home engine or `--spawn-home` and does not contact
+the Stack. Each side records its sample rate, channel count, total seconds,
+voiced seconds after edge silence, and first audio time. The comparison
+reports total and voiced duration ratios and their range, percentiles, and
+counts within 5, 8, and 12 percent of an even match.
+
 #### Text to speech, laptop dry run, 2026-10-01
 
 Hardware: Apple M4 Pro, 26 GB unified memory (arm64).

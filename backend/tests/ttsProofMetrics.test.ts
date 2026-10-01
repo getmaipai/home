@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { TTS_PROOF_LINES } from "../scripts/bench/tts-proof-lines";
-import { clipFraction, compareLine, edgeSilence, parseWav, renderTable, summarize, type LineMetrics, type ProofRow } from "../scripts/bench/ttsProofMetrics";
+import { buildControlRow, clipFraction, compareLine, edgeSilence, parseWav, percentile, renderTable, summarize, voicedSeconds, type LineMetrics, type ProofRow } from "../scripts/bench/ttsProofMetrics";
 import { parseArgs } from "../scripts/bench/tts-stack16-d";
 
 function wav(values: number[], format: "pcm" | "float" = "pcm", riffSize = 36 + values.length * (format === "pcm" ? 2 : 4), dataSize = values.length * (format === "pcm" ? 2 : 4)): Uint8Array {
@@ -10,7 +10,7 @@ function wav(values: number[], format: "pcm" | "float" = "pcm", riffSize = 36 + 
   values.forEach((value, index) => format === "pcm" ? view.setInt16(44 + index * 2, Math.round(value * 32767), true) : view.setFloat32(44 + index * 4, value, true));
   return bytes;
 }
-const good: LineMetrics = { durationSeconds: 1, clipFraction: 0, leadingSeconds: 0.1, trailingSeconds: 0.1, firstAudioMs: 100 };
+const good: LineMetrics = { durationSeconds: 1, voicedSeconds: 0.8, sampleRate: 24_000, channels: 1, clipFraction: 0, leadingSeconds: 0.1, trailingSeconds: 0.1, firstAudioMs: 100 };
 const row = (comparison = compareLine(good, good)): ProofRow => ({ line: 1, text: "The garden looks bright today.", home: good, stack: good, comparison });
 
 describe("TTS proof metrics", () => {
@@ -26,6 +26,9 @@ describe("TTS proof metrics", () => {
   test("rejects garbage bytes with a clear error", () => { expect(() => parseWav(new Uint8Array([1, 2, 3]))).toThrow("Unsupported or invalid WAV"); });
   test("counts clipped samples", () => { expect(clipFraction(new Float32Array([0, 0.999, -1, 0.5]))).toBe(0.5); });
   test("measures one second of leading silence", () => { expect(edgeSilence(new Float32Array([0, 0, 0.4, 0.4]), 2).leadingSeconds).toBe(1); });
+  test("calculates voiced seconds and floors negative values at zero", () => { expect(voicedSeconds(1, 0.1, 0.2)).toBeCloseTo(0.7); expect(voicedSeconds(0.2, 0.3, 0.4)).toBe(0); });
+  test("builds a control row with the two renders in the comparison columns", () => { const second = { ...good, voicedSeconds: 0.76 }; const control = buildControlRow(2, "A short line.", good, second); expect(control.home).toBe(good); expect(control.stack).toBe(second); expect(control.comparison.voicedRatio).toBeCloseTo(0.95); });
+  test("interpolates percentiles for known sorted values", () => { expect(percentile([1, 2, 3, 4, 5], 0.05)).toBeCloseTo(1.2); expect(percentile([1, 2, 3, 4, 5], 0.95)).toBeCloseTo(4.8); });
   test("all four checks pass on a matched pair", () => { expect(Object.values(compareLine(good, good)).filter((value) => typeof value === "boolean").every(Boolean)).toBe(true); });
   test("duration check fails alone", () => { const c = compareLine(good, { ...good, durationSeconds: 1.1 }); expect(c.durationOk).toBe(false); expect(c.clipOk && c.silenceOk && c.firstAudioOk).toBe(true); });
   test("clip check fails alone", () => { const c = compareLine(good, { ...good, clipFraction: 0.001 }); expect(c.clipOk).toBe(false); expect(c.durationOk && c.silenceOk && c.firstAudioOk).toBe(true); });
@@ -33,6 +36,7 @@ describe("TTS proof metrics", () => {
   test("first audio check fails alone", () => { const c = compareLine(good, { ...good, firstAudioMs: 126 }); expect(c.firstAudioOk).toBe(false); expect(c.durationOk && c.clipOk && c.silenceOk).toBe(true); });
   test("summarizes check counts and ratios", () => { const summary = summarize([row(), row(compareLine(good, { ...good, durationSeconds: 1.1 }))]); expect(summary.counts.durationOk).toEqual({ ok: 1, notOk: 1 }); expect(summary.durationRatio.median).toBe(1.05); expect(summary.passed).toBe(false); });
   test("renders stable plain text without em dash", () => { const rendered = renderTable([row()]); expect(rendered).toContain("Summary: PASS"); expect(rendered).toContain("duration median"); expect(rendered).not.toContain("—"); });
+  test("prints the ratio distributions", () => { const rendered = renderTable([row()]); expect(rendered).toContain("durationRatio min 1.000, p05 1.000, median 1.000, p95 1.000, max 1.000; within 5/8/12% 1/1/1"); expect(rendered).toContain("voicedRatio min 1.000"); });
   test("has thirty unique, non-empty lines in the requested word bands", () => {
     expect(TTS_PROOF_LINES).toHaveLength(30); expect(new Set(TTS_PROOF_LINES).size).toBe(30); expect(TTS_PROOF_LINES.every((line) => line.trim().length > 0)).toBe(true);
     const lengths = TTS_PROOF_LINES.map((line) => line.trim().split(/\s+/).length);
@@ -42,4 +46,5 @@ describe("TTS proof metrics", () => {
   });
   test("argument parser defaults ports, voice, lines and output", () => { expect(parseArgs([])).toEqual({ homePort: 8795, stackUrl: "http://127.0.0.1:8770", voice: "alba", lines: 30, out: "./tts-stack16-d-results.json", spawnHome: false }); });
   test("argument parser rejects unknown flags", () => { expect(() => parseArgs(["--unknown"])).toThrow("Unknown flag"); });
+  test("argument parser accepts Home and Stack controls", () => { expect(parseArgs(["--control", "home"]).control).toBe("home"); expect(parseArgs(["--control", "stack"]).control).toBe("stack"); expect(() => parseArgs(["--control", "other"])).toThrow("--control must be home or stack"); });
 });
