@@ -89,19 +89,14 @@ export const backupDir = classDir("backups");
 // apart from the directory-vs-file cleanup hazard.
 export const receivedBackupsDir = classDir("received-backups");
 
-// Downloaded GGUF weights and llama-server engine binaries (4.11's
-// deferred download-job queue): both real household data in the sense
-// that a household chose and paid bandwidth/disk for them, but neither is
-// ever synced, backed up, or read by anything except the engine
-// supervisor, so they get their own subdirectories under data/ rather
-// than crowding hub.db's world. `MAIPAI_DATA_DIR` already covers test
-// isolation for both (they resolve from dataDir, not a separate env var).
+// Reserved paths for the former Home chat downloader and supervisor.
+// They stay declared until STACK16-G-chat removes the dead importers, but
+// Home no longer downloads or runs chat files there.
 export const modelsDir = classDir("models");
 export const enginesDir = classDir("engines");
 
 // KIWIX-SIDECAR-01: the kiwix-tools binary (kiwix-serve/kiwix-manage),
-// same shape as enginesDir above - a pinned, re-fetchable download, not
-// household data - but deliberately NOT a subdirectory of enginesDir
+// Kiwix is a pinned download, not household data, and stays outside the retired engines path.
 // itself: llmSupervisor.ts's sweepOrphanEngineProcesses() does a plain
 // substring match on every process's command line against enginesDir
 // on every boot AND every `bun --hot` reload (Fix A2, 2026-09-07's

@@ -2,7 +2,7 @@ import { describe, expect, test, mock, afterEach, beforeEach } from "bun:test";
 import { render, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { SetupWizard } from "@/apps/setup/SetupWizard";
-import type { HardwareInfo, ModelFit } from "@/lib/api";
+import type { HardwareInfo } from "@/lib/api";
 import { waitForGone } from "../../../tests/waitForGone";
 
 afterEach(cleanup);
@@ -56,23 +56,6 @@ const HARDWARE: HardwareInfo = {
   cudaDevices: [],
   osVersion: "test",
 };
-
-const MODEL_FITS: ModelFit[] = [
-  {
-    model: {
-      id: "small-chat",
-      role: "chat",
-      label: "Small Chat Model",
-      license: "apache-2.0",
-      engine: "llama-server",
-      implemented: true,
-      sizing: { paramsB: 3, quant: "q4_k_m", diskBytes: 2_000_000_000, ramBytes: 3_000_000_000 },
-    } as ModelFit["model"],
-    fits: true,
-    requiredBytes: 3_000_000_000,
-    budgetBytes: 12_000_000_000,
-  },
-];
 
 async function goToOwnerStep(rendered: ReturnType<typeof render>) {
   await rendered.findByRole("heading", { name: "Household" });
@@ -209,101 +192,37 @@ describe("SetupWizard", () => {
     expect(rendered.getByRole("heading", { name: "Hardware" })).toBeTruthy();
   });
 
-  test("the hardware step loads real detection data and requires a model pick before continuing", async () => {
+  test("the hardware step shows Stack chat state without offering a Home model picker", async () => {
     sessionStorage.setItem("maipai:setup-wizard-step", "3");
     const restore = stubFetch({
-      // Most specific first: `stubFetch` matches by substring in
-      // insertion order, and "/api/host/models" is itself a prefix of
-      // both of the more specific paths below - listed after them, it
-      // would swallow their requests too (a real bug found live in this
-      // exact test the first time it was written).
-      "/api/host/models/selection": { modelId: null },
-      // The real select route returns a job, not an instant success (a
-      // code review finding); "ready" here simulates a model whose
-      // files are already fully cached, the same already-ready path
-      // ModelsSection.tsx's own tests cover.
-      "/api/host/models/small-chat/select": { modelId: "small-chat", status: "ready", phase: "", completedBytes: 0, totalBytes: 0, error: null, postLoadCheck: null },
+      "/api/host/models/selection": { modelId: "stack-model", name: "Stack Chat Model", state: "ready" },
       "/api/host/hardware": HARDWARE,
-      "/api/host/models": MODEL_FITS,
     });
     try {
       const rendered = renderWizard();
       await rendered.findByText(/Apple Silicon/);
-      const continueButton = rendered.getByRole("button", { name: "Continue" });
-      expect(continueButton.hasAttribute("disabled")).toBe(true);
-
-      await act(async () => {
-        fireEvent.click(rendered.getByText("Small Chat Model"));
-      });
-      await waitFor(() => expect(rendered.getByText("Selected")).toBeTruthy());
-      expect(continueButton.hasAttribute("disabled")).toBe(false);
-      // Found live 2026-09-06: an already-selected model's own button
-      // wasn't disabled, so clicking it again fired a redundant re-select
-      // job whose early phases have no byte count yet - all a household
-      // member saw was a second, wordless spinner appear from nowhere.
-      const modelButton = rendered.getByText("Small Chat Model").closest("button");
-      expect(modelButton?.hasAttribute("disabled")).toBe(true);
+      expect(await rendered.findByText("Stack Chat Model")).toBeTruthy();
+      expect(rendered.getByText(/Chat models are managed through the MaiPai Stack/)).toBeTruthy();
+      expect(rendered.getByText(/Chat state: ready/)).toBeTruthy();
+      expect(rendered.queryByRole("button", { name: "Small Chat Model" })).toBeNull();
+      expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false);
     } finally {
       restore();
     }
   });
 
-  // Found live 2026-09-06: a real model download sat at a static "Setting
-  // up…" with no phase or percentage, indistinguishable from a genuinely
-  // stuck job - the backend already tracks a human phase and a real byte
-  // count (ModelsSection.tsx's own settings-page card already shows
-  // both), this step just never read either.
-  test("a real download job shows its phase and byte progress, not a static 'Setting up…'", async () => {
+  test("the hardware step reports when Stack chat is offline", async () => {
     sessionStorage.setItem("maipai:setup-wizard-step", "3");
     const restore = stubFetch({
-      "/api/host/models/selection": { modelId: null },
-      "/api/host/models/small-chat/select": {
-        modelId: "small-chat",
-        status: "downloading_model",
-        phase: "downloading model weights",
-        completedBytes: 1024 * 1024 * 1024,
-        totalBytes: 2 * 1024 * 1024 * 1024,
-        error: null,
-        postLoadCheck: null,
-      },
+      "/api/host/models/selection": { modelId: null, name: null, state: "offline" },
       "/api/host/hardware": HARDWARE,
-      "/api/host/models": MODEL_FITS,
     });
     try {
       const rendered = renderWizard();
       await rendered.findByText(/Apple Silicon/);
-      const continueButton = rendered.getByRole("button", { name: "Continue" });
-      await act(async () => {
-        fireEvent.click(rendered.getByText("Small Chat Model"));
-      });
-      await waitFor(() => expect(rendered.getByText("Downloading the model…")).toBeTruthy());
-      expect(rendered.queryByText("Setting up…")).toBeNull();
-      expect(rendered.getByText(/1 GB of 2 GB/)).toBeTruthy();
-      // Jesse, 2026-09-06: picking a model shouldn't force a wait on this
-      // screen for the whole download/verify/load/test cycle - the job
-      // keeps running on the server regardless of which step the wizard
-      // is on, so Continue only needs a job in progress, not "ready".
-      expect(continueButton.hasAttribute("disabled")).toBe(false);
-    } finally {
-      restore();
-    }
-  });
-
-  test("a hardware fit list with nothing that fits offers Skip instead of trapping the household", async () => {
-    sessionStorage.setItem("maipai:setup-wizard-step", "3");
-    const restore = stubFetch({
-      "/api/host/models/selection": { modelId: null },
-      "/api/host/hardware": HARDWARE,
-      "/api/host/models": [{ ...MODEL_FITS[0], fits: false }],
-    });
-    try {
-      const rendered = renderWizard();
-      await rendered.findByText(/no model in the default set fits/i);
-      expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
-      await act(async () => {
-        fireEvent.click(rendered.getByRole("button", { name: "Skip - choose a model later" }));
-      });
-      expect(rendered.getByRole("heading", { name: "Trust this hub" })).toBeTruthy();
+      expect(await rendered.findByText("No chat model is currently selected in the MaiPai Stack")).toBeTruthy();
+      expect(rendered.getByText(/Chat state: offline/)).toBeTruthy();
+      expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false);
     } finally {
       restore();
     }

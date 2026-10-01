@@ -1,20 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
-import { restartChatAndWait } from "@/routes/host";
-import { stopChatBackend } from "@/lib/llmSupervisor";
 
 const RoleSchema = z.enum(["chat"]).openapi({ param: { name: "role", in: "path" } });
 const RestartResponseSchema = z.object({ role: RoleSchema, restarted: z.literal(true) });
-
-type Action = "restart" | "stop" | "start";
-type Actions = Record<"chat", Record<Action, () => Promise<void>>>;
-let testActions: Actions | null = null;
-export function __setEngineRoleActionsForTests(actions: Actions | null): void { testActions = actions; }
-
-const actions: Actions = {
-  chat: { restart: restartChatAndWait, stop: stopChatBackend, start: restartChatAndWait },
-};
 
 const restartRoute = createRoute({
   method: "post",
@@ -25,7 +14,7 @@ const restartRoute = createRoute({
   request: { params: z.object({ role: RoleSchema }) },
   responses: {
     200: { content: { "application/json": { schema: RestartResponseSchema } }, description: "The engine restart was requested." },
-    ...errorResponses({ 400: "Unknown engine role", 401: "Not signed in", 403: "Not owner/admin", 503: "The engine did not return in time" }),
+    ...errorResponses({ 400: "Unknown engine role", 401: "Not signed in", 403: "Not owner/admin", 409: "Model changes are made through the MaiPai Stack." }),
   },
 });
 
@@ -35,7 +24,7 @@ const stopRoute = createRoute({
   request: { params: z.object({ role: RoleSchema }) },
   responses: {
     200: { content: { "application/json": { schema: z.object({ role: RoleSchema, stopped: z.literal(true) }) } }, description: "The engine was stopped." },
-    ...errorResponses({ 400: "Unknown engine role", 401: "Not signed in", 403: "Not owner/admin", 503: "The engine could not be stopped" }),
+    ...errorResponses({ 400: "Unknown engine role", 401: "Not signed in", 403: "Not owner/admin", 409: "Model changes are made through the MaiPai Stack." }),
   },
 });
 
@@ -45,31 +34,19 @@ const startRoute = createRoute({
   request: { params: z.object({ role: RoleSchema }) },
   responses: {
     200: { content: { "application/json": { schema: z.object({ role: RoleSchema, started: z.literal(true) }) } }, description: "The engine was started." },
-    ...errorResponses({ 400: "Unknown engine role", 401: "Not signed in", 403: "Not owner/admin", 503: "The engine did not start" }),
+    ...errorResponses({ 400: "Unknown engine role", 401: "Not signed in", 403: "Not owner/admin", 409: "Model changes are made through the MaiPai Stack." }),
   },
 });
 
 export const engineRolesRoutes = apiRouter();
 engineRolesRoutes.openapi(restartRoute, async (c) => {
-  const { role } = c.req.valid("param");
-  try {
-    await (testActions ?? actions)[role].restart();
-  } catch (err) {
-    return c.json({ error: (err as Error).message }, 503);
-  }
-  return c.json({ role, restarted: true as const }, 200);
+  return c.json({ error: "Model changes are made through the MaiPai Stack." }, 409);
 });
 
 engineRolesRoutes.openapi(stopRoute, async (c) => {
-  const { role } = c.req.valid("param");
-  try { await (testActions ?? actions)[role].stop(); }
-  catch (err) { return c.json({ error: (err as Error).message }, 503); }
-  return c.json({ role, stopped: true as const }, 200);
+  return c.json({ error: "Model changes are made through the MaiPai Stack." }, 409);
 });
 
 engineRolesRoutes.openapi(startRoute, async (c) => {
-  const { role } = c.req.valid("param");
-  try { await (testActions ?? actions)[role].start(); }
-  catch (err) { return c.json({ error: (err as Error).message }, 503); }
-  return c.json({ role, started: true as const }, 200);
+  return c.json({ error: "Model changes are made through the MaiPai Stack." }, 409);
 });

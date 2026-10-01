@@ -1,7 +1,6 @@
 import { describe, test, expect, mock, afterEach } from "bun:test";
 import { render, cleanup, fireEvent, act } from "@testing-library/react";
-import { ModelsSection, formatEta } from "@/apps/settings/ModelsSection";
-import { waitForGone } from "../../../tests/waitForGone";
+import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { api, type FitPlanResponse } from "@/lib/api";
 import { __resetFitPlanCacheForTests } from "@/lib/useFitPlan";
 import { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
@@ -86,29 +85,14 @@ function chatFit(overrides: Partial<{ fits: boolean; implemented: boolean; url: 
   };
 }
 
-const NO_SELECTION = { modelId: null };
+const NO_SELECTION = { modelId: null, name: null, state: "offline" };
 const NO_ENGINE = { kind: "none", modelId: null, pid: null, startedAt: null };
-const RUNNING_ENGINE = { kind: "selection", modelId: "qwen3-8b-instruct-q4-k-m", pid: 4242, startedAt: "2026-09-04T10:00:00.000Z" };
 const testPlan = (verdict: "yes" | "no" | "slow" | "unknown") => StackFitPlan.parse({ schema: 1, model: "example", context_tokens: 8192, kv_cache_type: "f16", roles: [{ role: "chat", choice: "q4", peak: { low: 4 * 1024 ** 3, high: 5 * 1024 ** 3, source: "estimated", as_of: "2026-09-30" } }], total: { low: 5 * 1024 ** 3, high: 9 * 1024 ** 3, source: "estimated", as_of: "2026-09-30" }, cap: { low: 23 * 1024 ** 3, high: 24 * 1024 ** 3, source: "measured", as_of: "2026-09-30" }, margin: { low: 14 * 1024 ** 3, high: 19 * 1024 ** 3, source: "measured", as_of: "2026-09-30" }, paths: [{ path: "unified", fits: verdict === "yes", verdict: verdict === "slow" ? "no" : verdict, ...(verdict === "no" ? { shortfall: { low: 5 * 1024 ** 3, high: 6 * 1024 ** 3, source: "estimated", as_of: "2026-09-30" } } : {}) }], verdict, bottleneck: verdict === "unknown" ? "unknown" : "memory" });
 const FIT_YES = { plan: testPlan("yes"), wording: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of the 24 GB this computer can give to models." } };
 const FIT_NO = { plan: testPlan("no"), wording: { verdict: "no", headline: "Won't fit", detail: "Needs about 6 GB more memory." } };
 const FIT_UNKNOWN = { plan: testPlan("unknown"), wording: { verdict: "unknown", headline: "Can't tell yet", detail: "Nobody has measured a model like this on a computer like yours yet." } };
 const FIT_UNAVAILABLE = { plan: null, wording: { verdict: "unknown", headline: "Can't check right now", detail: "The model size checker did not answer. Try again in a moment." } };
 const GGUF_LINK = "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf";
-
-describe("formatEta", () => {
-  test("under 90 seconds reads as 'less than a minute'", () => {
-    expect(formatEta(45)).toBe("less than a minute left");
-  });
-  test("minutes are rounded and pluralized correctly", () => {
-    expect(formatEta(120)).toBe("about 2 minutes left");
-    expect(formatEta(185)).toBe("about 3 minutes left");
-  });
-  test("an hour or more switches to hours", () => {
-    expect(formatEta(3600)).toBe("about 1 hour left");
-    expect(formatEta(7200)).toBe("about 2 hours left");
-  });
-});
 
 describe("ModelsSection", () => {
   const baseResponses = {
@@ -133,7 +117,7 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
     try {
       const { findByRole, getByRole, findByText } = render(<ModelsSection />);
-      await findByText("Use this");
+      await findByText("Chat runs through the MaiPai Stack.");
       const input = await findByRole("textbox", { name: "Hugging Face model link" });
       fireEvent.change(input, { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
@@ -166,7 +150,7 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlanResponder(baseResponses, () => FIT_YES);
     try {
       const { findByText } = render(<ModelsSection />);
-      await findByText("Use this");
+      await findByText("Chat runs through the MaiPai Stack.");
       expect(document.querySelector('[data-slot="compare-models"]')).toBeNull();
     } finally { restore(); }
   });
@@ -305,7 +289,7 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES);
     try {
       const { findByText, getByText } = render(<ModelsSection />);
-      await findByText("Use this");
+      await findByText("Chat runs through the MaiPai Stack.");
       fireEvent.click(getByText("Details"));
       await findByText("Memory it needs");
       await findByText("about 5 to 9 GB");
@@ -316,7 +300,7 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_NO);
     try {
       const { findByText, getByText } = render(<ModelsSection />);
-      await findByText("Use this");
+      await findByText("Chat runs through the MaiPai Stack.");
       fireEvent.click(getByText("Details"));
       await findByText("It needs about 6 GB more memory. A smaller version of this model, or a shorter conversation memory, would help.");
       expect(document.querySelector('[data-slot="recommendation-card"]')).toBeNull();
@@ -328,7 +312,7 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNAVAILABLE);
     try {
       const { findByText, getByText, queryByText } = render(<ModelsSection />);
-      await findByText("Use this");
+      await findByText("Chat runs through the MaiPai Stack.");
       fireEvent.click(getByText("Details"));
       await findByText(/Uses about .* of memory\./);
       expect(queryByText("Memory it needs")).toBeNull();
@@ -416,70 +400,27 @@ describe("ModelsSection", () => {
     }
   });
 
-  test("a model nobody has chosen yet offers a 'Use this' action, with details tucked behind a toggle", async () => {
+  test("shows the Stack chat model and state without Home model controls", async () => {
     const restore = stubFetch({
       "/api/host/hardware": HARDWARE,
-      "role=chat": [chatFit({ fits: true })],
+      "role=chat": [chatFit()],
       "role=image": [],
       "role=video": [],
-      "/models/selection": NO_SELECTION,
+      "/models/selection": { modelId: "stack-chat-model", name: "Stack Chat Model", state: "ready" },
       "/engine/status": NO_ENGINE,
     });
     try {
-      const { findByText, getByText, queryByText } = render(<ModelsSection />);
-      await findByText("Use this");
-      // The pros/cons dump is real (Jesse, 2026-09-04: the old flat list
-      // was "ugly and too technical for a dad"), just not shown until asked.
-      expect(queryByText(/Runs well on a single 8GB GPU/)).toBeNull();
-      await act(async () => {
-        fireEvent.click(getByText("Details"));
-      });
-      await findByText(/Runs well on a single 8GB GPU/);
-    } finally {
-      restore();
-    }
+      const { findByText, queryByRole } = render(<ModelsSection />);
+      await findByText("Stack Chat Model");
+      await findByText("Ready");
+      await findByText("Chat runs through the MaiPai Stack.");
+      for (const action of ["Use this", "Restart", "Stop", "Other options"]) expect(queryByRole("button", { name: action })).toBeNull();
+      expect(queryByRole("button", { name: "Details" })).toBeTruthy();
+    } finally { restore(); }
   });
 
-  test("the already-selected model shows as Running, not as another 'Use this' offer", async () => {
-    const restore = stubFetch({
-      "/api/host/hardware": HARDWARE,
-      "role=chat": [chatFit({ fits: true })],
-      "role=image": [],
-      "role=video": [],
-      "/models/selection": { modelId: "qwen3-8b-instruct-q4-k-m" },
-      "/engine/status": RUNNING_ENGINE,
-    });
-    try {
-      const { findByText, queryByText } = render(<ModelsSection />);
-      await findByText("Running");
-      expect(queryByText("Use this")).toBeNull();
-    } finally {
-      restore();
-    }
-  });
 
-  test("a running model offers Stop/Restart, and Stop calls the real engine-control endpoint", async () => {
-    const restore = stubFetch({
-      "/api/host/hardware": HARDWARE,
-      "role=chat": [chatFit({ fits: true })],
-      "role=image": [],
-      "role=video": [],
-      "/models/selection": { modelId: "qwen3-8b-instruct-q4-k-m" },
-      "/engine/status": RUNNING_ENGINE,
-      "/engine/stop": { kind: "stopped", modelId: "qwen3-8b-instruct-q4-k-m", pid: null, startedAt: null },
-    });
-    try {
-      const { findByText, getByText } = render(<ModelsSection />);
-      await findByText("Running");
-      await findByText("Stop");
-      await act(async () => {
-        fireEvent.click(getByText("Stop"));
-      });
-      await findByText("Stopped");
-    } finally {
-      restore();
-    }
-  });
+
 
   // Found live 2026-09-06: "starting" had no way out - just a bare
   // spinner, no button - so a household member watching a hung spawn
@@ -487,49 +428,7 @@ describe("ModelsSection", () => {
   // had no recourse but to wait indefinitely. Stop is safe to offer here:
   // stopChatBackend() unconditionally clears the in-flight promise, the
   // same way it stops an already-running one.
-  test("a stuck 'starting' state still offers Stop, not just a bare spinner", async () => {
-    const restore = stubFetch({
-      "/api/host/hardware": HARDWARE,
-      "role=chat": [chatFit({ fits: true })],
-      "role=image": [],
-      "role=video": [],
-      "/models/selection": { modelId: "qwen3-8b-instruct-q4-k-m" },
-      "/engine/status": { kind: "starting", modelId: null, pid: null, startedAt: null },
-      "/engine/stop": { kind: "stopped", modelId: "qwen3-8b-instruct-q4-k-m", pid: null, startedAt: null },
-    });
-    try {
-      // "Starting…" legitimately appears twice (a status badge above,
-      // the spinner's own label below) - findAllByText, not findByText,
-      // avoids the ambiguous-match error that shape causes.
-      const { findAllByText, findByText, getByText } = render(<ModelsSection />);
-      await findAllByText("Starting…");
-      await findByText("Stop");
-      await act(async () => {
-        fireEvent.click(getByText("Stop"));
-      });
-      await findByText("Stopped");
-    } finally {
-      restore();
-    }
-  });
 
-  test("a stalled start names the problem and offers a retry", async () => {
-    const restore = stubFetch({
-      "/api/host/hardware": HARDWARE,
-      "role=chat": [chatFit({ fits: true })],
-      "role=image": [],
-      "role=video": [],
-      "/models/selection": { modelId: "qwen3-8b-instruct-q4-k-m" },
-      "/engine/status": { kind: "stalled", modelId: null, pid: null, startedAt: null },
-    });
-    try {
-      const { findByText } = render(<ModelsSection />);
-      await findByText("Start is stuck");
-      await findByText("Retry start");
-    } finally {
-      restore();
-    }
-  });
 
   test("a planned role (image/video) with no real backend yet is one honest line, not a pros/cons dump", async () => {
     const restore = stubFetch({
@@ -549,80 +448,12 @@ describe("ModelsSection", () => {
     }
   });
 
-  test("choosing a model starts the download job and shows its progress", async () => {
-    const restore = stubFetch({
-      "/api/host/hardware": HARDWARE,
-      "role=chat": [chatFit({ fits: true })],
-      "role=image": [],
-      "role=video": [],
-      "/models/selection": NO_SELECTION,
-      "/engine/status": NO_ENGINE,
-      "/select-status": {
-        modelId: "qwen3-8b-instruct-q4-k-m",
-        status: "downloading_model",
-        phase: "downloading model weights",
-        completedBytes: 1_000_000_000,
-        totalBytes: 5_000_000_000,
-        error: null,
-        postLoadCheck: null,
-      },
-      "/select": {
-        modelId: "qwen3-8b-instruct-q4-k-m",
-        status: "downloading_model",
-        phase: "downloading model weights",
-        completedBytes: 1_000_000_000,
-        totalBytes: 5_000_000_000,
-        error: null,
-        postLoadCheck: null,
-      },
-    });
-    try {
-      const { findByText, getByText } = render(<ModelsSection />);
-      await findByText("Use this");
-      await act(async () => {
-        fireEvent.click(getByText("Use this"));
-      });
-      await findByText("Downloading the model…");
-    } finally {
-      restore();
-    }
-  });
 
   // A code review (2026-09-04) found the job object was never cleared
   // once it reached "ready": activeJob stayed truthy forever, which kept
   // isSelected false and left the card permanently stuck on the last
   // progress bar instead of showing Running/Stop/Restart, until a full
   // page reload dropped the stale job state.
-  test("a job that reaches ready stops showing progress UI (doesn't get stuck)", async () => {
-    const restore = stubFetch({
-      "/api/host/hardware": HARDWARE,
-      "role=chat": [chatFit({ fits: true })],
-      "role=image": [],
-      "role=video": [],
-      "/models/selection": NO_SELECTION,
-      "/engine/status": NO_ENGINE,
-      "/select": {
-        modelId: "qwen3-8b-instruct-q4-k-m",
-        status: "ready",
-        phase: "ready",
-        completedBytes: 5_000_000_000,
-        totalBytes: 5_000_000_000,
-        error: null,
-        postLoadCheck: { estimatedBytes: 6_900_000_000, actualBytes: 7_700_000_000, driftPct: 0.11 },
-      },
-    });
-    try {
-      const { findByText, getByText, queryByText } = render(<ModelsSection />);
-      await findByText("Use this");
-      await act(async () => {
-        fireEvent.click(getByText("Use this"));
-      });
-      await waitForGone(() => queryByText("Use this"));
-      expect(queryByText("Downloading the model…")).toBeNull();
-    } finally {
-      restore();
-    }
-  });
 
   test("the Stack verdict replaces both legacy lines and sends the pinned URL and context", async () => {
     const fit = chatFit({ fits: false });
@@ -677,7 +508,7 @@ describe("ModelsSection", () => {
     const fitPlan = mock(() => Promise.reject(new Error("unused")));
     api.fitPlan = fitPlan as typeof api.fitPlan;
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit({ url: "https://example.invalid/model.gguf" })], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE });
-    try { const { findByText } = render(<ModelsSection />); await findByText("Use this"); expect(fitPlan).not.toHaveBeenCalled(); }
+    try { const { findByText } = render(<ModelsSection />); await findByText("Chat runs through the MaiPai Stack."); expect(fitPlan).not.toHaveBeenCalled(); }
     finally { restore(); api.fitPlan = original; }
   });
 

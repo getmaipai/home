@@ -7829,8 +7829,8 @@
               }
             }
           },
-          "503": {
-            "description": "The engine did not return in time",
+          "409": {
+            "description": "Model changes are made through the MaiPai Stack.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7920,8 +7920,8 @@
               }
             }
           },
-          "503": {
-            "description": "The engine could not be stopped",
+          "409": {
+            "description": "Model changes are made through the MaiPai Stack.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8011,8 +8011,8 @@
               }
             }
           },
-          "503": {
-            "description": "The engine did not start",
+          "409": {
+            "description": "Model changes are made through the MaiPai Stack.",
             "content": {
               "application/json": {
                 "schema": {

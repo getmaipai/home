@@ -232,7 +232,7 @@ timers.
 
 ## ENGINE-AVAIL-02 (first half)
 
-`beginTurn()` in `backend/src/lib/turnMachine/turnNext.ts` refuses a turn before resolving or creating a conversation when the locally supervised chat AI is stopped, blocked by a foreign process on its port, or has exhausted automatic restarts. The synchronous check runs before any tool or turn storage, so the failure returns as a 503 status instead of being saved as assistant reply text. Explicit `MAIPAI_LLAMA_SERVER_URL` and configured Stack routes skip the local check, while an engine that has not started remains eligible to start on demand. The chat adapter shows “MaiPai's AI isn't running right now. Try again in a moment.” A blocked-port refusal checks whether the recorded process still exists and clears the stale marker if it has exited. Each refusal also nudges a background supervisor retry, throttled to once every 30 seconds, unless an admin intentionally stopped the engine.
+Chat turns require the MaiPai Stack. Home no longer checks a local chat engine or starts one on demand. If the Stack is not configured or its chat role is unavailable, the turn returns an unavailable response before creating turn records.
 
 ## ENGINE-AVAIL-02c
 
@@ -34038,7 +34038,7 @@ On 2026-09-29, `bun stop` terminated the hub immediately while the chat, embeddi
 
 ## ENGINE-AVAIL-04c
 
-At the time of this incident, Home owned the chat, voice, embedding and background engine ports. Home now starts only chat itself. Embedding and background judge requests run through the configured Stack, and Home no longer starts or downloads those engines. The chat supervisor still checks its port before starting and reports a blocked port through Health and Repairs.
+At the time of this incident, Home owned the chat, voice, embedding and background engine ports. Home now runs text to speech, speech to text recognition, search, the background worker and chat through the MaiPai Stack. Home keeps the small Silero voice activity model for streaming speech until the Stack serves a streaming transcription session. Home cannot start or download a chat model in any state. Health reads the chat role from the Stack, while the old chat supervisor remains unreachable until STACK16-G-chat deletes it and its importers.
 
 Jesse decided that any non-Home process holding an engine port may be killed without asking. The coordinator dropped per-role lock files: the hub already has a single-instance lock, 04b now stops its engines on exit, and the port reap handles stragglers. `freePort()` still throws `ForeignPortHolderError` when a holder remains alive after both signals or signaling is denied. The port is marked blocked so the availability and Repair paths continue to report it. Identity changes and processes that disappear during the scan are not signaled.
 
@@ -34046,15 +34046,15 @@ The blocked-port Repair test now injects EPERM for its listener, because an ordi
 
 ## ENGINE-AVAIL-04d
 
-While chat availability is `unavailable/blocked_port`, the supervisor retries port recovery every 30 seconds. A successful engine start resolves the blocked-port Repair and clears the timer; an explicit stop or restart also clears it. If identity-checked signaling is denied, the Repair offers "Stop it and start MaiPai's AI" and shows the holder pid, command and age. The fix re-reads process facts immediately before signaling and refuses if the pid now names a different process, then starts chat and lets the normal healthy-start path resolve the issue. Non-admins cannot run the Repairs fix route. Port logs say whether the holder was reaped, already gone, changed identity, or could not be reaped.
+This was the former Home-owned chat recovery path. HOME-SEAL-CHAT disables it because Home no longer starts, stops or restarts a chat engine. The Stack owns chat process recovery, and Home reports its chat role state.
 
 ## ENGINE-AVAIL-05a (backend)
 
-`POST /api/host/engines/{role}/restart` restarts `chat`, `embed`, `voice`, or `background` for an owner or admin. Chat reuses the existing restart-and-wait flow and returns 503 with an error sentence if it does not become ready within 90 seconds. Embed, voice, and background restart their supervisor and request the lazy client start. At this slice, those supervisors did not track manual-stop state; ENGINE-AVAIL-05b below adds Stop and Start. The existing `POST /api/host/engine/restart` remains available with its existing response.
+This route previously restarted Home-owned engines. HOME-SEAL-CHAT makes chat restart, stop and start answer 409 with instructions to make model changes through the MaiPai Stack. The Stack role status remains readable through Home.
 
 ## ENGINE-AVAIL-05b
 
-At the time this route was added, it exposed owner/admin-only Stop, Start and Restart actions for Home's chat, embedding, voice and background engines. HOME-DEL-EMBED-BG removed the Home-owned embedding and background actions; the route now accepts only `chat`, while embedding and judge operation belong to the Stack.
+At the time this route was added, it exposed owner/admin-only Stop, Start and Restart actions for Home's chat, embedding, voice and background engines. HOME-DEL-EMBED-BG removed the embedding and background actions. HOME-SEAL-CHAT now seals the remaining chat actions with 409 responses, while the Stack owns chat, embedding and judge operation.
 
 ## ENGINE-AVAIL-05c
 

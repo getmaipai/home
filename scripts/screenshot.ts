@@ -1539,7 +1539,7 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
     await page.route("**/api/host/models/selection", (route) => route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ modelId: null }),
+      body: JSON.stringify({ modelId: "qwen3-8b-instruct-q4-k-m", name: "Qwen3 8B Instruct", state: "ready" }),
     }));
     const memory = state === "memory-tight"
       ? { available: true, memory: { usableGb: 16, usedGb: 14.8, freeGb: 1.2, pressure: "warn", pressureText: "This computer's memory is getting tight right now.", loaded: [{ id: "chat", label: "Chat", gb: 12.4 }, { id: "image", label: "Pictures", gb: 2.4 }], homeOwnedRoles: [] } }
@@ -1608,7 +1608,7 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
     const card = page.getByText("Qwen3 8B Instruct", { exact: true }).first();
     await card.waitFor();
     if (state === "unavailable") {
-      await page.getByRole("button", { name: "Use this", exact: true }).waitFor();
+      await page.getByText("Chat runs through the MaiPai Stack.", { exact: true }).waitFor();
       await page.getByText(answers.unavailable.headline, { exact: true }).waitFor({ state: "detached" });
     } else {
       await page.getByText((state === "memory-tight" ? answers.yes : answers[state]).headline, { exact: true }).waitFor();

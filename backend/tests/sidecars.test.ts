@@ -36,7 +36,7 @@ import { TestClient } from "./client";
 import { restoreDefaultScriptedStack } from "./stackFixture";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { join } from "node:path";
-import { getChatClient, getChatLivePid, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { getChatClient, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { logsDir } from "@/lib/paths";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 
@@ -420,26 +420,21 @@ describe("GET /api/health", () => {
 
 describe("probeAlive (what the Health page asks)", () => {
   // The 2026-09-07 Health-page bug in one assertion: a cached client to a
-  // process that has since died must probe false, not read as fine.
-  test("a stale client to a killed process probes false", async () => {
+  // server that has since stopped must probe false, not read as fine. The
+  // server is an external fixture, because Home no longer spawns chat.
+  test("a stale client to a stopped server probes false", async () => {
     __setStackClientForTests(null);
-    process.env.MAIPAI_LLAMA_SERVER_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
-    process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
-    // FLAKE-PORT-01 (issue 137): see the same note above - a fresh port
-    // for this real spawn, restored after, never deleted.
-    const priorPort = process.env.MAIPAI_LLAMA_SERVER_PORT;
-    process.env.MAIPAI_LLAMA_SERVER_PORT = String(reserveFreePort());
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0);
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     try {
       const staleClient = await getChatClient();
       expect(await probeAlive(staleClient)).toBe(true);
-      const pid = getChatLivePid()!;
-      process.kill(pid, "SIGKILL");
+      await stub.stop();
       await waitUntil(async () => (await probeAlive(staleClient)) === false);
     } finally {
       __resetLlmSupervisorForTests();
-      delete process.env.MAIPAI_LLAMA_SERVER_BIN;
-      delete process.env.MAIPAI_CHAT_MODEL_PATH;
-      process.env.MAIPAI_LLAMA_SERVER_PORT = priorPort;
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
     }
   }, 10_000);
 

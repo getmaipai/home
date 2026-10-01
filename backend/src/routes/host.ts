@@ -1,16 +1,10 @@
 import { Hono } from "hono";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { detectHardware } from "@/lib/hardware";
 import { recommend, CATALOG } from "@/lib/modelCatalog";
-import { getJob, startSelectJob } from "@/lib/modelDownloadJobs";
-import { getHouseholdSettingValue } from "@/lib/settings";
-import { CHAT_MODEL_SETTING_KEY } from "@/settings/aiKeys";
-import { engineBinaryPath, getChatClient, getEngineStatus, restartChatBackend, stopChatBackend } from "@/lib/llmSupervisor";
-import { modelsDir } from "@/lib/paths";
+import { getEngineStatus } from "@/lib/llmSupervisor";
+import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { getEngineStatsSamples } from "@/lib/engineStats";
-import { withTimeout } from "@maipai/core/src/withTimeout";
 import { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { AppEnv } from "@/types";
 
@@ -33,123 +27,69 @@ hostRoutes.get("/models", requireRole("owner", "admin"), async (c) => {
 });
 
 // The compact chat-facing list deliberately has a different boundary from
-// the owner diagnostics route above. Adults can see the healthy, implemented
-// chat choices and the current household selection without getting hardware,
-// memory, or engine internals; a child gets the empty safe shape and the
-// chat surface supplies its calm generic label instead. `fits` is the same
-// real reachability check the AI models card uses, while selection remains
-// owner/admin-only because it can download gigabytes and restart the engine.
+// the owner diagnostics route above. Adults see the Stack chat role and its
+// selected model without host diagnostics; a child gets the empty safe shape.
 hostRoutes.get("/chat-models", requireAuth, async (c) => {
   const actor = c.get("person");
   if (actor.role === "child" || actor.role === "teen") {
     return c.json({ models: [], selectedModel: null, canSelect: false as const });
   }
 
-  const hw = await detectHardware();
-  const currentId = (getHouseholdSettingValue(CHAT_MODEL_SETTING_KEY) as string) || null;
-  const engineReady = engineBinaryPath(hw) !== null;
-  const fits = recommend("chat", hw).filter((fit) => fit.model.implemented && fit.fits);
-  // Chat's picker is not a download surface. A model is a reachable choice
-  // only when its weights and this computer's pinned engine are already
-  // present; the full AI models page remains the place that downloads one.
-  const models = fits
-    .filter((fit) => engineReady && existsSync(join(modelsDir, `${fit.model.id}.gguf`)))
-    .map((fit) => ({ id: fit.model.id, label: fit.model.label }));
-  const selected = currentId ? CATALOG.find((model) => model.id === currentId && model.role === "chat" && model.implemented) : undefined;
+  // Chat model information comes from the Stack. Hardware fit details stay
+  // on the owner diagnostics route.
+  const stackChat = await readStackChatRole();
+  const models = stackChat?.models?.map((model) => ({ id: model.id, label: model.name })) ?? [];
+  const currentId = stackChat?.model?.id ?? null;
+  const selected = currentId ? stackChat?.models?.find((model) => model.id === currentId) : undefined;
   return c.json({
     models,
-    selectedModel: selected ? { id: selected.id, label: selected.label, available: models.some((model) => model.id === selected.id) } : null,
-    canSelect: actor.role === "owner" || actor.role === "admin",
+    selectedModel: selected ? { id: selected.id, label: selected.name, available: true } : currentId ? { id: currentId, label: stackChat?.model?.id ?? currentId, available: true } : null,
+    canSelect: false,
   });
 });
 
-// Which chat model (if any) the household has actually chosen, for
-// ModelsSection.tsx to know which card to mark "in use" without polling a
-// job that may not exist yet (a freshly-selected model that finished
-// downloading in a previous session has no running job any more).
+// Additive Stack chat selection and state for Home settings surfaces.
 hostRoutes.get("/models/selection", requireRole("owner", "admin"), async (c) => {
-  const modelId = (getHouseholdSettingValue(CHAT_MODEL_SETTING_KEY) as string) || null;
-  return c.json({ modelId });
+  const chat = await readStackChatRole();
+  return c.json({ modelId: chat?.model?.id ?? null, name: chat?.models?.find((m) => m.id === chat.model?.id)?.name ?? null, state: chat?.state?.state ?? "offline" });
 });
 
-// Starts (or returns the already-running) download-and-select job for one
-// catalog model id (modelDownloadJobs.ts). Fire-and-poll: this returns
-// immediately with the job's current row, GET .../select-status keeps
-// returning fresher rows as the job progresses.
+async function readStackChatRole() {
+  if (!isStackConfigured()) return null;
+  try { return (await getStackClient().roles()).roles.find((role) => role.id === "chat") ?? null; }
+  catch { return null; }
+}
+
+// Home no longer starts chat model downloads.
 hostRoutes.post("/models/:id/select", requireRole("owner", "admin"), async (c) => {
-  const id = c.req.param("id");
-  const model = CATALOG.find((m) => m.id === id && m.role === "chat");
-  if (!model) return c.json({ error: `unknown chat model: ${id}` }, 404);
-  if (!model.implemented) return c.json({ error: `${id} has no real backend yet` }, 400);
-  try {
-    return c.json(startSelectJob(id));
-  } catch (err) {
-    // A different model is already mid-select (modelDownloadJobs.ts's
-    // one-job-at-a-time gate) - a real, expected conflict, not a crash.
-    return c.json({ error: (err as Error).message }, 409);
-  }
+  return c.json({ error: "Model changes are made through the MaiPai Stack." }, 409);
 });
 
 hostRoutes.get("/models/:id/select-status", requireRole("owner", "admin"), async (c) => {
   const id = c.req.param("id");
-  const job = getJob(id);
-  if (!job) return c.json({ modelId: id, status: "none" });
-  return c.json(job);
+  return c.json({ modelId: id, status: "none" });
 });
 
 // Engine control ("do we need ways to see if llama and everything is
 // running, pause or stop it, restart" - Jesse, 2026-09-04) and the
 // resource-trend view alongside it.
-hostRoutes.get("/engine/status", requireRole("owner", "admin"), async (c) => c.json(getEngineStatus()));
+hostRoutes.get("/engine/status", requireRole("owner", "admin"), async (c) => {
+  const chat = await readStackChatRole();
+  const kind = chat?.state.state === "ready" || chat?.state.state === "installed" ? "url" : chat?.state.state === "loaded" ? "starting" : "none";
+  const modelId = chat?.model?.id ?? null;
+  const name = chat?.models?.find((model) => model.id === modelId)?.name ?? modelId;
+  // pid and startedAt remain for wire compatibility with fixed values because Home does not own this process.
+  return c.json({ kind, modelId, pid: null, startedAt: null, name, state: chat?.state.state ?? "offline" });
+});
 
 hostRoutes.get("/engine/stats", requireRole("owner", "admin"), async (c) => c.json(getEngineStatsSamples()));
 
 hostRoutes.post("/engine/stop", requireRole("owner", "admin"), async (c) => {
-  stopChatBackend();
-  return c.json(getEngineStatus());
+  return c.json({ error: "Model changes are made through the MaiPai Stack." }, 409);
 });
 
-// Synchronous, not a polled job like .../select: restarting an
-// already-downloaded model only re-spawns and re-runs the post-load
-// check (seconds), not a multi-GB download, so one request/response is
-// the honest shape rather than inventing a second progress-polling path
-// for a much shorter wait.
-// A code review of the live incident this same night (2026-09-04): a
-// hung getChatClient() used to hold this HTTP response open indefinitely
-// - the browser's own fetch has no default timeout either, so the page
-// showed "Starting..." forever with no way to recover short of a full
-// reload. This bounds the wait: past RESTART_TIMEOUT_MS the route
-// answers with a clear timeout error instead of hanging - the underlying
-// spawn attempt isn't cancelled (there's no cooperative-cancellation
-// story for a llama-server health-check loop), so if it does eventually
-// succeed, the next status poll picks it up; if it doesn't, the household
-// member gets a real error and a Restart button to try again rather than
-// a spinner with no way out.
-// Exported so a test can assert index.ts's own Bun.serve() idleTimeout
-// (lib/serverConfig.ts) stays comfortably above this - the exact
-// invariant a live incident (2026-09-07) found broken: Bun's connection-
-// level idle timeout doesn't know this route intends to wait this long,
-// so a shorter idleTimeout silently kills the connection first.
-export const RESTART_TIMEOUT_MS = 90_000;
-
-export async function restartChatAndWait(): Promise<void> {
-  await restartChatBackend();
-  await withTimeout(getChatClient(), RESTART_TIMEOUT_MS, () => new Error(`timed out waiting for the chat engine after ${RESTART_TIMEOUT_MS / 1000}s`));
-}
-
 hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
-  // withTimeout (lib/withTimeout.ts) owns the race-plus-clear-the-timer
-  // shape now - a code review (2026-09-06) found this hand-rolled copy
-  // was one of three in the codebase (scheduler.ts's per-job budget,
-  // modelDownload.ts's per-chunk stall detector, this one), the same
-  // "timer never cleared" bug class a 2026-09-04 review already found
-  // and fixed once, here specifically.
-  try {
-    await restartChatAndWait();
-  } catch (err) {
-    return c.json({ error: (err as Error).message }, 503);
-  }
-  return c.json(getEngineStatus());
+  return c.json({ error: "Model changes are made through the MaiPai Stack." }, 409);
 });
 
 // Restarts the whole hub process ("restart the entire server, under

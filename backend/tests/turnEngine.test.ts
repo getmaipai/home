@@ -42,6 +42,7 @@ import { __embedCallCountForTests, __resetEmbedCallCountForTests } from "@/lib/r
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { guardReply } from "@/lib/guards";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
+import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { turnActiveWithin, activeTurnCount, acquireTurnLease, __setTurnActivityClockForTests, DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 import { forgetByIds, remember, recall, PROFILE_SOURCE } from "@/lib/memory";
@@ -847,6 +848,10 @@ describe("CHAT-18: the turn lease on every exit path", () => {
     fn: (stub: { url: string; stop: () => void }) => Promise<T>,
   ): Promise<T> {
     __resetLlmSupervisorForTests();
+    // This helper exercises its own URL-addressed stub directly. Keep the
+    // preload's Stack out of that path so stream timing and engine errors
+    // remain properties of the stub being controlled here.
+    __setStackClientForTests(null);
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0, opts);
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
@@ -856,6 +861,7 @@ describe("CHAT-18: the turn lease on every exit path", () => {
       await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
       __resetLlmSupervisorForTests();
+      __resetStackEngineForTests();
     }
   }
 
@@ -4244,12 +4250,17 @@ describe("POST /api/turn/stream", () => {
 
     async function slowStub() {
       __resetLlmSupervisorForTests();
+      // These assertions exercise the already-running URL override
+      // directly. Clearing the preload's scripted Stack keeps its eager
+      // streaming adapter from waiting for the scripted reply before the
+      // route can deliver turn_meta.
+      __setStackClientForTests(null);
       const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
       let release: () => void = () => {};
       const gate = new Promise<void>((resolve) => { release = resolve; });
       const stub = startStubLlmServer(0, { scriptedChatReply: async () => { await gate; return "A delayed answer."; } });
       process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-      return { stub, release, cleanup: async () => { await stub.stop(); delete process.env.MAIPAI_LLAMA_SERVER_URL; __resetLlmSupervisorForTests(); } };
+      return { stub, release, cleanup: async () => { await stub.stop(); delete process.env.MAIPAI_LLAMA_SERVER_URL; __resetLlmSupervisorForTests(); __resetStackEngineForTests(); } };
     }
 
     test("cancels an in-flight stream and aborts the upstream request", async () => {
@@ -4796,6 +4807,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     fn: (stub: { url: string; stop: () => void }) => Promise<T>,
   ): Promise<T> {
     __resetLlmSupervisorForTests();
+    __setStackClientForTests(null);
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0, opts);
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
@@ -4804,6 +4816,8 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     } finally {
       await stub.stop();
       delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+      __resetStackEngineForTests();
     }
   }
 
@@ -5025,15 +5039,15 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
 
   test("every proposed call failing and the retry finding the engine gone emits an error event with code 'unavailable', and the turn is marked finished", async () => {
     const { client } = await owner();
-    const { stopChatBackend } = await import("@/lib/llmSupervisor");
     await withStub(
       {
         scriptedToolCalls: (request) => {
           if (!request.tools?.length) return undefined;
-          // The engine goes away between the tool decision and the
-          // tool-free retry (a crash mid-turn): the retry's own
-          // startCompleteStream() then fails before any header.
-          stopChatBackend();
+          // Point the URL seam at a closed endpoint between the tool
+          // decision and the tool-free retry. The cached external client
+          // is dropped, without asking Home to stop a process it does not own.
+          process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1";
+          __resetLlmSupervisorForTests();
           return [{ id: "call-1", type: "function", function: { name: "remember", arguments: "{}" } }]; // fails remember's own args schema, so the batch is all-failed
         },
       },

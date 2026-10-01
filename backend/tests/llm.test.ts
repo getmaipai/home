@@ -1,8 +1,9 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import * as llmSupervisor from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { complete, startCompleteStream, embed, envelopeToolCall, PERSON_TURN_BUDGET, type ToolSpec, type ToolCall, CHAT_SAMPLING } from "@/lib/llm";
 import { clampMaxTokens } from "@/routes/llm";
@@ -1003,47 +1004,27 @@ describe("lib/llm.ts routed through a configured Stack", () => {
   // own, so a future refactor of either's own Stack-routing condition
   // could silently reintroduce the bug with the suite staying green -
   // both proven directly below too.
-  test("MAIPAI_LLAMA_SERVER_URL wins over a configured Stack, not the other way around", async () => {
+  test("complete and streaming stay on the configured Stack even when a local URL is set", async () => {
     fixture = startStackFixture({
-      "POST /v1/chat/completions": async () => {
-        throw new Error("the Stack must never be reached - the env var override should have won");
+      "POST /v1/chat/completions": async (req) => {
+        const body = await req.clone().json() as { stream?: boolean };
+        if (body.stream) return new Response('data: {"choices":[{"delta":{"content":"Stack reply"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', { headers: { "content-type": "text/event-stream", ...IDENTITY_HEADERS } });
+        return Response.json({ choices: [{ message: { role: "assistant", content: "Stack reply" } }] }, { headers: IDENTITY_HEADERS });
       },
     });
     configureStack();
-
-    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const stub = startStubLlmServer(0, { scriptedChatReply: () => "hello from the local stub, not the stack" });
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1";
+    const localClient = spyOn(llmSupervisor, "getChatClient");
     try {
       const completed = await complete("chat", [{ role: "user", content: "hi" }]);
       expect(completed.ok).toBe(true);
-      if (completed.ok) expect(completed.value.text).toBe("hello from the local stub, not the stack");
-    } finally {
-      await stub.stop();
-    }
-  });
-
-  test("the same is true for startCompleteStream()", async () => {
-    fixture = startStackFixture({
-      "POST /v1/chat/completions": async () => {
-        throw new Error("the Stack must never be reached - the env var override should have won");
-      },
-    });
-    configureStack();
-
-    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const stub = startStubLlmServer(0, { scriptedChatReply: () => "hello from the local stub, not the stack" });
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-    try {
+      if (completed.ok) expect(completed.value.text).toBe("Stack reply");
       const started = await startCompleteStream("chat", [{ role: "user", content: "hi" }]);
       expect(started.ok).toBe(true);
-      if (!started.ok) return;
-      let text = "";
-      for await (const delta of started.tokens) text += delta;
-      expect(text).toBe("hello from the local stub, not the stack");
-    } finally {
-      await stub.stop();
-    }
+      if (started.ok) { let text = ""; for await (const delta of started.tokens) text += delta; expect(text).toBe("Stack reply"); }
+      expect(fixture.calls).toEqual(["POST /v1/chat/completions", "POST /v1/chat/completions"]);
+      expect(localClient).not.toHaveBeenCalled();
+    } finally { localClient.mockRestore(); }
   });
 
   test("embeddings use the Stack even when MAIPAI_EMBED_URL is set", async () => {

@@ -5,8 +5,8 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
-import { describeHardware, activeJobOf, ModelJobProgress } from "@/apps/settings/ModelsSection";
-import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type BackupInfo } from "@/lib/api";
+import { describeHardware } from "@/apps/settings/ModelsSection";
+import { api, ApiError, type HardwareInfo, type BackupInfo } from "@/lib/api";
 
 interface SetupWizardProps {
   /** Fires once the owner account exists and the wizard is done (or the
@@ -93,9 +93,7 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
 
   // Hardware (step 3)
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
-  const [modelFits, setModelFits] = useState<ModelFit[] | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [modelJob, setModelJob] = useState<ModelJob | null>(null);
+  const [stackChat, setStackChat] = useState<{ name: string | null; state: string }>({ name: null, state: "offline" });
 
   // Backups (step 8)
   const [backups, setBackups] = useState<BackupInfo[] | null>(null);
@@ -170,57 +168,15 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
     setBusy(true);
     setError(null);
     try {
-      const [hw, fits, selection] = await Promise.all([api.hardware(), api.models("chat"), api.modelSelection()]);
+      const [hw, selection] = await Promise.all([api.hardware(), api.modelSelection()]);
       setHardware(hw);
-      setModelFits(fits);
-      setSelectedModelId(selection.modelId);
+      setStackChat({ name: selection.name, state: selection.state });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not detect hardware.");
     } finally {
       setBusy(false);
     }
   }
-
-  // Marks the model chosen only once its job actually reaches "ready" -
-  // a code review (2026-09-06) found the original version treated the
-  // start-job POST resolving as success, enabling Continue while the
-  // model was still downloading/verifying/loading; a later failure left
-  // the household already past this step with nothing having surfaced.
-  // Mirrors ModelsSection.tsx's own real polling loop rather than a
-  // second copy of it.
-  async function selectModel(id: string) {
-    setError(null);
-    try {
-      setModelJob(await api.selectModel(id));
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not start that model.");
-    }
-  }
-
-  useEffect(() => {
-    if (!modelJob || modelJob.status === "ready" || modelJob.status === "failed" || modelJob.status === "none") return;
-    const timer = setInterval(() => {
-      api
-        .modelSelectStatus(modelJob.modelId)
-        .then(setModelJob)
-        .catch(() => {
-          /* a transient poll failure isn't worth surfacing; the next tick retries */
-        });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [modelJob]);
-
-  useEffect(() => {
-    if (modelJob?.status === "ready") setSelectedModelId(modelJob.modelId);
-    if (modelJob?.status === "failed") setError(modelJob.error ?? "That model failed to set up.");
-  }, [modelJob]);
-
-  // `activeJobOf` is a plain function, not a hook, so this is safe to
-  // compute here even though it's only read inside the "hardware" case
-  // below (the progress display itself is `<ModelJobProgress job=.../>`,
-  // which owns its own `useDownloadRate` call - this one is just for the
-  // per-model button label and the Continue/disabled gates).
-  const activeJob = activeJobOf(modelJob);
 
   async function loadBackupsStep() {
     setBusy(true);
@@ -337,8 +293,6 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
       break;
 
     case "hardware": {
-      const jobActive = activeJob !== null;
-      const hasAnyFit = (modelFits ?? []).some((fit) => fit.fits);
       content = (
         <StepFields>
           {busy && !hardware ? (
@@ -346,63 +300,14 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
           ) : hardware ? (
             <>
               <p className="text-base text-muted-foreground">{describeHardware(hardware)}</p>
-              {modelFits && modelFits.length > 0 && !hasAnyFit ? (
-                <p className="text-base text-muted-foreground">
-                  No model in the default set fits this hardware yet. You can pick one later once more options are added.
-                </p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {(modelFits ?? []).map((fit) => (
-                    <Button
-                      key={fit.model.id}
-                      type="button"
-                      variant="outline"
-                      // Already selected (and no job currently running for
-                      // it) needs no re-click - found live 2026-09-06:
-                      // without this, clicking an already-"Selected" model
-                      // fires a redundant re-select job whose early phases
-                      // (verifying/loading/testing an already-cached model)
-                      // have no byte count yet, and the button's own label
-                      // stayed stuck on "Selected" (checked before the
-                      // active job below), so all a household member saw
-                      // was a second, wordless spinner appear with no
-                      // explanation.
-                      disabled={!fit.fits || jobActive || selectedModelId === fit.model.id}
-                      onClick={() => void selectModel(fit.model.id)}
-                      className="h-auto justify-between py-3 text-left"
-                    >
-                      <span>
-                        <span className="font-medium">{fit.model.label}</span>
-                        {!fit.fits ? <span className="ml-2 text-base text-muted-foreground">doesn't fit this hardware</span> : null}
-                      </span>
-                      {activeJob?.modelId === fit.model.id ? (
-                        // The specific phase ("Downloading the model…" etc.)
-                        // is the details block below, not repeated here -
-                        // this is just "something's happening to this row."
-                        <span className="text-base text-muted-foreground">Working…</span>
-                      ) : selectedModelId === fit.model.id ? (
-                        <span className="text-base text-primary">Selected</span>
-                      ) : null}
-                    </Button>
-                  ))}
-                </div>
-              )}
-              <ModelJobProgress job={modelJob} />
+              <p className="text-base font-medium">{stackChat.name ?? "No chat model is currently selected in the MaiPai Stack"}</p>
+              <p className="text-base text-muted-foreground">Chat models are managed through the MaiPai Stack. Chat state: {stackChat.state}.</p>
             </>
           ) : null}
           <ErrorText error={error} />
         </StepFields>
       );
-      // Jesse, 2026-09-06: picking a model shouldn't force a wait on this
-      // screen for the download/verify/load/test cycle to finish - the
-      // job already runs on the server independent of which wizard step
-      // is showing, so blocking Continue on `selectedModelId` (only ever
-      // set once the job reaches "ready") added dead time to setup for no
-      // real benefit. A job in progress is enough to move on; the model
-      // keeps getting ready in the background through the rest of setup.
-      nextDisabled = !selectedModelId && !activeJob;
-      skipLabel = hasAnyFit ? undefined : "Skip - choose a model later";
-      onSkip = hasAnyFit ? undefined : advance;
+      nextDisabled = false;
       break;
     }
 

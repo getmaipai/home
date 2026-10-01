@@ -277,15 +277,5 @@ async function runSelectJob(modelId: string): Promise<void> {
  * gated at the route (routes/host.ts); this function trusts its caller
  * already checked that. */
 export function startSelectJob(modelId: string): JobRow {
-  if (activeJob && activeJob.modelId !== modelId) {
-    throw new Error(`"${activeJob.modelId}" is still being set up - wait for it to finish before choosing a different model`);
-  }
-  if (!activeJob) {
-    upsertJob(modelId, { status: "queued", phase: "queued", error: null });
-    const promise = runSelectJob(modelId).finally(() => {
-      if (activeJob?.modelId === modelId) activeJob = null;
-    });
-    activeJob = { modelId, promise };
-  }
-  return getJob(modelId)!;
+  throw new Error("Model changes are made through the MaiPai Stack.");
 }

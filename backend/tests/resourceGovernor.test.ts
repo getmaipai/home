@@ -1,6 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { join } from "node:path";
-import { getChatClient, getEngineStatus, restartChatBackend, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { getChatClient, restartChatBackend, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import {
   startResourceGovernor,
   __setGovernorTuningForTestsOnly,
@@ -9,34 +8,9 @@ import {
 } from "@/lib/resourceGovernor";
 import { listIssues, __resetFixHandlersForTests } from "@/lib/issues";
 import { resetDb } from "./reset-db";
-import { reserveFreePort } from "./fixtures/reserveFreePort";
-import { __setStackClientForTests } from "@/lib/stackEngine";
-
-// The tier-2 (developer override) spawn path is the only real, non-mocked
-// way to get llmSupervisor.ts's private chatBackend state (and so
-// getEngineStatus().pid) to point at a process these tests control - tier
-// 3 needs a real downloaded GGUF + engine binary neither this suite nor
-// llmSupervisor.test.ts's own tests have. See docs/dev.md's
-// resource-governor entry for why trigger B (process-vs-baseline) is
-// consequently only exercised here via startResourceGovernor() called
-// directly against that same real, live pid - real process, real
-// measurement, a deliberately chosen ceiling, never a mocked one.
-const FAKE_BIN = join(import.meta.dir, "fixtures", "fakeLlamaServer.ts");
-
-// tests/preload.ts's isolated chat port, captured so afterEach can put it
-// BACK rather than delete it. The original `delete` here was the live
-// bug behind "the chat engine dies silently" (docs/dev.md, "What was
-// actually killing the chat engine", 2026-09-07): with the variable
-// gone, a later test file's spawn resolved llmSupervisor.ts's default
-// port 8788 and freePort() SIGKILLed the real dev hub's engine on this
-// same machine. tests/isolation.ts now fails any test that leaves it
-// unset; this is the fix at the source.
-const ISOLATED_CHAT_PORT = process.env.MAIPAI_LLAMA_SERVER_PORT;
-let TEST_CHAT_PORT: string | null = null;
 
 beforeEach(() => {
   resetDb();
-  __setStackClientForTests(null);
   __resetFixHandlersForTests();
   __resetLlmSupervisorForTests();
   // Fast enough to reach a sustained breach in well under a second, and a
@@ -58,110 +32,14 @@ afterEach(async () => {
   __resetGovernorTuningForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_BIN;
   delete process.env.MAIPAI_CHAT_MODEL_PATH;
-  process.env.MAIPAI_LLAMA_SERVER_PORT = ISOLATED_CHAT_PORT;
   delete process.env.FAKE_LLAMA_INFLATE_MB;
 });
 
-async function waitUntil(check: () => boolean | Promise<boolean>, timeoutMs = 5_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await check()) return;
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  throw new Error("waitUntil() timed out");
-}
-
-describe("resourceGovernor: trigger B (process usage vs. its own baseline)", () => {
-  test("sustained real RSS growth past baseline x1.3 raises a Repairs issue and restarts the backend", async () => {
-    process.env.MAIPAI_LLAMA_SERVER_BIN = FAKE_BIN;
-    process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
-    TEST_CHAT_PORT = String(reserveFreePort());
-    process.env.MAIPAI_LLAMA_SERVER_PORT = TEST_CHAT_PORT;
-    process.env.FAKE_LLAMA_INFLATE_MB = "50"; // a real, resident ~50MB+ allocation
-
-    const client = await getChatClient(); // real tier-2 spawn of the fixture
-    expect(await client.health()).toBe(true);
-    const pid = getEngineStatus().pid!;
-    expect(pid).toBeGreaterThan(0);
-
-    // Tier 2's own automatic governor (wired in llmSupervisor.ts) only
-    // watches trigger A (no model metadata to size trigger B against) -
-    // exercise trigger B directly against this same real, live pid with a
-    // deliberately tiny baseline its real inflated RSS will genuinely
-    // exceed.
-    startResourceGovernor({ pid, hasCuda: false, ceilingBaselineBytes: 5_000_000 });
-
-    await waitUntil(() => listIssues().some((i) => i.source === "resource-governor" && i.key === "chat"), 5_000);
-    const issue = listIssues().find((i) => i.source === "resource-governor")!;
-    expect(issue.severity).toBe("error");
-    expect(issue.detail).toMatch(/exceeded its expected ceiling/);
-
-    // restartChatBackend() actually ran: the backend is no longer the one
-    // this test started.
-    await waitUntil(() => getEngineStatus().pid !== pid, 5_000);
-  }, 15_000);
-});
-
-describe("resourceGovernor: staleness guard against a racing manual restart", () => {
-  test("a manual restart mid-breach-accumulation stops the stale governor from ever acting", async () => {
-    process.env.MAIPAI_LLAMA_SERVER_BIN = FAKE_BIN;
-    process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
-    TEST_CHAT_PORT = String(reserveFreePort());
-    process.env.MAIPAI_LLAMA_SERVER_PORT = TEST_CHAT_PORT;
-    process.env.FAKE_LLAMA_INFLATE_MB = "50";
-
-    await getChatClient();
-    const oldPid = getEngineStatus().pid!;
-
-    // Tiny baseline so the governor WOULD trip after 2 sustained breaches
-    // if left to accumulate. The real scenario: a manual restart races in
-    // while the governor is mid-accumulation; the staleness check (pid
-    // changed) must retire it before a second breach can trip it.
-    //
-    // Deterministic under load: we start the governor and immediately
-    // trigger the restart (restartChatBackend clears state.chatBackend
-    // before its stop resolves, so getEngineStatus() reports pid null the
-    // moment it returns). The governor's first tick - whenever it lands -
-    // sees the pid changed and self-retires. Because the restart is in
-    // flight before even one tick can accumulate a breach, there is no
-    // timing window where two breaches could stack and trip the governor.
-    startResourceGovernor({ pid: oldPid, hasCuda: false, ceilingBaselineBytes: 5_000_000 });
-    await restartChatBackend();
-
-    // The stale governor self-retires on the first tick that sees the
-    // changed pid (a new spawn in flight, or no backend at all). We can't
-    // observe that tick directly, so give it a bounded, generous window
-    // (several poll intervals) for the tick to land - a sleep, not a
-    // condition poll: the assertion is a negative one (no governor tripped
-    // issue), which is trivially true at t=0 and cannot be waited on.
-    // Bounded so it is still fast when the governor retires quickly, and
-    // generous enough for real time under CPU load where the restart's
-    // respawn itself takes seconds.
-    await new Promise((r) => setTimeout(r, 3_000));
-
-    expect(listIssues().some((i) => i.source === "resource-governor")).toBe(false);
-    expect(getEngineStatus().pid).not.toBe(oldPid);
-  }, 20_000);
-});
-
 describe("resourceGovernor: tier-2 override wiring", () => {
-  test("a developer-override spawn starts a governor at all (trigger A only, no crash from a null baseline)", async () => {
-    process.env.MAIPAI_LLAMA_SERVER_BIN = FAKE_BIN;
-    process.env.MAIPAI_CHAT_MODEL_PATH = "/dev/null";
-    TEST_CHAT_PORT = String(reserveFreePort());
-    process.env.MAIPAI_LLAMA_SERVER_PORT = TEST_CHAT_PORT;
-
-    const client = await getChatClient();
-    expect(await client.health()).toBe(true);
-    expect(getEngineStatus().pid).not.toBeNull();
-    // The override spawn's own governor is already running by the time
-    // getChatClient() resolved (llmSupervisor.ts wires it in startChatBackend).
-    // Real system memory on a CI/dev box is not under pressure, so trigger A
-    // should not fire in this window - proves the wiring doesn't spuriously
-    // restart a perfectly healthy override spawn. Bounded sleep, generous
-    // enough for a few governor ticks to land even under load.
-    await new Promise((r) => setTimeout(r, 3_000));
-    expect(getEngineStatus().pid).not.toBeNull();
-    expect(listIssues().some((i) => i.source === "resource-governor")).toBe(false);
-  }, 20_000);
+  test("chat cannot start a Home-owned process even when developer overrides are present", async () => {
+    process.env.MAIPAI_LLAMA_SERVER_BIN = "/does/not/matter";
+    process.env.MAIPAI_CHAT_MODEL_PATH = "/does/not/matter.gguf";
+    await expect(getChatClient()).rejects.toThrow("Home runs chat through the MaiPai Stack.");
+    await expect(restartChatBackend()).rejects.toThrow("Home runs chat through the MaiPai Stack.");
+  });
 });

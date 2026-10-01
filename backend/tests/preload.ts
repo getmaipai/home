@@ -5,7 +5,7 @@
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach } from "bun:test";
+import { afterEach, beforeEach } from "bun:test";
 import { installTestIsolationGuard } from "./isolation";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
@@ -80,6 +80,9 @@ __setDefaultStackClientForTests(defaultScriptedStack.client);
 // so that class of leak fails the offending test by name instead. The
 // snapshot is taken inside this call, after every assignment above.
 installTestIsolationGuard();
+beforeEach(() => {
+  __setDefaultStackClientForTests(defaultScriptedStack.client);
+});
 
 // getmaipai/home#123: a fire-and-forget background job (a crisis
 // notification, an embed job kicked off after a memory write - never
@@ -101,5 +104,6 @@ installTestIsolationGuard();
 // registration order can get wrong.
 afterEach(async () => {
   await __drainBackgroundWorkForTests();
+  delete process.env.MAIPAI_LLAMA_SERVER_URL;
   __setDefaultStackClientForTests(defaultScriptedStack.client);
 });

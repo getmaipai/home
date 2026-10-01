@@ -34,7 +34,6 @@ import type {
   ModelFit,
   ChatModelOption,
   ChatModelsResponse,
-  ModelJob,
   EngineStatus,
   EngineStatsSample,
   ClonedVoiceInfo,
@@ -125,7 +124,7 @@ export type ProjectView = Project & { posted_artifact: { id: string; version: nu
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ModelJob, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
+export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
@@ -1026,9 +1025,7 @@ export const api = {
   computerMemory: () => request<ComputerMemoryResponse>("/api/computer-memory"),
   fitPlan: (body: { source: { url: string } | { path: string } | { repo: string; revision?: string }; context_tokens?: number; kv_cache_type?: "f16" | "q8_0" | "q4_0" }) => request<FitPlanResponse>("/api/fit-plan", { method: "POST", body: JSON.stringify(body) }),
   chatModels: () => request<ChatModelsResponse>("/api/host/chat-models"),
-  modelSelection: () => request<{ modelId: string | null }>("/api/host/models/selection"),
-  selectModel: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select`, { method: "POST" }),
-  modelSelectStatus: (id: string) => request<ModelJob>(`/api/host/models/${encodeURIComponent(id)}/select-status`),
+  modelSelection: () => request<{ modelId: string | null; name: string | null; state: string }>("/api/host/models/selection"),
   senses: () => request<{ brain: string; voice: string }>("/api/health", { timeoutMs: 8_000 }),
   // The fuller shape of the same /api/health response, for Settings ->
   // Household -> Health (HealthSection.tsx) - senses() above stays

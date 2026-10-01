@@ -11,8 +11,6 @@
 // are not declared anywhere else, so they are declared here once, and
 // each one takes its destination from the URL the downloader actually
 // uses rather than a second copy of the host name that could drift.
-import { CATALOG } from "@/lib/modelCatalog";
-import { ENGINE_BINARIES } from "@/lib/engineCatalog";
 import { KIWIX_BINARIES } from "@/lib/kiwixCatalog";
 import { KIWIX_CATALOG_URL } from "@/lib/referenceLibrary";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
@@ -67,10 +65,6 @@ export function platformConnections(): PrivacyConnection[] {
   // Catalog entries marked `implemented: false` are recorded decisions
   // with no pinned download at all; nothing can fetch them, so nothing
   // about them belongs in a table of connections that really happen.
-  const modelHosts = hostsOf(CATALOG.filter((m) => m.download).map((m) => m.download!.url));
-  const engineHosts = hostsOf(
-    ENGINE_BINARIES.flatMap((b) => [b.archive.url, ...(b.extraArchives ?? []).map((a) => a.url)]),
-  );
   const wakewordHosts = hostsOf(WAKEWORD_ALL_ASSETS.map((a) => a.url));
   const visionHosts = hostsOf(VISION_ALL_ASSETS.map((a) => a.url));
   const voiceHost = hostsOf([voiceCatalogUrl()]);
@@ -81,14 +75,6 @@ export function platformConnections(): PrivacyConnection[] {
   const internetProbePort = Number(getHouseholdSettingValue(INTERNET_PROBE_TCP_PORT_KEY) ?? 443);
 
   const rows: (PrivacyConnection | null)[] = [
-    row("platform:language-models", modelHosts, {
-      when: "only when an adult picks a language model to download, in Settings",
-      what: DOWNLOAD_CARRIES,
-    }),
-    row("platform:engine", engineHosts, {
-      when: "once, when the hub sets up the program that runs the models on your computer",
-      what: DOWNLOAD_CARRIES,
-    }),
     row("platform:wake-word-models", wakewordHosts, {
       when: "once, when someone turns on listening for a wake word",
       what: DOWNLOAD_CARRIES,

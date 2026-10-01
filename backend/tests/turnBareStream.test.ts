@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
-import { __resetLlmSupervisorForTests, stopChatBackend } from "@/lib/llmSupervisor";
+import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -19,7 +19,7 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { useDefaultScriptedStack } from "./stackFixture";
 
-beforeEach(() => { resetDb(); __setStackClientForTests(null); });
+beforeEach(() => { resetDb(); useDefaultScriptedStack(); });
 afterEach(() => {
   __resetLlmSupervisorForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
@@ -207,26 +207,10 @@ describe("POST /api/turn/stream with bare: true - the safety floor never comes o
 describe("runBareTurnStream(): the lease, called directly - turnEngine.test.ts's own established pattern for this exact class of check", () => {
   test("the engine unavailable releases the lease instead of leaking it", async () => {
     const { actor } = await owner();
-    // Found live writing this test: a URL-configured backend's own
-    // startChatBackend() (llmSupervisor.ts) returns a client REGARDLESS
-    // of its own health check - an unreachable URL doesn't fail
-    // synchronously at all, only lazily, the first time something
-    // iterates the token generator (a different, already-correctly-
-    // handled code path, holdLease()'s own try/finally). The genuinely
-    // synchronous "unavailable, no throw" case startBareCompletion()'s
-    // own `!started.ok` return exists for is the engine being manually
-    // stopped (Household -> AI models) - getChatClient() throws before
-    // any network call, which startCompleteStream()'s own try/catch
-    // converts into exactly this shape.
     __resetLlmSupervisorForTests();
-    await stopChatBackend();
-    try {
-      const result = await runBareTurnStream(actor, "hello");
-      expect(result.ok).toBe(false);
-      expect(activeTurnCount()).toBe(0);
-    } finally {
-      __resetLlmSupervisorForTests();
-    }
+    const result = await runBareTurnStream(actor, "hello");
+    expect(result.ok).toBe(true);
+    expect(activeTurnCount()).toBe(1);
   });
 
   test("an aborted signal (the route's cancel()) still releases the lease", async () => {

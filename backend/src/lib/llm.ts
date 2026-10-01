@@ -467,19 +467,9 @@ export async function complete(
   const invalid = validate(role, messages);
   if (invalid) return invalid;
 
-  // getmaipai/home#151: MAIPAI_LLAMA_SERVER_URL is already documented
-  // (llmSupervisor.ts's own tier 1) as the explicit override - "point
-  // at an already-running server (real or someone else's stub)" - the
-  // one env var a developer or a test sets specifically to be obeyed.
-  // Checking it before the household's own Stack setting matches that
-  // stated intent (a real household never sets a raw env var; the only
-  // realistic setters are a developer overriding on purpose or a
-  // test's own scripted stub) and closes a whole class of test flake
-  // at the source: four test files each needed their own resetDb() to
-  // clear a leftover engines.stack.url row that would otherwise win
-  // over this env var - this ordering means a new test calling
-  // complete()/startCompleteStream() never needs to rediscover that.
-  if (!process.env.MAIPAI_LLAMA_SERVER_URL && isStackRoleEnabled("chat")) return completeViaStack(role, messages, opts);
+  // Home chat always goes through the MaiPai Stack when it is configured.
+  // MAIPAI_LLAMA_SERVER_URL no longer selects a Home-owned chat backend.
+  if (isStackRoleEnabled("chat")) return completeViaStack(role, messages, opts);
 
   let client;
   try {
@@ -667,9 +657,8 @@ export async function startCompleteStream(
   const invalid = validate(role, messages);
   if (invalid) return invalid;
 
-  // getmaipai/home#151: the same MAIPAI_LLAMA_SERVER_URL-before-Stack
-  // ordering as complete() above, and for the identical reason.
-  if (!process.env.MAIPAI_LLAMA_SERVER_URL && isStackRoleEnabled("chat")) return startCompleteStreamViaStack(role, messages, opts, signal);
+  // Streaming follows the same Stack-only routing as complete() above.
+  if (isStackRoleEnabled("chat")) return startCompleteStreamViaStack(role, messages, opts, signal);
 
   let client;
   try {

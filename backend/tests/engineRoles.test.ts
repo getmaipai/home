@@ -1,18 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { app } from "@/app";
-import { __setEngineRoleActionsForTests } from "@/routes/engineRoles";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 
-const calls: string[] = [];
 beforeEach(() => {
   resetDb();
-  calls.length = 0;
-  __setEngineRoleActionsForTests({
-    chat: { restart: async () => { calls.push("chat:restart"); }, stop: async () => { calls.push("chat:stop"); }, start: async () => { calls.push("chat:start"); } },
-  });
 });
-afterEach(() => __setEngineRoleActionsForTests(null));
 
 async function ownerClient(): Promise<TestClient> {
   const client = new TestClient();
@@ -23,12 +15,11 @@ async function ownerClient(): Promise<TestClient> {
 
 describe("POST /api/host/engines/{role}/restart", () => {
   for (const role of ["chat"] as const) {
-    test(`${role} restart returns the contract body`, async () => {
+    test(`${role} restart refuses Home-owned model changes`, async () => {
       const client = await ownerClient();
       const res = await client.post(`/api/host/engines/${role}/restart`, {});
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ role, restarted: true });
-      expect(calls).toContain(`${role}:restart`);
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: "Model changes are made through the MaiPai Stack." });
     });
   }
 
@@ -49,7 +40,6 @@ describe("POST /api/host/engines/{role}/restart", () => {
     await adult.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
     const res = await adult.post("/api/host/engines/chat/restart", {});
     expect(res.status).toBe(403);
-    expect(calls).toEqual([]);
   });
 
   test("rejects an unknown role", async () => {
@@ -62,24 +52,20 @@ describe("POST /api/host/engines/{role}/restart", () => {
     expect(res.status).toBe(400);
   });
 
-  test("chat timeout returns 503 with an error", async () => {
-    __setEngineRoleActionsForTests({
-      chat: { restart: async () => { throw new Error("chat did not return in time"); }, stop: async () => {}, start: async () => {} },
-    });
+  test("chat restart returns the sealed error", async () => {
     const res = await (await ownerClient()).post("/api/host/engines/chat/restart", {});
-    expect(res.status).toBe(503);
-    expect(await res.json()).toEqual({ error: "chat did not return in time" });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Model changes are made through the MaiPai Stack." });
   });
 });
 
 describe("POST /api/host/engines/{role}/{stop,start}", () => {
   for (const action of ["stop", "start"] as const) for (const role of ["chat"] as const) {
-    test(`${role} ${action} is owner/admin-only and reaches its supervisor`, async () => {
+    test(`${role} ${action} is owner/admin-only and refuses Home-owned model changes`, async () => {
       const client = await ownerClient();
       const res = await client.post(`/api/host/engines/${role}/${action}`, {});
-      expect(res.status).toBe(200);
-      expect(await res.json()).toEqual({ role, [action === "stop" ? "stopped" : "started"]: true });
-      expect(calls).toContain(`${role}:${action}`);
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: "Model changes are made through the MaiPai Stack." });
     });
   }
 
@@ -92,6 +78,5 @@ describe("POST /api/host/engines/{role}/{stop,start}", () => {
     for (const role of ["chat"] as const) {
       for (const action of ["stop", "start"] as const) expect((await adult.post(`/api/host/engines/${role}/${action}`, {})).status).toBe(403);
     }
-    expect(calls).toEqual([]);
   });
 });

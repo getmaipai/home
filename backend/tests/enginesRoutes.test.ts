@@ -138,7 +138,7 @@ describe("/api/engines", () => {
   // handler), so this proves the two surfaces now agree.
   test("GET / with no Stack configured reports the required Stack as offline", async () => {
     __setStackClientForTests(null);
-    await stopChatBackend();
+    await expect(stopChatBackend()).rejects.toThrow("Home runs chat through the MaiPai Stack.");
     try {
       const { client } = await owner();
       const res = await client.get("/api/engines");

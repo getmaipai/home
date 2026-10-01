@@ -311,10 +311,8 @@ const initialTls = hasHouseholdLeaf() ? getHouseholdLeafForServer() : null;
 // than either a silent no-op or exiting the process with nothing
 // configured to bring it back up.
 //
-// idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS (lib/serverConfig.ts) - found
-// live 2026-09-07, Bun.serve()'s own default (10s) was silently killing
-// the connection before routes/host.ts's own 90s RESTART_TIMEOUT_MS ever
-// got a chance to respond. See that file's own header for the full story.
+// idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS (lib/serverConfig.ts) keeps
+// the listener's response window above Bun's short default.
 let server = Bun.serve({
   port: configuredPort,
   fetch: app.fetch,

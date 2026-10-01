@@ -72,12 +72,13 @@ export function startDefaultScriptedStack(): StackFixture {
     // legacy URL. Proxying through it keeps their abort observation real
     // while the public call still goes through the Stack client.
     const legacyUpstream = path === "/v1/chat/completions" ? process.env.MAIPAI_LLAMA_SERVER_URL : undefined;
-    const response = await fetch(`${legacyUpstream ?? engine.url}${path}`, {
+    const request = {
       method: req.method,
       headers: req.headers,
       body: req.method === "GET" ? undefined : await req.arrayBuffer(),
       ...(legacyUpstream ? { signal: req.signal } : {}),
-    });
+    };
+    const response = await fetch(`${legacyUpstream ?? engine.url}${path}`, request);
     const headers = new Headers(response.headers);
     headers.set("x-maipai-engine", "local scripted-test");
     headers.set("x-maipai-model", "scripted-stub");

@@ -344,6 +344,7 @@ export function reportChatBackendUnreachable(message: string): void {
   const backend = state.chatBackend;
   if (!backend) return;
   if (backend.watch) backend.watch.markDown(`stopped answering (${message})`);
+  else if (backend.kind === "url") return;
   else void restartChatBackend();
 }
 
@@ -387,16 +388,8 @@ function deriveChatAvailability(kind: EngineHealth["kind"], alive: boolean | nul
 
 export function chatAvailabilityState(): ChatAvailabilityState {
   if (process.env.MAIPAI_LLAMA_SERVER_URL) return { availability: "ready", reason: null };
-  const port = Number(process.env.MAIPAI_LLAMA_SERVER_PORT ?? 8788);
-  const status = getEngineStatus();
-  const kind = engineHealthKind("chat", status.kind, port);
-  if (kind === "blocked" && !blockedPortHolderAlive(port)) return { availability: "ready", reason: null };
-  const availability = deriveChatAvailability(kind, null);
-  if (status.kind === "none" && state.lastStartFailure) {
-    availability.availability = "unavailable";
-    availability.reason = state.lastStartFailure;
-  }
-  return availability;
+  if (!isStackRoleEnabled("chat")) return { availability: "unavailable", reason: "not_installed" };
+  return { availability: "ready", reason: null };
 }
 
 /** Null unless the engine is genuinely fully installed - both the binary
@@ -497,6 +490,9 @@ async function trySpawnFromSelection(): Promise<ChatBackend | null> {
 
 async function startChatBackend(): Promise<ChatBackend> {
   const configuredUrl = process.env.MAIPAI_LLAMA_SERVER_URL;
+  if (!configuredUrl) {
+    throw new Error("chat model unavailable: Home runs chat through the MaiPai Stack.");
+  }
   if (configuredUrl) {
     // ENGINE-HOST-01: nothing is spawned; the engine already running is
     // probed and its identity read (never its address: the label only).
@@ -561,120 +557,24 @@ async function startChatBackend(): Promise<ChatBackend> {
  * failure (a briefly-wrong model path, a taken port, a slow first load
  * past the health timeout) until the whole process restarted. */
 export async function getChatClient(): Promise<LlamaServerClient> {
-  if (isStackRoleEnabled("chat") && !process.env.MAIPAI_LLAMA_SERVER_URL) throw new Error("chat model unavailable: chat is served by the MaiPai Stack");
-  if (state.manuallyStopped) {
-    throw new Error("the chat engine is stopped - restart it from Household → AI models");
+  // A URL override points at an engine that is already running. Keep this
+  // seam for tests and benches; every local spawn and download path stays sealed.
+  if (!process.env.MAIPAI_LLAMA_SERVER_URL) {
+    throw new Error("chat model unavailable: Home runs chat through the MaiPai Stack.");
   }
   if (state.chatBackend) return state.chatBackend.client;
-  expireStalledChatStart();
-  if (!state.startingPromise) {
-    const myGeneration = state.generation;
-    state.startingStartedAtMs = Date.now();
-    state.startingPromise = startChatBackend()
-      .then(async (backend): Promise<ChatBackend> => {
-        if (myGeneration !== state.generation) {
-          // A stop/restart landed while this spawn was still starting
-          // (COR-1): a real, 20-60s window on an actual model. Assigning
-          // to `chatBackend` here regardless would resurrect exactly the
-          // state stopChatBackend()/restartChatBackend() just cleared - a
-          // live, GPU-resident process the admin explicitly stopped (or
-          // superseded with a restart), with getEngineStatus() reporting
-          // "stopped" the whole time because it checks `manuallyStopped`
-          // first, never `chatBackend` itself. Stopped instead, and the
-          // ORIGINAL caller (already committed to awaiting this exact
-          // promise) recurses into getChatClient() so it transparently
-          // lands on whatever the CURRENT generation resolves to - the
-          //
-          // Unlike former Home embedding supervisor's own spawn, tier 3 here
-          // (trySpawnFromSelection) has already run a real side effect by
-          // this point - lastPostLoadCheck, read by the Household -> AI
-          // models status page - for whichever backend this generation
-          // check just discarded (a background review of this fix caught
-          // it: porting the guard didn't account for a side effect
-          // former Home embedding supervisor's own spawn never had). Nulled rather than
-          // left stale; the recursive getChatClient() call below sets a
-          // fresh one if the new generation also reaches tier 3.
-          if (backend.kind === "selection") state.lastPostLoadCheck = null;
-          backend.stop();
-          return { ...backend, client: await getChatClient() };
-        }
-        state.chatBackend = backend;
-        state.startingPromise = null;
-        state.startingStartedAtMs = null;
-        state.startupStalled = false;
-        state.lastStartFailure = null;
-        // A genuinely healthy spawn closes out any earlier failure -
-        // same "a fresh success clears a prior fault" posture
-        // resourceGovernor's own resolveIssue("resource-governor", "chat")
-        // call already has just above.
-        resolveIssue("chat-engine", "spawn");
-        clearBlockedPortRetry();
-        resolveIssue("chat-engine", "startup_stalled");
-        return backend;
-      })
-      .catch((err) => {
-        if (myGeneration === state.generation) {
-          state.startingPromise = null;
-          state.startingStartedAtMs = null;
-          const message = (err as Error).message;
-          state.lastStartFailure = /hasn't finished downloading|no longer in the catalog|no llama-server-compatible sizing/.test(message) ? "not_installed" : "failed_start";
-          if (err instanceof ForeignPortHolderError && err.reason === "not_permitted") {
-            const port = err.port;
-            registerFixHandler(`start_chat_after_blocked_port:${port}`, async () => {
-              stopBlockedPortHolder(port);
-              clearBlockedPortRetry();
-              await getChatClient();
-            });
-            const holder = blockedPortDetails(port);
-            void raiseIssue({
-              source: "chat-engine",
-              key: "spawn",
-              severity: "error",
-              title: "MaiPai's AI can't start while another program uses its port",
-              detail: holder
-                ? `MaiPai tried to stop the holder but lacked permission. Process ${holder.pid}: ${holder.command} (running ${holder.age}). Use the fix to stop it and start MaiPai's AI.`
-                : message,
-              fix: { label: "Stop it and start MaiPai's AI", action: `start_chat_after_blocked_port:${port}` },
-              remindAfterMs: 15 * 60_000,
-            });
-            startBlockedPortRetry(port);
-          }
-        }
-        // Found live 2026-09-07: a genuine chat-engine spawn failure had
-        // no Repairs-page visibility at all - only found by a household
-        // member happening to check Settings -> AI models themselves.
-        // Every other subsystem that can fail on its own (a Tier 1
-        // package's sandbox, TLS renewal) already raises an issue here;
-        // this was the one gap. Not raised for `manuallyStopped` (that
-        // throws before startChatBackend() is ever called, so it never
-        // reaches this catch) - only a real spawn/post-load-check
-        // failure lands here.
-        //
-        // Gated on the same myGeneration === generation check as the
-        // startingPromise clear above it (a code review, 2026-09-07,
-        // caught this was missing here): without it, a stale generation's
-        // spawn - already superseded by a deliberate stop/restart -
-        // rejecting later would raise a false "failed to start" for an
-        // admin action that was never a failure, and could even re-raise
-        // it AFTER the new generation's own resolveIssue() already
-        // cleared it, leaving a phantom issue stuck open while the engine
-        // is actually running fine.
-        if (myGeneration === state.generation && !(err instanceof ForeignPortHolderError && err.reason === "not_permitted")) {
-          void raiseIssue({
-            source: "chat-engine",
-            key: "spawn",
-            severity: "error",
-            title: "MaiPai's AI failed to start",
-            detail: err instanceof ForeignPortHolderError
-              ? `Another program is using the port MaiPai's AI needs, so it can't start. (Technical detail: ${err.message})`
-              : (err as Error).message,
-            remindAfterMs: 15 * 60_000,
-          });
-        }
-        throw err;
-      });
+  if (state.startingPromise) return (await state.startingPromise).client;
+  const promise = startChatBackend();
+  state.startingPromise = promise;
+  try {
+    const backend = await promise;
+    state.chatBackend = backend;
+    state.startingPromise = null;
+    return backend.client;
+  } catch (error) {
+    state.startingPromise = null;
+    throw error;
   }
-  return (await state.startingPromise).client;
 }
 
 /** Invalidates an orphaned startup so a later caller can retry. The
@@ -699,18 +599,7 @@ function expireStalledChatStart(): boolean {
  * this once a fresh download's checksum verifies, right before the
  * select job's own "loading"/"testing" phases exercise the new spawn. */
 export async function restartChatBackend(): Promise<void> {
-  clearBlockedPortRetry();
-  cancelEngineRespawn("chat");
-  state.manuallyStopped = false;
-  state.generation++;
-  // The state is cleared before the (now awaited, #73) stop, so a
-  // caller that does not await, the test reset among them, sees the
-  // backend gone at once; the process is stopped in the background.
-  const previous = state.chatBackend;
-  state.chatBackend = null;
-  state.startingPromise = null;
-  state.startingStartedAtMs = null;
-  await previous?.stop();
+  throw new Error("Home runs chat through the MaiPai Stack.");
 }
 
 /** Engine control's "stop/pause": kills the running backend (if any) and,
@@ -719,15 +608,7 @@ export async function restartChatBackend(): Promise<void> {
  * a fresh model select, which calls that) runs. Safe to call with nothing
  * running (a stopped stub, or nothing started yet). */
 export async function stopChatBackend(): Promise<void> {
-  clearBlockedPortRetry();
-  cancelEngineRespawn("chat");
-  state.manuallyStopped = true;
-  state.generation++;
-  const previous = state.chatBackend;
-  state.chatBackend = null;
-  state.startingPromise = null;
-  state.startingStartedAtMs = null;
-  await previous?.stop();
+  throw new Error("Home runs chat through the MaiPai Stack.");
 }
 
 /** Real-time engine status for the Household → AI models page: is
@@ -746,6 +627,7 @@ export function getEngineStatus(): EngineStatus {
     return { kind: "starting", modelId: null, pid: null, startedAt: null };
   }
   if (state.startupStalled) return { kind: "stalled", modelId: null, pid: null, startedAt: null };
+  if (process.env.MAIPAI_LLAMA_SERVER_URL) return { kind: "url", modelId: null, pid: null, startedAt: null };
   return { kind: "none", modelId: null, pid: null, startedAt: null };
 }
 

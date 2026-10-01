@@ -37,6 +37,7 @@ describe("Home's class list", () => {
     expect(new Set(DATA_CLASSES.map((c) => c.id)).size).toBe(
       DATA_CLASSES.length,
     );
+    expect(DATA_CLASSES.filter((c) => c.id === "models" || c.id === "engines").every((c) => c.holds === "No files managed by Home")).toBe(true);
   });
 
   test("every declaration parses against the spec's data-class shape and belongs to home", () => {
@@ -91,9 +92,8 @@ describe("Home's class list", () => {
       if (c.whenMissing === "hold") expect(c.degrades, c.id).toEqual([]);
     }
     for (const id of [
-      "models",
       "engines",
-          "reference",
+      "reference",
       "people-files",
       "backups",
     ]) {

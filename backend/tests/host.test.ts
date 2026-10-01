@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
+import { getHouseholdSettingValue } from "@/lib/settings";
 
 beforeEach(() => {
   resetDb();
@@ -75,7 +76,7 @@ describe("GET /api/host/chat-models", () => {
     const res = await owner.get("/api/host/chat-models");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { models: Array<{ id: string; label: string }>; selectedModel: unknown; canSelect: boolean };
-    expect(body.canSelect).toBe(true);
+    expect(body.canSelect).toBe(false);
     expect(body.models.every((model) => Object.keys(model).sort().join(",") === "id,label")).toBe(true);
   });
 
@@ -89,6 +90,42 @@ describe("GET /api/host/chat-models", () => {
     const res = await childClient.get("/api/host/chat-models");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ models: [], selectedModel: null, canSelect: false });
+  });
+});
+
+describe("POST /api/host/models/:id/select", () => {
+  test("returns 409 because model changes belong to the MaiPai Stack", async () => {
+    const owner = await ownerClient();
+    const res = await owner.post("/api/host/models/qwen3-8b-instruct-q4-k-m/select", {});
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "Model changes are made through the MaiPai Stack." });
+    expect(getHouseholdSettingValue("chat.model_id")).toBe("");
+  });
+});
+
+describe("POST /api/host/engine/{stop,restart}", () => {
+  test("refuses Home-owned chat engine controls", async () => {
+    const owner = await ownerClient();
+    for (const action of ["stop", "restart"] as const) {
+      const res = await owner.post(`/api/host/engine/${action}`, {});
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({ error: "Model changes are made through the MaiPai Stack." });
+    }
+  });
+});
+
+describe("GET /api/host/engine/status", () => {
+  test("reports the configured scripted Stack chat role", async () => {
+    const owner = await ownerClient();
+    const res = await owner.get("/api/host/engine/status");
+    expect(res.status).toBe(200);
+    const body = await res.json() as { kind: string; modelId: string | null; pid: number | null; startedAt: string | null; name: string | null; state: string };
+    expect(body.kind).toBe("url");
+    expect(body.modelId).toBeNull();
+    expect(body.pid).toBeNull();
+    expect(body.startedAt).toBeNull();
+    expect(body.name).toBeNull();
+    expect(body.state).toBe("ready");
   });
 });
 

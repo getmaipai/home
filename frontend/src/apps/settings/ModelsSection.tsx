@@ -7,7 +7,7 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { getIcon } from "@maipai/ui/src/icons";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
-import { api, ApiError, type HardwareInfo, type ModelFit, type ModelJob, type EngineStatus } from "@/lib/api";
+import { api, ApiError, type HardwareInfo, type ModelFit } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
 import { modelLinkName, parseModelLink } from "@/lib/modelLink";
@@ -38,21 +38,20 @@ export function ModelsSection() {
   const [imageFits, setImageFits] = useState<ModelFit[] | null>(null);
   const [videoFits, setVideoFits] = useState<ModelFit[] | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [engineStatus, setEngineStatus] = useState<EngineStatus | null>(null);
-  const [job, setJob] = useState<ModelJob | null>(null);
+  const [stackChat, setStackChat] = useState<{ name: string | null; state: string }>({ name: null, state: "offline" });
   const [error, setError] = useState<string | null>(null);
   const [checked, setChecked] = useState<Array<{ name: string; response: FitPlanResponse }>>([]);
 
   const load = useCallback(() => {
     setError(null);
-    Promise.all([api.hardware(), api.models("chat"), api.models("image"), api.models("video"), api.modelSelection(), api.engineStatus()])
-      .then(([hw, chat, image, video, selection, engine]) => {
+    Promise.all([api.hardware(), api.models("chat"), api.models("image"), api.models("video"), api.modelSelection()])
+      .then(([hw, chat, image, video, selection]) => {
         setHardware(hw);
         setChatFits(chat);
         setImageFits(image);
         setVideoFits(video);
         setSelectedModelId(selection.modelId);
-        setEngineStatus(engine);
+        setStackChat({ name: selection.name, state: selection.state });
       })
       .catch((e: unknown) => setError(e instanceof ApiError ? e.message : "Could not load this computer's information."));
   }, []);
@@ -65,79 +64,9 @@ export function ModelsSection() {
   useEffect(loadComputerMemory, [loadComputerMemory]);
 
   const implementedChatFits = chatFits?.filter((fit) => fit.model.implemented) ?? [];
-  const activeRecommendedJob = activeJobOf(job);
-  const failedRecommendedJob = job?.status === "failed" ? job : null;
-  const recommended = implementedChatFits.find((fit) => fit.model.id === (activeRecommendedJob?.modelId ?? failedRecommendedJob?.modelId ?? selectedModelId)) ?? implementedChatFits[0] ?? null;
+  const recommended = implementedChatFits.find((fit) => fit.model.id === selectedModelId) ?? implementedChatFits[0] ?? null;
   const recommendedUrl = recommended?.model.download?.url?.startsWith("https://huggingface.co/") ? recommended.model.download.url : null;
   const recommendedFit = useFitPlan(recommendedUrl, recommended?.contextUsed);
-
-  // A light background poll for "is it still running" (engine control's
-  // other half: seeing it go down, not just starting/stopping it) - slow
-  // enough (10s) not to be a real load, since this is dad-facing status,
-  // not a live dashboard.
-  useEffect(() => {
-    const timer = setInterval(() => {
-      api.engineStatus().then(setEngineStatus).catch(() => {});
-    }, 10_000);
-    return () => clearInterval(timer);
-  }, []);
-
-  async function handleStop() {
-    setError(null);
-    try {
-      setEngineStatus(await api.stopEngine());
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not stop the AI.");
-    }
-  }
-
-  async function handleRestart() {
-    setError(null);
-    setEngineStatus({ kind: "starting", modelId: null, pid: null, startedAt: null });
-    try {
-      setEngineStatus(await api.restartEngine());
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not restart the AI.");
-      load();
-    }
-  }
-
-  // Poll the active job while it's actually in flight; stop as soon as it
-  // lands on ready/failed so an idle page never keeps a timer running.
-  useEffect(() => {
-    if (!job || job.status === "ready" || job.status === "failed" || job.status === "none") return;
-    const timer = setInterval(() => {
-      api
-        .modelSelectStatus(job.modelId)
-        .then(setJob)
-        .catch(() => {
-          /* a transient poll failure isn't worth surfacing; the next tick retries */
-        });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [job]);
-
-  // selectedModelId tracks "ready" from wherever it's first observed - a
-  // poll tick landing on ready, or (a code review, 2026-09-04, found this
-  // exact gap) the very first select response already being ready, e.g.
-  // re-selecting a model whose files are already fully cached on disk.
-  // The poll effect above never even starts in that case (its own guard
-  // bails out immediately on a job that's already terminal), so this had
-  // to live in its own effect covering every path job can reach "ready"
-  // through, not inlined into just one of them.
-  useEffect(() => {
-    if (job?.status === "ready") { setSelectedModelId(job.modelId); loadComputerMemory(); }
-  }, [job, loadComputerMemory]);
-
-  async function handleChoose(modelId: string) {
-    setError(null);
-    try {
-      setJob(await api.selectModel(modelId));
-      loadComputerMemory();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not start setting up this model.");
-    }
-  }
 
   return (
     <Section heading="AI models">
@@ -151,12 +80,9 @@ export function ModelsSection() {
           <ChatModelCard
             fits={chatFits}
             selectedModelId={selectedModelId}
-            job={job}
-            engineStatus={engineStatus}
+            stackName={stackChat.name}
+            stackState={stackChat.state}
             fitPlan={recommendedFit}
-            onChoose={handleChoose}
-            onStop={handleStop}
-            onRestart={handleRestart}
           />
           <CheckModelCard onChecked={(name, response) => setChecked((items) => [{ name, response }, ...items.filter((item) => item.name !== name)].slice(0, 3))} />
           {recommended ? <CompareCard recommended={{ name: recommended.model.label, response: recommendedFit.response?.plan ? recommendedFit.response : null }} checked={checked} hardware={hardware} /> : null}
@@ -182,276 +108,40 @@ export function describeHardware(hw: HardwareInfo): string {
   return `This computer: no graphics card detected, ${hw.totalRamGb} GB memory. AI models will run slowly.`;
 }
 
-// Pulled out of ChatModelCard as one named, unit-testable function rather
-// than four booleans chained inline (a code review, 2026-09-04, flagged
-// the inline version as easy to update incompletely - miss one spot when
-// a new engine/job status is added later, and the card silently falls
-// through to the wrong branch with no compiler error). Still four
-// booleans, not a full discriminated union: a bigger rewrite of the JSX
-// below to consume one wasn't worth the risk of a rushed, un-reviewed
-// restructure at this hour for what the review itself called a
-// maintainability nice-to-have, not a bug - this is the bounded half of
-// that fix.
-// "ready" excluded alongside "none"/"failed": a completed job must stop
-// counting as "active" or the card gets stuck showing progress UI
-// forever (the same review finding).
-export function activeJobOf(job: ModelJob | null): ModelJob | null {
-  return job && job.status !== "none" && job.status !== "failed" && job.status !== "ready" ? job : null;
-}
-
-function deriveEngineState(
-  isSelected: boolean,
-  engineStatus: EngineStatus | null,
-  modelId: string,
-) {
-  // "url"/"override" count as running too, not just "selection": a code
-  // review (2026-09-04) found only "selection" counted, so a developer's
-  // MAIPAI_LLAMA_SERVER_URL/_BIN override active at the same time as a
-  // household selection left the card blank (isSelected true, every
-  // derived flag false) instead of showing it as running - reachable only
-  // via that env-override dev configuration, but a real gap. Those two
-  // kinds have no real modelId to compare (llmSupervisor.ts never sets
-  // one for them), so they're not required to match; "selection" still
-  // must match modelId - a stale poll response naming a model this
-  // household member just switched away from should never read as "this
-  // card is running."
-  const isRunning =
-    isSelected &&
-    (engineStatus?.kind === "url" ||
-      engineStatus?.kind === "override" ||
-      (engineStatus?.kind === "selection" && engineStatus.modelId === modelId));
-  return {
-    isRunning,
-    isStarting: isSelected && engineStatus?.kind === "starting",
-    isStalled: isSelected && engineStatus?.kind === "stalled",
-    isStopped: isSelected && engineStatus?.kind === "stopped",
-  };
-}
-
-// Real time/amount-left tracking (Jesse, 2026-09-04: "we need to be able
-// to see progress - time/amount left, time/amount downloaded"). The job
-// row only ever carries a byte count, not a rate - speed is derived
-// client-side from successive polls (job.completedBytes is polled every
-// 1s), smoothed so one slow or fast tick doesn't make the ETA jump
-// around. Resets whenever the phase changes (downloading_engine's small
-// archive finishing and downloading_model's much larger one starting is
-// a real, sharp rate change, not noise to smooth through).
-export function useDownloadRate(completedBytes: number, totalBytes: number, status: string): { bytesPerSecond: number | null; etaSeconds: number | null } {
-  const lastRef = useRef<{ completedBytes: number; at: number; status: string } | null>(null);
-  const [bytesPerSecond, setBytesPerSecond] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (totalBytes <= 0) return;
-    const now = Date.now();
-    const last = lastRef.current;
-    if (!last || last.status !== status) {
-      setBytesPerSecond(null);
-    } else if (completedBytes > last.completedBytes) {
-      const seconds = (now - last.at) / 1000;
-      if (seconds > 0) {
-        const instant = (completedBytes - last.completedBytes) / seconds;
-        setBytesPerSecond((prev) => (prev === null ? instant : prev * 0.6 + instant * 0.4));
-      }
-    }
-    lastRef.current = { completedBytes, at: now, status };
-  }, [completedBytes, totalBytes, status]);
-
-  const etaSeconds = bytesPerSecond && bytesPerSecond > 0 ? (totalBytes - completedBytes) / bytesPerSecond : null;
-  return { bytesPerSecond, etaSeconds };
-}
-
-export function formatEta(seconds: number): string {
-  if (seconds < 90) return "less than a minute left";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `about ${minutes} minute${minutes === 1 ? "" : "s"} left`;
-  const hours = Math.round(minutes / 60);
-  return `about ${hours} hour${hours === 1 ? "" : "s"} left`;
-}
-
-export const JOB_PHASE_LABEL: Record<string, string> = {
-  queued: "Getting ready…",
-  downloading_engine: "Setting up the AI engine…",
-  downloading_model: "Downloading the model…",
-  verifying: "Double-checking the download…",
-  loading: "Starting it up…",
-  testing: "Making sure it works…",
-};
-
-// Shared by ChatModelCard below and SetupWizard.tsx's hardware step - the
-// identical phase label / progress bar / byte-rate-ETA line, wherever a
-// download job needs showing (a code review, 2026-09-06, found the two
-// call sites had drifted into near-duplicate JSX). Renders nothing for a
-// job that isn't active (queued/downloading/verifying/loading/testing) -
-// null, done, or failed all show something else at the call site, not
-// this. Takes the raw `job` rather than an already-derived `activeJob` so
-// it can call `useDownloadRate` itself, unconditionally, the same "always
-// called, no-ops when there's nothing to track" shape `activeJobOf`'s own
-// comment already established for a hook that can't be called only on
-// some renders.
-export function ModelJobProgress({ job }: { job: ModelJob | null }) {
-  const activeJob = activeJobOf(job);
-  const { bytesPerSecond, etaSeconds } = useDownloadRate(activeJob?.completedBytes ?? 0, activeJob?.totalBytes ?? 0, activeJob?.status ?? "");
-  if (!activeJob) return null;
-  return (
-    <div className="flex flex-col gap-1">
-      {/* Progress's determinate mode renders no label of its own (spinner
-       * mode is the only one that does), so the phase text is its own
-       * line here rather than passed as `label` - and always present,
-       * even before a byte count exists, so a bare spinner is never
-       * shown with nothing explaining it. */}
-      <p className="text-base text-muted-foreground">{JOB_PHASE_LABEL[activeJob.status] ?? "Working…"}</p>
-      <Progress
-        mode={activeJob.totalBytes > 0 ? "determinate" : "spinner"}
-        value={activeJob.totalBytes > 0 ? (activeJob.completedBytes / activeJob.totalBytes) * 100 : undefined}
-      />
-      {activeJob.totalBytes > 0 ? (
-        <span className="text-base text-muted-foreground">
-          {formatBytes(activeJob.completedBytes)} of {formatBytes(activeJob.totalBytes)}
-          {bytesPerSecond ? ` · ${formatBytes(bytesPerSecond)}/s` : ""}
-          {etaSeconds !== null ? ` · ${formatEta(etaSeconds)}` : ""}
-        </span>
-      ) : null}
-    </div>
-  );
-}
-
 function ChatModelCard({
   fits,
   selectedModelId,
-  job,
-  engineStatus,
+  stackName,
+  stackState,
   fitPlan,
-  onChoose,
-  onStop,
-  onRestart,
 }: {
   fits: ModelFit[] | null;
   selectedModelId: string | null;
-  job: ModelJob | null;
-  engineStatus: EngineStatus | null;
+  stackName: string | null;
+  stackState: string;
   fitPlan: ReturnType<typeof useFitPlan>;
-  onChoose: (modelId: string) => void;
-  onStop: () => void;
-  onRestart: () => void;
 }) {
   const [showDetails, setShowDetails] = useState(false);
-  const [showOthers, setShowOthers] = useState(false);
   const CheckIcon = getIcon("check");
-  const AlertIcon = getIcon("alert-triangle");
   const ChevronIcon = getIcon("chevron-down");
-
-  // `job` (unlike `fits`) is always available, so this can run before
-  // either early return below - it has to: a hook called only on some
-  // renders (after `fits` loads, say) breaks React's rules of hooks
-  // (found by eslint-plugin-react-hooks, 2026-09-05, no live symptom yet
-  // since `fits` is only ever null on the very first render).
-  const activeJob = activeJobOf(job);
-
-  if (fits === null) return <RoleCardShell title="Chat"><Progress mode="spinner" label="Checking options" /></RoleCardShell>;
-  // Only entries with a real backend can ever be offered a "Use this" -
-  // the old read-only version explicitly gated on `implemented`; a code
-  // review (2026-09-04) found the rewrite had dropped that guard (no live
-  // impact today, the catalog's one chat entry is implemented: true, but
-  // a real regression in the code for the day a second one isn't).
-  const implementedFits = fits.filter((f) => f.model.implemented);
-  if (implementedFits.length === 0) return null;
-
-  const failedJob = job && job.status === "failed" ? job : null;
-  const primary = implementedFits.find((f) => f.model.id === (activeJob?.modelId ?? failedJob?.modelId ?? selectedModelId)) ?? implementedFits[0]!;
-  const isSelected = selectedModelId === primary.model.id && !activeJob;
-  const { isRunning, isStarting, isStopped, isStalled } = deriveEngineState(isSelected, engineStatus, primary.model.id);
-  const others = implementedFits.filter((f) => f.model.id !== primary.model.id);
+  if (fits === null) return <RoleCardShell title="Chat"><Progress mode="spinner" label="Checking the MaiPai Stack" /></RoleCardShell>;
+  const primary = fits.find((f) => f.model.id === selectedModelId) ?? fits.find((f) => f.model.implemented) ?? null;
   return (
     <RoleCardShell title="Chat">
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-base font-medium">{primary.model.label}</span>
-          {isRunning ? (
+          <span className="text-base font-medium">{stackName ?? "No chat model selected in the MaiPai Stack"}</span>
+          {stackState === "ready" || stackState === "loaded" ? (
             <span className="flex items-center gap-1 text-base text-[var(--primary)]">
-              <CheckIcon className="h-4 w-4" aria-hidden /> Running
+              <CheckIcon className="h-4 w-4" aria-hidden /> {stackState === "ready" ? "Ready" : "Loaded"}
             </span>
-          ) : isStopped ? (
-            <span className="text-base text-[var(--muted-foreground)]">Stopped</span>
-          ) : isStarting ? (
-            <span className="text-base text-[var(--muted-foreground)]">Starting…</span>
-          ) : isStalled ? (
-            <span className="text-base text-[var(--destructive)]">Start is stuck</span>
-          ) : null}
+          ) : <span className="text-base text-[var(--muted-foreground)]">{stackState}</span>}
         </div>
-
-        {isSelected && (isRunning || isStopped || isStarting || isStalled) ? (
-          <div className="flex items-center gap-2">
-            {isRunning ? (
-              <>
-                <Button variant="secondary" onClick={onRestart}>Restart</Button>
-                <Button variant="ghost" onClick={onStop}>Stop</Button>
-              </>
-            ) : isStopped ? (
-              <Button variant="secondary" onClick={onRestart}>Start</Button>
-            ) : isStalled ? (
-              <Button variant="secondary" onClick={onRestart}>Retry start</Button>
-            ) : (
-              // Found live 2026-09-06: "starting" had no way out - a
-              // household member watching a spinner with no escape hatch
-              // if it never resolves (a hung spawn, an interrupted
-              // hot-reload mid-start on a dev box). Stop is always safe to
-              // call here: stopChatBackend() unconditionally clears
-              // startingPromise, so it abandons a stuck attempt exactly
-              // the same way it stops a healthy running one.
-              <>
-                <Progress mode="spinner" label="Starting…" />
-                <Button variant="ghost" onClick={onStop}>Stop</Button>
-              </>
-            )}
-          </div>
-        ) : null}
-
-        {activeJob ? (
-          <ModelJobProgress job={job} />
-        ) : failedJob ? (
-          <div className="flex flex-col gap-2">
-            <p className="flex items-start gap-1.5 text-base text-[var(--destructive)]">
-              <AlertIcon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> Something went wrong: {failedJob.error}
-            </p>
-            <Button variant="secondary" className="w-fit" onClick={() => onChoose(primary.model.id)}>
-              Try again
-            </Button>
-          </div>
-        ) : isSelected ? null : (
-          <div className="flex flex-col gap-2">
-            <FitLine fitPlan={fitPlan} legacyWarning={!primary.fits} />
-            <Button className="w-fit" onClick={() => onChoose(primary.model.id)}>
-              Use this
-            </Button>
-          </div>
-        )}
-
+        <p className="text-base text-[var(--muted-foreground)]">Chat runs through the MaiPai Stack.</p>
+        {primary ? <FitLine fitPlan={fitPlan} legacyWarning={!primary.fits} /> : null}
         <Disclosure open={showDetails} onToggle={() => setShowDetails((v) => !v)} label="Details" icon={ChevronIcon}>
-          <div className="flex flex-col gap-1 pt-1">
-            {(primary.model.pros ?? []).map((pro) => (
-              <p key={pro} className="text-base text-[var(--muted-foreground)]">+ {pro}</p>
-            ))}
-            {(primary.model.cons ?? []).map((con) => (
-              <p key={con} className="text-base text-[var(--muted-foreground)]">− {con}</p>
-            ))}
-            <DetailsFitPanel fitPlan={fitPlan} legacyBytes={primary.requiredBytes} />
-          </div>
+          <div className="flex flex-col gap-1 pt-1">{primary ? <DetailsFitPanel fitPlan={fitPlan} legacyBytes={primary.requiredBytes} /> : <p className="text-base text-[var(--muted-foreground)]">The Stack has not reported a chat model.</p>}</div>
         </Disclosure>
-
-        {others.length > 0 ? (
-          <Disclosure open={showOthers} onToggle={() => setShowOthers((v) => !v)} label="Other options" icon={ChevronIcon}>
-            <div className="flex flex-col gap-2 pt-1">
-              {others.map((f) => (
-                <div key={f.model.id} className="flex items-center justify-between gap-2 rounded-[var(--radius)] border border-[var(--border)] p-2 text-base">
-                  <span>{f.model.label}</span>
-                  <Button variant="secondary" onClick={() => onChoose(f.model.id)} disabled={activeJob !== null}>
-                    Use this
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </Disclosure>
-        ) : null}
       </div>
     </RoleCardShell>
   );

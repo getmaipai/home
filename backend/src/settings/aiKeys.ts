@@ -1,37 +1,14 @@
-// AI settings (docs/SETTINGS.md Rule 3: "One card per role... Advanced
-// and expert details fold"). `chat.model_id` is the household's real
-// selection (llmSupervisor.ts's tier 3 reads it to know what to spawn);
-// the three `_override` keys are engineAutotune.ts's advanced escape
-// hatch ("auto-tune launch flags... with an advanced override," this
-// pass's own brief) for context size, flash attention, and the quantized
-// KV cache, each defaulting to "let auto-tune decide."
-//
-// `chat.model_id` is `level: "expert"` on purpose, not "basic": it isn't
-// meant to be edited through the generic settings renderer at all (Rule 1
-// - ModelsSection.tsx's "choose this" flow is the real, declared `setup`-
-// style escape hatch that owns changing it, since a plain value write
-// here has no download/spawn side effects the generic PUT /api/settings
-// route would run). Expert level just keeps it out of the Advanced fold a
-// person browsing AI settings would otherwise see and could edit into a
-// broken state (a stale or mistyped catalog id) with no download behind
-// it.
+// `chat.model_id` remains declared for compatibility with stored settings.
+// Home no longer writes it. The Stack owns chat model selection and process
+// state. The three `_override` keys remain declared for legacy supervisor
+// cleanup and do not control Stack chat.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
-// The chat picker and the engine supervisor both refer to the same real
-// household selection. Keeping the key name beside its declaration makes a
-// dedicated chat surface less likely to drift into a second setting.
+// Kept as a stable key name while old stored values remain readable.
 export const CHAT_MODEL_SETTING_KEY = "chat.model_id" as const;
 
-// HOME-STACK-02b: one setting decides whether Home's model calls go
-// through a MaiPai Stack instead of its own built-in supervisors. Empty
-// (the default) means no Stack is configured: Home keeps today's own
-// spawned engines exactly as before. HOME-STACK-01's installer is the
-// real, planned writer once it lands; until then this is a manual escape
-// hatch for a hand-run Stack, same household scope and same
-// not-for-the-generic-renderer posture as `chat.model_id` above (no
-// download or spawn side effect here either, but pointing Home at the
-// wrong URL silently breaks every model call, so it stays out of the
-// Advanced fold a person could stumble into).
+// One setting points Home at its required local Stack. An empty value
+// means the Stack is not configured and chat is unavailable.
 export const STACK_URL_SETTING_KEY = "engines.stack.url" as const;
 
 export const AI_SETTINGS_KEYS: SettingsKey[] = [

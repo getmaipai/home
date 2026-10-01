@@ -1917,6 +1917,10 @@ describe("#88: the judge and an edited turn", () => {
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0);
     await stub.stop();
+    // The judge used the scripted Stack above; the edited turn's failure
+    // case below specifically exercises an unreachable URL override.
+    __setStackClientForTests(null);
+    setHouseholdSettingValue("engines.stack.url", "");
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     try {
       const result = await runTurn(actor, "chat", "I love anchovies, actually", { conversationId: turn.conversationId ?? undefined, supersedes: turn.id });

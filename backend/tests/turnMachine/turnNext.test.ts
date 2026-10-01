@@ -9,7 +9,7 @@ import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests, __setChatRecoveryNudgeForTests } from "@/lib/llmSupervisor";
 import { __setStackClientForTests } from "@/lib/stackEngine";
-import { restoreDefaultScriptedStack } from "../stackFixture";
+import { restoreDefaultScriptedStack, startStackFixture } from "../stackFixture";
 import { __blockPortForTests, __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { createBenchPeople, startRecordingProxy, startFakeSearxng, type BenchPeople, type FakeSearxng } from "../../scripts/bench/conversationRunner";
@@ -51,6 +51,7 @@ const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
 // shape packageHost.test.ts and turnEngine.test.ts already use.
 beforeEach(() => {
   resetDb();
+  useDefaultScriptedStack();
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
   __resetRateLimiterForTests();
@@ -2118,48 +2119,30 @@ describe("turnNext.ts: ENGINE-AVAIL-02 first half, refusal before turn effects",
   });
 });
 
-// DEADLINE-01 (dev.md "U6 rerun ruling" (a)): a generation that never
-// finishes at all (the model node's own deadline, a dead engine) used
-// to deliver an empty string through answer as if the model had
-// genuinely said nothing - a genuinely dead MAIPAI_LLAMA_SERVER_URL
-// (a closed, real port - a real connection refusal, not a mock) drives
-// runOneGeneration's own `started.ok === false` path directly, no
-// scripting needed.
+// Home requires the Stack for chat, so a legacy local URL cannot replace it.
 describe("turnNext.ts: DEADLINE-01, a failed generation never delivers an empty reply", () => {
-  async function deadEngineUrl(): Promise<string> {
-    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const stub = startStubLlmServer(0, {});
-    const url = stub.url;
-    await stub.stop();
-    return url;
-  }
-
-  test("an ordinary question whose engine cannot be reached gets a typed status and no turn row", async () => {
-    process.env.MAIPAI_LLAMA_SERVER_URL = await deadEngineUrl();
+  beforeEach(() => {
+    useDefaultScriptedStack();
     __resetLlmSupervisorForTests();
-    const before = db.select().from(conversationTurns).all().length;
-    const result = await runTurnNext(people.owner, "chat", "how do I make a paper airplane");
-    expect(result).toEqual({ ok: false, status: 503, code: "engine_unavailable", error: "MaiPai's AI isn't running right now." });
-    expect(db.select().from(conversationTurns).all()).toHaveLength(before);
   });
 
-  test("the spoken status uses the fixed child-safe line", async () => {
-    process.env.MAIPAI_LLAMA_SERVER_URL = await deadEngineUrl();
-    __resetLlmSupervisorForTests();
-    const result = await runTurnNext(people.owner, "chat", "what is the weather", { spoken: true });
-    expect(result).toEqual({ ok: false, status: 503, code: "engine_unavailable", error: "I can't think right now. I've told the grown-ups." });
-  });
-
-  test("an unavailable forced generation returns a typed status without history", async () => {
-    process.env.MAIPAI_LLAMA_SERVER_URL = await deadEngineUrl();
-    __resetLlmSupervisorForTests();
+  test("a closed legacy URL does not replace the configured Stack", async () => {
+    const { complete } = await import("@/lib/llm");
+    const fixture = startStackFixture({
+      "POST /v1/chat/completions": async () => Response.json(
+        { choices: [{ message: { role: "assistant", content: "Stack answer." }, finish_reason: "stop" }] },
+        { headers: { "x-maipai-engine": "local scripted-test", "x-maipai-model": "scripted-stub", "x-maipai-revision": "scripted-test" } },
+      ),
+    });
+    __setStackClientForTests(fixture.client);
+    process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1";
     try {
-      const before = db.select().from(conversationTurns).all().length;
-      const result = await runTurnNext(people.owner, "chat", "who is the president of chile");
-      expect(result).toEqual({ ok: false, status: 503, code: "engine_unavailable", error: "MaiPai's AI isn't running right now." });
-      expect(db.select().from(conversationTurns).all()).toHaveLength(before);
+      const result = await complete("chat", [{ role: "user", content: "hello" }]);
+      expect(result.ok).toBe(true);
+      expect(fixture.calls).toEqual(["POST /v1/chat/completions"]);
     } finally {
-      // The closed endpoint is isolated to this test by afterEach().
+      fixture.stop();
+      restoreDefaultScriptedStack();
     }
   });
 });
