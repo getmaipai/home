@@ -148,7 +148,7 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
       </div>
     );
   } else if (def.selector === "boolean") {
-    control = <><Switch checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
+    control = <><Switch checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} className="after:-inset-y-4" />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
   } else if (def.selector === "select") {
     const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
     const getLabel = def.key === "household.locale" ? localeDisplayName : titleCaseOption;

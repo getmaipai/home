@@ -8078,15 +8078,7 @@
                         "type": "object",
                         "properties": {
                           "component": {
-                            "type": "string",
-                            "enum": [
-                              "chat",
-                              "embed",
-                              "background",
-                              "voice",
-                              "library",
-                              "hub"
-                            ]
+                            "type": "string"
                           },
                           "uptime_percent": {
                             "type": "number",
@@ -8179,15 +8171,7 @@
                         "type": "object",
                         "properties": {
                           "component": {
-                            "type": "string",
-                            "enum": [
-                              "chat",
-                              "embed",
-                              "background",
-                              "voice",
-                              "library",
-                              "hub"
-                            ]
+                            "type": "string"
                           },
                           "started_at": {
                             "type": "string"
@@ -8550,15 +8534,7 @@
                   "components": {
                     "type": "array",
                     "items": {
-                      "type": "string",
-                      "enum": [
-                        "chat",
-                        "embed",
-                        "background",
-                        "voice",
-                        "library",
-                        "hub"
-                      ]
+                      "type": "string"
                     },
                     "minItems": 1
                   },
@@ -8610,14 +8586,23 @@
                     "components": {
                       "type": "array",
                       "items": {
-                        "type": "string",
-                        "enum": [
-                          "chat",
-                          "embed",
-                          "background",
-                          "voice",
-                          "library",
-                          "hub"
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "embed",
+                              "background",
+                              "voice",
+                              "library",
+                              "hub",
+                              "internet"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^service:[a-z0-9][a-z0-9_-]{0,63}$"
+                          }
                         ]
                       },
                       "minItems": 1
@@ -8755,14 +8740,23 @@
                     "components": {
                       "type": "array",
                       "items": {
-                        "type": "string",
-                        "enum": [
-                          "chat",
-                          "embed",
-                          "background",
-                          "voice",
-                          "library",
-                          "hub"
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "embed",
+                              "background",
+                              "voice",
+                              "library",
+                              "hub",
+                              "internet"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^service:[a-z0-9][a-z0-9_-]{0,63}$"
+                          }
                         ]
                       },
                       "minItems": 1
@@ -8862,6 +8856,144 @@
           },
           "409": {
             "description": "Window is completed or already cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status/apps": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Read app health derived from declared needs",
+        "responses": {
+          "200": {
+            "description": "App health and ninety daily uptime buckets. Needs are visible to owners and admins.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "operational",
+                          "degraded",
+                          "down",
+                          "waiting_for_internet"
+                        ]
+                      },
+                      "reason": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "needs": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "engine",
+                                "service",
+                                "internet"
+                              ]
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "purpose": {
+                              "type": "string"
+                            },
+                            "required": {
+                              "type": "boolean"
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "operational",
+                                "degraded",
+                                "down",
+                                "waiting"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "id",
+                            "name",
+                            "purpose",
+                            "required",
+                            "state"
+                          ]
+                        }
+                      },
+                      "history": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "date": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "string",
+                              "enum": [
+                                "operational",
+                                "degraded",
+                                "down",
+                                "waiting_for_internet"
+                              ]
+                            },
+                            "uptime": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "date",
+                            "state",
+                            "uptime"
+                          ]
+                        }
+                      },
+                      "uptimePercent": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "state",
+                      "reason",
+                      "history",
+                      "uptimePercent"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {
