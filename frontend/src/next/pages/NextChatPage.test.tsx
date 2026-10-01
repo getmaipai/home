@@ -3221,8 +3221,10 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
 
   afterEach(() => __setUnwiredControlsForTests(false));
 
-  function stubAddMenuFetch(streamBody?: ReadableStream<Uint8Array>, imageRoleReady = false): () => void {
+  function stubAddMenuFetch(streamBody?: ReadableStream<Uint8Array>, imageRoleReady = false, width = 390): () => void {
     const original = globalThis.fetch;
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
     (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -3235,6 +3237,7 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     }) as unknown as typeof fetch;
     return () => {
       globalThis.fetch = original;
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     };
   }
 
@@ -3379,6 +3382,23 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
       await within(addMenu()).findByText("Add photos and files");
       const items = Array.from(addMenu().querySelectorAll('[data-slot="composer-menu-item"]')).map((el) => el.textContent);
       expect(items).toEqual([expect.stringContaining("Add photos and files"), expect.stringContaining("Take a photo")]);
+    } finally {
+      restore();
+    }
+  });
+
+  test("the one-entry desktop add control is a direct attachment button", async () => {
+    const restore = stubAddMenuFetch(undefined, false, 1280);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      const add = addButton();
+      expect(add).toBeTruthy();
+      expect(add.parentElement?.querySelector('[data-slot="composer-menu"]')).toBeNull();
     } finally {
       restore();
     }

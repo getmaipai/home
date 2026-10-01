@@ -25,6 +25,7 @@ import { ComposerPrimitive } from "@assistant-ui/react";
 import { useComposerAddAttachment } from "@assistant-ui/core/react";
 import { useQuery } from "@tanstack/react-query";
 import { ComposerAttachButton, ComposerMenu, ComposerMenuItem } from "@maipai/ui/src/elements/composer";
+import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
@@ -221,8 +222,17 @@ function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) 
 export function ComposerAddMenu() {
   const [open, setOpen] = useState(false);
   const { setScope } = useContext(PackageScopeContext);
-  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
+  const breakpoint = useBreakpoint();
+  const directAttachment = breakpoint.atLeast(640);
+  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: !directAttachment });
   const close = () => setOpen(false);
+  if (directAttachment) {
+    return (
+      <ComposerPrimitive.AddAttachment asChild>
+        <ComposerAttachButton aria-label="Add" className="size-12" />
+      </ComposerPrimitive.AddAttachment>
+    );
+  }
   return (
     <DismissableLayer.Root className="relative" onDismiss={open ? close : undefined}>
       <ComposerAttachButton

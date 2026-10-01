@@ -112,6 +112,17 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
   --composer-bg: var(--card) !important;
 }
 
+/* CHAT-QUIET-01: the composer uses the same page surface as its thread. */
+.aui-root.aui-thread-root {
+  --composer-bg: var(--background) !important;
+}
+
+/* CHAT-QUIET-01: the shipped spec sheet uses the mono token for labels;
+ * Home's result-card rows read more naturally in the body face. */
+[data-slot="spec-sheet"] {
+  --font-mono: var(--font-sans);
+}
+
 html.incognito [data-slot="input"],
 html.incognito input:not([type="checkbox"]):not([type="radio"]) {
   border-color: var(--incognito-input-border);

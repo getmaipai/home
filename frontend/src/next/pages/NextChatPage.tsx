@@ -796,7 +796,7 @@ function NextChatWelcome() {
 function NextReasoningGroup({ children, group }: PropsWithChildren<{ group: ThreadGroupPart }>) {
   const running = group.status.type === "running";
   return (
-    <ReasoningRoot streaming={running} variant="ghost">
+    <ReasoningRoot streaming={running} defaultOpen={false} variant="ghost">
       <ReasoningTrigger active={running} />
       <ReasoningContent aria-busy={running}>
         {/* Live finding, 2026-09-22 (Jesse, in Firefox): the shipped
