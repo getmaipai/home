@@ -179,11 +179,11 @@ Inventory from `backend/src` and bundled package sources: package `host.fetch`
 (`packageHost.ts`, rate-limited per destination host) is the only shared
 package HTTP choke point. It covers media lookup (Wikidata and Wikipedia),
 weather (Open-Meteo geocoding and forecast), MusicBrainz, news' NPR RSS,
-MLB Stats API, and configured SearXNG/Wikipedia search. Package-local direct
-fetches in `news/handler.ts`, `sports/handler.ts`, and `music/handler.ts` do
-not pass through that choke point today and remain STATUS-SVC-03a gaps; media
-lookup and weather go through `host.fetch`. Chat's web search uses the
-`packageHost.ts` SearXNG integration path and existing rate limit.
+MLB Stats API, and package calls through `host.fetch`. In particular,
+`news/handler.ts`, `sports/handler.ts`, and `music/handler.ts` use the
+`hostFetch` RPC wrapper, and weather's recipe uses the host fetch operation;
+these are not raw outbound fetches. Chat's SearXNG search uses its own
+existing integration choke point and limiter in `packageHost.ts`.
 
 Other direct external fetch inventory (STATUS-SVC-03b):
 
@@ -199,8 +199,11 @@ Other direct external fetch inventory (STATUS-SVC-03b):
   services. Favicon and user-requested page fetches are user-named sites,
   not fixed required app services.
 
-These paths are tracked in BACKLOG as STATUS-SVC-03a and 03b. No probes were
-added and no existing request volume was increased.
+The remaining declaration and platform paths are tracked in BACKLOG as
+STATUS-SVC-03a and 03b. Package services use one limiter at
+`createHost().fetch`; SearXNG keeps its purpose-built limiter and records its
+real search outcomes at that integration choke point. No probes were added
+and no existing request volume was increased.
 
 ## STATUS-C3a
 
