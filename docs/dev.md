@@ -1682,6 +1682,37 @@ Home's chat, judge, and embedding model names to the Stack's role names.
 The flag is off by default, so existing bench runs keep their usual
 upstream behavior.
 
+#### Chat and the judge, laptop run, 2026-10-01
+
+Hardware: Apple M4 Pro, 24 GB memory. The Stack used llama-server build
+b10797 with Qwen3 8B Q4_K_M (`qwen3-8b-instruct-q4-k-m`) for chat and
+the shared judge role.
+
+The live owner replay completed all 174 turns across three repeats.
+Four of 12 failed-block rows passed on all three repeats; 16 of 19
+control rows passed on all three repeats. The replay bar requires every
+failed-block row to pass all three repeats and no control regression,
+so chat failed. Honesty had one failed-block row,
+`president-of-chile-hallucinated-name-followup`, which failed all three
+repeats; the control honesty row passed all three. This fixed set had no safety or privacy
+category rows. Median first delta was 143.5 ms and median first sentence
+was 1,390 ms; the replay log does not report tokens per second.
+
+Judge-eval did not reach the model. It refused because `MAIPAI_DATA_DIR`
+was unset, while the phase instructions prohibited setting it. Precision,
+recall, and seconds per turn are therefore unmeasured. The comparison
+provided for this run is the 1.7B Q8_0 same-scorer result from
+2026-09-13: precision 66.7%, recall 100%, and 2.59 seconds per turn.
+The 4B and 8B have no same-scorer results for this comparison, so this
+attempt did not produce the first 8B number.
+
+Chat verdict: failed the owner replay bar, with 4/12 failed rows and
+16/19 control rows passing all three repeats. Judge verdict: failed to
+run because bench setup refused the unset `MAIPAI_DATA_DIR`, leaving the
+judge bars unmeasured. No same-day run against Home's own engine exists
+because this machine cannot hold two 8B copies; the cited baseline is an
+older run on a different model. The Studio run is still owed.
+
 The text to speech harness in `backend/scripts/bench/tts-stack16-d.ts`
 compares 30 fixed English lines spoken by Home's Pocket TTS service and
 the Stack's speech route in the same preset voice. It checks duration
