@@ -38,6 +38,7 @@ import { tmpdir } from "node:os";
 import { resolve, sep } from "node:path";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
+import { startRecordingProxy } from "./recordingProxy";
 
 const CLOSED_PORT_URL = "http://127.0.0.1:1";
 
@@ -82,6 +83,24 @@ if (!process.env.MAIPAI_EMBED_URL) refuse("MAIPAI_EMBED_URL is not set; a bench 
  * bench's own fresh one by then, so refusing from main() mutates
  * nothing that matters. */
 export async function startBench(): Promise<void> {
+  if (process.env.MAIPAI_BENCH_UPSTREAM === "stack") {
+    // Some entry points already own a recording proxy for chat. Their
+    // marker lets the shared setup reuse it for the other role URLs
+    // instead of translating a request twice. Other benches, including
+    // judge-eval, get one adapter per distinct Stack upstream here.
+    const markedProxy = process.env.MAIPAI_BENCH_STACK_PROXY;
+    const byUpstream = new Map<string, string>();
+    for (const name of ["MAIPAI_LLAMA_SERVER_URL", "MAIPAI_EMBED_URL", "MAIPAI_BACKGROUND_URL"] as const) {
+      const url = process.env[name];
+      if (!url || url === markedProxy || url === CLOSED_PORT_URL) continue;
+      let adapted = byUpstream.get(url);
+      if (!adapted) {
+        adapted = startRecordingProxy(url).url;
+        byUpstream.set(url, adapted);
+      }
+      process.env[name] = adapted;
+    }
+  }
   for (const [name, url] of [["MAIPAI_LLAMA_SERVER_URL", process.env.MAIPAI_LLAMA_SERVER_URL], ["MAIPAI_EMBED_URL", process.env.MAIPAI_EMBED_URL]] as const) {
     if (!url || !(await new LlamaServerClient(url).health())) refuse(`no engine answers at ${name} (${sanitizeEngineUrl(url)}); a bench needs an engine that is already running and ready.`);
   }

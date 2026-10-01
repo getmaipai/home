@@ -140,12 +140,40 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
   const pending = new Set<Promise<void>>();
   let scripted: string | null = null;
   const base = upstream.replace(/\/$/, "");
+  // The Stack intentionally exposes /healthz and role names, while the
+  // Home bench clients expect llama-server's /health and model names.
+  // Keep this translation opt-in and local to the bench proxy.
+  const stackAdapter = process.env.MAIPAI_BENCH_UPSTREAM === "stack";
   const server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
     async fetch(req) {
       const url = new URL(req.url);
-      const body = req.method === "POST" ? await req.text() : undefined;
+      let body = req.method === "POST" ? await req.text() : undefined;
+      if (stackAdapter && req.method === "GET" && url.pathname === "/health") {
+        try {
+          const health = await fetch(`${base}/healthz`, { signal: req.signal });
+          const payload = await health.json() as { ok?: unknown };
+          return health.status === 200 && payload.ok === true
+            ? Response.json({ status: "ok" })
+            : Response.json({ status: "error" }, { status: 503 });
+        } catch {
+          return Response.json({ status: "error" }, { status: 503 });
+        }
+      }
+      if (stackAdapter && body && (url.pathname === "/v1/chat/completions" || url.pathname === "/v1/embeddings")) {
+        try {
+          const parsed = JSON.parse(body) as { model?: string };
+          if (url.pathname === "/v1/chat/completions") {
+            parsed.model = parsed.model === "background" ? "judge" : "chat";
+          } else {
+            parsed.model = "embed";
+          }
+          body = JSON.stringify(parsed);
+        } catch {
+          // Invalid JSON keeps the proxy's ordinary pass-through behavior.
+        }
+      }
       // The record is captured here, before the upstream await, so two
       // completions in flight (a background summary beside the turn's
       // own) each keep their own reply text (a review).
@@ -287,4 +315,3 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
     stop: () => server.stop(true),
   };
 }
-

@@ -1676,6 +1676,12 @@ oMLX rows from the survey that decided this.
 
 ### The Stack proof harness
 
+For a live run against the Stack, set `MAIPAI_BENCH_UPSTREAM=stack`.
+The recording proxy then adapts the Stack's `/healthz` check and maps
+Home's chat, judge, and embedding model names to the Stack's role names.
+The flag is off by default, so existing bench runs keep their usual
+upstream behavior.
+
 The text to speech harness in `backend/scripts/bench/tts-stack16-d.ts`
 compares 30 fixed English lines spoken by Home's Pocket TTS service and
 the Stack's speech route in the same preset voice. It checks duration

@@ -472,6 +472,11 @@ async function resolveUpstream(): Promise<{ stub: { url: string; stop: () => voi
     const { startRecordingProxy } = await import("./recordingProxy");
     proxy = startRecordingProxy(upstream);
     process.env.MAIPAI_LLAMA_SERVER_URL = proxy.url;
+    if (process.env.MAIPAI_BENCH_UPSTREAM === "stack") {
+      if (process.env.MAIPAI_EMBED_URL?.replace(/\/$/, "") === upstream.replace(/\/$/, "")) process.env.MAIPAI_EMBED_URL = proxy.url;
+      if (process.env.MAIPAI_BACKGROUND_URL?.replace(/\/$/, "") === upstream.replace(/\/$/, "")) process.env.MAIPAI_BACKGROUND_URL = proxy.url;
+      process.env.MAIPAI_BENCH_STACK_PROXY = proxy.url;
+    }
   } else {
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     stub = startStubLlmServer(0);
