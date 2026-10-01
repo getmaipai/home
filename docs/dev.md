@@ -246,6 +246,12 @@ The live Repairs history showed 42 `repairs.new` notifications for the chat engi
 
 An open chat-engine Repair gets one additional `repairs.still_open` notification 15 minutes after it first opens, if it remains unresolved and not dismissed. Repeated health checks do not restart the timer, and the timer is cleared when the issue resolves or a person dismisses it. Other engine roles do not receive reminders. One reminder gives the adults a useful follow-up without turning a persistent outage into a notification loop. A plain timer fits this one bounded reminder: the issue row is re-read when it fires, while `hotReloadState` keeps its handle reachable across development reloads.
 
+## STATUS-FLAP-01
+
+The live status history on 2026-10-01 recorded chat as degraded at 10:10:55.002 and 10:16:01.978, returning to operational at 10:11:24.983 and 10:16:31.960. A one-time 09:52:25.267 transition also marked embed and voice degraded. The household had `engines.stack.url` configured and all four Stack role switches enabled. The chat probe cause and fix are recorded in commit `4bad0c23`.
+
+The same two chat intervals appeared for the Kiwix `library` component, but the investigation did not establish why it briefly reported `starting`. Its health loop polls every 10 seconds and restarts only after three consecutive failures. There was no five-minute Kiwix restart job; package warming is checked every 15 minutes and its bundled schedule is hourly. The warm job last ran at 10:07:25 before the first interval. The local app log contained only startup output, and the larger hub log had no nearby restart or resource-governor diagnostic. If the library transition recurs, capture its process and health-loop diagnostics; the chat fix does not explain the library state.
+
 ## SEARCH-FALLBACK-01: a second front door, Wikipedia's own official API (2026-09-24)
 
 **Objective.** `docs/plans/search-resilience-2026-09-24.md`'s item 3:
