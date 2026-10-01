@@ -86,3 +86,11 @@ A and B are what make "start a Stack beside the hub" safe to do now; they are th
 ## What this note does not decide
 
 Whether the Studio runs the household's hub (the owner's call, recorded 2026-09-17). Which models the Studio profile pins (that is STACK-14's output). Whether the robot uses the same setting (the robot is not built yet; the switches are Home settings and the robot's runtime reads the Stack directly).
+
+## Where it stands, 2026-10-01
+
+All four roles run on the Stack on the household's hub. Text to speech and speech to text passed listening checks and have proof runs. Search produced identical vectors. Chat and the judge have a same-day side by side against Home's own engine launch, with identical replay outcomes and identical judge scores.
+
+Home requires the Stack. The role switches are retired, the installer fails without the Stack, and a missing Stack is a Repairs entry. Home's own text to speech, speech to text, search and background engines are deleted. Chat is sealed and cannot spawn or download an engine.
+
+The 24 GB machine showed that the Stack's governor margin lets the judge share chat on p16, while p32 uses a separate judge. Open follow-ups are listed in the STACK-16 backlog rows: spec cleanup, fit verdict screenshots, judge quality, embedding launch flags, the dropped own-engine button, and installing the Stack as a service.
