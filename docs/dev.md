@@ -1703,6 +1703,19 @@ counts within 5, 8, and 12 percent of an even match.
 
 `backend/scripts/bench/embed-stack16-e.ts` compares Home and Stack vectors for 200 fixed sentences using the same Nomic model file. Every sentence must reach cosine similarity 0.999, repeated requests must return identical vectors, Stack single request median latency can be at most 50 ms slower, and batch throughput must reach at least 80 percent of Home's. Flags select the Stack URL, Home port, model path, number of sentences, and JSON output path. The script starts Home's embedding engine on its own port and stops that child when done. It is run by hand and never by `check.sh`.
 
+##### Laptop dry run, 2026-10-01
+
+Hardware: Apple M4 Pro, 26 GB unified memory.
+
+Both sides used Nomic embed text v1.5 Q4_K_M at revision
+`0188c9bf409793f810680a5a431e7b899c46104c`. Home used llama-server
+0.3.0-dev, build 10797, commit `832fd6f17`; the Stack used llama-server
+`b10797`. All 200 cosine scores were 1.000000 and deterministic, with
+median single request times of 4.442 ms for Home and 4.845 ms for the
+Stack, and batch rates of 497.91 and 369.09 sentences per second. The run
+fails the batch bar because Stack throughput was 0.741 of Home's; all
+other bars passed.
+
 ### Speech to text, laptop dry run, 2026-10-01
 
 Hardware: Apple M4 Pro, 26 GB unified memory (arm64).
