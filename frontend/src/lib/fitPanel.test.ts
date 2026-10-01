@@ -22,6 +22,15 @@ function plan(verdict: Plan["verdict"]): Plan {
 }
 
 describe("describeFitPlan", () => {
+  test("puts the known model file first without an estimate source or date", () => {
+    const source = plan("unknown");
+    source.model_file_bytes = 11_771_546_784;
+    const row = describeFitPlan(source).rows[0]!;
+    expect(row).toEqual({ label: "Model file", value: "about 11 GB" });
+  });
+  test("omits the model file row when its size is unknown", () => {
+    expect(describeFitPlan(plan("unknown")).rows[0]?.label).toBe("Memory it needs");
+  });
   test("lays out each valid verdict without changing plan numbers", () => {
     for (const verdict of ["yes", "slow", "no", "unknown"] as const) {
       const source = plan(verdict);

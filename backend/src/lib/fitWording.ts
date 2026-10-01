@@ -1,4 +1,5 @@
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
+import { formatFileGiB } from "../../../shared/fitGiB";
 
 export function fitWording(plan: StackFitPlan): { verdict: "yes" | "slow" | "no" | "unknown"; headline: string; detail: string } {
   const headline = {
@@ -26,7 +27,9 @@ export function fitWording(plan: StackFitPlan): { verdict: "yes" | "slow" | "no"
       detail = "It fits only by using the processor, so answers will be slower.";
       break;
     case "unknown":
-      detail = "Nobody has measured a model like this on a computer like yours yet.";
+      detail = typeof plan.model_file_bytes === "number" && typeof plan.cap.high === "number"
+        ? `The model file is about ${formatFileGiB(plan.model_file_bytes)} GB, and this computer can give ${Math.floor(plan.cap.high / 1024 ** 3)} GB to models. How much more memory it needs while running is not known for this model family yet.`
+        : "Nobody has measured a model like this on a computer like yours yet.";
       break;
   }
   return { verdict: plan.verdict, headline, detail };

@@ -1,4 +1,5 @@
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
+import { formatFileGiB } from "../../../shared/fitGiB";
 
 export type FitPanelRow = { label: string; value: string; source?: "measured" | "dry-run" | "estimated" | "unknown"; asOf?: string };
 
@@ -31,6 +32,7 @@ function range(low: number | null, high: number | null): string {
 
 export function describeFitPlan(plan: StackFitPlan): { rows: FitPanelRow[]; remedy: string | null } {
   const rows: FitPanelRow[] = [
+    ...(typeof plan.model_file_bytes === "number" ? [{ label: "Model file", value: `about ${formatFileGiB(plan.model_file_bytes)} GB` }] : []),
     { label: "Memory it needs", value: range(plan.total.low, plan.total.high), source: plan.total.source, asOf: plan.total.as_of },
     { label: "Memory it can use", value: plan.cap.high === null ? "Not known yet" : `about ${wholeGb(plan.cap.high)} GB`, source: plan.cap.source, asOf: plan.cap.as_of },
     { label: "What limits it", value: bottleneckNames[plan.bottleneck] },

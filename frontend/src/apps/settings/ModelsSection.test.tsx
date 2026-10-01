@@ -116,6 +116,19 @@ describe("ModelsSection", () => {
     "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE,
   };
 
+  test("Check a model explains the known file size for an unmeasured family", async () => {
+    const plan = StackFitPlan.parse({ ...testPlan("unknown"), model_file_bytes: 11_771_546_784, cap: { low: 16 * 1024 ** 3, high: 16 * 1024 ** 3, source: "measured", as_of: "2026-09-30" } });
+    const response = { plan, wording: { verdict: "unknown", headline: "Can't tell yet", detail: "The model file is about 11 GB, and this computer can give 16 GB to models. How much more memory it needs while running is not known for this model family yet." } };
+    const restore = stubFetchWithFitPlan(baseResponses, response);
+    try {
+      const { findByRole, getByRole, findAllByText } = render(<ModelsSection />);
+      const input = await findByRole("textbox", { name: "Hugging Face model link" });
+      fireEvent.change(input, { target: { value: GGUF_LINK } });
+      await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
+      expect((await findAllByText(response.wording.detail)).length).toBeGreaterThan(0);
+    } finally { restore(); }
+  });
+
   test("after two successful checks Compare shows the recommended model and both checked models", async () => {
     const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
     try {
