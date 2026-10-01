@@ -8,6 +8,6 @@ export function useStatusApps() {
     queryKey: STATUS_APPS_QUERY_KEY,
     queryFn: () => api.statusApps(),
     retry: false,
-    refetchInterval: (query) => query.state.data?.apps?.some((app) => app.state !== "operational") ? 5_000 : 15_000,
+    refetchInterval: (query) => query.state.data?.some((app) => app.state !== "operational") ? 5_000 : 15_000,
   });
 }

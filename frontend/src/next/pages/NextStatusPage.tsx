@@ -29,7 +29,7 @@ export function NextStatusPage({ person }: { person: Roster }) {
   const historyQuery = useQuery<StatusHistory>({ queryKey: ["status-history", 90], queryFn: () => api.statusHistory(90), refetchInterval: 60_000, retry: false, enabled: canSeeParts });
   const boardData = boardQuery.data && Array.isArray(boardQuery.data.maintenance) ? boardQuery.data : undefined;
   const maintenance = activeMaintenanceParts(boardData?.maintenance);
-  const apps = appsQuery.data?.apps ?? [];
+  const apps = appsQuery.data ?? [];
   const appSummary = statusAppsSummary(apps);
   const summary = appSummary.level === "online" && maintenance.length > 0
     ? { ...appSummary, level: "maintenance" as const, text: "Maintenance", message: "Scheduled work is underway." }

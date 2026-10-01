@@ -629,10 +629,10 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
         date: new Date(today.getTime() - (89 - index) * 86_400_000).toISOString().slice(0, 10),
         state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100,
       }));
-      await page.route("**/api/status/apps", (request) => request.fulfill({ status: 200, json: { apps: [
-        { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true }], history, uptimePercent: 99.5 },
+      await page.route("**/api/status/apps", (request) => request.fulfill({ status: 200, json: [
+        { id: "chat", name: "Chat", state: "down", reason: "Chat is not working because Brain is down.", needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true, purpose: "Chat model" }], history, uptimePercent: 99.5 },
         ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, needs: [], history: history.map((day) => ({ ...day, state: "operational", uptime: 100 })), uptimePercent: 100 })),
-      ] } }));
+      ] }));
     }
     await page.goto(`${BASE_URL}${route.path}`);
     // `chat-list` (`?list=1`) legitimately opens the thread-history
@@ -3798,10 +3798,10 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
     const date = new Date(today.getTime() - (89 - index) * 86_400_000).toISOString().slice(0, 10);
     return { date, state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100 };
   });
-  const appFixture = (admin: boolean) => ({ apps: [
-    { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", ...(admin ? { needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true }] } : {}), history, uptimePercent: 99.5 },
+  const appFixture = (admin: boolean) => [
+    { id: "chat", name: "Chat", state: "down", reason: "Chat is not working because Brain is down.", ...(admin ? { needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true, purpose: "Chat model" }] } : {}), history, uptimePercent: 99.5 },
     ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, ...(admin ? { needs: [] } : {}), history: history.map((day) => ({ ...day, state: "operational", uptime: 100 })), uptimePercent: 100 })),
-  ] });
+  ];
 
   for (const [role, session, admin] of [["admin", ownerSession, true], ["non-admin", memberSession, false]] as const) {
     for (const [viewportName, width] of [["desktop", 1440], ["phone", 390]] as const) {
@@ -3819,14 +3819,14 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
         });
         await page.goto(`${BASE_URL}/status`);
         await page.getByText("Apps", { exact: true }).waitFor({ timeout: 15000 });
-        await page.getByRole("region", { name: "Overall status" }).getByText("Chat isn't working right now.", { exact: true }).waitFor();
+        await page.getByRole("region", { name: "Overall status" }).getByText("Chat is not working because Brain is down.", { exact: true }).waitFor();
         if (admin) {
           await page.getByText("Needs: Brain (down)", { exact: true }).waitFor();
           await page.getByText("Behind the scenes", { exact: true }).waitFor();
         } else {
           if (await page.getByText("Behind the scenes", { exact: true }).count()) throw new Error("non-admin status capture shows Behind the scenes");
           if (await page.getByText("Brain", { exact: true }).count()) throw new Error("non-admin status capture exposed the Brain engine name");
-          const chatReason = await page.getByText("Chat isn't working right now.", { exact: true }).first().textContent();
+          const chatReason = await page.getByText("Chat is not working because Brain is down.", { exact: true }).first().textContent();
           if (chatReason?.includes("Brain")) throw new Error("non-admin reason sentence exposed an engine name");
           const statusLinkTitle = await page.locator('a[href="/status"]').getAttribute("title");
           if (statusLinkTitle?.includes("Brain")) throw new Error("non-admin status indicator tooltip exposed an engine name");
@@ -3838,7 +3838,7 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
           const chatLink = page.locator('[aria-label="Primary navigation"] a[href="/next/chat"]');
           await chatLink.waitFor({ timeout: 5000 });
           if (await chatLink.getAttribute("aria-label") !== "Chat: not working") throw new Error(`${role} status menu label did not expose Chat status: ${await chatLink.getAttribute("aria-label")}`);
-          if (await chatLink.getAttribute("title") !== "Chat isn't working right now.") throw new Error(`${role} status tooltip did not use the app reason sentence`);
+          if (await chatLink.getAttribute("title") !== "Chat is not working because Brain is down.") throw new Error(`${role} status tooltip did not use the app reason sentence`);
         }
       } finally { await context.close(); }
     }

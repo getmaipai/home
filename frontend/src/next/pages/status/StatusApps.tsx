@@ -18,7 +18,7 @@ function appStripSummary(app: StatusApp) {
 }
 
 function needsSentence(app: StatusApp) {
-  return `Needs: ${(app.needs ?? []).map((need) => `${need.name} (${need.state === "operational" ? "fine" : need.state.replaceAll("_", " ")})`).join(", ")}`;
+  return `Needs: ${(app.needs ?? []).map((need) => `${need.name} (${need.state === "operational" ? "fine" : need.state === "waiting" ? "waiting for internet" : need.state.replaceAll("_", " ")})`).join(", ")}`;
 }
 
 export function StatusApps({ person, apps, behindTheScenes }: { person: Roster; apps: StatusApp[]; behindTheScenes?: ReactNode }) {

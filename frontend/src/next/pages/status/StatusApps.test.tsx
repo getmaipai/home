@@ -10,8 +10,8 @@ afterEach(cleanup);
 const person = (role: Roster["role"]) => ({ role }) as Roster;
 const app = (state: "operational" | "degraded" | "down" | "waiting_for_internet"): StatusApp => ({
   id: "chat", name: "Chat", state,
-  reason: state === "operational" ? null : "Chat is having trouble because Brain is down.",
-  needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true }],
+  reason: state === "operational" ? null : "Chat is not working because Brain is down.",
+  needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", purpose: "Chat model", required: true }],
   history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-09-${String((index % 30) + 1).padStart(2, "0")}`, state, uptime: 0.5 })),
   uptimePercent: 99.5,
 });
@@ -41,7 +41,7 @@ describe("app status presentation", () => {
   test.each(["degraded", "down", "waiting_for_internet"] as const)("renders %s for the household without dependency names or controls", (state) => {
     const view = render(<TooltipProvider><StatusApps person={person("adult")} apps={[app(state)]} /></TooltipProvider>);
     expect(view.getByText("Chat")).toBeInTheDocument();
-    expect(view.getByText("Chat is having trouble because Brain is down.")).toBeInTheDocument();
+    expect(view.getByText("Chat is not working because Brain is down.")).toBeInTheDocument();
     expect(view.queryByText(/Needs: Brain/)).not.toBeInTheDocument();
     expect(view.queryByText("Behind the scenes")).not.toBeInTheDocument();
     expect(view.queryByRole("button", { name: /Restart|Stop|Start/ })).not.toBeInTheDocument();

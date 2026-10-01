@@ -1,3 +1,4 @@
+import type { StatusAppsWire } from "@maipai/home-backend/src/wire";
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { StatusNote } from "@maipai/spec/gen/ts/status-note.js";
@@ -546,13 +547,10 @@ export type StatusHistoryIncident = { component: "chat" | "embed" | "background"
 export type StatusHistoryComponent = { component: StatusHistoryIncident["component"]; uptime_percent: number | null; days: StatusHistoryDay[]; current: { state: StatusHistoryState; since: string | null } };
 export type StatusHistory = { generated_at: string; days: number; components: StatusHistoryComponent[]; incidents: StatusHistoryIncident[] };
 
-// STATUS-SVC-05 draft wire types, replaced with the route schema's inferred
-// response when the backend lane lands.
-export type StatusAppState = "operational" | "degraded" | "down" | "waiting_for_internet";
-export type StatusAppNeed = { kind: "engine" | "service" | "internet"; id: string; name: string; state: StatusAppState; required: boolean };
-export type StatusAppHistoryDay = { date: string; state: StatusAppState; uptime: number };
-export type StatusApp = { id: string; name: string; state: StatusAppState; reason: string | null; needs?: StatusAppNeed[]; history: StatusAppHistoryDay[]; uptimePercent: number };
-export type StatusAppsResponse = { apps: StatusApp[] };
+export type StatusAppsResponse = StatusAppsWire;
+export type StatusApp = StatusAppsResponse[number];
+export type StatusAppNeed = NonNullable<StatusApp["needs"]>[number];
+export type StatusAppState = StatusApp["state"];
 
 export const api = {
   profiles: () => request<Roster[]>("/api/auth/profiles"),

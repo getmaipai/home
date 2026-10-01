@@ -14,9 +14,9 @@ describe("status app language and sidebar severity", () => {
   });
 
   test("uses the plain reason sentence as tooltip and accessible label", () => {
-    expect(appStatusSentence("Chat", "down", "Chat can't reach Brain right now.")).toEqual({
+    expect(appStatusSentence("Chat", "down", "Chat is not working because Brain is down.")).toEqual({
       ariaLabel: "Chat: not working",
-      title: "Chat can't reach Brain right now.",
+      title: "Chat is not working because Brain is down.",
     });
   });
 

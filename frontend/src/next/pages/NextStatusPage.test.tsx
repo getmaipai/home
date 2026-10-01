@@ -10,10 +10,10 @@ function makePerson(role: Roster["role"]): Roster {
   return { id: "person-abc123", display_name: "Nova", nickname: null, role, avatar_seed: "person-abc123", source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true } as Roster;
 }
 
-const apps: StatusAppsResponse = { apps: [
-  { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100 })), uptimePercent: 99.5 },
-  ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational" as const, reason: null, needs: [{ kind: "engine" as const, id: "chat", name: "Brain", state: "operational" as const, required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: "operational" as const, uptime: 100 })), uptimePercent: 100 })),
-] };
+const apps: StatusAppsResponse = [
+  { id: "chat", name: "Chat", state: "down", reason: "Chat is not working because Brain is down.", needs: [{ kind: "engine", id: "chat", name: "Brain", purpose: "Chat model", state: "down", required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: index === 89 ? "down" : "operational", uptime: index === 89 ? 50 : 100 })), uptimePercent: 99.5 },
+  ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational" as const, reason: null, needs: [{ kind: "engine" as const, id: "chat", name: "Brain", purpose: "Chat model", state: "operational" as const, required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: "operational" as const, uptime: 100 })), uptimePercent: 100 })),
+];
 
 function mockStatus() {
   const original = globalThis.fetch;
@@ -39,9 +39,9 @@ describe("NextStatusPage app-first view", () => {
     try {
       const view = renderWithQueryClient(<NextStatusPage person={makePerson("adult")} />);
       expect(await view.findByText("Apps")).toBeTruthy();
-      expect(view.getAllByText("Chat isn't working right now.").length).toBeGreaterThan(0);
+      expect(view.getAllByText("Chat is not working because Brain is down.").length).toBeGreaterThan(0);
       for (const name of ["Chat", "Home", "Videos", "Music", "Podcasts"]) expect(view.getAllByText(name).length).toBeGreaterThan(0);
-      expect(view.getAllByText("Chat isn't working right now.").some((line) => line.closest("[data-status-banner]") !== null)).toBe(true);
+      expect(view.getAllByText("Chat is not working because Brain is down.").some((line) => line.closest("[data-status-banner]") !== null)).toBe(true);
       expect(view.queryByText("Needs: Brain (down)")).toBeNull();
       expect(view.queryByText("Behind the scenes")).toBeNull();
       expect(view.queryByText("Brain", { exact: true })).toBeNull();

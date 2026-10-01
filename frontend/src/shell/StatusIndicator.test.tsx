@@ -6,10 +6,10 @@ import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 
 afterEach(cleanup);
 
-const appStatus = (state: "operational" | "degraded" | "down" | "waiting_for_internet") => ({ apps: [{
-  id: "chat", name: "Chat", state, reason: state === "operational" ? null : "Chat isn't working right now.",
-  needs: [{ kind: "engine", id: "chat", name: "Brain", state, required: true }], history: [], uptimePercent: 100,
-}] });
+const appStatus = (state: "operational" | "degraded" | "down" | "waiting_for_internet") => [{
+  id: "chat", name: "Chat", state, reason: state === "operational" ? null : "Chat is not working because Brain is down.",
+  needs: [{ kind: "engine", id: "chat", name: "Brain", state: state === "waiting_for_internet" ? "waiting" : state, purpose: "Chat model", required: true }], history: [], uptimePercent: 100,
+}];
 
 describe("StatusIndicator", () => {
   test.each([
@@ -32,7 +32,7 @@ describe("StatusIndicator", () => {
         return found;
       });
       expect(link.getAttribute("href")).toBe("/status");
-      if (state !== "operational") expect(link.getAttribute("title")).toBe("Chat isn't working right now.");
+      if (state !== "operational") expect(link.getAttribute("title")).toBe("Chat is not working because Brain is down.");
     } finally { globalThis.fetch = originalFetch; }
   });
 

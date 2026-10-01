@@ -12,7 +12,7 @@ export function StatusIndicator() {
   const board = useQuery<StatusBoard>({ queryKey: STATUS_BOARD_QUERY_KEY, queryFn: () => api.statusBoard(), refetchInterval: 30_000 });
   const underMaintenance = activeMaintenanceParts(Array.isArray(board.data?.maintenance) ? board.data.maintenance : undefined);
   const appsQuery = useStatusApps();
-  const appsSummary = statusAppsSummary(appsQuery.data?.apps ?? []);
+  const appsSummary = statusAppsSummary(appsQuery.data ?? []);
   const summary = appsSummary.level === "online" && underMaintenance.length > 0
     ? { ...appsSummary, level: "maintenance" as const, text: "Maintenance" }
     : appsSummary;
