@@ -348,8 +348,8 @@ install_stack_service() {
     log "[dry-run] would run as ${stack_user:-<no console user found>}: $(stack_install_service_command "$binary" "$stack_data_dir" "$STACK_PORT_BASE" "$bun_bin") (or a higher port near ${STACK_PORT_BASE} if that one is taken)"
     [ "$os" = "linux" ] && log "[dry-run] would run: loginctl enable-linger ${stack_user:-<no console user found>}"
     log "[dry-run] would poll http://127.0.0.1:${STACK_PORT_BASE}/healthz (or that higher port)"
-    log "[dry-run] would run: bun run backend/scripts/set-setting.ts engines.stack.url http://127.0.0.1:${STACK_PORT_BASE} --only-if-empty-or-prefix http://127.0.0.1: (port as above)"
     log "[dry-run] would read engines.stack.url first; if empty, explicitly write engines.stack.use_chat, use_embeddings, use_stt, and use_tts as false"
+    log "[dry-run] would run: bun run backend/scripts/set-setting.ts engines.stack.url http://127.0.0.1:${STACK_PORT_BASE} --only-if-empty-or-prefix http://127.0.0.1: (port as above)"
     return 0
   fi
 
@@ -391,11 +391,8 @@ install_stack_service() {
   done
   log "MaiPai Stack is running at http://127.0.0.1:${stack_port}"
 
-  # The port into engines.stack.url, only now that the Stack is
-  # confirmed healthy - the last thing this whole sequence writes, never
-  # the first, so a Stack that never comes up leaves Home on its own
-  # supervisors exactly as HOME-STACK-02b's safe default already
-  # guarantees (docs/dev.md's own design paragraph for this item).
+  # Read the previous address after health succeeds. Fresh setups first
+  # store all role switches off; only then may the address be written.
   # --only-if-empty-or-prefix (a code review's own finding): a household
   # that has since pointed this setting at a remote or hand-run Stack
   # through the settings UI keeps that choice on the next upgrade,
@@ -404,9 +401,9 @@ install_stack_service() {
   local previous_stack_url
   previous_stack_url=$(cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts --get engines.stack.url) \
     || { log "Could not read engines.stack.url before setup."; return 1; }
+  write_fresh_stack_role_defaults "$previous_stack_url" "$install_root" "$bun_bin" || return 1
   (cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts engines.stack.url "http://127.0.0.1:${stack_port}" --only-if-empty-or-prefix "http://127.0.0.1:") \
     || { log "Could not write engines.stack.url. The Stack is running but Home will not call it until this is fixed and the setting is set by hand."; return 1; }
-  write_fresh_stack_role_defaults "$previous_stack_url" "$install_root" "$bun_bin" || return 1
 }
 
 setup_stack() {

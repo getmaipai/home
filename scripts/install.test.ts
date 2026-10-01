@@ -72,6 +72,20 @@ describe("write_fresh_stack_role_defaults", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  test("stops after a failed first switch write before allowing the address write", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-install-roles-fail-"));
+    mkdirSync(join(root, "backend"));
+    const fakeBun = join(root, "bun");
+    writeFileSync(fakeBun, "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+    try {
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; write_fresh_stack_role_defaults '\"\"' "${root}" "${fakeBun}" && echo address-write`]);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout.toString()).not.toContain("address-write");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("find_console_user", () => {
@@ -129,6 +143,7 @@ describe("--dry-run", () => {
     expect(stdout).toContain("would poll http://127.0.0.1:8770/healthz");
     expect(stdout).toContain("would run: bun run backend/scripts/set-setting.ts engines.stack.url http://127.0.0.1:8770 --only-if-empty-or-prefix http://127.0.0.1:");
     expect(stdout).toContain("would read engines.stack.url first; if empty, explicitly write engines.stack.use_chat, use_embeddings, use_stt, and use_tts as false");
+    expect(stdout.indexOf("would read engines.stack.url first; if empty")).toBeLessThan(stdout.indexOf("would run: bun run backend/scripts/set-setting.ts engines.stack.url"));
   });
 
   test("makes no network call at all - find_free_port() (a real loopback socket probe) never runs", () => {

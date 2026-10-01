@@ -12,6 +12,7 @@
 //   bun run backend/scripts/set-setting.ts engines.stack.url "http://127.0.0.1:8770"
 //   bun run backend/scripts/set-setting.ts engines.stack.url "http://127.0.0.1:8770" --only-if-empty-or-prefix "http://127.0.0.1:"
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "../src/lib/settings";
+import { getRegistryKey } from "../src/lib/settingsRegistry";
 
 const [key, value, ...rest] = process.argv.slice(2);
 if (key === "--get" && value) {
@@ -45,9 +46,31 @@ if (flagIndex !== -1) {
   }
 }
 
-const result = setHouseholdSettingValue(key, value);
+const keyDef = getRegistryKey(key);
+if (!keyDef) {
+  console.error(`could not set ${key}: unknown settings key: ${key}`);
+  process.exit(1);
+}
+
+let typedValue: unknown = value;
+if (keyDef.selector === "boolean") {
+  if (value !== "true" && value !== "false") {
+    console.error(`could not set ${key}: expected true or false`);
+    process.exit(1);
+  }
+  typedValue = value === "true";
+} else if (keyDef.selector === "number" || keyDef.selector === "duration") {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    console.error(`could not set ${key}: expected a finite number`);
+    process.exit(1);
+  }
+  typedValue = parsed;
+}
+
+const result = setHouseholdSettingValue(key, typedValue);
 if (!result.ok) {
   console.error(`could not set ${key}: ${result.error}`);
   process.exit(1);
 }
-console.log(`${key} = ${JSON.stringify(value)}`);
+console.log(`${key} = ${JSON.stringify(typedValue)}`);
