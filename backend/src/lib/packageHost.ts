@@ -1106,7 +1106,7 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
         : [];
       for (const name of unresponsiveNames) searxngBenchedUntil.set(name, Date.now() + SEARXNG_ENGINE_BENCH_MS);
       const unresponsiveEngines = unresponsiveNames.length > 0;
-      void recordServiceOutcome(new URL(baseUrl).host, { ok: !unresponsiveEngines, error: unresponsiveEngines ? new Error("captcha or service access wall") : undefined });
+      void recordServiceOutcome("searxng", { ok: !unresponsiveEngines, error: unresponsiveEngines ? new Error("captcha or service access wall") : undefined });
       if (text === SEARXNG_NO_RESULTS_TEXT && unresponsiveEngines) {
         // This exact message reaches a household member verbatim only
         // because `turnMachine/nodes/answer.ts`'s `toolOutageLine()`
@@ -1154,7 +1154,7 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
         kind: "down",
         detail: `${err instanceof Error ? err.message : String(err)} Check the SearXNG URL in Settings -> AI & connections -> Integrations.`,
       });
-      void recordServiceOutcome(new URL(baseUrl).host, { ok: false, error: err });
+      void recordServiceOutcome("searxng", { ok: false, error: err });
     }
     // SEARCH-FALLBACK-01: "when SearXNG is down" - the other half. Tried
     // AFTER recording SearXNG's own real health (a household still needs

@@ -199,8 +199,10 @@ Other direct external fetch inventory (STATUS-SVC-03b):
   services. Favicon and user-requested page fetches are user-named sites,
   not fixed required app services.
 
-The remaining declaration and platform paths are tracked in BACKLOG as
-STATUS-SVC-03a and 03b. Package services use one limiter at
+The remaining paths are tracked in BACKLOG as STATUS-SVC-03b. Installed
+built-in plugins that Chat can invoke contribute their fixed service needs
+to Chat's registry; absent plugins contribute no service need. Package
+services use one limiter at
 `createHost().fetch`; SearXNG keeps its purpose-built limiter and records its
 real search outcomes at that integration choke point. No probes were added
 and no existing request volume was increased.

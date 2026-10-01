@@ -51,7 +51,8 @@ export function listStatusApps(): StatusApp[] {
   const core = CORE_APPS.map((app) => ({ ...app, needs: [...app.needs] }));
   const chat = core.find((app) => app.id === "chat")!;
   const searxng = installedServices.get("searxng") ?? BUILT_IN_PLUGIN_SERVICES.websearch![0]!;
-  chat.needs.push(searxng);
+  installedServices.set("searxng", searxng);
+  chat.needs.push(...installedServices.values());
   const known = new Set(core.map((app) => app.id));
   const installed = appsFromManifests(packageApps).filter((app) => !known.has(app.id)).map((app) => ({
     ...app,
