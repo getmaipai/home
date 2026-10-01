@@ -1,7 +1,7 @@
 // Server-side STT endpointing (session-c-brain-and-voice.md step 5),
 // ported from the archived legacy hub's lib/voice/sttSession.ts - the
 // exact tuned numbers the plan names verbatim ("the numbers legacy
-// tuned") - repointed at lib/stt.ts's Moonshine transcription instead of
+// tuned") - wired to the Stack's transcription route instead of
 // legacy's HTTP call to a separate whisper.cpp sidecar.
 //
 // VAD is Silero (neural, via sileroVad.ts) gated by a cheap RMS
@@ -10,15 +10,10 @@
 // to pure-RMS thresholds when the model isn't installed yet (boot
 // before background download) or inference fails.
 //
-// Moonshine has no native streaming partials any more than whisper.cpp
-// did, so partials re-transcribe the growing buffer at a fixed interval.
-// Moonshine's own "silent-head" quirk (real, observed against the
-// pinned tiny-en model, not theoretical): an utterance whose sent audio
-// starts with a long dead-silence pre-roll occasionally decodes to an
-// EMPTY string even though real speech follows - finalize() retries once
-// from the real voiced onset (dropping the pre-roll) before giving up,
-// the plan's own "a short pre-roll and a retry from onset when the
-// model returns empty" rule.
+// The Stack accepts complete WAV files, so partials re-transcribe the
+// growing buffer at a fixed interval.
+// A complete WAV with a long silent pre-roll can decode to an empty string,
+// so finalize() retries once from the voiced onset before giving up.
 import { transcribeUtterance } from "@/lib/stt";
 import { getSileroStream, type SileroVadStream } from "@/lib/sileroVad";
 import type { SttWireEvent } from "@maipai/spec/voice/ts/sttTypes.js";
@@ -28,6 +23,10 @@ export interface SttSessionConfig {
   silenceTimeoutS: number;
   partialIntervalS: number;
 }
+
+let sileroLoader: typeof getSileroStream = getSileroStream;
+export function __setSileroLoaderForTests(loader: typeof getSileroStream): void { sileroLoader = loader; }
+export function __resetSileroLoaderForTests(): void { sileroLoader = getSileroStream; }
 
 // Fallback energy thresholds (Silero unavailable).
 const VAD_ONSET_RMS = 0.02;
@@ -43,7 +42,7 @@ const PRE_GATE_RMS = 0.006;
 // Pre-onset rolling window prepended to the utterance at onset. Silero
 // decides per 32ms chunk and its onset probability ramps over a chunk
 // or two, so without this the first phoneme would be clipped from what
-// gets sent to Moonshine.
+// gets sent to the Stack.
 const PREROLL_S = 0.32;
 const MIN_SPEECH_SAMPLES_FRAC = 0.2; // ignore bursts shorter than 0.2s
 // Hard cap on buffered audio (~30s). Steady noise that never dips below
@@ -51,7 +50,7 @@ const MIN_SPEECH_SAMPLES_FRAC = 0.2; // ignore bursts shorter than 0.2s
 // bound; force a finalize once this is hit so memory stays flat.
 const MAX_SPEECH_SECONDS = 30;
 
-// Moonshine (like whisper.cpp before it) sometimes transcribes non-speech
+// The Stack recognizer sometimes transcribes non-speech
 // sounds as bracketed/parenthetical annotations - "[BLANK_AUDIO]",
 // "(keyboard clicking)", "(typing)", "♪♪♪", "*sighs*". The energy VAD
 // can't tell these from speech, so without this filter a few keystrokes
@@ -78,7 +77,7 @@ export class SttSession {
   private speech: Float32Array[] = [];
   private speechLen = 0;
   // How many of the leading samples in `speech` are pre-roll (not real
-  // voiced audio) - the Moonshine silent-head retry drops exactly this
+  // voiced audio) - the retry drops exactly this
   // many samples and re-decodes from the real onset.
   private prerollIncludedLen = 0;
   private speaking = false;
@@ -101,7 +100,7 @@ export class SttSession {
     this.cfg = cfg;
     this.send = send;
     if (cfg.sampleRate === 16_000) {
-      void getSileroStream().then((s) => {
+      void sileroLoader().then((s) => {
         if (!this.closed) this.silero = s;
       });
     }
@@ -269,7 +268,7 @@ export class SttSession {
         return;
       }
       if (!text && this.prerollIncludedLen > 0) {
-        // Moonshine's own silent-head quirk: retry once from the real
+        // Retry once from the real
         // voiced onset, dropping the pre-roll that may have read as
         // dead air with nothing to transcribe.
         try {
@@ -358,8 +357,8 @@ export function encodeWav(pcm: Float32Array, sampleRate: number): Uint8Array {
 
 /** Decodes a 16-bit mono PCM WAV back to Float32 samples in [-1, 1] -
  * the inverse of encodeWav(), used by routes/stt.ts's transcribe route
- * to turn an uploaded WAV file into what lib/stt.ts's transcribe()
- * actually wants. Only the one format this repo ever produces or
+ * to turn an uploaded WAV file into the Stack transcription route's
+ * input shape. Only the one format this repo ever produces or
  * accepts (16-bit PCM, mono) - a real, named gap for a WAV in a
  * different bit depth or channel count, not silently mishandled: it
  * throws rather than guessing. */

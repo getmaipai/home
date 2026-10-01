@@ -140,10 +140,8 @@ export const wakewordDir = classDir("wakeword-models");
 // Downloaded face detection and embedding models, served to browser clients.
 export const visionDir = classDir("vision-models");
 
-// Session C step 5 (session-c-brain-and-voice.md): the STT program's own
-// re-downloadable models - the Silero VAD onnx file (utterance
-// endpointing, lib/sttSession.ts) and the Moonshine tiny-en archive
-// (transcription, lib/stt.ts). Same shape as wakewordDir above.
+// Silero VAD for utterance endpointing in the Home streaming path.
+// Transcription models are owned and downloaded by the Stack.
 export const sttDir = classDir("stt-models");
 
 // PROJECT-RUN-01: each project's own artifact files, one subdirectory per

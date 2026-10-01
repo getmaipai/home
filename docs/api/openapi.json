@@ -10079,11 +10079,11 @@
         "tags": [
           "Voice"
         ],
-        "summary": "STT asset install status",
-        "description": "Whether the STT assets (Silero VAD, Moonshine recognizer) are installed and the recognizer is loaded in the current process.",
+        "summary": "Stack speech to text status",
+        "description": "The configured Stack's speech to text role state. The legacy asset fields remain for response compatibility.",
         "responses": {
           "200": {
-            "description": "Per-asset install and recognizer-load status.",
+            "description": "Stack role state with legacy asset fields fixed to false.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10092,18 +10092,32 @@
                     "installed": {
                       "type": "boolean"
                     },
+                    "stackState": {
+                      "type": "string",
+                      "enum": [
+                        "notInstalled",
+                        "installed",
+                        "loaded",
+                        "ready",
+                        "offline"
+                      ]
+                    },
                     "sileroInstalled": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "description": "Deprecated Home VAD asset flag; always false."
                     },
                     "moonshineInstalled": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "description": "Deprecated Home recognizer asset flag; always false."
                     },
                     "recognizerLoaded": {
-                      "type": "boolean"
+                      "type": "boolean",
+                      "description": "Deprecated Home recognizer state; always false."
                     }
                   },
                   "required": [
                     "installed",
+                    "stackState",
                     "sileroInstalled",
                     "moonshineInstalled",
                     "recognizerLoaded"

@@ -19,7 +19,7 @@ import { EMBED_MODEL_URL } from "@/lib/embedAssets";
 import { BACKGROUND_MODEL_URL, BACKGROUND_MODEL_SMALL_URL } from "@/lib/backgroundAssets";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
 import { VISION_ALL_ASSETS } from "@/lib/visionAssets";
-import { SILERO_VAD_ASSET, MOONSHINE_ARCHIVE } from "@/lib/sttAssets";
+import { SILERO_VAD_ASSET } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
 import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
 import { telegramConfigured } from "@/lib/telegramChannel";
@@ -76,7 +76,7 @@ export function platformConnections(): PrivacyConnection[] {
   const wakewordHosts = hostsOf(WAKEWORD_ALL_ASSETS.map((a) => a.url));
   const visionHosts = hostsOf(VISION_ALL_ASSETS.map((a) => a.url));
   const voiceHost = hostsOf([voiceCatalogUrl()]);
-  const sttHosts = hostsOf([SILERO_VAD_ASSET.url, MOONSHINE_ARCHIVE.url]);
+  const sttHosts = hostsOf([SILERO_VAD_ASSET.url]);
   const internetProbeOn = getHouseholdSettingValue(INTERNET_PROBE_ENABLED_KEY) !== false;
   const internetProbeDns = String(getHouseholdSettingValue(INTERNET_PROBE_DNS_NAME_KEY) ?? "example.com");
   const internetProbeAddress = String(getHouseholdSettingValue(INTERNET_PROBE_TCP_ADDRESS_KEY) ?? "1.1.1.1");
@@ -103,13 +103,10 @@ export function platformConnections(): PrivacyConnection[] {
       when: "when an adult opens the list of voices to pick one",
       what: "a request for the list of available voices, and your home's internet address. No recording, and no voice of anyone in the house.",
     }),
-    // Session C step 5 (2026-09-06): speech-to-text's own two one-time
-    // downloads (the utterance-detection model and the transcription
-    // model) - found missing here by the same code review that already
-    // caught the tts-program/tts-model/tts-voice-files gap below, so it
-    // gets its own row rather than repeating that omission.
+    // Home fetches the small Silero model only for local utterance
+    // endpointing; transcription model downloads belong to the Stack.
     row("platform:stt-models", sttHosts, {
-      when: "the first time someone uses speech to text (push-to-talk)",
+      when: "the first time someone uses streaming speech input, when Home downloads its small voice-activity model to cut speech into sentences; speech recognition runs on the Stack",
       what: DOWNLOAD_CARRIES,
     }),
     // Memory recall uses this embedder (memory.ts: embed() on every

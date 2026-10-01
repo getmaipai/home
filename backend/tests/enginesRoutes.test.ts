@@ -1,12 +1,10 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { owner, teen } from "./support/testAuth";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture, offlineResponse, type StackFixture } from "./stackFixture";
-import { sileroVadPath, moonshinePath } from "@/lib/sttAssets";
 import { stopChatBackend, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 
 beforeEach(() => {
@@ -110,8 +108,7 @@ describe("/api/engines", () => {
   // gap that let the original bug ship unnoticed.
   test("GET / with no Stack configured reads real roles from Home's own supervisors, never an error", async () => {
     // No configure() call: engines.stack.url stays unset, the default
-    // every household starts in. STT assets are not staged, the
-    // default fresh-install state.
+    // every household starts in. STT is Stack-owned.
     const { client } = await owner();
     const res = await client.get("/api/engines");
     expect(res.status).toBe(200);
@@ -124,28 +121,10 @@ describe("/api/engines", () => {
     // supervisors guarantee.
     expect(byId.chat).toBe("ready");
     expect(byId.embed).toBe("ready");
-    // stt: no stub fallback exists - real assets or nothing, and
-    // nothing is staged in this fresh test data dir.
-    expect(byId.stt).toBe("notInstalled");
+    // STT is omitted because it is not a Home-owned role.
+    expect(byId.stt).toBeUndefined();
     // image: nothing implemented on the Home side at all yet.
     expect(byId.image).toBe("notInstalled");
-  });
-
-  test("GET / with no Stack configured and real STT assets staged reads stt as ready - the composer's own gate", async () => {
-    mkdirSync(sileroVadPath().replace(/\/[^/]+$/, ""), { recursive: true });
-    writeFileSync(sileroVadPath(), "not a real model, just proving the file-exists check");
-    mkdirSync(moonshinePath("encode.int8.onnx").replace(/\/[^/]+$/, ""), { recursive: true });
-    writeFileSync(moonshinePath("encode.int8.onnx"), "not a real model either");
-    try {
-      const { client } = await owner();
-      const res = await client.get("/api/engines");
-      const body = (await res.json()) as { roles: Array<{ id: string; state: { state: string } }> };
-      const stt = body.roles.find((r) => r.id === "stt")!;
-      expect(stt.state.state).toBe("ready");
-    } finally {
-      rmSync(sileroVadPath(), { force: true });
-      rmSync(moonshinePath("encode.int8.onnx"), { force: true });
-    }
   });
 
   // The review finding this closes: an earlier version of

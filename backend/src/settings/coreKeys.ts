@@ -29,7 +29,7 @@ export const INTERNET_PROBE_TCP_PORT_KEY = "status.internet_probe.tcp_port" as c
 //
 // Locale list kept to what's actually usable today: docs/ENGINEERING.md's
 // language rule requires English, and STACK.md's robot speech stack notes
-// Moonshine (the default English STT) is English-only, so a genuinely
+// The Stack's speech recognition model may be language-specific, so a genuinely
 // multi-locale household waits on that work landing, not on this key.
 // Backs lib/conversationHistory.ts's runRetention() (4.14: "retention
 // defaults: conversations ninety days then summarised... each is a

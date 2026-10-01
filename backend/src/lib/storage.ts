@@ -87,7 +87,7 @@ export function storageSummary(): StorageSummary {
     { area: "engines", bytes: dirSizeBytes(enginesDir) },
     { area: "voice_wakewords", bytes: dirSizeBytes(wakewordDir) },
     { area: "vision_models", bytes: dirSizeBytes(visionDir) },
-    { area: "voice_stt", bytes: dirSizeBytes(sttDir) },
+    { area: "voice_stt_vad", bytes: dirSizeBytes(sttDir) },
     { area: "voice_cloned", bytes: dirSizeBytes(clonedVoicesDir) },
     { area: "cache", bytes: dirSizeBytes(cacheDir) },
     { area: "backups", bytes: dirSizeBytes(backupDir) },

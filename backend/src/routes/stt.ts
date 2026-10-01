@@ -6,7 +6,8 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { upgradeWebSocket } from "hono/bun";
 import { requireAuth } from "@/middleware/auth";
 import { SttSession, decodeWav } from "@/lib/sttSession";
-import { transcribeUtterance, sttAssetsInstalled, sttAssetInstallStatus, sttRecognizerLoaded } from "@/lib/stt";
+import { transcribeUtterance } from "@/lib/stt";
+import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import type { SttStatusResponse, SttTranscribeResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
@@ -122,10 +123,9 @@ const sttStatusRoute = createRoute({
   method: "get",
   path: "/stt/status",
   tags: ["Voice"],
-  summary: "STT asset install status",
+  summary: "Stack speech to text status",
   description:
-    "Whether the STT assets (Silero VAD, Moonshine recognizer) are installed " +
-    "and the recognizer is loaded in the current process.",
+    "The configured Stack's speech to text role state. The legacy asset fields remain for response compatibility.",
   middleware: [requireAuth] as const,
   responses: {
     200: {
@@ -133,24 +133,35 @@ const sttStatusRoute = createRoute({
         "application/json": {
           schema: z.object({
             installed: z.boolean(),
-            sileroInstalled: z.boolean(),
-            moonshineInstalled: z.boolean(),
-            recognizerLoaded: z.boolean(),
+            stackState: z.enum(["notInstalled", "installed", "loaded", "ready", "offline"]),
+            sileroInstalled: z.boolean().describe("Deprecated Home VAD asset flag; always false."),
+            moonshineInstalled: z.boolean().describe("Deprecated Home recognizer asset flag; always false."),
+            recognizerLoaded: z.boolean().describe("Deprecated Home recognizer state; always false."),
           }),
         },
       },
-      description: "Per-asset install and recognizer-load status.",
+      description: "Stack role state with legacy asset fields fixed to false.",
     },
     ...errorResponses({ 401: "Not signed in" }),
   },
 });
 
 sttStatusRoutes.openapi(sttStatusRoute, async (c) => {
-  const { sileroInstalled, moonshineInstalled } = sttAssetInstallStatus();
+  let roleState: "notInstalled" | "installed" | "loaded" | "ready" | "offline" = "offline";
+  if (isStackConfigured()) {
+    try {
+      const { roles } = await getStackClient().roles();
+      const sttRole = roles.find((role) => role.id === "stt");
+      roleState = sttRole?.state.state ?? "notInstalled";
+    } catch {
+      roleState = "offline";
+    }
+  }
   return c.json({
-    installed: sttAssetsInstalled(),
-    sileroInstalled,
-    moonshineInstalled,
-    recognizerLoaded: sttRecognizerLoaded(),
-  } satisfies SttStatusResponse, 200);
+    installed: roleState === "ready" || roleState === "installed" || roleState === "loaded",
+    stackState: roleState,
+    sileroInstalled: false, // Home's retained VAD asset is not an STT engine install.
+    moonshineInstalled: false, // Home no longer owns the transcription model.
+    recognizerLoaded: false, // The recognizer runs in the Stack.
+  } satisfies SttStatusResponse & { stackState: typeof roleState }, 200);
 });

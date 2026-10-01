@@ -2,16 +2,16 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { __setSttBackendForTests, __resetSttForTests, sttAssetsInstalled, sttRecognizerLoaded, transcribeUtterance } from "@/lib/stt";
+import { transcribeUtterance } from "@/lib/stt";
 import { encodeWav } from "@/lib/sttSession";
 import { websocket } from "hono/bun";
 import { app } from "@/app";
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { sileroVadPath } from "@/lib/sttAssets";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { listIssues } from "@/lib/issues";
 import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
+
+let fixture: StackFixture | undefined;
 
 beforeEach(() => {
   resetDb();
@@ -19,7 +19,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  __resetSttForTests();
+  fixture?.stop();
+  fixture = undefined;
   __resetStackEngineForTests();
 });
 
@@ -43,7 +44,8 @@ describe("POST /api/stt/transcribe", () => {
   });
 
   test("returns the scripted transcription for a fixture WAV", async () => {
-    __setSttBackendForTests(async () => "the fixture said this");
+    fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => Response.json({ text: "the fixture said this" }, { headers: IDENTITY_HEADERS }) });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
     const client = await owner();
     const res = await client.postBytes("/api/stt/transcribe", fixtureWav(), "audio/wav");
     expect(res.status).toBe(200);
@@ -65,40 +67,28 @@ describe("GET /api/voice/stt/status", () => {
     expect(res.status).toBe(401);
   });
 
-  test("reports installed=false, both per-asset flags false, and recognizerLoaded=false with no real assets in the test data dir", async () => {
+  test("reports ready state for the configured Stack role and keeps legacy asset fields false", async () => {
+    fixture = startStackFixture({ "GET /stack/v1/roles": async () => Response.json({ roles: [{ id: "stt", state: { state: "ready" } }] }) });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
     const client = await owner();
     const res = await client.get("/api/voice/stt/status");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { installed: boolean; sileroInstalled: boolean; moonshineInstalled: boolean; recognizerLoaded: boolean };
-    expect(body.installed).toBe(false);
+    const body = (await res.json()) as { installed: boolean; stackState: string; sileroInstalled: boolean; moonshineInstalled: boolean; recognizerLoaded: boolean };
+    expect(body.installed).toBe(true);
+    expect((body as typeof body & { stackState: string }).stackState).toBe("ready");
     expect(body.sileroInstalled).toBe(false);
     expect(body.moonshineInstalled).toBe(false);
     expect(body.recognizerLoaded).toBe(false);
   });
 
-  // A code review (2026-09-06) found the status route's own doc comment
-  // promised a partial-install distinction ("silero present, Moonshine
-  // missing") that nothing actually implemented - this proves it now
-  // does, the real reachable state since ensureSttAssets() downloads
-  // Silero first, then Moonshine.
-  test("a partial install (Silero present, Moonshine still missing) reports each asset separately", async () => {
-    // Written into the shared test data dir (MAIPAI_DATA_DIR is one temp
-    // dir for the whole `bun test` run, not per-test) and removed again
-    // in `finally` - left behind, it would make getSileroStream() try to
-    // load garbage in every OTHER test that creates an SttSession after
-    // this one in the same process.
-    mkdirSync(sileroVadPath().replace(/\/[^/]+$/, ""), { recursive: true });
-    writeFileSync(sileroVadPath(), "not a real model, just proving the file-exists check");
-    try {
-      const client = await owner();
-      const res = await client.get("/api/voice/stt/status");
-      const body = (await res.json()) as { installed: boolean; sileroInstalled: boolean; moonshineInstalled: boolean };
-      expect(body.sileroInstalled).toBe(true);
-      expect(body.moonshineInstalled).toBe(false);
-      expect(body.installed).toBe(false);
-    } finally {
-      rmSync(sileroVadPath(), { force: true });
-    }
+  test("reports an offline Stack role state as not installed", async () => {
+    fixture = startStackFixture({ "GET /stack/v1/roles": async () => Response.json({ roles: [{ id: "stt", state: { state: "offline", reason: "worker stopped" } }] }) });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    const client = await owner();
+    const res = await client.get("/api/voice/stt/status");
+    const body = (await res.json()) as { installed: boolean; stackState: string };
+    expect(body.installed).toBe(false);
+    expect(body.stackState).toBe("offline");
   });
 });
 
@@ -114,7 +104,6 @@ describe("WS /api/stt/stream", () => {
     // reproduces the exact failure shape and asserts the fix: a clean
     // {t:"error"} event, and the connection still processing messages
     // afterward.
-    __setSttBackendForTests(async () => "still alive");
     const client = await owner();
     const cookie = client.getCookie();
     if (!cookie) throw new Error("no session cookie captured - did auth/setup run first?");
@@ -138,45 +127,13 @@ describe("WS /api/stt/stream", () => {
   });
 });
 
-describe("lib/stt.ts test seam", () => {
-  test("sttAssetsInstalled()/sttRecognizerLoaded() reflect real state, not the scripted test backend", () => {
-    // __setSttBackendForTests() only overrides transcribeUtterance() -
-    // it never fakes "installed" or "loaded", so these two stay real
-    // (and false, in a test environment with no downloaded models) even
-    // while a test backend is active - a deliberate design choice
-    // (status reporting should never lie because a DIFFERENT concern
-    // was stubbed for a different test).
-    __setSttBackendForTests(async () => "anything");
-    expect(sttAssetsInstalled()).toBe(false);
-    expect(sttRecognizerLoaded()).toBe(false);
-  });
-});
-
-// HOME-STACK-02b: engines.stack.url set (no __setSttBackendForTests() -
-// transcribeUtterance() checks that seam FIRST, so exercising the Stack
-// branch means leaving it unset) routes through the Stack's
-// /v1/audio/transcriptions instead of the in-process recognizer.
+// Speech always routes through the configured Stack transcription endpoint.
 describe("lib/stt.ts routed through a configured Stack", () => {
-  let fixture: StackFixture;
-
-  afterEach(() => {
-    fixture?.stop();
-  });
-
-  test("configured Stack serves listening regardless of the retired switch", async () => {
-    let calls = 0;
-    fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => { calls++; return Response.json({ text: "unexpected Stack reply" }); } });
-    setHouseholdSettingValue("engines.stack.url", fixture.url);
-    expect(await transcribeUtterance(new Float32Array(1600), 16_000)).toBe("unexpected Stack reply");
-    expect(calls).toBe(1);
-  });
-
   test("configured Stack routes listening through its client", async () => {
-    let calls = 0;
-    fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => { calls++; return Response.json({ text: "Stack heard this" }); } });
+    fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => Response.json({ text: "Stack heard this" }) });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
     expect(await transcribeUtterance(new Float32Array(1600), 16_000)).toBe("Stack heard this");
-    expect(calls).toBe(1);
+    expect(fixture.calls).toEqual(["POST /v1/audio/transcriptions"]);
   });
 
   test("transcribes through the Stack, sending a real WAV file", async () => {

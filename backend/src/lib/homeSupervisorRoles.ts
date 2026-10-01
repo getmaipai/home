@@ -12,7 +12,6 @@
 // sources, never a second concept for role readiness).
 import { probeChatEngine, getEngineStatus } from "@/lib/llmSupervisor";
 import { probeEmbedEngine } from "@/lib/embedSupervisor";
-import { sttAssetsInstalled } from "@/lib/stt";
 import type { EngineHealth } from "@/lib/sidecars";
 import type { RoleInfo, RoleState } from "@/lib/stack/types";
 
@@ -96,30 +95,6 @@ async function embedRole(): Promise<RoleInfo> {
   };
 }
 
-/** stt has no stub fallback and no separate process to supervise
- * (lib/stt.ts's own header: sherpa-onnx-node is an in-process native
- * addon, so there is no `probeSttEngine()` the way chat/embed each
- * have) - it is real assets on disk or it is nothing, checked directly
- * rather than through a probe. */
-function sttRole(): RoleInfo {
-  const installed = sttAssetsInstalled();
-  return {
-    id: "stt",
-    label: "Speech to text",
-    wire: "transcription",
-    residency: "jit",
-    endpoints: [],
-    quality: ["everyday"],
-    sharesModelWith: null,
-    state: installed
-      ? { state: "ready", since: new Date().toISOString(), checkedAt: new Date().toISOString() }
-      : notInstalledRoleState("STT assets (Silero VAD, Moonshine) have not finished downloading yet."),
-    reason: null,
-    model: null,
-    check: NO_CHECK,
-  };
-}
-
 /** Nothing exists on the Home side for image generation yet (both
  * catalog entries in modelCatalog.ts are `implemented: false`, no
  * supervisor, no probe) - reported honestly as not installed rather
@@ -145,11 +120,12 @@ function imageRole(): RoleInfo {
 /** `GET /api/engines`'s own roles source when no Stack is configured -
  * chat/embed each do the identical live probe `GET /api/health`
  * already makes (no new network behavior, and the two routes can no
- * longer disagree about the same engine's own state); stt and image
- * are synchronous, side-effect-free reads (no probe to make - see each
- * one's own comment for why). Nothing here ever spawns anything, the
- * same posture the route's Stack-configured path already has. */
+ * longer disagree about the same engine's own state); image is a
+ * synchronous, side-effect-free read. STT belongs to the configured
+ * Stack and is omitted when no Stack is configured. Nothing here ever
+ * spawns anything, the same posture the route's Stack-configured path
+ * already has. */
 export async function getHomeSupervisorRoles(): Promise<RoleInfo[]> {
   const [chat, embed] = await Promise.all([chatRole(), embedRole()]);
-  return [chat, sttRole(), embed, imageRole()];
+  return [chat, embed, imageRole()];
 }

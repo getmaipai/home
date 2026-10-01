@@ -10,7 +10,6 @@ import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { startWyomingServer, type WyomingServerHandle } from "@/lib/wyomingServer";
 import { WyomingFramer, encodeWyomingMessage, type WyomingMessage } from "@/lib/wyoming";
 import { issueApiToken } from "@/lib/apiToken";
-import { __setSttBackendForTests, __resetSttForTests } from "@/lib/stt";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { sqlite } from "@/db";
@@ -31,11 +30,9 @@ beforeEach(() => {
 
 afterEach(() => {
   __resetLlmSupervisorForTests();
-  __resetSttForTests();
   server?.stop();
   speechStack?.stop();
   speechStack = undefined;
-  __resetStackEngineForTests();
 });
 
 function makePerson(): string {
@@ -133,7 +130,12 @@ describe("the Wyoming satellite server", () => {
     const personId = makePerson();
     const token = issueApiToken(personId);
 
-    __setSttBackendForTests(async (samples) => (samples.length > 0 ? "the scripted utterance" : ""));
+    speechStack = startStackFixture({
+      "POST /v1/audio/transcriptions": async () => Response.json({ text: "the scripted utterance" }, { headers: IDENTITY_HEADERS }),
+      "POST /v1/chat/completions": async () => Response.json({ choices: [{ message: { role: "assistant", content: "Good morning." } }] }, { headers: IDENTITY_HEADERS }),
+    });
+    setHouseholdSettingValue("engines.stack.url", speechStack.url);
+    __setStackClientForTests(speechStack.client);
 
     server = startWyomingServer(0);
     const client = new ScriptedWyomingClient();
@@ -151,10 +153,10 @@ describe("the Wyoming satellite server", () => {
     const afterHandle = await client.waitForMessages(2);
     const handled = afterHandle[1]!;
     expect(handled.type).toBe("handled");
-    expect((handled.data as { text: string }).text).toContain("good morning");
+    expect((handled.data as { text: string }).text).toBe("Good morning.");
 
     // "transcribe" through step 5's real STT session, scripted to a
-    // known reply via __setSttBackendForTests above - real audio framing
+    // known reply via a real Stack fixture - real audio framing
     // (audio-start/audio-chunk/audio-stop) exercised end to end over the
     // real socket, only the model call itself stubbed (no real speech
     // model installed in this test environment).
@@ -253,7 +255,9 @@ describe("the Wyoming satellite server", () => {
   test("audio-stop rejects a declared format this server can't decode, instead of silently mis-decoding it", async () => {
     const personId = makePerson();
     const token = issueApiToken(personId);
-    __setSttBackendForTests(async () => "should never be called");
+    speechStack = startStackFixture({ "POST /v1/audio/transcriptions": async () => Response.json({ text: "should never be called" }) });
+    setHouseholdSettingValue("engines.stack.url", speechStack.url);
+    __setStackClientForTests(speechStack.client);
     server = startWyomingServer(0);
     const client = new ScriptedWyomingClient();
     await client.connect(server.port);
@@ -272,6 +276,9 @@ describe("the Wyoming satellite server", () => {
   test("the transcript/handle path shares the same per-person turn rate limit as every other turn-engine entry point", async () => {
     const personId = makePerson();
     const token = issueApiToken(personId);
+    speechStack = startStackFixture({ "POST /v1/chat/completions": async () => Response.json({ choices: [{ message: { role: "assistant", content: "handled" } }] }, { headers: IDENTITY_HEADERS }) });
+    setHouseholdSettingValue("engines.stack.url", speechStack.url);
+    __setStackClientForTests(speechStack.client);
     server = startWyomingServer(0);
     const client = new ScriptedWyomingClient();
     await client.connect(server.port);
@@ -300,10 +307,12 @@ describe("the Wyoming satellite server", () => {
     // independent async run, so this "describe" - synchronous, no
     // await - could answer while the slow transcribe call was still
     // in flight, arriving out of order on the wire.
-    __setSttBackendForTests(async (samples) => {
+    speechStack = startStackFixture({ "POST /v1/audio/transcriptions": async () => {
       await new Promise((r) => setTimeout(r, 300));
-      return samples.length > 0 ? "slow transcript" : "";
-    });
+      return Response.json({ text: "slow transcript" }, { headers: IDENTITY_HEADERS });
+    } });
+    setHouseholdSettingValue("engines.stack.url", speechStack.url);
+    __setStackClientForTests(speechStack.client);
     server = startWyomingServer(0);
     const client = new ScriptedWyomingClient();
     await client.connect(server.port);

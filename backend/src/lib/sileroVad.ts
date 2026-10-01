@@ -17,7 +17,7 @@
 import * as ort from "onnxruntime-web";
 import type { InferenceSession } from "onnxruntime-web";
 import { existsSync, readFileSync } from "node:fs";
-import { sileroVadPath } from "@/lib/sttAssets";
+import { ensureSileroVadAsset, sileroVadPath } from "@/lib/sttAssets";
 
 const CHUNK = 512; // model chunk @ 16kHz (32ms)
 const CONTEXT = 64; // samples the model wants carried over from the previous chunk
@@ -46,7 +46,10 @@ export async function getSileroStream(): Promise<SileroVadStream | null> {
     // downloading) - sttSession.ts's own RMS fallback exists exactly
     // for this, matching legacy's "falls back... when the model isn't
     // installed yet" posture, not a startup requirement this throws on.
-    if (!existsSync(sileroVadPath())) return null;
+    if (!existsSync(sileroVadPath())) {
+      void ensureSileroVadAsset().catch((err) => console.warn(`[stt] silero vad download failed (${(err as Error).message})`));
+      return null;
+    }
     initOrt();
     const created: Promise<InferenceSession> = ort.InferenceSession.create(new Uint8Array(readFileSync(sileroVadPath())), { executionProviders: ["wasm"] });
     p = created;

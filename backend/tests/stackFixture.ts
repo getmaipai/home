@@ -10,6 +10,7 @@ export type StackFixtureHandler = (req: Request) => Response | Promise<Response>
 export interface StackFixture {
   url: string;
   client: StackClient;
+  calls: string[];
   stop(): void;
 }
 
@@ -17,17 +18,19 @@ export interface StackFixture {
  * handler; an unmatched request 404s loudly rather than hanging, so a
  * missing route in a test reads as a clear failure. */
 export function startStackFixture(routes: Record<string, StackFixtureHandler>): StackFixture {
+  const calls: string[] = [];
   const server = Bun.serve({
     port: 0,
     fetch: async (req) => {
       const url = new URL(req.url);
+      calls.push(`${req.method} ${url.pathname}`);
       const handler = routes[`${req.method} ${url.pathname}`];
       if (!handler) return Response.json({ error: `no fixture route for ${req.method} ${url.pathname}` }, { status: 404 });
       return handler(req);
     },
   });
   const url = `http://127.0.0.1:${server.port}`;
-  return { url, client: createStackClient({ baseUrl: url }), stop: () => server.stop(true) };
+  return { url, client: createStackClient({ baseUrl: url }), calls, stop: () => server.stop(true) };
 }
 
 export const IDENTITY_HEADERS: Record<string, string> = {

@@ -111,15 +111,16 @@ describe("the hub's own connections", () => {
     expect(byId.get("platform:text-embedding-model")?.when).not.toContain("Nothing in MaiPai");
   });
 
-  // A code review (2026-09-06, Session C step 5) found the STT feature's
-  // two model downloads (Silero VAD, the Moonshine archive) missing from
-  // this page - the same "if it is not on this list, it does not
-  // happen" gap the tts-* rows below were already added to close once.
-  test("speech-to-text's model downloads are listed", () => {
+  // Home still downloads Silero for streaming speech endpointing. The
+  // Stack owns speech recognition and lists its own model downloads.
+  test("Home's voice-activity model download is listed", () => {
     const byId = new Map(platformConnections().map((r) => [r.id, r]));
     const row = byId.get("platform:stt-models");
-    expect(row?.destination).toContain("github.com");
-    expect(row?.destination).toContain("raw.githubusercontent.com");
+    expect(row?.destination).toBe("raw.githubusercontent.com");
+    expect(row?.when).toContain("cut speech into sentences");
+    expect(row?.when).toContain("speech recognition runs on the Stack");
+    expect(row?.what).not.toContain("Moonshine");
+    expect(row?.what).not.toContain("recognition model");
   });
 
   // REFERENCE-LIBRARY-01: the kiwix-tools binary download was a real
@@ -134,11 +135,15 @@ describe("the hub's own connections", () => {
     expect(library?.what).toContain("third-party download mirror");
   });
 
-  test("Home declares no downloads for its deleted speech engine", () => {
-    const ids = platformConnections().map((row) => row.id);
+  test("Home declares no downloads for its deleted speech recognizer", () => {
+    const ids = platformConnections().map((connection) => connection.id);
     expect(ids).not.toContain("platform:tts-program");
     expect(ids).not.toContain("platform:tts-model");
     expect(ids).not.toContain("platform:tts-voice-files");
+    const row = platformConnections().find((connection) => connection.id === "platform:stt-models");
+    expect(row).toBeDefined();
+    expect(row?.what).not.toContain("Moonshine");
+    expect(row?.what).not.toContain("recognition model");
   });
 
   // Session C step 8 (session-c-brain-and-voice.md): "listed on the

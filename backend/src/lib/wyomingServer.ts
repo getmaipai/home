@@ -22,7 +22,8 @@
 // into `describe`/`transcribe`/`synthesize`/`handle`.
 import { readWavPcm, WyomingFramer, encodeWyomingMessage, type WyomingMessage } from "@/lib/wyoming";
 import { resolveApiToken } from "@/lib/apiToken";
-import { transcribeUtterance, sttAssetsInstalled } from "@/lib/stt";
+import { transcribeUtterance } from "@/lib/stt";
+import { isStackConfigured } from "@/lib/stackEngine";
 import { synthesizeSpeech } from "@/lib/tts";
 import { runTurn } from "@/lib/turnEngine";
 import { personWithinTurnBudget } from "@/lib/llm";
@@ -65,8 +66,8 @@ function send(socket: { write: (data: Uint8Array) => void }, msg: WyomingMessage
   socket.write(encodeWyomingMessage(msg));
 }
 
-// int16 PCM bytes -> Float32Array in [-1, 1], the shape lib/stt.ts's
-// transcribe() wants (the same conversion sttSession.ts's own encodeWav()
+// int16 PCM bytes -> Float32Array in [-1, 1], the shape lib/stt.ts's Stack request
+// takes (the same conversion sttSession.ts's own encodeWav()
 // does in reverse).
 function pcm16ToFloat32(bytes: Uint8Array): Float32Array {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -103,7 +104,7 @@ async function handleMessage(
       send(socket, {
         type: "info",
         data: {
-          asr: sttAssetsInstalled() ? [{ name: "maipai", installed: true }] : [],
+          asr: isStackConfigured() ? [{ name: "maipai", installed: true }] : [],
           tts: [{ name: "maipai", installed: true }],
           handle: [{ name: "maipai", installed: true }],
         },
@@ -129,7 +130,7 @@ async function handleMessage(
       state.audioChunks = [];
       state.audioFormat = null;
       // pcm16ToFloat32() below only knows how to decode 16-bit mono -
-      // this server's own STT path (lib/stt.ts) doesn't accept anything
+      // this server's Stack STT path does not accept anything
       // else either. A satellite is free to declare a different real
       // format on audio-start (per Wyoming's own event shape); silently
       // decoding those bytes as if they were 16-bit mono would produce
