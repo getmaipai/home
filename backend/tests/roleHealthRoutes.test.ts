@@ -14,7 +14,6 @@ beforeEach(() => {
   resetDb();
   db.delete(statusEvents).run();
   setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
-  setHouseholdSettingValue("engines.stack.use_chat", true);
 });
 afterEach(() => { __resetStackEngineForTests(); __resetLlmSupervisorForTests(); __setRoleHealthForTests({}); });
 

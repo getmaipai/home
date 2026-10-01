@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -35,53 +35,20 @@ describe("stack_install_service_command", () => {
   });
 });
 
-describe("stack_roles_are_fresh_setup", () => {
-  test("fresh setup explicitly disables role routing", () => {
-    expect(bashCall('stack_roles_are_fresh_setup \'""\' && echo fresh || echo upgrade').stdout).toBe("fresh");
-  });
-
-  test("upgrade leaves every role setting untouched", () => {
-    expect(bashCall('stack_roles_are_fresh_setup \'"http://127.0.0.1:8770"\' && echo fresh || echo upgrade').stdout).toBe("upgrade");
-  });
-});
-
-describe("write_fresh_stack_role_defaults", () => {
-  test("writes four explicit false values on a fresh install and none on upgrade", () => {
-    const root = mkdtempSync(join(tmpdir(), "maipai-install-roles-"));
-    const backend = join(root, "backend");
-    const fakeBun = join(root, "bun");
-    mkdirSync(backend);
-    writeFileSync(fakeBun, "#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$ROLE_LOG\"\n", { mode: 0o755 });
+describe("required Stack setup failures", () => {
+  test.each([
+    ["missing Stack user", 'find_console_user() { echo ""; }', "logged-in console user"],
+    ["missing Stack binary", 'find_console_user() { echo marlow; }; render_stack_binary_name() { echo absent; }', "compiled Stack binary is missing"],
+    ["failed service install", 'find_console_user() { echo marlow; }; chown() { return 0; }; sudo() { return 1; }', "install-service command failed"],
+    ["health timeout", 'find_console_user() { echo marlow; }; chown() { return 0; }; sudo() { return 0; }; curl() { return 22; }; sleep() { :; }', "did not answer /healthz in time"],
+  ] as const)("fails when there is a %s", (_name, setup, message) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-install-required-stack-"));
+    mkdirSync(join(root, "stack"));
+    writeFileSync(join(root, "stack", "maipai-stack-darwin-arm64"), "", { mode: 0o755 });
     try {
-      const fresh = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; write_fresh_stack_role_defaults '""' "${root}" "${fakeBun}"`], {
-        env: { ...process.env, ROLE_LOG: join(root, "fresh.log") },
-      });
-      expect(fresh.exitCode).toBe(0);
-      expect(readFileSync(join(root, "fresh.log"), "utf8").trim().split(/\r?\n/)).toEqual([
-        "run scripts/set-setting.ts engines.stack.use_chat false",
-        "run scripts/set-setting.ts engines.stack.use_embeddings false",
-        "run scripts/set-setting.ts engines.stack.use_stt false",
-        "run scripts/set-setting.ts engines.stack.use_tts false",
-      ]);
-      const upgrade = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; write_fresh_stack_role_defaults '\"http://127.0.0.1:8770\"' "${root}" "${fakeBun}"`], {
-        env: { ...process.env, ROLE_LOG: join(root, "upgrade.log") },
-      });
-      expect(upgrade.exitCode).toBe(0);
-      expect(existsSync(join(root, "upgrade.log"))).toBe(false);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  test("stops after a failed first switch write before allowing the address write", () => {
-    const root = mkdtempSync(join(tmpdir(), "maipai-install-roles-fail-"));
-    mkdirSync(join(root, "backend"));
-    const fakeBun = join(root, "bun");
-    writeFileSync(fakeBun, "#!/bin/sh\nexit 1\n", { mode: 0o755 });
-    try {
-      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; write_fresh_stack_role_defaults '\"\"' "${root}" "${fakeBun}" && echo address-write`]);
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${setup}; install_stack_service "${root}" "${root}/bun" darwin arm64 no`], { env: { ...process.env, STACK_HEALTH_TRIES: "1" } });
       expect(result.exitCode).toBe(1);
-      expect(result.stdout.toString()).not.toContain("address-write");
+      expect(result.stdout.toString()).toContain(message);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -142,8 +109,7 @@ describe("--dry-run", () => {
     expect(stdout).toContain("install-service");
     expect(stdout).toContain("would poll http://127.0.0.1:8770/healthz");
     expect(stdout).toContain("would run: bun run backend/scripts/set-setting.ts engines.stack.url http://127.0.0.1:8770 --only-if-empty-or-prefix http://127.0.0.1:");
-    expect(stdout).toContain("would read engines.stack.url first; if empty, explicitly write engines.stack.use_chat, use_embeddings, use_stt, and use_tts as false");
-    expect(stdout.indexOf("would read engines.stack.url first; if empty")).toBeLessThan(stdout.indexOf("would run: bun run backend/scripts/set-setting.ts engines.stack.url"));
+    expect(stdout).not.toContain("engines.stack.use_");
   });
 
   test("makes no network call at all - find_free_port() (a real loopback socket probe) never runs", () => {

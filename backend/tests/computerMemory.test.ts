@@ -18,20 +18,8 @@ describe("describeComputerMemory", () => {
   test("describes an empty loaded list", () => {
     expect(describeComputerMemory(budget([]))).toEqual({ usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [], homeOwnedRoles: [] });
   });
-  test("reports all roles as Home-owned when all Stack switches are off", () => {
+  test("reports no Home-owned roles when a Stack is configured", () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
-    for (const role of ["chat", "embeddings", "stt", "tts"] as const) setHouseholdSettingValue(`engines.stack.use_${role}`, false);
-    expect(describeComputerMemory(budget([]), getHomeOwnedRoles()).homeOwnedRoles).toEqual(["chat", "embeddings", "stt", "tts"]);
-  });
-  test("reports only Home-owned roles when two Stack switches are on", () => {
-    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
-    setHouseholdSettingValue("engines.stack.use_chat", true);
-    setHouseholdSettingValue("engines.stack.use_embeddings", true);
-    expect(describeComputerMemory(budget([]), getHomeOwnedRoles()).homeOwnedRoles).toEqual(["stt", "tts"]);
-  });
-  test("reports no Home-owned roles when every Stack switch is on", () => {
-    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
-    for (const role of ["chat", "embeddings", "stt", "tts"] as const) setHouseholdSettingValue(`engines.stack.use_${role}`, true);
     expect(describeComputerMemory(budget([]), getHomeOwnedRoles()).homeOwnedRoles).toEqual([]);
   });
   test("a test client counts every role as Stack-owned", () => {

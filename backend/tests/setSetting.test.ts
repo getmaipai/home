@@ -3,8 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
-import { getHouseholdSettingSource, getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
-import { backfillStackRoleSettings } from "@/lib/stackEngine";
+import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 
 // HOME-STACK-01: install.sh's own scripts/set-setting.ts, run as a real
 // separate process (the same way install.sh actually calls it) against
@@ -80,31 +79,11 @@ test("converts finite numbers and preserves text setting writes", () => {
   expect(run(["--get", "engines.stack.url"]).stdout).toBe('"http://127.0.0.1:8770"');
 });
 
-test("fresh installer role writes precede the address and survive startup backfill unchanged", () => {
+test("deprecated role values remain writable for compatibility", () => {
   dataDir = mkdtempSync(join(tmpdir(), "maipai-set-setting-installer-"));
   const roles = ["chat", "embeddings", "stt", "tts"];
-  const results = Bun.spawnSync(["bash", "-c", `cd "${import.meta.dir}/.." && for role in chat embeddings stt tts; do bun run scripts/set-setting.ts "engines.stack.use_$role" false || exit; done && bun run scripts/set-setting.ts engines.stack.url http://127.0.0.1:8770 --only-if-empty-or-prefix http://127.0.0.1:`], { env: { ...process.env, MAIPAI_DATA_DIR: dataDir } });
-  expect(results.exitCode).toBe(0);
-  const checkDb = new Database(join(dataDir, "hub.db"), { readonly: true, create: false });
-  let before: unknown[];
-  try {
-    const rows = checkDb.query("SELECT key, value, source FROM settings_values WHERE scope = 'household'").all() as { key: string; value: string; source: string }[];
-    before = roles.map((role) => {
-      const row = rows.find((entry) => entry.key === `engines.stack.use_${role}`);
-      expect(row?.source).toBe("user");
-      return JSON.parse(row?.value ?? "null");
-    });
-    expect(rows.find((entry) => entry.key === "engines.stack.url")?.value).toBe('"http://127.0.0.1:8770"');
-  } finally {
-    checkDb.close();
-  }
-  expect(before).toEqual([false, false, false, false]);
-  // Invoke the actual startup function against this process's own DB as a second guard.
-  setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
-  roles.forEach((role) => setHouseholdSettingValue(`engines.stack.use_${role}`, false));
-  backfillStackRoleSettings();
-  expect(roles.map((role) => getHouseholdSettingValue(`engines.stack.use_${role}`))).toEqual(before);
-  expect(getHouseholdSettingSource("engines.stack.use_chat")).toBe("user");
+  for (const role of roles) expect(run([`engines.stack.use_${role}`, "false"]).exitCode).toBe(0);
+  expect(roles.map((role) => run(["--get", `engines.stack.use_${role}`]).stdout)).toEqual(["false", "false", "false", "false"]);
 });
 
 test("--only-if-empty-or-prefix writes when the current value is empty", () => {

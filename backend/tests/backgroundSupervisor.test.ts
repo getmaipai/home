@@ -127,7 +127,6 @@ describe("backgroundSupervisor completeBackground()", () => {
       },
     });
     setHouseholdSettingValue("engines.stack.url", stack.url);
-    setHouseholdSettingValue("engines.stack.use_chat", true);
     const responseFormat = { type: "json_object" as const };
     const { completeBackground } = await import("@/lib/backgroundSupervisor");
     const result = await completeBackground([{ role: "user", content: "summarize" }], { temperature: 0.2, max_tokens: 77, response_format: responseFormat });
@@ -139,7 +138,6 @@ describe("backgroundSupervisor completeBackground()", () => {
   test("returns unavailable and raises chat Repairs when the Stack judge answers 503", async () => {
     stack = startStackFixture({ "POST /v1/chat/completions": async () => offlineResponse("judge", "the judge role is offline") });
     setHouseholdSettingValue("engines.stack.url", stack.url);
-    setHouseholdSettingValue("engines.stack.use_chat", true);
     const { completeBackground } = await import("@/lib/backgroundSupervisor");
     expect(await completeBackground([{ role: "user", content: "summarize" }])).toEqual({ ok: false, unavailable: true });
     expect(listIssues().find((issue) => issue.source === "stack" && issue.key === "offline.chat")?.detail).toBe("the judge role is offline");

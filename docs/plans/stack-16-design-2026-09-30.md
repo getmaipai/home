@@ -24,11 +24,11 @@ What is in the way:
 
 ### One setting for where, one for which
 
-`engines.stack.url` stays what it is: where the Stack lives. Four household booleans, `engines.stack.use_chat`, `engines.stack.use_embeddings`, `engines.stack.use_stt` and `engines.stack.use_tts`, independently decide which model roles go through it. They are declared once in Home's settings declaration. Each defaults off, so the Stack can run beside Home while Home's own engines keep doing the work. The memory judge and background worker follow chat because they share chat's model.
+`engines.stack.url` stays what it is: where the Stack lives. Four household booleans, `engines.stack.use_chat`, `engines.stack.use_embeddings`, `engines.stack.use_stt` and `engines.stack.use_tts`, independently decide which model roles go through it. The four booleans were retired once all roles were proven on the Stack. The memory judge and background worker follow chat because they share chat's model.
 
-This one change fixes three things at once. The installer sets the address and explicitly writes all four switches off on a fresh setup. On upgrade, a one-time backfill turns all four on for an existing configured hub unless any switch already has a stored value. A Stack can run beside the hub for sizing, health, updates, the Engines page and Check a model while chat and voice stay exactly as they are (this is what the owner asked for on 2026-09-30 when Check a model said it needed a Stack). And a role moves on its own, which is what makes the order below possible.
+This one change fixed the earlier plan. HOME-REQ-01 retired the switches after all roles were proven on the Stack, and the installer now requires it.
 
-One known limit while roles are still on Home's engines: the Stack's memory budget only sees what the Stack loaded, so "Memory right now" and the fit verdicts will undercount what Home's engines use until those roles move. The page says so in one line whenever any role switch is off.
+Home's current memory response preserves the `homeOwnedRoles` field for compatibility and reports an empty list.
 
 ### Proving a role before it moves
 
@@ -58,7 +58,7 @@ A role moves to the Stack on the family's hub only on Jesse's word for that role
 
 ### Undoing it
 
-Turning a role's `engines.stack.use_*` switch off moves it back to Home's own engine on the next request. That works because Home's engine code is not deleted until the very last item. A call already running on the Stack when a role is removed is left to finish or fail, and is not moved mid-way. When the Stack itself stops, a Repairs entry opens (already built) and the Engines page gets one button, "Use this computer's own engine for this", that does exactly the removal. There is no automatic fallback: a fallback that hides a broken Stack is how a household ends up on the wrong engine for a month without knowing.
+The switches are kept in the shared spec until a later cleanup, but Home no longer reads them. The Stack is required during install; a missing configured address appears in Repairs after boot.
 
 ### Deleting Home's engines
 

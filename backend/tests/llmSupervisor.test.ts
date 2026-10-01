@@ -56,10 +56,8 @@ describe("llmSupervisor chatEngineDown()", () => {
 
   test("the shared helper reads Stack state while chatEngineDown remains a local supervisor backstop", async () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
-    setHouseholdSettingValue("engines.stack.use_chat", false);
     stateStopped();
     expect(chatEngineDown()).toBe(true);
-    setHouseholdSettingValue("engines.stack.use_chat", true);
     __setStackClientForTests({ roles: async () => ({ roles: [{ id: "chat", state: { state: "ready", since: "now" }, reason: null }] }) } as never);
     expect(chatEngineDown()).toBe(true);
     expect(await roleHealth("chat")).toEqual({ availability: "ready", reason: null });
@@ -170,7 +168,6 @@ describe("llmSupervisor chatEngineDown()", () => {
     expect(chatEngineDown()).toBe(false);
     delete process.env.MAIPAI_LLAMA_SERVER_URL;
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:12345");
-    setHouseholdSettingValue("engines.stack.use_chat", true);
     stateStopped();
     expect(chatEngineDown()).toBe(true);
     __setStackClientForTests({ roles: async () => ({ roles: [{ id: "chat", state: { state: "ready", since: "now" }, reason: null }] }) } as never);
@@ -179,7 +176,6 @@ describe("llmSupervisor chatEngineDown()", () => {
 
   test("health ignores stale local chat startup while chat is Stack-owned", async () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:12345");
-    setHouseholdSettingValue("engines.stack.use_chat", true);
     const state = (globalThis as typeof globalThis & {
       __maipai_llmSupervisor?: { startingPromise: Promise<never> | null; startingStartedAtMs: number | null };
     }).__maipai_llmSupervisor!;

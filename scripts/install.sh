@@ -315,19 +315,6 @@ stack_install_service_command() {
   echo "${args[*]}"
 }
 
-stack_roles_are_fresh_setup() {
-  [ "$1" = '""' ]
-}
-
-write_fresh_stack_role_defaults() {
-  local previous_url="$1" install_root="$2" bun_bin="$3" stack_role
-  stack_roles_are_fresh_setup "$previous_url" || return 0
-  for stack_role in chat embeddings stt tts; do
-    (cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts "engines.stack.use_${stack_role}" false) \
-      || { log "Could not turn off Stack ${stack_role} routing for a fresh setup."; return 1; }
-  done
-}
-
 install_stack_service() {
   local install_root="$1" bun_bin="$2" os="$3" arch="$4" dry_run="$5"
   local stack_dir="${install_root}/stack"
@@ -348,7 +335,6 @@ install_stack_service() {
     log "[dry-run] would run as ${stack_user:-<no console user found>}: $(stack_install_service_command "$binary" "$stack_data_dir" "$STACK_PORT_BASE" "$bun_bin") (or a higher port near ${STACK_PORT_BASE} if that one is taken)"
     [ "$os" = "linux" ] && log "[dry-run] would run: loginctl enable-linger ${stack_user:-<no console user found>}"
     log "[dry-run] would poll http://127.0.0.1:${STACK_PORT_BASE}/healthz (or that higher port)"
-    log "[dry-run] would read engines.stack.url first; if empty, explicitly write engines.stack.use_chat, use_embeddings, use_stt, and use_tts as false"
     log "[dry-run] would run: bun run backend/scripts/set-setting.ts engines.stack.url http://127.0.0.1:${STACK_PORT_BASE} --only-if-empty-or-prefix http://127.0.0.1: (port as above)"
     return 0
   fi
@@ -363,47 +349,44 @@ install_stack_service() {
   # exactly the kind of thing that looks right and silently is not.
   # Every step below is therefore checked and returned from explicitly;
   # none are left to `-e` to stop at.
-  [ -n "$stack_user" ] || { log "Could not determine the logged-in console user - the Stack needs a real user session, not root. Skipping the Stack; Home will run on its own built-in supervisors."; return 1; }
-  [ -x "$binary" ] || { log "The compiled Stack binary is missing at ${binary}. Skipping the Stack; Home will run on its own built-in supervisors."; return 1; }
+  [ -n "$stack_user" ] || { log "Could not determine the logged-in console user. The MaiPai Stack is required; installation cannot continue."; return 1; }
+  [ -x "$binary" ] || { log "The compiled Stack binary is missing at ${binary}. The MaiPai Stack is required; installation cannot continue."; return 1; }
 
-  mkdir -p "$stack_data_dir" || { log "Could not create ${stack_data_dir}. Skipping the Stack."; return 1; }
-  chmod 0700 "$stack_data_dir" || { log "Could not set ${stack_data_dir} owner-only. Skipping the Stack."; return 1; }
-  chown -R "$stack_user" "$stack_dir" || { log "Could not chown ${stack_dir} to ${stack_user}. Skipping the Stack."; return 1; }
-  echo "$stack_user" > "${stack_dir}/.user" || { log "Could not write ${stack_dir}/.user. Skipping the Stack."; return 1; }
+  mkdir -p "$stack_data_dir" || { log "Could not create ${stack_data_dir}. The MaiPai Stack is required; installation cannot continue."; return 1; }
+  chmod 0700 "$stack_data_dir" || { log "Could not set ${stack_data_dir} owner-only. The MaiPai Stack is required; installation cannot continue."; return 1; }
+  chown -R "$stack_user" "$stack_dir" || { log "Could not chown ${stack_dir} to ${stack_user}. The MaiPai Stack is required; installation cannot continue."; return 1; }
+  echo "$stack_user" > "${stack_dir}/.user" || { log "Could not write ${stack_dir}/.user. The MaiPai Stack is required; installation cannot continue."; return 1; }
 
   local install_service_argv=() argv_line
   while IFS= read -r argv_line; do install_service_argv+=("$argv_line"); done < <(stack_install_service_argv "$binary" "$stack_data_dir" "$stack_port" "$bun_bin")
   sudo -u "$stack_user" env "${install_service_argv[@]}" \
-    || { log "The Stack's install-service command failed. Skipping the Stack; Home will run on its own built-in supervisors."; return 1; }
+    || { log "The Stack's install-service command failed. The MaiPai Stack is required; installation cannot continue."; return 1; }
   if [ "$os" = "linux" ]; then
     loginctl enable-linger "$stack_user" 2>/dev/null || true
   fi
 
   log "Waiting for the Stack to answer at http://127.0.0.1:${stack_port}/healthz..."
-  local tries=0
+  local tries=0 max_tries=40
+  [ -n "${STACK_HEALTH_TRIES:-}" ] && max_tries="$STACK_HEALTH_TRIES"
   while ! curl -sf "http://127.0.0.1:${stack_port}/healthz" >/dev/null 2>&1; do
     tries=$((tries + 1))
-    if [ "$tries" -ge 40 ]; then
-      log "The Stack did not answer /healthz in time. Skipping engines.stack.url; Home will run on its own built-in supervisors."
+    if [ "$tries" -ge "$max_tries" ]; then
+      log "The Stack did not answer /healthz in time. The MaiPai Stack is required; installation cannot continue."
       return 1
     fi
     sleep 0.5
   done
   log "MaiPai Stack is running at http://127.0.0.1:${stack_port}"
 
-  # Read the previous address after health succeeds. Fresh setups first
-  # store all role switches off; only then may the address be written.
+  # Read the previous address after health succeeds. The local address
+  # replaces an empty setting or this installer's previous local address.
   # --only-if-empty-or-prefix (a code review's own finding): a household
   # that has since pointed this setting at a remote or hand-run Stack
   # through the settings UI keeps that choice on the next upgrade,
   # rather than this installer silently overwriting it back to its own
   # local port every time.
-  local previous_stack_url
-  previous_stack_url=$(cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts --get engines.stack.url) \
-    || { log "Could not read engines.stack.url before setup."; return 1; }
-  write_fresh_stack_role_defaults "$previous_stack_url" "$install_root" "$bun_bin" || return 1
   (cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts engines.stack.url "http://127.0.0.1:${stack_port}" --only-if-empty-or-prefix "http://127.0.0.1:") \
-    || { log "Could not write engines.stack.url. The Stack is running but Home will not call it until this is fixed and the setting is set by hand."; return 1; }
+    || { log "Could not write engines.stack.url. The MaiPai Stack is required; installation cannot continue."; return 1; }
 }
 
 setup_stack() {
@@ -411,8 +394,8 @@ setup_stack() {
   local stack_dir="${install_root}/stack"
   local source_dir
   source_dir=$(mktemp -d)
-  fetch_stack_source "$source_dir" "$dry_run" || { log "Could not fetch the Stack's source. Skipping the Stack."; rm -rf "$source_dir"; return 1; }
-  build_stack_binary "$source_dir" "$stack_dir" "$bun_bin" "$dry_run" || { log "Could not build the Stack binary. Skipping the Stack."; rm -rf "$source_dir"; return 1; }
+  fetch_stack_source "$source_dir" "$dry_run" || { log "Could not fetch the Stack's source. The MaiPai Stack is required; installation cannot continue."; rm -rf "$source_dir"; return 1; }
+  build_stack_binary "$source_dir" "$stack_dir" "$bun_bin" "$dry_run" || { log "Could not build the Stack binary. The MaiPai Stack is required; installation cannot continue."; rm -rf "$source_dir"; return 1; }
   rm -rf "$source_dir"
   install_stack_service "$install_root" "$bun_bin" "$os" "$arch" "$dry_run"
 }
@@ -504,23 +487,11 @@ main() {
   local bun_bin="${bun_home}/bin/bun"
   build_app "$install_root" "$bun_bin"
 
-  # The Stack, before Home's own service starts (see setup_stack's own
-  # comment on why the settings write comes last within it) - never
-  # fatal to the Home install itself: a Stack that fails to build or
-  # come up leaves engines.stack.url unset and Home boots on its own
-  # built-in supervisors, HOME-STACK-02b's own safe default.
+  # The Stack must be fully installed and configured before Home's own
+  # service starts.
   if ! setup_stack "$install_root" "$bun_bin" "$os" "$arch" "no"; then
-    log "Continuing without the Stack."
-    # An upgrade that had a running Stack, stopped it above, then
-    # failed to rebuild or restart it, would otherwise leave
-    # engines.stack.url pointing at a process that no longer exists -
-    # Home would see the Stack as merely offline/unreachable rather than
-    # falling back cleanly to its own supervisors. Cleared, best-effort;
-    # its own failure is not fatal to Home's install either.
-    if [ "$had_existing_stack" = "yes" ]; then
-      (cd "${install_root}/backend" && "$bun_bin" run scripts/set-setting.ts engines.stack.url "" --only-if-empty-or-prefix "http://127.0.0.1:") \
-        || log "Could not clear the stale engines.stack.url - set it to empty by hand if the Stack does not come back."
-    fi
+    log "MaiPai Stack setup failed. Home requires the Stack. Home's service was not started."
+    exit 1
   fi
 
   if [ "$os" = "linux" ]; then

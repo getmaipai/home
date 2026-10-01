@@ -7,7 +7,7 @@
 // hf-token route) needs identically: reading the setting, one cached
 // client per URL, and mapping a StackError the same way everywhere
 // (never inventing a cause the Stack itself didn't state).
-import { getHouseholdSettingValue, getHouseholdSettingSource, setHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { createStackClient, type StackClient } from "@/lib/stack/client";
 import { StackError, type StackErrorKind } from "@/lib/stack/errors";
 import { hostLabel, type EngineIdentity } from "@/lib/engineIdentity";
@@ -45,25 +45,13 @@ export function isStackConfigured(): boolean {
 export type StackRole = "chat" | "embeddings" | "stt" | "tts";
 export const STACK_ROLES: readonly StackRole[] = ["chat", "embeddings", "stt", "tts"];
 
-export function isStackRoleEnabled(role: StackRole): boolean {
-  return testClient !== null || (isStackConfigured() && getHouseholdSettingValue(`engines.stack.use_${role}`) === true);
+export function isStackRoleEnabled(_role: StackRole): boolean {
+  return isStackConfigured();
 }
 
-/** Home's own engines still own every role that the Stack does not route. */
+/** Kept for the additive computer-memory API; all roles belong to Stack. */
 export function getHomeOwnedRoles(): StackRole[] {
-  return STACK_ROLES.filter((role) => !isStackRoleEnabled(role));
-}
-
-/** Existing configured hubs retain their former all-role behavior once, at boot. */
-export function backfillStackRoleSettings(): void {
-  const url = getHouseholdSettingValue("engines.stack.url");
-  if (typeof url !== "string" || url.trim().length === 0) return;
-  const roles: StackRole[] = ["chat", "embeddings", "stt", "tts"];
-  if (roles.some((role) => {
-    const source = getHouseholdSettingSource(`engines.stack.use_${role}`);
-    return source !== undefined && source !== "default";
-  })) return;
-  for (const role of roles) setHouseholdSettingValue(`engines.stack.use_${role}`, true);
+  return [];
 }
 
 let cachedClient: StackClient | null = null;

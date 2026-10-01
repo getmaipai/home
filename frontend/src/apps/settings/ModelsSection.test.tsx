@@ -370,13 +370,13 @@ describe("ModelsSection", () => {
     } finally { restore(); }
   });
 
-  test("shows the empty Stack message and names the roles still running on Home", async () => {
-    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [], homeOwnedRoles: ["chat", "embeddings", "stt", "tts"] as Array<"chat" | "embeddings" | "stt" | "tts"> } };
+  test("shows the empty-memory message when the Stack has nothing loaded", async () => {
+    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [], homeOwnedRoles: [] as Array<"chat" | "embeddings" | "stt" | "tts"> } };
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
     try {
       const { findByText } = render(<ModelsSection />);
-      await findByText("The Stack has nothing loaded.");
-      await findByText("This counts only what the Stack has loaded. Home's own engines still run: chat, search, listening and speaking.");
+      await findByText("Nothing is loaded right now.");
+      expect(document.body.textContent).not.toContain("Home's own engines still run");
     } finally { restore(); }
   });
 
