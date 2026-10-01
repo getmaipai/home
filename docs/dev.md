@@ -35113,3 +35113,14 @@ failure branches. Their unit and integration tests remain in `composer.test.ts`,
 `turnMachine/answer.test.ts`, `turnMachine/outputGate.test.ts`, and
 `turnEngine.test.ts`. Engine connectivity failures are covered by the exact
 search-success, compose-failure regressions in both turn paths.
+
+## CHAT-HEADER target size follow-up (2026-10-01)
+
+A chat-only phone/dark scan on clean `origin/main` passed. After the full
+mobile wordmark fix, the expanded logo left too little room for the chat
+controls, and axe found the title overlapping the global Search target. The
+chat title now has a real `h-12 min-w-12` box with no hit-area pad. At phone
+widths, the duplicate header wordmark is hidden while the chat header slot is
+active; the sidebar keeps its logo. The adjacent actions target has an 8px
+gap. Header tests assert the real height and minimum width classes. A focused
+chat and chat-list phone/dark scan passes with zero violations and overflow.

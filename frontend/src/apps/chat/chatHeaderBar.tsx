@@ -69,7 +69,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
-import { hitArea } from "@maipai/ui/src/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -160,43 +159,28 @@ export function ChatHeaderBar() {
   const title = data.title || "New Chat";
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+    <div data-chat-header-bar className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
       <ChatIcon className="text-muted-foreground size-4 shrink-0" />
       {renaming ? (
         <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />
       ) : (
         <>
-          {/* CHAT-FIND-0923-05: the kit's own "default" Button size is a
-              deliberate h-12 (48px, docs/UI.md's hard touch-target
-              floor) - correct for a real interactive control, but it
-              grew this row taller than the template's own header
-              controls (Light-Dark.tsx: `h-10 w-10`, 40px, the same
-              convention the app-sidebar's own logo row already sits at
-              - 57px, not this row's own 65px, the gap Jesse found live).
-              `h-10` plus `hitArea(1)` (the same technique `icon-lg`
-              already uses) keeps the 48px hit area a real click needs
-              while the visual line returns to 40px, matching the
-              template's own convention rather than carving out a
-              special case for this one row. */}
+          {/* Keep the title button itself at the kit's 48px touch-target
+              floor. A pseudo-element hit-area pad overlaps its neighbor
+              here and axe does not count it as a sufficiently sized,
+              separate target. */}
           <Button
             type="button"
             variant="ghost"
-            className={`h-10 min-w-12 flex-1 justify-start px-2 text-base font-medium ${hitArea(1)}`}
+            className="h-12 min-w-12 flex-1 justify-start px-2 text-base font-medium"
             onClick={() => setRenaming(true)}
           >
             <span className="min-w-0 truncate">{title}</span>
           </Button>
           <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
-              {/* A review caught this: `icon-lg` carries its own
-                  `hitArea(1)` (a 4px overhang each side), and so does
-                  the title button above - back-to-back on this row's
-                  own `gap-1` (4px), the two overhangs cover the exact
-                  same 4px strip between them, and this button, later in
-                  DOM order, wins every click that lands there instead
-                  of the title. `ms-1` (4px) closes the row's own gap to
-                  the buttons' own 8px, the width both overhangs
-                  together need to stop touching at all. */}
+              {/* Keep an 8px visual gap between the two independent
+                  48px targets. */}
               <Button type="button" variant="ghost" size="icon-lg" className="ms-1" aria-label="Conversation actions">
                 <ChevronDownIcon className="size-4" />
               </Button>

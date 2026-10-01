@@ -71,6 +71,8 @@ describe("ChatHeaderBar", () => {
     const layoutClasses = title.className.split(" relative before:").at(0) ?? "";
     expect(layoutClasses).toContain("flex-1");
     expect(layoutClasses).toContain("min-w-12");
+    expect(layoutClasses).toContain("h-12");
+    expect(layoutClasses.split(" ")).not.toContain("h-10");
     expect(layoutClasses.split(" ")).not.toContain("shrink-0");
     expect(layoutClasses).not.toContain("grow");
     expect(layoutClasses).not.toContain("max-w-full");
@@ -84,6 +86,7 @@ describe("ChatHeaderBar", () => {
     const button = await view.findByRole("button", { name: "New Chat" });
     const layoutClasses = button.className.split(" relative before:").at(0) ?? "";
     expect(layoutClasses).toContain("min-w-12");
+    expect(layoutClasses).toContain("h-12");
     expect(layoutClasses).toContain("flex-1");
     expect(layoutClasses.split(" ")).not.toContain("shrink-0");
     expect(button.querySelector("span")?.className).toContain("min-w-0 truncate");
