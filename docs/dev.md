@@ -1623,6 +1623,19 @@ Stack has proven the hub's residency profile on the Studio. The host
 table in the Apple silicon plan gained LocalAI, Harbor, mlx-serve and
 oMLX rows from the survey that decided this.
 
+### The Stack proof harness
+
+The text to speech harness in `backend/scripts/bench/tts-stack16-d.ts`
+compares 30 fixed English lines spoken by Home's Pocket TTS service and
+the Stack's speech route in the same preset voice. It checks duration
+within 5 percent, clipping below 0.1 percent, edge silence at most 0.6
+seconds with no more than 0.25 seconds extra on the Stack, and first
+audio no slower than 1.25 times Home's. Its flags select the Home port,
+Stack URL, voice, number of lines, JSON output, whether to spawn Home's
+engine, and an optional directory for WAV files. Audio stays in memory
+unless that directory is supplied. This harness is run by hand and never
+by `check.sh`.
+
 The alternatives rejected are a two-card layout, because there is no second
 card; a static memory reservation, because it wastes idle unified memory;
 CUDA-only MTP, because it is not a verified Metal dependency on the pinned
