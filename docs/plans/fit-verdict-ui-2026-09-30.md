@@ -12,14 +12,15 @@ One shape, `StackFitPlan` (spec-v0.1.60): a verdict (`yes`, `slow`, `no`, `unkno
 
 The words, in the dad test's terms:
 
-| Verdict | Home says | Colour token (status pill) |
-|---|---|---|
-| `yes` | Runs well on this computer | teal (Ready) |
-| `slow` | Runs, but slowly | orange (Attention) |
-| `no` | Won't fit, needs about 6 GB more memory | red (Error) |
-| `unknown` | Can't tell yet: nobody has measured a model like this on a computer like yours | secondary (Idle) |
+| Verdict | Badge | Home says | Colour token (status pill) |
+|---|---|---|---|
+| `yes` | Good fit | Runs well on this computer | teal (Ready) |
+| `slow` | Slow here | Runs, but slowly | orange (Attention) |
+| `no` | Too big | Won't fit, needs about 6 GB more memory | red (Error) |
+| `unknown` | Not tested yet | Can't tell yet: nobody has measured a model like this on a computer like yours | secondary (Idle) |
 
-An unknown answer is never dressed up as a no or a yes. A number that is an estimate says so in its tooltip with its source and date.
+An unknown answer is never dressed up as a no or a yes. A number that is an estimate says so in its tooltip with its source and date. The source words are fixed: measured reads 'Tested on this computer on <date>.', dry-run reads 'Checked on this computer without a full run, <date>.', estimated reads 'An estimate. Not yet tested on a computer like this one.', unknown reads 'Not known yet.' A figure nothing has reported reads 'Not measured yet', never a zero.
+
 
 ## The screens
 
