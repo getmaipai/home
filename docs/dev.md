@@ -1648,6 +1648,17 @@ counts within 5, 8, and 12 percent of an even match.
 
 `backend/scripts/bench/stt-stack16-e.ts` renders the fixed English lines with Stack text to speech, then scores the same audio with Home's in-process recognizer and the Stack speech route. It requires aggregate Stack word error rate to be at most 1 percentage point worse than Home, median extra time at most 150 ms, p95 extra time at most 400 ms, and matching repeat transcripts for the first five lines on both sides. No real recordings are used. Flags select the Stack URL, voice, number of lines, JSON output path, and an optional directory for WAV files. It is run by hand and never by `check.sh`.
 
+### Speech to text, laptop dry run, 2026-10-01
+
+Hardware: Apple M4 Pro, 26 GB unified memory (arm64).
+
+Home and the Stack both used `sherpa-onnx-node` 1.13.8 and
+`moonshine-tiny-en-int8`, archive revision
+`d5fe6ec4334fef36255b2a4010412cad4c007e33103fec62fb5d17cad88086f2`.
+Aggregate WER was 0.0132 on each side, all 30 transcripts matched,
+and median and p95 extra Stack time were -0.4 ms and 3.6 ms; the laptop
+run passes every bar, and the Studio run is still owed.
+
 #### Text to speech, laptop dry run, 2026-10-01
 
 Hardware: Apple M4 Pro, 26 GB unified memory (arm64).
