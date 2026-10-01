@@ -34,7 +34,7 @@ describe("embedding proof metrics", () => {
   test("summarizes batch throughput failure", () => { expect(summarizeEmbed([row({ batchRatio: 0.79 })]).passed).toBe(false); });
   test("renders aligned plain text without an em dash", () => {
     const rendered = renderEmbedTable([row()], summarizeEmbed([row()]));
-    expect(rendered).toContain("Summary: PASS"); expect(rendered).toContain("line  cosine"); expect(rendered).not.toContain("—");
+    expect(rendered).toContain("Summary: PASS"); expect(rendered).toContain("line  cosine"); expect(rendered).not.toContain(String.fromCharCode(0x2014));
   });
   test("argument parser defaults and unknown flags", () => {
     expect(parseArgs([])).toEqual({ stackUrl: "http://127.0.0.1:8770", homePort: 8796, out: "./embed-stack16-e-results.json", lines: 200, homeModel: "/Users/jessetorres/Developer/github.com/getmaipai/home/data/models/nomic-embed-text-v1.5.Q4_K_M.gguf" });
