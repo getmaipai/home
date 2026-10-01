@@ -1699,6 +1699,10 @@ counts within 5, 8, and 12 percent of an even match.
 
 `backend/scripts/bench/stt-stack16-e.ts` renders the fixed English lines with Stack text to speech, then scores the same audio with Home's in-process recognizer and the Stack speech route. It requires aggregate Stack word error rate to be at most 1 percentage point worse than Home, median extra time at most 150 ms, p95 extra time at most 400 ms, and matching repeat transcripts for the first five lines on both sides. No real recordings are used. Flags select the Stack URL, voice, number of lines, JSON output path, and an optional directory for WAV files. It is run by hand and never by `check.sh`.
 
+#### Search (embeddings)
+
+`backend/scripts/bench/embed-stack16-e.ts` compares Home and Stack vectors for 200 fixed sentences using the same Nomic model file. Every sentence must reach cosine similarity 0.999, repeated requests must return identical vectors, Stack single request median latency can be at most 50 ms slower, and batch throughput must reach at least 80 percent of Home's. Flags select the Stack URL, Home port, model path, number of sentences, and JSON output path. The script starts Home's embedding engine on its own port and stops that child when done. It is run by hand and never by `check.sh`.
+
 ### Speech to text, laptop dry run, 2026-10-01
 
 Hardware: Apple M4 Pro, 26 GB unified memory (arm64).
