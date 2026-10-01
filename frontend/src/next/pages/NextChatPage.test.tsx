@@ -972,6 +972,34 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     }
   });
 
+  test("produced-file menu exposes its available actions and supports keyboard navigation", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    let restore: () => void = () => {};
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(view.queryByLabelText("Message input")).not.toBeNull());
+      await act(async () => { window.dispatchEvent(new Event("resize")); });
+      restore = await openArtifact(view);
+      const card = view.container.querySelector('[data-slot="produced-artifact-card"]');
+      expect(card).toBeTruthy();
+      const trigger = within(card as HTMLElement).getByRole("button", { name: "More" });
+      fireEvent.keyDown(trigger, { key: "ArrowDown" });
+      const open = await within(document.body).findByRole("menuitem", { name: "Open" });
+      expect(within(document.body).getByRole("menuitem", { name: "Download" })).toBeTruthy();
+      expect(within(document.body).getByRole("menuitem", { name: "Show in Library" })).toBeTruthy();
+      expect(within(document.body).queryByRole("menuitem", { name: "Delete" })).toBeNull();
+      await waitFor(() => expect(document.activeElement).toBe(open));
+    } finally {
+      restore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
+  });
+
   // A code review caught this: the desktop canvas's own content used
   // to stay mounted (and its `useQuery` for the artifact with it)
   // forever after the FIRST artifact ever closed, not just through one

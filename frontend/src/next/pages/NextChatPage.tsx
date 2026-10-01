@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type MutableRefObject, type PointerEvent, type PropsWithChildren, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolApprovalOption, type ToolCallMessagePartComponent } from "@assistant-ui/react";
@@ -24,6 +24,7 @@ import { JobProgress, type JobStage } from "@maipai/ui/src/elements/job-progress
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorSearch, ModelSelectorList, ModelSelectorEffort, type ModelOption } from "@maipai/ui/src/elements/model-selector";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
@@ -383,14 +384,33 @@ const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string, never>
   // stuck reading a non-spinning "Loading..." forever, never an error.
   const meta = data ? `${data.kind} · v${data.version}` : query.isError ? "Not available right now" : "Loading…";
   return (
-    <ArtifactCard
-      title={data?.title ?? "Document"}
-      meta={meta}
-      generating={query.isLoading}
-      onClick={() => openArtifact(result.id)}
-    />
+    <ProducedArtifactCard id={result.id} title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onOpen={() => openArtifact(result.id)} />
   );
 };
+
+function ProducedArtifactCard({ id, title, meta, generating, onOpen }: { id: string; title: string; meta: string; generating: boolean; onOpen: () => void }) {
+  const navigate = useNavigate();
+  const MoreIcon = getIcon("more-horizontal");
+  return (
+    <div className="flex w-full max-w-sm items-center gap-1" data-slot="produced-artifact-card">
+      <ArtifactCard className="min-w-0 flex-1" title={title} meta={meta} generating={generating} onClick={onOpen} />
+      <div className="shrink-0">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button type="button" variant="ghost" size="icon" aria-label="More">
+              <MoreIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => { window.location.assign(`/api/artifacts/${encodeURIComponent(id)}/export`); }}>Download</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => navigate("/files")}>Show in Library</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+}
 
 function ArtifactTool() {
   useAssistantToolUI({ toolName: "write_document", render: ArtifactCardToolRender, display: "standalone" });
@@ -487,7 +507,7 @@ function ProjectFinishedArtifact({ id }: { id: string }) {
     openArtifact(id);
     reloadMainThread();
   }, [id, openArtifact, reloadMainThread]);
-  return <ArtifactCard title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onClick={() => openArtifact(id)} />;
+  return <ProducedArtifactCard id={id} title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onOpen={() => openArtifact(id)} />;
 }
 
 // PROJECT-PROGRESS-01 (issue #180): a project's own dependency-graph
