@@ -13,6 +13,7 @@ export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHe
 const stackRole: Partial<Record<HealthRole, StackRole>> = {
   chat: "chat", embed: "embeddings", voice: "tts",
 };
+const STACK_IDLE_REASON = "No request through the public route in the last hour.";
 
 export async function localRoleHealthEntry(role: HealthRole): Promise<EngineHealthEntry> {
   if (role === "chat") return await probeChatEngine();
@@ -32,11 +33,18 @@ export async function roleHealth(role: HealthRole): Promise<RoleHealth> {
       const row = roles.find((item) => item.id === (routed === "embeddings" ? "embed" : routed));
       if (!row) return { availability: "unavailable", reason: "stack_unreachable" };
       const state = row.state.state;
-      return state === "ready"
-        ? { availability: "ready", reason: null }
-        : state === "loaded" || state === "installed"
-          ? { availability: "starting", reason: null }
-          : { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start" };
+      // Stack's installed state is a selected, available role with no live
+      // process. JIT/resident roles start on their next real request, so
+      // this is idle-by-design rather than a status-page degradation.
+      if (state === "ready" || state === "installed") return { availability: "ready", reason: null };
+      if (state === "loaded") {
+        // Stack also uses loaded when a ready role has simply had no public
+        // request in an hour. Only a loaded state without this idle reason
+        // represents an active load that has not become ready yet.
+        if (row.state.reason === STACK_IDLE_REASON) return { availability: "ready", reason: null };
+        return { availability: "starting", reason: null };
+      }
+      return { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start" };
     } catch {
       return { availability: "unavailable", reason: "stack_unreachable" };
     }

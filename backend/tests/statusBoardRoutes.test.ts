@@ -5,6 +5,7 @@ import { maintenanceWindows, statusEvents, statusNotes } from "@/db/schema";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetServiceHealthForTests, recordServiceOutcome } from "@/lib/serviceHealth";
+import { setHouseholdSettingValue } from "@/lib/settings";
 
 beforeEach(() => { resetDb(); __resetServiceHealthForTests(); db.delete(statusNotes).run(); db.delete(maintenanceWindows).run(); db.delete(statusEvents).run(); });
 
@@ -33,6 +34,7 @@ describe("status routes", () => {
 
   test("admin app needs include in-memory service diagnostics, members do not", async () => {
     const owner = await ownerClient();
+    setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:8888");
     await recordServiceOutcome("searxng", { ok: false, status: 429 }, new Date());
     const ownerApps = await owner.get("/api/status/apps");
     const apps = await ownerApps.json() as Array<{ id: string; needs?: Array<Record<string, unknown>> }>;

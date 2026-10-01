@@ -35478,3 +35478,50 @@ result through the existing SidebarMenuBadge component. No vendored layout or
 menu data is edited. `StatusAppsResponse` is shared with the backend route
 schema through its alias-free wire contract; the endpoint returns an array,
 and each need includes its purpose and `waiting` need state.
+
+## STATUS-LIVE-01 (2026-10-01)
+
+The weather service events at 12:25 and 13:25 UTC align with the installed
+weather package's hourly warm schedule. Each warm recipe uses geocoding and
+forecast requests. The shared home's retained event rows and logs do not
+preserve the individual HTTP status or transport exception for those samples,
+so the exact failure class cannot be established after the fact. The next
+recorded success recovered each service, within seconds for the earlier run
+and by 13:37 UTC for the later one. No additional health request was added:
+the existing `host.fetch` observations remain the only service signals, as
+required by decision 3 of
+`docs/plans/status-internet-services-2026-09-30.md` and
+`getmaipai/.github/docs/THIRD-PARTY-SERVICES.md`. A lone failure after a
+known success stays operational; two consecutive failures degrade; three
+consecutive timeouts or server errors become an outage; a limited/access
+block signal degrades immediately; a success clears the consecutive-failure
+run. This keeps a retry transient from painting the history amber without
+adding traffic or hiding a sustained failure.
+
+The saved SearX integration URL is configured and the `websearch` package is
+enabled. A single read-only request to its configured `/search` endpoint
+returned HTTP 200 and Earth results. The historical degraded event has no
+stored failure class, and no open SearX issue remains, so the old row alone
+does not prove a current outage. The actual bug was that Chat's declared
+service need was included even when the URL was absent; app status and
+history now omit SearX unless configured. When configured, service need
+component IDs and diagnostics use the same normalized host mapping as
+`serviceHealth.ts`.
+
+The read-only Stack roles response returned `tts: installed` with no failure
+reason, while `chat`, `coding`, `judge`, `router`, `embed`, and `rerank` were
+ready; `vision` was ready; `stt` was installed; `wakeword`, `image`, `video`,
+and `music` were not installed. Home's voice role routes to Stack `tts`.
+Stack uses `installed` for a role with no live process and `loaded` with the
+reason `No request through the public route in the last hour.` for an idle
+role. Both are available on demand, so the shared role-health mapping now
+reports them operational. A loaded role without that idle reason remains
+starting, and an unreachable Stack remains unavailable. This shared mapping
+feeds health, turn preflight, status history, and app health.
+
+The isolated 390px status/apps capture measured the status link at 48px wide
+with matching client and scroll widths. The responsive status label is
+intentionally hidden below the small breakpoint. The neighboring gray “S”
+is the profile avatar initial, not clipped status text. Before and after
+captures show no status-indicator layout bug, so no UI styling change was
+needed. The running household hub was read only and was not restarted.

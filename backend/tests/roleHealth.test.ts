@@ -30,4 +30,18 @@ describe("roleHealth", () => {
     expect(await roleHealth("chat")).toEqual({ availability: "ready", reason: null });
     expect(await roleHealth("embed")).toMatchObject({ availability: expect.any(String) });
   });
+
+  test("Stack installed and idle loaded roles are available on demand, while active loading stays degraded", async () => {
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    setHouseholdSettingValue("engines.stack.use_tts", true);
+    client([{ id: "tts", state: { state: "installed" } }]);
+    expect(await roleHealth("voice")).toEqual({ availability: "ready", reason: null });
+
+    setHouseholdSettingValue("engines.stack.use_chat", true);
+    client([{ id: "chat", state: { state: "loaded", reason: "No request through the public route in the last hour." } }]);
+    expect(await roleHealth("chat")).toEqual({ availability: "ready", reason: null });
+
+    client([{ id: "chat", state: { state: "loaded" } }]);
+    expect(await roleHealth("chat")).toEqual({ availability: "starting", reason: null });
+  });
 });

@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, test } from "bun:test";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { statusEvents } from "@/db/schema";
 import { __resetServiceHealthForTests, recordServiceOutcome, serviceDetail, serviceState, serviceDiagnostics } from "@/lib/serviceHealth";
 import { __setReminderTimingForTests, __resetReminderTimersForTests, listIssues } from "@/lib/issues";
 import { recordStatusSample } from "@/lib/statusHistory";
@@ -8,6 +11,29 @@ import { resetDb } from "../../tests/reset-db";
 beforeEach(() => { resetDb(); __resetServiceHealthForTests(); __resetStatusAppsForTests(); __resetReminderTimersForTests(); __setReminderTimingForTests(10); });
 
 describe("outside service request health", () => {
+  test("one transient timeout stays operational if the next real request succeeds", async () => {
+    __setStatusAppsForTests([{ id: "weather", name: "Weather", needs: [{ kind: "service", id: "api.example.com", name: "Example", purpose: "Test", required: false }] }]);
+    const at = new Date("2026-10-01T12:00:00Z");
+    await recordServiceOutcome("api.example.com", { ok: true }, at);
+    await recordServiceOutcome("api.example.com", { ok: false, error: new Error("request timed out") }, new Date(at.getTime() + 1000));
+    expect(serviceState("service:api-example-com", at.getTime() + 1000)).toBe("operational");
+    await recordStatusSample(new Date(at.getTime() + 1000));
+    expect(db.select({ state: statusEvents.state }).from(statusEvents).where(eq(statusEvents.component, "service:api-example-com")).all()).toEqual([{ state: "operational" }]);
+    await recordServiceOutcome("api.example.com", { ok: true }, new Date(at.getTime() + 2000));
+    expect(serviceState("service:api-example-com", at.getTime() + 2000)).toBe("operational");
+  });
+
+  test("repeated consecutive server failures degrade, then the third is an outage", async () => {
+    const at = new Date("2026-10-01T12:00:00Z");
+    await recordServiceOutcome("api.example.com", { ok: true }, at);
+    await recordServiceOutcome("api.example.com", { ok: false, status: 503 }, new Date(at.getTime() + 500));
+    expect(serviceState("service:api-example-com", at.getTime())).toBe("operational");
+    await recordServiceOutcome("api.example.com", { ok: false, status: 503 }, new Date(at.getTime() + 1000));
+    expect(serviceState("service:api-example-com", at.getTime() + 1000)).toBe("degraded");
+    await recordServiceOutcome("api.example.com", { ok: false, status: 503 }, new Date(at.getTime() + 1500));
+    expect(serviceState("service:api-example-com", at.getTime() + 1500)).toBe("outage");
+  });
+
   test("records actual success, then becomes unknown after idle window", async () => {
     const at = new Date("2026-10-01T12:00:00Z");
     await recordServiceOutcome("api.example.com", { ok: true }, at);

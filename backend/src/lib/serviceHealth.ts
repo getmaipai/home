@@ -2,13 +2,13 @@ import { recordStatusSample } from "@/lib/statusHistory";
 import { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
 import { listStatusApps, type StatusApp } from "@/lib/appNeeds";
 import { resolveIssue, raiseIssue, listIssues } from "@/lib/issues";
+import { serviceComponent, serviceId } from "@/lib/serviceComponent";
 
 export type ServiceOutcome = "success" | "timeout" | "server_error" | "limited" | "error";
 export type ServiceSample = { at: number; outcome: ServiceOutcome; errorClass: string | null };
 export type ServiceHealthDetail = { last_success_at: string | null; last_error_class: string | null };
 export type ServiceHealthDiagnostics = ServiceHealthDetail & { success_count: number; failure_count: number };
 
-const WINDOW_MS = 60 * 60 * 1000;
 const IDLE_MS = 6 * 60 * 60 * 1000;
 const samples = new Map<string, ServiceSample[]>();
 const details = new Map<string, ServiceHealthDetail>();
@@ -17,11 +17,6 @@ let internetState: "up" | "down" | null = null;
 const DEBOUNCE_MS = 60_000;
 let lastInternetAt = 0;
 const timeoutByMinute = new Map<number, Set<string>>();
-
-function serviceId(host: string): string {
-  const value = host.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
-  return value || "unknown";
-}
 
 export function classifyServiceOutcome(error: unknown, status?: number): { outcome: ServiceOutcome; errorClass: string | null } {
   if (status === 429) return { outcome: "limited", errorClass: "http_429" };
@@ -34,20 +29,24 @@ export function classifyServiceOutcome(error: unknown, status?: number): { outco
   return { outcome: "error", errorClass: name };
 }
 
+/** Keep a known-good service operational through one transient failure.
+ * Two consecutive failures degrade, three consecutive timeouts or 5xx
+ * responses are an outage, and a block signal is degraded immediately. */
 function derive(rows: ServiceSample[], now = Date.now()): "operational" | "degraded" | "outage" | null {
-  const recent = rows.filter((row) => now - row.at <= WINDOW_MS);
   if (!rows.length || now - rows.at(-1)!.at > IDLE_MS) return null;
-  if (!recent.length) return "degraded";
-  if (recent.at(-1)!.outcome === "limited") return "degraded";
-  const failures = recent.filter((row) => row.outcome === "timeout" || row.outcome === "server_error");
-  if (failures.length >= 3 && failures.slice(-3).every((row) => row.outcome === "timeout" || row.outcome === "server_error")) return "outage";
-  if (recent.some((row) => row.outcome !== "success")) return "degraded";
-  return "operational";
+  const recent = rows.filter((row) => now - row.at <= IDLE_MS);
+  const trailingFailures: ServiceSample[] = [];
+  for (let i = recent.length - 1; i >= 0 && recent[i]!.outcome !== "success"; i--) trailingFailures.unshift(recent[i]!);
+  if (!trailingFailures.length) return "operational";
+  if (trailingFailures.some((row) => row.outcome === "limited")) return "degraded";
+  if (trailingFailures.length >= 3 && trailingFailures.slice(-3).every((row) => row.outcome === "timeout" || row.outcome === "server_error")) return "outage";
+  if (trailingFailures.length >= 2) return "degraded";
+  return recent.some((row) => row.outcome === "success") ? "operational" : "degraded";
 }
 
 export async function recordServiceOutcome(host: string, result: { ok: boolean; status?: number; error?: unknown }, now = new Date()): Promise<void> {
   const id = serviceId(host);
-  const component = `service:${id}`;
+  const component = serviceComponent(host);
   if (!StatusComponent.safeParse(component).success) return;
   const classified = result.ok ? { outcome: "success" as const, errorClass: null } : classifyServiceOutcome(result.error, result.status);
   const rows = samples.get(id) ?? [];

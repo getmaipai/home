@@ -11,6 +11,7 @@ import type { InternetState } from "@/lib/internetProbe";
 import { knownServiceComponents } from "@/lib/serviceHealth";
 import { reconcileServiceBlockIssues, serviceState } from "@/lib/serviceHealth";
 import { roleHealth } from "@/lib/roleHealth";
+import { configuredServiceComponents } from "@/lib/appNeeds";
 
 export type StatusState = StatusEventRecord["state"];
 type ComponentStateMap = Partial<Record<StatusComponent, StatusState>>;
@@ -26,7 +27,8 @@ export function buildStatusHistory(days: number, now: Date = new Date()) {
   const startIso = new Date(windowStart).toISOString();
   const rows = db.select({ component: statusEvents.component, state: statusEvents.state, at: statusEvents.at })
     .from(statusEvents).orderBy(statusEvents.at).all();
-  const components = [...baseComponents, ...new Set(rows.map((row) => row.component).filter((component) => component.startsWith("service:")))] as StatusComponent[];
+  const serviceComponents = configuredServiceComponents();
+  const components = [...baseComponents, ...serviceComponents] as StatusComponent[];
   const generated_at = now.toISOString();
   const output = components.map((component) => {
     const all = rows.filter((row) => row.component === component);
@@ -163,7 +165,8 @@ export async function recordStatusSample(now: Date = new Date(), internet?: Inte
     const health = healthForTests ?? await collectHealth();
     const maintenance = activeMaintenanceComponents(now);
     const states = await liveComponentStatesFrom(health, maintenance);
-    const serviceComponents = knownServiceComponents();
+    const configuredServices = new Set(configuredServiceComponents());
+    const serviceComponents = knownServiceComponents().filter((component) => configuredServices.has(component));
     for (const component of [...baseComponents, ...new Set(serviceComponents)] as StatusComponent[]) {
       const service = component.startsWith("service:") ? serviceState(component, now.getTime()) : null;
       const state: StatusState | undefined = service ? service === "unknown" ? undefined : service === "outage" ? "outage" : service : states[component];

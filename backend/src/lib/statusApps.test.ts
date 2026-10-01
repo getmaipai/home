@@ -1,8 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { appResponse, buildAppHistory, deriveAppState, unionRequiredDowntime, type StatusApp } from "@/lib/statusApps";
+import { appResponse, buildAppHistory, componentForNeed, deriveAppState, unionRequiredDowntime, type StatusApp } from "@/lib/statusApps";
 import { __resetInternetProbeForTests, classifyInternetFailures, probeInternet } from "@/lib/internetProbe";
 
 describe("app status derivation", () => {
+  test("normalizes service host needs to the service health component id", () => {
+    expect(componentForNeed({ kind: "service", id: "api.open-meteo.com", name: "Weather", purpose: "Forecast", required: false })).toBe("service:api-open-meteo-com");
+  });
+
   test.each([
     ["operational", [{ required: true, state: "operational" }, { required: false, state: "operational" }], "operational"],
     ["required down", [{ required: true, state: "down" }], "down"],

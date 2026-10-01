@@ -3831,6 +3831,23 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
           const statusLinkTitle = await page.locator('a[href="/status"]').getAttribute("title");
           if (statusLinkTitle?.includes("Brain")) throw new Error("non-admin status indicator tooltip exposed an engine name");
         }
+        if (viewportName === "phone") {
+          const indicatorLayout = await page.locator('a[href="/status"]').first().evaluate((anchor) => {
+            const rect = anchor.getBoundingClientRect();
+            const status = anchor.querySelector('[data-status]');
+            return {
+              viewport: { width: window.innerWidth, height: window.innerHeight },
+              anchor: { x: rect.x, y: rect.y, width: rect.width, height: rect.height, scrollWidth: anchor.scrollWidth, clientWidth: anchor.clientWidth },
+              statusText: status?.textContent?.trim() ?? "",
+              children: [...(status?.children ?? [])].map((child) => {
+                const childRect = child.getBoundingClientRect();
+                const style = getComputedStyle(child);
+                return { text: child.textContent?.trim() ?? "", display: style.display, x: childRect.x, width: childRect.width, scrollWidth: (child as HTMLElement).scrollWidth, clientWidth: (child as HTMLElement).clientWidth };
+              }),
+            };
+          });
+          console.log(`status phone indicator geometry: ${JSON.stringify(indicatorLayout)}`);
+        }
         const path = join(outDir, `status-apps-${role}-${width}.png`);
         await page.screenshot({ path, fullPage: true });
         console.log(`Wrote ${path}`);

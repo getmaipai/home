@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
 import { statusEvents } from "@/db/schema";
 import { buildStatusHistory } from "@/lib/statusHistory";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { resetDb } from "./reset-db";
 import type { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
 import type { StatusEvent } from "@maipai/spec/gen/ts/status-event.js";
@@ -19,6 +20,13 @@ describe("buildStatusHistory", () => {
     const result = buildStatusHistory(2, now);
     expect(result.components.every((part) => part.uptime_percent === null && part.current.state === "none" && part.current.since === null)).toBe(true);
     expect(result.components.every((part) => part.days.every((entry) => entry.worst === "none"))).toBe(true);
+  });
+
+  test("a historical SearXNG row is hidden when its integration is not configured", () => {
+    add("service:searxng", "degraded", now.getTime() - 60_000);
+    expect(buildStatusHistory(1, now).components.some((part) => part.component === "service:searxng")).toBe(false);
+    setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:8888");
+    expect(buildStatusHistory(1, now).components.find((part) => part.component === "service:searxng")?.current.state).toBe("degraded");
   });
 
   test("continuous operational state is 100 percent", () => {

@@ -2,6 +2,7 @@ export type AppNeed = { kind: "engine" | "service" | "internet"; id: string; nam
 export type AppState = "operational" | "degraded" | "down" | "waiting_for_internet";
 export type NeedState = "operational" | "degraded" | "down" | "waiting" | "unknown";
 import { serviceState } from "@/lib/serviceHealth";
+import { serviceComponent } from "@/lib/serviceComponent";
 import { roleHealth } from "@/lib/roleHealth";
 export type StatusApp = { id: string; name: string; needs: AppNeed[] };
 export type StatusEventLike = { component: string; state: string; at: string };
@@ -9,7 +10,7 @@ export type StatusEventLike = { component: string; state: string; at: string };
 const ENGINE_COMPONENT: Record<string, string> = { chat: "chat", understanding: "embed", memory: "background", voice: "voice", hub: "hub" };
 export function componentForNeed(need: AppNeed): string {
   if (need.kind === "internet") return "internet";
-  if (need.kind === "service") return `service:${need.id}`;
+  if (need.kind === "service") return serviceComponent(need.id);
   return ENGINE_COMPONENT[need.id] ?? need.id;
 }
 

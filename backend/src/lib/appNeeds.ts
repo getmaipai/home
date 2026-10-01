@@ -1,4 +1,6 @@
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { serviceComponent } from "@/lib/serviceComponent";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { AppNeed, StatusApp } from "@/lib/statusApps";
 export type { StatusApp } from "@/lib/statusApps";
@@ -56,13 +58,18 @@ export function listStatusApps(): StatusApp[] {
   }
   const core = CORE_APPS.map((app) => ({ ...app, needs: [...app.needs] }));
   const chat = core.find((app) => app.id === "chat")!;
-  const searxng = installedServices.get("searxng") ?? BUILT_IN_PLUGIN_SERVICES.websearch![0]!;
-  installedServices.set("searxng", searxng);
-  chat.needs.push(...installedServices.values());
+  const searxngConfigured = Boolean(getHouseholdSettingValue("search.searxng_url"));
+  chat.needs.push(...[...installedServices.values()].filter((need) => need.id !== "searxng" || searxngConfigured));
   const known = new Set(core.map((app) => app.id));
   const installed = appsFromManifests(packageApps).filter((app) => !known.has(app.id)).map((app) => ({
     ...app,
     needs: [...app.needs, ...(BUILT_IN_PLUGIN_SERVICES[app.id] ?? [])],
   }));
   return [...core, ...installed];
+}
+
+export function configuredServiceComponents(): string[] {
+  return [...new Set(listStatusApps().flatMap((app) => app.needs
+    .filter((need) => need.kind === "service")
+    .map((need) => serviceComponent(need.id))))];
 }
