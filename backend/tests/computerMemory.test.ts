@@ -16,7 +16,7 @@ describe("describeComputerMemory", () => {
   beforeEach(() => resetDb());
   afterEach(() => __resetStackEngineForTests());
   test("describes an empty loaded list", () => {
-    expect(describeComputerMemory(budget([]))).toEqual({ usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [], homeOwnedRoles: [] });
+    expect(describeComputerMemory(budget([]))).toEqual({ usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [], homeOwnedRoles: [] });
   });
   test("reports all roles as Home-owned when all Stack switches are off", () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
@@ -55,7 +55,7 @@ describe("describeComputerMemory", () => {
     const result = describeComputerMemory(budget(Object.keys(roleNames).map((id) => model(id, 1))));
     expect(result.loaded.map((item) => item.label)).toEqual(Object.values(roleNames));
   });
-  test.each([["normal", "Plenty of room right now."], ["warn", "Memory is getting tight."], ["critical", "Memory is very tight."]] as const)("words %s pressure", (pressure, text) => {
+  test.each([["normal", "This computer has plenty of free memory right now."], ["warn", "This computer's memory is getting tight right now."], ["critical", "This computer's memory is very tight right now."]] as const)("words %s pressure", (pressure, text) => {
     expect(describeComputerMemory(budget([], pressure)).pressureText).toBe(text);
   });
 });

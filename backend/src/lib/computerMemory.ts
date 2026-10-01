@@ -23,7 +23,7 @@ export function describeComputerMemory(budget: BudgetResponse, homeOwnedRoles: S
     usedGb: round(used),
     freeGb: round(Math.max(0, budget.capBytes - used)),
     pressure: budget.pressure,
-    pressureText: { normal: "Plenty of room right now.", warn: "Memory is getting tight.", critical: "Memory is very tight." }[budget.pressure],
+    pressureText: { normal: "This computer has plenty of free memory right now.", warn: "This computer's memory is getting tight right now.", critical: "This computer's memory is very tight right now." }[budget.pressure],
     loaded: budget.loaded.map(({ id, peakBytes }) => ({ id, label: roleNames[id] ?? id, gb: round(peakBytes) })),
     homeOwnedRoles,
   };

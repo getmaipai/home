@@ -359,7 +359,7 @@ describe("ModelsSection", () => {
 
 
   test("shows Memory right now, its figure, and a loaded model line", async () => {
-    const memory = { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }], homeOwnedRoles: [] } };
+    const memory = { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }], homeOwnedRoles: [] } };
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
     try {
       const { findByText } = render(<ModelsSection />);
@@ -371,7 +371,7 @@ describe("ModelsSection", () => {
   });
 
   test("shows the empty Stack message and names the roles still running on Home", async () => {
-    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [], homeOwnedRoles: ["chat", "embeddings", "stt", "tts"] as Array<"chat" | "embeddings" | "stt" | "tts"> } };
+    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [], homeOwnedRoles: ["chat", "embeddings", "stt", "tts"] as Array<"chat" | "embeddings" | "stt" | "tts"> } };
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
     try {
       const { findByText } = render(<ModelsSection />);
@@ -381,7 +381,7 @@ describe("ModelsSection", () => {
   });
 
   test("shows the original empty-memory lines when no roles still run on Home", async () => {
-    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [], homeOwnedRoles: [] } };
+    const memory = { available: true, memory: { usableGb: 16, usedGb: 0, freeGb: 16, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [], homeOwnedRoles: [] } };
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE, "/api/computer-memory": memory });
     try {
       const { findByText, queryByText } = render(<ModelsSection />);

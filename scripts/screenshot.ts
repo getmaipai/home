@@ -1526,8 +1526,8 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       body: JSON.stringify({ modelId: null }),
     }));
     const memory = state === "memory-tight"
-      ? { available: true, memory: { usableGb: 16, usedGb: 14.8, freeGb: 1.2, pressure: "warn", pressureText: "Memory is getting tight.", loaded: [{ id: "chat", label: "Chat", gb: 12.4 }, { id: "image", label: "Pictures", gb: 2.4 }], homeOwnedRoles: [] } }
-      : { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }, { id: "embed", label: "Search", gb: 1.1 }], homeOwnedRoles: ["chat", "embeddings", "stt", "tts"] } };
+      ? { available: true, memory: { usableGb: 16, usedGb: 14.8, freeGb: 1.2, pressure: "warn", pressureText: "This computer's memory is getting tight right now.", loaded: [{ id: "chat", label: "Chat", gb: 12.4 }, { id: "image", label: "Pictures", gb: 2.4 }], homeOwnedRoles: [] } }
+      : { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }, { id: "embed", label: "Search", gb: 1.1 }], homeOwnedRoles: ["chat", "embeddings", "stt", "tts"] } };
     await page.route("**/api/computer-memory", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(memory) }));
     const answers = {
       yes: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of the 24 GB this computer can give to models." },

@@ -11,7 +11,7 @@ describe("GET /api/computer-memory", () => {
   test("includes an empty Home-owned role list when the test client owns every role", async () => {
     __setStackClientForTests({ budget: async () => value } as unknown as StackClient);
     const { client } = await owner();
-    expect(await (await client.get("/api/computer-memory")).json()).toEqual({ available: true, memory: { usableGb: 16, usedGb: 5, freeGb: 11, pressure: "normal", pressureText: "Plenty of room right now.", loaded: [{ id: "chat", label: "Chat", gb: 5 }], homeOwnedRoles: [] } });
+    expect(await (await client.get("/api/computer-memory")).json()).toEqual({ available: true, memory: { usableGb: 16, usedGb: 5, freeGb: 11, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [{ id: "chat", label: "Chat", gb: 5 }], homeOwnedRoles: [] } });
   });
   test("reports unavailable when the Stack throws", async () => {
     __setStackClientForTests({ budget: async () => { throw new Error("offline"); } } as unknown as StackClient);
