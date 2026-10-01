@@ -26,6 +26,7 @@ export function appStatusMenuBadge(app: StatusApp): { badge: "amber" | "red"; ti
 }
 
 export function sidebarItemStatus(apps: readonly StatusApp[], item: { name: string; url?: string }) {
+  if (!Array.isArray(apps)) return undefined;
   const app = apps.find((candidate) => candidate.name.toLocaleLowerCase() === item.name.toLocaleLowerCase());
   return app ? appStatusMenuBadge(app) : undefined;
 }

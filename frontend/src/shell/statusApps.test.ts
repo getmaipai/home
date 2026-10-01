@@ -29,4 +29,8 @@ describe("status app language and sidebar severity", () => {
     expect(sidebarItemStatus(apps, { name: "Videos", url: "/videos" })).toEqual({ badge: "red", title: "YouTube isn't reachable right now.", ariaLabel: "Videos: not working" });
     expect(sidebarItemStatus(apps, { name: "Family", url: "/people" })).toBeUndefined();
   });
+
+  test("ignores a non-array response from an older or unavailable status route", () => {
+    expect(sidebarItemStatus({} as never, { name: "Chat", url: "/chat" })).toBeUndefined();
+  });
 });
