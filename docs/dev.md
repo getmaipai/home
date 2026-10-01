@@ -33761,6 +33761,10 @@ The only engine launcher in `backend/scripts/` or `scripts/` was the training he
 
 The process-group regression starts a headless server, kills its group, and checks that the listener stopped answering and `lsof` shows no listener on that port. `bash scripts/check.sh` is the Home gate.
 
+## UI-LOGO-PHONE
+
+The mobile dashboard header reused the kit's `FullLogo` with its 40px sidebar overflow clamp, clipping the wordmark. Home's token overlay expands only the logo link inside `header nav` to the natural 120px width. The capture mode measures its image and container and asserts no clipping or horizontal page scroll at 390px; before and after captures are saved at 390px and 1440px in both themes.
+
 ## ENGINE-AVAIL-06a
 
 The person setting `notifications.browser.enabled` is declared in Home's notification settings and included in the pinned commons spec registry (`spec-v0.1.63`). Me > Notifications renders it through the shared settings renderer and Switch. Permission is requested only from its on-switch action; if the browser denies it, the setting remains off and the page explains why. The shell reads the bell's existing 15-second pending-notification query. It seeds the first result as existing history, then asks the active service worker to show one generic system alert per new notification id at level `immediate` or `time_sensitive`. Clicking opens `/status`. Home has no quiet-hours policy yet, so no additional quiet-hours filter applies. These alerts run only while a Home page is open. The org notification standard now describes local alerts from the open app and browser-maker push as a separate opt-in relay. The relay remains ENGINE-AVAIL-06b.

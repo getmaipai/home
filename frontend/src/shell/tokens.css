@@ -157,6 +157,13 @@ html.incognito input:not([type="checkbox"]):not([type="radio"]) {
  * resolution `@maipai/ui/src/tokens.css`'s own `@import` above uses. */
 @source "../../node_modules/@maipai/ui/src";
 
+/* The kit reuses FullLogo in the mobile header, where its sidebar-sized
+ * 40px overflow clamp crops the wordmark. Expand only the header instance. */
+header nav a:has(> img[alt="logo"]) {
+  max-width: 120px;
+  overflow: visible;
+}
+
 :root {
   /* Home's brand accent is cyan, not the kit's electric blue
    * (brand/README.md's per-product accent table). 26%, not the

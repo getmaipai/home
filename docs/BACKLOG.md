@@ -12,6 +12,8 @@ Rough size tags: **S** (a session or less), **M** (a real slice, days),
 
 ## Settings redesign
 
+- [x] **UI-LOGO-PHONE: the mobile header shows the full logo wordmark** (S, 2026-09-30): the kit's 40px sidebar clamp cropped it to "Ma". Home's token overlay expands only the header logo link; the 390px capture asserts natural image width, fitting container, and no horizontal page scroll. See `docs/dev.md`.
+
 Design: [settings redesign plan](plans/settings-redesign-2026-09-30.md).
 
 - [x] **S1: Shared `ProfileForm` extracted from the profile page's Edit dialog (same fields, same API, tests), used by both** (S, committed): one definition of "edit a person".

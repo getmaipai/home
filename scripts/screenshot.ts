@@ -2493,6 +2493,49 @@ async function captureNextDashboardReview(browser: Browser, sessionValue: string
         await page.goto(`${BASE_URL}/`);
         await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
         await settleAnimations(page);
+        if (viewport.width === 390) {
+          const logo = await page.locator('header nav a:has(img[alt="logo"])').evaluate((anchor) => {
+            const image = Array.from(anchor.querySelectorAll<HTMLImageElement>('img[alt="logo"]'))
+              .find((candidate) => getComputedStyle(candidate).display !== "none");
+            if (!image) throw new Error("visible header logo image not found");
+            const box = (element: HTMLElement) => ({
+              clientWidth: element.clientWidth,
+              scrollWidth: element.scrollWidth,
+              overflowX: getComputedStyle(element).overflowX,
+              renderedWidth: element.getBoundingClientRect().width,
+            });
+            const container = anchor as HTMLElement;
+            const wrapper = container.parentElement;
+            const imageBounds = image.getBoundingClientRect();
+            const containerBounds = container.getBoundingClientRect();
+            return {
+              image: {
+                clientWidth: image.clientWidth,
+                scrollWidth: image.scrollWidth,
+                overflowX: getComputedStyle(image).overflowX,
+                renderedWidth: image.getBoundingClientRect().width,
+                naturalWidth: image.naturalWidth,
+              },
+              container: box(container),
+              imageFitsContainer: imageBounds.left >= containerBounds.left - 1 &&
+                imageBounds.right <= containerBounds.right + 1,
+              wrapper: wrapper ? box(wrapper) : null,
+              page: {
+                clientWidth: document.documentElement.clientWidth,
+                scrollWidth: document.documentElement.scrollWidth,
+              },
+            };
+          });
+          console.log(`logo-phone assertion @ 390/${theme}: ${JSON.stringify(logo)}`);
+          if (
+            logo.image.renderedWidth < logo.image.naturalWidth - 1 ||
+            logo.container.clientWidth < logo.image.renderedWidth - 1 ||
+            !logo.imageFitsContainer ||
+            logo.page.scrollWidth > logo.page.clientWidth
+          ) {
+            throw new Error(`logo-phone assertion failed @ 390/${theme}: ${JSON.stringify(logo)}`);
+          }
+        }
         const path = join(outDir, `next-dashboard-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
         console.log(`Wrote ${path}`);
@@ -5005,7 +5048,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -5036,7 +5079,7 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview
+    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview
       ? []
       : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
         ? A11Y_ONLY_COMBOS
@@ -5106,7 +5149,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !chatShortcutsReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !chatShortcutsReview && !nextDashboardReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
