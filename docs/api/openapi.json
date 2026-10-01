@@ -8944,6 +8944,12 @@
                             "last_error_class": {
                               "type": "string",
                               "nullable": true
+                            },
+                            "success_count": {
+                              "type": "number"
+                            },
+                            "failure_count": {
+                              "type": "number"
                             }
                           },
                           "required": [

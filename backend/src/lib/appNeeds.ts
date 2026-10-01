@@ -1,6 +1,7 @@
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { AppNeed, StatusApp } from "@/lib/statusApps";
+export type { StatusApp } from "@/lib/statusApps";
 
 const CORE_APPS: StatusApp[] = [
   { id: "home", name: "Home", needs: [{ kind: "engine", id: "hub", name: "MaiPai Home", purpose: "Open the household hub", required: true }] },
@@ -11,6 +12,10 @@ const CORE_APPS: StatusApp[] = [
     { kind: "engine", id: "voice", name: "Voice", purpose: "Speak replies aloud", required: false },
   ] },
 ];
+
+let statusAppsForTests: StatusApp[] | undefined;
+export function __setStatusAppsForTests(apps: StatusApp[] | undefined): void { statusAppsForTests = apps; }
+export function __resetStatusAppsForTests(): void { statusAppsForTests = undefined; }
 
 export function appsFromManifests(manifests: PackageManifest[]): StatusApp[] {
   return manifests.filter((manifest) => manifest.kind === "app").map((manifest) => ({
@@ -38,6 +43,7 @@ const BUILT_IN_PLUGIN_SERVICES: Record<string, AppNeed[]> = {
 };
 
 export function listStatusApps(): StatusApp[] {
+  if (statusAppsForTests) return statusAppsForTests.map((app) => ({ ...app, needs: [...app.needs] }));
   const packageApps: PackageManifest[] = [];
   const installedServices = new Map<string, AppNeed>();
   for (const id of listPackageIds()) {

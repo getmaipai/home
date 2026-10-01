@@ -38,6 +38,7 @@ describe("status routes", () => {
     const apps = await ownerApps.json() as Array<{ id: string; needs?: Array<Record<string, unknown>> }>;
     const search = apps.find((item) => item.id === "chat")?.needs?.find((need) => need.id === "searxng");
     expect(search).toMatchObject({ state: "degraded", last_error_class: "http_429" });
+    expect(search).toMatchObject({ success_count: 0, failure_count: 1 });
     const created = await owner.post("/api/people", { displayName: "Marlow", role: "child", secret: "0000" });
     const person = await created.json() as { id: string };
     const child = new TestClient();

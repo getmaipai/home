@@ -9,7 +9,7 @@ import { nextHlc } from "@/lib/hlc";
 import { randomSuffix } from "@maipai/core/src/id";
 import type { InternetState } from "@/lib/internetProbe";
 import { knownServiceComponents } from "@/lib/serviceHealth";
-import { serviceState } from "@/lib/serviceHealth";
+import { reconcileServiceBlockIssues, serviceState } from "@/lib/serviceHealth";
 
 export type StatusState = StatusEventRecord["state"];
 type ComponentStateMap = Partial<Record<StatusComponent, StatusState>>;
@@ -162,6 +162,9 @@ export async function recordStatusSample(now: Date = new Date(), internet?: Inte
     if (internet) {
       const state: StatusState = maintenance.has("internet") ? "maintenance" : internet === "down" ? "outage" : internet;
       if (state !== lastState("internet")) writeEvent("internet", state, now, "sample");
+      await reconcileServiceBlockIssues(now, internet);
+    } else {
+      await reconcileServiceBlockIssues(now);
     }
     upsertHeartbeat(now);
   } catch (err) {
