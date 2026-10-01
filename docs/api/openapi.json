@@ -8933,8 +8933,17 @@
                                 "operational",
                                 "degraded",
                                 "down",
-                                "waiting"
+                                "waiting",
+                                "unknown"
                               ]
+                            },
+                            "last_success_at": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "last_error_class": {
+                              "type": "string",
+                              "nullable": true
                             }
                           },
                           "required": [

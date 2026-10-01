@@ -8,6 +8,8 @@ import { activeMaintenanceComponents } from "@/lib/statusBoard";
 import { nextHlc } from "@/lib/hlc";
 import { randomSuffix } from "@maipai/core/src/id";
 import type { InternetState } from "@/lib/internetProbe";
+import { knownServiceComponents } from "@/lib/serviceHealth";
+import { serviceState } from "@/lib/serviceHealth";
 
 export type StatusState = StatusEventRecord["state"];
 type ComponentStateMap = Partial<Record<StatusComponent, StatusState>>;
@@ -150,8 +152,10 @@ export async function recordStatusSample(now: Date = new Date(), internet?: Inte
     const health = healthForTests ?? await collectHealth();
     const maintenance = activeMaintenanceComponents(now);
     const states = componentStatesFrom(health, maintenance);
-    for (const component of baseComponents) {
-      const state = states[component];
+    const serviceComponents = knownServiceComponents();
+    for (const component of [...baseComponents, ...new Set(serviceComponents)] as StatusComponent[]) {
+      const service = component.startsWith("service:") ? serviceState(component, now.getTime()) : null;
+      const state: StatusState | undefined = service ? service === "unknown" ? undefined : service === "outage" ? "outage" : service : states[component];
       if (!state || state === lastState(component)) continue;
       writeEvent(component, state, now, state === "maintenance" ? "maintenance" : "sample");
     }

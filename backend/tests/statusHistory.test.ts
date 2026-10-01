@@ -12,6 +12,7 @@ import type { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
 import { activeMaintenanceComponents, createMaintenance, type MaintenanceInput } from "@/lib/statusBoard";
 import { buildStatusHistory } from "@/lib/statusHistory";
 import { resetDb } from "./reset-db";
+import { __resetServiceHealthForTests } from "@/lib/serviceHealth";
 
 type EngineKind = HealthSnapshot["engines"]["chat"]["kind"];
 
@@ -23,6 +24,7 @@ const baseHealth = (): HealthSnapshot => ({
 });
 
 beforeEach(() => {
+  __resetServiceHealthForTests();
   resetDb();
   db.delete(statusEvents).run();
   db.delete(statusHeartbeat).run();

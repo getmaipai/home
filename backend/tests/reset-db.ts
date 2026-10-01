@@ -6,6 +6,7 @@ import { __resetCommandsCacheForTests } from "@/lib/commands";
 import { __resetTurnActivityForTests } from "@/lib/turnActivity";
 import { __clearPendingSummaryRefreshesForTests, __resetOrdinaryToolSetForTests, __resetOutputNotificationsForTests } from "@/lib/turnEngine";
 import { __resetPackageCachesForTests } from "@/lib/plugins";
+import { __resetServiceHealthForTests } from "@/lib/serviceHealth";
 import { __resetSkillCacheForTests } from "@/lib/skills";
 import {
   people,
@@ -98,6 +99,7 @@ function assertDisposableTestDataDir(): void {
 
 export function resetDb(): void {
   assertDisposableTestDataDir();
+  __resetServiceHealthForTests();
   db.delete(approvals).run();
   db.delete(memoryConsolidationCursor).run();
   db.delete(grants).run();

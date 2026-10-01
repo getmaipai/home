@@ -1,6 +1,7 @@
 export type AppNeed = { kind: "engine" | "service" | "internet"; id: string; name: string; purpose: string; required: boolean };
 export type AppState = "operational" | "degraded" | "down" | "waiting_for_internet";
-export type NeedState = "operational" | "degraded" | "down" | "waiting";
+export type NeedState = "operational" | "degraded" | "down" | "waiting" | "unknown";
+import { serviceState } from "@/lib/serviceHealth";
 export type StatusApp = { id: string; name: string; needs: AppNeed[] };
 export type StatusEventLike = { component: string; state: string; at: string };
 
@@ -15,6 +16,16 @@ function normalized(state: string | undefined): NeedState {
   if (state === "outage" || state === "down") return "down";
   if (state === "degraded") return "degraded";
   return "operational";
+}
+
+function currentState(component: string, state: string | undefined): NeedState | "unknown" {
+  if (component.startsWith("service:")) {
+    const derived = serviceState(component);
+    if (derived === "unknown") return "unknown";
+    if (derived === "outage") return "down";
+    return derived;
+  }
+  return state ? normalized(state) : "unknown";
 }
 
 export function deriveAppState(needs: Array<Pick<AppNeed, "required" | "kind"> & { state: string }>): AppState {
@@ -32,7 +43,8 @@ export function needStates(app: StatusApp, events: StatusEventLike[]): Array<App
   }
   const internetDown = app.needs.some((need) => need.kind === "internet" && need.required && normalized(latest.get("internet")?.state) === "down");
   return app.needs.map((need) => {
-    const raw = normalized(latest.get(componentForNeed(need))?.state);
+    const component = componentForNeed(need);
+    const raw = currentState(component, latest.get(component)?.state);
     return { ...need, state: internetDown && need.kind !== "internet" ? "waiting" : raw };
   });
 }
@@ -151,6 +163,9 @@ export function appReason(app: StatusApp, state: AppState, needs: Array<AppNeed 
   if (state === "waiting_for_internet") return `${app.name} is waiting for the internet.`;
   const failed = needs.find((need) => need.required && need.state === "down");
   if (!failed && needs.some((need) => need.required && need.state === "degraded")) return `${app.name} is starting up.`;
+  const limited = needs.find((need) => need.kind === "service" && need.state === "degraded");
+  if (limited) return `${limited.name} is limiting requests from this home for a while.`;
+  if (needs.some((need) => need.kind === "service" && need.state === "unknown")) return `${app.name} has outside services with no recent use.`;
   if (failed?.kind === "service") return `${app.name} isn't working: ${failed.name} isn't reachable.`;
   if (failed?.id === "hub") return `${app.name} isn't working: MaiPai Home isn't running.`;
   if (failed) return `${app.name} isn't working: MaiPai's AI isn't running.`;

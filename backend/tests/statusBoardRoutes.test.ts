@@ -4,8 +4,9 @@ import { db } from "@/db";
 import { maintenanceWindows, statusEvents, statusNotes } from "@/db/schema";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { __resetServiceHealthForTests, recordServiceOutcome } from "@/lib/serviceHealth";
 
-beforeEach(() => { resetDb(); db.delete(statusNotes).run(); db.delete(maintenanceWindows).run(); db.delete(statusEvents).run(); });
+beforeEach(() => { resetDb(); __resetServiceHealthForTests(); db.delete(statusNotes).run(); db.delete(maintenanceWindows).run(); db.delete(statusEvents).run(); });
 
 async function ownerClient(): Promise<TestClient> {
   const client = new TestClient();
@@ -28,6 +29,21 @@ describe("status routes", () => {
     expect((await child.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" })).status).toBe(200);
     const childApps = await (await child.get("/api/status/apps")).json() as Array<{ needs?: unknown[] }>;
     expect(childApps.every((app) => !("needs" in app))).toBe(true);
+  });
+
+  test("admin app needs include in-memory service diagnostics, members do not", async () => {
+    const owner = await ownerClient();
+    await recordServiceOutcome("searxng", { ok: false, status: 429 }, new Date());
+    const ownerApps = await owner.get("/api/status/apps");
+    const apps = await ownerApps.json() as Array<{ id: string; needs?: Array<Record<string, unknown>> }>;
+    const search = apps.find((item) => item.id === "chat")?.needs?.find((need) => need.id === "searxng");
+    expect(search).toMatchObject({ state: "degraded", last_error_class: "http_429" });
+    const created = await owner.post("/api/people", { displayName: "Marlow", role: "child", secret: "0000" });
+    const person = await created.json() as { id: string };
+    const child = new TestClient();
+    await child.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
+    const memberApps = await (await child.get("/api/status/apps")).json() as Array<Record<string, unknown>>;
+    expect(JSON.stringify(memberApps)).not.toContain("last_error_class");
   });
 
   test("maintenance accepts the expanded shared status component vocabulary", async () => {

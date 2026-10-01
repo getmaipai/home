@@ -156,6 +156,52 @@ and maintenance states at 1440 and 390 pixels in light and dark themes under
 the browser's own health response; the maintenance window uses the isolated
 backend's owner route.
 
+## STATUS-SVC-03
+
+`createHost().fetch()` observes the HTTP outcome after the existing per-host
+rate limiter and cache have allowed an actual outbound request. The bounded
+in-memory service window stores timestamps, outcome class, last success, and
+last error class. State transitions go through `recordStatusSample()` and the
+existing `status_events` history; no event detail contains a URL, response,
+query, or credential. Success is operational, a sustained run of timeouts or
+5xx is outage, and 429, CAPTCHA, or sign-in walls are degraded. No traffic
+within six hours means unknown (“no recent use”). Three distinct service
+timeouts in a minute also sample Internet as down; the service failures are
+not independently treated as down by that correlation rule.
+
+The apps route currently includes Chat and Home as built-in apps. Chat uses
+the household-configured SearXNG search integration, so its optional need is
+`service:searxng`; Chat does not use YouTube. There are no bundled Videos or
+Podcasts app manifests. Service diagnostics appear only in owner/admin need
+entries. This change adds no outbound connection, so it adds no privacy row.
+
+Inventory from `backend/src` and bundled package sources: package `host.fetch`
+(`packageHost.ts`, rate-limited per destination host) is the only shared
+package HTTP choke point. It covers media lookup (Wikidata and Wikipedia),
+weather (Open-Meteo geocoding and forecast), MusicBrainz, news' NPR RSS,
+MLB Stats API, and configured SearXNG/Wikipedia search. Package-local direct
+fetches in `news/handler.ts`, `sports/handler.ts`, and `music/handler.ts` do
+not pass through that choke point today and remain STATUS-SVC-03a gaps; media
+lookup and weather go through `host.fetch`. Chat's web search uses the
+`packageHost.ts` SearXNG integration path and existing rate limit.
+
+Other direct external fetch inventory (STATUS-SVC-03b):
+
+- `telegramChannel.ts`: Telegram sendMessage; has its own Telegram limiter.
+- `referenceLibrary.ts`: Kiwix catalog and metadata links; no shared service
+  outcome choke point.
+- `updates.ts`: GitHub release checks; separate update path.
+- `voiceCatalog.ts`, `modelDownload.ts`, `store.ts`, `storeIndex.ts`, and
+  `sidecars.ts`: voice/model/store/engine catalogs or downloads; separate
+  paths.
+- `favicons.ts`: arbitrary site favicon lookup; separate fetch helper.
+- `engineIdentity.ts` and local engine probes are loopback calls, not outside
+  services. Favicon and user-requested page fetches are user-named sites,
+  not fixed required app services.
+
+These paths are tracked in BACKLOG as STATUS-SVC-03a and 03b. No probes were
+added and no existing request volume was increased.
+
 ## STATUS-C3a
 
 `GET /api/status/history?days=90` gives any signed-in household member,
