@@ -680,8 +680,21 @@ const TIMELINE_VERB: Record<TimelineCall["state"], string> = {
   error: "Failed",
 };
 const ToolTimelineIcon = getIcon("wrench");
+
+function toolTimelineRestingLabel(stepCount: number, stats: TurnStats | undefined): string {
+  const totalTimeMs = stats?.total_time_ms;
+  if (totalTimeMs == null) return `${stepCount} tool call${stepCount === 1 ? "" : "s"}`;
+  if (totalTimeMs < 60_000) {
+    const seconds = Math.round(totalTimeMs / 1000);
+    return `Worked for ${seconds} second${seconds === 1 ? "" : "s"}, ${stepCount} step${stepCount === 1 ? "" : "s"}`;
+  }
+  const minutes = Math.round(totalTimeMs / 60_000);
+  return `Worked for ${minutes} minute${minutes === 1 ? "" : "s"}, ${stepCount} step${stepCount === 1 ? "" : "s"}`;
+}
+
 const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>, TimelineCall[]> = ({ result }) => {
   const [open, setOpen] = useState(false);
+  const stats = useAuiState((s) => s.message.metadata?.custom?.stats as TurnStats | undefined);
   if (!result?.length) return null;
   const running = result.some((call) => call.state === "running");
   return (
@@ -692,7 +705,7 @@ const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>
       open={open}
       onOpenChange={setOpen}
       activeLabel="Working…"
-      restingLabel={`${result.length} tool call${result.length === 1 ? "" : "s"}`}
+      restingLabel={toolTimelineRestingLabel(result.length, stats)}
       // No producer for a per-file diff-stat summary anywhere in Home
       // today (the kit's own upstream use is a coding-agent timeline) -
       // a named gap, not invented data.

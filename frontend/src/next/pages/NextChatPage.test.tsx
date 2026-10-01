@@ -649,6 +649,54 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     }
   });
 
+  test("finished tool timelines show the turn duration and step count", async () => {
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: { query: "tide chart" }, call_id: "call-time-1" },
+        { t: "tool_result", call_id: "call-time-1", package_id: "websearch", outcome: { text: "3 results" } },
+        { type: "delta", text: "High tide is at 4pm." },
+        { type: "done", value: { turn_id: "turn-tools-time", reply: { text: "High tide is at 4pm." }, source: "model", safety: SAFETY, stats: { total_time_ms: 12_000 } } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "when's high tide");
+      await view.findByText("High tide is at 4pm.");
+      expect(await view.findByRole("button", { name: "Worked for 12 seconds, 1 step" })).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test("finished tool timelines use minutes and plural steps, keep fallback without stats, and retain the running label", async () => {
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: { query: "tide chart" }, call_id: "call-time-2" },
+        { t: "tool_result", call_id: "call-time-2", package_id: "websearch", outcome: { text: "3 results" } },
+        { t: "tool_call", package_id: "weather", args: { city: "Seattle" }, call_id: "call-time-3" },
+        { t: "tool_result", call_id: "call-time-3", package_id: "weather", outcome: { text: "sunny" } },
+        { type: "delta", text: "High tide is at 4pm." },
+        { type: "done", value: { turn_id: "turn-tools-time-2", reply: { text: "High tide is at 4pm." }, source: "model", safety: SAFETY, stats: { total_time_ms: 240_000 } } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "when's high tide");
+      await view.findByText("High tide is at 4pm.");
+      expect(await view.findByRole("button", { name: "Worked for 4 minutes, 2 steps" })).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
   // TOOL-EVENTS-02: a search step's `tool_result.outcome.sites` renders
   // as chips under that step (host + link), through the shipped
   // `Source`/`SourceIcon` the message-level Sources card already uses -
