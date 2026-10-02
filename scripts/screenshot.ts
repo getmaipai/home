@@ -169,6 +169,7 @@ const settingsReview = process.argv.includes("--settings-review");
 const pictureReview = process.argv.includes("--picture-review");
 let pictureSearchServer: ReturnType<typeof Bun.serve> | undefined;
 let websearchFixture: ReturnType<typeof Bun.serve> | undefined;
+let chatPolishSearchCalls = 0;
 
 // TOOL-EVENTS-02: a self-contained fake SearXNG, never the real one or
 // Wikipedia (getmaipai/.github's liveHubQuiet.ts guard) - the same
@@ -185,12 +186,14 @@ function startWebSearchFixture(): void {
   websearchFixture = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
-    fetch(req) {
+    async fetch(req) {
       const url = new URL(req.url);
       if (url.pathname !== "/search") return new Response("not found", { status: 404 });
       const q = url.searchParams.get("q") ?? "";
+      if (/friday pizza night/i.test(q)) await new Promise((resolve) => setTimeout(resolve, 1200));
       const results = /mariners/i.test(q) ? [{ title: "Mariners win 6-3", url: "https://example.com/mariners-game-score", content: "The Seattle Mariners won last night's game 6-3, extending their winning streak to four games." }] : [];
-      return Response.json({ query: q, results });
+      const pizzaResults = /friday pizza night/i.test(q) ? [{ title: "Friday pizza night", url: "https://example.com/friday-pizza-night", content: "Friday is the family's pizza night." }] : [];
+      return Response.json({ query: q, results: [...results, ...pizzaResults] });
     },
   });
 }
@@ -3260,6 +3263,13 @@ async function captureNextChatArtifactReview(browser: Browser, sessionValue: str
 async function captureNextChatPolishReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
+
+  const modelSetting = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "chat.model_id", value: "qwen3-8b-instruct-q4-k-m" }),
+  });
+  if (!modelSetting.ok) throw new Error(`captureNextChatPolishReview: seeding chat.model_id failed: ${modelSetting.status}`);
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     const context = await newContext(browser, viewport, "dark", sessionValue);
@@ -3282,6 +3292,13 @@ async function captureNextChatPolishReview(browser: Browser, sessionValue: strin
         await page.getByRole("textbox", { name: "Message input" }).waitFor();
       }
 
+      const legacyPipeline = await fetch(`${BASE_URL}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+        body: JSON.stringify({ scope: "household", key: "turn.pipeline.next", value: false }),
+      });
+      if (!legacyPipeline.ok) throw new Error(`seed document turn.pipeline.next=false failed: ${legacyPipeline.status}`);
+
       await page.getByRole("textbox", { name: "Message input" }).fill("Could you write that up as a document about pizza night?");
       await page.getByRole("button", { name: "Send message", exact: true }).click();
       const stopButton = page.getByRole("button", { name: "Stop generating", exact: true });
@@ -3301,21 +3318,43 @@ async function captureNextChatPolishReview(browser: Browser, sessionValue: strin
       }
       await page.screenshot({ path: join(outDir, `next-chat-polish-filemenu-${viewport.width}-dark.png`), fullPage: slug === "phone" });
       await page.keyboard.press("Escape");
-      const trace = page.getByText(/^Worked for \d+ seconds?, \d+ steps?$/);
-      if (!(await trace.isVisible().catch(() => false))) {
-        const evidence = await page.evaluate(() => ({
-          assistantText: [...document.querySelectorAll('[data-slot="aui_assistant-message-root"]')].map((item) => (item as HTMLElement).innerText.trim()),
-          timelineText: [...document.querySelectorAll('[data-slot*="tool"], [data-slot*="timeline"]')].map((item) => ({ slot: item.getAttribute("data-slot"), text: (item.textContent ?? "").trim() })),
-        }));
-        console.error(`[chat-polish-review] trace DOM evidence ${JSON.stringify(evidence)}`);
-      }
+
+      const pipeline = await fetch(`${BASE_URL}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+        body: JSON.stringify({ scope: "household", key: "turn.pipeline.next", value: true }),
+      });
+      if (!pipeline.ok) throw new Error(`seed polish turn.pipeline.next failed: ${pipeline.status}`);
+      const pipelineReadback = await fetch(`${BASE_URL}/api/settings?scope=household`, { headers: { Cookie: `session=${sessionValue}` } });
+      if (!pipelineReadback.ok) throw new Error(`read polish turn.pipeline.next failed: ${pipelineReadback.status}`);
+      const pipelineValues = await pipelineReadback.json() as Array<{ key: string; value: unknown }>;
+      const nextPipelineValue = pipelineValues.find((setting) => setting.key === "turn.pipeline.next")?.value;
+      console.log(`[chat-polish-review] trace pipeline setting ${JSON.stringify(nextPipelineValue)}`);
+      if (nextPipelineValue !== true) throw new Error("captureNextChatPolishReview: turn.pipeline.next did not read back true");
+      const traceResponsePromise = page.waitForResponse((response) => response.url().includes("/api/turn/stream") && response.request().method() === "POST");
+      await page.getByRole("textbox", { name: "Message input" }).fill("Could you please remember that Friday is pizza night?");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      const traceResponse = await traceResponsePromise;
+      const traceEvents = (await traceResponse.text()).split("\n").filter(Boolean).map((line) => {
+        try {
+          const event = JSON.parse(line) as { type?: string; t?: string; status?: unknown; package_id?: string; call_id?: string; outcome?: unknown; value?: { source?: string; plugin_id?: string; reply?: { text?: string }; stats?: { total_time_ms?: number | null } } };
+          return { type: event.t ?? event.type ?? "unknown", status: event.status, package_id: event.package_id, call_id: event.call_id, outcome: event.outcome, source: event.value?.source, plugin_id: event.value?.plugin_id, reply: event.value?.reply?.text, total_time_ms: event.value?.stats?.total_time_ms };
+        } catch {
+          return "unparsed";
+        }
+      });
+      console.log(`[chat-polish-review] trace turn NDJSON events ${JSON.stringify(traceEvents)}`);
+      const trace = page.getByText(/^Worked for \d+ seconds?, 1 step$/);
+      await trace.waitFor({ timeout: 20000 });
+      const traceScrollToBottom = page.getByRole("button", { name: "Scroll to bottom", exact: true });
+      if (await traceScrollToBottom.count()) await traceScrollToBottom.click();
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-chat-polish-trace-${viewport.width}-dark.png`), fullPage: slug === "phone" });
 
-      await page.getByRole("textbox", { name: "Message input" }).fill("What is 2 plus 2?");
+      await page.getByRole("textbox", { name: "Message input" }).fill("Tell me about herbs for the kitchen.");
       await page.getByRole("button", { name: "Send message", exact: true }).click();
       const secondStop = page.getByRole("button", { name: "Stop generating", exact: true });
-      await page.getByText("2 plus 2 is 4.").waitFor({ timeout: 15000 });
+      await page.getByText("Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.").waitFor({ timeout: 15000 });
       if (await secondStop.count()) await secondStop.waitFor({ state: "detached", timeout: 30000 });
       const scrollToBottom = page.getByRole("button", { name: "Scroll to bottom", exact: true });
       if (await scrollToBottom.count()) await scrollToBottom.click();
@@ -4979,6 +5018,22 @@ async function main() {
     // these args into the real artifact record, so nothing about the
     // card or the canvas panel is scripted past this one model call.
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    if (text.includes("Friday is pizza night")) {
+      let lastUserIndex = -1;
+      for (let i = 0; i < request.messages.length; i++) {
+        if (request.messages[i]?.role === "user") lastUserIndex = i;
+      }
+      const currentTurnHasToolMessage = request.messages.slice(lastUserIndex + 1).some((message) => message.role === "tool");
+      console.log(`[chat-polish-review] Friday search stub request ${JSON.stringify({ currentTurnHasToolMessage, offeredTools: request.tools?.map((tool) => tool.function.name) ?? [] })}`);
+      if (!currentTurnHasToolMessage && request.tools?.some((tool) => tool.function.name === "websearch")) {
+        return [{
+          id: "call-websearch-pizza-night",
+          type: "function",
+          function: { name: "websearch", arguments: JSON.stringify({ expression: `Friday pizza night capture ${++chatPolishSearchCalls}` }) },
+        }];
+      }
+      return undefined;
+    }
     if (text.includes("pizza night")) {
       return [{
         id: "call-write-document",
@@ -5030,6 +5085,8 @@ async function main() {
     return undefined;
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    if (text.includes("Friday is pizza night")) return "Friday is pizza night.";
+    if (text.includes("What is 2 plus 2?")) return "<think>The user is asking a simple arithmetic question. 2 plus 2 equals 4.</think>2 plus 2 is 4.";
     if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
     // STATUS-PHRASES-01's own capture: a real, but short, artificial
     // delay (FAST-04's own documented "hold the first token back"
@@ -5145,7 +5202,7 @@ async function main() {
       });
       if (!searchSetting.ok) throw new Error(`seed picture search fixture failed: ${searchSetting.status}`);
     }
-    if (nextChatToolsReview) {
+    if (nextChatToolsReview || nextChatPolishReview) {
       startWebSearchFixture();
       const searchSetting = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
