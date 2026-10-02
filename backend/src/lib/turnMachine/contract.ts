@@ -129,11 +129,12 @@ export interface TurnBudget {
   /** The reply floor (spec-v0.1.28, turn-machine-state-record-2026-09-22.md
    * "The reply floor", owner's rule 2026-09-23): the most visible tokens
    * one written adult reply may take - a runaway-guard backstop, never a
-   * length target (the written plan's own length numbers, register.ts's
-   * writtenBudgetFor, stay room the model's own end-of-reply decides
-   * inside). nodes/model.ts's max_tokens derivation uses this only for a
-   * written, non-brevity, adult turn; every other turn keeps its existing
-   * max_words-derived cap. */
+   * length target. THIN-1A (docs/design/RULES.md rule 5): for a written
+   * adult turn this is the ONLY cap on every non-forced generation, the
+   * phrasing round after a search included; the plan's word numbers no
+   * longer reach that turn's request at all. A child's or teen's typed
+   * turn and every spoken or glance turn keep their max_words-derived
+   * cap (rule 0). */
   reply_ceiling_tokens: number;
   deadlines_ms: { model: number; tool: number; total: number };
   measured: { false_call_rate: number; inverse_miss_rate: number; rewrite_pass_rate: number; on: string };

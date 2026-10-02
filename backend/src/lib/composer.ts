@@ -945,6 +945,14 @@ export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[]): L
 // the titles themselves, so it rephrased them as if they were an
 // answer. Irrelevant, and never fired, when searchResultCount is 0 (no
 // websearch outcome at all) - guarded by the caller, nodes/model.ts.
+// THIN-1A (docs/design/RULES.md rule 5): the written class here is
+// promptSurfaceClassFor()'s own written-and-adult class, never a minor's
+// typed turn (that one reads spoken, surfaceClass.ts), so on it no line
+// says how many words to write or how many items to list - the "under
+// 140 words" cap and the "at most N of them, 15 words each" list shape
+// (#156) were a length target, and max_tokens is a ceiling, not a target.
+// The spoken class keeps both exactly (rule 0: a spoken turn's shape and
+// a child's or teen's limits never loosen here).
 export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: string, searchResultCount = 0, allSnippetsEmpty = false): string {
   const lengthClause = surfaceClass === "written" ? "structured where it helps" : "in one to three sentences";
   const quotedUtterance = quoteForPrompt(utterance);
@@ -956,7 +964,8 @@ export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: strin
   ];
   if (searchResultCount > 0) {
     const itemLimit = Math.min(searchResultCount, 7);
-    lines.push(`Keep the reply under 140 words and omit raw URLs. Answer the question first, in the shape it calls for. Only when I asked for the results themselves, list at most ${itemLimit} of them, one sentence of at most 15 words each.`);
+    if (surfaceClass === "written") lines.push("Omit raw URLs. Answer the question first, in the shape it calls for.");
+    else lines.push(`Keep the reply under 140 words and omit raw URLs. Answer the question first, in the shape it calls for. Only when I asked for the results themselves, list at most ${itemLimit} of them, one sentence of at most 15 words each.`);
     if (allSnippetsEmpty) {
       lines.push("The results have no summary text, only titles and links; say only what a title itself states, and don't invent detail.");
     }

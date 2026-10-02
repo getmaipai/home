@@ -27,7 +27,7 @@ import type { TurnStreamEvent } from "@/wire";
 import { getPendingAsk, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
-import { conversationTurns, conversations, memoryRecords } from "@/db/schema";
+import { conversationTurns, conversations, memoryRecords, people as people_ } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
@@ -1210,6 +1210,160 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
   });
 });
 
+// THIN-1A (docs/design/RULES.md rule 5, docs/BACKLOG.md "Thin chat
+// path"): no length cap on an adult's written chat. No instruction in
+// the request tells the model how many words to write, and max_tokens is
+// the model's own reply ceiling (the catalog's reply_ceiling_tokens), a
+// runaway guard and never a target - on the plain first call AND on the
+// phrasing round after a search, which used to carry "under 140 words"
+// and a max_tokens derived from the plan's word budget (608). Rule 0
+// outranks rule 5: a child's typed turn, a teen's typed turn and a spoken
+// turn keep exactly the limits they carry today, asserted here at their
+// current values so this item can never loosen one by accident.
+describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
+  async function generationMaxTokens(turnId: string): Promise<(number | null)[]> {
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { max_tokens: number | null }[] };
+    return (stats.generations ?? []).map((g) => g.max_tokens);
+  }
+  const WORD_COUNT = /\b\d+ words\b/u;
+  function allMessageText(request: ChatCompletionRequest | undefined): string {
+    return (request?.messages ?? []).map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""))).join("\n");
+  }
+  function lastUserInstruction(request: ChatCompletionRequest | undefined): string {
+    return request?.messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+  }
+  /** The same searched-answer fixture the interim-rule tests use (a
+   * forced websearch call, then the phrasing round over its result),
+   * capturing both requests. */
+  async function searchedTurn(actor: typeof people.owner, surface: "chat" | "robot", opts?: { spoken?: boolean }) {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let phrasingRequest: ChatCompletionRequest | undefined;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }];
+          },
+          reply: (request) => {
+            if (!request.messages.some((m) => m.role === "tool")) return "searching";
+            phrasingRequest = request;
+            return "The current president of Chile answers your question.";
+          },
+        },
+        () => runTurnNext(actor, surface, "who is the president of chile", opts),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.sources?.length).toBeGreaterThan(0);
+      return { turnId: result.value.turn_id, phrasingRequest };
+    } finally {
+      searxng.stop();
+    }
+  }
+  async function teen() {
+    db.update(people_).set({ role: "teen" }).where(eq(people_.id, people.child.id)).run();
+    const row = db.select().from(people_).where(eq(people_.id, people.child.id)).get();
+    if (!row) throw new Error("no teen row");
+    return row;
+  }
+
+  test("an adult's written turn carries no word-count instruction and max_tokens equal to the model's ceiling, on a plain and a searched answer", async () => {
+    let plainRequest: ChatCompletionRequest | undefined;
+    const plain = await withStub(
+      { reply: (request) => { plainRequest = request; return "Fold it in half, then fold the corners in."; } },
+      () => runTurnNext(people.owner, "chat", "how do I make a paper airplane"),
+    );
+    expect(plain.ok).toBe(true);
+    if (!plain.ok || plain.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(plainRequest?.max_tokens).toBe(CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget!.reply_ceiling_tokens);
+    expect(plainRequest?.max_tokens).toBe(1536);
+    expect(allMessageText(plainRequest)).not.toMatch(WORD_COUNT);
+    expect(allMessageText(plainRequest)).not.toContain("sentence");
+
+    const searched = await searchedTurn(people.owner, "chat");
+    // The phrasing round: the ceiling again, never the plan's own word
+    // budget turned into tokens (360 words -> 608 before this item).
+    expect(searched.phrasingRequest?.max_tokens).toBe(1536);
+    expect(await generationMaxTokens(searched.turnId)).toEqual([96, 1536]);
+    const instruction = lastUserInstruction(searched.phrasingRequest);
+    expect(instruction).not.toContain("under 140 words");
+    expect(instruction).not.toContain("at most");
+    expect(instruction).not.toContain("15 words");
+    expect(allMessageText(searched.phrasingRequest)).not.toMatch(WORD_COUNT);
+    // What stays: the shape instruction and the URL rule are not length.
+    expect(instruction).toContain("structured where it helps");
+    expect(instruction).toContain("Omit raw URLs");
+  });
+
+  test("a child's typed turn keeps today's limits: the 40-word band clamp, 96 tokens", async () => {
+    let request: ChatCompletionRequest | undefined;
+    const result = await withStub(
+      { reply: (r) => { request = r; return "Fold it in half, then fold the corners in."; } },
+      () => runTurnNext(people.child, "chat", "how do I make a paper airplane"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    // The written question budget (220 words) clamped to the child
+    // band's 40, then LAT-01's formula: ceil(40 * 1.6) + 32 = 96.
+    expect(request?.max_tokens).toBe(96);
+    expect(await generationMaxTokens(result.value.turn_id)).toEqual([96]);
+    // A minor's typed turn reads spoken (promptSurfaceClassFor): the
+    // plan line still names its sentence count.
+    expect(allMessageText(request)).toContain("sentence");
+  });
+
+  test("a teen's typed turn keeps today's limits: the written word budget as a token cap, 384 plain and 608 searched, and the 140-word line", async () => {
+    const actor = await teen();
+    let request: ChatCompletionRequest | undefined;
+    const result = await withStub(
+      { reply: (r) => { request = r; return "Fold it in half, then fold the corners in."; } },
+      () => runTurnNext(actor, "chat", "how do I make a paper airplane"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    // The written question budget (220 words, no band clamp for a teen)
+    // through LAT-01's formula: ceil(220 * 1.6) + 32 = 384.
+    expect(request?.max_tokens).toBe(384);
+    expect(allMessageText(request)).toContain("sentence");
+
+    const searched = await searchedTurn(actor, "chat");
+    // The evidence-boosted row (360 words): ceil(360 * 1.6) + 32 = 608,
+    // and the spoken-class phrasing instruction with its own limits.
+    expect(searched.phrasingRequest?.max_tokens).toBe(608);
+    expect(await generationMaxTokens(searched.turnId)).toEqual([96, 608]);
+    const instruction = lastUserInstruction(searched.phrasingRequest);
+    expect(instruction).toContain("in one to three sentences");
+    expect(instruction).toContain("under 140 words");
+  });
+
+  test("a spoken adult turn keeps today's limits: the spoken act table, 128 tokens, and the 140-word line on a searched answer", async () => {
+    // A client-flagged spoken turn on the chat surface (a dictated or
+    // voice-session turn): surfaceClassOf() makes it spoken whatever the
+    // surface says, so a question is 60 words -> ceil(60 * 1.6) + 32 = 128.
+    let request: ChatCompletionRequest | undefined;
+    const flagged = await withStub(
+      { reply: (r) => { request = r; return "Fold it in half, then fold the corners in."; } },
+      () => runTurnNext(people.owner, "chat", "how do I make a paper airplane", { spoken: true }),
+    );
+    expect(flagged.ok).toBe(true);
+    if (!flagged.ok || flagged.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(request?.max_tokens).toBe(128);
+    expect(allMessageText(request)).toContain("sentence");
+
+    // The robot: spoken by surface. Evidence never moves the spoken
+    // table, so the phrasing round stays at 128 too.
+    const searched = await searchedTurn(people.owner, "robot");
+    expect(searched.phrasingRequest?.max_tokens).toBe(128);
+    expect(await generationMaxTokens(searched.turnId)).toEqual([96, 128]);
+    const instruction = lastUserInstruction(searched.phrasingRequest);
+    expect(instruction).toContain("in one to three sentences");
+    expect(instruction).toContain("under 140 words");
+  });
+});
+
 // U4c (docs/BACKLOG.md): the plan turnNext.ts computes up front always
 // has evidence hardcoded to zero, since nothing has run yet at that
 // point - correct for the first (forced-call) generation, but the
@@ -1246,17 +1400,16 @@ describe("turnNext.ts: U4c, the plan recomputes from real tool-round evidence", 
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.sources?.length).toBeGreaterThan(0);
-      // PHRASE-01 (dev.md "The written prompt on tier 1, decided"'s own
-      // follow-up) superseded this row's own original comment: the
-      // phrasing round's own max_tokens no longer comes from
-      // replyMaxTokensFor's flat reply_ceiling_tokens backstop (1536
-      // regardless of evidence) - it is LAT-01's visibleReplyMaxTokens
-      // formula directly, so the evidence recompute's own max_words
-      // move (220 -> 360 words here) DOES change it: Math.ceil(360*1.6)
-      // + 32 = 608, thinking off. This row's own tool result is real (a
-      // source found), so the ordinary phrasing generation actually
-      // runs and reads it, unlike the empty-rows row below.
-      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(608);
+      // PHRASE-01 had this row prove the recompute through max_tokens
+      // (220 -> 360 words became 608 tokens on the phrasing round).
+      // THIN-1A (docs/design/RULES.md rule 5) retired that for an adult's
+      // written chat: every non-forced round runs under the model's own
+      // ceiling, so the plan's word move no longer reaches this request.
+      // The recompute itself still happens and still reaches a teen's
+      // typed turn (the THIN-1A describe asserts 608 there); for the
+      // adult this row now proves the ceiling held through the
+      // evidence-boosted round, not the formula.
+      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(1536);
     } finally {
       searxng.stop();
     }
@@ -1726,8 +1879,17 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
   });
 });
 
-describe("turnNext.ts: #156, search-result lists get a measured answer budget", () => {
-  test("a seven-result answer gets a per-item limit and completes under the unchanged 608-token cap", async () => {
+// THIN-1A (docs/design/RULES.md rule 5) retired #156's own measured budget
+// for an ADULT's written chat: the per-item limit and the 140-word cap
+// were a length target, and the 608-token cap was the plan's word budget
+// in disguise. This row now asserts the opposite for that turn - no
+// per-item limit in the instruction and the model's ceiling as
+// max_tokens - with the stub still answering the complete seven-row list
+// only when no cap is in the instruction, so a reintroduced cap fails the
+// row the same way the truncated reply used to. The spoken class keeps
+// #156's budget exactly (the THIN-1A describe above asserts it).
+describe("turnNext.ts: #156 under THIN-1A, a searched list answer on an adult's written chat has no measured budget", () => {
+  test("a seven-result answer carries no per-item limit and runs under the model's ceiling", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     let phrasingRequest: ChatCompletionRequest | undefined;
@@ -1756,17 +1918,18 @@ describe("turnNext.ts: #156, search-result lists get a measured answer budget", 
             if (!request.messages.some((message) => message.role === "tool")) return "Searching.";
             phrasingRequest = request;
             const instruction = request.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
-            return instruction.includes("under 140 words") && instruction.includes("at most 7 of them") ? completeReply : oldCapReply;
+            return !instruction.includes("under 140 words") && !instruction.includes("at most 7 of them") ? completeReply : oldCapReply;
           },
         },
         () => runTurnNext(people.owner, "chat", "what do the seven museum poster search results say?"),
       );
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(phrasingRequest?.max_tokens).toBe(608);
+      expect(phrasingRequest?.max_tokens).toBe(1536);
       const instruction = phrasingRequest?.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
-      expect(instruction).toContain("under 140 words");
-      expect(instruction).toContain("at most 7 of them");
+      expect(instruction).not.toContain("under 140 words");
+      expect(instruction).not.toContain("at most 7 of them");
+      expect(instruction).toContain("Omit raw URLs");
       expect(instruction).not.toContain("numbered");
       expect(result.value.reply.text).toBe(completeReply);
       expect(result.value.reply.text).not.toMatch(/from the$/u);
@@ -1810,7 +1973,10 @@ describe("turnNext.ts: #168, a searched question is answered in the shape it cal
       // list-format regression got past it.
       const writtenInstruction = await askAndCapture("chat");
       expect(writtenInstruction).toContain("structured where it helps");
-      expect(writtenInstruction).toContain("under 140 words");
+      // THIN-1A (rule 5): the written adult class carries no word cap any
+      // more - #168's own row used to assert the 140-word line here too.
+      expect(writtenInstruction).not.toContain("under 140 words");
+      expect(writtenInstruction).toContain("Omit raw URLs");
       expect(writtenInstruction).not.toContain("numbered");
       // Case 2: "robot" resolves to the spoken register unconditionally
       // (surfaceClassOf; "phone" and "pod" aren't implemented yet on
@@ -2464,7 +2630,11 @@ describe("turnNext.ts: PHRASE-01, the phrasing round continues the forced call's
     }
   });
 
-  test("the phrasing request's max_tokens is LAT-01's visibleReplyMaxTokens formula for the plan, not the written-adult reply-ceiling backstop", async () => {
+  // THIN-1A (docs/design/RULES.md rule 5) inverted this row: PHRASE-01
+  // had the phrasing round read LAT-01's word-budget formula (608 here)
+  // instead of the written-adult ceiling; on an adult's written chat the
+  // ceiling is now the one cap on every non-forced round.
+  test("the phrasing request's max_tokens is the written-adult reply ceiling, not the plan's word budget through LAT-01's formula", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     try {
@@ -2483,15 +2653,12 @@ describe("turnNext.ts: PHRASE-01, the phrasing round continues the forced call's
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
       const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { max_tokens: number | null }[] };
       const generations = stats.generations ?? [];
-      // U4c's own sibling test (above) independently confirmed this
-      // exact fixture's own evidence-boosted plan row (a real source
-      // found, max_words 220 -> 360) produces visibleReplyMaxTokens(360,
-      // false) = 608 - the written-adult reply_ceiling_tokens backstop
-      // (1536, this model's own catalog entry) would read completely
-      // differently, so 608 here proves the formula switch, not a
-      // coincidence of two constants landing on the same number.
-      expect(generations[generations.length - 1]?.max_tokens).toBe(608);
-      expect(generations[generations.length - 1]?.max_tokens).not.toBe(1536);
+      // The evidence-boosted plan row (a real source found, max_words
+      // 220 -> 360) would read 608 through visibleReplyMaxTokens; 1536
+      // (this model's own reply_ceiling_tokens) proves the phrasing
+      // round took the ceiling and never the word budget.
+      expect(generations[generations.length - 1]?.max_tokens).toBe(1536);
+      expect(generations[generations.length - 1]?.max_tokens).not.toBe(608);
     } finally {
       searxng.stop();
     }

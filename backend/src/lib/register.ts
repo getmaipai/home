@@ -67,7 +67,15 @@ function writtenQuestionHasRoom(evidence: PlanInput["evidence"]): boolean {
  * here is generous headroom, not a ceiling tuned for "the way a person
  * talking out loud would." Falls back to the spoken numbers for an act
  * this table doesn't size specially (there are none today; every act
- * the base switch handles gets its own written row). */
+ * the base switch handles gets its own written row).
+ *
+ * THIN-1A (docs/design/RULES.md rule 5): for an ADULT's written turn
+ * these numbers reach nothing any more - nodes/model.ts's max_tokens is
+ * the model's own reply ceiling on every round, and planLineAbout()
+ * below has never named a count on the written class. The table stays
+ * because a teen's typed turn is written-class too and still takes its
+ * max_tokens from these words (220 -> 384 tokens, 360 -> 608), and a
+ * child's typed turn clamps from them (rule 0: neither loosens here). */
 function writtenBudgetFor(act: TurnSignal["primary_act"], evidence: PlanInput["evidence"]): { maxSentences: number; maxWords: number } {
   switch (act) {
     case "greeting":

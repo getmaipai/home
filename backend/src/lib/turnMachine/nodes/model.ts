@@ -183,7 +183,17 @@ const FORCED_CALL_MAX_TOKENS = 96;
  * file's own inline version of the same check (surfaceClass +
  * age_band, no shared helper) drifting from messages.ts's own gate on
  * the persona/plan-line side, which is exactly the kind of duplicated-
- * predicate risk a second, independent copy invites. */
+ * predicate risk a second, independent copy invites.
+ *
+ * THIN-1A (docs/design/RULES.md rule 5): this is now the ONE place a
+ * non-forced generation's max_tokens comes from, the phrasing round
+ * after a tool round included - PHRASE-01 had that round read LAT-01's
+ * word-budget formula directly (the evidence-boosted 360 words became
+ * 608 tokens), which was a length target on an adult's written chat
+ * with the plan's own word count behind it. For a written adult the
+ * ceiling is the only cap, every round; a minor's typed turn and every
+ * spoken or glance turn still fall through to the formula unchanged
+ * (rule 0). */
 function replyMaxTokensFor(state: TurnState, thinking: boolean): number {
   const isWrittenAdult = isWrittenAdultTurn(state.planBasis.surfaceClass, state.plan.age_band) && !state.planBasis.brevity;
   if (isWrittenAdult) return state.budget.reply_ceiling_tokens + (thinking ? state.budget.thinking_budget_tokens_toggled : 0);
@@ -686,12 +696,13 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // the household's own toggle too, same as an ordinary call.
   const thinkingOn = tool_choice !== "required" && state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
   // FORCED-CALL-01: the forced call's own cap is fixed (FORCED_CALL_
-  // MAX_TOKENS). PHRASE-01: the phrasing round's own cap is LAT-01's
-  // visibleReplyMaxTokens formula directly, never replyMaxTokensFor's
-  // written-adult ceiling override - that override exists for the
-  // stable-prefix-only written turn PREFIX-CLASS-01 measured, not for a
-  // continuation already carrying tool results and its own instruction.
-  const maxTokens = tool_choice === "required" ? FORCED_CALL_MAX_TOKENS : isPhrasingRound ? visibleReplyMaxTokens(state.plan.max_words, thinkingOn) : replyMaxTokensFor(state, thinkingOn);
+  // MAX_TOKENS). THIN-1A (rule 5): every other round, the phrasing round
+  // included, takes replyMaxTokensFor's own answer - the model's ceiling
+  // for a written adult, LAT-01's formula for everyone else. PHRASE-01
+  // used to send the phrasing round through the formula directly, so an
+  // adult's searched answer was capped by the plan's word budget (608
+  // tokens) while the plain first call was not.
+  const maxTokens = tool_choice === "required" ? FORCED_CALL_MAX_TOKENS : replyMaxTokensFor(state, thinkingOn);
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : interimRuleApplies ? "interim_rule" : "model", signal);
   // DEADLINE-01: a generation that never finished (the model node's
   // own deadline, a dead engine) is one more way "the model produced
@@ -742,8 +753,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // first attempt produced no usable text at all, so the retry is the
   // one recourse left before this round ships an empty reply.
   if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && (thinkingOn || phrasingToolCallDiscarded)) {
-    const retryMaxTokens = isPhrasingRound ? visibleReplyMaxTokens(state.plan.max_words, false) : replyMaxTokensFor(state, false);
-    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, retryMaxTokens, "model_retry_no_thinking", signal);
+    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, replyMaxTokensFor(state, false), "model_retry_no_thinking", signal);
     if (!attempt.ok) {
       settleFailedGate(gate);
       const failureMessage = attempt.message ?? "";

@@ -124,8 +124,10 @@ export const CATALOG: ModelCapabilities[] = [
       // The reply floor (spec-v0.1.28, turn-machine-state-record-2026-09-22.md
       // "The reply floor", owner's rule 2026-09-23): a runaway-guard
       // backstop for the most visible tokens one written adult reply may
-      // take, never a length target - the written plan's own length
-      // numbers (register.ts's writtenBudgetFor) stay room, not a ceiling.
+      // take, never a length target. THIN-1A (docs/design/RULES.md rule
+      // 5): the one cap on an adult's written chat, every round; the
+      // written plan's word numbers (register.ts's writtenBudgetFor) size
+      // a teen's typed turn and a child's clamp base, never an adult's.
       reply_ceiling_tokens: 1536,
       deadlines_ms: { model: 20000, tool: 10000, total: 45000 },
       measured: {
