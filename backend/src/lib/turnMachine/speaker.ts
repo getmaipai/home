@@ -14,7 +14,7 @@ export function speakerIsAnonymous(state: Pick<TurnState, "surface" | "actor" | 
 }
 
 /** THIN-0N (rules 0 and 12): the band every moderation and shaping read
- * uses, effectiveBand()'s own result exactly as turnEngine.ts's
+ * uses, effectiveBand()'s own result exactly as the old engine file's
  * prepareTurn() derives it. An unidentified robot speaker is the child
  * band even when the signed-in person is an adult; every other turn is
  * the signed-in person's own band. Tightening only, never a loosening. */

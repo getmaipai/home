@@ -37,6 +37,7 @@ import { RULE_NAMES } from "../../src/lib/ruleNames.js";
  * `turnNext.ts`, every node and the machine definition itself. */
 export const TURN_PATH_FILES: readonly string[] = [
   "turnEngine.ts",
+  "turnShared.ts",
   "turnContext.ts",
   "guards.ts",
   "unknownNames.ts",

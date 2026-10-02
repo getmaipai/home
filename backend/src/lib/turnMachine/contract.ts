@@ -9,7 +9,7 @@
 // household member's words could match - the rule-budget lint's zero
 // baseline for turnMachine/ holds trivially here.
 import type { PersonRow } from "@/lib/memoryIngestion";
-import type { Surface, SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
+import type { Surface, SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
@@ -235,13 +235,13 @@ export interface TurnState {
    * context node's own decision, the ceiling `output_gate` can only
    * lower. `"presence"` is named by the design (a shared screen a
    * child may be in the room for) but no presence signal exists on the
-   * hub yet (turnEngine.ts's own "Presence unknown for now"), so
+   * hub yet (the old engine file's own "Presence unknown for now"), so
    * nothing sets it today - included in the type because the record
    * names it, never produced until a presence source is built. */
   reasoning: { emit: boolean; withheld_for: "minor" | "surface" | "presence" | "gate" | null };
   /** STREAM-NEXT-01: set only by turnNext.ts's own runTurnNextStream(),
    * undefined for every other caller (runTurnNext(), the bench harness) -
-   * the identical StatusChannel turnEngine.ts's own old-path stream kind
+   * the identical StatusChannel the old engine file's own old-path stream kind
    * already uses, reused rather than a second one; nodes/tool.ts pushes
    * the same "On it." status line onto it as each proposal starts, so it
    * reaches a live client before the search itself runs. */

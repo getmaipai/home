@@ -26,7 +26,7 @@ import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool
 import { speakerNamedAny } from "@/lib/subjects";
 import { isBarePronoun } from "@/lib/text";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
-import { visibleReplyMaxTokens } from "@/lib/turnEngine";
+import { visibleReplyMaxTokens } from "@/lib/turnShared";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
 import { planLineForTurnMachine } from "@/lib/register";
@@ -53,9 +53,9 @@ import type { StreamGate } from "./outputGate";
  * and marks the gate done, so output_gate's own `streamed.done` branch
  * (outputGate.ts, "logged equals streamed by construction") picks up
  * the real delivered text instead of `model_failed`'s fixed line -
- * mirroring turnEngine.ts's own runTurnStream()'s finalize(), whose
+ * mirroring the old engine file's own runTurnStream()'s finalize(), whose
  * "cut with real partial content already streamed stays source: model"
- * branch (turnEngine.ts, the comment beside `refusedWithNothingDelivered`)
+ * branch (the old engine file, the comment beside `refusedWithNothingDelivered`)
  * never resets a stream's already-released text for ANY ending, crash
  * or cancel alike - only an output-safety refusal with nothing
  * delivered yet gets the canned line there, the identical zero-delivered
@@ -169,7 +169,7 @@ const FORCED_CALL_MAX_TOKENS = 96;
 /** The reply floor (spec-v0.1.28, U4b-2, turn-machine-state-record-
  * 2026-09-22.md "The reply floor"): a written, non-brevity, adult
  * turn uses the budget's own reply_ceiling_tokens instead of LAT-01's
- * shared visibleReplyMaxTokens formula (turnEngine.ts) - a runaway
+ * shared visibleReplyMaxTokens formula (the old engine file) - a runaway
  * backstop sized per model, not a max_words-derived number built for
  * the spoken register's short-form defaults, which would clip a long
  * written answer well before it ever ran away. Every other turn

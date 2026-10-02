@@ -3,7 +3,7 @@
 // honesty invariant...; the malformed repair | done; refused when the
 // output floor refuses." Simplest real implementation (U2b's own
 // brief): evaluateReply() (safety.ts) runs the SAME evaluateSafety()/
-// forOutput() floor turnEngine.ts's own gateOutputSafety() calls per
+// forOutput() floor the old engine file's own gateOutputSafety() calls per
 // sentence, over the whole composed reply at once rather than
 // streamed sentence-by-sentence - real safety coverage of the actual
 // text a household hears, not yet the per-sentence early-cut behavior
@@ -29,7 +29,7 @@ import { turnAgeBand } from "../speaker";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { envelopeToolCall } from "@/lib/llm";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
-import { notifyOncePerTurn } from "@/lib/turnEngine";
+import { notifyOncePerTurn } from "@/lib/turnShared";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
@@ -47,7 +47,7 @@ export interface StreamGateResult {
   /** The most recent non-refuse flag (e.g. a self_harm mention that
    * never refuses), so finalize() can still derive crisis resources for
    * a turn that never refused at all - the same field gateOutputSafety()
-   * (turnEngine.ts) returns for the identical reason. */
+   * (the old engine file) returns for the identical reason. */
   lastFlagged: SafetyResult | undefined;
   /** STREAM-NEXT-01 (b), point 4: this generation's own first non-space
    * character was "{" - held whole, never released sentence by
@@ -71,13 +71,13 @@ export interface StreamGateResult {
  * (nodes/model.ts's own runOneGeneration() calls push() with each raw
  * delta as it arrives, from deep inside the machine's own async node
  * call - nothing above it in that call stack is built to catch a
- * mid-node throw) rather than pull-driven like turnEngine.ts's own
+ * mid-node throw) rather than pull-driven like the old engine file's own
  * gateOutputSafety(): a refusal never throws from inside push() or
  * finish(); it ends the release (no sentence after it is ever handed to
  * `release`) and is read back afterward via result(). The caller
  * (turnNext.ts) is what turns that into the wire's own mid-stream
  * refusal, the same StreamSafetyRefusal shape and behavior
- * turnEngine.ts's own stream already uses. */
+ * the old engine file's own stream already uses. */
 export class StreamGate {
   private pending = "";
   private isFirstChunk = true;
@@ -90,7 +90,7 @@ export class StreamGate {
 
   constructor(
     private readonly band: AgeBand,
-    // SAFETY-NOTIFY-NEXT-01: the actor/turnId turnEngine.ts's own
+    // SAFETY-NOTIFY-NEXT-01: the actor/turnId the old engine file's own
     // gateOutputSafety() closes over from its own outer scope - this
     // class has none of its own, so both arrive here instead, used only
     // for the identical `notifyOncePerTurn()` calls below.
@@ -138,7 +138,7 @@ export class StreamGate {
     return firstChar === "{" || firstChar === "<";
   }
 
-  /** turnEngine.ts's own gateOutputSafety()/checkAndNotify(): the per-
+  /** the old engine file's own gateOutputSafety()/checkAndNotify(): the per-
    * sentence check plus the identical notify call, so a flagged
    * sentence on the streamed path reaches a parent exactly as it would
    * on the old path - never a second, silent check. */
@@ -148,14 +148,14 @@ export class StreamGate {
     return safety;
   }
 
-  /** turnEngine.ts's own gateOutputSafety()/wholeRefusal(): a sentence
+  /** the old engine file's own gateOutputSafety()/wholeRefusal(): a sentence
    * that passes its OWN check can still make the REPLY SO FAR unsafe
    * read as a whole (a claim split across two sentences, each benign
    * alone) - checked on `delivered + next`, the identical floor, every
    * time, whether or not the new span's own check already passed. Never
    * called with nothing delivered yet (whitespace alone is nothing
-   * delivered, the identical guard turnEngine.ts's own version has).
-   * Notifies only on an actual refusal, the same as turnEngine.ts's own
+   * delivered, the identical guard the old engine file's own version has).
+   * Notifies only on an actual refusal, the same as the old engine file's own
    * version - the non-refusing case is already covered by
    * checkAndNotify()'s own unconditional call above it. */
   private wholeRefusal(next: string): SafetyResult | undefined {
@@ -185,7 +185,7 @@ export class StreamGate {
       const trimmed = rawSpan.trim();
       if (!trimmed) {
         // Whitespace alone between two sentences: nothing to classify,
-        // still the reply's own whitespace (turnEngine.ts's identical
+        // still the reply's own whitespace (the old engine file's identical
         // #99 fix - dropping it here would reproduce that bug).
         this.delivered += rawSpan;
         this.release(rawSpan);
@@ -196,7 +196,7 @@ export class StreamGate {
       // A refusal carries the WHOLE reply's own result when something
       // was already delivered, so an earlier sentence's self-harm
       // category (and its crisis text) rides on the refusal - the
-      // identical precedence turnEngine.ts's own gateOutputSafety() uses
+      // identical precedence the old engine file's own gateOutputSafety() uses
       // (`wholeRefusal(rawSpan) ?? safety`).
       if (safety.action === "refuse") {
         this.refused = this.wholeRefusal(rawSpan) ?? safety;
@@ -225,7 +225,7 @@ export class StreamGate {
    *
    * A code review caught the first cut repairing with `repairReply`
    * (this fragment alone) before checking safety on the REPAIRED text -
-   * two real bugs, both fixed by matching turnEngine.ts's own
+   * two real bugs, both fixed by matching the old engine file's own
    * gateOutputSafety() exactly instead: (1) `repairReply` judges quote/
    * bracket balance only over the isolated tail, so a quote legitimately
    * OPENED in an earlier, already-released sentence and correctly
@@ -379,7 +379,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   const repaired = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
   const evaluation = evaluateReply({ text: repaired, speech: input.reply.speech }, band);
   // SAFETY-NOTIFY-NEXT-01: the immediate (non-streamed) path's own whole-
-  // reply boundary - the identical call turnEngine.ts's own
+  // reply boundary - the identical call the old engine file's own
   // applyOutputBoundary() makes right after its own equivalent
   // evaluateReply(), unconditionally, before the refuse check below.
   notifyOncePerTurn(state.actor, evaluation.effective, state.turnId, "[turn]");

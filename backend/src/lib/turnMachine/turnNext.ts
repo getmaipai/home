@@ -1,7 +1,7 @@
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
 // the entry `routes/turn.ts` calls, with the same TurnStreamResult shape
-// runTurnStream() already returns (turnEngine.ts, imported here, never
-// redefined - "one definition, one place"). turnEngine.ts is not edited
+// runTurnStream() already returns (the old engine file, imported here, never
+// redefined - "one definition, one place"). the old engine file is not edited
 // by U2.
 //
 // runTurnNext() (U2's own build) always resolves through TurnStreamResult's
@@ -12,8 +12,9 @@
 // needs: routes/turn.ts's `/stream` route calls it instead, when
 // turn.pipeline.next is on.
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
-import type { Surface, SpeakerEvidence, PresentPerson, TurnValue, TurnStreamResult, StreamOutcome } from "@/lib/turnEngine";
-import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnEngine";
+import type { Surface, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome } from "@/lib/turnShared";
+import type { TurnValue } from "@/wire";
+import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
@@ -76,7 +77,7 @@ export interface RunTurnNextOpts {
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
   const stats = buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0);
   // A live acceptance run (U2d) caught this omitting plugin_id/
-  // command_id/sources entirely - turnEngine.ts's own equivalent
+  // command_id/sources entirely - the old engine file's own equivalent
   // builder always carries the package id that ran (plugin_id for a
   // model-proposed tool, command_id for a household command) and any
   // sources, and the bench's own scorer reads exactly these two
@@ -95,7 +96,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
   // on the old path's own runTurnStream() ("always used prepared.
   // crisisResources even when outputSafety was the one actually
   // flagged"). `?? ` keeps the input-side line as the fallback, exactly
-  // as turnEngine.ts's own finalize() does - never dropping a genuine
+  // as the old engine file's own finalize() does - never dropping a genuine
   // input-side crisis mention just because the output side had nothing
   // to add. `state.streamGate` is undefined for every non-streaming
   // caller, so this is a no-op there.
@@ -123,7 +124,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // emitting this turn AND output_gate's own safety pass over the
     // span didn't refuse it - the gated span itself, never the raw one.
     reasoning,
-    // home#147: turnEngine.ts's own logTurnSafely() (the old path)
+    // home#147: the old engine file's own logTurnSafely() (the old path)
     // sets both of these from the identical outcomes list - never
     // called here, so the new path built no structured part (the
     // weather/almanac card) and no artifact (write_document's own
@@ -157,11 +158,11 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   }
   // THIN-0C: the judge's queue is keyed on the stored signal; a safety
   // refusal and a credential turn are never the judge's
-  // (turnEngine.ts's judgeStatusAtInsert, the function the old path calls).
+  // (the old engine file's judgeStatusAtInsert, the function the old path calls).
   logTurn(actor, surface, text, value, { ...opts, judgeStatus: judgeStatusAtInsert(value, state.signal) });
   // PROJECT-START-01 (lib/projects/post.ts's own header): this turn's
   // own conversation_turns row is only ever written here, at the very
-  // end - unlike the legacy turnEngine.ts's prepareTurn(), nothing on
+  // end - unlike the legacy the old engine file's prepareTurn(), nothing on
   // this path writes a provisional row up front. A project that finishes
   // fast enough (every scripted test; a real one-step project on a fast
   // engine) can reach its terminal state, and try to attach its result to
@@ -266,7 +267,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // as the old path's prepareTurn() derives it.
   const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
-  // old path (turnEngine.ts's own commandOpeners(effectiveLoaded)) - a
+  // old path (the old engine file's own commandOpeners(effectiveLoaded)) - a
   // clause opening with a bundled package's own command verb ("look",
   // "convert", "define") reads as a directive by shape, the cue the
   // commands node's imperative wildcards (below) depend on to fire at
@@ -275,7 +276,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // the commands node's own temporary-mode guard still keeps a
   // memory:write package from actually firing in a temporary chat.
   // SIGNAL-02: the same loaded-manifests read commandOpeners() just
-  // took, never a second load - computedPatternMatch() (turnEngine.ts)
+  // took, never a second load - computedPatternMatch() (the old engine file)
   // is the injected predicate turnSignal.ts's own clauseSubject() reads
   // to classify "what time is it in Tokyo" as target: computed instead
   // of world, so the interim rule stops forcing a search for it.
@@ -430,7 +431,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   // rather than swallowing anything else this function might throw.
   // THIN-0C: the old path engages the lease before routing, so a turn
   // that fails after the engine was reached still counts as household
-  // activity (turnEngine.ts's lease.engage()). Same here on the failure
+  // activity (the old engine file's lease.engage()). Same here on the failure
   // paths: engage when the context or model node had run.
   const engageIfEngineReached = () => {
     if (state.nodes.some((n) => n.node === "context" || n.node === "model")) begun.lease.engage();
@@ -522,7 +523,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // outcomes.length alone, which stayed 0 for a matched command
     // (recordCommandOutcome, machine.ts, now pushes its outcome too).
     // A second review caught this ALSO forcing source to "confirm"
-    // whenever preConfirmed was set: turnEngine.ts's own reference
+    // whenever preConfirmed was set: the old engine file's own reference
     // builder reports "plugin" (with plugin_id) for a confirmed
     // action that actually ran, "confirm" only for the bare
     // acknowledgment lines that never touch a package - lastVia
@@ -535,7 +536,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // "command" (a household's own custom command, matchCommand): the
     // old path's own convention is source "plugin"/plugin_id for a
     // bundled package match, whatever matched it (literal pattern,
-    // Tier 2, or a tool call - turnEngine.ts's own source: "plugin"
+    // Tier 2, or a tool call - the old engine file's own source: "plugin"
     // sites all report plugin_id, never command_id, for any of
     // these), and "command"/command_id only for a genuine
     // household-defined command (commands.ts's own custom.id branch).
@@ -553,7 +554,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
  * on the default path - a known constant reply (the remember
  * confirmation, a safety refusal) comes from the active companion's own
  * pool or the shared one, through the same variedConstantReply()
- * turnEngine.ts itself uses, never a second copy of the pools. Runs
+ * the old engine file itself uses, never a second copy of the pools. Runs
  * after the output gate, exactly where the old path varies its own text:
  * every variant is a fixed, hand-written line from replyVariation.ts,
  * never model text, so nothing here loosens the gate for anyone.
@@ -568,7 +569,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
  *
  * THIN-0J (rule 12): a spoken-class turn (robot, pod, phone, or a chat
  * turn the client flags as spoken) also gets the old path's server-side
- * speech text, through the same speechTextFor() turnEngine.ts uses: the
+ * speech text, through the same speechTextFor() the old engine file uses: the
  * varied text normalized for speaking, or the robot's first-sentence
  * projection. A written or glance turn keeps whatever speech its own
  * node authored (none for the model's text), so a written adult reply
@@ -656,10 +657,10 @@ async function* drainDeltaQueue(channel: StatusChannel<string>): AsyncGenerator<
  * anywhere near done, so routes/turn.ts's existing stream branch
  * (ResumeSession, streamResponse, streamTurnEvents()) can relay a live
  * status line and gated sentences, the same contract runTurnStream()
- * (turnEngine.ts) already fulfills for the old path - no second
+ * (the old engine file) already fulfills for the old path - no second
  * transport. state.status is the identical StatusChannel/"status" wire
  * event the old path already streams; nodes/tool.ts pushes the same
- * "On it." line onto it turnEngine.ts's own runTurnStream() does,
+ * "On it." line onto it the old engine file's own runTurnStream() does,
  * before the search itself starts. state.streamGate (outputGate.ts) is
  * what nodes/model.ts's own runOneGeneration() pushes raw deltas into
  * and what nodes/output_gate itself reads back instead of re-evaluating
@@ -777,7 +778,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     // never carried a tool_call/tool_result at all until this.
     toolEvents: state.toolEvents,
     // ENGINEERING gap, named rather than silently worked around: the new
-    // path has no equivalent of turnEngine.ts's own bannedPhrasesFor()
+    // path has no equivalent of the old engine file's own bannedPhrasesFor()
     // yet, so the thinking-cue filler (streamTurnEvents()'s own
     // pickThinkingCue()) can repeat a phrase a recent old-path turn
     // already used. Cosmetic only (a filler line, never the reply

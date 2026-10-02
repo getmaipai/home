@@ -10,7 +10,7 @@
 // separate prompt template per source.
 //
 // U4b amended this contract (dev.md "U6 rerun 2 ruling" (1)): the
-// stable message also carries `turnEngine.ts`'s own `buildStablePrefix()`
+// stable message also carries `the old engine file`'s own `buildStablePrefix()`
 // (identity, `composePersonaPrompt`, the information-handling and
 // naturalness policies - persona/plan are inputs now too, not "context
 // alone"), and the volatile message gains the plan line
@@ -27,7 +27,7 @@ import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import { promptSurfaceClassFor } from "@/lib/surfaceClass";
-import { buildStablePrefix } from "@/lib/turnEngine";
+import { buildStablePrefix } from "@/lib/turnShared";
 import { planLineForTurnMachine } from "@/lib/register";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
@@ -64,7 +64,7 @@ function renderMemoryMatches(memoryItems: readonly ContextItem[]): string {
 
 /** CONTEXT-RECALL-01 (dev.md "The owner's three live turns", (2)): the
  * same header, trust line and "nothing matched" line the old path's
- * own memorySection used (turnEngine.ts), shared via memoryFraming.ts -
+ * own memorySection used (the old engine file), shared via memoryFraming.ts -
  * a recalled row reads as background evidence under this header, never
  * as the turn's own subject, which is what let a fresh conversation's
  * small talk get answered as if a remembered lookup were the question.
@@ -120,7 +120,7 @@ function isStableContext(source: ContextItem["source"]): boolean {
   return false;
 }
 
-/** U1's own cache-stable order (turnEngine.ts's buildStablePrefix()
+/** U1's own cache-stable order (the old engine file's buildStablePrefix()
  * ahead of the window, its own volatile `context` string after it -
  * `runTurn()`'s literal `[stablePrefix, ...window.messages, context,
  * utterance]` message list), carried to this path for the first time.

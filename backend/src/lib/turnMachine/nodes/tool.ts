@@ -58,7 +58,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const { tool, callId } = proposal.request;
     // LIVE-0923-01 (home/docs/dev.md): the old path's own forced-search
     // call never trusted the model's own `category` argument either
-    // (turnEngine.ts's resolveToolCalls() call, noteIgnoredModelWeb
+    // (the old engine file's resolveToolCalls() call, noteIgnoredModelWeb
     // searchCategory) - it always computed "images" itself, only when
     // the turn's own intent classifier decided the household wanted a
     // picture, never from what the model proposed. This node passed
@@ -75,7 +75,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     //
     // READ-PAGE-01 (home/docs/dev.md, home/docs/BACKLOG.md): the same
     // floor extends to `read_page` - the old path only ever sets it
-    // from `pageReadRequested(text)` (turnEngine.ts:3966, "did the
+    // from `pageReadRequested(text)` (the old engine file:3966, "did the
     // person actually ask to read/open the page"), never from the
     // model's own choice; this node passed it through unfiltered too,
     // and it was `true` on every forced call in the same live
@@ -97,8 +97,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // step running, not just its eventual outcome.
     toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args });
     // STREAM-NEXT-01 (a): the identical "On it." status line
-    // turnEngine.ts's own runTurnStream() emits before running a tool
-    // (turnEngine.ts:6636) - set only by turnNext.ts's own
+    // the old engine file's own runTurnStream() emits before running a tool
+    // (the old engine file:6636) - set only by turnNext.ts's own
     // runTurnNextStream() (state.status is undefined for the immediate/
     // bench callers), so a streamed client sees the tool is running
     // before the search itself starts, not batched into toolEvents until
@@ -153,7 +153,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       // SEARCH-EMPTY-01: this carried only the numeric HTTP-style
       // status, never the semantic HostError code a real caller (a
       // replay bench filtering on `search_unavailable`, e.g.) actually
-      // wants. Fixed to `turnEngine.ts`'s own established pattern
+      // wants. Fixed to `the old engine file`'s own established pattern
       // (`(result as {code?:string}).code ?? String(result.status)`,
       // six call sites there) rather than `commands.ts`'s simpler
       // `result.code` alone (a review, 2026-09-24, caught that the

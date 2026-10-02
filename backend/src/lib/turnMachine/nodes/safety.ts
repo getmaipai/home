@@ -9,7 +9,7 @@ import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { evaluateSafety, carriesCrisisSignal } from "@/lib/safety";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { turnAgeBand } from "../speaker";
-import { notifyOncePerTurn, conversationInCrisis } from "@/lib/turnEngine";
+import { notifyOncePerTurn, conversationInCrisis } from "@/lib/turnShared";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 
 export interface SafetyInput {
@@ -26,7 +26,7 @@ export const safetyNode: Node<SafetyInput, SafetyOutput> = async (state, input) 
   // THIN-0N: the speaker's effective band, as the old path's prepareTurn().
   const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
   const safety = evaluateSafety(input.utterance, band);
-  // SAFETY-NOTIFY-NEXT-01: the identical input-side call turnEngine.ts's
+  // SAFETY-NOTIFY-NEXT-01: the identical input-side call the old engine file's
   // own prepareTurn() makes (CHAT-02: "the input side shares the per-turn
   // dedupe with the output side") - fired regardless of `action`
   // (allow_with_resources and refuse can both flag a minor's turn), and

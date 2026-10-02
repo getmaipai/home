@@ -7,14 +7,14 @@
 // RULES-AND-LEARNED-COMPONENTS.md's "deterministic on purpose" table:
 // the household's own custom commands (lib/commands.ts's matchCommand,
 // the `commands` DB table) and the bundled packages' own closed
-// `routing.patterns` (matchPattern, turnEngine.ts - kept, never
+// `routing.patterns` (matchPattern, the old engine file - kept, never
 // deleted; only the model-offered tool set and the lookup ladder that
 // used to sit in front of it are going). A package whose routing is
 // `always_offer` (websearch) is a tool for the model node, never an
 // instant command here - matching it on an exact literal would answer
 // "search the web for X" without ever reaching the interim rule.
 import { matchCommand, runCommand } from "@/lib/commands";
-import { matchPattern, loadAllManifests } from "@/lib/turnEngine";
+import { matchPattern, loadAllManifests } from "@/lib/turnShared";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { runPlugin, meetsMinRole } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
@@ -34,7 +34,7 @@ export type CommandsOutput =
 export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, input) => {
   // THIN-0A (issue #204): "forget that" / "forget what I told you about
   // X" is the engine's own exact command, the same parser and the same
-  // conversation lookup the old path calls (turnEngine.ts ~2566), so the
+  // conversation lookup the old path calls (the old engine file ~2566), so the
   // model never answers a forget with "Got it." and keeps the record.
   // Checked before the household's custom commands, as on the old path.
   // A temporary chat stores no turns and writes no memory, so it has
@@ -52,11 +52,11 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
     const outcome = outcomeOf({
       callId: `command:${custom.id}`,
       // A code review (2026-09-22) caught this prefixed ("command:x"),
-      // where turnEngine.ts's own reference builder uses the bare id
+      // where the old engine file's own reference builder uses the bare id
       // for TurnValue.command_id (matchedCommand.id, unprefixed) -
       // buildTurnValue() (turnNext.ts) copies this outcome's packageId
       // straight onto the wire, so a prefixed id here reached the
-      // household's own client under a name turnEngine.ts never used.
+      // household's own client under a name the old engine file never used.
       packageId: custom.id,
       status: result.ok ? "succeeded" : "failed",
       via: "command",
@@ -77,8 +77,8 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
     if (manifest.routing?.always_offer) continue;
     if (!meetsMinRole(state.actor.role, manifest.min_role)) continue;
     // A code review (2026-09-22) caught this loop with neither of
-    // turnEngine.ts's own two guards on its identical literal-pattern
-    // match: skipping a consequential manifest here (turnEngine.ts
+    // the old engine file's own two guards on its identical literal-pattern
+    // match: skipping a consequential manifest here (the old engine file
     // ~1696, the `lock-doors` finding) is what keeps a side-effecting
     // package from firing on a bare pattern match with no confirm -
     // without it, a literal match runs runPlugin() straight from this
@@ -87,7 +87,7 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
     // model and `policy` normally; only the instant, un-confirmed path
     // here is closed to it.
     if (manifest.consequential) continue;
-    // CHAT-PARITY-02's own guard (turnEngine.ts ~2792), mirrored here:
+    // CHAT-PARITY-02's own guard (the old engine file ~2792), mirrored here:
     // a temporary chat may run an ordinary command, but never one that
     // declares memory:write - the same invariant `policy`'s own
     // temporary_mode check enforces for a model-proposed tool call,

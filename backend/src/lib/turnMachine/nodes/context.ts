@@ -15,7 +15,7 @@ import { recall, getProfileParagraph, embedQueryForRecall, bumpUsage } from "@/l
 import { subjectRosterFor } from "@/lib/subjects";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { MAX_MEMORY_SNIPPETS } from "@/lib/turnEngine";
+import { MAX_MEMORY_SNIPPETS } from "@/lib/turnShared";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { shapeOf } from "@/lib/turnSignal";
 import { planFor } from "@/lib/register";
@@ -29,7 +29,7 @@ export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
 
 /** "Reasoning is a second output" (the owner's ruling): decided once,
  * here, from the age band and the surface - "a minor's turn never
- * receives reasoning" (turnEngine.ts's own `ageBand === "child" ||
+ * receives reasoning" (the old engine file's own `ageBand === "child" ||
  * ageBand === "teen"` is the established "not a full adult" check,
  * reused rather than a second one) and "the typed chat screen is the
  * only surface that may emit it." VOICE-LIVE-02: a spoken turn is
@@ -131,7 +131,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // durable record that outlives it).
   if (!temporary) {
     // CONTEXT-RECALL-01 (dev.md "The owner's three live turns", (2)):
-    // carries the old path's own recall call whole (turnEngine.ts
+    // carries the old path's own recall call whole (the old engine file
     // around line 3290, hard-won logic), never a bare recall(actor,
     // utterance) - that fell to the lenient keyword-overlap path with
     // no tier floor at all, which is why a fresh conversation's small
@@ -169,7 +169,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       // instead of only the up to MAX_MEMORY_SNIPPETS that actually
       // reach the prompt below - RecallOptions.bumpUsage's own comment
       // names exactly this ("the turn engine... bumps only the subset
-      // that actually reached the model's prompt"), which turnEngine.ts
+      // that actually reached the model's prompt"), which the old engine file
       // already honors this same way (its own bumpUsage() call after
       // its own prompt-inclusion filter).
       bumpUsage: false,
@@ -180,7 +180,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // weak, and every sliced candidate became a context item with no
     // further check - a context leak, privacy-adjacent (a household
     // topic that never came up in this conversation, surfaced anyway).
-    // The old path has no equivalent filter either (turnEngine.ts's
+    // The old path has no equivalent filter either (the old engine file's
     // own memoryMatches = recall(...) call, checked directly: no
     // eligibility or score gate ahead of it) - nothing to export and
     // reuse, so this floor is new, scoped to this call site only.
@@ -208,7 +208,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // the noise a weak, non-forced entity match rides in on
     // (entity-recall's own row: 12 candidates including six at
     // 0.056-0.059 down to the 4 that actually matter, still passing).
-    // THIN-0B: the old path's own derivation (turnEngine.ts, basePlan's
+    // THIN-0B: the old path's own derivation (the old engine file, basePlan's
     // `disclosureWithheld: memoryMatches.withheldForBand > 0`), limited
     // here to a child or teen: an adult is never told something is held
     // back, so an adult's plan stays as it was.
