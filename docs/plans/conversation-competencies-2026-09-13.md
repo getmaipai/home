@@ -45,6 +45,8 @@ bench), **planned** (a BACKLOG item), **missing** (no item).
 | C4 | Knows the date, the time, the season, and what "tonight" and "yesterday" mean | date and time supplied; no season; "tonight" and "yesterday" understanding unmeasured (the next-day row proves recall only) | FAST-02, MEM-04 | the next-day row |
 | C5 | Knows the weather, the news, what is on today, when asked or when relevant | weather needs a named place ("what's the weather?" alone is not built; #98); news planned; "when relevant" missing | Skills section; Proactive section (L) | one row each |
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 3 and 5: "short for chat" and "samplers on" no longer hold as written; adult written chat has no length steer and sampling is per model.
+
 ## D. Sounding like someone
 
 | # | Competency | Status | Where | Bench row |

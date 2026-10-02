@@ -432,6 +432,9 @@ severe genuinely defeating SEARCH-HEALTH-01, built the same day.**
    Fixed: the row snippet is Wikipedia's own short `description` field
    (a genuinely different sentence) when one exists, falling back to
    the extract only when it doesn't.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 7: the 300-character `SEARXNG_FIELD_MAX_CHARS` snippet cut no longer holds.
+
 6. **The extract had no length cap**, unlike every other SearXNG-sourced
    field in this file (`SEARXNG_FIELD_MAX_CHARS`, 300). The row snippet
    now shares that same bound; `page.text` gets the identical 32,000-
@@ -703,6 +706,8 @@ Exit: `bash scripts/check.sh` green; the fourteen new/changed tests
 above (twelve plus two regression tests for the review's own findings
 1 and 2), landed.
 
+> **Superseded 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 6: search down no longer routes straight to the fixed line, and "never answer from your own knowledge" no longer holds; the model answers from what it knows and says the lookup did not happen.
+
 ## SEARCH-EMPTY-01: search down and search found nothing are never the same reply (2026-09-24)
 
 **Objective.** `conv-19awhetzdf` (the same conversation LIVE-0924-01
@@ -745,6 +750,8 @@ new machinery - `answerInputFrom()`'s own existing last-resort branch
 shape for the "no more rounds" exit; it was simply never reached from
 round 1, where a round always remained, until this guard existed to
 route here.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 6: swapping any failed-outcome message for a fixed line no longer applies to a failed tool; the safety reason for the floor stays.
 
 **A pre-existing safety floor had to be worked with, not around.**
 `output_gate`'s own COMMAND-FAIL-01 provenance check
@@ -943,6 +950,8 @@ it first, and a cleared run is capped at a person's pace (one query every
 several seconds, a handful of queries total, never a rep count picked
 for statistical confidence alone). No live SearXNG runs tonight
 (2026-09-24) after this was raised, on any item.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the second constrained call after a required-call miss no longer holds; a model-written query stands, a forced-miss recovery does not.
 
 ## QUERY-WRITER-01: a pronoun follow-up after a required-call miss resolves before it searches (2026-09-24)
 
@@ -1151,6 +1160,8 @@ search traffic.
 Exit: `bash scripts/check.sh` green (backend scope: 4185/4185, plus
 frontend typecheck/docs/standards unaffected). Low-effort review: no
 findings.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 1, 9 and 10: streaming only non-forced generations (a forced-search reply arriving at once) and gating reasoning whole at the end no longer hold, and the web chat's own NDJSON stream gives way to `assistant-stream` (the NDJSON events stay for other clients); the envelope guard stays.
 
 ## STREAM-NEXT-01: real progressive streaming for the new path (2026-09-24)
 
@@ -3769,6 +3780,8 @@ set. Full architecture: platform plan chapters 1, 3, and 4.
       already set - building the real `tts` role is a separate, real
       slice of work, deliberately not started tonight given how much
       this session had already covered.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 2 and 9: `stripThinking()` and the think-tag detector in the stream, and the custom `TurnStreamEvent` stream as the web chat's wire, no longer hold; the spoken disfluency design itself stands.
 
 ### Voice output disfluency design, 2026-09-17
 
@@ -8025,6 +8038,8 @@ handful of people, one indexed settings lookup); adding a cache with
 real invalidation-on-write for a query costing microseconds isn't worth
 the complexity yet, revisit if it ever actually shows up in a profile.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 2 and 4: the window of the newest 4 turns under a chars/4 estimate of 1,200 tokens, the summary refresh tied to that boundary and the 200-row fetch cap no longer hold; the window is sized from the engine's real context with real token counts.
+
 ## Session A: step 3, conversations, the window, the rolling summary (2026-09-05)
 
 The single largest step so far: a real `Conversation` spec record,
@@ -9908,6 +9923,8 @@ refetch on `onSettled` - a fixed fixture would have undone the optimistic
 removal the instant that refetch landed. Fixed the same way (a `dismissed`
 flag flipped by the stubbed dismiss call, read by the list response).
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 9: the hand-written `ChatModelAdapter.run()` accumulating NDJSON deltas, and `consumeThinking()`, no longer hold; the web chat's stream is `assistant-stream`.
+
 ## Session B: step 4, chat on assistant-ui (2026-09-05)
 
 ChatPage.tsx rebuilt on `@assistant-ui/react` (0.15.18) plus its own
@@ -11349,6 +11366,8 @@ chat template). `enginePostLoadCheck.ts` sends one canned request with a
 that cannot do this is caught at spawn, not at the first household
 message.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: withholding tools below an embedding floor (`TIER2_AMBIGUOUS_FLOOR`, `MAX_TIER2_TOOLS_OFFERED`) no longer holds; tools stay offered on `auto`.
+
 E3. `turnEngine.ts`: delete `attemptTier2Tools()`'s separate
 `complete()` call, `toolCallSchema()` and `parseToolCalls()` in
 `lib/llm.ts`. `prepareTurn()` returns `{ kind: "model", messages, tools }`
@@ -11988,6 +12007,8 @@ reloads again at phone and desktop sizes. These are demo conversations,
 not claims about live model quality. Persistent edit/regenerate branches,
 attachments, and continuous voice remain separate backlog work.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the retry with `tool_choice: "required"` after a first-sentence guess no longer holds; tools stay on `auto`.
+
 ## Automatic web lookups instead of declining (2026-09-07, getmaipai/home#67)
 
 Jesse's own household chat (`conv-8mybzoihzl`, `conv-emfobqwawp`,
@@ -12130,6 +12151,8 @@ BACKLOG.md alone owns completion status.
 
 ### Scope and precedence
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: "no agent loop" and two calls per turn no longer hold; the model chooses tools on `auto` across rounds.
+
 Retain the existing engine, SQLite store, package host, native tools,
 recipe interpreters, companion packages, and shared speech normalization.
 Do not introduce an agent loop, graph database, second intent model, custom
@@ -12192,6 +12215,8 @@ unexecuted rather than silently claiming all requests completed. A
 consequential proposal causes one confirmation and no other execution in
 that batch. Independent non-consequential calls execute concurrently.
 Recovery never repeats a completed action.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 7: the websearch recipe returning bounded snippet rows plus a `synthesis_hint` no longer holds; search gives the model fetched page text with numbered sources.
 
 Use direct output for one successful result with `reply` and no
 `synthesis_hint`. Use one final composition for a data-only result, a result
@@ -12491,6 +12516,9 @@ record stands.
    approved text under 2,500 ms p95 for a single-tool turn. A spoken cue
    never counts as first text. The same bench runs on the hub and records
    its numbers without a gate until the hub's hardware is fixed.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: "no agent loop, no second intent model, two calls per turn" no longer holds; the model chooses tools on `auto` across rounds.
+
 3. **A `background` model role, on its own process, never for intent and
    never for a user-facing reply.** This amends "do not introduce a second
    intent model" by scope, not by reversal: the ban on a second intent
@@ -12525,6 +12553,9 @@ record stands.
    assertion retired gets a documented replacement. The action-claim half
    (a claim of a completed action needs a typed outcome) stays in CHAT-04
    because it depends on CHAT-15's outcomes.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 3: leaving variation to one global sampler set no longer holds; sampling comes from each model's catalog record.
+
 6. **Prompt diet, then samplers for variation.** The plugins list leaves
    the prompt (native tools already carry descriptions for what is
    offered). Every bundled package gets a one-sentence, imperative,
@@ -12672,6 +12703,8 @@ hold before a latency gain counts, the default outcome is "keep the 8B",
 and a recommendation is never itself a switch. The reasoning for testing
 a smaller model at all (a newer generation, a narrow job, an 8 GB card)
 is written into the item so the verdict is read against it.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the cap of two evidence rounds and four tool calls no longer holds.
 
 ### Decision 10, revised: a bounded investigation mode (2026-09-12)
 
@@ -13431,6 +13464,8 @@ came back is `a-car-it-was-never-told-about`. The five still failing
 invention-guard rows.
 
 **Exit gate**: `bash scripts/check.sh` green in the worktree.
+
+> **Superseded 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 3: one `CHAT_SAMPLING` set on every chat request, justified by a tool-calling bench, no longer holds; sampling comes from each model's catalog record.
 
 ### FAST-06: variation from samplers, not from a prompt sentence (2026-09-12)
 
@@ -14872,6 +14907,9 @@ other's section once (147cd28, f4779a6).
   previous question said back skipped), with the engine's one retry
   with a note on both paths: [docs/dev/session-a.md](dev/session-a.md)
   (2026-09-14).
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the turn signal feeding routing, the plan and the lookup decision no longer holds for the lookup decision; it keeps register, the plan line and safety only.
+
 - ACT-01, the turn signal: `classifyTurnSignal()` in `lib/turnSignal.ts`
   (the protocol layer on a consumed pending ask, the high-precision
   rules over `utteranceShape()`'s own clause split, the conservative
@@ -15219,6 +15257,8 @@ sentence from another fixture conversation's replies). Three seeded
 runs, the runner's existing rule. **Size S-M.** Before CHAT-13, and
 with or before step 3a's engine half (section 10).
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 10: `enforceWellFormed()` repairing markers, quote marks and dangling clauses inside the safety gate no longer holds; formatting is split out of the gate.
+
 ### 2. Broken output (findings 13 and 17): the well-formed reply gate
 
 **Root cause, in the code.** Nothing between the engine and the
@@ -15435,6 +15475,8 @@ proper noun in the reply is in the utterance, the history or the
 evidence). **Size M** (spec S, engine M). The spec part first, then
 the engine; the detector is the first half of CHAT-13's resolver and
 CHAT-13 reuses it.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: forcing a lookup on a promise, offer or currency word no longer holds; the model decides.
 
 ### 4. Promises, offers, currency and corrections (findings 2, 3, 7, and 6 in part)
 
@@ -16295,6 +16337,8 @@ controller and the curator are the judge's own mechanism (a background
 pass on the 4B with a deterministic gate) pointed at quality instead of
 extraction. The model stays a fixed, measurable quantity, and what a
 family sees improving is their data, with a paper trail.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 1 and 5: the signal deciding a lookup, and `max_sentences` and `max_words` as length limits on adult written chat, no longer hold; spoken and child bands keep theirs.
 
 ### 12. The act and the emotion of a turn, and the register they drive (2026-09-14)
 
@@ -18449,6 +18493,8 @@ Rejected, with the reason:
   retrieval, privacy or whether a contradiction is raised) is the rule,
   whatever the field is called.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the engine deciding a lookup from asked-field, world-reference and currency words, and forcing one when the model hedges or promises, no longer holds; the model decides.
+
 ### 16. The 2026-09-14 evening chat (findings 26 to 46, 2026-09-14)
 
 The design for the second evening's findings in
@@ -18830,6 +18876,8 @@ purpose stays exempt (SAFETY-01's `self-harm-state` row unchanged).
 **Item and size.** REP-01 (S): `guards.ts` (the two shapes,
 `self_assertion`), both paths in `turnEngine.ts`, the retry note, the
 rows. Before CHAT-13. The plan half rides with ACT-03.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 7: bounded rows (title, snippet, URL, at most eight) no longer hold; search gives the model fetched page text with numbered sources.
 
 #### 4. A lookup reply carrying its source; a URL, a picture or a video on the chat surface (d; finding 27)
 
@@ -19788,6 +19836,8 @@ interface TurnStats {
 }
 ```
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 2 and 4: leaving `context_used_percent` null until the engine exposes its context size no longer holds; Home reads the engine's reported context length.
+
 The engine-owned values are `prompt_tokens`, `predicted_tokens`,
 `tokens_per_second`, `cache_reuse_tokens`, `cache_reuse_percent`, and
 `stop_reason` when llama-server's final streamed chunk provides its
@@ -19853,6 +19903,8 @@ renders neither. One desktop screenshot shows the full list open.
 Verdict: search is a per-person query over the conversation titles and turn text the hub already holds; pin is one boolean on the spec conversation record; groups remain an open design question because folders, tags, and projects each imply different ownership and nesting semantics, so no grouping model is built here.
 
 The S half uses SQLite `LIKE` because the schema has no conversation FTS table. Search is always scoped to the authenticated person's own conversations, and pinning is an additive field on the existing conversation record and PATCH route. Grouping is intentionally left at the design question: folders provide hierarchy, tags provide many-to-many labels, and projects provide a richer container model, so choosing one without a household use case would harden the wrong contract.
+
+> **Superseded 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 1 and 7: reading a page only for page-shaped words, one fetch after SearXNG, no longer holds; the model decides and search reads result pages.
 
 ## PAGE-01: reading a page the person asked about
 
@@ -20919,6 +20971,8 @@ Two more things a review found before this landed for real. First, `packageHost.
 
 BACKLOG's own contract: `reasoning` (`assistant-ui.com/elements/reasoning`) binds to `TurnStreamEvent`'s own gap, named in `docs/plans/shell-on-shadcndashboard-2026-09-21.md`'s wire table - a new additive event `{ type: "reasoning"; text: string; sequence?: number }`, alongside `delta`. Read `turnEngine.ts`'s streaming path end to end (`composeBlocking`, `gateOutputSafety`/`gateGuards`, `holdOpening`, `holdForLookup`'s mid-stream `<think>` handling) and `wellFormed.ts`'s `visibleText()`/`thinkingPrefix()` before writing any of this - this section is that read, and the smallest-change proposal it points to.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 2: wrapping the engine's `reasoning_content` into `<think>` tags and splitting it again by regex no longer holds; it is carried as its own field and part.
+
 ### The one representation every function already agrees on
 
 `wellFormed.ts` owns two regexes and nothing else: `THINK_BLOCK_RE` (`<think>...</think>`, closed) and `OPEN_THINK_RE` (an unclosed `<think>` running to end of string - a generation cut off mid-reasoning). `visibleText(text)` strips both; `thinkingPrefix(text)` extracts both (closed blocks joined, then any trailing open one) and calls the result a "prefix" by convention, not by enforcement - nothing here checks that a think block is actually first, it just always is in practice, because the chat template puts it there.
@@ -20963,6 +21017,8 @@ Nothing above needs to change. Every function this section covers - `wellFormed.
 The one new thing is a stateful pass added at the OUTERMOST boundary only - `streamTurnEvents()`, right where each `current.value` chunk currently becomes one unconditional `{ type: "delta", text: current.value }` (`routes/turn.ts:301`) - built as `wellFormed.ts`'s own new `feedThinkSplit()`/`flushThinkSplit()` functions, split each chunk into its think-tagged and visible spans as it emits wire events: a think span becomes `{ type: "reasoning", text }`, a visible span keeps becoming `{ type: "delta", text }`, both carrying their own `sequence`. `fullText` still accumulates from `current.value` (untouched, pre-split), so `finalize()` sees no difference at all.
 
 **Correction (a review caught this): `feedThinkSplit()` mirrors `holdForLookup()`'s own `inThink` state machine (the identical two tag tests, the same close-boundary slicing) - it does not call or share code with it.** They are two independent implementations of the same idea, one more (fixing a bug in one does not fix the other), a real, named limitation rather than actual reuse - `wellFormed.ts` is the one shared home for the two tag regexes themselves (`THINK_BLOCK_RE`/`OPEN_THINK_RE`), but the two STATE MACHINES built on top of them are separate. A genuine third copy exists too: `commons`'s `chatCompleteStream()`/`home`'s `stackChatDeltas()` (see "the engine already separates it" below) run their own small `reasoningOpen` synthesis state machine, deliberately kept as a hand-copied "ported here verbatim" pair (the same precedent this file's own header already set before REASONING-01 touched it) rather than a shared export, since the two live in different repos with no existing shared-runtime-code path between them today. Consolidating any of this is a real simplification opportunity for a later pass, not something this item's own scope required.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 2: the `feedThinkSplit()` regex split and the literal `</think>` hazard no longer hold; the engine's `reasoning_content` is used as returned.
 
 ## REASONING-01, landed (2026-09-21)
 
@@ -21012,6 +21068,8 @@ This satisfies the contract table's "streamed as it arrives" honestly rather tha
 **Decided: "byte-identical to today" means the stored `TurnValue.reply.text`/`fullText` and the rendered, client-visible text** - both hold exactly, per above (neither is touched by this change). The `delta` WIRE EVENT's own granularity may change: in the common/short-think-block case, today's single glued `delta` chunk (think + opening visible text together) becomes two events tomorrow, a `reasoning` event and a smaller `delta` event. That's an accepted, expected difference, not a regression - the design above satisfies the visible-text reading, which is what the contract table and the assistant-ui reasoning Element actually need.
 
 Non-streaming `runTurn()`/`POST /api/turn` is unaffected and out of scope: it has no live event stream to add a `reasoning` event to, and `TurnValue.reply.text` keeps the embedded-think-block shape it already has. A non-streaming reasoning surface, if ever wanted, is a separate, later gap.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 2 and 9: re-wrapping reasoning in think tags and building the reasoning part and the synthetic `toolName: "sources"` part in a hand-written adapter no longer hold; the engine's field and the kit's parts are used.
 
 ### The engine already separates it - checked live, confirmed, wired in
 
@@ -21241,6 +21299,8 @@ Budget mode moves these four to the local-model lane as COORDINATOR-written brie
 
 **HOME-UI-04g: no flash on refresh of /next** (S, found live 2026-09-21). Refreshing `/next` showed a navy body flash and the old shell's `RouteSkeleton` before React painted the kit. Root cause: `NextRoutes` rendered its loading branch (a vendored `RouteSkeleton`) until the settings query resolved, and the body's `.dark`/`.style-*` classes were only applied by React hooks after mount, so the first paint used the old shell's palette. Fix: a per-browser `localStorage` cache (`frontend/src/next/shellNextCache.ts`, key `maipai.shell.next`) written by `useNextLook` (look) and `useNextAppearance` (theme) and read by `main.tsx`'s `applyCachedNextPalette()` before React mounts, so the first paint already carries the correct look and theme. `useShellNext` seeds its initial state from the cache (`on`/`off`/`loading`) instead of always starting at "loading", so a cached refresh skips the skeleton entirely. `NextRoutes` now calls `useNextLook` unconditionally at the top (fixing a Rules-of-Hooks violation caught by `react-hooks/rules-of-hooks`) and the loading branch is wrapped in a `data-testid` for the test suite. `useNextAppearance` stays inside `NextRoutesInner` under the kit's `ThemeProvider`. Tests: `shellNextCache.test.ts` (5 cases: round-trip, empty, malformed JSON, wrong shape, storage blocked) and `NextRoutes.test.tsx` (9 cases including "loading with no cache renders RouteSkeleton"). Frontend suite: 528 pass. `bun tsc --noEmit` and `bun eslint .` clean (one pre-existing warning in `chatModelAdapter.test.ts`).
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 7 and 9: inline markers rendering as literal text, and sources riding a synthetic tool part, no longer hold; an `[n]` mapper feeds the kit's sources and inline-citation parts.
+
 ## Slice 5(a): sources, no inline markers yet - two shipped-component gaps named first (2026-09-22)
 
 **Why**: COORDINATOR's own slice 5 order, item (a): "sources and citations into the sources/inline-citation/document-reference Elements from the citation data the turn carries." A `design-resolver` pass (platform principle 6, "no hand-built UI") read the three new kit Elements, spec.md's "Inside a turn" section, and the retired page's own precedent before any line was written, since the shipped Elements' own gaps needed naming first.
@@ -21379,6 +21439,8 @@ Budget mode moves these four to the local-model lane as COORDINATOR-written brie
 
 **`trace-waterfall` needs real per-phase spans `TurnStats` doesn't have** - routing, a lookup, a tool call, generation, each with a start and duration. Not built this pass rather than faked with invented spans; [TRACE-SPANS-01](https://github.com/getmaipai/home/issues/134) (M, backend) tracks it, wanted by ADMIN-PERF-01 and the bare-model compare tool's own trace column too, so it's not orphan work.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 2 and 4: the missing context size is no longer a gap to wait on; Home reads the engine's reported context length.
+
 **A real backend gap found scoping this, not previously named**: `context_used_percent` (`TurnStats`) is a permanent, hardcoded `null` in `backend/src/lib/turnStats.ts` - never computed, not a transient bug. COORDINATOR's own first-pass instruction was to derive `modelContextWindow` from `context_tokens / context_used_percent` if the Engines API came up empty; found this wasn't viable (dividing by a field that's always `null`) before implementing it, so the fallback is "leave the context bar out" instead - a message with no measured chat role, or no Stack configured at all (`roles: []`, the common case today per `routes/engines.ts`'s own header comment), shows `MessageTiming` alone, correctly, rather than a bar built on a fabricated window.
 
 **Verified live** on 8787 against a real turn: Details shows in the "..." menu only for a message with real stats, reveals "First token 5.1s · Total 5.4s · Speed 39 tok/s · Engine local qwen3-8b-instruct-q4-k-m" on click (real numbers, not fixture data), and the context bar correctly does not appear on this dev machine (no Stack configured here) - toggling Details closed again removes the reveal. 4 new tests (`NextChatPage.test.tsx`): the menu entry hides with no stats, timing reveals on click, the context bar shows once the Stack reports a measured role, the context bar stays out when it doesn't. Frontend suite: 626 pass (622 + 4 new).
@@ -21414,6 +21476,8 @@ COORDINATOR's ruling (2026-09-22, after the scope report below) shrank slice (f)
 **Also found, not this item's to fix**: the kit vendored `elements-model-selector` (`commons-a/ui/src/elements/model-selector.tsx`) months before this slice - a full `Popover` + `cmdk` model picker whose own `ModelSelectorEffort` row renders exactly a "Thinking" label with low/med/high radios. It is not the right part for this control (its effort row is a sub-component of a model list, and RESP-04's own text already gives the Instant/Thinking fallback its own shape), but it is very likely the shipped answer once `MODEL-SEL-01` lands - and it would put a second, `Popover`-styled menu convention in the same composer beside `ComposerMenu`'s own composer-anchored one. Named here so `MODEL-SEL-01` decides that deliberately rather than discovering it mid-build. Separately: `commons-a/ui/docs/dashboard-upstream.md`'s "Patches pending upstream" table has four rows (five now, with `ComposerExtra`) sitting at "pending - PR not yet opened" - the doc's own text calls a row left there across a session the defect the note exists to catch. Flagged to COORDINATOR, not fixed here.
 
 **Verified**: `bash scripts/check.sh` in `commons-a/ui` (383 pass) and `home-a2` (frontend suite, 634 pass, `tsc --noEmit` and `eslint` both clean). 5 new tests (`NextChatPage.test.tsx`): the trigger's default label and the menu's two entries, opening the menu and picking Thinking, outside-click dismissal, Escape dismissal, and a real turn send resetting the mode back to Instant. **Live on 8787, unlike the rail entry above**: the composer isn't `lg:`-gated, so this session's own fixed 500px viewport didn't block it. The trigger reads "Instant" beside the attach button; clicking it opens `ComposerMenu` anchored directly above the trigger (composer-anchored, not floating elsewhere - the actual reason `Popover` was ruled out, confirmed by eye); picking "Thinking" updates the trigger and closes the menu; sending a real turn reset the trigger back to "Instant" the moment Send was clicked, before the reply even arrived - the one-shot consume, watched, not just asserted in a test.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 9: `TurnStreamResult`, `resume_token` and stored-event replay no longer hold as the web chat's stream; `assistant-stream` ships resumable streams.
 
 ## ADMIN-COMPARE-01 (b): the compare switch, and the seam that kept the safety floor unskippable (2026-09-22)
 
@@ -21565,6 +21629,8 @@ The spike's data is Session A's, in `data-scratch/arch-build-01-measurements.md`
 | Letta's memory-block and archival concepts | The shape of ARCH-MEM-01's record | Not run; read | n/a | n/a | Concepts only, never its runtime | **Read into ARCH-MEM-01's record**, no dependency |
 
 **Why XState and not our own.** The accepted design added two requirements after the row was written: a per-node trace on every turn (node, implementation and version, start and end, outcome, the model's generations under the model node) and a per-node deadline with an abort that reaches the engine, so that a layer can be watched and swapped. A statechart library ships both as its ordinary features (inspection events, actor cancellation), and A's spike showed the machine typechecks against the repo's own types without a fight. The in-house shape would grow those features by hand, and LangGraph would ship them at the price of owning the tool-call semantics the design keeps deterministic. The exit is cheap either way; the maintenance is not, and that is the difference.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the line that a question about the world is searched, with no-transition models run on `tool_choice: "none"` while the engine forces the search, no longer holds.
 
 **What the skeleton and the framework runs taught about the interim rule.** Across A's runs the rule ("a question about the world is searched") fired once in 20 model turns, on the second ask of the France question, where the model had already answered correctly from the conversation; the forced search cost about 2.6 s and changed nothing. The Chile failure (a question the model answers from memory instead of searching) did not reproduce on any of the three re-runs, so it is probabilistic, and B's measurement is the number that matters: the 8B calls a fitting search 19 times in 50 (38 percent) with 0 false calls in 50. So the rule stays on for the 8B, and U2's state record answers one question before the rule ships: its form gains "unless this conversation already holds the answer", and the model decides that inside the same structured call rather than in prose. The proposed shape: the forced call offers two choices, the search tool and an `answer_from_this_conversation` tool whose one argument is the quoted line of the window it answers from; the engine verifies the quote is in the window (a set check, not a judgment) and otherwise runs the search. Tonight's quiet-window run, ten repeats with the rule on and off, gives the cost and the miss rate that settle it.
 
@@ -21742,6 +21808,8 @@ gate on top of the flag) - four cases, `NextChatPage.test.tsx`.
 dark, the menu open, the Apps group visible - the default-visible set
 only, the flag unset). Full suite: 642 frontend tests, 0 failures.
 
+> **Superseded 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: a fine-tuned head deciding whether a turn needs a lookup is not built; the model decides.
+
 ## Track 3: the local decider verdict (2026-09-22)
 
 The question phase 0's track 3 asked: can a small local typed-decision model replace the word rules and the interim rule as the decider for "does this turn need a web lookup", on this hub and on the robot's Pi. Session's data: `data-scratch/jev-bakeoff/results.md` (the rerun section), 17 rows (the ROUTE-FIND-03 and REPLY-FIND-02 rows with their null pins, the three Chile turns with prior turns as context, the Luna and "search the web" turns), CPU and Metal on the M4 Pro, 24 GB.
@@ -21800,6 +21868,8 @@ Objective per `docs/BACKLOG.md:5709`. A survey of what already exists came first
 
 A live finding (the reasoning card's right edge clipping in Firefox) needed a Firefox capture to confirm - `scripts/screenshot.ts` gained `--firefox` (mirrors `--webkit` exactly: `firefox.launch()` from `playwright`, no other change to the pipeline), but Playwright's own Firefox build fails to launch headless on this machine: `Could not find profile folder`, immediately after `*** You are running in headless mode.`. Survives a full reinstall (the cached build deleted and re-downloaded clean, same failure) and there is no quarantine attribute on the app bundle. A known machine finding, not a code defect (2026-09-13): revisit on a machine where Playwright Firefox launches, or when this machine's install is repaired some other way. Until then, `--firefox` exists and works in principle for whoever gets there; the reasoning-clipping fix itself (`ReasoningText`'s own `pe-2`, NextChatPage.tsx) was verified in Chromium at 1440 and 390 and by code inspection of the shipped Element's own missing right padding, not by a Firefox capture.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 1, 4 and 8: the per-model budget columns (`always_search`, `model_transitions`, `query_writer`, `rounds`, `tools_offered`, a hand-set `context_tokens`) and the rule that a model with no record runs with transitions off no longer hold; the measured numbers stay as evidence.
+
 ## ARCH-MEASURE-01: the per-model budget verdict (2026-09-22)
 
 Written at 22:45 from exactly what was measured; the results file's quiet-window header read "STATUS: FINAL" at that moment; the amendment at 22:55 carries the final numbers. Sources: `data-scratch/arch-measure/results.md` (the tool-calling bench at ten repeats per row on the fixed pipeline, the inverse-miss rows included; the query-rewrite bench; the routing corpus), `data-scratch/skeleton-results.md` (the bare skeleton on the live 8B), the track-3 verdict above, and U2d's live replay run relayed by the coordinator. Engine build b10797, models `qwen3-8b-instruct-q4-k-m.gguf`, `qwen3-4b-q4-k-m.gguf`, `qwen3-1.7b-q8-0.gguf`, side instances on a spare port with the hub's flags and one slot, Apple M4 Pro, 20-core GPU, 24 GB. The 27B is dropped (a coding fine-tune at 3.4 bits on another build, and its routed rows never replied). Latency was not measured tonight for any model; the 8B's numbers stand from LAT-00 to LAT-03 (183 tok/s effective prefill live, 405 on a fresh one-slot instance, 36 tok/s decode) and the skeleton (2.5 s median, 3.9 s p90 to first visible token).
@@ -21840,6 +21910,8 @@ What "off" means for the 4B and the 1.7B: the machine runs identically, the mode
 **Astra's amendments (outside review, 2026-09-22).** "0 of 50 false calls" is overstated: it is 0 of 50 outside always-offer, with 10 of 50 lookup calls on the negatives ungraded, over five questions at ten repeats; the one-sided 95 percent upper bound on 0 of 50 is about 5.8 percent, so the 2 percent bar is not established by this sample, and `model_transitions` on for the 8B is provisional on that ground too. Every capability number is versioned against the model artifact (file and hash), the engine build, the prompt and the tool set it ran under, and is invalid when any of the four changes. The `answer_from_context_tool` column reads false for every model until the escape returns (state record). MEASURE-02's centrepiece is end-to-end search success on fresh held-out multi-turn conversations through the shipping configuration, with timeouts counted as failures, compared against the builder fallback.
 
 **Still owed, as MEASURE-02:** the 8B query-rewrite on all 15 rows in a gate-free window;  the 4B rewrite rows 9 to 15; latency per model with the LAT-03 probe; the Studio's model on arrival. None of these blocks U2's build; the 8B rewrite blocks U2d's acceptance and the 4B confirmation blocks its record.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 5: written word budgets (220, 360, 160, 90) and "length lives in the plan and nowhere else" no longer hold for adult written chat; spoken and child bands keep theirs.
 
 ## U4: the answer register by surface, landed on the new path (2026-09-23, `f17dcc1b`)
 
@@ -21903,6 +21975,8 @@ New `MicrophoneGroup`, appended below the voice list in the same chevron menu: `
 **The wake-word shortcut clause is deferred, not dropped.** The original item's third clause ("only when a wakeword package is installed, offers the shortcut to that device's declared wake-word setting") has nothing to point at yet: HANDSFREE-01 (c) (below) is the item that defines the settings key a device's wake word lives under, and no "wakeword package installed" concept exists on Home's side either - only a Stack engine role of that name, a different thing entirely. Building the shortcut now would mean inventing both the key and the install concept inside this file, exactly the kind of second copy the platform's "one definition, one place" principle forbids. `composerVoiceControls.tsx` implements the honest absent case today (nothing rendered); the present case is HANDSFREE-01 (c)'s own scope once that key exists.
 
 **Verified:** `composerVoiceControls.test.tsx` gained a fourth test (VOICE-LIVE-03) - two fake input devices, both listed in the open chevron menu, choosing the second writes `maipai.chat.mic-device-id` via `readMicDevicePreference()`. The existing three tests needed two real fixes, not cosmetic ones: the mocked fetch's generic `{}` fallback broke `VoiceChevron`'s new `currentQuery.data?.find()` once it started reading real settings (added an explicit `/api/settings` -> `[]` case); and `MicrophoneGroup`'s `enumerateDevices()`/`devicechange` calls need a `navigator.mediaDevices` fake in bun's test environment (the same `Object.defineProperty` pattern `useWakeWord.test.ts` and `sttDictationAdapter.test.ts` already use) - unmounting before restoring it needs an extra microtask tick, since the effect cleanup that calls `removeEventListener` runs as a passive effect a tick after `unmount()` returns, not synchronously within it. The first test's own name and comment were stale after VOICE-LIVE-01b (2026-09-23): "no Stack configured" no longer means an empty roles list, so it's reworded to what it actually tests now (the overview reporting no roles at all, e.g. before the query resolves). `NextChatPage.test.tsx`'s own VOICE-LIVE-01 "both ready" test needed the identical two fixes (it mounts the real `ComposerVoiceControls` too) once VOICE-LIVE-03 started calling real settings/mediaDevices from inside it.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the ruling to rely on `tool_choice: "required"` and fall to the builder row on a miss no longer holds; the engine-bug finding stays as evidence.
 
 ## ENGINE-CONTRACT-01: the first recorded failure, `tool_choice: "required"` on a warm KV cache (2026-09-23)
 
@@ -22222,6 +22296,8 @@ beside `cached_tokens`; whether these two were a parse failure or a
 literal `{}` is read from that field on the next run, and the fix is
 the same either way.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 8: the hand-picked `tools_offered` list per budget no longer holds; every model gets every tool its template supports.
+
 ### Regression B: `recall` instead of nothing on a negative control
 
 `control-negative-spiderman` repeat 3 and `control-negative-feeling-down`
@@ -22508,6 +22584,9 @@ account for it, ranked by what the numbers say:
    message) was built on the old path and never carried to the new one.
    Ruling: `NEXT-CACHE-01`, the same order in `messages.ts`, proven by
    `cached_tokens` growing across a conversation.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: item 3 and its `computed` target, which exist only so the interim rule stops forcing search, no longer hold; there is no forced search to stop.
+
 3. **The forced search fires on computed questions.** `control-twelve-
    plus-thirty` (8.9 to 21.6 s, forced on two of three) and `control-
    time-in-tokyo` (22.6 to 23.7 s, forced and missed on all three,
@@ -22564,6 +22643,8 @@ times the old path's total, every forced-search turn's total is under
 search, a phrasing round: about 2, 3 and 3 s on this Mac), and
 `cached_tokens` rises across every multi-turn row.
 
+> **Superseded 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the `computed` target exists only to steer the interim forced-search rule, which is gone; the turn signal no longer decides a search.
+
 ## SIGNAL-02: the computed target, spec half written (2026-09-23)
 
 The spec half of SIGNAL-02 is written into the commons working tree
@@ -22618,6 +22699,8 @@ That fix introduced a second defect, only visible once `chatHeaderBar.tsx`'s own
 **Both fixes verified twice over:** the commons re-review's real-browser reproduction for the Search-overflow fix (37 widths, zero overlaps), and this item's own real captures opened and judged for the wrap fix - the full title reading whole at 1440, truncating with no wrap at 390, in both themes, plus a throwaway regression check (not committed - a temporary capture of the Settings page's own Search fallback at 800px, removed before landing) confirming the wrap-below-390 fix didn't reopen the Search-overflow case it was built on top of. `HeaderExtraContext.tsx`'s own `useHeaderExtra()` doc comment gained a paragraph naming the implicit contract: a consumer must itself add `flex-1 min-w-0` (and `truncate` on whatever should actually clip) to benefit from the growing left group - `chatHeaderBar.tsx` is the one example today.
 
 **A low-effort review of the home-side diff found four more real issues, all fixed, plus one named gap deferred to CHAT-HEADER-02.** (1) `ChatHeaderRename`'s `Input` kept the old fixed `max-w-64` while the display-mode title now grows via `flex-1` - entering rename on a wide header with a long title would visibly snap the header's own width down to 256px and back on commit/cancel/blur; fixed (`min-w-0 flex-1`, matching the title), with a new test asserting the rename input's own classes. (2) The doc comment above claimed Header.tsx used `flex-1`, when the landed fix is `flex-auto` (plus the `flex-nowrap`/`sm:flex-wrap` follow-up) - reworded to match what's actually in `ui-v0.5.39`, so a future reader doesn't "fix" Header.tsx back to the version the same-day review already found broken. (3) The 60-character fixture title named real people ("Corey Feldman," "Michael Jackson") - a real violation of the persona-roster rule even though the wording originated as the owner's own live example, not this session's invention; replaced with a roster-compliant title of the same length. (4) `seedConversation` in `captureChatThreadActionsReview` duplicated the exact recipe this item's own new capture needed - factored into the shared `seedTitledConversation()` helper above, both callers now use it. **Named, deferred gap:** the title `Button`'s own `flex-1` sets `flex-shrink:1` via the `flex` shorthand, but the kit's shared `buttonVariants` base class also carries an unconditional `shrink-0` that `tailwind-merge` does not dedupe against `flex-1` (different utility groups) and that wins the cascade (confirmed with a real computed-style check) - today this never triggers a real bug, since the title's `flex-basis: 0%` keeps this nested row permanently in the "grow" branch rather than the "shrink" branch, but CHAT-HEADER-02's planned app icon in this same slot could make the row's own available space genuinely tight enough to reach the shrink branch, where this would leave the chevron nowhere to go; documented in `chatHeaderBar.tsx`'s own comment for that item to re-check, not silently assumed fixed here. (Also noted, not fixed: several sibling `--x-review` flags, including the new one, don't fully isolate themselves from the default full capture matrix when run standalone - a pre-existing gap this item inherited rather than introduced, out of scope to fix here.)
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 5: the 720-token limit derived from the plan's `max_words` no longer holds for adult written chat.
 
 ## U4c: the plan recomputes from real tool-round evidence (2026-09-23)
 
@@ -22805,6 +22888,8 @@ green; `bash scripts/check.sh` green. Review: low, one finding-free pass
 
 **Verified for real, this time, before the push:** `git status --short` first every time in the shared checkout (the coordinator's own rule after a separate incident this same session: a lane in the shared checkout runs only `git fetch`, `git merge --ff-only`, `bun install --force` after a pin move, and `git status` - never `git checkout --`, `git stash`, `git reset` or `git clean` there, and never any command that discards working-tree changes anywhere without `git status --short` in the same breath and the paths named from it; every other git command lives in the item's own worktree). With that: local ff-merge, `bun install --force` in both workspaces, `bun restart`, then a real headless-Chromium session against `/next/chat` with the fake media device - `ui.appearance` set explicitly via `PUT /api/settings` before each theme (`colorScheme` alone does not flip the shell once a person has a real appearance setting, `scripts/screenshot.ts`'s own established pattern, restored to its original value afterward) - captured at 1440 and 390, light and dark: real bars, real varying heights, mid-recording; the real transcript sitting in the composer's own text field once dictation stops; zero requests whose content-type carried audio or a multipart/binary payload across all eight captures. Every screenshot opened and read before calling this done, per the org's own screenshot standard. `bash scripts/check.sh` green throughout. Review: low each pass (a mechanical fallback swap, then the layout fix), no findings surviving to this state.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 8: `thinking_budget_tokens` in the catalog as a per-model gate no longer holds; thinking follows the person's toggle and the template, with the age gate unchanged.
+
 ## THINK-DEFAULT-01: thinking is the person's toggle, not the budget's default (2026-09-23)
 
 The first design fact from "U6 rerun ruling" (b) 1: the 8B budget's
@@ -22854,6 +22939,8 @@ on - `chatModelAdapter.ts`'s `consumeThinking()` already sends it on
 the OLD path unconditionally, so once the new path is the household's
 real default this needs no frontend change at all; named here only
 because it was checked, not assumed.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 1 and 6: a failed forced generation falling to the builder-row search no longer holds, and the fixed failure line no longer stands in for an answer when a tool fails; the model answers.
 
 ## DEADLINE-01: a failed generation never delivers an empty reply (2026-09-23)
 
@@ -23184,6 +23271,9 @@ re-derives anything from a printed table) and prints:
    `control-negative-spiderman`, `control-negative-feeling-down`) 3/3.
 3. Every plain (non-forced) turn's total within 1.25x the old path's
    total, matched by row/repeat/turn-index between the two paths.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 13: the forced-search turn under 10 seconds median no longer holds as a bar; the first-text bar stays.
+
 4. Every forced-search turn's total under 10s median.
 5. `cached_tokens` rising, or tying, across every multi-turn row -
    never dropping; a tie passes (two identical-cost turns are not a
@@ -23217,6 +23307,8 @@ default is off, advanced, household scope: "Use the new reply engine")
 and ran the same three turns on both paths in fresh conversations. The
 old path read faster and more accurate. From the traces (roster-safe
 facts only) and the code on `main` at 7db9756d, four rulings.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 1 and 5: a forced call at all, and its 440 and 96 token limits, no longer hold.
 
 ### (1) A forced call that misses must cost under a second, not eleven
 
@@ -23297,6 +23389,8 @@ job without a signal switch. The replay row, in Jesse's exact words:
 memory holds a roster-safe remembered lookup, expecting no tool and a
 reply that never mentions a search, a birthdate or trying again.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: `signal.target` and the `computed` target carrying the search decision no longer hold.
+
 ### (3) SIGNAL-02 covers Tokyo end to end
 
 Yes. The almanac-time manifest gains the opener `what time is it in *`,
@@ -23333,6 +23427,8 @@ engine for part of it, per the coordinator's own note before starting -
 the household-quiet wait stretched rather than skipped, and this run
 never touched `turn.pipeline.next` for the household's own setting
 (the bench flips it in its own isolated data directory only).
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 13: the bar that every forced-search turn is under 10 seconds median no longer holds; the first-text bar stays.
 
 ### The bar, verbatim
 
@@ -23643,6 +23739,8 @@ so Jesse finds both. Jesse's own judgment is still the acceptance bar
 this row waits on, round 2 same as round 1 - not something this
 session can self-certify.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 12: the old path being frozen no longer holds as written; the thin-path record is the accepted design and the old path is deleted after porting.
+
 ## The reply floor: the layers that remove substance today (2026-09-23)
 
 The owner's rule is in the state record ("The reply floor") and the
@@ -23757,6 +23855,8 @@ meet the bare floor where the bare model does, the interim rule's
 trigger is the layer at fault (a conceptual question with no fresh
 fact needs no lookup), and that is a design question for the flip,
 raised by this row, not decided here.
+
+> **Superseded 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 1 and 7: the interim rule that forces a search on every surface (`always_search`) no longer holds, and neither does "use the results as support"; tools are offered with `tool_choice: "auto"`, the model decides, and answers are grounded in numbered pages.
 
 ## The interim rule's trigger, decided (2026-09-23)
 
@@ -24216,6 +24316,8 @@ contract.ts` (`NodeOutcome`), `backend/src/lib/turnStats.ts`
 (`TurnGeneration`, `TurnNodeExecution`), `backend/tests/turnMachine/
 turnNext.test.ts`.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 5: deriving a reply limit from planned words no longer applies to adult written chat; a token limit there is a ceiling, never a target.
+
 ## U4b-2: the reply floor's fixes, measured, held (2026-09-23)
 
 The four assigned fixes landed, code-reviewed clean, full backend
@@ -24264,6 +24366,8 @@ lands, not before - the new path never reaches this item's own layers
 on this question today.
 
 **The prompt-cache question, three fix rounds, isolated:**
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 8: `NO_RECORD_BUDGET` for a model without a measured record no longer holds; no model is gated by a missing record.
 
 Round 1 (the four assigned fixes plus the review fix, before the
 formality/examples fixes): new path, 3.4s, two short paragraphs, no
@@ -24770,6 +24874,8 @@ Reported to Fable in full (both tables, the "no arm clears the floor"
 reading, and the "you" misread's non-reproduction) for the
 PREFIX-CLASS-01 composition ruling.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 13: 0.5x then 0.35x of the bare floor as the acceptance bar, and the shipped 0.30x and 0.26x "accepted exception", no longer hold; CHAT-AB-01 is the acceptance.
+
 ## PARITY-BISECT-04: arms e and f, and the ruling (2026-09-23)
 
 The coordinator's own extended protocol, same isolation and the same
@@ -25094,6 +25200,8 @@ tested levers (role, wording, the plan line) have each been ruled out
 or shown insufficient alone, and the written-adult reply-length
 collapse on this tier remains open.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 5 and 13: keeping `max_words` in the written prompt, and the bare-floor ratio as the bar with an accepted exception, no longer hold; CHAT-AB-01 is the acceptance.
+
 ## The written prompt on tier 1, decided (2026-09-23)
 
 The coordinator's own design record, read from everything measured
@@ -25235,6 +25343,8 @@ class (any file exercising `packageHost.ts`, `voiceCatalog.ts`,
 `telegramChannel.ts` or `updates.ts` without a reset in its own
 `beforeEach`) - not checked here, noted on the issue for whoever picks
 those up next.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 12: the old path being frozen except for safety defects no longer holds as written; the thin-path record is the accepted design and the old path is deleted after porting.
 
 ## OPENER-01: landed as a runtime gate, the manifest edit found to conflict with the old path's own frozen tests (2026-09-23)
 
@@ -25690,6 +25800,8 @@ the rest of the frontend stages on `frontend`/`full` only) match this
 design exactly, so a real diff of each shape runs the stage set this
 record claims it does.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 1 and 5: continuing a forced call's prompt, and the 608-token limit, no longer hold.
+
 ## PHRASE-01: the phrasing round continues the forced call's prompt (2026-09-23)
 
 "U6 rerun 2 ruling" (2) named the mechanism exactly: the phrasing round
@@ -26121,6 +26233,8 @@ interim-rule routing gap, out of this item's own scope - the phrasing
 round now handles even that mis-routed case gracefully instead of
 reciting its own identity).
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 13: the 0.4x tier-1 bar no longer holds; CHAT-AB-01 is the acceptance.
+
 **Step 6, the acceptance measurement**, rerun once after the fix since
 the coordinator asked for a fresh number: identical to the pre-fix
 run, 0.24x prompt-cache / 0.33x benchmarking-words (seeds 1-5 pinned,
@@ -26188,6 +26302,8 @@ frontend, 0 fail, the memory sample above), once on the real diff
 about to land (39 scripts + 4081 backend + 721 frontend, 0 fail, scope
 auto-escalated to `full` by GATE-SCOPE-01's own rule since
 `scripts/check.sh` itself changed).
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 13: the 0.4x and 0.35x bare-floor ratios as the bar no longer hold; CHAT-AB-01 is the acceptance, and this set is its precursor.
 
 ## WRITTEN-PARITY-01: the written set measures the reply floor against the bare model (2026-09-23, Session B)
 
@@ -26346,6 +26462,8 @@ rule - one gate covers this whole block) - `scripts: bun test` (3 new
 opened, both correct). Review: low (a new standalone verification
 script plus a comment, no application code changed).
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 12 and 13: the old path staying reachable behind `turn.pipeline.next`, and the forced-search turn under 10 seconds as a bar, no longer hold; the setting is deleted and the first-text bar stays.
+
 ## U6: the flip, decided (2026-09-24, Fable's ruling on rerun 3)
 
 Rerun 3, once, under a real hold (no gate, build or headless run
@@ -26446,6 +26564,8 @@ control-ten-turn-spoken-drift#1 shape now passes, a real drop with no
 gap still fails). Review: medium (a default that changes every
 household's own turn path).
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the forced-search override carried by `signal.target` no longer holds.
+
 ## home#147: the new path never set structured_part or artifact (2026-09-24, Session B)
 
 Found the day the flip landed (structural, but only visible once the
@@ -26500,6 +26620,8 @@ quoted anywhere below, per the org's own rule - defect classes and
 file:line traces only. One fix landed this block (1); the rest are
 traces and numbers for the coordinator's own ruling on the fix design,
 per its own instruction.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the engine stripping the model's `category` because the old path computed it no longer holds; the model's tool arguments stand.
 
 ### (1) websearch's own `category` argument, fixed this block
 
@@ -26659,6 +26781,8 @@ full suite). Review: low (a one-line scope guard on one tool, the
 model's own args untouched for every other tool - `tool.ts`'s own
 change is the smallest correct fix, not the design for (2)-(6) above,
 which the coordinator rules on next).
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rules 1 and 7: stripping the model's `read_page` by default no longer holds; the model's tool arguments stand and search reads result pages.
 
 ## READ-PAGE-01: measured, shipped (2026-09-24)
 
@@ -27197,6 +27321,8 @@ noted: a full-pipeline test (real stub engine, real `runTurnNextStream()`)
 proving the chunker's own dangling-tail repair survives end to end, not
 only at the `outputGate.test.ts` unit level.
 
+> **Superseded 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 6: filtering a failed search out of the phrasing prompt so the model cannot paper over it no longer holds; the model answers and says the lookup did not happen.
+
 ## SEARCH-MIXED-01: a round that mixes a failed search with a succeeded call never lets the model paper over the failure (2026-09-24)
 
 The same independent review named in SAFETY-NOTIFY-NEXT-01's own entry
@@ -27348,6 +27474,8 @@ Full backend suite green (4221/4221) both before committing and after.
 Review low (a bench-script-only, S-sized fix). Not B's own files
 (packageHost.ts/searxngHealth.ts/searchHealthState.ts untouched) - B was
 told before starting.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the `interimRuleApplies` and `forceSearchOnly` branches no longer hold.
 
 ## PHRASE-02: gated closed on today's own numbers (2026-09-24)
 
@@ -28322,6 +28450,8 @@ Sources: [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-
 [DeepakNess review](https://deepakness.com/blog/deepseek-harness/),
 [dshfind chat-ui plugins](https://dshfind.com/en/plugins/t/chat-ui).
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 5: the budget cap of 608 `max_tokens` and the list limits no longer hold for adult written chat; `max_tokens` is a ceiling only.
+
 ## #156: the measured search-list budget
 
 The failure's 360-word plan gave the new path's post-search phrasing
@@ -28451,6 +28581,8 @@ a turn works, not a ladder; `turnMachine/contract.ts` already only uses
 `routingStats` still list `embedding`/`keyword` values that can no
 longer occur post-D7 - additive-API rule says keep the field, stop
 emitting those values. Neither is sized or scheduled here.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 1: the claim that the interim rule's successor is a learned lookup router (LOOKUP-HEAD-01, CORRECTION-02, CORRECTION-03) no longer holds; the model decides.
 
 ## Design pass over the reserved items (Fable, 2026-09-26)
 
@@ -28888,6 +29020,9 @@ per the org gate rule for a failure the diff didn't touch. No live
 `bun restart`: this item is
 policy/loader/trace logic with no manifest content changed, and the
 8787 hub was not restarted by this lane.
+
+> **Superseded 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 5: the verbatim 140-word instruction, the cap of seven items and the 608-token limit no longer hold for adult written chat.
+
 ## SEARCH-SHAPE-01 landed: bound the searched reply, do not format it (2026-09-26)
 
 da37d88d (#156, 2026-09-25) added a line to `phrasingInstruction()`
@@ -29044,6 +29179,8 @@ anyone has run it on. The one design-level fact from the survey:
 stable-diffusion.cpp now runs every row of the bakeoff on both
 machines from one MIT binary with a Metal backend, which is a Stack
 engine question STACK-14's bench should take up beside ComfyUI.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 7: infobox rows and the `allSnippetsEmpty` instruction no longer hold as the search shape; search gives the model fetched page text with numbered sources.
 
 ## SEARCH-ROWS-01 landed: infobox answers reach the model, and an empty-snippet search says so (2026-09-26)
 
@@ -30586,6 +30723,8 @@ NextSettingsPage.test.tsx`, `commons`'s `spec/settings/keys.json` and
 `spec/package.json` (spec-v0.1.48), `scripts/check.sh` and both
 `package.json`s' `@maipai/spec` pin.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 8: reaching the reply through `NO_RECORD_BUDGET` no longer holds; no model is gated by a missing budget record.
+
 ## PROJECT-REPLY-01: a confirmed start_project's own reply text, and a real complication found tracing it (2026-09-27)
 
 Jesse confirmed a real `start_project` ask ("Start Bedtime storybook?",
@@ -31277,6 +31416,9 @@ wiring row does not start until the bench row's table is in this file.
   ranges. The steering spike's thirty utterances and the written set's
   twenty-two rows are held out: never in any corpus, they are the
   bench.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](design/RULES.md) chat rule 3: defining the bare reference as the identity line plus `CHAT_SAMPLING` no longer holds; the reference uses the model's own catalog sampling.
+
 - The neutral reply: the bare local model (Qwen3-8B, thinking off, the
   identity line only, `CHAT_SAMPLING`), which is the reply floor by
   definition. Written prompts get the written-class shape (headings

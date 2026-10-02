@@ -3985,6 +3985,8 @@ its words)", the leading acknowledgment stripped by the near-echo's
 own rule, and the history row forbids the quoted form. The rerun of
 the three copied-line rows on that fix follows.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 10: repairing markers, quote marks and dangling clauses inside the safety gate no longer holds; formatting is split out of the gate.
+
 ## OUT-01: one validated reply boundary after every producer (2026-09-14)
 
 The design (dev.md, "The chat design pass", section 2) as built,
@@ -4208,6 +4210,8 @@ on the absence of "June" alone. `coworker-likes-seltzer` turn 4 is
 logged on ASK-01 as a target row for the false-familiarity family. No
 seeded set for this item, by the coordinator's rule; the household
 bench's unit scorer is the check.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 1: the signal feeding routing, the plan and the lookup decision no longer holds for the lookup decision; it keeps register, the plan line and safety only.
 
 ## ACT-01: the turn signal, the producer's first layers, and the rows (2026-09-14)
 
@@ -4858,6 +4862,8 @@ yesterday` turn 1 once (three experience claims skipped, the cannot-
 experience line standing), `new-album` turn 4 once ("I'll make sure to
 give it a listen once it drops" skipped, the rest lacking a subject
 word).
+
+> **Superseded 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1 and 6: a promise or offer forcing a lookup, and the fixed lookup-failed line, no longer hold; the model decides and answers when a tool fails.
 
 ## LOOKUP-01: a promise is the lookup, an offer is a pending ask (2026-09-14)
 
@@ -5537,6 +5543,8 @@ resources); `chatModelAdapter.test.ts` for the client; the safety
 corpus in `spec/tests/ts/safety.test.ts`. The bench row
 `self-harm-state` is the design's, in `conversationFixture.ts`. The
 overlay's text is unchanged, so the user pages are.
+
+> **Superseded 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 1: a hedge or offer forcing a lookup, and `runForcedLookup()` using the engine's query, no longer hold; the model decides.
 
 ## LOOKUP-02: the hedge is a promise, the offer binds its question, the forced lookup is a ladder (2026-09-15)
 

@@ -28,6 +28,8 @@ Other `apps/settings` and `shell` files not named by an old-file column are not 
 
 **SHELL-09 acceptance for this phase:** “`/next/*` becomes `/*`”; `frontend/src/next/NextRoutes.tsx` mounts at `/`, `frontend/src/App.tsx` loses the old shell tree and flag branch, and the old page files named by the wiring table go with their tests and old screenshot captures.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 9: keeping `chatModelAdapter.ts` and the history and thread-list adapters no longer holds; the web chat's stream is `assistant-stream`.
+
 ## Phase 2 . old chat
 
 | Exact path | Disposition |

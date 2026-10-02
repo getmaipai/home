@@ -95,6 +95,8 @@ non-removable, and crisis resources are offered alongside a conversation,
 never used to block a person who needs help. This follows the safety
 invariants in `../.github/CLAUDE.md`.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 9: continuing a cut-off stream through edit supersession (CHAT-PARITY-04) no longer holds; `assistant-stream` ships resumable streams.
+
 ## Verdicts
 
 Each missing capability gets one disposition. Existing items are linked, not

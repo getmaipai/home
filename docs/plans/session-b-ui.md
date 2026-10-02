@@ -114,6 +114,8 @@ You do not touch any other file under `backend/` or `spec/`. If a step
 needs a backend change, write it into your dev.md section for Session A
 or a later session, use what the contract gives you, and move on.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 9: one hand-written `ChatModelAdapter` on `useLocalRuntime` no longer holds; the web chat's stream is `assistant-stream`.
+
 ## Framework decisions (verified 2026-09-05 against npm, GitHub and the official docs; re-check the version column at install and pin what you install)
 
 | Need | Use | Verified today | Why, and the gotcha |
@@ -228,6 +230,8 @@ with `refetchInterval`.
 
 Tests: one page test per migrated page proving loading, error with
 retry, and data render through the shared state.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 9: the adapter mapping a scripted NDJSON stream to messages no longer holds; the web chat's stream is `assistant-stream`.
 
 ### Step 4: chat on assistant-ui (M)
 

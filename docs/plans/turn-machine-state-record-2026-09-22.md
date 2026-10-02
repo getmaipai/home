@@ -82,6 +82,8 @@ never reads the raw utterance when the context list exists (the list is
 the prompt's only input, which is what makes ARCH-POLICY-01's boundary a
 pure filter later).
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1 and 2: the model row's `tool_choice` from the interim rule, the interim rule paragraph, and regenerating a no-visible-text reply with thinking off no longer hold.
+
 ## The machine
 
 XState v5 `setup()` with the actors below; every `invoke` carries the
@@ -146,6 +148,8 @@ of the context list, compared after whitespace and case folding, because
 its whole meaning is "this line answers it".
 
 ## The live grounding refusals of 2026-09-22 late: diagnosis and work order
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 6: ending the turn with the policy refusal "I don't actually have that in this conversation" no longer holds for tool failures; it stays for `min_role` and consent.
 
 After the term-level fix (c09ac25b, d0cd09bb) the live replay still ended
 nearly every world question, control rows included, on the policy
@@ -250,6 +254,8 @@ ever authorizes an invented action parameter. A refusal's trace records
 the branch and the argument NAME, never the terms (terms are the
 person's data).
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1 and 8: the transition table keyed on `always_search`, `model_transitions` and `query_writer` no longer holds; tools are on `auto` for every model.
+
 ## The transition table, once
 
 | `model_transitions` | `always_search` and a world question | What runs |
@@ -262,6 +268,8 @@ person's data).
 This table is the one authority; "transitions off goes straight to
 answer" above is read as the last row only, and the verdict's "what off
 means" is the third row.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 6 and 8: the inability reply for a world question without a network, and narrowing the budget by deployment, no longer hold; the model answers from what it knows and says the lookup did not happen.
 
 ## Deployment limits narrow the budget
 
@@ -398,6 +406,8 @@ envelope is (2026-09-23). A behaviour that seems to need one of those is a bench
 on the replay set first, then either a node's own change or a budget
 field, never a rule added in front of the model.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 5 and 13: written length as room derived from the budget's reply ceiling, and the bare-parity trend line beside the human verdict as acceptance, no longer hold; CHAT-AB-01 is the acceptance and adult written chat has no length cap.
+
 ## The reply floor (owner's rule, 2026-09-23)
 
 Jesse compared the hub's reply with the bare model's on a typed adult
@@ -449,6 +459,8 @@ trend line, never a gate). Every failure is read by a person. U4b and
 PHRASE-01 accept only when every adult typed row keeps the bare
 reply's points and structure on that column.
 
+> **Superseded 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 12: the `turn.pipeline.next` setting and keeping the old path reachable no longer hold; the setting is deleted.
+
 ## The setting
 
 `turn.pipeline.next`: scope household, selector switch, default `false`,
@@ -457,6 +469,8 @@ the rebuilt one; it must pass the same tests on this hub before it
 becomes the default.", level advanced, declared once in the settings
 registry (`spec/settings/keys.json`), honoured by `home` and `bot`. The
 route reads it per turn; the flip (U6) changes the default only.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1, 3, 4 and 8: the per-model budget record (`always_search`, `query_writer`, starting budgets, a hand-set `context_tokens` of 4,000, a model with no record running with transitions off) no longer holds.
 
 ## The budget record
 
@@ -482,6 +496,8 @@ shape), `spec` (`turn_budget` on the model capabilities record and the
 `turn.pipeline.next` key), `backend/scripts/bench/replay.ts` (reads the
 trace). `turnEngine.ts` is not edited by U2; the deletions come after
 the flip.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 1: the acceptance that a world question runs the search with `tool_choice: "required"` no longer holds.
 
 ## Acceptance (from the plan, made exact)
 

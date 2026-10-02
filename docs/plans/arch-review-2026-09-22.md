@@ -15,6 +15,8 @@ every cited line, and names where the row and the code disagree. Where it found 
 does not exist, or missing code that does, the record should be corrected
 before any design is built on it.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 8: the per-model budget gating rounds, tools and transitions, "read by the loop and nothing else", no longer holds.
+
 ## The three most consequential findings
 
 **1. ARCH-AGENT-01 keys the architecture on the wrong variable.** The class

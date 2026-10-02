@@ -28,6 +28,8 @@ While search is down, the rule in `THIRD-PARTY-SERVICES.md` applies: only a
 person's own searches go out, nothing in the background, and one probe
 query every 15 minutes until an engine answers again.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 6: search down routing straight to a fixed line, never falling back to the model's own knowledge, no longer holds; the model answers and says the lookup did not happen.
+
 **2. An honest reply when search fails (SEARCH-EMPTY-01, already ordered).**
 When search is down, the reply says so. When it worked but found nothing,
 the reply says so. It never falls back to the model's own knowledge and

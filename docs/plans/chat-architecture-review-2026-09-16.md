@@ -1,5 +1,7 @@
 # Chat architecture review: is the deterministic pipeline the right shape? (2026-09-16)
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1, 3 and 5: the premise that decisions stay in code because an 8B is bad at tool decisions, the lookup router head and logit trigger, the single sampling set with DRY as the repetition line, and the sentence and word caps from `planFor` no longer hold.
+
 An evidence-backed review of the hub's chat architecture, written by a
 design session on the stronger model at the owner's request. It answers
 one question: the pipeline that decides what a turn is, what it is
@@ -750,6 +752,8 @@ that "hallucinated entities outside the defined set" [112, 157, 158,
 159]. In every one of these the rule-shaped job is still done by rules,
 but by rules someone else maintains against a public corpus.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1 and 3: the verdict rows keeping the engine's lookup decision and one sampling set no longer hold.
+
 ## 3. Verdict per layer
 
 The verdicts use three words. *Keep*: the layer's mechanism is the
@@ -1026,6 +1030,8 @@ The bounded emotional state (`valid_to` at 24 hours or seven days, never
 a trait) has no published counterpart and the closest evidence supports
 it; it stays, and the household's own re-assertion and expiry counts
 from CUR-01 are the measurement.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 1: the correction to build a lookup router and logit trigger no longer holds; the model decides.
 
 ## 5. Corrections, in order
 

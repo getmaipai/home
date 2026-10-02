@@ -1,5 +1,7 @@
 # Work order: SEARCH-SHAPE-01 (fixes #168)
 
+> **Superseded 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 5 and 7: the 140-word limit, the cap of seven items of fifteen words and "omit raw URLs" no longer hold; adult written chat has no length cap and search answers are grounded in numbered pages with citations.
+
 Coordinator: Fable (session home-codex-01), 2026-09-26. Lane: one Claude
 agent, Sonnet floor (closes an issue; changes what the model is told on
 every searched turn). Issue: https://github.com/getmaipai/home/issues/168,

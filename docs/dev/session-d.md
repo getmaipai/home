@@ -958,6 +958,8 @@ wants (a permission-diff PR comment, a vendoring scan, screenshot
 generation with vision review, the CLA check) is likewise deferred - a
 maintainer-review-plus-CLA merge gate is manual until then.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 7: web search needing the owner's own SearXNG, and "isn't set up yet" until then, no longer holds; search works with no key and no account.
+
 ## Step 7: the lookups
 
 The plan's own list, one package each unless noted: web search,

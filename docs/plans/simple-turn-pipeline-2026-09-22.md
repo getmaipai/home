@@ -31,6 +31,9 @@ The new pipeline has five steps and no word ladder:
    or not at all, and answer without the model. Nothing fuzzy.
 3. **Context.** What the hub knows that is allowed for this person and this
    screen: memories (dated and labeled), the conversation, the clock.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 1: the interim rule (act is question and target is world means the search tool is required) no longer holds; tools are offered on `auto`.
+
 4. **One model call with tools.** The model sees the conversation and the
    tools, decides, and writes the search words itself, so "he" becomes the
    president's name for free. One interim rule for the 8B, no word lists:
@@ -39,6 +42,8 @@ The new pipeline has five steps and no word ladder:
 5. **An answer with sources.** The model writes the answer from what the
    search returned, the sources show under it, the safety check runs on
    the way out, and that is all.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 4: a hand-set per-model `context_tokens` budget no longer holds; the window is the engine's real context.
 
 **One MaiPai, not several (a hard requirement).** There is one pipeline
 and one code path, on the hub, on the robot and behind every client. It
@@ -54,6 +59,8 @@ commands, the context and its small model, and says plainly when a
 question needs the hub. The proof is built in: the same replay set runs
 through the same code on two different models, and only the budget
 differs (unit U2's acceptance).
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 13: the replay set with forced-search latency bars as the flip gate no longer holds; CHAT-AB-01 is the acceptance.
 
 The whole thing is judged by one replay set: your own failed conversations
 from today, run on every change. The new path is built next to the old one
@@ -141,6 +148,8 @@ the flip, and the interim rule's relaxation on the Studio.
 
 ## The detail
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 2 and 5: regenerating a malformed reply once inside the gate, and "length lives in the plan only", no longer hold for adult written chat.
+
 ### 1. What stays in code
 
 Everything on this list is an invariant or a privacy rule, never a
@@ -201,6 +210,8 @@ Roughly 1,900 lines of rules retire. What stays of the rule layer is the
 dialogue-act signal (`turnSignal.ts`, which the interim rule reads) until
 the learned head replaces its open-class part, and the household half of
 the name resolver.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1, 6 and 8: the interim rule, the learned head (ROUTER-RLCD-01, LOOKUP-HEAD-01), "model decides" only for a model with a measured miss rate, and a Pi that declines world questions no longer hold; the model decides for every model and a failed or missing lookup is answered from what the model knows.
 
 ### 3. Deciding "is this a question about the world" without regex
 
@@ -291,6 +302,8 @@ Studio (M5 Max, 27B class): prefill and decode roughly three times
 faster, so "hi" under half a second and a searched question under 2
 seconds. The design is identical; the interim rule relaxes per point 3.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 12: the new path behind a household setting with the old path kept reachable no longer holds; the setting is deleted and the old path is deleted after porting.
+
 ### 6. Migration order, so the hub never gets worse
 
 The new path is built beside the old one behind a household setting,
@@ -301,6 +314,8 @@ when the new path passes every failed row and matches or beats the old
 path on every control row. Deletions come after the flip, one family per
 commit, each with the replay set green. If a deletion turns a row red, the
 deletion is reverted and the row becomes a unit, never a new rule.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1, 5 and 8: the per-model budget record (`always_search`, rounds, tools) and the plan-owned reply length in the build units no longer hold.
 
 ### 7. The build units
 
@@ -432,6 +447,8 @@ is written to this, and every later unit obeys it.
   proven on the replay set with the per-node report, and no caller
   changes. The decider from phase 0's track 3, a different search
   package, or a new output checker each arrive this way.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1, 2 and 5: the interim rule reading the closed-set half of `turnSignal.ts`, regenerating a malformed reply, and the length constants in `replyConstraints.ts` no longer hold for adult written chat.
 
 ### 10. End-state inventory
 

@@ -12,6 +12,8 @@ between tiers; there is no tier branch in the turn code. The acceptance
 workload runs on tier 1 first. You decide the order of the three
 capabilities.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 1 and 8: the floor tier having `always_search` on with the builder as query writer no longer holds; every tier's model decides and gets every feature its template supports.
+
 ## The tiers at a glance
 
 | Capability | Floor: an 8 GB laptop or a CPU-only desktop (the robot's configuration) | Tier 1: 24 GB Apple silicon laptop | Tier 2: 16 GB CUDA laptop (two 8 GB cards) | Tier 3: 128 GB Studio and up |

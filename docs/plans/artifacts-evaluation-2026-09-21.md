@@ -141,6 +141,8 @@ What shadcn.io AI does not provide, against what Home has or needs:
 - **Stay**: zero change now; the Details pane keeps serving the
   structured artifacts.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 9: Home's own artifact panel with a kit `StreamingMarkdown` no longer holds; the canvas is a shipped Element using the chat's renderer.
+
 ## 5. Recommended architecture
 
 **Stay on assistant-ui; do not replace the chat.** Build the

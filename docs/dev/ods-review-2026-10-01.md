@@ -202,6 +202,8 @@ Jesse asked for an opinion that does not start from our own standards. Here it i
 
 **Recommendation.** Native stays the architecture. Add a Linux image as a second, clearly labelled delivery of the same release, used first by us for install testing and published once the native installer is proven. Jesse's call 2.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 11: adopting a running Ollama or LM Studio, and running Open WebUI as a yardstick, no longer hold; no outside runner is required, shipped, detected or adopted.
+
 ## The assembled stack: Open WebUI, Qdrant, Tika, SearXNG, Infinity, Open Terminal, Ollama, in Docker
 
 Jesse asked for the same fresh view on the stack most people assemble today: Open WebUI as the interface, Qdrant for vectors, Apache Tika for document extraction, SearXNG for web search, Infinity for reranking, Open Terminal as a sandbox, Ollama as the model runner, all under Docker. This was not part of the gathered evidence; it is judged from what the ODS reports show about the same parts and from general knowledge of the projects, and two points are marked as unchecked.
@@ -262,6 +264,8 @@ Verdict: our structure is the one more likely to survive, because it has fewer m
 6. **Running the assembled Open WebUI stack beside Home as a yardstick: no.**
 
 Resolved by reading, not asked: the environment editor, the pre-commit framework, shell hooks in manifests, several chat surfaces, and release notes carrying caveats are all rejected on existing rules. The LaunchAgent versus LaunchDaemon conflict is a measurement for the Studio runbook.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 11: STACK-ADOPT-01 is dropped; no outside runner is detected or adopted, including one an owner already runs.
 
 ## BACKLOG items (filed in docs/BACKLOG.md on 2026-10-01)
 

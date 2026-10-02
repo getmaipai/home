@@ -86,6 +86,8 @@ Notes on four of them.
 
 **8, branching.** Two different things share the word. Switching between versions of a reply after an edit is built and stays. Starting a separate chat from a point in this one is not a shipped part (searched the installed `@assistant-ui/react` and `@assistant-ui/core` for a fork or duplicate call: none), so it would need a backend copy route and a new menu entry. Nothing a family has asked for needs it.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 9: a new `StreamingMarkdown` kit block for the pane no longer holds; the canvas uses the chat's `MarkdownText`.
+
 ## The canvas, and the document in it
 
 Added the same day, after Jesse asked about the part of screen B this review first passed over: the pane in the reference is good to look at, and so is the document inside it. Those are two separate things, and we are behind on both.
@@ -271,6 +273,8 @@ Resolved by reading, not asked: the context count (rejected on the dad test and 
 **Edit 2, `docs/BACKLOG.md`, the CHAT-PARITY-06 row.** Append to the row's first line: "Amended 2026-10-01 (reference screens review): the design pass also names the closed set of typed blocks for a designed document and how the same page prints to PDF, and covers files a project assembles (a PDF, a picture), how they show in the pane on a wide screen and on a phone, and whether a produced file is listed in Library; see `docs/dev/reference-screens-review-2026-10-01.md`."
 
 **Edit 3, `docs/BACKLOG.md`, the HOME-FIT-02 row.** Append: "Amended 2026-10-01: 'Only models that fit' starts on; rows are ordered recommended first, then good fit, slow, not tested, too big; each pill carries the badge word from the plan's table."
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 9: CANVAS-READ-01 planning a new `StreamingMarkdown` kit block no longer holds; the canvas uses the chat's `MarkdownText`.
 
 ## BACKLOG items (filed in docs/BACKLOG.md on 2026-10-01)
 

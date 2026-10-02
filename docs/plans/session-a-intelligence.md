@@ -95,6 +95,8 @@ You do not touch `frontend/`, `spec/ui/`, `scripts/screenshot.ts`, or
 `backend/src/settings/uiKeys.ts`. If a step needs a frontend change,
 note it in your dev.md section for Session B and move on.
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 9: the NDJSON turn stream as the web chat's wire no longer holds; the events stay for other clients, with additions only.
+
 ## Contract with Session B (frozen; additive only)
 
 Session B builds the chat, home, search and memory surfaces against
@@ -200,6 +202,8 @@ Tests (regression first): an owner's turn prompt does not contain a
 child's person-scoped memory text; "remember I'm allergic to peanuts"
 writes scope person with the actor; provenance equals the turn id;
 usage counts equal injected count.
+
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rules 2 and 4: the newest 4 turns plus a 1,200-token estimate no longer holds; the window is sized from the engine's real context (the rolling summary may survive as overflow).
 
 ### Step 3: conversations, the window, the rolling summary (M)
 

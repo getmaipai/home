@@ -72,6 +72,8 @@ clears the floor, never a second pass.
 
 ## The work order: TRUEUP-01 (Session B, after PHRASE-01, before WRITTEN-PARITY-01)
 
+> **Superseded in part 2026-10-02** by [docs/design/RULES.md](../design/RULES.md) chat rule 12: the old path being frozen except for safety defects no longer holds as written; the thin-path record is the accepted design and the old path is deleted after porting.
+
 The old path is frozen except for safety defects and is deleted after
 the flip (plan section 2), so nothing here edits a constant the old path
 reads. The pattern is PREFIX-CLASS-01's: one table, one selector, the
