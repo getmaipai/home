@@ -490,13 +490,15 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  for (const [key, value] of [["engines.stack.url", STACK_URL], ["engines.stack.use_chat", true], ["engines.stack.use_embeddings", true]] as const) {
-    const response = await fetch(`${BASE_URL}/api/settings`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-      body: JSON.stringify({ scope: "household", key, value }),
-    });
-    if (!response.ok) throw new Error(`seed ${key} failed: ${response.status}`);
+  if (nextChatArtifactReview) {
+    for (const [key, value] of [["engines.stack.url", STACK_URL], ["engines.stack.use_chat", true], ["engines.stack.use_embeddings", true]] as const) {
+      const response = await fetch(`${BASE_URL}/api/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+        body: JSON.stringify({ scope: "household", key, value }),
+      });
+      if (!response.ok) throw new Error(`seed ${key} failed: ${response.status}`);
+    }
   }
   if (nextChatArtifactReview) {
     const pipeline = await fetch(`${BASE_URL}/api/settings`, {
@@ -511,7 +513,7 @@ async function seedHousehold(): Promise<string> {
   if (!seededPeople.ok) throw new Error(`seed people lookup failed: ${seededPeople.status}`);
   const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((person) => person.display_name === "Sage");
   if (!sage) throw new Error("seed people lookup did not return Sage");
-  attachWriteDocumentRoutingStats(sage.id);
+  if (nextChatArtifactReview) attachWriteDocumentRoutingStats(sage.id);
   for (const person of [
     { displayName: "Marlow", role: "teen" },
     { displayName: "Nova", role: "child" },
@@ -5001,8 +5003,8 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = startScreenshotStack(chatModel.url);
-  STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
+  const screenshotStack = nextChatArtifactReview ? startScreenshotStack(chatModel.url) : undefined;
+  if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
   let backend: ReturnType<typeof Bun.spawn>;
@@ -5018,7 +5020,7 @@ async function main() {
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
       // This matrix never calls speech; all speech requests go to the Stack.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, MAIPAI_EMBED_SERVER_URL: chatModel.url },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(nextChatArtifactReview ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
       stdout: "pipe",
       stderr: "inherit",
     });
@@ -5040,7 +5042,7 @@ async function main() {
     // actual cause - is always what gets rethrown, never whatever a
     // cleanup step itself raised.
     try { chatModel.stop(); } catch { /* best effort */ }
-    try { screenshotStack.stop(true); } catch { /* best effort */ }
+    try { screenshotStack?.stop(true); } catch { /* best effort */ }
     try { removeOwnedDemoDataDir(DATA_DIR, DATA_OWNER.token); } catch { /* best effort */ }
     throw err;
   }
@@ -5571,7 +5573,7 @@ async function main() {
     try { await backend.exited; } catch { /* best effort */ }
     if (backendPid && processStartTime(backendPid) !== undefined) throw new Error(`Screenshot backend pid ${backendPid} survived teardown`);
     if (await fetch(BASE_URL, { signal: AbortSignal.timeout(500) }).then(() => true, () => false)) throw new Error(`Screenshot backend port at ${BASE_URL} remained open after teardown`);
-    screenshotStack.stop(true);
+    screenshotStack?.stop(true);
     removeOwnedDemoDataDir(DATA_DIR, DATA_OWNER.token);
   }
   } catch (startupError) {
