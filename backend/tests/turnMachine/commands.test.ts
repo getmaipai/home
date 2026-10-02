@@ -216,3 +216,19 @@ describe("commandsNode: THIN-0D, the recall package never runs for an unidentifi
     expect(knownResult.output.matched).toBe(true);
   });
 });
+
+// THIN-0D follow-up: the remember package writes a memory as the signed-in
+// person, so an unidentified robot speaker never reaches it by an opener.
+describe("commandsNode: THIN-0D, the remember package never runs for an unidentified robot speaker", () => {
+  test("a robot turn with no evidence does not fire the remember opener; an identified speaker does", async () => {
+    const text = "remember that my favorite food is pizza";
+    const base = classifyTurnSignal({ text, ageBand: "adult", commandOpeners: OPENERS });
+    const signalOverride = { ...base, primary_act: "directive" } as TurnSignal;
+    const anon = { ...stateFor(people.owner, text, { signalOverride }), surface: "robot", speakerEvidence: null } as unknown as TurnState;
+    const anonResult = await commandsNode(anon, { utterance: text }, NODE_SIGNAL);
+    expect(anonResult.output.matched).toBe(false);
+    const known = { ...anon, speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } } as unknown as TurnState;
+    const knownResult = await commandsNode(known, { utterance: text }, NODE_SIGNAL);
+    expect(knownResult.output.matched).toBe(true);
+  });
+});

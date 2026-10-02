@@ -82,7 +82,7 @@ export interface AnswerOutput {
 function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "min_role") return "That one needs a grown-up.";
   if (reason === "temporary_mode") return "I can't save anything in a temporary chat.";
-  if (reason === "anonymous_speaker") return "I don't know who's talking yet, so I can't look through anyone's memories.";
+  if (reason === "anonymous_speaker") return "I don't know who's talking yet, so I can't use anyone's memories.";
   if (reason === "crisis_state") return "Let's stay with this for now. I'm here.";
   if (reason === "manifest_invalid") return "I can't do that right now. Something on my end isn't working.";
   return "I don't actually have that in this conversation, so I won't guess.";

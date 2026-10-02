@@ -12,8 +12,10 @@ export function speakerIsAnonymous(state: Pick<TurnState, "surface" | "actor" | 
   return effectiveBand(state.surface, state.actor, state.speakerEvidence, new Date()).basis === "unknown_speaker_default";
 }
 
-/** A package that reads memory (the manifest declares memory:read) reads
- * the signed-in person's records, so an anonymous speaker never reaches it. */
-export function readsMemory(manifest: { permissions?: readonly string[] }): boolean {
-  return manifest.permissions?.includes("memory:read") === true;
+/** A package that reads or writes memory (the manifest declares
+ * memory:read or memory:write) acts on the signed-in person's records, so
+ * an anonymous speaker never reaches it: no reading them, and no writing
+ * a memory as that person either. */
+export function touchesMemory(manifest: { permissions?: readonly string[] }): boolean {
+  return manifest.permissions?.includes("memory:read") === true || manifest.permissions?.includes("memory:write") === true;
 }

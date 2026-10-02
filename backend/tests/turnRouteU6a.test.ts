@@ -17,7 +17,7 @@ import { resetDb } from "./reset-db";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
-import { people, conversationTurns } from "@/db/schema";
+import { people, conversationTurns, memoryRecords } from "@/db/schema";
 import { __setTikaRunnerForTests } from "@/lib/documentExtraction";
 import { attachments } from "@/db/schema";
 import type { PersonRow } from "@/types";
@@ -301,6 +301,31 @@ describe("POST /api/turn - U6a's non-stream twin", () => {
       const res = await client.post("/api/turn", { surface: "chat", text: "hi", thinking: true });
       expect(res.status).toBe(200);
       expect(seen.requests[0]?.chat_template_kwargs?.enable_thinking).toBe(true);
+    });
+  });
+});
+
+// THIN-0D: the route hands a robot request's speaker_evidence to the default
+// path, so an unidentified voice never reaches the remember package and the
+// identified one does. Chat ignores the field entirely.
+describe("POST /api/turn - THIN-0D, speaker_evidence reaches the default path", () => {
+  const text = "remember that my favorite food is pizza";
+  const evidence = (person: string) => ({ person, basis: "voice", level: "confirmed" });
+
+  function memoryCount(): number {
+    return db.select().from(memoryRecords).all().length;
+  }
+
+  test("a robot request with no evidence writes no memory; with the signed-in person's evidence the package runs", async () => {
+    setHouseholdSettingValue("turn.pipeline.next", true);
+    const { client, actor } = await owner();
+    await withStubReply("Okay.", async () => {
+      const anon = await client.post("/api/turn", { surface: "robot", text });
+      expect(anon.status).toBe(200);
+      expect(memoryCount()).toBe(0);
+      const known = await client.post("/api/turn", { surface: "robot", text, speaker_evidence: evidence(actor.id) });
+      expect(known.status).toBe(200);
+      expect(memoryCount()).toBe(1);
     });
   });
 });

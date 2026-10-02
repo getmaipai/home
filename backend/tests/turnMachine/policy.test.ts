@@ -191,3 +191,23 @@ describe("policyNode: THIN-0D, a recall proposal is refused for an unidentified 
     expect(chat.output.entries[0]?.decision).toEqual({ allow: true });
   });
 });
+
+// THIN-0D follow-up: the remember package writes as the signed-in person,
+// so an unknown voice cannot write a memory either.
+describe("policyNode: THIN-0D, a remember proposal is refused for an unidentified robot speaker", () => {
+  beforeEach(() => resetDb());
+
+  function robotState(speakerEvidence: TurnState["speakerEvidence"]): TurnState {
+    return { actor: { id: "owner-1", role: "owner" }, surface: "robot", speakerEvidence, context: [], crisis: false, temporary: false, utterance: "remember that my favorite food is pizza" } as unknown as TurnState;
+  }
+  const call = { tool: "remember", args: { fact: "my favorite food is pizza" }, id: "call-1" };
+
+  test("no evidence refuses with anonymous_speaker; the identified speaker is allowed; another surface is allowed", async () => {
+    const anon = await policyNode(robotState(null), { calls: [call] }, new AbortController().signal);
+    expect(anon.output.entries[0]?.decision).toEqual({ allow: false, reason: "anonymous_speaker" });
+    const known = await policyNode(robotState({ person: "owner-1", basis: "voice", level: "confirmed" }), { calls: [call] }, new AbortController().signal);
+    expect(known.output.entries[0]?.decision).toEqual({ allow: true });
+    const chat = await policyNode({ ...robotState(null), surface: "chat" } as TurnState, { calls: [call] }, new AbortController().signal);
+    expect(chat.output.entries[0]?.decision).toEqual({ allow: true });
+  });
+});
