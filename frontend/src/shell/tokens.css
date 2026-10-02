@@ -90,9 +90,16 @@ html.incognito body[class*="style-"] [data-slot="sidebar-inner"] {
   background-color: var(--incognito-sidebar);
 }
 
+/* The current page's menu entry is a solid primary pill (the sidebar's own
+ * accent is nearly the sidebar colour, so data-active alone is not visible). */
+[data-slot="sidebar-inner"] a[data-slot="sidebar-menu-button"][data-active] {
+  background-color: var(--primary);
+  color: var(--background);
+}
+
 /* Keep Home's primary cyan for links, actions and selected controls.
  * Only the vendored sidebar's active navigation pill joins Incognito's
- * violet highlights; since ui-v0.5.89 the shipped NavItem marks the
+ * violet highlights; since ui-v0.5.89 (matched at the root mount since ui-v0.5.90) the shipped NavItem marks the
  * current page's link itself with data-active and aria-current="page". */
 html.incognito body[class*="style-"] [data-slot="sidebar-inner"] a[data-slot="sidebar-menu-button"][data-active] {
   background-color: var(--hue-violet);
