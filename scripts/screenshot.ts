@@ -2281,7 +2281,7 @@ async function captureNextStandup(browser: Browser, sessionValue: string): Promi
 
 
   const pages: Array<{ slug: string; path: string; waitFor: string }> = [
-    { slug: "dashboard", path: "/", waitFor: "text=Stay informed with today's activity" },
+    { slug: "dashboard", path: "/", waitFor: "text=Here is your household today." },
     { slug: "people", path: "/people", waitFor: 'a[href^="/people/"]' },
     { slug: "settings", path: "/settings", waitFor: "text=Default Inputs" },
     { slug: "sign-in", path: "/sign-in", waitFor: "form" },
@@ -2393,7 +2393,7 @@ async function captureNextSidebarReview(browser: Browser, sessionValue: string):
     try {
       const page = await context.newPage();
       await page.goto(`${BASE_URL}/`);
-      await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
+      await page.locator("text=Here is your household today.").first().waitFor({ timeout: 15000 });
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-sidebar-expanded-desktop-${theme}.png`) });
       console.log(`Wrote ${join(outDir, `next-sidebar-expanded-desktop-${theme}.png`)}`);
@@ -2437,7 +2437,7 @@ async function captureNextLookPresets(browser: Browser, sessionValue: string): P
     try {
       const page = await context.newPage();
       await page.goto(`${BASE_URL}/`);
-      await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
+      await page.locator("text=Here is your household today.").first().waitFor({ timeout: 15000 });
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-look-${look}-desktop-dark.png`) });
       console.log(`Wrote ${join(outDir, `next-look-${look}-desktop-dark.png`)}`);
@@ -2479,7 +2479,7 @@ async function captureNextAppearanceMismatch(browser: Browser, sessionValue: str
     try {
       const page = await context.newPage();
       await page.goto(`${BASE_URL}/`);
-      await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
+      await page.locator("text=Here is your household today.").first().waitFor({ timeout: 15000 });
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, `next-appearance-${setting}-vs-os-${osPref}.png`) });
       console.log(`Wrote ${join(outDir, `next-appearance-${setting}-vs-os-${osPref}.png`)}`);
@@ -2556,7 +2556,7 @@ async function captureNextDashboardReview(browser: Browser, sessionValue: string
       try {
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/`);
-        await page.locator("text=Stay informed with today's activity").first().waitFor({ timeout: 15000 });
+        await page.locator("text=Here is your household today.").first().waitFor({ timeout: 15000 });
         await settleAnimations(page);
         if (viewport.width === 390) {
           const logo = await page.locator('header nav a:has(img[alt="logo"])').evaluate((anchor) => {
@@ -2626,7 +2626,7 @@ async function captureNextProfileSheetReview(browser: Browser, sessionValue: str
   try {
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/`);
-    await page.getByText("Stay informed with today's activity").waitFor({ timeout: 15000 });
+    await page.getByText("Here is your household today.").waitFor({ timeout: 15000 });
     await page.getByRole("button", { name: "Open account menu for Sage" }).click();
     const sheet = page.getByRole("dialog");
     await sheet.getByRole("heading", { name: "Sage" }).waitFor();

@@ -77,6 +77,7 @@ describe("NextDashboardPage", () => {
         </MemoryRouter>,
       );
       await waitFor(() => expect(document.body.textContent).toContain("Nova"));
+      expect(document.body.textContent).toContain("Here is your household today.");
       expect(document.body.textContent).toContain("4"); // people_count
       expect(document.body.textContent).toContain("Up to date"); // updates_available: false
     } finally {
@@ -84,7 +85,7 @@ describe("NextDashboardPage", () => {
     }
   });
 
-  test("owner/admin: repairs and engines cards render when the wire carries them", async () => {
+  test("owner/admin: repairs render when the wire carries them, while operator words stay off Home", async () => {
     const restore = mockDashboardFetch({
       people_count: 2,
       updates_available: true,
@@ -101,8 +102,7 @@ describe("NextDashboardPage", () => {
       );
       await waitFor(() => expect(document.body.textContent).toContain("Repairs"));
       expect(document.body.textContent).toContain("3"); // repairs_open
-      expect(document.body.textContent).toContain("Engines");
-      expect(document.body.textContent).toContain("3 issues"); // 1 critical + 0 error + 2 warning
+      expect(document.body.textContent).not.toMatch(/\b(Turns|Engines|Stack)\b/);
       expect(document.body.textContent).toContain("Available"); // updates_available: true
       // ui-v0.5.23's rail restructuring dropped these three routes'
       // permanent nav entry - the stat cards are now their real way
@@ -110,7 +110,6 @@ describe("NextDashboardPage", () => {
       for (const [label, href] of [
         ["Updates", "/updates"],
         ["Repairs", "/repairs"],
-        ["Engines", "/engines"],
       ] as const) {
         const card = Array.from(document.querySelectorAll("a")).find((a) => a.textContent?.includes(label));
         expect(card).toBeDefined();
@@ -122,10 +121,9 @@ describe("NextDashboardPage", () => {
   });
 
   // The wire itself omits repairs_open/engines for anyone but owner/
-  // admin (backend/src/lib/dashboard.ts's own header) - the page must
-  // never render these cards with a faked zero when they're simply
-  // absent from the response.
-  test("non-admin: no repairs or engines card at all when the wire omits them", async () => {
+  // admin (backend/src/lib/dashboard.ts's own header). All roles still
+  // keep the chart and Engines card off Home.
+  test("non-admin: no repairs or operator words when the wire omits admin fields", async () => {
     const restore = mockDashboardFetch({
       people_count: 2,
       updates_available: false,
@@ -140,7 +138,7 @@ describe("NextDashboardPage", () => {
       );
       await waitFor(() => expect(document.body.textContent).toContain("People"));
       expect(document.body.textContent).not.toContain("Repairs");
-      expect(document.body.textContent).not.toContain("Engines");
+      expect(document.body.textContent).not.toMatch(/\b(Turns|Engines|Stack)\b/);
     } finally {
       restore();
     }
@@ -186,7 +184,7 @@ describe("NextDashboardPage", () => {
     }
   });
 
-  test("engines card: the Stack-not-configured empty state, never a faked count", async () => {
+  test("operator words stay off Home even when the admin wire carries an empty engine state", async () => {
     const restore = mockDashboardFetch({
       people_count: 1,
       updates_available: false,
@@ -201,8 +199,8 @@ describe("NextDashboardPage", () => {
           <NextDashboardPage person={makePerson()} />
         </MemoryRouter>,
       );
-      await waitFor(() => expect(document.body.textContent).toContain("Engines"));
-      expect(document.body.textContent).toContain("No Stack");
+      await waitFor(() => expect(document.body.textContent).toContain("People"));
+      expect(document.body.textContent).not.toMatch(/\b(Turns|Engines|Stack)\b/);
     } finally {
       restore();
     }

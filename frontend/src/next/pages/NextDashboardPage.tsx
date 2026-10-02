@@ -5,8 +5,6 @@ import { Greeting } from "@/next/pages/dashboard/Greeting";
 import { PeopleCountCard } from "@/next/pages/dashboard/PeopleCountCard";
 import { UpdatesCard } from "@/next/pages/dashboard/UpdatesCard";
 import { RepairsCard } from "@/next/pages/dashboard/RepairsCard";
-import { EnginesCard } from "@/next/pages/dashboard/EnginesCard";
-import { TurnsPerDayChart } from "@/next/pages/dashboard/TurnsPerDayChart";
 import { RecentActivityTable } from "@/next/pages/dashboard/RecentActivityTable";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 
@@ -90,7 +88,6 @@ export function NextDashboardPage({ person }: { person: Roster }) {
         // their presence IS the visibility check; no second,
         // client-side role check invented.
         const showRepairs = data.repairs_open !== undefined;
-        const showEngines = data.engines !== undefined;
 
           return (
             <div className="pb-4">
@@ -110,14 +107,6 @@ export function NextDashboardPage({ person }: { person: Roster }) {
                   <RepairsCard open={data.repairs_open!} />
                 </div>
               )}
-              {showEngines && (
-                <div className="lg:col-span-3 col-span-6">
-                  <EnginesCard engines={data.engines!} />
-                </div>
-              )}
-              <div className="lg:col-span-7 col-span-12">
-                <TurnsPerDayChart series={data.turns_per_day} />
-              </div>
               <div className="lg:col-span-5 col-span-12">
                 <RecentActivityTable rows={data.recent_activity} />
               </div>

@@ -31,7 +31,7 @@ export function Greeting({ displayName }: { displayName: string }) {
       <h2 className="text-xl flex items-center gap-2 capitalize">
         {greetingFor(new Date(), displayName)} <span className="flex items-center">{isDaytime ? <SunIcon size={25} color="orange" /> : <MoonIcon size={25} />}</span>
       </h2>
-      <p className="text-sm font-normal text-muted-foreground">Stay informed with today's activity</p>
+      <p className="text-sm font-normal text-muted-foreground">Here is your household today.</p>
     </div>
   );
 }
