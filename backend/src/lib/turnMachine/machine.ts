@@ -11,7 +11,8 @@ import type { TurnState, NodeName, NodeOutcome, ActionProposal } from "./contrac
 type NodeFn<In, Out> = (state: TurnState, input: In, signal: AbortSignal) => Promise<{ outcome: NodeOutcome; output: Out }>;
 import { TraceRecorder } from "./trace";
 import { nodeSignal } from "./deadline";
-import { safetyNode, applySafety, safetyRoute, inputCarriesCrisisSignal, type SafetyOutput } from "./nodes/safety";
+import { safetyNode, applySafety, safetyRoute, inputSafetyAfterFailure, type SafetyOutput } from "./nodes/safety";
+import { carriesCrisisSignal } from "@/lib/safety";
 import { commandsNode, type CommandsOutput } from "./nodes/commands";
 import { contextNode, applyContext, type ContextOutput } from "./nodes/context";
 import { modelNode, ANSWER_FROM_CONTEXT_TOOL_ID, rawUtteranceWebsearchCall, type ModelOutput } from "./nodes/model";
@@ -327,7 +328,11 @@ export const turnMachine = setup({
       if (output.refused && output.safety) context.turnState.outputSafety = output.safety;
     },
     applySafetyFailure: ({ context }) => {
-      context.turnState.crisis = inputCarriesCrisisSignal(context.turnState.utterance);
+      const input = inputSafetyAfterFailure(context.turnState.utterance);
+      if (input) {
+        context.turnState.safety = input;
+        context.turnState.crisis = carriesCrisisSignal(input);
+      }
     },
     applyReasoningTrace: ({ context }) => {
       const output = context.step as OutputGateOutput;

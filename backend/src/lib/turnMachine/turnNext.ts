@@ -19,6 +19,7 @@ import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { turnAgeBand } from "./speaker";
+import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
@@ -140,7 +141,14 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
 }
 
 function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: string, value: TurnValue): void {
-  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary };
+  // THIN-0L: the row marks a self-harm signal on this turn's input or on
+  // its reply, whatever the reply's own action, so the conversation stays
+  // in the crisis state for the next CRISIS_STATE_TURNS turns. The same
+  // expression the old path's logTurnSafely() uses; state.crisis is not
+  // used because it also carries the earlier turns' state, which would
+  // keep the window open forever.
+  const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
+  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal };
   if (state.temporary) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).

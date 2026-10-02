@@ -9,7 +9,7 @@ import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { evaluateSafety, carriesCrisisSignal } from "@/lib/safety";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { turnAgeBand } from "../speaker";
-import { notifyOncePerTurn } from "@/lib/turnEngine";
+import { notifyOncePerTurn, conversationInCrisis } from "@/lib/turnEngine";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 
 export interface SafetyInput {
@@ -32,7 +32,11 @@ export const safetyNode: Node<SafetyInput, SafetyOutput> = async (state, input) 
   // (allow_with_resources and refuse can both flag a minor's turn), and
   // before a refusal is even decided, exactly as the old path does.
   notifyOncePerTurn(state.actor, safety, state.turnId, "[turn]");
-  const crisis = carriesCrisisSignal(safety);
+  // THIN-0L (SAFETY-01, the old path's `inCrisis`): this turn's own
+  // self-harm signal, or one on any of the conversation's last
+  // CRISIS_STATE_TURNS turns (a temporary session included). The state
+  // keeps the overlay on every reply and stops packages and lookups.
+  const crisis = carriesCrisisSignal(safety) || conversationInCrisis(state.conversationId);
   const credential = detectCredential(input.utterance);
   const outcome: NodeOutcome = { ok: true };
   return {
@@ -52,13 +56,16 @@ export function safetyRoute(output: SafetyOutput): "refused" | "blocked" | "comm
 /** THIN-0M: when this node itself throws, the turn is refused with no
  * result to read. The spec's classifier is called directly (not through
  * the failing evaluateSafety()) so an input that stated self-harm still
- * gets the crisis resources, which cannot be configured off. A second
- * failure answers false: the refusal stands, never a thrown error. */
-export function inputCarriesCrisisSignal(utterance: string): boolean {
+ * gets the crisis resources, which cannot be configured off, and the
+ * logged turn still marks the conversation (THIN-0L). Returns the
+ * classifier's result as a refusal, or undefined when a second failure
+ * leaves nothing to read: the refusal stands, never a thrown error. */
+export function inputSafetyAfterFailure(utterance: string): ReturnType<typeof evaluateSafety> | undefined {
   try {
-    return carriesCrisisSignal(checkSafety(utterance, { isMinor: true }));
+    const result = checkSafety(utterance, { isMinor: true });
+    return { ...result, action: "refuse" };
   } catch {
-    return false;
+    return undefined;
   }
 }
 

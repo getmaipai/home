@@ -68,6 +68,11 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
       : { outcome: okOutcome, output: { matched: true, text: result.error, outcome } };
   }
 
+  // THIN-0L (SAFETY-01): in the crisis state no package is routed by an
+  // opener, as on the old path (`inCrisis` skips the route). The
+  // conversation is never blocked: the model still answers.
+  if (state.crisis) return { outcome: { ok: true }, output: { matched: false } };
+
   for (const { id, manifest } of loadAllManifests()) {
     if (manifest.routing?.always_offer) continue;
     if (!meetsMinRole(state.actor.role, manifest.min_role)) continue;
