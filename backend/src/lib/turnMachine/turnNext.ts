@@ -29,7 +29,7 @@ import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
 import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf } from "@/lib/turnContext";
-import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
+import { getActiveChatEngineIdentity, stackRefusal } from "@/lib/stackEngine";
 import { nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
 import { roleHealth } from "@/lib/roleHealth";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
@@ -237,10 +237,13 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const invalid = validateTurnInput(surface, text);
   if (invalid) return { ok: false, result: invalid };
 
-  if ((await roleHealth("chat")).availability === "unavailable") {
+  // THIN-1C: `live` - the precheck asks the Stack itself, never a
+  // remembered refusal (roleHealth.ts), so "try again in a moment" is a
+  // real retry; the line still names the Stack's reason when the live
+  // answer is no and a refusal is on record.
+  if ((await roleHealth("chat", { live: true })).availability === "unavailable") {
     nudgeChatEngineRecovery();
-    const error = opts.spoken === true || surface !== "chat" ? "I can't think right now. I've told the grown-ups." : "MaiPai's AI isn't running right now.";
-    return { ok: false, result: { ok: false, status: 503, code: "engine_unavailable", error } };
+    return { ok: false, result: { ok: false, status: 503, code: "engine_unavailable", error: engineUnavailableLine({ spoken: opts.spoken === true, surface }) } };
   }
 
   const resolved = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary });
@@ -572,8 +575,19 @@ class EngineUnavailableTurnError extends Error {
   constructor(message: string) { super(message); }
 }
 
+/** The one line for "the AI isn't running", for the precheck in
+ * beginTurn() and for a model node that found the engine gone mid-turn.
+ * THIN-1C (docs/design/RULES.md rule 6; fixes part of getmaipai/home#203):
+ * when the Stack itself refused the chat role just now (a 503 with its
+ * reason - the machine was low on memory), a written chat turn says so
+ * in the household's wording and asks for a retry in a moment, instead
+ * of a line that reads as if nothing is running at all; the health row
+ * carries the identical line (roleHealth.ts). A spoken turn and every
+ * non-chat surface keep their fixed line exactly (rule 0: nothing here
+ * changes how a spoken turn is shaped). */
 function engineUnavailableLine(state: Pick<TurnState, "spoken" | "surface">): string {
-  return state.spoken || state.surface !== "chat" ? "I can't think right now. I've told the grown-ups." : "MaiPai's AI isn't running right now.";
+  if (state.spoken || state.surface !== "chat") return "I can't think right now. I've told the grown-ups.";
+  return stackRefusal("chat")?.household ?? "MaiPai's AI isn't running right now.";
 }
 
 export async function runTurnNext(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnStreamResult> {

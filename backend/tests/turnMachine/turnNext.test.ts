@@ -8,8 +8,10 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests, __setChatRecoveryNudgeForTests } from "@/lib/llmSupervisor";
-import { __setStackClientForTests } from "@/lib/stackEngine";
+import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { restoreDefaultScriptedStack, startStackFixture } from "../stackFixture";
+import { collectHealth } from "@/lib/healthSnapshot";
+import { listIssues } from "@/lib/issues";
 import { __blockPortForTests, __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { createBenchPeople, startRecordingProxy, startFakeSearxng, type BenchPeople, type FakeSearxng } from "../../scripts/bench/conversationRunner";
@@ -1361,6 +1363,97 @@ describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
     const instruction = lastUserInstruction(searched.phrasingRequest);
     expect(instruction).toContain("in one to three sentences");
     expect(instruction).toContain("under 140 words");
+  });
+});
+
+// THIN-1C (docs/design/RULES.md rule 6; fixes part of getmaipai/home#203):
+// when the Stack cannot start the chat engine it answers HTTP 503 with an
+// `offline_reason` - the exact body below is the one #203 quotes from a
+// 24 GB machine that was out of memory. Home used to lose it: the reply
+// was composer.ts's own COMPOSE_FAILURE_LINE ("Sorry, I couldn't do
+// that.") because the role list still said chat was installed and ready
+// on demand, and the health row said the same. The reason now reaches the
+// reply (in the household's wording) and the health row's own `detail`,
+// while Repairs keeps the Stack's own words.
+describe("turnNext.ts: THIN-1C, the Stack's reason for refusing to start the AI reaches the reply and the health row", () => {
+  const ISSUE_203_BODY = {
+    error: "No engine is ready for role 'chat'.",
+    role: "chat",
+    state: "offline",
+    offline_reason: "The current memory budget cannot admit the request. It needs about 0.5 GB with 2.7 GB free, after the working margin the machine's tier keeps back; memory pressure is warn. The chat engine waited 15 s for memory and gave up.",
+  };
+  /** A Stack that refuses the chat role with #203's body while its role
+   * list still shows chat as installed (ready on demand) - exactly the
+   * live combination that let the turn's own precheck through. */
+  function refusingStack() {
+    const fixture = startStackFixture({
+      "POST /v1/chat/completions": async () => Response.json(ISSUE_203_BODY, { status: 503 }),
+      "GET /stack/v1/roles": async () => Response.json({ roles: [{ id: "chat", state: { state: "installed", since: "scripted-test" }, reason: null }] }),
+    });
+    __setStackClientForTests(fixture.client);
+    return fixture;
+  }
+
+  test("a chat turn refused with #203's exact 503 body says the computer is low on memory, and the health row shows chat offline with that reason", async () => {
+    const fixture = refusingStack();
+    try {
+      const result = await runTurnNext(people.owner, "chat", "hi");
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("expected the refused turn, not a reply");
+      expect(result.code).toBe("engine_unavailable");
+      expect(result.error).toContain("low on memory");
+      expect(result.error.toLowerCase()).toContain("try again in a moment");
+      expect(result.error).not.toBe(COMPOSE_FAILURE_LINE);
+      // The health data the status page reads: chat offline, with the
+      // same household wording, never the Stack's raw diagnostic.
+      const health = await collectHealth();
+      expect(health.ok).toBe(false);
+      expect(health.engines.chat.availability).toBe("unavailable");
+      expect(health.engines.chat.detail).toContain("low on memory");
+      expect(JSON.stringify(health)).not.toContain("memory budget");
+      // Repairs keeps the Stack's own words, as before.
+      const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.chat");
+      expect(issue?.detail).toBe(ISSUE_203_BODY.offline_reason);
+    } finally {
+      fixture.stop();
+      __resetStackEngineForTests();
+    }
+  });
+
+  test("the live streaming turn carries the same line as its engine_unavailable error", async () => {
+    const fixture = refusingStack();
+    try {
+      const result = await runTurnNextStream(people.owner, "chat", "hi");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      let thrown: unknown;
+      try {
+        for await (const _chunk of result.tokens) { /* the engine never starts */ }
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(StreamUnavailable);
+      expect(thrown).toMatchObject({ code: "engine_unavailable" });
+      expect((thrown as Error).message).toContain("low on memory");
+    } finally {
+      fixture.stop();
+      __resetStackEngineForTests();
+    }
+  });
+
+  test("a later turn that the Stack serves again clears the remembered refusal from the health row", async () => {
+    const fixture = refusingStack();
+    try {
+      const refused = await runTurnNext(people.owner, "chat", "hi");
+      expect(refused.ok).toBe(false);
+    } finally {
+      fixture.stop();
+    }
+    useDefaultScriptedStack();
+    const served = await withStub({ reply: () => "Hello again." }, () => runTurnNext(people.owner, "chat", "hi"));
+    expect(served.ok).toBe(true);
+    const health = await collectHealth();
+    expect(health.engines.chat.availability).toBe("ready");
+    expect(health.engines.chat.detail ?? null).toBeNull();
   });
 });
 

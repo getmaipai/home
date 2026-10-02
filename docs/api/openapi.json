@@ -234,6 +234,10 @@
                                 "failed_start",
                                 null
                               ]
+                            },
+                            "detail": {
+                              "type": "string",
+                              "nullable": true
                             }
                           },
                           "required": [
@@ -289,6 +293,10 @@
                                 "failed_start",
                                 null
                               ]
+                            },
+                            "detail": {
+                              "type": "string",
+                              "nullable": true
                             }
                           },
                           "required": [
@@ -344,6 +352,10 @@
                                 "failed_start",
                                 null
                               ]
+                            },
+                            "detail": {
+                              "type": "string",
+                              "nullable": true
                             }
                           },
                           "required": [
@@ -399,6 +411,10 @@
                                 "failed_start",
                                 null
                               ]
+                            },
+                            "detail": {
+                              "type": "string",
+                              "nullable": true
                             }
                           },
                           "required": [

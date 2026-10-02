@@ -531,6 +531,12 @@ export interface EngineHealthEntry {
   alive: boolean | null;
   availability?: "ready" | "starting" | "unavailable";
   reason?: "stopped" | "crashed" | "blocked_port" | "not_installed" | "failed_start" | null;
+  /** THIN-1C (fixes part of getmaipai/home#203): present only when the
+   * Stack itself refused this role (an HTTP 503 with its `offline_reason`,
+   * e.g. the machine is low on memory): that reason in the household's
+   * wording, the same line the chat reply carries. The status page shows
+   * it beside the engine's row; absent, the row reads as before. */
+  detail?: string | null;
 }
 
 export interface HealthStatus {

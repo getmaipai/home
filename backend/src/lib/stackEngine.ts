@@ -98,6 +98,72 @@ export function __resetStackEngineForTests(): void {
   cachedClient = null;
   cachedUrl = null;
   stackChatIdentity = null;
+  refusals.clear();
+}
+
+// THIN-1C (docs/design/RULES.md rule 6; fixes part of getmaipai/home#203):
+// the Stack's own reason for refusing a role - the `offline_reason` on
+// its 503 body ("The current memory budget cannot admit the request...
+// The chat engine waited 15 s for memory and gave up.") - used to reach
+// only Repairs. The chat reply said "Sorry, I couldn't do that." and the
+// health row said chat was fine, because the role list still showed the
+// engine as installed and ready on demand: nothing in Home remembered
+// that the Stack had just said no. This is that memory, per role: set on
+// every 503 refusal, read by roleHealth() (the health row, the status
+// page and the model node's outage check; the turn's own precheck asks
+// the Stack live instead, so a retry is real) and by turnNext.ts's
+// engine-unavailable line, cleared by the next call the Stack serves
+// (resolveStackOffline) or by age. The age limit is what keeps the
+// health row honest: a refusal older than this is forgotten, so a
+// machine that freed its memory is never shown offline for longer than
+// this. 30 s is twice the wait the Stack itself gives the engine before
+// refusing (the body above: 15 s).
+export const STACK_REFUSAL_TTL_MS = 30_000;
+
+export interface StackRefusal {
+  /** The Stack's own words, as its 503 body stated them (Repairs shows
+   * these); undefined when the body carried no offline_reason. */
+  offline_reason: string | undefined;
+  /** The same reason in the household's wording - the one line the
+   * chat reply and the health row both carry. */
+  household: string;
+  at: number;
+}
+
+const refusals = new Map<string, StackRefusal>();
+
+/** The household's wording for a refusal, decided from the Stack's own
+ * stated reason - never a cause the Stack did not give. One fixed line
+ * per case, the same closed code-to-text mapping nodes/answer.ts's own
+ * refusal lines use: the memory refusal #203 reports gets its own line
+ * (the computer is low on memory), anything else the plain "couldn't
+ * start"; both say to try again in a moment, since the Stack admits the
+ * engine again the moment the machine has room. The check reads the
+ * engine's own diagnostic, never a household member's words (the same
+ * footing nodes/model.ts's "could not reach" check already stands on). */
+export function householdStackRefusalLine(offline_reason: string | undefined): string {
+  const lowMemory = offline_reason !== undefined && offline_reason.toLowerCase().includes("memory");
+  return lowMemory
+    ? "MaiPai's AI couldn't start because the computer is low on memory. Try again in a moment."
+    : "MaiPai's AI couldn't start right now. Try again in a moment.";
+}
+
+function rememberStackRefusal(role: string, offline_reason: string | undefined): void {
+  refusals.set(role, { offline_reason, household: householdStackRefusalLine(offline_reason), at: Date.now() });
+}
+
+/** The Stack's most recent refusal of this role, if it is younger than
+ * STACK_REFUSAL_TTL_MS and no call has been served since; null
+ * otherwise. Keyed by the role name the Stack call sites use ("chat",
+ * "embed", "background", "tts", "stt"). */
+export function stackRefusal(role: string, now = Date.now()): StackRefusal | null {
+  const refusal = refusals.get(role);
+  if (!refusal) return null;
+  if (now - refusal.at > STACK_REFUSAL_TTL_MS) {
+    refusals.delete(role);
+    return null;
+  }
+  return refusal;
 }
 
 let stackChatIdentity: EngineIdentity | null = null;
@@ -154,6 +220,11 @@ const REPAIRS_WORTHY: ReadonlySet<StackErrorKind> = new Set(["offline", "unreach
 export function stackFailureResult(err: unknown, role: string): StackFailureResult {
   if (err instanceof StackError) {
     if (REPAIRS_WORTHY.has(err.kind)) {
+      // THIN-1C: a 503 is the Stack itself saying no, with its reason;
+      // remembered so the health row and the chat reply can carry it.
+      // "unreachable" is not remembered: nothing answered, and
+      // roleHealth() already reads that case live from the socket.
+      if (err.kind === "offline") rememberStackRefusal(role, err.offline_reason);
       reportStackOffline(err.offline_reason, role, err.message);
       // The companion line is chat's own voice, spoken back to whoever
       // just tried to talk to it - embed/tts/stt fail silently to a
@@ -174,6 +245,7 @@ export function stackFailureResult(err: unknown, role: string): StackFailureResu
  * catch/handling is untouched. */
 export function reportStackFailure(err: unknown, role: string): void {
   if (err instanceof StackError && REPAIRS_WORTHY.has(err.kind)) {
+    if (err.kind === "offline") rememberStackRefusal(role, err.offline_reason);
     reportStackOffline(err.offline_reason, role, err.message);
     return;
   }
@@ -200,5 +272,6 @@ export function reportStackOffline(offline_reason: string | undefined, role: str
  * call already takes, scoped per role so one role's outage never masks
  * or clears another's. */
 export function resolveStackOffline(role: string): void {
+  refusals.delete(role);
   resolveIssue(ISSUE_SOURCE, `offline.${role}`);
 }

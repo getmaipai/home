@@ -95,6 +95,9 @@ const EngineHealthSchema = z.object({
   alive: z.boolean().nullable(),
   availability: z.enum(["ready", "starting", "unavailable"]).optional(),
   reason: z.enum(["stopped", "crashed", "blocked_port", "not_installed", "failed_start"]).nullable().optional(),
+  // THIN-1C (#203): the Stack's own stated reason for refusing the role,
+  // in household wording; only present after such a refusal.
+  detail: z.string().nullable().optional(),
 });
 const HealthResponseSchema = z.object({
   brain: z.string(),
