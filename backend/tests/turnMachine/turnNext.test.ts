@@ -1310,7 +1310,7 @@ describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
     // The phrasing round: the ceiling again, never the plan's own word
     // budget turned into tokens (360 words -> 608 before this item).
     expect(searched.phrasingRequest?.max_tokens).toBe(1536);
-    expect(await generationMaxTokens(searched.turnId)).toEqual([96, 1536]);
+    expect(await generationMaxTokens(searched.turnId)).toEqual([1536, 1536]);
     const instruction = lastUserInstruction(searched.phrasingRequest);
     expect(instruction).not.toContain("under 140 words");
     expect(instruction).not.toContain("at most");
@@ -1356,7 +1356,7 @@ describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
     // The evidence-boosted row (360 words): ceil(360 * 1.6) + 32 = 608,
     // and the spoken-class phrasing instruction with its own limits.
     expect(searched.phrasingRequest?.max_tokens).toBe(608);
-    expect(await generationMaxTokens(searched.turnId)).toEqual([96, 608]);
+    expect(await generationMaxTokens(searched.turnId)).toEqual([384, 608]);
     const instruction = lastUserInstruction(searched.phrasingRequest);
     expect(instruction).toContain("in one to three sentences");
     expect(instruction).toContain("under 140 words");
@@ -1382,7 +1382,7 @@ describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
     // the child band's plan), so this stays the adult spoken table.
     const searched = await searchedTurn(people.owner, "robot", { speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } });
     expect(searched.phrasingRequest?.max_tokens).toBe(128);
-    expect(await generationMaxTokens(searched.turnId)).toEqual([96, 128]);
+    expect(await generationMaxTokens(searched.turnId)).toEqual([128, 128]);
     const instruction = lastUserInstruction(searched.phrasingRequest);
     expect(instruction).toContain("in one to three sentences");
     expect(instruction).toContain("under 140 words");
@@ -1557,11 +1557,9 @@ describe("turnNext.ts: U4c, the plan recomputes from real tool-round evidence", 
       // all: composer.ts's own "empty_rows" mode (model_calls: 0)
       // writes the canned no-results line directly, so the forced
       // call is the ONLY (and so also the last) generation this turn
-      // ever runs. FORCED_CALL_MAX_TOKENS (96) applies regardless of
-      // plan, evidence, or the reply floor's own ceiling, since there
-      // is no ordinary/phrasing generation here for either to ever
-      // apply to.
-      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(96);
+      // ever runs. THIN-2A: that call is no longer forced, so it runs
+      // under the model's own ceiling like any adult written round.
+      expect(await lastGenerationMaxTokens(result.value.turn_id)).toBe(1536);
     } finally {
       searxng.stop();
     }
@@ -1632,65 +1630,47 @@ describe("turnNext.ts: THINK-DEFAULT-01, thinking is the person's per-turn toggl
   });
 });
 
-describe("turnNext.ts: ENGINE-CONTRACT-02, a required miss falls to the builder row", () => {
+// THIN-2A (docs/design/RULES.md rule 1): the model decides whether a turn
+// needs a search. No signal field, word rule or list forces one, so a world
+// question is offered the tools with tool_choice "auto" like any other turn,
+// and a model that answers in text gets its own answer, not a builder search.
+describe("turnNext.ts: THIN-2A, tools are offered with tool_choice auto and nothing forces a search", () => {
+  test("a world question the model answers in text is delivered as its own answer, with no search run", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const toolRequests: ChatCompletionRequest[] = [];
+    const OWN_ANSWER = "Paris is the capital of France.";
+    try {
+      const result = await withStub(
+        {
+          reply: (request) => {
+            if (request.tools && request.tools.length > 0) toolRequests.push(request);
+            return OWN_ANSWER;
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "what is the capital of france"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toContain(OWN_ANSWER);
+      expect(searxng.queries).toHaveLength(0);
+      expect(toolRequests.length).toBeGreaterThan(0);
+      for (const request of toolRequests) expect(request.tool_choice).toBe("auto");
+      expect(toolRequests[0]?.tools?.some((t) => t.function.name === "websearch")).toBe(true);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      expect(row?.stats ?? "").not.toContain("required_miss");
+    } finally {
+      searxng.stop();
+    }
+  });
+});
+
+describe("turnNext.ts: ENGINE-CONTRACT-02, an invalid websearch call falls to the builder row", () => {
   async function modelNodeOutcomes(turnId: string): Promise<{ ok?: boolean; required_miss?: boolean }[]> {
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
     const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; required_miss?: boolean } }[] };
     return (stats.nodes ?? []).filter((n) => n.node === "model").map((n) => n.outcome ?? {});
   }
-
-  test('a scripted engine that returns content to a required call produces a searched answer, the trace shows required_miss: true on model and a builder query, and the discarded text appears nowhere', async () => {
-    const searxng = startFakeSearxng();
-    setHouseholdSettingValue("search.searxng_url", searxng.url);
-    const DISCARDED = "The current president of Chile is a made-up name from the model's own knowledge.";
-    let calls = 0;
-    try {
-      const result = await withStub(
-        {
-          // The first (forced) call never returns a tool call at all -
-          // the required miss, exactly A2/A3's own shape
-          // (ENGINE-CONTRACT-01's dev.md finding) - and answers in
-          // plain text instead; the second call (the builder row's own
-          // phrasing round, tool_choice none) answers for real. Scripted
-          // by call order, not by a tool-role message in the request -
-          // the new path's phrasing round rebuilds its prompt from the
-          // same context list every time, never injecting the tool
-          // result back into the messages themselves (sources reach the
-          // delivered reply through state.outcomes instead, answer.ts's
-          // own "model_text" case) - a pre-existing gap, not this item's
-          // to fix, so the test scripts on order to stay independent of
-          // it.
-          reply: () => {
-            calls++;
-            return calls === 1 ? DISCARDED : "The current president of Chile answers your question, sourced.";
-          },
-        },
-        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
-      );
-      expect(result.ok).toBe(true);
-      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      // Searched, sourced - the builder row ran a real search from the
-      // engine's own query (the utterance), never the discarded text.
-      expect(searxng.queries.length).toBeGreaterThan(0);
-      expect(result.value.plugin_id).toBe("websearch");
-      expect(result.value.sources?.length).toBeGreaterThan(0);
-      // The discarded text appears nowhere: not the reply, not stored
-      // outcomes, not the trace.
-      expect(result.value.reply.text).not.toContain(DISCARDED);
-      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
-      expect(row?.replyText ?? "").not.toContain(DISCARDED);
-      expect(row?.stats ?? "").not.toContain(DISCARDED);
-      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { callId: string; args?: Record<string, unknown> }[]) : [];
-      expect(outcomes.some((o) => o.callId === "builder" && o.args?.expression === "who is the president of chile")).toBe(true);
-      // required_miss: true on the FIRST model entry (the forced call
-      // that missed); the trace never says it about a call that
-      // honoured the choice.
-      const modelOutcomes = await modelNodeOutcomes(result.value.turn_id);
-      expect(modelOutcomes[0]?.required_miss).toBe(true);
-    } finally {
-      searxng.stop();
-    }
-  });
 
   test("a scripted engine that honours the call is unchanged", async () => {
     const searxng = startFakeSearxng();
@@ -1802,8 +1782,8 @@ describe("turnNext.ts: ENGINE-CONTRACT-02, a required miss falls to the builder 
 // found the builder row searching the bare, unresolved utterance. These
 // tests use the same roster-safe shape (a person-subject turn, then a
 // pronoun follow-up), never the real household's own words.
-describe("turnNext.ts: QUERY-WRITER-01, a required miss recovers through one grammar-constrained generation before the raw-utterance builder row", () => {
-  test('a scripted engine that misses the forced call and then answers the constrained call with {"expression":"<resolved subject> show end"} searches that expression', async () => {
+describe("turnNext.ts: QUERY-WRITER-01, an invalid websearch call recovers through one grammar-constrained generation before the raw-utterance builder row", () => {
+  test('a scripted engine that sends an empty websearch call and then answers the constrained call with {"expression":"<resolved subject> show end"} searches that expression', async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     try {
@@ -1818,14 +1798,15 @@ describe("turnNext.ts: QUERY-WRITER-01, a required miss recovers through one gra
       let queryWriterRequest: ChatCompletionRequest | undefined;
       const result = await withStub(
         {
+          // THIN-2A: nothing forces a call any more, so the miss this
+          // recovers from is the model's own half-committed call (empty
+          // arguments, ENGINE-CONTRACT-02 regression A).
+          calls: (request) => (request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-1", name: "websearch", args: "{}" }]),
           reply: (request) => {
             if (request.response_format) {
               queryWriterRequest = request;
               return JSON.stringify({ expression: "marlow show end" });
             }
-            // The forced round's own miss: plain text, never a call -
-            // the exact ENGINE-CONTRACT-01 shape this item's own fix
-            // recovers from, one round earlier than the builder row.
             if (!request.messages.some((m) => m.role === "tool")) return "I'm not sure.";
             return "Marlow's show ended last year, sourced.";
           },
@@ -1860,6 +1841,7 @@ describe("turnNext.ts: QUERY-WRITER-01, a required miss recovers through one gra
 
       const result = await withStub(
         {
+          calls: (request) => (request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-1", name: "websearch", args: "{}" }]),
           reply: (request) => {
             // The query-writer's own generation succeeds and returns
             // valid JSON - but a BARE pronoun and nothing else, the
@@ -2595,7 +2577,7 @@ describe("turnNext.ts: COMMAND-FAIL-01, a failed pattern outcome continues the t
 // a doomed reply, and the phrasing/ordinary round's own cap comes from
 // LAT-01's one shared formula (visibleReplyMaxTokens), retiring
 // maxTokensFor's second, max_words * 2 formula (proven above, U4/U4c).
-describe("turnNext.ts: FORCED-CALL-01, a forced call that misses costs under a second", () => {
+describe("turnNext.ts: FORCED-CALL-01 (retired by THIN-2A), no call is forced, so none is aborted", () => {
   // The stub streams every word of a scripted reply synchronously in
   // one tick (stubServer.ts's own `start(controller)`), so on
   // localhost the whole HTTP response is already sitting in the fetch
@@ -2618,69 +2600,50 @@ describe("turnNext.ts: FORCED-CALL-01, a forced call that misses costs under a s
     return { reasons, restore: () => { AbortController.prototype.abort = original; } };
   }
 
-  test("a scripted engine that answers a required call with text is aborted after its first delta and the turn searches through the builder with required_miss: true", async () => {
+  // THIN-2A inverts the two forced-call rows that lived here: a model that
+  // answers in text is never aborted or searched for, and the first request
+  // carries tool_choice "auto" with the household's own thinking toggle and
+  // the model's own ceiling, not the forced call's fixed 96-token cap.
+  test("a scripted engine that answers a world question with text is never aborted and nothing is searched", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     const spy = spyOnAbort();
     try {
       const result = await withStub(
-        {
-          // The forced call never scripts a tool call at all (`calls`
-          // returns undefined), so it falls to `reply` and answers in
-          // plain text - the miss. The phrasing round (the second
-          // request, carrying a tool-role message) answers for real.
-          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question, sourced." : "The current president of Chile is a made-up name the model should never get to finish saying."),
-        },
+        { reply: () => "The current president of Chile is a name from the model's own knowledge." },
         () => runTurnNext(people.owner, "chat", "who is the president of chile"),
       );
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(searxng.queries.length).toBeGreaterThan(0);
-      expect(result.value.plugin_id).toBe("websearch");
-      expect(result.value.sources?.length).toBeGreaterThan(0);
-      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
-      const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; required_miss?: boolean } }[] };
-      const modelOutcomes = (stats.nodes ?? []).filter((n) => n.node === "model").map((n) => n.outcome ?? {});
-      expect(modelOutcomes[0]?.required_miss).toBe(true);
-      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { callId: string; args?: Record<string, unknown> }[]) : [];
-      expect(outcomes.some((o) => o.callId === "builder" && o.args?.expression === "who is the president of chile")).toBe(true);
-      // The proof this item is actually about: model.ts's own
-      // early-abort branch really fired, with its own documented
-      // reason, not just that the reply got discarded after arriving
-      // whole (ENGINE-CONTRACT-02's own, unmodified test above already
-      // covers "discarded eventually"; this proves "aborted, not read
-      // to the end").
-      expect(spy.reasons.some((r) => r instanceof DOMException && r.message === "forced call wrote text, not a tool call")).toBe(true);
+      expect(searxng.queries).toHaveLength(0);
+      expect(result.value.reply.text).toContain("from the model's own knowledge");
+      expect(spy.reasons.some((r) => r instanceof DOMException && r.message === "forced call wrote text, not a tool call")).toBe(false);
     } finally {
       spy.restore();
       searxng.stop();
     }
   });
 
-  test("a required request carries thinking: false and max_tokens: 96 whatever the budget's thinking", async () => {
+  test("the first request of a world question carries tool_choice auto, the toggled thinking and the model's ceiling", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
-    let forcedRequest: ChatCompletionRequest | undefined;
+    let firstRequest: ChatCompletionRequest | undefined;
     try {
       const result = await withStub(
         {
           calls: (request) => {
             if (request.messages.some((m) => m.role === "tool")) return undefined;
-            forcedRequest ??= request;
+            firstRequest ??= request;
             return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "president of chile" }) }];
           },
           reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
         },
-        // The household's own thinking toggled ON for this turn (the
-        // 8B's thinking_budget_tokens_toggled is 512, THINK-DEFAULT-01) -
-        // the exact case the row names: a required call's thinking:false
-        // and max_tokens:96 hold regardless of the budget's own thinking.
         () => runTurnNext(people.owner, "chat", "who is the president of chile", { thinking: true }),
       );
       expect(result.ok).toBe(true);
-      expect(forcedRequest?.tool_choice).toBe("required");
-      expect(forcedRequest?.chat_template_kwargs?.enable_thinking).toBe(false);
-      expect(forcedRequest?.max_tokens).toBe(96);
+      expect(firstRequest?.tool_choice).toBe("auto");
+      expect(firstRequest?.chat_template_kwargs?.enable_thinking).toBe(true);
+      expect(firstRequest?.max_tokens).toBe(1536 + 512);
     } finally {
       searxng.stop();
     }

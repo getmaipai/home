@@ -1,29 +1,14 @@
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
-// state table and "The interim rule"): one call, the fixed tool set
-// from the budget, tool_choice per the interim rule, streamed so the
-// wire's own `reasoning`/`delta` events (section "What every turn
-// writes") come from the same call turnNext.ts forwards to the client.
-//
-// The interim rule (simple-turn-pipeline-2026-09-22.md point 3, folded
-// with the state record's own "unless this conversation already holds
-// the answer" refinement): when the turn signal reads primary_act
-// "question" and target "world", and the budget's always_search is on,
-// the call runs tool_choice "required" over exactly two tools - the
-// search tool and, when answer_from_context_tool is also on,
-// answer_from_this_conversation (one argument: the quoted line of the
-// context list it answers from). The household-subject rule (a turn
-// naming a family member is never sent to the web) is a context check,
-// not a signal field: it looks at whether any "roster"-sourced item's
-// text names a subject already in the household-subject stack this
-// turn's context carries - here, simply, whether the utterance itself
-// contains a roster name, the same literal check subjects.ts's own
-// speakerNamedAny() already makes for this exact purpose elsewhere.
+// state table): one call, the fixed tool set from the budget, offered with
+// tool_choice "auto" (docs/design/RULES.md rule 1, THIN-2A: the model
+// decides whether a turn needs a search or a tool; no signal field, word
+// rule or list does), streamed so the wire's own `reasoning`/`delta` events
+// come from the same call turnNext.ts forwards to the client.
 import { startCompleteStream, envelopeToolCall } from "@/lib/llm";
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
-import { speakerNamedAny } from "@/lib/subjects";
 import { isBarePronoun } from "@/lib/text";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnShared";
@@ -96,14 +81,14 @@ export interface ModelInput {
    * boundary, since offering no tools is what makes a text answer
    * certain, never a second, separate cap checked somewhere else. */
   toolsAllowed: boolean;
-  /** The interim rule's own retry guard (the state record: "a quote
-   * that is not there is an ungrounded argument and the search runs
-   * instead"): true only on the one re-entry machine.ts's
-   * `answer_from_context_check` state makes after policy rejected an
-   * ungrounded quote. Forces the search tool alone, `tool_choice`
-   * "required" - never offering `answer_from_this_conversation` again,
-   * which is what guarantees this retries exactly once instead of the
-   * model choosing the same broken answer a second time. */
+  /** The ungrounded-quote retry guard (the state record: "a quote that is
+   * not there is an ungrounded argument and the search runs instead"):
+   * true only on the one re-entry machine.ts's `answer_from_context_check`
+   * state makes after policy rejected an ungrounded quote. Offers the
+   * search tool alone (still `tool_choice` "auto", never forced), never
+   * `answer_from_this_conversation` again, which is what guarantees this
+   * retries exactly once. Only reachable when a budget offers that tool;
+   * no catalog record does (stage 7 removes it with the old path). */
   forceSearchOnly?: boolean;
 }
 
@@ -126,24 +111,6 @@ export type ModelOutput =
   // never empty text.
   | { kind: "model_failed"; reasoning?: string };
 
-/** Whether the utterance is what the interim rule calls "a question
- * about the world" - the signal's own closed-set fields, no new rule. */
-function isWorldQuestion(state: TurnState): boolean {
-  return state.signal.primary_act === "question" && state.signal.target === "world";
-}
-
-/** The roster names this turn's own context list already carries
- * (nodes/context.ts's "roster" item), read back rather than re-fetched -
- * one source of the household's names, whichever node asks. */
-function rosterNames(state: TurnState): string[] {
-  return state.context.filter((c) => c.source === "roster").map((c) => c.text);
-}
-
-function householdSubjectNamed(state: TurnState): boolean {
-  const roster = rosterNames(state);
-  return roster.length > 0 && speakerNamedAny(state.utterance, roster);
-}
-
 function toolSpecFor(id: string): ToolSpec | null {
   if (id === ANSWER_FROM_CONTEXT_TOOL_ID) return ANSWER_FROM_CONTEXT_TOOL;
   // PROJECT-START-01: start_project is a virtual tool the same way
@@ -155,17 +122,6 @@ function toolSpecFor(id: string): ToolSpec | null {
   if (!loaded.ok) return null;
   return { id, description: loaded.value.description, args: loaded.value.args };
 }
-
-// FORCED-CALL-01 (dev.md "The owner's three live turns", (1)): a
-// required call's own reply IS a tool_calls fragment stream, never
-// text - a websearch call is 30 to 45 tokens (the name, `expression`,
-// `category`, `read_page` and the wrapper), so 96 leaves real room for
-// a long expression and can never pay for a 440-token knowledge answer
-// the way the ordinary/phrasing call's own cap did. The cap is the
-// backstop for the non-streaming Stack twin and for a runaway call;
-// the early-abort below (the first text delta on a forced call) is
-// what actually keeps a miss cheap in the common, streaming case.
-const FORCED_CALL_MAX_TOKENS = 96;
 
 /** The reply floor (spec-v0.1.28, U4b-2, turn-machine-state-record-
  * 2026-09-22.md "The reply floor"): a written, non-brevity, adult
@@ -247,31 +203,17 @@ function boundedGenerationError(message: string | undefined): string | undefined
  * it through the streaming client (COR-7's own signal support), and
  * drains it manually so the generator's return value (the tool calls)
  * survives - `for await...of` would discard it. */
-async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "required" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal): Promise<GenerationResult> {
-  const forced = tool_choice === "required";
-  // STREAM-NEXT-01 (b), ruling point 6: only a non-forced generation can
-  // legitimately end in text (a `required` call either calls the tool or
-  // is discarded by the builder row - FORCED-CALL-01's own abort-on-any-
-  // text below never lets one stream real prose), so the gate is never
-  // even touched for one. `state.streamGate` is undefined for every
-  // caller but turnNext.ts's own runTurnNextStream(), so this is a no-op
+async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal): Promise<GenerationResult> {
+  // STREAM-NEXT-01 (b): `state.streamGate` is undefined for every caller
+  // but turnNext.ts's own runTurnNextStream(), so this is a no-op
   // everywhere else. reset() clears whatever a PRIOR, now-abandoned
   // attempt (an offered round the model answered with a tool call
   // instead, or an earlier empty attempt this call is retrying) left
-  // pending - this turn's real reply is always its LAST eligible
-  // generation's own text.
-  const gate = forced ? undefined : state.streamGate;
+  // pending - this turn's real reply is always its LAST generation's
+  // own text.
+  const gate = state.streamGate;
   gate?.reset();
-  // FORCED-CALL-01: a child AbortController chained off the node's own
-  // signal (deadline.ts's nodeSignal shape, without its timer half -
-  // this one fires on content, not a clock), so a forced call's own
-  // early-abort never reaches past THIS generation's own request.
-  const controller = forced ? new AbortController() : null;
-  if (controller) {
-    if (signal.aborted) controller.abort(signal.reason);
-    else signal.addEventListener("abort", () => controller.abort(signal.reason), { once: true });
-  }
-  const started = await startCompleteStream("chat", messages, { model: state.modelId, tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens }, controller?.signal ?? signal);
+  const started = await startCompleteStream("chat", messages, { model: state.modelId, tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens }, signal);
   if (!started.ok) {
     // GENFAIL-01 (dev.md "generation_failed is never blind again"): a
     // failed attempt used to leave no generation record at all (the
@@ -312,20 +254,6 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
         break;
       }
       if (firstDeltaMs === null) firstDeltaMs = Date.now() - requestSentMs;
-      // FORCED-CALL-01: llm.ts streams a tool call as tool_calls
-      // fragments, never as text, and a forced call always runs
-      // thinking off (modelNode, below), so ANY text delta at all here
-      // already means the model wrote prose instead of a call - the
-      // miss itself. Abort now rather than pay for the rest of a
-      // doomed generation; breaking (not throwing) lets this fall
-      // through below exactly like an ordinary "no tool call" attempt,
-      // which the existing requiredButMissing/builder-row logic in
-      // modelNode already handles correctly.
-      if (forced && controller && step.value.length > 0) {
-        controller.abort(new DOMException("forced call wrote text, not a tool call", "AbortError"));
-        await started.tokens.return?.(undefined as never).catch(() => {});
-        break;
-      }
       raw += step.value;
       if (gate && thinkSplit) {
         for (const span of feedThinkSplit(thinkSplit, step.value)) if (!span.reasoning) gate.push(span.text);
@@ -571,11 +499,9 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // emission already uses.
   if (isPhrasingRound) state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "checking", state.persona), stage: "composing" });
 
-  const interimRuleApplies = input.toolsAllowed && state.budget.always_search && isWorldQuestion(state) && !householdSubjectNamed(state);
-
   let messages: LlmMessage[] = contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken");
   let tools: ToolSpec[];
-  let tool_choice: "auto" | "required" | "none" | undefined;
+  let tool_choice: "auto" | "none" | undefined;
 
   if (isPhrasingRound) {
     // PHRASE-01's own continuation: the forced call's own messages,
@@ -656,36 +582,29 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     tool_choice = "none";
   } else if (input.forceSearchOnly) {
     tools = [toolSpecFor("websearch")].filter((t): t is ToolSpec => t !== null);
-    tool_choice = "required";
+    tool_choice = "auto";
   } else if (!input.toolsAllowed) {
     tools = [];
     tool_choice = undefined;
-  } else if (interimRuleApplies) {
-    const ids = state.budget.answer_from_context_tool ? ["websearch", ANSWER_FROM_CONTEXT_TOOL_ID] : ["websearch"];
-    tools = ids.map(toolSpecFor).filter((t): t is ToolSpec => t !== null);
-    tool_choice = "required";
   } else {
     tools = state.budget.tools_offered
       .slice()
       .sort()
       .map(toolSpecFor)
       .filter((t): t is ToolSpec => t !== null);
+    tool_choice = "auto";
   }
 
   state.messages = messages;
   if (!isPhrasingRound) state.lastTools = tools;
 
-  // STREAM-NEXT-01 (b), ruling point 6: only a non-forced round can ever
-  // legitimately end in text (FORCED_CALL_MAX_TOKENS/the abort-on-any-
-  // text guard mean a forced round never has real prose to stream).
-  // Computed once, here, since `tool_choice` never changes across this
-  // node's own retry (below) - the SAME gate instance settles at
-  // exactly one of this function's own exit points, decided by THAT
-  // exit's own final outcome, never by an intermediate attempt a retry
-  // might still replace (a code review's own finding: finish()ing on an
-  // empty first attempt locked the gate before its own retry's real
-  // text could ever reach it).
-  const gate = tool_choice === "required" ? undefined : state.streamGate;
+  // STREAM-NEXT-01 (b): the gate settles at exactly one of this
+  // function's own exit points, decided by THAT exit's own final
+  // outcome, never by an intermediate attempt a retry might still
+  // replace (a code review's own finding: finish()ing on an empty first
+  // attempt locked the gate before its own retry's real text could ever
+  // reach it).
+  const gate = state.streamGate;
 
   // GROUND-01: `context`'s own decideReasoning() already decided
   // `reasoning.withheld_for === "minor"` from the age band, reused here
@@ -694,31 +613,13 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // cost control since the reasoning span would be consumed and
   // dropped below regardless (see `reasoning` a few lines down).
   const minorThinkingOff = state.reasoning.withheld_for === "minor" && !state.budget.thinking_for_minors;
-  // FORCED-CALL-01 (dev.md "The owner's three live turns", (1)):
-  // thinking off on every required call, whatever the person's own
-  // toggle - a call is not a reply, and re-check C's own miss-rate
-  // measurement was taken with thinking off. Only a `required` call is
-  // forced this way; an ordinary/offered call still follows the
-  // household's own toggle (THINK-DEFAULT-01) unchanged. A phrasing
-  // round's own tool_choice is "none", never "required", so it reads
-  // the household's own toggle too, same as an ordinary call.
-  const thinkingOn = tool_choice !== "required" && state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
-  // FORCED-CALL-01: the forced call's own cap is fixed (FORCED_CALL_
-  // MAX_TOKENS). THIN-1A (rule 5): every other round, the phrasing round
-  // included, takes replyMaxTokensFor's own answer - the model's ceiling
-  // for a written adult, LAT-01's formula for everyone else. PHRASE-01
-  // used to send the phrasing round through the formula directly, so an
-  // adult's searched answer was capped by the plan's word budget (608
-  // tokens) while the plain first call was not.
-  const maxTokens = tool_choice === "required" ? FORCED_CALL_MAX_TOKENS : replyMaxTokensFor(state, thinkingOn);
-  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : interimRuleApplies ? "interim_rule" : "model", signal);
-  // DEADLINE-01: a generation that never finished (the model node's
-  // own deadline, a dead engine) is one more way "the model produced
-  // no query" happens - on a forced turn (tool_choice required), the
-  // builder row runs exactly as it does for a missed or invalid call
-  // below; otherwise the turn gets a real, fixed model_failed line,
-  // never the empty string this used to deliver silently through
-  // `answer` as if the model had genuinely said nothing.
+  const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
+  const maxTokens = replyMaxTokensFor(state, thinkingOn);
+  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : "model", signal);
+  // DEADLINE-01: a generation that never finished (the model node's own
+  // deadline, a dead engine) gets a real, fixed model_failed line, never
+  // the empty string this used to deliver silently through `answer` as if
+  // the model had genuinely said nothing.
   if (!attempt.ok) {
     settleFailedGate(gate);
     const failureMessage = attempt.message ?? "";
@@ -726,7 +627,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
       state.engineUnavailable = true;
       return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
     }
-    return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
+    return { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
   }
 
   // ENVELOPE-NONE-01 (a code review, 2026-09-23): `tool_choice: "none"`
@@ -769,7 +670,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
         state.engineUnavailable = true;
         return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
       }
-      return tool_choice === "required" ? builderFallbackOutput(input.utterance, [], undefined, attempt.code, attempt.message) : { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
+      return { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
     }
     if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) attempt = { ...attempt, toolCalls: undefined };
   }
@@ -796,7 +697,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
 
   // ENGINE-CONTRACT-02 (dev.md 2026-09-23, "U6: the flip verdict"): the
   // model node verifies a websearch call carries a non-empty string
-  // expression, forced or offered alike - never only "did a tool_choice
+  // expression, offered - never only "did a tool_choice
   // required call come back with a call at all." Regression A found
   // llama-server b10797 half-committing on an OFFERED call too: a
   // parse-failed or empty arguments string, toolCallFromWire's own
@@ -828,19 +729,8 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // than inventing a second, parked-ask path for a case the household
   // never needs to confirm anything about.
   const websearchValid = typeof websearchExpression === "string" && websearchExpression.trim().length > 0 && !isBarePronoun(websearchExpression);
-  // QUERY-WRITER-01b (bench-only, getmaipai-26's ruling, 2026-09-24): a
-  // real required-call miss is genuinely rare and engine-dependent
-  // (ENGINE-CONTRACT-02 measured 0/5 to 8/10 by temp/cache state alone)
-  // - too unreliable to exercise recoveredMissingCall()/the query-writer
-  // itself from a live bench. This env var forces every forced turn
-  // into the miss branch below regardless of what the model actually
-  // returned, so a bench can drive that path deterministically. Read
-  // only by its own exact value, unset in every real deployment - a
-  // production request has no way to set it.
-  const benchForceRequiredMiss = process.env.MAIPAI_BENCH_FORCE_REQUIRED_MISS === "1";
-  const requiredButMissing = tool_choice === "required" && (!websearchCall || benchForceRequiredMiss);
   const offeredButInvalid = websearchCall !== undefined && !websearchValid;
-  if (requiredButMissing || offeredButInvalid) {
+  if (offeredButInvalid) {
     // A review caught the first cut here discarding every tool call the
     // model made, not only the bad websearch one - policy.ts runs every
     // proposal in `input.calls` (nodes/policy.ts's own `for` loop), so a
