@@ -1918,12 +1918,12 @@ async function captureChatThreadActionsReview(browser: Browser, sessionValue: st
 
 /** CHAT-LIST-01's own acceptance ("captured at 1440 and 390") - the
  * `/chat` thread list's own toolbar row with the new temporary-
- * chat button beside New Thread, both visible together. Seeded with
+ * chat button beside New chat, both visible together. Seeded with
  * one real conversation (seedTitledConversation, the same helper
  * captureChatThreadActionsReview uses for the legacy `/chat` list) so
  * the list isn't the empty state. On phone the rail is a Sheet, opened
  * the same way a person would ("Show threads" - NextChatPage.test.tsx's
- * own "New Thread closes the phone/tablet Sheet" test uses the same
+ * own "New chat closes the phone/tablet Sheet" test uses the same
  * button). Light and dark, matching the coordinator's own instruction
  * for this batch of four header/list rows. */
 async function captureChatListReview(browser: Browser, sessionValue: string): Promise<void> {
@@ -1946,7 +1946,7 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
         // On phone the rail column is still in the DOM (hidden, not
         // unmounted) once the Sheet's own copy of the same list opens
         // beside it - scoped to the open dialog the same way
-        // NextChatPage.test.tsx's "New Thread closes the phone/tablet
+        // NextChatPage.test.tsx's "New chat closes the phone/tablet
         // Sheet" test disambiguates the two.
         let scope: Page | Locator = page;
         if (slug === "phone") {
@@ -1954,7 +1954,7 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
           scope = page.getByRole("dialog");
         }
         await scope.getByText("Weekend garden plans", { exact: true }).waitFor();
-        await scope.getByRole("button", { name: "New Thread", exact: true }).waitFor();
+        await scope.getByRole("button", { name: "New chat", exact: true }).waitFor();
         await scope.getByRole("button", { name: "Start a temporary chat", exact: true }).waitFor();
         await settleAnimations(page);
         const file = `chat-list-temporary-button-${viewport.width}-${theme}.png`;
@@ -3075,9 +3075,9 @@ async function verifyLaneBTouchTargets(browser: Browser, sessionValue: string): 
       await page.keyboard.press("Escape");
       if (slug === "phone") {
         await page.getByRole("button", { name: "Show threads" }).click();
-        await check(page, page.getByRole("dialog").getByRole("button", { name: "New Thread", exact: true }), "New Thread (phone)");
+        await check(page, page.getByRole("dialog").getByRole("button", { name: "New chat", exact: true }), "New chat (phone)");
       } else {
-        await check(page, page.getByRole("button", { name: "New Thread", exact: true }), "New Thread (desktop)");
+        await check(page, page.getByRole("button", { name: "New chat", exact: true }), "New chat (desktop)");
       }
       await page.close();
     } finally {
@@ -5060,7 +5060,8 @@ async function buttonTransitionDuration(browser: Browser, sessionValue: string, 
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/`);
     await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    const trigger = page.getByRole("button", { name: "Toggle Sidebar" });
+    const menu = page.locator('[data-slot="sidebar"]').first();
+    const trigger = menu.getByRole("button", { name: "Toggle app menu", exact: true });
     await trigger.waitFor({ timeout: 15000 });
     const duration = await trigger.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
     return duration;
