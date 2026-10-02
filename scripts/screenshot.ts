@@ -55,6 +55,7 @@ import { rmSync, mkdirSync, existsSync, writeFileSync, readFileSync } from "node
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
+import { startScreenshotStack } from "./screenshotStack";
 import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
 // getmaipai/home#114: each backend asks Bun.serve() to bind port 0 atomically and reports
@@ -63,6 +64,7 @@ import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweep
 let DATA_DIR: string;
 let BASE_URL: string;
 let DATA_OWNER: RunOwner;
+let STACK_URL: string;
 const ROOT = join(import.meta.dir, "..");
 const BUILD_LOCK = join(ROOT, ".screenshot-build.lock");
 const useWebkit = process.argv.includes("--webkit");
@@ -451,6 +453,27 @@ function seedWeatherCache(dataDir: string): void {
   }
 }
 
+function seedWriteDocumentRoutingStats(): void {
+  if (!nextChatArtifactReview) return;
+  const source = `import { sqlite } from "./src/db/index.ts";
+sqlite.exec("PRAGMA foreign_keys = OFF");
+sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, user_text, reply_text, source, plugin_id, safety_action, created_at, hlc, routing_tier, routing_score) VALUES ('screenshot-routing-write-document', 'screenshot-routing-fixture', 'chat', 'screenshot routing fixture', '', 'plugin', 'write_document', 'allow', ?, ?, 'tool', 1.0)").run(new Date().toISOString(), new Date().toISOString() + ':0:screenshot-routing-write-document');
+sqlite.close();
+`;
+  const seeded = Bun.spawnSync({ cmd: ["bun", "-e", source], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+  if (seeded.exitCode !== 0) throw new Error(`write_document routing stats seed failed with exit code ${seeded.exitCode}`);
+}
+
+function attachWriteDocumentRoutingStats(personId: string): void {
+  if (!nextChatArtifactReview) return;
+  const source = `import { sqlite } from "./src/db/index.ts";
+sqlite.query("UPDATE conversation_turns SET person_id = ? WHERE id = 'screenshot-routing-write-document'").run(${JSON.stringify(personId)});
+sqlite.close();
+`;
+  const seeded = Bun.spawnSync({ cmd: ["bun", "-e", source], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+  if (seeded.exitCode !== 0) throw new Error(`write_document routing owner seed failed with exit code ${seeded.exitCode}`);
+}
+
 async function seedHousehold(): Promise<string> {
   // Seed through Bun's native fetch, not Playwright's own context.request:
   // playwright-core's APIRequestContext throws ("cannot be parsed as a
@@ -467,10 +490,28 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
+  for (const [key, value] of [["engines.stack.url", STACK_URL], ["engines.stack.use_chat", true], ["engines.stack.use_embeddings", true]] as const) {
+    const response = await fetch(`${BASE_URL}/api/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+      body: JSON.stringify({ scope: "household", key, value }),
+    });
+    if (!response.ok) throw new Error(`seed ${key} failed: ${response.status}`);
+  }
+  if (nextChatArtifactReview) {
+    const pipeline = await fetch(`${BASE_URL}/api/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+      body: JSON.stringify({ scope: "household", key: "turn.pipeline.next", value: false }),
+    });
+    if (!pipeline.ok) throw new Error(`seed turn.pipeline.next failed: ${pipeline.status}`);
+  }
+
   const seededPeople = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } });
   if (!seededPeople.ok) throw new Error(`seed people lookup failed: ${seededPeople.status}`);
   const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((person) => person.display_name === "Sage");
   if (!sage) throw new Error("seed people lookup did not return Sage");
+  attachWriteDocumentRoutingStats(sage.id);
   for (const person of [
     { displayName: "Marlow", role: "teen" },
     { displayName: "Nova", role: "child" },
@@ -2952,9 +2993,18 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
       const page = await context.newPage();
       await page.goto(`${BASE_URL}/chat`);
       await page.getByRole("textbox", { name: "Message input" }).waitFor();
-      await page.getByRole("button", { name: "Add", exact: true }).click();
-      await page.locator('[data-slot="composer-menu"][data-open]').waitFor({ timeout: 5000 });
-      await page.getByText("Add photos and files", { exact: true }).waitFor({ timeout: 5000 });
+      if (slug === "phone") {
+        await page.getByRole("button", { name: "Add", exact: true }).click();
+        await page.locator('[data-slot="composer-menu"][data-open]').waitFor({ timeout: 5000 });
+        await page.getByText("Add photos and files", { exact: true }).waitFor({ timeout: 5000 });
+      } else {
+        // At the desktop breakpoint Add is the direct attachment control;
+        // the shipped menu is phone-only (composerAddMenu.tsx). Capture
+        // that actual desktop state instead of waiting for a menu that
+        // this branch intentionally does not render.
+        await page.getByRole("button", { name: "Add", exact: true }).waitFor({ state: "visible" });
+      }
+      if ((await page.locator("body").innerText()).includes("isn't running")) throw new Error(`captureNextChatComposerReview: chat engine error banner on ${slug}`);
       await settleAnimations(page);
       const path = join(outDir, `next-chat-composer-${viewport.width}-dark.png`);
       await page.screenshot({ path, fullPage: slug === "phone" });
@@ -3142,31 +3192,63 @@ async function captureNextChatArtifactReview(browser: Browser, sessionValue: str
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
+  const modelSetting = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "chat.model_id", value: "qwen3-8b-instruct-q4-k-m" }),
+  });
+  if (!modelSetting.ok) throw new Error(`captureNextChatArtifactReview: seeding chat.model_id failed: ${modelSetting.status}`);
 
-  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
-  const context = await newContext(browser, viewport, "dark", sessionValue);
-  try {
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/chat`);
-    await page.getByRole("textbox", { name: "Message input" }).fill("Could you write me a short note about pizza night?");
+    await page.getByRole("textbox", { name: "Message input" }).fill("Could you write that up as a document about pizza night?");
     await page.getByRole("button", { name: "Send message", exact: true }).click();
-    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
-    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    const stopButton = page.getByRole("button", { name: "Stop generating", exact: true });
+    const artifactCard = page.locator('[data-slot="artifact-card"]');
+    await Promise.any([stopButton.waitFor({ timeout: 15000 }), artifactCard.waitFor({ timeout: 30000 })]);
+    if (await stopButton.count()) await stopButton.waitFor({ state: "detached", timeout: 30000 });
     // The artifact-card Element's own root slot, standalone in the
     // message flow (ArtifactTool's own `display: "standalone"`).
-    await page.locator('[data-slot="artifact-card"]').waitFor({ timeout: 15000 });
-    await page.locator('[data-slot="artifact-card"]').click();
+    try {
+      await artifactCard.waitFor({ timeout: 15000 });
+    } catch (error) {
+      const evidence = await page.evaluate(() => {
+        const roots = [...document.querySelectorAll('[data-slot="aui_assistant-message-root"]')];
+        const last = roots.at(-1);
+        const visible = (element: Element) => {
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return style.visibility !== "hidden" && style.display !== "none" && rect.width > 0 && rect.height > 0;
+        };
+        const parts = last ? [...last.querySelectorAll("[data-slot], [data-tool-name], [aria-label]")]
+          .filter((element) => /tool|artifact|document/i.test(`${element.getAttribute("data-slot") ?? ""} ${element.getAttribute("data-tool-name") ?? ""} ${element.getAttribute("aria-label") ?? ""}`) && visible(element))
+          .map((element) => ({ slot: element.getAttribute("data-slot"), tool: element.getAttribute("data-tool-name"), label: element.getAttribute("aria-label"), text: (element.textContent ?? "").trim().slice(0, 240) })) : [];
+        return { assistantText: last && visible(last) ? (last as HTMLElement).innerText.trim().slice(0, 1200) : null, toolCallParts: parts };
+      });
+      console.error(`[artifact-review] final assistant DOM evidence ${JSON.stringify(evidence)}`);
+      throw error;
+    }
+    const canvasBody = page.locator('[data-slot="canvas-split-body"]');
+    if (!(await canvasBody.isVisible().catch(() => false))) {
+      await artifactCard.click();
+    }
     // The canvas-split Element's own document body, real content
     // fetched through api.artifactCurrent() - not the card's loading
     // placeholder.
-    await page.locator('[data-slot="canvas-split-body"]').waitFor({ timeout: 15000 });
+    await canvasBody.waitFor({ timeout: 15000 });
     await settleAnimations(page);
     const path = join(outDir, `next-chat-artifact-${viewport.width}-dark.png`);
-    await page.screenshot({ path });
+    await page.screenshot({ path, fullPage: slug === "phone" });
     console.log(`Wrote ${path}`);
     await page.close();
-  } finally {
-    await context.close();
+    } finally {
+      await context.close();
+    }
   }
 }
 
@@ -4790,6 +4872,7 @@ async function main() {
   DATA_DIR = createOwnedDemoDataDir(ROOT, DATA_OWNER);
   try {
     seedWeatherCache(DATA_DIR);
+    seedWriteDocumentRoutingStats();
     if (statusC3bReview) seedStatusC3bEvents();
 
   console.log("Starting a throwaway backend on a temp data dir...");
@@ -4918,6 +5001,8 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
+  const screenshotStack = startScreenshotStack(chatModel.url);
+  STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
   let backend: ReturnType<typeof Bun.spawn>;
@@ -4955,6 +5040,7 @@ async function main() {
     // actual cause - is always what gets rethrown, never whatever a
     // cleanup step itself raised.
     try { chatModel.stop(); } catch { /* best effort */ }
+    try { screenshotStack.stop(true); } catch { /* best effort */ }
     try { removeOwnedDemoDataDir(DATA_DIR, DATA_OWNER.token); } catch { /* best effort */ }
     throw err;
   }
@@ -5477,11 +5563,15 @@ async function main() {
     }
   } finally {
     await browser?.close();
+    const backendPid = backend.pid;
     backend.kill();
     try { chatModel.stop(); } catch { /* best effort */ }
     try { pictureSearchServer?.stop(true); } catch { /* best effort */ }
     try { websearchFixture?.stop(true); } catch { /* best effort */ }
     try { await backend.exited; } catch { /* best effort */ }
+    if (backendPid && processStartTime(backendPid) !== undefined) throw new Error(`Screenshot backend pid ${backendPid} survived teardown`);
+    if (await fetch(BASE_URL, { signal: AbortSignal.timeout(500) }).then(() => true, () => false)) throw new Error(`Screenshot backend port at ${BASE_URL} remained open after teardown`);
+    screenshotStack.stop(true);
     removeOwnedDemoDataDir(DATA_DIR, DATA_OWNER.token);
   }
   } catch (startupError) {
