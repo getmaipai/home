@@ -276,7 +276,8 @@ const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
 const nextChatPolishReview = process.argv.includes("--next-chat-polish-review");
-const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview;
+const nextShellFoldReview = process.argv.includes("--next-shell-fold-review");
+const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview;
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
@@ -3260,6 +3261,126 @@ async function captureNextChatArtifactReview(browser: Browser, sessionValue: str
   }
 }
 
+async function captureNextShellFoldReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        await page.evaluate(() => { document.cookie = "sidebar_state=; path=/; max-age=0"; });
+        await page.reload();
+        if (slug === "phone") {
+          await page.getByRole("button", { name: "Show threads" }).waitFor();
+          const historyButton = page.getByRole("button", { name: "Show threads" });
+          const phoneRow = historyButton.locator("xpath=ancestor::div[contains(@class, 'lg:hidden')][1]");
+          await settleAnimations(page);
+          const firstRunPath = join(outDir, `next-shell-fold-phone-first-run-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path: firstRunPath, fullPage: true });
+          console.log(`Wrote ${firstRunPath}`);
+          const phonePath = join(outDir, `next-shell-fold-phone-history-row-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path: phonePath, fullPage: true });
+          console.log(`Wrote ${phonePath}`);
+          const headerTrigger = page.locator('header [data-slot="sidebar-trigger"]');
+          await headerTrigger.click();
+          await page.locator('[data-mobile="true"][data-slot="sidebar"]').waitFor({ state: "visible" });
+          await settleAnimations(page);
+          const sheetPath = join(outDir, `next-shell-fold-phone-menu-sheet-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path: sheetPath, fullPage: true });
+          console.log(`Wrote ${sheetPath}`);
+          await page.close();
+          continue;
+        }
+        const menu = page.locator('[data-slot="sidebar"]').first();
+        await menu.waitFor({ state: "attached" });
+        await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "collapsed");
+        const suffix = `${viewport.width}-${theme}`;
+        if (slug === "desktop") {
+          await menu.getByRole("link", { name: "Chat" }).hover();
+          await page.locator('[data-slot="tooltip-content"]').filter({ hasText: "Chat" }).waitFor({ state: "visible" });
+        }
+        await settleAnimations(page);
+        const foldedPath = join(outDir, `next-shell-fold-chat-first-folded-${suffix}.png`);
+          await page.screenshot({ path: foldedPath, fullPage: slug === "phone" });
+        console.log(`Wrote ${foldedPath}`);
+
+        {
+          const menuTrigger = menu.getByRole("button", { name: "Toggle app menu" });
+          await menuTrigger.waitFor();
+          await menuTrigger.click();
+          await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "expanded");
+          await settleAnimations(page);
+          const openPath = join(outDir, `next-shell-fold-chat-click-open-${suffix}.png`);
+          await page.screenshot({ path: openPath });
+          console.log(`Wrote ${openPath}`);
+
+          await page.reload();
+          await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "expanded");
+          await settleAnimations(page);
+          const reloadPath = join(outDir, `next-shell-fold-chat-reload-open-${suffix}.png`);
+          await page.screenshot({ path: reloadPath });
+          console.log(`Wrote ${reloadPath}`);
+        }
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+
+  for (const theme of THEMES) {
+    const viewport = VIEWPORTS.find((item) => item.slug === "desktop")!;
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/next`);
+      await page.getByRole("heading", { level: 1 }).first().waitFor();
+      await page.evaluate(() => { document.cookie = "sidebar_state=; path=/; max-age=0"; });
+      await page.reload();
+      await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "collapsed");
+      await settleAnimations(page);
+      const collapsedPath = join(outDir, `next-shell-fold-home-first-folded-1440-${theme}.png`);
+      await page.screenshot({ path: collapsedPath });
+      console.log(`Wrote ${collapsedPath}`);
+      const menu = page.locator('[data-slot="sidebar"]').first();
+      await menu.getByRole("button", { name: "Toggle app menu" }).click();
+      await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "expanded");
+      await settleAnimations(page);
+      const expandedPath = join(outDir, `next-shell-fold-home-click-open-1440-${theme}.png`);
+      await page.screenshot({ path: expandedPath });
+      console.log(`Wrote ${expandedPath}`);
+    } finally {
+      await context.close();
+    }
+  }
+
+  const desktop = VIEWPORTS.find((item) => item.slug === "desktop")!;
+  const cookie = { Cookie: `session=${sessionValue}` };
+  await seedTitledConversation("captureNextShellFoldReview", cookie, "Weekend garden plans");
+  const context = await newContext(browser, desktop, "dark", sessionValue);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+    await page.getByRole("button", { name: "Toggle app menu" }).click();
+    await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "expanded");
+    const list = page.locator('[data-slot="next-chat-rail"]');
+    await list.getByRole("button", { name: "New chat", exact: true }).waitFor();
+    await list.getByRole("searchbox", { name: "Search chats" }).waitFor();
+    await settleAnimations(page);
+    const path = join(outDir, "next-shell-fold-chat-list-1440-dark.png");
+    await page.screenshot({ path });
+    console.log(`Wrote ${path}`);
+  } finally {
+    await context.close();
+  }
+}
+
 async function captureNextChatPolishReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -5442,6 +5563,12 @@ async function main() {
     if (nextChatPolishReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
       await captureNextChatPolishReview(browser, sessionValue);
       console.log("completed named review: --next-chat-polish-review");
+      return;
+    }
+
+    if (nextShellFoldReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextChatPolishReview) {
+      await captureNextShellFoldReview(browser, sessionValue);
+      console.log("completed named review: --next-shell-fold-review");
       return;
     }
 
