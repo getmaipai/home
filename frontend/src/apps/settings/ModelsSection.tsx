@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Badge } from "@maipai/ui/src/ui/badge";
-import { Status } from "@maipai/ui/src/ui/status";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
@@ -14,7 +13,7 @@ import { modelLinkName, parseModelLink } from "@/lib/modelLink";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { Card } from "@maipai/ui/src/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
-import { describeFitPlan, describeHomeOwnedRoles, type FitPanelRow } from "@/lib/fitPanel";
+import { describeFitPlan, describeHomeOwnedRoles, fitBadgeWord, fitSourceSentence, type FitPanelRow } from "@/lib/fitPanel";
 import type { ComputerMemoryResponse } from "@/lib/api";
 import type { FitPlanResponse } from "@/lib/api";
 import { summarizeFits } from "@/lib/fitSummary";
@@ -159,13 +158,17 @@ function FitLine({ fitPlan, legacyWarning }: { fitPlan: ReturnType<typeof useFit
 }
 
 function FitResult({ headline, detail, verdict, sizedModel }: { headline: string; detail: string; verdict: "yes" | "slow" | "no" | "unknown"; sizedModel?: string | null }) {
+  return <div className="flex flex-col items-start gap-1"><FitVerdictBadge verdict={verdict} /><p className="text-base text-[var(--muted-foreground)]">{headline}</p><p className="text-base text-[var(--muted-foreground)]">{detail}</p>{sizedModel ? <p className="text-base text-[var(--muted-foreground)]">Sized from {sizedModel}.</p> : null}</div>;
+}
+
+function FitVerdictBadge({ verdict }: { verdict: "yes" | "slow" | "no" | "unknown" }) {
   const appearance = {
     yes: { variant: "secondary" as const, className: "bg-[var(--hue-teal)] text-foreground" },
     slow: { variant: "secondary" as const, className: "bg-[var(--hue-orange)] text-foreground" },
     no: { variant: "destructive" as const, className: "" },
     unknown: { variant: "secondary" as const, className: "" },
   }[verdict];
-  return <div className="flex flex-col items-start gap-1"><Badge data-verdict={verdict} variant={appearance.variant} className={appearance.className}>{headline}</Badge><p className="text-base text-[var(--muted-foreground)]">{detail}</p>{sizedModel ? <p className="text-base text-[var(--muted-foreground)]">Sized from {sizedModel}.</p> : null}</div>;
+  return <Badge data-verdict={verdict} variant={appearance.variant} className={appearance.className}>{fitBadgeWord(verdict)}</Badge>;
 }
 
 function CheckModelCard({ onChecked }: { onChecked: (name: string, response: FitPlanResponse) => void }) {
@@ -218,7 +221,7 @@ function DetailsFitPanel({ fitPlan, legacyBytes }: { fitPlan: ReturnType<typeof 
 function FitPanel({ response }: { response: FitPlanResponse }) {
   if (!response.plan) return null;
   const { rows, remedy } = describeFitPlan(response.plan);
-  return <div className="flex flex-col gap-3 pt-2"><SpecSheet title="Fit details" rows={rows.map(({ label, value }) => ({ label, value }))} visibleCount={rows.length} />{rows.filter((row) => row.source && row.source !== "unknown").map((row) => <FitSource key={row.label} row={row} />)}{remedy ? <Alert><AlertTitle>What would help?</AlertTitle><AlertDescription>{remedy}</AlertDescription></Alert> : null}</div>;
+  return <div className="flex flex-col gap-3 pt-2"><SpecSheet title="Fit details" rows={rows.map(({ label, value }) => ({ label, value }))} visibleCount={rows.length} />{rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}{remedy ? <Alert><AlertTitle>What would help?</AlertTitle><AlertDescription>{remedy}</AlertDescription></Alert> : null}</div>;
 }
 
 function CompareCard({ recommended, checked, hardware }: { recommended: { name: string; response: FitPlanResponse | null }; checked: Array<{ name: string; response: FitPlanResponse }>; hardware: HardwareInfo | null }) {
@@ -233,11 +236,11 @@ function CompareCard({ recommended, checked, hardware }: { recommended: { name: 
   if (comparable.length < 2) return null;
   const cards = comparable.map((item) => {
     const need = describeFitPlan(item.response.plan!).rows.find((row) => row.label === "Memory it needs")?.value ?? "Not known yet";
-    const status = { yes: "online", slow: "degraded", no: "offline", unknown: "maintenance" }[item.response.wording.verdict] as "online" | "degraded" | "offline" | "maintenance";
     return (
       <Card key={item.name} className="gap-3 p-4">
         <h4 className="break-words text-base font-medium">{item.name}</h4>
-        <Status status={status} className="w-fit">{item.response.wording.headline}</Status>
+        <FitVerdictBadge verdict={item.response.wording.verdict} />
+        <p className="text-sm text-[var(--muted-foreground)]">{item.response.wording.headline}</p>
         <div className="flex flex-col gap-1">
           <span className="text-sm text-[var(--muted-foreground)]">Memory it needs</span>
           <span className="break-words text-base tabular-nums">{need}</span>
@@ -277,9 +280,8 @@ function CompareCard({ recommended, checked, hardware }: { recommended: { name: 
 }
 
 function FitSource({ row }: { row: FitPanelRow }) {
-  if (!row.source || row.source === "unknown") return null;
-  const sourceName = { measured: "Measured", "dry-run": "Dry run", estimated: "Estimated" }[row.source];
-  return <p className="text-sm text-[var(--muted-foreground)]">{row.label}: {sourceName}{row.asOf ? ` · ${row.asOf}` : ""}</p>;
+  if (!row.source) return null;
+  return <p className="text-sm text-[var(--muted-foreground)]">{row.label}: {fitSourceSentence(row.source, row.asOf)}</p>;
 }
 
 function ComputerMemoryCard({ response }: { response: ComputerMemoryResponse }) {

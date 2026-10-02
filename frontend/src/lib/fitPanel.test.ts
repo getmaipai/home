@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { StackFitPlan, type StackFitPlan as Plan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
-import { describeFitPlan, describeHomeOwnedRoles } from "@/lib/fitPanel";
+import { describeFitPlan, describeHomeOwnedRoles, fitBadgeWord, fitSourceSentence } from "@/lib/fitPanel";
 
 const measured = (low: number, high: number) => ({ low: Math.round(low), high: Math.round(high), source: "measured" as const, as_of: "2026-09-30" });
 const unknownFigure = () => ({ low: null, high: null, source: "unknown" as const, as_of: "2026-09-30" });
@@ -54,7 +54,7 @@ describe("describeFitPlan", () => {
     const source = plan("unknown");
     source.total = unknownFigure();
     source.cap = unknownFigure();
-    expect(describeFitPlan(source).rows.slice(0, 2).map((row) => row.value)).toEqual(["Not known yet", "Not known yet"]);
+    expect(describeFitPlan(source).rows.slice(0, 2).map((row) => row.value)).toEqual(["Not measured yet", "Not measured yet"]);
   });
   test("collapses a range when both endpoints round to the same tenth", () => {
     const source = plan("yes");
@@ -70,5 +70,30 @@ describe("describeFitPlan", () => {
   test("has no remedy for yes or unknown plans", () => {
     expect(describeFitPlan(plan("yes")).remedy).toBeNull();
     expect(describeFitPlan(plan("unknown")).remedy).toBeNull();
+  });
+});
+
+describe("fit verdict badge words", () => {
+  test("yes reads Good fit", () => expect(fitBadgeWord("yes")).toBe("Good fit"));
+  test("slow reads Slow here", () => expect(fitBadgeWord("slow")).toBe("Slow here"));
+  test("no reads Too big", () => expect(fitBadgeWord("no")).toBe("Too big"));
+  test("unknown reads Not tested yet", () => expect(fitBadgeWord("unknown")).toBe("Not tested yet"));
+});
+
+describe("fit number source sentences", () => {
+  test("measured reads Tested on this computer on 30 Sep 2026.", () => {
+    expect(fitSourceSentence("measured", "2026-09-30")).toBe("Tested on this computer on 30 Sep 2026.");
+  });
+  test("dry-run reads Checked on this computer without a full run, 30 Sep 2026.", () => {
+    expect(fitSourceSentence("dry-run", "2026-09-30")).toBe("Checked on this computer without a full run, 30 Sep 2026.");
+  });
+  test("estimated reads An estimate. Not yet tested on a computer like this one.", () => {
+    expect(fitSourceSentence("estimated", "2026-09-30")).toBe("An estimate. Not yet tested on a computer like this one.");
+  });
+  test("unknown reads Not known yet.", () => {
+    expect(fitSourceSentence("unknown", "2026-09-30")).toBe("Not known yet.");
+  });
+  test("formats the stored measurement date without using a literal date", () => {
+    expect(fitSourceSentence("measured", "2025-01-09")).toBe("Tested on this computer on 9 Jan 2025.");
   });
 });

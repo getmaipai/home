@@ -298,19 +298,21 @@ describe("ModelsSection", () => {
 
   test("fit verdict badges use the teal, orange, red, and neutral status tokens", async () => {
     const cases = [
-      { response: FIT_YES, token: "--hue-teal" },
-      { response: { plan: testPlan("slow"), wording: { verdict: "slow", headline: "Runs, but slowly", detail: "It fits only by using the processor, so answers will be slower." } }, token: "--hue-orange" },
-      { response: FIT_NO, token: "bg-destructive" },
-      { response: FIT_UNKNOWN, token: "bg-secondary" },
+      { response: FIT_YES, badge: "Good fit", token: "--hue-teal" },
+      { response: { plan: testPlan("slow"), wording: { verdict: "slow", headline: "Runs, but slowly", detail: "It fits only by using the processor, so answers will be slower." } }, badge: "Slow here", token: "--hue-orange" },
+      { response: FIT_NO, badge: "Too big", token: "bg-destructive" },
+      { response: FIT_UNKNOWN, badge: "Not tested yet", token: "bg-secondary" },
     ];
-    for (const { response, token } of cases) {
+    for (const { response, badge, token } of cases) {
       const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, response);
       try {
         const { findByText, getByText } = render(<ModelsSection />);
+        await findByText(badge);
         await findByText(response.wording.headline);
-        const pill = getByText(response.wording.headline).closest("[data-verdict]");
+        const pill = getByText(badge).closest("[data-verdict]");
         expect(pill?.getAttribute("data-verdict")).toBe(response.wording.verdict);
         expect(pill?.className).toContain(token);
+        if (response.wording.verdict === "unknown") expect(pill?.className).not.toContain("bg-destructive");
       } finally { restore(); cleanup(); __resetFitPlanCacheForTests(); }
     }
   });
