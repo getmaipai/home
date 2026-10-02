@@ -3865,7 +3865,7 @@ describe("NextChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
     };
   }
 
-  async function openHeaderMenu(view: { findByRole: (role: string, options: { name: string }) => Promise<HTMLElement> }) {
+  async function openHeaderMenu(view: { findAllByRole: (role: string, options: { name: string }) => Promise<HTMLElement[]> }) {
     const trigger = (await view.findAllByRole("button", { name: "Conversation actions" }))[0]!;
     act(() => {
       fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 });
