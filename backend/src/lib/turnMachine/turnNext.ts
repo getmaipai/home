@@ -92,8 +92,12 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
   // input-side crisis mention just because the output side had nothing
   // to add. `state.streamGate` is undefined for every non-streaming
   // caller, so this is a no-op there.
+  // THIN-0E (#85): a refused stream's result is the whole-reply check
+  // (it carries an earlier delivered sentence's self_harm category), so
+  // it wins over the last sentence's own flag.
   const inputCrisisLine = state.crisis ? "If you or someone you know is in crisis, help is available. Call or text 988 (US) any time." : undefined;
-  const outputFlag = state.streamGate?.result().lastFlagged;
+  const gated = state.streamGate?.result();
+  const outputFlag = gated?.refused ?? gated?.lastFlagged;
   const crisisResources = outputFlag ? (deriveCrisisResources(outputFlag) ?? inputCrisisLine) : inputCrisisLine;
   return {
     reply: { text, speech },
