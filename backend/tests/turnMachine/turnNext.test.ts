@@ -5,6 +5,8 @@
 // (the machine, every node, the real DB) with scripted model behaviour,
 // since no live engine is available in this suite.
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests, __setChatRecoveryNudgeForTests } from "@/lib/llmSupervisor";
@@ -3620,5 +3622,62 @@ describe("turnNext.ts: THIN-0J, server-side speech text for spoken turns on the 
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toBe(WRITTEN);
     expect(result.value.reply.speech).toBeUndefined();
+  });
+});
+
+// THIN-2C (docs/design/RULES.md rule 1): the turn signal keeps four jobs (the
+// plan line, memory-judge eligibility, the wire `signal` event and spoken-cue
+// suppression) and no longer has a search job. One test per job, plus a scan
+// that nothing in the machine's tool path reads the signal's target or act.
+describe("turnNext.ts: THIN-2C, the turn signal keeps its four jobs and has no search job", () => {
+  test("plan line: a spoken question's prompt carries the plan line naming the act", async () => {
+    let request: ChatCompletionRequest | undefined;
+    const result = await withStub(
+      { reply: (r) => { request = r; return "Paris."; } },
+      () => runTurnNext(people.owner, "chat", "what is the capital of france", { spoken: true }),
+    );
+    expect(result.ok).toBe(true);
+    const text = (request?.messages ?? []).map((m) => (typeof m.content === "string" ? m.content : "")).join("\n");
+    expect(text).toContain("a question");
+    expect(text).toContain("sentence");
+  });
+
+  test("judge eligibility: the signal a turn carries marks a statement eligible and a question not", async () => {
+    const { hasEligibleClause } = await import("@/lib/turnSignal");
+    const statement = await withStub({ reply: () => "Nice." }, () => runTurnNext(people.owner, "chat", "sprout plays the violin on tuesdays"));
+    const question = await withStub({ reply: () => "Paris." }, () => runTurnNext(people.owner, "chat", "what is the capital of france"));
+    if (!statement.ok || statement.kind !== "immediate" || !question.ok || question.kind !== "immediate") throw new Error("expected immediate results");
+    expect(hasEligibleClause(statement.signal)).toBe(true);
+    expect(hasEligibleClause(question.signal)).toBe(false);
+  });
+
+  test("wire event: the streamed result carries the same frozen signal the route sends as the signal event", async () => {
+    await withStub({ reply: () => "Paris." }, async () => {
+      const result = await runTurnNextStream(people.owner, "chat", "what is the capital of france");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      expect(result.signal.primary_act).toBe("question");
+      expect(result.signal.target).toBe("world");
+    });
+  });
+
+  test("spoken cue: suppressed when the turn blames the hub, not otherwise", async () => {
+    await withStub({ reply: () => "Sorry about that." }, async () => {
+      const blame = await runTurnNextStream(people.owner, "chat", "no, you're wrong about that", { spoken: true });
+      if (!blame.ok || blame.kind !== "stream") throw new Error("expected a stream result");
+      expect(blame.cueSuppressed).toBe(true);
+    });
+    await withStub({ reply: () => "Paris." }, async () => {
+      const plain = await runTurnNextStream(people.owner, "chat", "what is the capital of france", { spoken: true });
+      if (!plain.ok || plain.kind !== "stream") throw new Error("expected a stream result");
+      expect(plain.cueSuppressed).toBe(false);
+    });
+  });
+
+  test("no search job: the model, policy, tool, answer and machine files never read the signal's target, act or computed kind", () => {
+    const root = join(import.meta.dir, "../../src/lib/turnMachine");
+    for (const file of ["nodes/model.ts", "nodes/policy.ts", "nodes/tool.ts", "nodes/answer.ts", "machine.ts"]) {
+      const source = readFileSync(join(root, file), "utf8");
+      expect({ file, reads: /signal\.(target|primary_act)|"computed"/.test(source) }).toEqual({ file, reads: false });
+    }
   });
 });
