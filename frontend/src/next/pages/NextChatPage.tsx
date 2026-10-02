@@ -1381,9 +1381,9 @@ function NextThreadList({
     <ThreadListRoot>
       <div className="flex items-center gap-1">
         {collapseToggle}
-        <ThreadListNew className="min-h-12" onClick={onNewThread} disabled={availability === "unavailable"} />
+        <ThreadListNew label="New chat" className="min-h-12" onClick={onNewThread} disabled={availability === "unavailable"} />
       </div>
-      {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} />}
+      {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} label="Search chats" />}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />
     </ThreadListRoot>
   );
