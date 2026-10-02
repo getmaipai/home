@@ -12,7 +12,7 @@
 // needs: routes/turn.ts's `/stream` route calls it instead, when
 // turn.pipeline.next is on.
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
-import type { Surface, TurnValue, TurnStreamResult, StreamOutcome } from "@/lib/turnEngine";
+import type { Surface, SpeakerEvidence, PresentPerson, TurnValue, TurnStreamResult, StreamOutcome } from "@/lib/turnEngine";
 import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert } from "@/lib/turnEngine";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
@@ -51,6 +51,12 @@ export interface RunTurnNextOpts {
   // own doc comment has the full matching rule. Absent for every typed
   // or spoken turn, exactly as today.
   ask_answer?: { turn_id: string; approved: boolean };
+  // THIN-0D: the robot body's own speaker_evidence and present list,
+  // from POST /api/turn and /api/turn/stream (routes/turn.ts passes them
+  // for the robot surface only). Absent means the body said nothing, and
+  // a robot turn without evidence naming the signed-in person is anonymous.
+  speakerEvidence?: SpeakerEvidence | null;
+  present?: readonly PresentPerson[] | null;
   // U4/RESP-01 point 1: additive, forces the spoken register for a
   // dictated chat turn - unwired to any client today (no dictation
   // marker exists yet), plumbed and tested ahead of a real caller.
@@ -298,6 +304,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     conversationId: conversation.id,
     actor,
     surface,
+    ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
     utterance: text,
     modelId: opts.model,
     signal,

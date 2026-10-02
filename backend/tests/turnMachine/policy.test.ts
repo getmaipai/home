@@ -171,3 +171,23 @@ describe("policyNode: a manifest that fails validation is refused as manifest_in
     expect(missingOutcome.message).toBeUndefined();
   });
 });
+
+// THIN-0D: a model-proposed recall for an unidentified robot speaker is
+// refused (the recall package reads the signed-in person's memories).
+describe("policyNode: THIN-0D, a recall proposal is refused for an unidentified robot speaker", () => {
+  beforeEach(() => resetDb());
+
+  function robotState(speakerEvidence: TurnState["speakerEvidence"]): TurnState {
+    return { actor: { id: "owner-1", role: "owner" }, surface: "robot", speakerEvidence, context: [], crisis: false, temporary: false, utterance: "do you remember my favorite food" } as unknown as TurnState;
+  }
+  const call = { tool: "recall", args: { topic: "favorite food" }, id: "call-1" };
+
+  test("no evidence refuses with anonymous_speaker; the identified speaker is allowed; another surface is allowed", async () => {
+    const anon = await policyNode(robotState(null), { calls: [call] }, new AbortController().signal);
+    expect(anon.output.entries[0]?.decision).toEqual({ allow: false, reason: "anonymous_speaker" });
+    const known = await policyNode(robotState({ person: "owner-1", basis: "voice", level: "confirmed" }), { calls: [call] }, new AbortController().signal);
+    expect(known.output.entries[0]?.decision).toEqual({ allow: true });
+    const chat = await policyNode({ ...robotState(null), surface: "chat" } as TurnState, { calls: [call] }, new AbortController().signal);
+    expect(chat.output.entries[0]?.decision).toEqual({ allow: true });
+  });
+});

@@ -18,6 +18,7 @@ import { matchPattern, loadAllManifests } from "@/lib/turnEngine";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { runPlugin, meetsMinRole } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
+import { speakerIsAnonymous, readsMemory } from "../speaker";
 import { usableReply } from "@/lib/composer";
 import { COMPUTED_WILDCARD_RESOLVERS, NEVER_FIRES_WILDCARDS } from "@/lib/manifestLint";
 import type { Node, NodeOutcome } from "../contract";
@@ -88,6 +89,9 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
     // applied here too since this loop runs before the model ever sees
     // the turn.
     if (state.temporary && manifest.permissions?.includes("memory:write")) continue;
+    // THIN-0D: a package that reads memory reads the signed-in person's,
+    // so an unidentified robot speaker never reaches it by an opener.
+    if (speakerIsAnonymous(state) && readsMemory(manifest)) continue;
     for (const pattern of manifest.routing?.patterns ?? []) {
       const captured = matchPattern(input.utterance, pattern);
       if (captured === null) continue;

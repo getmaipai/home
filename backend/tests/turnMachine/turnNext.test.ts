@@ -3135,3 +3135,31 @@ describe("turnNext.ts: the memory judge and the default path (THIN-0C)", () => {
     expect(turnActiveWithin(20_000)).toBe(true);
   });
 });
+
+// THIN-0D, end to end: the opts the route passes for the robot surface
+// reach the machine, and the prompt the engine receives carries none of
+// the signed-in person's memories unless the evidence names them.
+describe("turnNext.ts: THIN-0D, an unidentified robot speaker's prompt carries no personal memory", () => {
+  const PERSONAL = "Sage likes noodles with extra chili for dinner";
+
+  async function promptFor(opts: { speakerEvidence?: { person: string | null; basis: "voice" | "unknown"; level: "confirmed" | "unknown" } | null }, surface: "robot" | "chat" = "robot"): Promise<string> {
+    const seeded = remember(people.owner, { text: PERSONAL, category: "fact", tier: "durable", scope: "person", person: people.owner.id, source: "test", importance: 0.5 });
+    if (!seeded.ok) throw new Error("setup failed");
+    await embedMemoryRecordSafely(seeded.value.id, PERSONAL);
+    const seen: ChatCompletionRequest[] = [];
+    await withStub({ reply: (request) => { seen.push(request); return "Noodles sound good."; } }, () => runTurnNext(people.owner, surface, "should we eat noodles for dinner", opts));
+    return seen.flatMap((request) => request.messages.map((m) => String(m.content ?? ""))).join("\n");
+  }
+
+  test("no evidence: the engine never sees the signed-in person's memory", async () => {
+    expect(await promptFor({ speakerEvidence: null })).not.toContain("extra chili");
+  });
+
+  test("evidence naming the signed-in person: the memory reaches the engine", async () => {
+    expect(await promptFor({ speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } })).toContain("extra chili");
+  });
+
+  test("a chat turn is unchanged", async () => {
+    expect(await promptFor({}, "chat")).toContain("extra chili");
+  });
+});

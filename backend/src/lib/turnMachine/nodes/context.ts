@@ -16,6 +16,7 @@ import { subjectRosterFor } from "@/lib/subjects";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { MAX_MEMORY_SNIPPETS } from "@/lib/turnEngine";
+import { speakerIsAnonymous } from "../speaker";
 import type { Node, ContextItem, TurnState } from "../contract";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
@@ -130,16 +131,16 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // the whole job.
     const now = new Date();
     const ageBand = speakerAgeBand(state.actor, now);
-    // withholdSensitive's robot half mirrors turnContext.ts's own
-    // sensitiveAllowed(): missing presence data withholds rather than
-    // guesses, and no presence signal exists on the new path yet
-    // (this file's own header note) - so every robot-surface turn
-    // withholds sensitive records until a real speaker-evidence/
-    // presence system lands here too. anonymous stays false for the
-    // same reason: no unknown-speaker-default path exists on the new
-    // engine yet either.
+    // withholdSensitive's robot half is deliberately stricter than
+    // turnContext.ts's own sensitiveAllowed(): every robot-surface turn
+    // withholds sensitive records, even for a confirmed, alone speaker,
+    // until a presence check lands here too. THIN-0D: anonymous is the
+    // old path's own derivation (effectiveBand(): a robot turn whose
+    // speaker_evidence does not name the signed-in person), so an
+    // unidentified speaker recalls no person-scope record, and only the
+    // household records a child may see.
     const withholdSensitive = state.surface === "robot" || ageBand === "child" || ageBand === "teen";
-    const anonymous = false;
+    const anonymous = speakerIsAnonymous(state);
     const queryVector = await embedQueryForRecall(input.utterance);
     const recalled = recall(state.actor, input.utterance, {
       selfOnly: true,
@@ -196,7 +197,14 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // the noise a weak, non-forced entity match rides in on
     // (entity-recall's own row: 12 candidates including six at
     // 0.056-0.059 down to the 4 that actually matter, still passing).
-    const matches = recalled.filter((m) => m.forceInclude || m.score >= MEMORY_CONTEXT_MIN_SCORE).slice(0, MAX_MEMORY_SNIPPETS);
+    const matches = recalled
+      .filter((m) => m.forceInclude || m.score >= MEMORY_CONTEXT_MIN_SCORE)
+      // THIN-0D: effectiveBand() treats an unidentified robot speaker as
+      // the child band, so the household records it may see are the
+      // child_ok ones (recall() itself filters by the signed-in person's
+      // band, which is not the speaker's).
+      .filter((m) => !anonymous || m.record.child_disclosure === "child_ok")
+      .slice(0, MAX_MEMORY_SNIPPETS);
     // Every sliced match becomes a context item below, unconditionally
     // (no further filtering happens after this point) - so the matches
     // array itself is exactly "what reached the prompt," the same
@@ -214,7 +222,9 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       });
     }
 
-    const profile = getProfileParagraph(state.actor);
+    // The old path's own `anonymous || temporary ? undefined`: the profile
+    // is the signed-in person's.
+    const profile = anonymous ? null : getProfileParagraph(state.actor);
     if (profile) {
       items.push({ id: `profile-${profile.id}`, text: profile.text, source: "profile", subjects: [], disclosure: profile.child_disclosure ?? "adult_only", at: profile.created_at });
     }

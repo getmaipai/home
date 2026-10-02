@@ -277,7 +277,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
     ? await (async () => {
         // runTurnNext() always resolves "immediate" (its own header note);
         // the explicit kind check is TypeScript's, not a real branch.
-        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, ask_answer: parsedEvidence.data.ask_answer });
+        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, ask_answer: parsedEvidence.data.ask_answer, ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}) });
         return next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the new path returned a stream result unexpectedly" } : next;
       })()
       : await runTurn(actor, surface, body.text ?? "", {
@@ -792,7 +792,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
         // route needs the "stream" kind TurnStreamResult (a live status/
         // tokens pair the machine hasn't finished yet), never the
         // "immediate" one the blocking POST / route above uses.
-        ? await runTurnNextStream(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, signal: abortController.signal, ask_answer: parsedEvidence.data.ask_answer })
+        ? await runTurnNextStream(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, signal: abortController.signal, ask_answer: parsedEvidence.data.ask_answer, ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}) })
         : await runTurnStream(actor, surface, body.text ?? "", {
             thinking: dropReasoning ? false : body.thinking,
             spoken: body.spoken === true,

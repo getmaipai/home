@@ -200,3 +200,19 @@ describe("commandsNode: a failed pattern outcome continues the turn, never the r
     }
   });
 });
+
+// THIN-0D: the recall package reads the signed-in person's memories, so
+// an unidentified robot speaker never reaches it by a command opener.
+describe("commandsNode: THIN-0D, the recall package never runs for an unidentified robot speaker", () => {
+  test("a robot turn with no evidence does not fire the recall opener; an identified speaker does", async () => {
+    const text = "do you remember my favorite food";
+    const base = classifyTurnSignal({ text, ageBand: "adult", commandOpeners: OPENERS });
+    const signalOverride = { ...base, primary_act: "directive" } as TurnSignal;
+    const anon = { ...stateFor(people.owner, text, { signalOverride }), surface: "robot", speakerEvidence: null } as unknown as TurnState;
+    const anonResult = await commandsNode(anon, { utterance: text }, NODE_SIGNAL);
+    expect(anonResult.output.matched).toBe(false);
+    const known = { ...anon, speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } } as unknown as TurnState;
+    const knownResult = await commandsNode(known, { utterance: text }, NODE_SIGNAL);
+    expect(knownResult.output.matched).toBe(true);
+  });
+});

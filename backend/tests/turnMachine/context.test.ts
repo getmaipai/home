@@ -209,3 +209,68 @@ describe("MEMORY-FLOOR-01: a weak match never becomes a context item, a pinned o
     expect(kept.some((m) => m.record.id === seeded.value.id)).toBe(true);
   });
 });
+
+// THIN-0D (rule 12, port before delete; fixes part of #204): on the
+// robot, a speaker the body cannot name gets no signed-in person's
+// memories. The old path derives this from effectiveBand() (turnContext.ts):
+// a robot turn is anonymous unless speaker_evidence names the signed-in
+// person. Same fixtures as above, driven through contextNode itself.
+describe("contextNode: THIN-0D, an unidentified robot speaker is anonymous", () => {
+  const PERSONAL = "Sage likes noodles with extra chili for dinner";
+  const SHARED = "The household eats noodles for dinner on Fridays";
+  const ADULTS_ONLY = "The household noodles for dinner budget is tight this month";
+  const PROFILE = "Sage is a night owl who eats noodles for dinner";
+  const ASK = "should we eat noodles for dinner";
+
+  async function seedHousehold(): Promise<void> {
+    const rows = [
+      remember(people.owner, { text: PERSONAL, category: "fact", tier: "durable", scope: "person", person: people.owner.id, source: "test", importance: 0.5 }),
+      remember(people.owner, { text: SHARED, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5, child_disclosure: "child_ok" }),
+      remember(people.owner, { text: ADULTS_ONLY, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5, child_disclosure: "adult_only" }),
+      remember(people.owner, { text: PROFILE, category: "identity", tier: "durable", scope: "person", person: people.owner.id, source: PROFILE_SOURCE, importance: 0.9, pinned: true }),
+    ];
+    const texts = [PERSONAL, SHARED, ADULTS_ONLY, PROFILE];
+    for (const [i, row] of rows.entries()) {
+      if (!row.ok) throw new Error("setup failed");
+      await embedMemoryRecordSafely(row.value.id, texts[i]!);
+    }
+  }
+
+  function robotState(evidence: TurnState["speakerEvidence"]): TurnState {
+    return { actor: people.owner, surface: "robot", conversationId: "", speakerEvidence: evidence } as TurnState;
+  }
+
+  const texts = (items: { source: string; text: string }[], source: string) => items.filter((i) => i.source === source).map((i) => i.text);
+
+  test("no speaker evidence: none of the signed-in person's memories or profile, no adult-only household record", async () => {
+    await seedHousehold();
+    const { output } = await contextNode(robotState(null), { utterance: ASK }, SIGNAL);
+    expect(texts(output.items, "memory")).not.toContain(PERSONAL);
+    expect(texts(output.items, "memory")).not.toContain(ADULTS_ONLY);
+    expect(texts(output.items, "memory")).toContain(SHARED);
+    expect(texts(output.items, "profile")).toEqual([]);
+  });
+
+  test("evidence naming someone else, or level unknown, is anonymous too", async () => {
+    await seedHousehold();
+    const other = await contextNode(robotState({ person: people.child.id, basis: "voice", level: "confirmed" }), { utterance: ASK }, SIGNAL);
+    expect(texts(other.output.items, "memory")).not.toContain(PERSONAL);
+    const unknown = await contextNode(robotState({ person: null, basis: "unknown", level: "unknown" }), { utterance: ASK }, SIGNAL);
+    expect(texts(unknown.output.items, "memory")).not.toContain(PERSONAL);
+    expect(texts(unknown.output.items, "profile")).toEqual([]);
+  });
+
+  test("an identified speaker still recalls their own memories and profile", async () => {
+    await seedHousehold();
+    const { output } = await contextNode(robotState({ person: people.owner.id, basis: "voice", level: "confirmed" }), { utterance: ASK }, SIGNAL);
+    expect(texts(output.items, "memory")).toContain(PERSONAL);
+    expect(texts(output.items, "profile")).toEqual([PROFILE]);
+  });
+
+  test("a non-robot surface is unchanged, evidence or not", async () => {
+    await seedHousehold();
+    const { output } = await contextNode({ actor: people.owner, surface: "chat", conversationId: "" } as TurnState, { utterance: ASK }, SIGNAL);
+    expect(texts(output.items, "memory")).toContain(PERSONAL);
+    expect(texts(output.items, "profile")).toEqual([PROFILE]);
+  });
+});

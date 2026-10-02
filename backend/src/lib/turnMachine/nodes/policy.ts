@@ -15,6 +15,7 @@ import { START_PROJECT_TOOL_ID, projectTypeForArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
 import { ANSWER_FROM_CONTEXT_TOOL_ID } from "./model";
+import { speakerIsAnonymous, readsMemory } from "../speaker";
 
 export interface PolicyInput {
   calls: readonly ToolCall[];
@@ -331,6 +332,11 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     if (!meetsMinRole(state.actor.role, manifest.min_role)) {
       noteRefusal("min_role");
       entries.push({ proposal, decision: { allow: false, reason: "min_role" } });
+      continue;
+    }
+    if (speakerIsAnonymous(state) && readsMemory(manifest)) {
+      noteRefusal("anonymous_speaker");
+      entries.push({ proposal, decision: { allow: false, reason: "anonymous_speaker" } });
       continue;
     }
     if (state.temporary && manifest.permissions?.includes("memory:write")) {

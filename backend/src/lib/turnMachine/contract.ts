@@ -9,7 +9,7 @@
 // household member's words could match - the rule-budget lint's zero
 // baseline for turnMachine/ holds trivially here.
 import type { PersonRow } from "@/lib/memoryIngestion";
-import type { Surface } from "@/lib/turnEngine";
+import type { Surface, SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
@@ -90,7 +90,7 @@ export type PolicyDecision =
       // actually have that in this conversation") covers it, the same
       // closed set of named-then-defaulted reasons `ungrounded_args`/
       // `unknown_tool`/`context_tool_in_policy` already are.
-      reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "context_tool_in_policy" | "temporary_mode" | "crisis_state" | "unknown_project_type";
+      reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "context_tool_in_policy" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type";
       ask?: PendingAskInfo;
     };
 
@@ -149,6 +149,12 @@ export interface TurnState {
   conversationId: string;
   actor: PersonRow;
   surface: Surface;
+  /** THIN-0D: the robot body's own speaker_evidence and present list,
+   * honored on the robot surface only (routes/turn.ts); absent for every
+   * other surface. An unidentified robot speaker is anonymous
+   * (speaker.ts's speakerIsAnonymous()). */
+  speakerEvidence?: SpeakerEvidence | null;
+  present?: readonly PresentPerson[] | null;
   utterance: string;
   modelId?: string;
   signal: TurnSignal;
