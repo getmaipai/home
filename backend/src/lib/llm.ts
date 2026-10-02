@@ -450,7 +450,7 @@ export async function completeViaStackRequest(role: string, request: RoleRequest
 
 async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: LlmCompleteOptions): Promise<LlmOpResult> {
   const { offering, body } = chatRequestBody(messages, opts);
-  const result = await completeViaStackRequest(role, { model: opts.model ?? role, ...body });
+  const result = await completeViaStackRequest(role, { ...body, model: opts.model ?? role });
   if (!result.ok) return result.failure;
   const data = result.data as { choices?: Array<{ message: { content: string; reasoning_content?: string | null; tool_calls?: ToolCallWire[] } }>; model?: string };
     const choice = data.choices?.[0];
@@ -489,7 +489,7 @@ export async function complete(
     // always win, explicitly. Both fixes live in that one shared
     // builder now, not duplicated between this call and the Stack's.
     const { offering, body } = chatRequestBody(messages, opts);
-    const response = await client.chatComplete({ model: opts.model ?? "chat", ...body });
+    const response = await client.chatComplete({ ...body, model: opts.model ?? "chat" });
     const choice = response.choices[0];
     if (!choice) {
       return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
@@ -627,7 +627,7 @@ async function startCompleteStreamViaStack(
   let headers: Headers;
   try {
     const client = getStackClient();
-    const result = await client.chat({ model: opts.model ?? role, ...body, stream: true }, { signal });
+    const result = await client.chat({ ...body, model: opts.model ?? role, stream: true }, { signal });
     if (!("stream" in result)) {
       return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: the Stack answered a streaming request without a stream" };
     }
@@ -683,7 +683,7 @@ export async function startCompleteStream(
   // transform an individual delta the way those two do.
   async function* tokens(): AsyncGenerator<string, ToolCall[] | undefined, void> {
     try {
-      const wireToolCalls = yield* client!.chatCompleteStream({ model: opts.model ?? "chat", ...body }, signal, stats);
+      const wireToolCalls = yield* client!.chatCompleteStream({ ...body, model: opts.model ?? "chat" }, signal, stats);
       return offering && wireToolCalls && wireToolCalls.length > 0 ? wireToolCalls.map(toolCallFromWire) : undefined;
     } catch (err) {
       // A request the caller itself cancelled (the person closed the tab
@@ -704,7 +704,7 @@ export type BackgroundResult = { ok: true; text: string } | { ok: false; unavail
 /** Runs memory extraction and summaries through the configured Stack judge. */
 export async function completeBackground(messages: LlmMessage[], options: LlmCompleteOptions = {}): Promise<BackgroundResult> {
   const { body } = chatRequestBody(messages, options);
-  const result = await completeViaStackRequest("background", { model: options.model ?? "judge", ...body });
+  const result = await completeViaStackRequest("background", { ...body, model: options.model ?? "judge" });
   if (!result.ok) return { ok: false, unavailable: true };
   const data = result.data as { choices?: Array<{ message?: { content?: string } }> };
   const content = data.choices?.[0]?.message?.content;

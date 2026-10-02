@@ -885,6 +885,51 @@ describe("lib/llm.ts routed through a configured Stack", () => {
     expect(getActiveChatEngineIdentity()).toEqual({ host: "local", build: "b10797", model: "qwen3-8b-instruct-q4_k_m.gguf", healthy: null });
   });
 
+  // Live outage 2026-10-02: the turn machine passes `model: undefined`
+  // for the default model, and the spread put that key after the role
+  // fallback, so the Stack client rejected every chat turn.
+  describe("an explicit model: undefined still sends the role", () => {
+    function scriptModelCapture(): { models: unknown[] } {
+      const seen: { models: unknown[] } = { models: [] };
+      fixture = startStackFixture({
+        "POST /v1/chat/completions": async (req: Request) => {
+          const body = (await req.json()) as { model?: unknown; stream?: boolean };
+          seen.models.push(body.model);
+          if (body.stream) {
+            const sse = `data: ${JSON.stringify({ choices: [{ delta: { content: "hi" } }] })}\n\ndata: [DONE]\n\n`;
+            return new Response(sse, { headers: { "content-type": "text/event-stream", ...IDENTITY_HEADERS } });
+          }
+          return Response.json({ model: "chat", choices: [{ message: { role: "assistant", content: "hi" } }] }, { headers: IDENTITY_HEADERS });
+        },
+      });
+      configureStack();
+      return seen;
+    }
+
+    test("non-streaming", async () => {
+      const seen = scriptModelCapture();
+      const result = await complete("chat", [{ role: "user", content: "hi" }], { model: undefined, max_tokens: 8 });
+      expect(result.ok).toBe(true);
+      expect(seen.models).toEqual(["chat"]);
+    });
+
+    test("streaming", async () => {
+      const seen = scriptModelCapture();
+      const started = await startCompleteStream("chat", [{ role: "user", content: "hi" }], { model: undefined, max_tokens: 8 });
+      expect(started.ok).toBe(true);
+      if (started.ok) for await (const _ of started.tokens) { /* drain */ }
+      expect(seen.models).toEqual(["chat"]);
+    });
+
+    test("an explicit model is still honoured on both paths", async () => {
+      const seen = scriptModelCapture();
+      await complete("chat", [{ role: "user", content: "hi" }], { model: "custom-model", max_tokens: 8 });
+      const started = await startCompleteStream("chat", [{ role: "user", content: "hi" }], { model: "custom-model", max_tokens: 8 });
+      if (started.ok) for await (const _ of started.tokens) { /* drain */ }
+      expect(seen.models).toEqual(["custom-model", "custom-model"]);
+    });
+  });
+
   test("a scripted 503 becomes the companion line and a Repairs entry carrying offline_reason", async () => {
     fixture = startStackFixture({
       "POST /v1/chat/completions": async () => offlineResponse("chat", "the engine process is not running"),
