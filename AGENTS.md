@@ -17,6 +17,21 @@ The pre-rebuild hub (244 commits, Bun/Hono, ~250 SQLite tables) is
 preserved locally as `legacy-backups/home-legacy.git`, reference only for
 hard-won logic, never a requirement of feature scope.
 
+**Hard design rules (owner's rule, 2026-10-02): read
+[docs/design/RULES.md](docs/design/RULES.md) before any work on the
+chat turn, search, the turn stream, the chat UI, the canvas or the
+engine launch.** That file is the authority. It overrides
+`docs/dev.md`, every file in `docs/plans/` and any backlog item that
+says otherwise, including ones written before it; an older record is
+history, never permission. A change that breaks a rule is rejected in
+review whatever it cites. If the work in front of you needs a rule to
+change, stop and report that to the coordinator: only the owner changes
+a rule. In short, for the chat turn: age and surface gates outrank
+everything; the model decides when to search; the engine's native
+features are the implementation; no length cap on adult written chat; a
+failed tool never fails the answer; shipped parts only; port before
+delete.
+
 Layout: `backend/` (Bun, Hono, Zod, Drizzle/SQLite), `frontend/` (React,
 Vite). The shared record shapes, interpreters, and fixtures live in
 `getmaipai/commons`'s `spec/` workspace (`@maipai/spec`, pinned by tag -
