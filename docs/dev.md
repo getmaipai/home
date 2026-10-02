@@ -35699,3 +35699,39 @@ intentionally hidden below the small breakpoint. The neighboring gray “S”
 is the profile avatar initial, not clipped status text. Before and after
 captures show no status-indicator layout bug, so no UI styling change was
 needed. The running household hub was read only and was not restarted.
+
+## SHELL-FOLD-01 alignment and header rule (2026-10-02)
+
+The 1440px first-run capture measured the shipped `size-4` sidebar icon token
+at 16x16px. Before the fix, every menu SVG was already that size, but the
+folded rail was 70px wide (center x=35), nav and footer icon centers were x=32,
+and the fold button and its SVG were centered at x=40. The fix is in Home's
+shell CSS: the collapsed menu hit areas move 3px to the rail center and the
+fold control is centered in its sidebar header. The sidebar logo row's own
+bottom border is suppressed for desktop and mobile; the page header border
+and vertical menu divider remain the kit's own.
+
+The screenshot capture now logs each rail control's box and center, the
+sidebar header and parent boxes with computed bottom-border width, and the
+page header border. It asserts icon size, folded center alignment, expanded
+left-edge alignment, zero sidebar-header bottom border in folded and expanded
+states and in the phone sheet, and a present page-header border. Initial
+measurements: fold button center x=40, nav/footer icon center x=32, rail
+center x=35; all icons 16x16. Expanded main-menu icons began at x=28 while
+Settings and Help began at x=32. The first correction pass centered the folded
+controls but still failed the expanded footer alignment, so the footer menu
+buttons were shifted 4px left.
+
+Final capture: folded nav, Settings and Help SVGs are all 16x16px, centered at
+x=35; the fold button is centered at x=35. Expanded Home, Chat, Library,
+Family, Settings and Help SVGs all start at x=28. The folded sidebar header is
+54x56px at (8,8), border width 0; expanded it is 240x56px at (8,8), border
+width 0. The measured header parent has border width 0 in both states. The
+page header remains 1px, spanning the content pane. In the open 390px phone
+sheet, the sidebar header is 291.5x56px at x=0 with border width 0; the page
+header remains 1px. The capture assertions passed in light and dark. All 17
+generated capture images were opened and reviewed: there is no horizontal
+rule under the sidebar logo, the page header rule and vertical divider remain,
+the Chat tooltip shows “Chat” followed by its status, and the phone history
+button shares its row with the chat title. The chat list shows “New chat” and
+“Search chats”.

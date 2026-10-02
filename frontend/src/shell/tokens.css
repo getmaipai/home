@@ -175,6 +175,38 @@ header nav a:has(> img[alt="logo"]) {
   overflow: visible;
 }
 
+/* SHELL-FOLD-01: the menu header's horizontal rule never aligned with the
+ * page header because the two headers have independent heights and padding.
+ * Remove only the rule under the sidebar logo row; the page header's own
+ * border and the sidebar's vertical edge remain supplied by the kit. */
+.sidebar-box [data-slot="sidebar-header"],
+[data-mobile="true"][data-sidebar="sidebar"] [data-slot="sidebar-header"] {
+  border-bottom-width: 0;
+}
+
+/* The folded rail is 70px wide while its icon buttons are 32px wide and
+ * centered at x=32 by the shipped padding. Center the whole hit areas on the
+ * measured rail center, and center the fold control in the same header row. */
+@media (min-width: 768px) {
+  [data-slot="sidebar"][data-state="expanded"] .sidebar-box [data-slot="sidebar-footer"] [data-slot="sidebar-menu-button"] {
+    translate: -4px 0;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-menu-button"] {
+    translate: 3px 0;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-header"] {
+    position: relative;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-header"] > button[aria-label="Toggle app menu"] {
+    position: absolute;
+    left: 50%;
+    translate: -50% 0;
+  }
+}
+
 :root {
   /* Home's brand accent is cyan, not the kit's electric blue
    * (brand/README.md's per-product accent table). 26%, not the
