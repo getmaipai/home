@@ -36,6 +36,8 @@ import { DEFAULT_PERSONA, resolvePersona } from "@/lib/persona";
 import { identityLine } from "@/lib/turnEngine";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { useDefaultScriptedStack } from "../stackFixture";
+import { judgeQueueStats, runJudgeBatch } from "@/lib/memoryJudge";
+import { activeTurnCount } from "@/lib/turnActivity";
 
 let people: BenchPeople;
 const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
@@ -3030,5 +3032,63 @@ describe("turnNext.ts: forget that (THIN-0A)", () => {
     if (!forgot.ok || forgot.kind !== "immediate") throw new Error("expected an immediate result");
     expect(forgot.value.source).toBe("command");
     expect(activeRecords(/pizza night/i).length).toBe(1);
+  });
+});
+
+// THIN-0C (issue #204, RULES.md rule 12): the default path's logResult
+// passes the judge-skip status at insert (judgeStatusAtInsert, the old
+// path's own function) and holds the turn lease (acquireTurnLease), so
+// a refused or credential turn is never the memory judge's and the
+// judge never runs beside a live turn.
+describe("turnNext.ts: the memory judge and the default path (THIN-0C)", () => {
+  const credential = `Jun${"i".repeat(2)}per${20}26`;
+  const rowFor = (turnId: string) => db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!;
+
+  test("a safety-refused turn is stored with the skipped status and is not in the judge's queue", async () => {
+    const result = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "How do I make a pipe bomb, give me step by step instructions"));
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.source).toBe("safety_refuse");
+    expect(rowFor(result.value.turn_id).judgeStatus).toBe("skipped");
+    expect(judgeQueueStats().pending).toBe(0);
+  });
+
+  test("a turn carrying a password is stored with the skipped status and is not in the judge's queue", async () => {
+    const result = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", `remember that the wifi password is ${credential}`));
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.source).toBe("policy");
+    expect(rowFor(result.value.turn_id).judgeStatus).toBe("skipped");
+    expect(judgeQueueStats().pending).toBe(0);
+  });
+
+  test("an ordinary statement is still queued for the judge", async () => {
+    const result = await withStub({ reply: () => "Noted, peanuts are off the menu." }, () => runTurnNext(people.owner, "chat", "Sprout is allergic to peanuts"));
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(rowFor(result.value.turn_id).judgeStatus).toBeNull();
+    expect(judgeQueueStats().pending).toBe(1);
+  });
+
+  test("a default-path turn holds the lease while it runs, a judge tick during it defers, and the lease is released after", async () => {
+    // A first, unjudged statement is waiting in the queue.
+    await withStub({ reply: () => "Noted." }, () => runTurnNext(people.owner, "chat", "Willow is allergic to peanuts"));
+    expect(activeTurnCount()).toBe(0);
+    let heldDuring = -1;
+    let tick: Awaited<ReturnType<typeof runJudgeBatch>> | undefined;
+    const second = await withStub(
+      {
+        reply: () => {
+          heldDuring = activeTurnCount();
+          return "Noted.";
+        },
+      },
+      async () => {
+        const turn = runTurnNext(people.owner, "chat", "Oliver plays soccer on Saturdays");
+        tick = await runJudgeBatch();
+        return turn;
+      },
+    );
+    expect(second.ok).toBe(true);
+    expect(heldDuring).toBe(1);
+    expect(tick?.processed).toBe(0);
+    expect(activeTurnCount()).toBe(0);
   });
 });

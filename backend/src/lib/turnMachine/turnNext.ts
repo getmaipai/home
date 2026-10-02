@@ -13,7 +13,8 @@
 // turn.pipeline.next is on.
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, TurnValue, TurnStreamResult, StreamOutcome } from "@/lib/turnEngine";
-import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources } from "@/lib/turnEngine";
+import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert } from "@/lib/turnEngine";
+import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
@@ -129,10 +130,15 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
 function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: string, value: TurnValue): void {
   const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary };
   if (state.temporary) {
-    appendTemporaryTurn(actor, surface, text, value, opts);
+    // THIN-0C: the old path's own status for a temporary turn (never a
+    // judge candidate; the row is process memory only).
+    appendTemporaryTurn(actor, surface, text, value, { ...opts, judgeStatus: "skipped" });
     return;
   }
-  logTurn(actor, surface, text, value, opts);
+  // THIN-0C: the judge's queue is keyed on the stored signal; a safety
+  // refusal and a credential turn are never the judge's
+  // (turnEngine.ts's judgeStatusAtInsert, the function the old path calls).
+  logTurn(actor, surface, text, value, { ...opts, judgeStatus: judgeStatusAtInsert(value, state.signal) });
   // PROJECT-START-01 (lib/projects/post.ts's own header): this turn's
   // own conversation_turns row is only ever written here, at the very
   // end - unlike the legacy turnEngine.ts's prepareTurn(), nothing on
@@ -187,6 +193,10 @@ function resumesAsk(ask: PendingAsk, utterance: string, askAnswer?: { turn_id: s
 class TurnMachineTimeout extends Error {}
 
 interface BegunTurn {
+  // THIN-0C: the turn lease (lib/turnActivity.ts), held from here until
+  // the turn is logged so the memory judge never runs beside a live turn.
+  // Whoever receives the BegunTurn releases it exactly once.
+  lease: TurnLease;
   state: TurnState;
   machineActor: ActorRefFrom<typeof turnMachine>;
   abortSignal: AbortSignal;
@@ -359,9 +369,17 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // state record's own "a negative or a new statement clears it."
   if (pendingAsk) setPendingAsk(conversation.id, null);
 
-  const machineActor = createActor(turnMachine, { input: { turnState: state, abortSignal, preConfirmed } });
-  machineActor.start();
-  return { ok: true, value: { state, machineActor, abortSignal, startedAt, temporary, conversationId: conversation.id } };
+  // THIN-0C: acquired only after every early return above (an invalid
+  // request or a stale tap acquires nothing), as the old path does.
+  const lease = acquireTurnLease();
+  try {
+    const machineActor = createActor(turnMachine, { input: { turnState: state, abortSignal, preConfirmed } });
+    machineActor.start();
+    return { ok: true, value: { lease, state, machineActor, abortSignal, startedAt, temporary, conversationId: conversation.id } };
+  } catch (err) {
+    lease.release();
+    throw err;
+  }
 }
 
 /** Awaits the machine to "done" and builds the turn's own TurnValue -
@@ -409,6 +427,10 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   if (!ranNodes.has("answer")) trace.skip("answer", "not reached this turn");
   if (!ranNodes.has("output_gate")) trace.skip("output_gate", "not reached this turn");
   state.nodes = trace.nodes();
+  // THIN-0C: a turn that reached the context or model node used the
+  // engine; engaging makes the release count as household activity (the
+  // judge's idle window), as the old path's lease.engage() does.
+  if (ranNodes.has("context") || ranNodes.has("model")) begun.lease.engage();
 
   let value: TurnValue;
   if (finalState === "asked") {
@@ -500,11 +522,12 @@ function engineUnavailableLine(state: Pick<TurnState, "spoken" | "surface">): st
 export async function runTurnNext(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnStreamResult> {
   const begun = await beginTurn(actor, surface, text, opts);
   if (!begun.ok) return begun.result;
-  const { state } = begun.value;
+  const { state, lease } = begun.value;
   let value: TurnValue;
   try {
     value = await finishTurn(begun.value);
   } catch (err) {
+    lease.release();
     // Only the machine's own timeout/abort becomes a 503 "unavailable" -
     // anything else finishTurn() might throw (a real bug in buildTurnValue,
     // the trace bookkeeping) propagates uncaught, exactly as it did
@@ -514,7 +537,11 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     if (err instanceof TurnMachineTimeout) return { ok: false, status: 503, code: "unavailable", error: err.message };
     throw err;
   }
-  logResult(state, actor, surface, text, value);
+  try {
+    logResult(state, actor, surface, text, value);
+  } finally {
+    lease.release();
+  }
   // TOOL-EVENTS-01(b): omitted entirely (not an empty array) when this
   // turn ran no tool - routes/turn.ts spreads it in only when present,
   // so a turn with nothing to report costs nothing on the wire.
@@ -618,6 +645,7 @@ export async function runTurnNextStream(actor: PersonRow, surface: Surface, text
       backgroundError = err instanceof Error ? err : new Error(String(err));
     })
     .finally(() => {
+      begun.value.lease.release(); // THIN-0C: after the turn is logged (or failed), never before
       gate.finish(); // safety net - idempotent; closes the queue via onDone when model.ts's own successful-round finish() never ran (a generation failure before any drained, or an engine timeout)
       status.close();
       queue.close(); // idempotent
