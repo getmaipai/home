@@ -272,6 +272,8 @@ const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
+const nextChatPolishReview = process.argv.includes("--next-chat-polish-review");
+const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview;
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
@@ -454,7 +456,7 @@ function seedWeatherCache(dataDir: string): void {
 }
 
 function seedWriteDocumentRoutingStats(): void {
-  if (!nextChatArtifactReview) return;
+  if (!chatArtifactCapture) return;
   const source = `import { sqlite } from "./src/db/index.ts";
 sqlite.exec("PRAGMA foreign_keys = OFF");
 sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, user_text, reply_text, source, plugin_id, safety_action, created_at, hlc, routing_tier, routing_score) VALUES ('screenshot-routing-write-document', 'screenshot-routing-fixture', 'chat', 'screenshot routing fixture', '', 'plugin', 'write_document', 'allow', ?, ?, 'tool', 1.0)").run(new Date().toISOString(), new Date().toISOString() + ':0:screenshot-routing-write-document');
@@ -465,7 +467,7 @@ sqlite.close();
 }
 
 function attachWriteDocumentRoutingStats(personId: string): void {
-  if (!nextChatArtifactReview) return;
+  if (!chatArtifactCapture) return;
   const source = `import { sqlite } from "./src/db/index.ts";
 sqlite.query("UPDATE conversation_turns SET person_id = ? WHERE id = 'screenshot-routing-write-document'").run(${JSON.stringify(personId)});
 sqlite.close();
@@ -490,7 +492,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (nextChatArtifactReview) {
+  if (chatArtifactCapture) {
     for (const [key, value] of [["engines.stack.url", STACK_URL], ["engines.stack.use_chat", true], ["engines.stack.use_embeddings", true]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -500,7 +502,7 @@ async function seedHousehold(): Promise<string> {
       if (!response.ok) throw new Error(`seed ${key} failed: ${response.status}`);
     }
   }
-  if (nextChatArtifactReview) {
+  if (chatArtifactCapture) {
     const pipeline = await fetch(`${BASE_URL}/api/settings`, {
       method: "PUT",
       headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
@@ -513,7 +515,7 @@ async function seedHousehold(): Promise<string> {
   if (!seededPeople.ok) throw new Error(`seed people lookup failed: ${seededPeople.status}`);
   const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((person) => person.display_name === "Sage");
   if (!sage) throw new Error("seed people lookup did not return Sage");
-  if (nextChatArtifactReview) attachWriteDocumentRoutingStats(sage.id);
+  if (chatArtifactCapture) attachWriteDocumentRoutingStats(sage.id);
   for (const person of [
     { displayName: "Marlow", role: "teen" },
     { displayName: "Nova", role: "child" },
@@ -3255,6 +3257,77 @@ async function captureNextChatArtifactReview(browser: Browser, sessionValue: str
   }
 }
 
+async function captureNextChatPolishReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
+      let page = await context.newPage();
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      if (slug === "phone") {
+        await settleAnimations(page);
+        await page.screenshot({ path: join(outDir, "next-chat-polish-welcome-clean-390-dark.png"), fullPage: true });
+        await page.getByRole("button", { name: "Add", exact: true }).click();
+        await page.getByText("Add photos and files").waitFor();
+      }
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, `next-chat-polish-welcome-${viewport.width}-dark.png`), fullPage: slug === "phone" });
+      if (slug === "phone") {
+        await page.close();
+        page = await context.newPage();
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      }
+
+      await page.getByRole("textbox", { name: "Message input" }).fill("Could you write that up as a document about pizza night?");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      const stopButton = page.getByRole("button", { name: "Stop generating", exact: true });
+      const artifactCard = page.locator('[data-slot="artifact-card"]');
+      await Promise.any([stopButton.waitFor({ timeout: 15000 }), artifactCard.waitFor({ timeout: 30000 })]);
+      if (await stopButton.count()) await stopButton.waitFor({ state: "detached", timeout: 30000 });
+      await artifactCard.waitFor({ timeout: 15000 });
+      if (slug === "phone") await page.keyboard.press("Escape");
+      const moreButton = page.locator('button[aria-label="More"]').first();
+      if (await moreButton.count()) {
+        await moreButton.click();
+        await page.getByRole("menuitem", { name: "Show in Library" }).waitFor();
+        await settleAnimations(page);
+      } else {
+        const buttons = await page.locator("button").evaluateAll((items) => items.map((item) => ({ label: item.getAttribute("aria-label"), text: (item.textContent ?? "").trim(), title: item.getAttribute("title") })));
+        console.error(`[chat-polish-review] file menu trigger absent at ${viewport.width}px; buttons ${JSON.stringify(buttons)}`);
+      }
+      await page.screenshot({ path: join(outDir, `next-chat-polish-filemenu-${viewport.width}-dark.png`), fullPage: slug === "phone" });
+      await page.keyboard.press("Escape");
+      const trace = page.getByText(/^Worked for \d+ seconds?, \d+ steps?$/);
+      if (!(await trace.isVisible().catch(() => false))) {
+        const evidence = await page.evaluate(() => ({
+          assistantText: [...document.querySelectorAll('[data-slot="aui_assistant-message-root"]')].map((item) => (item as HTMLElement).innerText.trim()),
+          timelineText: [...document.querySelectorAll('[data-slot*="tool"], [data-slot*="timeline"]')].map((item) => ({ slot: item.getAttribute("data-slot"), text: (item.textContent ?? "").trim() })),
+        }));
+        console.error(`[chat-polish-review] trace DOM evidence ${JSON.stringify(evidence)}`);
+      }
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, `next-chat-polish-trace-${viewport.width}-dark.png`), fullPage: slug === "phone" });
+
+      await page.getByRole("textbox", { name: "Message input" }).fill("What is 2 plus 2?");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      const secondStop = page.getByRole("button", { name: "Stop generating", exact: true });
+      await page.getByText("2 plus 2 is 4.").waitFor({ timeout: 15000 });
+      if (await secondStop.count()) await secondStop.waitFor({ state: "detached", timeout: 30000 });
+      const scrollToBottom = page.getByRole("button", { name: "Scroll to bottom", exact: true });
+      if (await scrollToBottom.count()) await scrollToBottom.click();
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, `next-chat-polish-actions-${viewport.width}-dark.png`), fullPage: true });
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 /** SHELL-05's own acceptance ("1440 and 390... captures dark/light"):
  * both viewports, both themes, of `/settings`. Waits on "Family
  * name", a real, always-present basic key under Household > System
@@ -5004,7 +5077,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = nextChatArtifactReview ? startScreenshotStack(chatModel.url) : undefined;
+  const screenshotStack = chatArtifactCapture ? startScreenshotStack(chatModel.url) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -5021,7 +5094,7 @@ async function main() {
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
       // This matrix never calls speech; all speech requests go to the Stack.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(nextChatArtifactReview ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
       stdout: "pipe",
       stderr: "inherit",
     });
@@ -5307,6 +5380,12 @@ async function main() {
 
     if (nextBackupsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview) {
       await captureNextBackupsReview(browser, sessionValue);
+    }
+
+    if (nextChatPolishReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
+      await captureNextChatPolishReview(browser, sessionValue);
+      console.log("completed named review: --next-chat-polish-review");
+      return;
     }
 
     if (nextChatArtifactReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview) {
