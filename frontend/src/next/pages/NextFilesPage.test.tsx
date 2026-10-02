@@ -30,6 +30,14 @@ function mockFetch(files: VisibleFile[]) {
 }
 
 describe("NextFilesPage", () => {
+  test("explains what the Library will hold when there are no files", async () => {
+    const { restore } = mockFetch([]);
+    try {
+      renderWithQueryClient(<NextFilesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Nothing here yet. Stories, pictures and documents you make in chat are kept here."));
+    } finally { restore(); }
+  });
+
   test("shows owned and shared files under their real owners and filters the list", async () => {
     const { restore } = mockFetch([file("file-abc123", "person-abc123"), file("file-sage123", "person-sage123", true, "document")]);
     try {

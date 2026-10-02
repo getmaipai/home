@@ -112,7 +112,7 @@ export function NextFilesPage({ person }: { person: Roster }) {
               </div>
             </CardContent>
           </Card>
-          <NextDataTable data={tableRows} rowKey={(row) => row.id} rowActions={(row) => [{ label: "View details", onClick: () => setSelectedId(row.id) }]} emptyMessage="Nothing here yet." />
+          <NextDataTable data={tableRows} rowKey={(row) => row.id} rowActions={(row) => [{ label: "View details", onClick: () => setSelectedId(row.id) }]} emptyMessage="Nothing here yet. Stories, pictures and documents you make in chat are kept here." />
           {tableRows.length > 0 ? (
             <Card>
               <CardHeader className="border-b border-border"><CardTitle>File details</CardTitle></CardHeader>
