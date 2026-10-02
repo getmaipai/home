@@ -16,6 +16,9 @@ import { subjectRosterFor } from "@/lib/subjects";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { MAX_MEMORY_SNIPPETS } from "@/lib/turnShared";
+import { recallEpisodes, formatEpisodesForPrompt, episodeQueryEligible, asksWhatHubSaid, earliestDroppedTurn, contentTerms, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, type EpisodeMatch } from "@/lib/episodes";
+import { isBareSocialTurn } from "@/lib/guards";
+import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { shapeOf } from "@/lib/turnSignal";
 import { planFor } from "@/lib/register";
@@ -244,6 +247,39 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     if (profile) {
       items.push({ id: `profile-${profile.id}`, text: profile.text, source: "profile", subjects: [], disclosure: profile.child_disclosure ?? "adult_only", at: profile.created_at });
     }
+
+    // THIN-0F (rules 4 and 12, ported from the old engine file's episode
+    // recall): what the person actually said earlier, verbatim, beside the
+    // extracted facts. Injected context, never a tool. Per-person scoping
+    // lives inside recallEpisodes() (a person's own rows only), and the same
+    // withholdSensitive/anonymous floors as the memory recall above apply.
+    // Never for a temporary chat (this block is inside the !temporary guard).
+    const episodeLocale = (getHouseholdSettingValue("household.locale") as string | undefined) ?? "en-US";
+    const displayName = sanitizeForPrompt(state.actor.displayName);
+    // Earlier conversations: this conversation is excluded whole, its turns
+    // are the window's job. The person's own side only, unless the question
+    // asks what the hub said (then the hub's side comes as a reported note).
+    const episodeMatches = episodeQueryEligible(input.utterance)
+      ? recallEpisodes(state.actor, input.utterance, queryVector, { now, excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, withholdSensitive, anonymous, ...(asksWhatHubSaid(input.utterance) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
+      : [];
+    // RECALL-03: this conversation's own turns that fell out of the window
+    // are evidence too, the person's words only, and the earliest dropped
+    // turn when the question is about how the chat began.
+    const earlierMatches: EpisodeMatch[] = [];
+    if (window.droppedOlder) {
+      const byFloors = contentTerms(input.utterance).length >= 2 && !isBareSocialTurn(input.utterance)
+        ? recallEpisodes(state.actor, input.utterance, queryVector, { now, withinConversationId: conversation.id, excludeTurnIds: window.turnIds, sides: "user", limit: 2, withholdSensitive, anonymous })
+        : [];
+      earlierMatches.push(...byFloors.map((m) => ({ ...m, earlierInThisConversation: true })));
+      if (ASKS_ABOUT_START_RE.test(input.utterance)) {
+        const first = earliestDroppedTurn(state.actor, conversation.id, window.turnIds, null);
+        if (first && !earlierMatches.some((m) => m.episode.turnId === first.episode.turnId)) earlierMatches.unshift({ ...first, earlierInThisConversation: true });
+      }
+    }
+    const earlierBlock = formatEpisodesForPrompt(earlierMatches, displayName, episodeLocale, now, EARLIER_HEADER);
+    if (earlierBlock) items.push({ id: "episodes-earlier-in-conversation", text: earlierBlock, source: "episode", subjects: [], disclosure: "child_ok" });
+    const episodesBlock = formatEpisodesForPrompt(episodeMatches, displayName, episodeLocale, now);
+    if (episodesBlock) items.push({ id: "episodes-earlier-conversations", text: episodesBlock, source: "episode", subjects: [], disclosure: "child_ok" });
   }
 
   // The clock: always real, never a memory - the almanac's own
