@@ -15,6 +15,13 @@ async function ownerClient(): Promise<TestClient> {
   return client;
 }
 
+// A window that starts ten minutes from now and lasts an hour, so it always
+// counts as upcoming whenever the suite runs (fixed dates went stale).
+function upcomingWindow(): { starts_at: string; ends_at: string } {
+  const start = Date.now() + 10 * 60 * 1000;
+  return { starts_at: new Date(start).toISOString(), ends_at: new Date(start + 60 * 60 * 1000).toISOString() };
+}
+
 describe("status routes", () => {
   test("app status is signed-in for everyone and need details are owner/admin only", async () => {
     expect((await new TestClient().get("/api/status/apps")).status).toBe(401);
@@ -52,7 +59,7 @@ describe("status routes", () => {
 
   test("maintenance accepts the expanded shared status component vocabulary", async () => {
     const owner = await ownerClient();
-    const result = await owner.post("/api/status/maintenance", { title: "Internet provider work", components: ["internet", "service:youtube"], starts_at: "2026-10-02T12:00:00Z", ends_at: "2026-10-02T13:00:00Z" });
+    const result = await owner.post("/api/status/maintenance", { title: "Internet provider work", components: ["internet", "service:youtube"], ...upcomingWindow() });
     expect(result.status).toBe(201);
     expect((await result.json() as { components: string[] }).components).toEqual(["internet", "service:youtube"]);
   });
@@ -87,7 +94,7 @@ describe("status routes", () => {
   test("an authenticated child reads the board without admin fields", async () => {
     const owner = await ownerClient();
     expect((await owner.post("/api/status/note", { body: "Water will be off" })).status).toBe(201);
-    expect((await owner.post("/api/status/maintenance", { title: "Updates", components: ["hub"], starts_at: "2026-10-02T12:00:00Z", ends_at: "2026-10-02T13:00:00Z" })).status).toBe(201);
+    expect((await owner.post("/api/status/maintenance", { title: "Updates", components: ["hub"], ...upcomingWindow() })).status).toBe(201);
     const created = await owner.post("/api/people", { displayName: "Marlow", role: "child", secret: "0000" });
     const person = (await created.json()) as { id: string };
     const child = new TestClient();
@@ -109,7 +116,7 @@ describe("status routes", () => {
     expect((await signedOut.post("/api/status/maintenance", {})).status).toBe(401);
     expect((await signedOut.post("/api/status/maintenance/maint-a1b2c3/cancel", {})).status).toBe(401);
     expect((await owner.post("/api/status/note", { body: "Planned work" })).status).toBe(201);
-    const maintenance = await owner.post("/api/status/maintenance", { title: "Updates", components: ["hub"], starts_at: "2026-10-02T12:00:00Z", ends_at: "2026-10-02T13:00:00Z" });
+    const maintenance = await owner.post("/api/status/maintenance", { title: "Updates", components: ["hub"], ...upcomingWindow() });
     expect(maintenance.status).toBe(201);
     expect((await new TestClient().post("/api/status/note", { body: "No" })).status).toBe(401);
     expect((await app.request("/api/status/note", { method: "DELETE" })).status).toBe(401);
@@ -134,7 +141,7 @@ describe("status routes", () => {
       expect((await member.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" })).status).toBe(200);
       expect((await member.post("/api/status/note", { body: "No" })).status).toBe(403);
       expect((await member.request("/api/status/note", { method: "DELETE" })).status).toBe(403);
-      expect((await member.post("/api/status/maintenance", { title: "No", components: ["hub"], starts_at: "2026-10-02T12:00:00Z", ends_at: "2026-10-02T13:00:00Z" })).status).toBe(403);
+      expect((await member.post("/api/status/maintenance", { title: "No", components: ["hub"], ...upcomingWindow() })).status).toBe(403);
       expect((await member.post("/api/status/maintenance/maint-a1b2c3/cancel", {})).status).toBe(403);
     }
   });
