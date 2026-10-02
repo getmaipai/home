@@ -2714,7 +2714,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
               <HistoryIcon className="size-4" />
             </Button>
-            <ChatHeaderBar />
+            <ChatHeaderBar phoneRow />
           </div>
           {bareMode ? (
             // COORDINATOR, 2026-09-22: "while it is on, it is obvious...

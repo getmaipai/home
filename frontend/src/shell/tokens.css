@@ -175,15 +175,6 @@ header nav a:has(> img[alt="logo"]) {
   overflow: visible;
 }
 
-/* Chat uses the same mobile header for its conversation title and actions.
- * Its full wordmark has no room beside those 48px targets, so the compact
- * chat header drops the duplicate mark; the sidebar retains its logo. */
-@media (max-width: 639px) {
-  header nav:has([data-chat-header-bar]) a:has(> img[alt="logo"]) {
-    display: none;
-  }
-}
-
 :root {
   /* Home's brand accent is cyan, not the kit's electric blue
    * (brand/README.md's per-product accent table). 26%, not the

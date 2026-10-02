@@ -140,7 +140,7 @@ function ChatHeaderRename({ title, onRename, onDone }: { title: string; onRename
   );
 }
 
-export function ChatHeaderBar() {
+export function ChatHeaderBar({ phoneRow = false }: { phoneRow?: boolean } = {}) {
   const data = useChatHeaderData();
   const [renaming, setRenaming] = useState(false);
   const [open, setOpen] = useState(false);
@@ -159,7 +159,7 @@ export function ChatHeaderBar() {
   const title = data.title || "New Chat";
 
   return (
-    <div data-chat-header-bar className="hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex">
+    <div data-chat-header-bar className={phoneRow ? "flex min-w-0 flex-1 items-center gap-1 overflow-hidden" : "hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex"}>
       <ChatIcon className="text-muted-foreground size-4 shrink-0" />
       {renaming ? (
         <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />
