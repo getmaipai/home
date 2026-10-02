@@ -3253,3 +3253,49 @@ describe("turnNext.ts: THIN-0I, per-companion confirmation and refusal pools on 
     expect(REFUSAL_REPEAT).toContain(second.value.reply.text);
   });
 });
+
+// THIN-0J (docs/BACKLOG.md, rule 12): the old path's finalizeReply()
+// gives every spoken reply a server-side speech text (the visible text
+// normalized for speaking, and the robot's first-sentence projection);
+// the default path carried none, so Wyoming and the robot spoke the raw
+// text. Same spoken/robot fixtures as the REASONING-02 suite above; the
+// expected speech is the identical normalizeForSpeech() the old path's
+// own route test (tests/turnEngine.test.ts) asserts on.
+describe("turnNext.ts: THIN-0J, server-side speech text for spoken turns on the default path", () => {
+  // A number, a unit and an abbreviation in one sentence, each one a
+  // thing a TTS engine reads wrong when handed the written form. The
+  // utterance is the U4 suite's own plain one-call question (no command
+  // or package claims it, so the stub's reply is the model's own text).
+  const WRITTEN = "It is 72°F at 10:04 am, Dr. Smith said.";
+  const SPOKEN = "It is seventy-two degrees Fahrenheit at ten oh four in the morning, Doctor Smith said.";
+
+  test("a spoken chat turn carries the normalized speech text and the stored reply is unchanged", async () => {
+    const result = await withStub({ reply: () => WRITTEN }, () => runTurnNext(people.owner, "chat", "how do I make a paper airplane", { spoken: true }));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe(WRITTEN);
+    expect(result.value.reply.speech).toBe(SPOKEN);
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+    expect(row?.replyText).toBe(WRITTEN);
+  });
+
+  test("a robot turn speaks the first sentence only, without a link, the old path's own projection", async () => {
+    const reply = "Fold it in half. See https://example.com for the rest.";
+    const result = await withStub({ reply: () => reply }, () => runTurnNext(people.owner, "robot", "how do I make a paper airplane"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe(reply);
+    // tests/turnEngine.test.ts's own fixture: the first sentence with
+    // its own stop, and never a URL.
+    expect(result.value.reply.speech).toBe("Fold it in half.");
+    expect(result.value.reply.speech).not.toContain("http");
+  });
+
+  test("a written adult turn is unchanged: no speech text, the text exactly as generated", async () => {
+    const result = await withStub({ reply: () => WRITTEN }, () => runTurnNext(people.owner, "chat", "how do I make a paper airplane"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe(WRITTEN);
+    expect(result.value.reply.speech).toBeUndefined();
+  });
+});

@@ -13,7 +13,7 @@
 // turn.pipeline.next is on.
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, SpeakerEvidence, PresentPerson, TurnValue, TurnStreamResult, StreamOutcome } from "@/lib/turnEngine";
-import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply } from "@/lib/turnEngine";
+import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnEngine";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
@@ -548,12 +548,22 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
  * untouched (the old path's sentence-case opener is not ported: an
  * adult's written reply stays exactly as generated). An authored speech
  * text that differs from the visible text is kept as authored, the old
- * path's own rule; one that merely repeats the text follows the varied
- * text so a spoken confirmation says what the screen shows. */
+ * path's own rule.
+ *
+ * THIN-0J (rule 12): a spoken-class turn (robot, pod, phone, or a chat
+ * turn the client flags as spoken) also gets the old path's server-side
+ * speech text, through the same speechTextFor() turnEngine.ts uses: the
+ * varied text normalized for speaking, or the robot's first-sentence
+ * projection. A written or glance turn keeps whatever speech its own
+ * node authored (none for the model's text), so a written adult reply
+ * is exactly what it was before this port. */
 function finalizeNextReply(state: TurnState, value: TurnValue): TurnValue {
   const { text, speech } = value.reply;
   if (speech !== undefined && speech !== text) return value;
   const variedText = variedConstantReply(state.actor.id, value.source, text, state.persona.id);
+  if (surfaceClassOf(state.surface, state.spoken) === "spoken") {
+    return { ...value, reply: { ...value.reply, text: variedText, speech: speechTextFor(state.surface, variedText, speech) } };
+  }
   if (variedText === text) return value;
   return { ...value, reply: { ...value.reply, text: variedText, ...(speech === undefined ? {} : { speech: variedText }) } };
 }

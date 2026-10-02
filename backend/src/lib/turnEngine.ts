@@ -3778,8 +3778,21 @@ function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface =
     value.source === "model"
       ? sentenceCaseOpener(text) // CHAT-04 (#81)
       : variedConstantReply(actor.id, value.source, text, personaId);
-  const spokenText = surface === "robot" && speech === undefined ? splitIntoSentences(variedText)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : normalizeForSpeech(variedText);
+  const spokenText = speechTextFor(surface, variedText, speech);
   return { ...value, document_available: value.document_available ?? false, reply: { text: variedText, speech: spokenText } };
+}
+
+/** The server-side speech text for a reply whose authored speech, if
+ * any, repeats its visible text: the robot with no authored speech gets
+ * the first sentence alone, links dropped (the projection its speaker
+ * reads), every other surface gets the whole text normalized for
+ * speaking (numbers, times, units, abbreviations and markdown read the
+ * way a person says them). finalizeReply() above and the default path's
+ * turnMachine/turnNext.ts call this same function (THIN-0J, rule 12:
+ * ported, not copied). The output is for TTS only; the visible text is
+ * never replaced by it. */
+export function speechTextFor(surface: Surface, text: string, authoredSpeech: string | undefined): string {
+  return surface === "robot" && authoredSpeech === undefined ? splitIntoSentences(text)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : normalizeForSpeech(text);
 }
 
 /** Runs one conversation turn end to end: safety first, then the
