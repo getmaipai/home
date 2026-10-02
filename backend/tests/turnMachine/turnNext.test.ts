@@ -521,7 +521,7 @@ describe("turnNext.ts: a matched bundled package reports plugin_id, never comman
 
 describe("turnNext.ts: budget.model_transitions false", () => {
   test("no tool call is ever offered, whatever the model would otherwise choose", async () => {
-    const noToolsBudget = { ...NO_RECORD_BUDGET, model_transitions: false, rounds: 0 as const };
+    const noToolsBudget = { ...NO_RECORD_BUDGET, always_search: false, model_transitions: false, rounds: 0 as const };
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
     CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = noToolsBudget;
     let sawTools = false;

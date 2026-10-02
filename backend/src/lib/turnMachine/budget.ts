@@ -14,7 +14,6 @@ import type { TurnBudget } from "./contract";
 export const NO_RECORD_BUDGET: TurnBudget = {
   rounds: 0,
   tools_offered: [],
-  always_search: false,
   answer_from_context_tool: false,
   model_transitions: false,
   context_tokens: 2000,

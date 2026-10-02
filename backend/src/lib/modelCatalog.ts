@@ -99,6 +99,9 @@ export const CATALOG: ModelCapabilities[] = [
       // it's added here by hand rather than discovered from
       // backend/packages/ the way a real one would be.
       tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "start_project", "timer", "weather", "websearch"],
+      // THIN-2B (rule 1): deprecated and ignored. Home no longer reads it;
+      // the pinned spec still requires the field, and a later spec tag
+      // removes it.
       always_search: true,
       // GROUND-01 (state record, "The interim rule"): off in every
       // budget until reuse-with-freshness is built - a quote check
