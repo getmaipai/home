@@ -181,7 +181,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
         {/* THEME-TOGGLE-01 (2026-09-26): light/dark already lives at
             Settings > Me > Appearance (ui.appearance) - the header's
             own shortcut duplicated it, so it's off here. */}
-        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} statusIndicator={<StatusIndicator />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} statusIndicator={<StatusIndicator />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} defaultSidebarOpen={false} showSidebarTriggerInMenu showHeaderSidebarTrigger={false} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />

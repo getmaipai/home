@@ -159,7 +159,7 @@ export function ChatHeaderBar() {
   const title = data.title || "New Chat";
 
   return (
-    <div data-chat-header-bar className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+    <div data-chat-header-bar className="hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex">
       <ChatIcon className="text-muted-foreground size-4 shrink-0" />
       {renaming ? (
         <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />
