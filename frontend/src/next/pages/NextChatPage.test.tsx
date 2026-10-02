@@ -271,7 +271,7 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
     }
   });
 
-  test("disables New Thread while chat is blocked and keeps past threads enabled", async () => {
+  test("disables New chat while chat is blocked and keeps past threads enabled", async () => {
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -289,7 +289,7 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
-      expect(await findByRole("button", { name: "New Thread" })).toBeDisabled();
+      expect(await findByRole("button", { name: "New chat" })).toBeDisabled();
       expect(await findByRole("button", { name: "A past chat" })).toBeEnabled();
     } finally {
       globalThis.fetch = original;
@@ -298,7 +298,7 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
 });
 
 describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
-  test("shows New Thread and an empty thread list with no past conversations", async () => {
+  test("shows New chat and an empty thread list with no past conversations", async () => {
     const restore = stubFetch();
     try {
       const { findByText } = renderPage(
@@ -306,7 +306,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
-      expect(await findByText("New Thread")).toBeVisible();
+      expect(await findByText("New chat")).toBeVisible();
     } finally {
       restore();
     }
@@ -389,7 +389,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     }
   });
 
-  // Found live, on 8787, verifying this slice: clicking "New Thread"
+  // Found live, on 8787, verifying this slice: clicking "New chat"
   // from the phone/tablet Sheet started a fresh conversation but left
   // the Sheet open over it, blocking the composer until it was
   // manually dismissed - `NextThreadList`'s own composed `onClick` on
@@ -398,7 +398,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   // ("thread history opens as a phone sheet...") is the pattern this
   // mirrors: the Sheet's own heading, not the toggle button, proves
   // open/closed once Radix aria-hides the rest of the page.
-  test("New Thread closes the phone/tablet Sheet, the same as selecting a past conversation", async () => {
+  test("New chat closes the phone/tablet Sheet, the same as selecting a past conversation", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -409,7 +409,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
       await view.findByLabelText("Message input");
       fireEvent.click(view.getByRole("button", { name: "Show threads" }));
       const dialog = await view.findByRole("heading", { name: "Conversations" });
-      fireEvent.click(within(dialog.closest('[role="dialog"]')!).getByText("New Thread"));
+      fireEvent.click(within(dialog.closest('[role="dialog"]')!).getByText("New chat"));
       await view.findByRole("button", { name: "Show threads" });
       expect(view.queryByRole("heading", { name: "Conversations" })).toBeNull();
     } finally {
@@ -1769,7 +1769,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
   const pane = () => document.querySelector('[data-slot="next-chat-pane"]')!;
   const classes = (el: Element) => el.className.split(/\s+/);
 
-  test("open: the toggle is inline in the column's own header row, beside New Thread, no floating instance", async () => {
+  test("open: the toggle is inline in the column's own header row, beside New chat, no floating instance", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -1787,7 +1787,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // Inside the rail, in the same header row as New Thread - not a
       // floating sibling, not a row of its own above the column.
       expect(rail().contains(toggle)).toBe(true);
-      const newThread = within(rail()).getByRole("button", { name: "New Thread" });
+      const newThread = within(rail()).getByRole("button", { name: "New chat" });
       expect(newThread.parentElement).toBe(toggle.parentElement);
       expect(view.queryByRole("button", { name: "Show conversations" })).toBeNull();
     } finally {
@@ -1802,7 +1802,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
   // the rail to width 0/inert, a second click correctly reopened it,
   // repeated cleanly) - written anyway as a permanent regression test
   // in Jesse's own words, the round trip the other tests in this block
-  // each only exercise half of. `queryByRole("New Thread")` staying
+  // each only exercise half of. `queryByRole("New chat")` staying
   // non-null through the "hidden" assertion is deliberate, not a typo:
   // "collapsed: the rail is hidden..." above already established that
   // this rail hides via a CSS class, never unmounts (so `aria-controls`
@@ -1817,7 +1817,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      expect(view.getByRole("button", { name: "New Thread" })).toBeVisible();
+      expect(view.getByRole("button", { name: "New chat" })).toBeVisible();
       expect(classes(rail())).toContain("w-64");
 
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
@@ -1833,7 +1833,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // the "open:" test above this one uses.
       expect(classes(rail())).toContain("w-64");
       expect(classes(rail())).not.toContain("w-0");
-      expect(view.getByRole("button", { name: "New Thread" })).toBeVisible();
+      expect(view.getByRole("button", { name: "New chat" })).toBeVisible();
     } finally {
       restore();
     }
@@ -1950,7 +1950,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       const peekedToggle = within(rail()).getByRole("button", { name: "Show conversations" });
       expect(classes(peekedToggle)).not.toContain("absolute");
       expect(peekedToggle).toHaveAttribute("aria-expanded", "true");
-      expect(within(rail()).getByRole("button", { name: "New Thread" })).toBeVisible();
+      expect(within(rail()).getByRole("button", { name: "New chat" })).toBeVisible();
       // Leaving the rail (the toggle's own real ancestor now) for
       // something outside it closes the peek.
       fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
@@ -2704,12 +2704,12 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     try {
       const first = page();
       await first.findByLabelText("Message input");
-      await waitFor(() => expect(first.getByRole("button", { name: "Conversation actions" })).toBeTruthy());
+      await waitFor(() => expect(first.getAllByRole("button", { name: "Conversation actions" })[0]).toBeTruthy());
       await waitFor(() => expect(trigger()).toHaveTextContent("Family"));
       fireEvent.click(trigger());
       fireEvent.click(menuItems()[1]!);
       await waitFor(() => expect(saved.settings).toEqual({ thinking: true }));
-      const actions = first.getByRole("button", { name: "Conversation actions" });
+      const actions = first.getAllByRole("button", { name: "Conversation actions" })[0]!;
       act(() => {
         fireEvent.pointerDown(actions, { button: 0, ctrlKey: false, pointerId: 1 });
         fireEvent.click(actions);
@@ -2720,9 +2720,9 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
 
       const reopened = page();
       await reopened.findByLabelText("Message input");
-      await waitFor(() => expect(reopened.getByRole("button", { name: "Conversation actions" })).toBeTruthy());
+      await waitFor(() => expect(reopened.getAllByRole("button", { name: "Conversation actions" })[0]).toBeTruthy());
       await waitFor(() => expect(trigger()).toHaveTextContent("Thinking"));
-      const reopenedActions = reopened.getByRole("button", { name: "Conversation actions" });
+      const reopenedActions = reopened.getAllByRole("button", { name: "Conversation actions" })[0]!;
       act(() => {
         fireEvent.pointerDown(reopenedActions, { button: 0, ctrlKey: false, pointerId: 1 });
         fireEvent.click(reopenedActions);
@@ -2797,7 +2797,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
         </ChatHeaderDataProvider>,
       );
       await view.findByLabelText("Message input");
-      const actions = await view.findByRole("button", { name: "Conversation actions" });
+      const actions = (await view.findAllByRole("button", { name: "Conversation actions" }))[0]!;
       act(() => {
         fireEvent.pointerDown(actions, { button: 0, ctrlKey: false, pointerId: 1 });
         fireEvent.click(actions);
@@ -2970,7 +2970,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       expect(bodies[1]!.thinking).toBe(true);
 
       // A new conversation keeps the active engine default.
-      fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New Thread" }));
+      fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New chat" }));
       await waitFor(() => expect(trigger()).toHaveTextContent("Family"));
     } finally {
       globalThis.fetch = originalFetch;
@@ -3199,7 +3199,7 @@ describe("NextChatPage (INCOGNITO-01 session flag wiring)", () => {
       await view.findByLabelText("Message input");
       await sendMessage(view, "a private question");
       await view.findByText("Reply 1.");
-      fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New Thread" }));
+      fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New chat" }));
       await sendMessage(view, "another private question");
       await view.findByText("Reply 2.");
 
@@ -3866,7 +3866,7 @@ describe("NextChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
   }
 
   async function openHeaderMenu(view: { findByRole: (role: string, options: { name: string }) => Promise<HTMLElement> }) {
-    const trigger = await view.findByRole("button", { name: "Conversation actions" });
+    const trigger = (await view.findAllByRole("button", { name: "Conversation actions" }))[0]!;
     act(() => {
       fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 });
       fireEvent.click(trigger);
@@ -3904,7 +3904,7 @@ describe("NextChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
       await new Promise((resolve) => setTimeout(resolve, 30));
       expect(env.ttsCalls()).toBe(callsAfterDisable);
 
-      fireEvent.click(await within(document.getElementById("next-chat-rail")!).findByRole("button", { name: "New Thread" }));
+      fireEvent.click(await within(document.getElementById("next-chat-rail")!).findByRole("button", { name: "New chat" }));
       await openHeaderMenu(view);
       expect(await view.findByRole("menuitemcheckbox", { name: "Read replies aloud" })).toHaveAttribute("aria-checked", "false");
     } finally {
