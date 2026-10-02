@@ -13,7 +13,10 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { resetDb } from "../reset-db";
 import { createBenchPeople, type BenchPeople } from "../../scripts/bench/conversationRunner";
 import { remember, embedMemoryRecordSafely, recall, PROFILE_SOURCE } from "@/lib/memory";
-import { contextNode, MEMORY_CONTEXT_MIN_SCORE } from "@/lib/turnMachine/nodes/context";
+import { contextNode, applyContext, MEMORY_CONTEXT_MIN_SCORE } from "@/lib/turnMachine/nodes/context";
+import { classifyTurnSignal } from "@/lib/turnSignal";
+import { planFor } from "@/lib/register";
+import { speakerAgeBand } from "@/lib/ageBand";
 import type { TurnState } from "@/lib/turnMachine/contract";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import { injectVector } from "../fixtures/injectVector";
@@ -272,5 +275,58 @@ describe("contextNode: THIN-0D, an unidentified robot speaker is anonymous", () 
     const { output } = await contextNode({ actor: people.owner, surface: "chat", conversationId: "" } as TurnState, { utterance: ASK }, SIGNAL);
     expect(texts(output.items, "memory")).toContain(PERSONAL);
     expect(texts(output.items, "profile")).toEqual([PROFILE]);
+  });
+});
+
+// THIN-0B (rules 0 and 12; fixes part of #204): when the age projection
+// withholds a household record from a child or teen, the model is told
+// and the plan points to a trusted adult (SAFETY.md's Santa case). The
+// old path counts the withheld records in recall() (withheldForBand) and
+// feeds planFor(); the default path hard-coded the flag to false.
+describe("contextNode: THIN-0B, a withheld record reaches the plan", () => {
+  const SANTA = "Santa is bringing the bike and it is hidden in the garage closet";
+  const ASK = "what is Santa bringing us for Christmas";
+
+  async function seedSanta(): Promise<void> {
+    const seeded = remember(people.owner, { text: SANTA, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5, sensitive: true, child_disclosure: "adult_only" });
+    if (!seeded.ok) throw new Error("setup failed");
+    await embedMemoryRecordSafely(seeded.value.id, SANTA);
+  }
+
+  function stateFor(actor: BenchPeople["owner"], utterance: string): TurnState {
+    const signal = classifyTurnSignal({ text: utterance, ageBand: speakerAgeBand(actor, new Date()), commandOpeners: new Set<string>() });
+    const planBasis = { signal, surface: "chat", surfaceClass: "written", brevity: false, companion: { directness: "direct", engagement: "balanced", complexity: "standard" }, band: speakerAgeBand(actor, new Date()), deferred: false, disclosureWithheld: false } as TurnState["planBasis"];
+    return { actor, surface: "chat", conversationId: "", utterance, signal, planBasis, plan: planFor({ ...planBasis, evidence: { choices: 0, sources: 0, deliverable: false } }) } as TurnState;
+  }
+
+  test("a child's question whose matching household record is withheld marks the plan: some_withheld, offer_to_ask, and the record stays out of the context", async () => {
+    await seedSanta();
+    const state = stateFor(people.child, ASK);
+    const { output } = await contextNode(state, { utterance: ASK }, SIGNAL);
+    expect(output.items.map((i) => i.text)).not.toContain(SANTA);
+    applyContext(state, output);
+    expect(state.plan.content_disclosure).toBe("some_withheld");
+    expect(state.plan.trusted_adult_move).toBe("offer_to_ask");
+    expect(state.plan.moves.defer).toBe("required");
+  });
+
+  test("the same question from an adult is unchanged: the record is read and the plan says full", async () => {
+    await seedSanta();
+    const state = stateFor(people.owner, ASK);
+    const { output } = await contextNode(state, { utterance: ASK }, SIGNAL);
+    expect(output.items.map((i) => i.text)).toContain(SANTA);
+    applyContext(state, output);
+    expect(state.plan.content_disclosure).toBe("full");
+    expect(state.plan.trusted_adult_move).toBe("none");
+  });
+
+  test("a child's turn with nothing withheld is unchanged", async () => {
+    await seedSanta();
+    const text = "how do I make a paper airplane";
+    const state = stateFor(people.child, text);
+    const { output } = await contextNode(state, { utterance: text }, SIGNAL);
+    applyContext(state, output);
+    expect(state.plan.content_disclosure).toBe("full");
+    expect(state.plan.trusted_adult_move).toBe("none");
   });
 });

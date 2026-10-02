@@ -3163,3 +3163,40 @@ describe("turnNext.ts: THIN-0D, an unidentified robot speaker's prompt carries n
     expect(await promptFor({}, "chat")).toContain("extra chili");
   });
 });
+
+// THIN-0B, end to end on the default path: the prompt the engine receives
+// is told something is held back and to point to a trusted adult, the
+// withheld record never reaches it, and the logged plan says so. An
+// adult's identical turn reads the record and carries no such line.
+describe("turnNext.ts: THIN-0B, a child asking about a withheld record is pointed to a trusted adult", () => {
+  const SANTA = "Santa is bringing the bike and it is hidden in the garage closet";
+  const ASK = "what is Santa bringing us for Christmas";
+
+  async function run(actor: BenchPeople["owner"]): Promise<{ prompt: string; plan: { content_disclosure: string; trusted_adult_move: string } }> {
+    const seeded = remember(people.owner, { text: SANTA, category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5, sensitive: true, child_disclosure: "adult_only" });
+    if (!seeded.ok) throw new Error("setup failed");
+    await embedMemoryRecordSafely(seeded.value.id, SANTA);
+    const seen: ChatCompletionRequest[] = [];
+    const result = await withStub({ reply: (request) => { seen.push(request); return "That is a surprise for the grown-ups to share."; } }, () => runTurnNext(actor, "chat", ASK));
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+    return { prompt: seen.flatMap((request) => request.messages.map((m) => String(m.content ?? ""))).join("\n"), plan: JSON.parse(row!.plan as unknown as string) };
+  }
+
+  test("a child: the prompt tells the model and names a parent or trusted adult, the record stays out, the plan is logged", async () => {
+    const { prompt, plan } = await run(people.child);
+    expect(prompt).not.toContain("garage closet");
+    expect(prompt).toContain("held back");
+    expect(prompt).toContain("trusted adult");
+    expect(plan.content_disclosure).toBe("some_withheld");
+    expect(plan.trusted_adult_move).toBe("offer_to_ask");
+  });
+
+  test("an adult: the record is read, no held-back line, the plan is full", async () => {
+    const { prompt, plan } = await run(people.owner);
+    expect(prompt).toContain("garage closet");
+    expect(prompt).not.toContain("held back");
+    expect(plan.content_disclosure).toBe("full");
+    expect(plan.trusted_adult_move).toBe("none");
+  });
+});

@@ -17,6 +17,8 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { MAX_MEMORY_SNIPPETS } from "@/lib/turnEngine";
 import { speakerIsAnonymous } from "../speaker";
+import { shapeOf } from "@/lib/turnSignal";
+import { planFor } from "@/lib/register";
 import type { Node, ContextItem, TurnState } from "../contract";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
@@ -61,6 +63,13 @@ export interface ContextOutput {
   temporary: boolean;
   items: ContextItem[];
   reasoning: TurnState["reasoning"];
+  /** THIN-0B: the age projection withheld at least one household record
+   * from this child or teen (recall()'s own withheldForBand count, the
+   * old path's `memoryMatches.withheldForBand > 0`). applyContext() folds
+   * it into the plan, so the model is told and the reply defers to a
+   * trusted adult. Absent or false for an adult and for a turn with
+   * nothing withheld. */
+  disclosureWithheld?: boolean;
 }
 
 let windowItemSeq = 0;
@@ -74,6 +83,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
 
   const items: ContextItem[] = [];
+  let disclosureWithheld = false;
 
   // GROUND-01 (state record, step 3): the current utterance joins the
   // context list as its own item, source "utterance" - the list's own
@@ -197,6 +207,11 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // the noise a weak, non-forced entity match rides in on
     // (entity-recall's own row: 12 candidates including six at
     // 0.056-0.059 down to the 4 that actually matter, still passing).
+    // THIN-0B: the old path's own derivation (turnEngine.ts, basePlan's
+    // `disclosureWithheld: memoryMatches.withheldForBand > 0`), limited
+    // here to a child or teen: an adult is never told something is held
+    // back, so an adult's plan stays as it was.
+    disclosureWithheld = (ageBand === "child" || ageBand === "teen") && recalled.withheldForBand > 0;
     const matches = recalled
       .filter((m) => m.forceInclude || m.score >= MEMORY_CONTEXT_MIN_SCORE)
       // THIN-0D: effectiveBand() treats an unidentified robot speaker as
@@ -248,7 +263,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     items.push({ id: `roster-${i}`, text: name, source: "roster", subjects: [], disclosure: "child_ok" });
   });
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state) } };
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state), disclosureWithheld } };
 };
 
 /** Applies the node's output onto TurnState, the same small
@@ -260,4 +275,15 @@ export function applyContext(state: import("../contract").TurnState, output: Con
   state.temporary = output.temporary;
   state.context = output.items;
   state.reasoning = output.reasoning;
+  if (output.disclosureWithheld) {
+    // THIN-0B: the plan's inputs, recomputed once with the withheld flag,
+    // and the trusted-adult move when a child or teen asked a question
+    // (the old path's `mayDefer` also asks for a named household subject
+    // and answers with a fixed line; the default path has no subject
+    // resolution yet, so the model is told and the plan requires the
+    // defer move instead). Every other planBasis input is unchanged.
+    const deferred = shapeOf(state.signal, state.utterance) === "question";
+    state.planBasis = { ...state.planBasis, disclosureWithheld: true, deferred };
+    state.plan = planFor({ ...state.planBasis, evidence: { choices: 0, sources: 0, deliverable: false } });
+  }
 }
