@@ -23,10 +23,10 @@ import { StreamSafetyRefusal, StreamUnavailable, type StreamOutcome } from "@/li
 import * as llm from "@/lib/llm";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import type { TurnStreamEvent } from "@/wire";
-import { getPendingAsk } from "@/lib/conversationHistory";
+import { getPendingAsk, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
-import { conversationTurns, conversations } from "@/db/schema";
+import { conversationTurns, conversations, memoryRecords } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
@@ -2982,5 +2982,53 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
         spy.mockRestore();
       }
     });
+  });
+});
+
+// THIN-0A (issue #204, RULES.md rule 12): "forget that" is the engine's
+// own exact command on the default path too, answered before the model
+// (lib/forgetCommand.ts, the same functions the old path calls). Until
+// this item the default path answered it with the model's "Got it." and
+// the memory stayed.
+describe("turnNext.ts: forget that (THIN-0A)", () => {
+  const activeRecords = (text: RegExp) => db.select().from(memoryRecords).all().filter((r) => r.status === "active" && r.deletedAt === null && text.test(r.text));
+
+  test("'forget that' after a remembered fact removes the memory and the reply says so", async () => {
+    const conv = resolveOrCreateConversation(people.owner, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const kept = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "remember that pizza night is Friday", { conversationId: conv.value.id }));
+    expect(kept.ok && kept.kind === "immediate" && kept.value.plugin_id).toBe("remember");
+    expect(activeRecords(/pizza night/i).length).toBe(1);
+    const forgot = await withStub({ reply: () => "Got it." }, () => runTurnNext(people.owner, "chat", "forget that", { conversationId: conv.value.id }));
+    if (!forgot.ok || forgot.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(forgot.value.source).toBe("command");
+    expect(forgot.value.command_id).toBe("forget");
+    expect(forgot.value.reply.text).toMatch(/forgot|forgotten/i);
+    expect(activeRecords(/pizza night/i)).toEqual([]);
+  });
+
+  test("'forget that' with nothing before it says there is nothing to forget", async () => {
+    const forgot = await withStub({ reply: () => "Got it." }, () => runTurnNext(people.owner, "chat", "forget that"));
+    if (!forgot.ok || forgot.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(forgot.value.source).toBe("command");
+    expect(forgot.value.reply.text).toBe("There's nothing to forget yet.");
+  });
+
+  test("in a temporary chat 'forget that' forgets nothing and says so", async () => {
+    await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "remember that pizza night is Friday"));
+    expect(activeRecords(/pizza night/i).length).toBe(1);
+    const forgot = await withStub({ reply: () => "Got it." }, () => runTurnNext(people.owner, "chat", "forget what I told you about pizza night", { temporary: true }));
+    if (!forgot.ok || forgot.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(forgot.value.source).toBe("command");
+    expect(forgot.value.reply.text).toMatch(/nothing to forget/i);
+    expect(activeRecords(/pizza night/i).length).toBe(1);
+  });
+
+  test("a child's forget never touches the owner's records", async () => {
+    await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "remember that pizza night is Friday"));
+    const forgot = await withStub({ reply: () => "Got it." }, () => runTurnNext(people.child, "chat", "forget what I told you about pizza night"));
+    if (!forgot.ok || forgot.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(forgot.value.source).toBe("command");
+    expect(activeRecords(/pizza night/i).length).toBe(1);
   });
 });

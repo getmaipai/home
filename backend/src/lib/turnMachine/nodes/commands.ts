@@ -15,6 +15,7 @@
 // "search the web for X" without ever reaching the interim rule.
 import { matchCommand, runCommand } from "@/lib/commands";
 import { matchPattern, loadAllManifests } from "@/lib/turnEngine";
+import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { runPlugin, meetsMinRole } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
 import { usableReply } from "@/lib/composer";
@@ -30,6 +31,20 @@ export type CommandsOutput =
   | { matched: true; text: string; speech?: string; outcome: import("@/lib/turnContext").ToolExecutionOutcome };
 
 export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, input) => {
+  // THIN-0A (issue #204): "forget that" / "forget what I told you about
+  // X" is the engine's own exact command, the same parser and the same
+  // conversation lookup the old path calls (turnEngine.ts ~2566), so the
+  // model never answers a forget with "Got it." and keeps the record.
+  // Checked before the household's custom commands, as on the old path.
+  // A temporary chat stores no turns and writes no memory, so it has
+  // nothing to forget and touches nothing.
+  const forget = parseForgetCommand(input.utterance);
+  if (forget) {
+    const text = state.temporary ? "There's nothing to forget in a temporary chat." : forgetFromConversation(state.actor, state.conversationId, forget.topic, state.turnId).reply;
+    const outcome = outcomeOf({ callId: `command:${FORGET_COMMAND_ID}`, packageId: FORGET_COMMAND_ID, status: "succeeded", via: "command", userMessage: text });
+    return { outcome: { ok: true }, output: { matched: true, text, outcome } };
+  }
+
   const custom = matchCommand(input.utterance, state.actor);
   if (custom) {
     const result = await runCommand(custom);
