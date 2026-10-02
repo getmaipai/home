@@ -138,21 +138,13 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // order, across every round, so flatMap-ing it here is safe
       // either way.
       const sources = state.outcomes.flatMap((o) => o.sources ?? []);
-      // SEARCH-MIXED-01: model.ts's own phrasing round never hands the
-      // model a failed outcome to answer around (its own tool_calls/
-      // tool_result pair is filtered out of that round's prompt
-      // entirely) - so a mixed round's own failure never has a chance
-      // to become something the model quietly worked around or
-      // answered from its own knowledge instead. The SAME fixed-code-
-      // to-text mapping "from_outcomes" already uses is applied here,
-      // deterministically, from the ORIGINAL unfiltered state.outcomes:
-      // an unrecognized failure code is silently skipped (no raw
-      // diagnostic ever reaches this line either way, only the fixed,
-      // safe lines toolOutageLine() itself names), never a rule reading
-      // what the model said.
-      const outageLines = [...new Set(state.outcomes.filter((o) => o.status === "failed").map((o) => toolOutageLine(o.errorCode)).filter((line): line is string => line !== null))];
-      const text = outageLines.length > 0 ? `${input.text} ${outageLines.join(" ")}`.trim() : input.text;
-      return { outcome: { ok: true }, output: { text, sources } };
+      // SEARCH-MIXED-01 / THIN-1B: a failed or empty lookup is never handed
+      // to the model (model.ts filters it out of the phrasing round) and
+      // the fixed note for the person's age band is added by model.ts
+      // itself, through the stream gate, so a streamed client receives it
+      // and the stored reply is the concatenation of released text. Nothing
+      // is appended here.
+      return { outcome: { ok: true }, output: { text: input.text, sources } };
     }
     case "context_quote":
       // The state record's own honesty rule: a world answer without a
@@ -168,8 +160,8 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // fallback (`answerInputFrom`), built from `outcomes.at(-1)?.
       // userMessage` - the SAME field this checks, so a failed last
       // outcome (a tool round's own final call failing with rounds
-      // exhausted, or SEARCH-EMPTY-01's own `toolAllFailed` guard
-      // routing straight here) is tagged the identical way "immediate"
+      // exhausted, the only way a failed round reaches this node now that
+      // THIN-1B removed SEARCH-EMPTY-01's `toolAllFailed` exit) is tagged the identical way "immediate"
       // is - UNLESS `toolOutageLine` recognizes the failure's own code
       // as one of its fixed, safe lines, in which case that line is
       // delivered directly and never tagged `outcome_error` at all (it

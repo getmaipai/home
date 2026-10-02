@@ -854,7 +854,7 @@ export function questionOf(outcomes: readonly ToolExecutionOutcome[]): string | 
 // adding phrasingInstruction's own copy pushed the file over its
 // unmarked-regex-literal baseline a second time - one string
 // operation, shared, never a second copy of the same escape.
-function quoteForPrompt(text: string): string {
+export function quoteForPrompt(text: string): string {
   return text.replace(/"/g, "'");
 }
 

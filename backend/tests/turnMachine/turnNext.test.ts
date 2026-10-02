@@ -45,6 +45,13 @@ import * as ageBand from "@/lib/ageBand";
 
 const realBand = ageBand.speakerAgeBand;
 
+// THIN-1B (rule 6): the fixed line a reply carries when the lookup did not
+// happen, one per age band. Pinned here as literals so a wording change is a
+// visible test edit; the table lives in nodes/lookupFallback.ts.
+const ADULT_LOOKUP_LINE = "I couldn't look that up just now, so this is from what I already know.";
+const TEEN_LOOKUP_LINE = "I couldn't look that up this time, so that's from what I already know.";
+const CHILD_LOOKUP_LINE = "I couldn't look that up right now, so I'm telling you what I already know.";
+
 let people: BenchPeople;
 const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
 
@@ -1902,46 +1909,11 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
     return (stats.nodes ?? []).filter((n) => n.node === "model").length;
   }
 
-  test("all upstream engines suspended (unresponsive_engines, zero rows) answers with the failed outcome's own line, never a second (phrasing) model call", async () => {
-    const searxng = startFakeSearxng();
-    setHouseholdSettingValue("search.searxng_url", searxng.url);
-    let calls = 0;
-    try {
-      const result = await withStub(
-        {
-          calls: (request) => {
-            if (request.messages.some((m) => m.role === "tool")) return undefined;
-            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "kevin bacon unresponsive engines fixture" }) }];
-          },
-          reply: () => {
-            calls++;
-            return "This should never run - the tool round failed outright, so there is no second round to reach.";
-          },
-        },
-        () => runTurnNext(people.owner, "chat", "what shows has kevin bacon been in"),
-      );
-      expect(result.ok).toBe(true);
-      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(result.value.reply.text).toBe("Search isn't working right now.");
-      // No phrasing round: the forced (or here, offered) call is the
-      // turn's only model generation - the `toolAllFailed` guard routed
-      // straight to `answer` instead of back to `model`.
-      expect(calls).toBe(0);
-      expect(await modelNodeCount(result.value.turn_id)).toBe(1);
-      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
-      const outcomes = row?.outcomes
-        ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string; userMessage?: string }[])
-        : [];
-      const websearchOutcome = outcomes.find((o) => o.packageId === "websearch");
-      expect(websearchOutcome?.status).toBe("failed");
-      expect(websearchOutcome?.errorCode).toBe("search_unavailable");
-      expect(websearchOutcome?.userMessage).toBe("Search isn't working right now.");
-    } finally {
-      searxng.stop();
-    }
-  });
-
-  test("zero rows with no engine failure still runs the phrasing round, whose own prompt now says plainly to report nothing found", async () => {
+  // THIN-1B (rule 6, inverts the SEARCH-EMPTY-01 row that used to assert the
+  // deterministic outage line alone): a search that is down no longer ends
+  // the turn. The model answers from what it knows and the reply carries the
+  // fixed line for the person's age band (never model-written).
+  test("THIN-1B: all upstream engines suspended (unresponsive_engines, zero rows) gets the model's own answer plus the adult's fixed line", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     let phrasingRequest: ChatCompletionRequest | undefined;
@@ -1949,36 +1921,126 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
       const result = await withStub(
         {
           calls: (request) => {
-            if (request.messages.some((m) => m.role === "tool")) return undefined;
-            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "kevin bacon no results fixture" }) }];
+            if (request.messages.some((m) => m.role === "tool") || request.messages.at(-1)?.content?.toString().includes("did not happen")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "kevin bacon unresponsive engines fixture" }) }];
           },
           reply: (request) => {
-            if (!request.messages.some((m) => m.role === "tool")) return "searching";
+            if (!request.messages.at(-1)?.content?.toString().includes("did not happen")) return "searching";
             phrasingRequest = request;
-            return "The search found nothing on that.";
+            return "Kevin Bacon has been in Footloose and Mystic River.";
           },
         },
         () => runTurnNext(people.owner, "chat", "what shows has kevin bacon been in"),
       );
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      // The phrasing round DID run (unlike the failed-outcome test
-      // above) - this is a real succeeded outcome, just an empty one.
+      expect(result.value.reply.text).toBe(`Kevin Bacon has been in Footloose and Mystic River. ${ADULT_LOOKUP_LINE}`);
+      // The second (answering) model call ran, and was handed no failed
+      // tool call or result to explain or work around.
       expect(await modelNodeCount(result.value.turn_id)).toBe(2);
-      expect(result.value.reply.text).toBe("The search found nothing on that.");
-      // The wiring this item actually controls: the phrasing round's own
-      // prompt carries the strengthened synthesis_hint and the real,
-      // empty rows array - proving the empty-rows case reaches the
-      // model with an explicit instruction, not just the old, looser
-      // hint that let the live incident's own model answer from its own
-      // knowledge instead. Whether a real model always obeys this is a
-      // live/bench question, the same boundary QUERY-WRITER-01's own
-      // co-reference accuracy sits behind - not provable by a scripted
-      // stub.
-      const toolMessage = phrasingRequest?.messages.find((m) => m.role === "tool");
-      expect(typeof toolMessage?.content).toBe("string");
-      expect(toolMessage?.content as string).toContain("if rows is empty, say plainly that the search found nothing");
-      expect(toolMessage?.content as string).toContain('"rows":[]');
+      expect(phrasingRequest?.messages.some((m) => m.role === "tool")).toBe(false);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      const outcomes = row?.outcomes
+        ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string; userMessage?: string }[])
+        : [];
+      const websearchOutcome = outcomes.find((o) => o.packageId === "websearch");
+      expect(websearchOutcome?.status).toBe("failed");
+      expect(websearchOutcome?.errorCode).toBe("search_unavailable");
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("THIN-1B: the streamed turn releases the fixed line too, and the stored reply is the concatenation of released text", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      const { delivered, value } = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool") || request.messages.at(-1)?.content?.toString().includes("did not happen")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "kevin bacon unresponsive engines fixture" }) }];
+          },
+          reply: (request) => (request.messages.at(-1)?.content?.toString().includes("did not happen") ? "Kevin Bacon has been in Footloose." : "searching"),
+        },
+        async () => {
+          const result = await runTurnNextStream(people.owner, "chat", "what shows has kevin bacon been in");
+          if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+          const chunks: string[] = [];
+          let outcome: StreamOutcome;
+          for (;;) {
+            const next = await result.tokens.next();
+            if (next.done) { outcome = next.value; break; }
+            chunks.push(next.value);
+          }
+          return { delivered: chunks.join(""), value: result.finalize(chunks.join(""), outcome) };
+        },
+      );
+      expect(delivered).toContain(ADULT_LOOKUP_LINE);
+      expect(value.reply.text).toBe(delivered);
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  test("THIN-1B: a child and a teen each get their own band's line, and the three lines differ", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const ask = async (actor: typeof people.owner) =>
+      withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool") || request.messages.at(-1)?.content?.toString().includes("did not happen")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "kevin bacon unresponsive engines fixture" }) }];
+          },
+          reply: (request) => (request.messages.at(-1)?.content?.toString().includes("did not happen") ? "He was in Footloose." : "searching"),
+        },
+        () => runTurnNext(actor, "chat", "what shows has kevin bacon been in"),
+      );
+    try {
+      const child = await ask(people.child);
+      if (!child.ok || child.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(child.value.reply.text).toBe(`He was in Footloose. ${CHILD_LOOKUP_LINE}`);
+      db.update(people_).set({ role: "teen" }).where(eq(people_.id, people.child.id)).run();
+      const teenActor = db.select().from(people_).where(eq(people_.id, people.child.id)).get()!;
+      const teen = await ask(teenActor);
+      if (!teen.ok || teen.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(teen.value.reply.text).toBe(`He was in Footloose. ${TEEN_LOOKUP_LINE}`);
+      expect(new Set([ADULT_LOOKUP_LINE, TEEN_LOOKUP_LINE, CHILD_LOOKUP_LINE]).size).toBe(3);
+    } finally {
+      searxng.stop();
+    }
+  });
+
+  // THIN-1B (inverts the SEARCH-EMPTY-01 row that asserted the phrasing
+  // round was handed the empty rows with "say plainly the search found
+  // nothing"): zero rows is a lookup that gave nothing, so the model answers
+  // from what it knows and the fixed line says so. The empty result is not
+  // handed to the model.
+  test("THIN-1B: zero rows with no engine failure gets the model's own answer plus the fixed line, and the empty result is never handed to the model", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    let phrasingRequest: ChatCompletionRequest | undefined;
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool") || request.messages.at(-1)?.content?.toString().includes("did not happen")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "kevin bacon no results fixture" }) }];
+          },
+          reply: (request) => {
+            if (!request.messages.at(-1)?.content?.toString().includes("did not happen")) return "searching";
+            phrasingRequest = request;
+            return "He has been in a lot of films.";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "what shows has kevin bacon been in"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(await modelNodeCount(result.value.turn_id)).toBe(2);
+      expect(result.value.reply.text).toBe(`He has been in a lot of films. ${ADULT_LOOKUP_LINE}`);
+      expect(phrasingRequest?.messages.some((m) => m.role === "tool")).toBe(false);
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
       const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string }[]) : [];
       expect(outcomes.find((o) => o.packageId === "websearch")?.status).toBe("succeeded");
@@ -2223,7 +2285,7 @@ describe("turnNext.ts: SEARCH-MIXED-01, a round that mixes a failed search with 
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.reply.text).toContain("Today is Tuesday, October 6th.");
-      expect(result.value.reply.text).toContain("Search isn't working right now.");
+      expect(result.value.reply.text).toContain(ADULT_LOOKUP_LINE);
       // The real proof: the failed outcome's own tool_calls/tool_result
       // pair never reached the phrasing round's own prompt at all - only
       // the succeeded almanac-date call did.

@@ -32,6 +32,7 @@ import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } fro
 import { planLineForTurnMachine } from "@/lib/register";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages } from "../messages";
+import { lookupMissed, lookupMissedLine, lookupMissedInstruction } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
 
@@ -612,11 +613,17 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // result) is left out of this round's prompt entirely, never just
     // the result alone (an assistant message announcing a call the
     // prompt then has no matching tool response for is an invalid
-    // transcript). `answer.ts`'s own "model_text" case appends the
-    // failed outcome's own toolOutageLine afterward, deterministically,
-    // from the ORIGINAL unfiltered state.outcomes - the model is never
-    // the one deciding whether to mention it.
-    const phrasedOutcomes = state.outcomes.filter((o) => o.status !== "failed");
+    // transcript). The fixed note for the person's age band is added after
+    // the model's text at the end of this function, deterministically, from
+    // the ORIGINAL unfiltered state.outcomes - the model is never the one
+    // deciding whether to mention it.
+    //
+    // THIN-1B (rule 6): the same goes for a lookup that succeeded with zero
+    // rows, and when NO outcome survives (search down, an error, a timeout,
+    // nothing found) the round is a plain answer from what the model knows
+    // (lookupMissedInstruction), with the fixed band line added after it
+    // below. The model is never handed an empty or failed result.
+    const phrasedOutcomes = state.outcomes.filter((o) => !lookupMissed(o));
     const assistantMessage = toolCallAssistantMessage(phrasedOutcomes);
     const resultMessages = toolResultMessages(phrasedOutcomes);
     // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as
@@ -637,8 +644,9 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     );
     const searchResultCount = searchRows.count;
     const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount, searchResultCount > 0 && searchRows.allEmpty);
-    const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? phrasing : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${phrasing}` };
-    messages = [...state.messages, assistantMessage, ...resultMessages, instruction];
+    const answering = phrasedOutcomes.length === 0 ? lookupMissedInstruction(promptSurfaceClass, input.utterance) : phrasing;
+    const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? answering : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${answering}` };
+    messages = phrasedOutcomes.length === 0 ? [...state.messages, instruction] : [...state.messages, assistantMessage, ...resultMessages, instruction];
     // The same tools block the forced/offered round itself sent -
     // reused verbatim (see contract.ts's own `lastTools` doc comment:
     // the Qwen3 template renders the tools block into the prompt's own
@@ -850,8 +858,23 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     return { outcome: { ok: true }, output: { kind: "tool_calls", calls: attempt.toolCalls, reasoning } };
   }
 
+  // THIN-1B (rule 6): a phrasing round over a turn whose lookup did not
+  // happen (or found nothing) ends with the fixed line for the person's age
+  // band. It is pushed through the stream gate like any released text, so a
+  // streamed client receives it and the stored reply stays the concatenation
+  // of released text; the model never writes it.
+  const missedLookup = isPhrasingRound && state.outcomes.some(lookupMissed);
+  const spoken = attempt.text.trimEnd();
+  // The note follows the reply after a space, or after a blank line when the
+  // reply stopped without a closing mark, so it never runs on from the
+  // model's last word; text that already ends in whitespace gets none added.
+  const closed = spoken.length > 0 && ".!?\u2026\"')".includes(spoken.slice(-1));
+  const joiner = spoken.length === 0 || attempt.text.length > spoken.length ? "" : closed ? " " : "\n\n";
+  const tail = missedLookup ? `${joiner}${lookupMissedLine(state.plan.age_band)}` : "";
+  if (tail) gate?.push(tail);
+
   // The one exit that ever ships real, streamable text - settle the
   // gate here, once, on the FINAL attempt (post-retry) alone.
   gate?.finish();
-  return { outcome: { ok: true }, output: { kind: "text", text: attempt.text, thinking: attempt.thinking, reasoning } };
+  return { outcome: { ok: true }, output: { kind: "text", text: `${attempt.text}${tail}`, thinking: attempt.thinking, reasoning } };
 };

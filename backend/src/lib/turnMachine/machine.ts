@@ -192,22 +192,11 @@ export const turnMachine = setup({
       return toRun.length === 0 && parkedAsk === null && context.queryWriterUsed;
     },
     moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds,
-    // SEARCH-EMPTY-01: a round whose every outcome failed (today,
-    // always a single websearch call) has no evidence for a phrasing
-    // round to compose from - reusing that round's own generation
-    // budget on a hallucinated answer is exactly the live defect
-    // (conv-19awhetzdf, docs/dev.md) this closes. Checked before
-    // `moreRoundsAvailable` (array order), so a genuine tool failure
-    // never reaches `model` for a doomed phrasing round even on round
-    // 1, where a round otherwise always remains. `answerInputFrom()`'s
-    // own last-resort branch (`context.turnState.outcomes.length > 0`)
-    // already builds the identical `from_outcomes` answer this needs -
-    // the same mechanism the "no more rounds" exit already used, never
-    // reached from round 1 until this guard existed to route here.
-    toolAllFailed: ({ event }) => {
-      const output = (event as unknown as { output: ToolOutput }).output;
-      return output.outcomes.length > 0 && output.outcomes.every((o) => o.status === "failed");
-    },
+    // THIN-1B (rule 6) removed SEARCH-EMPTY-01's `toolAllFailed` guard
+    // here: it sent a round whose every outcome failed straight to
+    // `answer` with a deterministic outage line. A failed tool never fails
+    // the answer; that round now reaches `model` like any other (see the
+    // tool state's transitions below).
     // PROJECT-PHRASE-01 (2026-09-27, dev.md - closes the live incident
     // PROJECT-PKGTYPE-02/03 and PROJECT-REPLY-01 fixed the symptoms
     // of, without reaching this): a succeeded start_project outcome's
@@ -221,8 +210,8 @@ export const turnMachine = setup({
     // framing, which is the wrong shape entirely for a "yes" that just
     // started a project - confronted with it, the model echoed
     // fragments of its own instructions back instead of relaying the
-    // outcome's own text. Checked in the same array position as
-    // `toolAllFailed` above (both before `moreRoundsAvailable`), so a
+    // outcome's own text. Checked before `moreRoundsAvailable` in the
+    // tool state's transitions, so a
     // successful start_project call never reaches a phrasing round
     // even when the household's own real budget (qwen3-8b:
     // model_transitions true, rounds: 1) would otherwise always offer
@@ -476,15 +465,14 @@ export const turnMachine = setup({
           // still-open generic at this point in the file; a future edit
           // to what "record a finished tool round" does must be applied
           // to both.
-          {
-            guard: "toolAllFailed",
-            actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes", "derivePlanFromEvidence"],
-            target: "answer",
-          },
-          // PROJECT-PHRASE-01: same three actions as the `toolAllFailed`
-          // branch above and the no-guard fallback below (see that
-          // branch's own comment on why this stays two literal arrays,
-          // not a shared reference) - checked here, before
+          // THIN-1B (rule 6): there is no `toolAllFailed` exit any more. A
+          // round whose every outcome failed (or found nothing) goes on to
+          // the answering round like any other, where model.ts answers from
+          // what it knows and ends with the fixed band line; the failed
+          // result itself is never handed to the model.
+          // PROJECT-PHRASE-01: same three actions as the no-guard fallback
+          // below (see the comment above on why this stays two literal
+          // arrays, not a shared reference) - checked here, before
           // `moreRoundsAvailable` ever runs, so a successful
           // start_project outcome always lands on `answer` directly,
           // never on a phrasing round `model` invocation.
