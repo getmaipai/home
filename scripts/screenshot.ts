@@ -1651,6 +1651,7 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
     const card = page.getByText("Qwen3 8B Instruct", { exact: true }).first();
     await card.waitFor();
     if (state === "unavailable") {
+      await page.getByRole("button", { name: "Details", exact: true }).click();
       await page.getByText("Chat runs through the MaiPai Stack.", { exact: true }).waitFor();
       await page.getByText(answers.unavailable.headline, { exact: true }).waitFor({ state: "detached" });
     } else {
