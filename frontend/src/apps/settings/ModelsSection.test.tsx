@@ -117,7 +117,7 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlanResponder(baseResponses, ({ source }) => source.repo ? FIT_NO : FIT_YES);
     try {
       const { findByRole, getByRole, findByText } = render(<ModelsSection />);
-      await findByText("Chat runs through the MaiPai Stack.");
+      await findByText("This computer: Apple Silicon, 24 GB memory.");
       const input = await findByRole("textbox", { name: "Hugging Face model link" });
       fireEvent.change(input, { target: { value: GGUF_LINK } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
@@ -150,7 +150,7 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlanResponder(baseResponses, () => FIT_YES);
     try {
       const { findByText } = render(<ModelsSection />);
-      await findByText("Chat runs through the MaiPai Stack.");
+      await findByText("This computer: Apple Silicon, 24 GB memory.");
       expect(document.querySelector('[data-slot="compare-models"]')).toBeNull();
     } finally { restore(); }
   });
@@ -289,10 +289,41 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES);
     try {
       const { findByText, getByText } = render(<ModelsSection />);
-      await findByText("Chat runs through the MaiPai Stack.");
+      await findByText("This computer: Apple Silicon, 24 GB memory.");
       fireEvent.click(getByText("Details"));
       await findByText("Memory it needs");
       await findByText("about 5 to 9 GB");
+    } finally { restore(); }
+  });
+
+  test("fit verdict badges use the teal, orange, red, and neutral status tokens", async () => {
+    const cases = [
+      { response: FIT_YES, token: "--hue-teal" },
+      { response: { plan: testPlan("slow"), wording: { verdict: "slow", headline: "Runs, but slowly", detail: "It fits only by using the processor, so answers will be slower." } }, token: "--hue-orange" },
+      { response: FIT_NO, token: "bg-destructive" },
+      { response: FIT_UNKNOWN, token: "bg-secondary" },
+    ];
+    for (const { response, token } of cases) {
+      const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, response);
+      try {
+        const { findByText, getByText } = render(<ModelsSection />);
+        await findByText(response.wording.headline);
+        const pill = getByText(response.wording.headline).closest("[data-verdict]");
+        expect(pill?.getAttribute("data-verdict")).toBe(response.wording.verdict);
+        expect(pill?.className).toContain(token);
+      } finally { restore(); cleanup(); __resetFitPlanCacheForTests(); }
+    }
+  });
+
+  test("the Stack sentence is inside Details", async () => {
+    const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_YES);
+    try {
+      const { findByText, getByText, queryByText } = render(<ModelsSection />);
+      await findByText("This computer: Apple Silicon, 24 GB memory.");
+      expect(queryByText("Chat runs through the MaiPai Stack.")).toBeNull();
+      fireEvent.click(getByText("Details"));
+      const sentence = await findByText("Chat runs through the MaiPai Stack.");
+      expect(getByText("Details").parentElement?.textContent).toContain(sentence.textContent);
     } finally { restore(); }
   });
 
@@ -300,7 +331,7 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_NO);
     try {
       const { findByText, getByText } = render(<ModelsSection />);
-      await findByText("Chat runs through the MaiPai Stack.");
+      await findByText("This computer: Apple Silicon, 24 GB memory.");
       fireEvent.click(getByText("Details"));
       await findByText("It needs about 6 GB more memory. A smaller version of this model, or a shorter conversation memory, would help.");
       expect(document.querySelector('[data-slot="recommendation-card"]')).toBeNull();
@@ -312,7 +343,7 @@ describe("ModelsSection", () => {
     const restore = stubFetchWithFitPlan({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit()], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE }, FIT_UNAVAILABLE);
     try {
       const { findByText, getByText, queryByText } = render(<ModelsSection />);
-      await findByText("Chat runs through the MaiPai Stack.");
+      await findByText("This computer: Apple Silicon, 24 GB memory.");
       fireEvent.click(getByText("Details"));
       await findByText(/Uses about .* of memory\./);
       expect(queryByText("Memory it needs")).toBeNull();
@@ -413,7 +444,7 @@ describe("ModelsSection", () => {
       const { findByText, queryByRole } = render(<ModelsSection />);
       await findByText("Stack Chat Model");
       await findByText("Ready");
-      await findByText("Chat runs through the MaiPai Stack.");
+      await findByText("This computer: Apple Silicon, 24 GB memory.");
       for (const action of ["Use this", "Restart", "Stop", "Other options"]) expect(queryByRole("button", { name: action })).toBeNull();
       expect(queryByRole("button", { name: "Details" })).toBeTruthy();
     } finally { restore(); }
@@ -508,7 +539,7 @@ describe("ModelsSection", () => {
     const fitPlan = mock(() => Promise.reject(new Error("unused")));
     api.fitPlan = fitPlan as typeof api.fitPlan;
     const restore = stubFetch({ "/api/host/hardware": HARDWARE, "role=chat": [chatFit({ url: "https://example.invalid/model.gguf" })], "role=image": [], "role=video": [], "/models/selection": NO_SELECTION, "/engine/status": NO_ENGINE });
-    try { const { findByText } = render(<ModelsSection />); await findByText("Chat runs through the MaiPai Stack."); expect(fitPlan).not.toHaveBeenCalled(); }
+    try { const { findByText } = render(<ModelsSection />); await findByText("This computer: Apple Silicon, 24 GB memory."); expect(fitPlan).not.toHaveBeenCalled(); }
     finally { restore(); api.fitPlan = original; }
   });
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Section } from "@maipai/ui/src/primitives/Section";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
+import { Badge } from "@maipai/ui/src/ui/badge";
 import { Status } from "@maipai/ui/src/ui/status";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
@@ -69,7 +69,7 @@ export function ModelsSection() {
   const recommendedFit = useFitPlan(recommendedUrl, recommended?.contextUsed);
 
   return (
-    <Section heading="AI models">
+    <div className="flex flex-col gap-4">
       {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
       {hardware === null ? (
         <Progress mode="spinner" label="Checking this computer" />
@@ -90,7 +90,7 @@ export function ModelsSection() {
           <PlannedRoleCard title="Video generation" fits={videoFits} />
         </div>
       )}
-    </Section>
+    </div>
   );
 }
 
@@ -137,10 +137,9 @@ function ChatModelCard({
             </span>
           ) : <span className="text-base text-[var(--muted-foreground)]">{stackState}</span>}
         </div>
-        <p className="text-base text-[var(--muted-foreground)]">Chat runs through the MaiPai Stack.</p>
         {primary ? <FitLine fitPlan={fitPlan} legacyWarning={!primary.fits} /> : null}
         <Disclosure open={showDetails} onToggle={() => setShowDetails((v) => !v)} label="Details" icon={ChevronIcon}>
-          <div className="flex flex-col gap-1 pt-1">{primary ? <DetailsFitPanel fitPlan={fitPlan} legacyBytes={primary.requiredBytes} /> : <p className="text-base text-[var(--muted-foreground)]">The Stack has not reported a chat model.</p>}</div>
+          <div className="flex flex-col gap-1 pt-1"><p className="text-base text-[var(--muted-foreground)]">Chat runs through the MaiPai Stack.</p>{primary ? <DetailsFitPanel fitPlan={fitPlan} legacyBytes={primary.requiredBytes} /> : <p className="text-base text-[var(--muted-foreground)]">The Stack has not reported a chat model.</p>}</div>
         </Disclosure>
       </div>
     </RoleCardShell>
@@ -160,8 +159,13 @@ function FitLine({ fitPlan, legacyWarning }: { fitPlan: ReturnType<typeof useFit
 }
 
 function FitResult({ headline, detail, verdict, sizedModel }: { headline: string; detail: string; verdict: "yes" | "slow" | "no" | "unknown"; sizedModel?: string | null }) {
-  const status = { yes: "online", slow: "degraded", no: "offline", unknown: "maintenance" }[verdict] as "online" | "degraded" | "offline" | "maintenance";
-  return <div className="flex flex-col items-start gap-1"><Status status={status}>{headline}</Status><p className="text-base text-[var(--muted-foreground)]">{detail}</p>{sizedModel ? <p className="text-base text-[var(--muted-foreground)]">Sized from {sizedModel}.</p> : null}</div>;
+  const appearance = {
+    yes: { variant: "secondary" as const, className: "bg-[var(--hue-teal)] text-foreground" },
+    slow: { variant: "secondary" as const, className: "bg-[var(--hue-orange)] text-foreground" },
+    no: { variant: "destructive" as const, className: "" },
+    unknown: { variant: "secondary" as const, className: "" },
+  }[verdict];
+  return <div className="flex flex-col items-start gap-1"><Badge data-verdict={verdict} variant={appearance.variant} className={appearance.className}>{headline}</Badge><p className="text-base text-[var(--muted-foreground)]">{detail}</p>{sizedModel ? <p className="text-base text-[var(--muted-foreground)]">Sized from {sizedModel}.</p> : null}</div>;
 }
 
 function CheckModelCard({ onChecked }: { onChecked: (name: string, response: FitPlanResponse) => void }) {
@@ -307,7 +311,7 @@ function PlannedRoleCard({ title, fits }: { title: string; fits: ModelFit[] | nu
 function RoleCardShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-[var(--border)] p-4">
-      <h3 className="mb-2 text-base font-medium">{title}</h3>
+      <h2 className="mb-2 text-base font-medium">{title}</h2>
       {children}
     </div>
   );

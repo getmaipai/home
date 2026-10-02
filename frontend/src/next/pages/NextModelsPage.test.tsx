@@ -74,6 +74,8 @@ describe("NextModelsPage", () => {
     try {
       const view = renderWithQueryClient(<NextModelsPage person={makePerson("admin")} />);
       await waitFor(() => expect(view.getByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy());
+      expect(view.getAllByText("AI models", { exact: true })).toHaveLength(1);
+      expect(view.container.querySelector(".rounded-xl.border")).toBeNull();
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/host/hardware"), expect.anything());
       expect(view.getByText("This computer: Apple Silicon, 24 GB memory.")).toBeTruthy();
       expect(view.queryByText("Brain")).toBeNull();
