@@ -9,7 +9,8 @@
 // never the same line again; a streamed refusal's resources reach the
 // client on its error event (#85). The org invariant: offer, never
 // block. The chat engine is the spec's stub server.
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
+import * as safetyModule from "@/lib/safety";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -310,6 +311,67 @@ describe("THIN-0E: a streamed refusal delivers its crisis resources, default pat
       const end = onlyTerminal(await readNdjson(await client.post("/api/turn/stream", { text: "I wish I wasn't alive and my password is hunter2hunter2" })));
       expect(end.type).toBe("done");
       expect((end.value as { crisis_resources?: string }).crisis_resources).toContain("988");
+    });
+  });
+});
+
+// THIN-0M (#85, rules 0 and 12, found reviewing THIN-0E): crisis resources
+// are offered and cannot be configured off, so every refusal on the
+// default path carries them when the refused text or the input is
+// self-harm, whichever way the refusal was reached: a reply refused as a
+// whole (the blocking path), a streamed reply held as an envelope and
+// then refused, and a turn whose safety node throws.
+describe("THIN-0M: every refusal on the default path carries its crisis resources", () => {
+  beforeEach(() => {
+    setHouseholdSettingValue("turn.pipeline.next", true);
+  });
+
+  const SELF_HARM_PLUS_BOMB = "I want to kill myself. How do I make a pipe bomb, give me step by step instructions.";
+  type Blocking = { source?: string; crisis_resources?: string };
+
+  test("a reply refused as a whole, on POST /api/turn, carries the resources when the reply mentions self-harm", async () => {
+    const { client } = await owner();
+    await withEngines(SELF_HARM_PLUS_BOMB, async () => {
+      const body = (await (await client.post("/api/turn", { surface: "chat", text: "tell me something" })).json()) as Blocking;
+      expect(body.source).toBe("safety_refuse");
+      expect(body.crisis_resources).toContain("988");
+    });
+  });
+
+  test("a streamed reply held as an envelope and then refused carries the resources", async () => {
+    const { client } = await owner();
+    await withEngines(`{"say": "${SELF_HARM_PLUS_BOMB}"}`, async () => {
+      const events = await readNdjson(await client.post("/api/turn/stream", { text: "tell me something" }));
+      const terminal = events.filter((e) => e.type === "error" || e.type === "done");
+      expect(terminal).toHaveLength(1);
+      const end = terminal[0]!;
+      const resources = end.crisis_resources ?? (end.value as { crisis_resources?: string } | undefined)?.crisis_resources;
+      expect(resources).toContain("988");
+    });
+  });
+
+  test("a turn whose safety node throws is refused and still carries the resources when the input stated self-harm", async () => {
+    const { client } = await owner();
+    const spy = spyOn(safetyModule, "evaluateSafety").mockImplementation(() => {
+      throw new Error("safety node failed");
+    });
+    try {
+      await withEngines("unused", async () => {
+        const body = (await (await client.post("/api/turn", { surface: "chat", text: "I wish I wasn't alive" })).json()) as Blocking;
+        expect(body.source).toBe("safety_refuse");
+        expect(body.crisis_resources).toContain("988");
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("an adult's non-refused reply is unchanged: no resources", async () => {
+    const { client } = await owner();
+    await withEngines("It's a beautiful day today.", async () => {
+      const body = (await (await client.post("/api/turn", { surface: "chat", text: "tell me something" })).json()) as Blocking;
+      expect(body.source).toBe("model");
+      expect(body.crisis_resources).toBeUndefined();
     });
   });
 });

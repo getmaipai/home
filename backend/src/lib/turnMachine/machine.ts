@@ -11,7 +11,7 @@ import type { TurnState, NodeName, NodeOutcome, ActionProposal } from "./contrac
 type NodeFn<In, Out> = (state: TurnState, input: In, signal: AbortSignal) => Promise<{ outcome: NodeOutcome; output: Out }>;
 import { TraceRecorder } from "./trace";
 import { nodeSignal } from "./deadline";
-import { safetyNode, applySafety, safetyRoute, type SafetyOutput } from "./nodes/safety";
+import { safetyNode, applySafety, safetyRoute, inputCarriesCrisisSignal, type SafetyOutput } from "./nodes/safety";
 import { commandsNode, type CommandsOutput } from "./nodes/commands";
 import { contextNode, applyContext, type ContextOutput } from "./nodes/context";
 import { modelNode, ANSWER_FROM_CONTEXT_TOOL_ID, rawUtteranceWebsearchCall, type ModelOutput } from "./nodes/model";
@@ -319,6 +319,16 @@ export const turnMachine = setup({
     // design puts this outcome on the model node's own trace entry
     // rather than a ninth node, so it's patched onto that entry here,
     // the one place both the trace and the final outcome are in hand.
+    // THIN-0M: keep the whole-reply check that refused the answer, and the
+    // input's own crisis signal when the safety node threw, so the refusal
+    // still offers the crisis resources.
+    applyOutputRefusal: ({ context }) => {
+      const output = context.step as OutputGateOutput;
+      if (output.refused && output.safety) context.turnState.outputSafety = output.safety;
+    },
+    applySafetyFailure: ({ context }) => {
+      context.turnState.crisis = inputCarriesCrisisSignal(context.turnState.utterance);
+    },
     applyReasoningTrace: ({ context }) => {
       const output = context.step as OutputGateOutput;
       const modelEntry = [...context.turnState.nodes].reverse().find((n) => n.node === "model");
@@ -351,7 +361,7 @@ export const turnMachine = setup({
           },
           { actions: [assign(({ event }) => ({ step: event.output })), "applySafety"], target: "commands" },
         ],
-        onError: { target: "refused", actions: assign({ step: () => ({ safety: { action: "refuse" } }) }) },
+        onError: { target: "refused", actions: [assign({ step: () => ({ safety: { action: "refuse" } }) }), "applySafetyFailure"] },
       },
     },
     commands: {
@@ -499,7 +509,7 @@ export const turnMachine = setup({
         src: "output_gate",
         input: ({ context }) => context,
         onDone: [
-          { guard: "outputRefused", actions: [assign(({ event }) => ({ step: event.output })), "applyReasoningTrace"], target: "refused" },
+          { guard: "outputRefused", actions: [assign(({ event }) => ({ step: event.output })), "applyReasoningTrace", "applyOutputRefusal"], target: "refused" },
           { actions: [assign(({ event }) => ({ step: event.output })), "applyReasoningTrace"], target: "done" },
         ],
       },

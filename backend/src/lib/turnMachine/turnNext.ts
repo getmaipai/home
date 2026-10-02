@@ -103,7 +103,9 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
   // it wins over the last sentence's own flag.
   const inputCrisisLine = state.crisis ? "If you or someone you know is in crisis, help is available. Call or text 988 (US) any time." : undefined;
   const gated = state.streamGate?.result();
-  const outputFlag = gated?.refused ?? gated?.lastFlagged;
+  // THIN-0M: a reply refused as a whole (blocking, or a streamed reply
+  // held as an envelope) leaves its check on state.outputSafety instead.
+  const outputFlag = gated?.refused ?? gated?.lastFlagged ?? state.outputSafety;
   const crisisResources = outputFlag ? (deriveCrisisResources(outputFlag) ?? inputCrisisLine) : inputCrisisLine;
   return {
     reply: { text, speech },

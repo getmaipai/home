@@ -5,6 +5,7 @@
 // safety architecture (docs/SAFETY.md) says must never become a
 // judgment: it stays a direct call to the deterministic floor, not a
 // reimplementation of it.
+import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { evaluateSafety, carriesCrisisSignal } from "@/lib/safety";
 import { detectCredential } from "@/lib/memoryContentPolicy";
 import { turnAgeBand } from "../speaker";
@@ -46,6 +47,19 @@ export function safetyRoute(output: SafetyOutput): "refused" | "blocked" | "comm
   if (output.safety.action === "refuse") return "refused";
   if (output.credentialBlock) return "blocked";
   return "commands";
+}
+
+/** THIN-0M: when this node itself throws, the turn is refused with no
+ * result to read. The spec's classifier is called directly (not through
+ * the failing evaluateSafety()) so an input that stated self-harm still
+ * gets the crisis resources, which cannot be configured off. A second
+ * failure answers false: the refusal stands, never a thrown error. */
+export function inputCarriesCrisisSignal(utterance: string): boolean {
+  try {
+    return carriesCrisisSignal(checkSafety(utterance, { isMinor: true }));
+  } catch {
+    return false;
+  }
 }
 
 export function applySafety(state: TurnState, output: SafetyOutput): void {

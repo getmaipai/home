@@ -253,6 +253,10 @@ export interface TurnState {
    * re-evaluating the whole reply - see outputGate.ts's own StreamGate
    * for why this lives there, not here or in model.ts. */
   streamGate?: StreamGate;
+  /** THIN-0M: the whole-reply check that made output_gate refuse a reply
+   * (set by the machine's applyOutputRefusal), so the refusal can carry
+   * the crisis resources when the refused text mentioned self-harm. */
+  outputSafety?: SafetyResult;
 }
 
 /** GROUND-01: `arg` is the refusing argument's NAME only, never its

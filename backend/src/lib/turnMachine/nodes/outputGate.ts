@@ -284,7 +284,9 @@ export interface OutputGateInput {
 }
 
 export type OutputGateOutput =
-  | { refused: true; text: string; reasoning: { emitted: false; withheld_for: TurnState["reasoning"]["withheld_for"] } }
+  // THIN-0M: `safety` is the whole-reply check that refused, so a refusal
+  // whose text mentioned self-harm still carries the crisis resources.
+  | { refused: true; text: string; safety?: SafetyResult; reasoning: { emitted: false; withheld_for: TurnState["reasoning"]["withheld_for"] } }
   | { refused: false; text: string; speech?: string; sources: AnswerOutput["sources"]; reasoningOut?: string; reasoning: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] } };
 
 /** The reasoning span's own safety pass ("Reasoning passes the output
@@ -404,9 +406,9 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     // context-decided reason (minor/surface) still wins when emit was
     // already false, never overwritten by an unrelated answer refusal.
     const refusedWithheldFor = input.reasoningEmit ? "gate" : withheldFor;
-    return { outcome: { ok: true }, output: { refused: true, text: REFUSAL_FIRST[0]!, reasoning: { emitted: false, withheld_for: refusedWithheldFor } } };
+    return { outcome: { ok: true }, output: { refused: true, text: REFUSAL_FIRST[0]!, safety: evaluation.effective, reasoning: { emitted: false, withheld_for: refusedWithheldFor } } };
   }
 
-  const reasoning = { emitted: reasoningOut !== undefined, withheld_for: withheldFor };
+  const reasoning ={ emitted: reasoningOut !== undefined, withheld_for: withheldFor };
   return { outcome: { ok: true }, output: { refused: false, text: repaired, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning } };
 };
