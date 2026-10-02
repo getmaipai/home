@@ -4,7 +4,9 @@
 // scripted budget check, mirroring `speechLint.test.ts`'s
 // fixture-driven style rather than running the CLI against real files.
 import { describe, expect, test } from "bun:test";
-import { scanSource } from "../scripts/lint/rule-budget";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { scanSource, TURN_PATH_FILES } from "../scripts/lint/rule-budget";
 import { RULE_NAMES } from "../src/lib/ruleNames";
 
 describe("rule-budget lint: scanSource", () => {
@@ -121,5 +123,23 @@ export const GREETING_RE = /^(hi|hello)$/i;
 `;
     const result = scanSource(fixture, "fixture.ts");
     expect(result.unmarked).toBe(1);
+  });
+});
+
+// THIN-2E (docs/design/RULES.md rule 1): the baseline may only go down, and a
+// baseline above the real count is slack a new rule could hide in. The
+// committed numbers equal the live unmarked counts, so a retired rule lowers
+// the file in the same push and a new unmarked one fails the lint.
+describe("rule-budget lint: the committed baseline is tight", () => {
+  test("every turn-path file's baseline equals its live unmarked count", () => {
+    const baseline = JSON.parse(readFileSync(join(import.meta.dir, "../rules-baseline.json"), "utf8")) as Record<string, number>;
+    const mismatches: string[] = [];
+    for (const file of TURN_PATH_FILES) {
+      const path = join(import.meta.dir, "../src/lib", file);
+      if (!existsSync(path)) continue;
+      const live = scanSource(readFileSync(path, "utf8"), file).unmarked;
+      if ((baseline[file] ?? 0) !== live) mismatches.push(`${file}: baseline ${baseline[file] ?? 0}, live ${live}`);
+    }
+    expect(mismatches).toEqual([]);
   });
 });
