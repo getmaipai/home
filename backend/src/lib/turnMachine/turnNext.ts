@@ -13,7 +13,7 @@
 // turn.pipeline.next is on.
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, SpeakerEvidence, PresentPerson, TurnValue, TurnStreamResult, StreamOutcome } from "@/lib/turnEngine";
-import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert } from "@/lib/turnEngine";
+import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply } from "@/lib/turnEngine";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
@@ -530,7 +530,32 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     const source: TurnValue["source"] = failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources);
   }
-  return value;
+  return finalizeNextReply(state, value);
+}
+
+/** THIN-0I (rules 12 and 14): the tail of the old path's finalizeReply()
+ * on the default path - a known constant reply (the remember
+ * confirmation, a safety refusal) comes from the active companion's own
+ * pool or the shared one, through the same variedConstantReply()
+ * turnEngine.ts itself uses, never a second copy of the pools. Runs
+ * after the output gate, exactly where the old path varies its own text:
+ * every variant is a fixed, hand-written line from replyVariation.ts,
+ * never model text, so nothing here loosens the gate for anyone.
+ * `state.persona` is the persona beginTurn() resolved for this turn
+ * (DEFAULT_PERSONA in a temporary chat), so the pool matches the
+ * companion the system prompt was built under even when the person
+ * switches companion mid-turn. The model's own text passes through
+ * untouched (the old path's sentence-case opener is not ported: an
+ * adult's written reply stays exactly as generated). An authored speech
+ * text that differs from the visible text is kept as authored, the old
+ * path's own rule; one that merely repeats the text follows the varied
+ * text so a spoken confirmation says what the screen shows. */
+function finalizeNextReply(state: TurnState, value: TurnValue): TurnValue {
+  const { text, speech } = value.reply;
+  if (speech !== undefined && speech !== text) return value;
+  const variedText = variedConstantReply(state.actor.id, value.source, text, state.persona.id);
+  if (variedText === text) return value;
+  return { ...value, reply: { ...value.reply, text: variedText, ...(speech === undefined ? {} : { speech: variedText }) } };
 }
 
 class EngineUnavailableTurnError extends Error {

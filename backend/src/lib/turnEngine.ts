@@ -3734,6 +3734,21 @@ function composedRecordOf(prepared: PreparedTurn): ComposedRecord | undefined {
   return { ...prepared.composed, phase: prepared.machine?.phase ?? prepared.composed.phase };
 }
 
+/** The reply pools for a known constant reply, keyed by source: a
+ * safety refusal rotates through replyVariation.ts's first/repeat pool,
+ * a package or command reply that is exactly one of the known constant
+ * confirmations rotates through the active companion's own pool (or the
+ * shared one when that companion has none), and every other source
+ * passes through unchanged. finalizeReply() below and the default
+ * path's turnMachine/turnNext.ts call this same function (THIN-0I, rule
+ * 12: ported, not copied), so the two paths cannot drift apart on which
+ * reply gets which pool. */
+export function variedConstantReply(personId: string, source: TurnValue["source"], text: string, personaId: string): string {
+  if (source === "safety_refuse") return pickRefusalVariant(personId);
+  if (source === "plugin" || source === "plugin_error" || source === "command" || source === "command_error") return varyKnownConstant(personId, text, personaId);
+  return text;
+}
+
 function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface = "chat", trace?: ReplyTrace, temporary = false): TurnValue {
   const value = enforceWellFormed(actor, applyOutputBoundary(actor, rawValue), trace);
   const { text, speech } = value.reply;
@@ -3760,16 +3775,9 @@ function finalizeReply(actor: PersonRow, rawValue: TurnValue, surface: Surface =
   // companion for one reply.
   const personaId = (temporary ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id"))).id;
   const variedText =
-    value.source === "safety_refuse"
-      ? pickRefusalVariant(actor.id)
-      : value.source === "plugin" ||
-          value.source === "plugin_error" ||
-          value.source === "command" ||
-          value.source === "command_error"
-        ? varyKnownConstant(actor.id, text, personaId)
-        : value.source === "model"
-          ? sentenceCaseOpener(text) // CHAT-04 (#81)
-          : text;
+    value.source === "model"
+      ? sentenceCaseOpener(text) // CHAT-04 (#81)
+      : variedConstantReply(actor.id, value.source, text, personaId);
   const spokenText = surface === "robot" && speech === undefined ? splitIntoSentences(variedText)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : normalizeForSpeech(variedText);
   return { ...value, document_available: value.document_available ?? false, reply: { text: variedText, speech: spokenText } };
 }
