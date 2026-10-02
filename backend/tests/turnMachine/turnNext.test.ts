@@ -37,7 +37,10 @@ import { identityLine } from "@/lib/turnEngine";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { useDefaultScriptedStack } from "../stackFixture";
 import { judgeQueueStats, runJudgeBatch } from "@/lib/memoryJudge";
-import { activeTurnCount } from "@/lib/turnActivity";
+import { activeTurnCount, turnActiveWithin, __resetTurnActivityForTests } from "@/lib/turnActivity";
+import * as ageBand from "@/lib/ageBand";
+
+const realBand = ageBand.speakerAgeBand;
 
 let people: BenchPeople;
 const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
@@ -3090,5 +3093,45 @@ describe("turnNext.ts: the memory judge and the default path (THIN-0C)", () => {
     expect(heldDuring).toBe(1);
     expect(tick?.processed).toBe(0);
     expect(activeTurnCount()).toBe(0);
+  });
+  test("a streamed turn whose setup throws after the lease was taken releases it", async () => {
+    const spy = spyOn(ageBand, "speakerAgeBand").mockImplementation((...args: Parameters<typeof ageBand.speakerAgeBand>) => {
+      // Throws only once the lease is held, i.e. in the stream's own setup.
+      if (activeTurnCount() > 0) throw new Error("setup failed");
+      return realBand(...args);
+    });
+    try {
+      await expect(withStub({ reply: () => "unused" }, () => runTurnNextStream(people.owner, "chat", "Oliver plays soccer on Saturdays"))).rejects.toThrow("setup failed");
+    } finally {
+      spy.mockRestore();
+    }
+    expect(activeTurnCount()).toBe(0);
+  });
+
+  test("a turn that fails after the model ran still counts as household activity for the judge's idle window", async () => {
+    __resetTurnActivityForTests();
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const original = llm.startCompleteStream.bind(llm);
+    const failure = spyOn(llm, "startCompleteStream").mockImplementation(async (...args) => {
+      if (args[1].some((message) => message.role === "tool")) return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: could not reach local engine" };
+      return original(...args);
+    });
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => request.messages.some((message) => message.role === "tool")
+            ? undefined
+            : [{ id: "call-death", name: "websearch", args: JSON.stringify({ expression: "today's headline news" }) }],
+          reply: () => "checking the news",
+        },
+        () => runTurnNext(people.owner, "chat", "what is in the news today"),
+      );
+      expect(result.ok).toBe(false);
+    } finally {
+      failure.mockRestore();
+    }
+    expect(activeTurnCount()).toBe(0);
+    expect(turnActiveWithin(20_000)).toBe(true);
   });
 });

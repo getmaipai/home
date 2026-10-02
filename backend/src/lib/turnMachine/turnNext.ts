@@ -401,11 +401,22 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   // call. TurnMachineTimeout is the one thing this function itself ever
   // throws for a caught error; every caller checks for it specifically
   // rather than swallowing anything else this function might throw.
+  // THIN-0C: the old path engages the lease before routing, so a turn
+  // that fails after the engine was reached still counts as household
+  // activity (turnEngine.ts's lease.engage()). Same here on the failure
+  // paths: engage when the context or model node had run.
+  const engageIfEngineReached = () => {
+    if (state.nodes.some((n) => n.node === "context" || n.node === "model")) begun.lease.engage();
+  };
   const finalSnapshot = await waitFor(machineActor, (s) => s.status === "done", { timeout: state.budget.deadlines_ms.total + 5000, signal: abortSignal }).catch((err: unknown) => {
+    engageIfEngineReached();
     throw new TurnMachineTimeout(`turn machine failed: ${(err as Error).message}`);
   });
   const finalState = finalSnapshot.value as string;
-  if (state.engineUnavailable) throw new EngineUnavailableTurnError(engineUnavailableLine(state));
+  if (state.engineUnavailable) {
+    engageIfEngineReached();
+    throw new EngineUnavailableTurnError(engineUnavailableLine(state));
+  }
 
   // A code review (2026-09-22) caught TraceRecorder.skip() never
   // called anywhere - a turn that never reaches, say, `tool` (no tool
@@ -599,6 +610,19 @@ async function* drainDeltaQueue(channel: StatusChannel<string>): AsyncGenerator<
 export async function runTurnNextStream(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnStreamResult> {
   const begun = await beginTurn(actor, surface, text, opts);
   if (!begun.ok) return begun.result;
+  // THIN-0C: anything below that throws before machineDone exists (its
+  // .finally is the normal release) must not leak the lease; release()
+  // is idempotent, so the normal path is unaffected.
+  try {
+    return startStream(actor, surface, text, begun.value);
+  } catch (err) {
+    begun.value.lease.release();
+    throw err;
+  }
+}
+
+function startStream(actor: PersonRow, surface: Surface, text: string, begunValue: BegunTurn): TurnStreamResult {
+  const begun = { ok: true as const, value: begunValue };
   const { state, startedAt } = begun.value;
 
   const status = new StatusChannel();
