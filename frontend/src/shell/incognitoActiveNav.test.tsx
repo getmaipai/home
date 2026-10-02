@@ -7,7 +7,7 @@ import SidebarLayout from "@maipai/ui/src/dashboard/layouts/full/vertical/sideba
 import { TooltipProvider } from "@maipai/ui/src/dashboard/components/ui/tooltip";
 
 const tokensCss = readFileSync(new URL("./tokens.css", import.meta.url), "utf8");
-const activeNavRule = tokensCss.match(/html\.incognito body\[class\*="style-"\] \[data-slot="sidebar-inner"\] a > div\.bg-primary\.text-background\s*\{[^}]*\}/)?.[0];
+const activeNavRule = tokensCss.match(/html\.incognito body\[class\*="style-"\] \[data-slot="sidebar-inner"\] a\[data-slot="sidebar-menu-button"\]\[data-active\]\s*\{[^}]*\}/)?.[0];
 const styleTestId = "incognito-active-nav-test-styles";
 const violet = "rgb(164, 52, 255)";
 
@@ -86,8 +86,8 @@ test.each([
     const inactiveLink = view.container.querySelector<HTMLAnchorElement>('a[href="/next"]');
     expect(activeLink).not.toBeNull();
     expect(inactiveLink).not.toBeNull();
-    const activePill = activeLink!.querySelector("div.bg-primary.text-background");
-    const inactiveItem = inactiveLink!.querySelector("div");
+    const activePill = activeLink;
+    const inactiveItem = inactiveLink;
     expect(activePill).not.toBeNull();
     expect(inactiveItem).not.toBeNull();
 

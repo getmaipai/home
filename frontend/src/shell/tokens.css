@@ -92,9 +92,9 @@ html.incognito body[class*="style-"] [data-slot="sidebar-inner"] {
 
 /* Keep Home's primary cyan for links, actions and selected controls.
  * Only the vendored sidebar's active navigation pill joins Incognito's
- * violet highlights; its shipped NavItem renders as a Link > div with
- * both bg-primary and text-background classes when active. */
-html.incognito body[class*="style-"] [data-slot="sidebar-inner"] a > div.bg-primary.text-background {
+ * violet highlights; since ui-v0.5.89 the shipped NavItem marks the
+ * current page's link itself with data-active and aria-current="page". */
+html.incognito body[class*="style-"] [data-slot="sidebar-inner"] a[data-slot="sidebar-menu-button"][data-active] {
   background-color: var(--hue-violet);
   color: white;
 }
