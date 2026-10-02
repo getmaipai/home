@@ -102,6 +102,10 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 export type { TurnReply, TurnValue } from "@/wire";
+// THIN-0G: the debounced summary refresh scheduler moved to summaryRefresh.ts
+// so the default path schedules it through the same code.
+import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
+export { __setSummaryRefreshDelayForTests, __clearPendingSummaryRefreshesForTests } from "@/lib/summaryRefresh";
 // THIN-0H (rule 12): these moved to turnShared.ts so the default path
 // (turnMachine/) no longer imports this file; imported back here for the
 // old path's own use and re-exported so existing callers keep working.
@@ -445,51 +449,6 @@ function logTurnSafely(
   scheduleSummaryRefresh(value.conversation_id);
 }
 
-// One pending timer per conversation, not one per turn - see
-// logTurnSafely()'s own comment for the bug this fixes. Exported only for
-// __clearPendingSummaryRefreshesForTests() below.
-const pendingSummaryRefreshes = new Map<string, ReturnType<typeof setTimeout>>();
-
-function scheduleSummaryRefresh(conversationId: string): void {
-  const existing = pendingSummaryRefreshes.get(conversationId);
-  if (existing) clearTimeout(existing);
-  const timer = setTimeout(() => {
-    pendingSummaryRefreshes.delete(conversationId);
-    maybeRefreshConversationSummary(conversationId).catch((err: unknown) =>
-      console.error(`[turn] conversation summary refresh failed: ${(err as Error).message}`),
-    );
-  }, summaryRefreshDelayMs);
-  pendingSummaryRefreshes.set(conversationId, timer);
-}
-
-// Test-only override for the debounce delay above - a real setTimeout()
-// proves the actual cascade (a newer turn cancels an older turn's own
-// pending timer) deterministically and fast, the same "real timer, sped
-// way up" shape lib/sidecars.ts's __setSidecarTimingForTestsOnly()
-// already uses, rather than mocking setTimeout itself or waiting out the
-// real 20s.
-let summaryRefreshDelayMs: number = DEFAULT_IDLE_WINDOW_MS;
-export function __setSummaryRefreshDelayForTests(ms: number | null): void {
-  summaryRefreshDelayMs = ms ?? DEFAULT_IDLE_WINDOW_MS;
-}
-
-/** Test-only: cancels every pending debounced summary-refresh timer
- * without letting it fire. A code review found every test file calling
- * runTurn() (memoryJudge.test.ts, notifications.test.ts, safety.test.ts,
- * tier2.test.ts, turnEngine.test.ts itself, and more) leaves one of these
- * timers outstanding at DEFAULT_IDLE_WINDOW_MS (20s) - most test files
- * finish well before that, so the timer fires later, against whatever the
- * NEXT test's resetDb() has already replaced the database with (a
- * different conversationId - maybeRefreshConversationSummary()'s own
- * not-found guard makes this harmless today, but it is still real
- * background work racing against unrelated tests for no reason). Wired
- * into resetDb() (tests/reset-db.ts) rather than into every individual
- * test file, so every file already calling resetDb() in its own
- * beforeEach gets this for free. */
-export function __clearPendingSummaryRefreshesForTests(): void {
-  for (const timer of pendingSummaryRefreshes.values()) clearTimeout(timer);
-  pendingSummaryRefreshes.clear();
-}
 
 
 /** The crisis line the overlay shows; exported for the tests and the

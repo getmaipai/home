@@ -37,6 +37,7 @@ import { roleHealth } from "@/lib/roleHealth";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { postProjectResult } from "@/lib/projects/post";
 import { StatusChannel } from "@/lib/statusChannel";
+import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
 import { StreamGate } from "./nodes/outputGate";
 import { resolveTurnBudget } from "./budget";
 import { turnMachine } from "./machine";
@@ -174,6 +175,10 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
     const projectId = (outcome.result?.data as { projectId?: string } | undefined)?.projectId;
     if (projectId) postProjectResult(projectId);
   }
+  // THIN-0G (rule 12): the rolling summary's post-turn refresh, the same
+  // debounced, fire-and-forget scheduler the old path calls after its own
+  // logTurn() (a temporary turn returned above, so schedules none).
+  scheduleSummaryRefresh(value.conversation_id);
 }
 
 /** Whether the utterance is a plain "yes" to a stored confirm/lookup ask
