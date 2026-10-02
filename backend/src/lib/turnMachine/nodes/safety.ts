@@ -7,7 +7,7 @@
 // reimplementation of it.
 import { evaluateSafety, carriesCrisisSignal } from "@/lib/safety";
 import { detectCredential } from "@/lib/memoryContentPolicy";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { turnAgeBand } from "../speaker";
 import { notifyOncePerTurn } from "@/lib/turnEngine";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 
@@ -22,7 +22,8 @@ export interface SafetyOutput {
 }
 
 export const safetyNode: Node<SafetyInput, SafetyOutput> = async (state, input) => {
-  const band = speakerAgeBand(state.actor, new Date());
+  // THIN-0N: the speaker's effective band, as the old path's prepareTurn().
+  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
   const safety = evaluateSafety(input.utterance, band);
   // SAFETY-NOTIFY-NEXT-01: the identical input-side call turnEngine.ts's
   // own prepareTurn() makes (CHAT-02: "the input side shares the per-turn

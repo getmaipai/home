@@ -24,7 +24,8 @@
 // text reply here was never granted an action result to misrepresent).
 import { assessReply, repairReply, repairTail } from "@/lib/wellFormed";
 import { evaluateReply, evaluateSafety, forOutput } from "@/lib/safety";
-import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+import type { AgeBand } from "@/lib/ageBand";
+import { turnAgeBand } from "../speaker";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { envelopeToolCall } from "@/lib/llm";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
@@ -347,7 +348,8 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     return { outcome: { ok: true }, output: { refused: false, text: COMPOSE_FAILURE_LINE, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningWithheldFor } } };
   }
 
-  const band = speakerAgeBand(state.actor, new Date());
+  // THIN-0N: the speaker's effective band, as the old path's prepareTurn().
+  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
 
   // STREAM-NEXT-01 (b), ruling point 1: on a streamed turn output_gate
   // IS the per-sentence gate - nodes/model.ts's own runOneGeneration()

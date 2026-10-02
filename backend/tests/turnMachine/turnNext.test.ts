@@ -22,7 +22,7 @@ import { CATALOG } from "@/lib/modelCatalog";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { registerProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
-import { StreamSafetyRefusal, StreamUnavailable, type StreamOutcome } from "@/lib/turnEngine";
+import { StreamSafetyRefusal, StreamUnavailable, type StreamOutcome, type SpeakerEvidence } from "@/lib/turnEngine";
 import * as llm from "@/lib/llm";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import type { TurnStreamEvent } from "@/wire";
@@ -1095,7 +1095,7 @@ describe("turnNext.ts: reasoning is a second output", () => {
   });
 
   test("a robot-surface turn emits no reasoning, and the trace says why", async () => {
-    const result = await withStub({ reply: () => "<think>internal reasoning here</think>Hi there!" }, () => runTurnNext(people.owner, "robot", "hi"));
+    const result = await withStub({ reply: () => "<think>internal reasoning here</think>Hi there!" }, () => runTurnNext(people.owner, "robot", "hi", { speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } })); // THIN-0N: an identified adult, so the reason stays "surface" (an unidentified speaker is withheld for "minor")
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reasoning).toBeUndefined();
@@ -1168,13 +1168,27 @@ describe("turnNext.ts: U4, the answer register by surface", () => {
   });
 
   test("a robot question's completion keeps today's spoken plan, unchanged", async () => {
-    const result = await withStub({ reply: () => "Fold it in half, then fold the corners in." }, () => runTurnNext(people.owner, "robot", "how do I make a paper airplane"));
+    // THIN-0N: an identified adult speaker (the body names the owner), so
+    // the plan stays the adult band's; the unidentified speaker's plan is
+    // the next test.
+    const result = await withStub({ reply: () => "Fold it in half, then fold the corners in." }, () => runTurnNext(people.owner, "robot", "how do I make a paper airplane", { speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } }));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     // Spoken keeps the act table exactly: a question is 60 words,
     // thinking off. FORCED-CALL-01: visibleReplyMaxTokens's formula,
     // not the retired max_words * 2 (120) - ceil(60 * 1.6) + 32 = 128.
     expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(128);
+  });
+
+  // THIN-0N (rules 0 and 12): the plan and the signal read the speaker's
+  // effective band, so an unidentified speaker on an adult's robot gets
+  // the child band's 40-word ceiling, as on the old path.
+  test("an unidentified robot speaker's plan is the child band's, on an adult owner's robot", async () => {
+    const result = await withStub({ reply: () => "Fold it in half, then fold the corners in." }, () => runTurnNext(people.owner, "robot", "how do I make a paper airplane"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    // ceil(40 * 1.6) + 32 = 96, the same figure a child's chat turn gets.
+    expect(await firstGenerationMaxTokens(result.value.turn_id)).toBe(96);
   });
 
   test("a minor's typed chat question keeps the max_words-derived cap, not the reply ceiling", async () => {
@@ -1238,7 +1252,7 @@ describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
   /** The same searched-answer fixture the interim-rule tests use (a
    * forced websearch call, then the phrasing round over its result),
    * capturing both requests. */
-  async function searchedTurn(actor: typeof people.owner, surface: "chat" | "robot", opts?: { spoken?: boolean }) {
+  async function searchedTurn(actor: typeof people.owner, surface: "chat" | "robot", opts?: { spoken?: boolean; speakerEvidence?: SpeakerEvidence }) {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     let phrasingRequest: ChatCompletionRequest | undefined;
@@ -1357,7 +1371,9 @@ describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
 
     // The robot: spoken by surface. Evidence never moves the spoken
     // table, so the phrasing round stays at 128 too.
-    const searched = await searchedTurn(people.owner, "robot");
+    // THIN-0N: the body names the owner (an unidentified speaker would be
+    // the child band's plan), so this stays the adult spoken table.
+    const searched = await searchedTurn(people.owner, "robot", { speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } });
     expect(searched.phrasingRequest?.max_tokens).toBe(128);
     expect(await generationMaxTokens(searched.turnId)).toEqual([96, 128]);
     const instruction = lastUserInstruction(searched.phrasingRequest);
@@ -2898,6 +2914,28 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
       expect(delivered.join("")).not.toContain("pipe bomb");
       const value = result.finalize(delivered.join(""), (threw as StreamSafetyRefusal).safety);
       expect(value.reply.text).toBe("I can't help with that.");
+    });
+  });
+
+  // THIN-0N (rules 0 and 12): the per-sentence gate reads the speaker's
+  // effective band. "Keep this between us." is read only by the
+  // minor-band grooming detector, so an unidentified speaker on an
+  // adult's robot has it cut, and an identified owner does not.
+  test("an unidentified robot speaker's stream is cut by the child band's floor; an identified adult's is not", async () => {
+    const reply = `${SAFE_SENTENCE} Keep this between us.`;
+    await withStub({ reply: () => reply }, async () => {
+      const result = await runTurnNextStream(people.owner, "robot", "tell me something");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, threw } = await drain(result.tokens);
+      expect(threw).toBeInstanceOf(StreamSafetyRefusal);
+      expect(delivered.join("")).not.toContain("between us");
+    });
+    await withStub({ reply: () => reply }, async () => {
+      const result = await runTurnNextStream(people.owner, "robot", "tell me something", { speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } });
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, threw } = await drain(result.tokens);
+      expect(threw).toBeUndefined();
+      expect(delivered.join("")).toContain("between us");
     });
   });
 

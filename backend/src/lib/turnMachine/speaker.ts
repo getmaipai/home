@@ -5,11 +5,21 @@
 // would otherwise reach the signed-in person's memories: context
 // (recall and the profile), commands and policy (the recall package).
 import { effectiveBand } from "@/lib/turnContext";
+import type { AgeBand } from "@/lib/ageBand";
 import type { TurnState } from "./contract";
 
 export function speakerIsAnonymous(state: Pick<TurnState, "surface" | "actor" | "speakerEvidence">): boolean {
   if (state.surface !== "robot") return false;
   return effectiveBand(state.surface, state.actor, state.speakerEvidence, new Date()).basis === "unknown_speaker_default";
+}
+
+/** THIN-0N (rules 0 and 12): the band every moderation and shaping read
+ * uses, effectiveBand()'s own result exactly as turnEngine.ts's
+ * prepareTurn() derives it. An unidentified robot speaker is the child
+ * band even when the signed-in person is an adult; every other turn is
+ * the signed-in person's own band. Tightening only, never a loosening. */
+export function turnAgeBand(surface: TurnState["surface"], actor: TurnState["actor"], speakerEvidence: TurnState["speakerEvidence"], now: Date): AgeBand {
+  return effectiveBand(surface, actor, speakerEvidence, now).band;
 }
 
 /** A package that reads or writes memory (the manifest declares

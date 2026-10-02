@@ -16,7 +16,7 @@ import { subjectRosterFor } from "@/lib/subjects";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { MAX_MEMORY_SNIPPETS } from "@/lib/turnEngine";
-import { speakerIsAnonymous } from "../speaker";
+import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { shapeOf } from "@/lib/turnSignal";
 import { planFor } from "@/lib/register";
 import type { Node, ContextItem, TurnState } from "../contract";
@@ -41,8 +41,9 @@ export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
  * Presence is left out on purpose: no presence signal exists on the
  * hub yet (this file's own header note), so `"presence"` is never
  * produced until one is built. */
-export function decideReasoning(state: Pick<TurnState, "actor" | "surface" | "spoken">): TurnState["reasoning"] {
-  const band = speakerAgeBand(state.actor, new Date());
+export function decideReasoning(state: Pick<TurnState, "actor" | "surface" | "spoken" | "speakerEvidence">): TurnState["reasoning"] {
+  // THIN-0N: the speaker's effective band, as the old path derives it.
+  const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
   if (band === "child" || band === "teen") return { emit: false, withheld_for: "minor" };
   if (state.surface !== "chat" || state.spoken) return { emit: false, withheld_for: "surface" };
   return { emit: true, withheld_for: null };

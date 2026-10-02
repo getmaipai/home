@@ -306,3 +306,30 @@ describe("StreamGate (STREAM-NEXT-01 (b)): the per-sentence gate a streamed turn
     expect(refused.doneCount.count).toBe(1);
   });
 });
+
+// THIN-0N (rules 0 and 12, found reviewing THIN-0D): the output gate reads
+// the speaker's EFFECTIVE band (turnContext.ts's effectiveBand(), the old
+// path's derivation), so an unidentified speaker on an adult's robot gets
+// the child band's thresholds. "keep this between us" is read only by the
+// minor-band grooming detector, so it separates the bands.
+describe("outputGateNode: THIN-0N, an unidentified robot speaker's reply is gated at the child band", () => {
+  const REPLY = "Sure, keep this between us.";
+  const owner = { id: "owner-1", displayName: "Test Person", role: "owner", birthdate: null } as unknown as PersonRow;
+
+  function robotState(evidence: TurnState["speakerEvidence"], surface: "robot" | "chat" = "robot"): TurnState {
+    return { actor: owner, surface, speakerEvidence: evidence, turnId: "turn-test-0n" } as unknown as TurnState;
+  }
+  const input = { reply: { text: REPLY, sources: [] }, reasoningIn: undefined, reasoningEmit: false, reasoningWithheldFor: null };
+
+  test("a robot turn with no evidence refuses what the child band refuses", async () => {
+    const { output } = await outputGateNode(robotState(null), input, SIGNAL);
+    expect(output.refused).toBe(true);
+  });
+
+  test("an identified adult speaker, and a non-robot surface, are unchanged", async () => {
+    const known = await outputGateNode(robotState({ person: owner.id, basis: "voice", level: "confirmed" }), input, SIGNAL);
+    expect(known.output.refused).toBe(false);
+    const chat = await outputGateNode(robotState(null, "chat"), input, SIGNAL);
+    expect(chat.output.refused).toBe(false);
+  });
+});

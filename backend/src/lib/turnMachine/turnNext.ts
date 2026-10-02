@@ -18,7 +18,7 @@ import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { turnAgeBand } from "./speaker";
 import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
@@ -251,7 +251,10 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const conversation = resolved.value;
   const temporary = isTemporaryConversation(conversation.id) || conversation.mode === "temporary";
 
-  const band = speakerAgeBand(actor, new Date());
+  // THIN-0N: the speaker's effective band (an unidentified robot speaker
+  // is the child band), for the signal, the plan and the stream gate,
+  // as the old path's prepareTurn() derives it.
+  const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
   // old path (turnEngine.ts's own commandOpeners(effectiveLoaded)) - a
   // clause opening with a bundled package's own command verb ("look",
@@ -696,7 +699,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
   status.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "thinking", state.persona), stage: "thinking" });
 
   const queue = new StatusChannel<string>();
-  const band = speakerAgeBand(actor, new Date());
+  const band = turnAgeBand(surface, actor, state.speakerEvidence, new Date()); // THIN-0N
   const gate = new StreamGate(
     band,
     actor,

@@ -13,7 +13,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { resetDb } from "../reset-db";
 import { createBenchPeople, type BenchPeople } from "../../scripts/bench/conversationRunner";
 import { remember, embedMemoryRecordSafely, recall, PROFILE_SOURCE } from "@/lib/memory";
-import { contextNode, applyContext, MEMORY_CONTEXT_MIN_SCORE } from "@/lib/turnMachine/nodes/context";
+import { contextNode, applyContext, decideReasoning, MEMORY_CONTEXT_MIN_SCORE } from "@/lib/turnMachine/nodes/context";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { planFor } from "@/lib/register";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -275,6 +275,19 @@ describe("contextNode: THIN-0D, an unidentified robot speaker is anonymous", () 
     const { output } = await contextNode({ actor: people.owner, surface: "chat", conversationId: "" } as TurnState, { utterance: ASK }, SIGNAL);
     expect(texts(output.items, "memory")).toContain(PERSONAL);
     expect(texts(output.items, "profile")).toEqual([PROFILE]);
+  });
+});
+
+// THIN-0N (rules 0 and 12): the reasoning decision reads the speaker's
+// effective band too, so an unidentified robot speaker on an adult's
+// robot is withheld for "minor" as the old path would, not "surface".
+describe("decideReasoning: THIN-0N, an unidentified robot speaker is the child band", () => {
+  test("an unidentified speaker is withheld for minor; an identified adult, and a non-robot surface, are unchanged", () => {
+    const anon = { actor: people.owner, surface: "robot", spoken: true, speakerEvidence: null } as TurnState;
+    expect(decideReasoning(anon).withheld_for).toBe("minor");
+    const known = { ...anon, speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } } as TurnState;
+    expect(decideReasoning(known).withheld_for).toBe("surface");
+    expect(decideReasoning({ actor: people.owner, surface: "chat", spoken: false } as TurnState)).toEqual({ emit: true, withheld_for: null });
   });
 });
 
