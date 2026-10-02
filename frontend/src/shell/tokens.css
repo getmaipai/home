@@ -184,9 +184,9 @@ header nav a:has(> img[alt="logo"]) {
   border-bottom-width: 0;
 }
 
-/* The folded rail is 70px wide while its icon buttons are 32px wide and
- * centered at x=32 by the shipped padding. Center the whole hit areas on the
- * measured rail center, and center the fold control in the same header row. */
+/* SHELL-FOLD-01: the folded rail is 70px wide. Give every icon control a
+ * 48px hit area, keep the shipped 16px glyphs, and center the controls in
+ * the rail's full-width menu rows. */
 @media (min-width: 768px) {
   /* SHELL-FOLD-01: match the footer's content inset to SidebarGroup's
    * px-2 inset in SidebarContent (the footer ships p-4). */
@@ -194,8 +194,70 @@ header nav a:has(> img[alt="logo"]) {
     padding-inline: 0.75rem;
   }
 
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-group"],
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-group-content"],
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-menu"] {
+    width: 100%;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-content"] [data-slot="sidebar-group"] {
+    box-sizing: border-box;
+    width: calc(100% + 16px);
+    margin-inline: -8px;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-footer"] [data-slot="sidebar-group"] {
+    width: 100%;
+    margin-inline: 0;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-footer"] > .hide-menu {
+    width: 54px;
+    min-width: 54px;
+    flex: 0 0 54px;
+    align-self: center;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box .simplebar-content {
+    overflow-x: hidden;
+  }
+
   [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-menu-button"] {
-    translate: 3px 0;
+    box-sizing: border-box;
+    width: 48px !important;
+    min-width: 48px;
+    height: 48px !important;
+    min-height: 48px;
+    margin-inline: auto;
+    padding: 0;
+    justify-content: center;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-menu-item"] {
+    display: flex;
+    justify-content: center;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-menu-item"] > [data-slot="sidebar-menu-button"] {
+    margin-inline: 0;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-menu-button"] > span {
+    width: auto;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-footer"] [data-slot="sidebar-menu-button"] > div.relative.flex.items-center {
+    justify-content: center;
+  }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-footer"] [data-slot="sidebar-menu-button"] .hide-menu {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-header"] {
@@ -204,13 +266,41 @@ header nav a:has(> img[alt="logo"]) {
   }
 
   [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-header"] > button[aria-label="Toggle app menu"] {
+    box-sizing: border-box;
     position: absolute;
     left: 50%;
     top: calc(50% + 4.5px);
     translate: -50% -50%;
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    min-height: 48px;
+    padding: 0;
   }
 
   [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-header"] > a:has(img[alt="logo"]) {
+    display: none;
+  }
+}
+
+/* The phone sheet has its own header opener. Keep that opener above the
+ * 48px floor and hide the docked-menu's duplicate fold button inside the
+ * sheet only. */
+@media (max-width: 719.98px) {
+  header nav > div > .flex.min-w-0.flex-auto {
+    gap: 0.25rem;
+  }
+
+  header [data-slot="sidebar-trigger"] {
+    box-sizing: border-box;
+    width: 48px;
+    min-width: 48px;
+    height: 48px;
+    min-height: 48px;
+    padding: 0;
+  }
+
+  [data-mobile="true"][data-slot="sidebar"] [data-slot="sidebar-header"] > button[aria-label="Toggle app menu"] {
     display: none;
   }
 }

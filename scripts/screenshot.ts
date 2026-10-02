@@ -3299,12 +3299,12 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
       ["Help", "https://github.com/getmaipai/home/blob/main/docs/user/README.md"],
     ] as const;
     for (const [name, href] of entries) {
-      const link = [...root.querySelectorAll<HTMLAnchorElement>("a")].find((candidate) => candidate.getAttribute("href") === href);
+      const link: HTMLAnchorElement | undefined = [...root.querySelectorAll<HTMLAnchorElement>("a")].find((candidate) => candidate.getAttribute("href") === href);
       const icon = link?.querySelector("svg") ?? null;
       const row = rect(`${name} icon`, icon);
       rows.push(row);
-      rows.push(rect(`${name} entry`, link));
-      const menuButton = link?.matches('[data-slot="sidebar-menu-button"]') ? link : link?.querySelector('[data-slot="sidebar-menu-button"]') ?? null;
+      rows.push(rect(`${name} entry`, link ?? null));
+      const menuButton = link?.matches('[data-slot="sidebar-menu-button"]') ? link ?? null : link?.querySelector('[data-slot="sidebar-menu-button"]') ?? null;
       rows.push(rect(`${name} menu button`, menuButton));
       rows.push(rect(`${name} icon parent`, icon?.parentElement ?? null));
       const label = link?.querySelector<HTMLElement>(".hide-menu") ?? null;
@@ -3351,6 +3351,7 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
       const logo = data.rows.find((row) => row.name === "sidebar logo")!;
       if (logo.width > 0 && logo.height > 0) throw new Error(`SHELL-FOLD folded: sidebar logo has visible area ${logo.width}×${logo.height}px`);
       const buttonBox = data.rows.find((row) => row.name === "fold button")!;
+      if (!near(buttonBox.width, 48) || !near(buttonBox.height, 48)) throw new Error(`SHELL-FOLD folded: fold button hit area is ${buttonBox.width}×${buttonBox.height}px, expected 48×48px`);
       if (!near(buttonBox.centerX, rail.centerX)) throw new Error(`SHELL-FOLD folded: fold button center x ${buttonBox.centerX}px differs from rail center x ${rail.centerX}px`);
       const pageHeader = data.rows.find((row) => row.name === "page header")!;
       if (!near(buttonBox.centerY, pageHeader.centerY)) throw new Error(`SHELL-FOLD folded: fold button center y ${buttonBox.centerY}px differs from page header row center y ${pageHeader.centerY}px`);
@@ -3361,6 +3362,11 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
       if (overlaps.length) throw new Error(`SHELL-FOLD folded: fold button overlaps sidebar-header sibling ${overlaps[0]}`);
       for (const icon of navIcons) {
         if (!near(foldButton.centerX, icon.centerX)) throw new Error(`SHELL-FOLD folded: fold button center x ${foldButton.centerX}px differs from ${icon.name} center x ${icon.centerX}px`);
+      }
+      for (const name of ["Home", "Chat", "Library", "Family", "Settings", "Help"]) {
+        const target = data.rows.find((row) => row.name === `${name} menu button`)!;
+        if (!near(target.width, 48) || !near(target.height, 48)) throw new Error(`SHELL-FOLD folded: ${name} hit area is ${target.width}×${target.height}px, expected 48×48px`);
+        if (!near(target.centerX, rail.centerX)) throw new Error(`SHELL-FOLD folded: ${name} hit area center x ${target.centerX}px differs from rail center x ${rail.centerX}px`);
       }
     } else {
       const left = navIcons[0]!.left;
@@ -3417,12 +3423,16 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
               const box = element.getBoundingClientRect();
               return { name, width: box.width, height: box.height, left: box.left, top: box.top, centerX: box.left + box.width / 2, centerY: box.top + box.height / 2, borderBottomWidth: Number.parseFloat(getComputedStyle(element).borderBottomWidth) || 0 };
             };
-            return [measure("phone sidebar header", header), measure("phone page header", pageHeader)];
+            const sheetToggle = document.querySelector<HTMLElement>('[data-mobile="true"][data-slot="sidebar"] [data-slot="sidebar-header"] > button[aria-label="Toggle app menu"]');
+            const headerTrigger = document.querySelector<HTMLElement>('header [data-slot="sidebar-trigger"]');
+            return [measure("phone sidebar header", header), measure("phone page header", pageHeader), measure("phone header menu trigger", headerTrigger), measure("phone sheet duplicate fold button", sheetToggle)];
           });
           console.log(`SHELL-FOLD phone header borders (${theme})`);
           console.table(phoneBorder);
           if (phoneBorder[0]!.borderBottomWidth !== 0) throw new Error(`SHELL-FOLD phone: sidebar header border-bottom-width is ${phoneBorder[0]!.borderBottomWidth}px, expected 0`);
           if (phoneBorder[1]!.borderBottomWidth <= 0) throw new Error(`SHELL-FOLD phone: page header border-bottom-width is ${phoneBorder[1]!.borderBottomWidth}px, expected a visible border`);
+          if (phoneBorder[2]!.width < 48 || phoneBorder[2]!.height < 48) throw new Error(`SHELL-FOLD phone: header menu trigger is ${phoneBorder[2]!.width}×${phoneBorder[2]!.height}px, expected at least 48×48px`);
+          if (phoneBorder[3]!.width !== 0 || phoneBorder[3]!.height !== 0) throw new Error(`SHELL-FOLD phone: duplicate sheet fold button remains visible at ${phoneBorder[3]!.width}×${phoneBorder[3]!.height}px`);
           const sheetPath = join(outDir, `next-shell-fold-phone-menu-sheet-${viewport.width}-${theme}.png`);
           await page.screenshot({ path: sheetPath, fullPage: true });
           console.log(`Wrote ${sheetPath}`);
@@ -3440,7 +3450,7 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
         await settleAnimations(page);
         const foldedGeometry = await measureShell(page, "folded");
         const foldedPath = join(outDir, `next-shell-fold-chat-first-folded-${suffix}.png`);
-          await page.screenshot({ path: foldedPath, fullPage: slug === "phone" });
+          await page.screenshot({ path: foldedPath, fullPage: false });
         console.log(`Wrote ${foldedPath}`);
 
         {
