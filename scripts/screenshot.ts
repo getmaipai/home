@@ -3266,7 +3266,7 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
   mkdirSync(outDir, { recursive: true });
 
   type ShellBox = { state: "folded" | "expanded"; name: string; width: number; height: number; left: number; top: number; centerX: number; centerY: number; borderBottomWidth: number };
-  const measureShell = async (page: Page, state: "folded" | "expanded"): Promise<{ rows: ShellBox[]; iconToken: { width: number; height: number } }> => page.evaluate((currentState) => {
+  const measureShell = async (page: Page, state: "folded" | "expanded"): Promise<{ rows: ShellBox[]; iconToken: { width: number; height: number }; headerOverlaps: string[] }> => page.evaluate((currentState) => {
     const root = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
     if (!root) throw new Error("shell measurement: sidebar container is missing");
     const stateRoot = document.querySelector<HTMLElement>('[data-slot="sidebar"]');
@@ -3281,6 +3281,13 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
     const rows = [rect("sidebar rail container", root), rect("fold button", button)];
     const sidebarHeader = root.querySelector<HTMLElement>('[data-slot="sidebar-header"]');
     rows.push(rect("sidebar header", sidebarHeader), rect("sidebar header parent", sidebarHeader?.parentElement ?? null));
+    const logo = sidebarHeader?.querySelector<HTMLElement>('a:has(img[alt="logo"])') ?? null;
+    rows.push(rect("sidebar logo", logo));
+    const footer = root.querySelector<HTMLElement>('[data-slot="sidebar-footer"]');
+    rows.push(rect("sidebar footer", footer));
+    rows.push(rect("footer group", footer?.querySelector('[data-slot="sidebar-group"]') ?? null));
+    rows.push(rect("footer group content", footer?.querySelector('[data-slot="sidebar-group-content"]') ?? null));
+    rows.push(rect("footer menu", footer?.querySelector('[data-slot="sidebar-menu"]') ?? null));
     const buttonIcon = button?.querySelector("svg") ?? null;
     rows.push(rect("fold button icon", buttonIcon));
     const entries = [
@@ -3296,6 +3303,12 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
       const icon = link?.querySelector("svg") ?? null;
       const row = rect(`${name} icon`, icon);
       rows.push(row);
+      rows.push(rect(`${name} entry`, link));
+      const menuButton = link?.matches('[data-slot="sidebar-menu-button"]') ? link : link?.querySelector('[data-slot="sidebar-menu-button"]') ?? null;
+      rows.push(rect(`${name} menu button`, menuButton));
+      rows.push(rect(`${name} icon parent`, icon?.parentElement ?? null));
+      const label = link?.querySelector<HTMLElement>(".hide-menu") ?? null;
+      rows.push(rect(`${name} label`, label));
     }
     const probe = document.createElement("svg");
     probe.className = "size-4";
@@ -3306,7 +3319,17 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
     probe.remove();
     const pageHeader = document.querySelector<HTMLElement>("header");
     rows.push(rect("page header", pageHeader));
-    return { rows, iconToken: { width: token.width, height: token.height } };
+    const headerOverlaps = button && sidebarHeader ? [...sidebarHeader.querySelectorAll<HTMLElement>("*")]
+      .filter((element) => !button.contains(element) && !element.contains(button))
+      .filter((element) => {
+        const style = getComputedStyle(element);
+        const box = element.getBoundingClientRect();
+        if (style.display === "none" || style.visibility === "hidden" || box.width === 0 || box.height === 0) return false;
+        const buttonBox = button.getBoundingClientRect();
+        return buttonBox.left < box.right && buttonBox.right > box.left && buttonBox.top < box.bottom && buttonBox.bottom > box.top;
+      })
+      .map((element) => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}.${[...element.classList].slice(0, 3).join(".")}`) : [];
+    return { rows, iconToken: { width: token.width, height: token.height }, headerOverlaps };
   }, state);
 
   const assertShellGeometry = (state: "folded" | "expanded", data: Awaited<ReturnType<typeof measureShell>>): void => {
@@ -3325,16 +3348,34 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
     const navIcons = data.rows.filter((row) => ["Home icon", "Chat icon", "Library icon", "Family icon"].includes(row.name));
     const foldButton = data.rows.find((row) => row.name === "fold button")!;
     if (state === "folded") {
+      const logo = data.rows.find((row) => row.name === "sidebar logo")!;
+      if (logo.width > 0 && logo.height > 0) throw new Error(`SHELL-FOLD folded: sidebar logo has visible area ${logo.width}×${logo.height}px`);
+      const buttonBox = data.rows.find((row) => row.name === "fold button")!;
+      if (!near(buttonBox.centerX, rail.centerX)) throw new Error(`SHELL-FOLD folded: fold button center x ${buttonBox.centerX}px differs from rail center x ${rail.centerX}px`);
+      const pageHeader = data.rows.find((row) => row.name === "page header")!;
+      if (!near(buttonBox.centerY, pageHeader.centerY)) throw new Error(`SHELL-FOLD folded: fold button center y ${buttonBox.centerY}px differs from page header row center y ${pageHeader.centerY}px`);
+      const overlaps = data.headerOverlaps;
       for (const icon of iconRows) {
         if (!near(icon.centerX, rail.centerX)) throw new Error(`SHELL-FOLD folded: ${icon.name} center x ${icon.centerX}px differs from rail center x ${rail.centerX}px`);
       }
+      if (overlaps.length) throw new Error(`SHELL-FOLD folded: fold button overlaps sidebar-header sibling ${overlaps[0]}`);
       for (const icon of navIcons) {
         if (!near(foldButton.centerX, icon.centerX)) throw new Error(`SHELL-FOLD folded: fold button center x ${foldButton.centerX}px differs from ${icon.name} center x ${icon.centerX}px`);
       }
     } else {
       const left = navIcons[0]!.left;
-      for (const icon of [...navIcons, ...data.rows.filter((row) => row.name === "Settings icon" || row.name === "Help icon")]) {
+      const menuIcons = data.rows.filter((row) => ["Home icon", "Chat icon", "Library icon", "Family icon", "Settings icon", "Help icon"].includes(row.name));
+      for (const icon of menuIcons) {
         if (!near(icon.left, left)) throw new Error(`SHELL-FOLD expanded: ${icon.name} left edge ${icon.left}px differs from nav icon left edge ${left}px`);
+      }
+      const iconSize = menuIcons[0]!;
+      for (const icon of menuIcons) {
+        if (!near(icon.width, iconSize.width) || !near(icon.height, iconSize.height)) throw new Error(`SHELL-FOLD expanded: ${icon.name} is ${icon.width}×${icon.height}px, unlike ${iconSize.name} at ${iconSize.width}×${iconSize.height}px`);
+      }
+      const menuLabels = data.rows.filter((row) => ["Home label", "Chat label", "Library label", "Family label", "Settings label", "Help label"].includes(row.name));
+      const labelLeft = menuLabels[0]!.left;
+      for (const label of menuLabels) {
+        if (!near(label.left, labelLeft)) throw new Error(`SHELL-FOLD expanded: ${label.name} left edge ${label.left}px differs from menu label left edge ${labelLeft}px`);
       }
     }
   };
@@ -3411,6 +3452,7 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
           const expandedGeometry = await measureShell(page, "expanded");
           for (const [geometryState, geometry] of [["folded", foldedGeometry], ["expanded", expandedGeometry]] as const) {
             console.log(`SHELL-FOLD geometry (${geometryState}); shipped SidebarMenuButton icon token size-4 = ${geometry.iconToken.width}×${geometry.iconToken.height}px`);
+            console.log(`SHELL-FOLD ${geometryState} fold button sibling overlaps: ${geometry.headerOverlaps.join(", ") || "none"}`);
             console.table(geometry.rows.map(({ state: _state, ...row }) => row));
           }
           assertShellGeometry("folded", foldedGeometry);

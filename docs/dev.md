@@ -35718,9 +35718,11 @@ left-edge alignment, zero sidebar-header bottom border in folded and expanded
 states and in the phone sheet, and a present page-header border. Initial
 measurements: fold button center x=40, nav/footer icon center x=32, rail
 center x=35; all icons 16x16. Expanded main-menu icons began at x=28 while
-Settings and Help began at x=32. The first correction pass centered the folded
-controls but still failed the expanded footer alignment, so the footer menu
-buttons were shifted 4px left.
+Settings and Help began at x=32; their labels began at x=52 and x=56
+respectively. Round two traced this to the footer's 16px horizontal padding
+(the main menu uses 8px) and its 12px inner icon-label gap (the main menu uses
+8px). Home's desktop CSS now gives the footer the matching 12px inset and 8px
+gap; the earlier 4px translate was removed.
 
 Final capture: folded nav, Settings and Help SVGs are all 16x16px, centered at
 x=35; the fold button is centered at x=35. Expanded Home, Chat, Library,
@@ -35735,3 +35737,14 @@ rule under the sidebar logo, the page header rule and vertical divider remain,
 the Chat tooltip shows “Chat” followed by its status, and the phone history
 button shares its row with the chat title. The chat list shows “New chat” and
 “Search chats”.
+
+Round two also measured the folded logo link at 34x32px while it overlapped the
+28x28px fold control. The collapsed desktop header now hides that logo and
+retains its measured 56px row height; the fold control centers at x=35 and
+y=40.5, aligned with the page header row. The fold control has no intersection
+with another visible header sibling. The expanded logo and right-aligned fold
+control remain in their normal positions. Final assertions require zero-area
+folded logo, no fold-control sibling overlap, equal 16x16px SVGs, equal x=28
+icon edges and x=52 label edges across all six expanded entries. The final
+capture passed and the folded/open 1440px dark/light images and 390px phone
+sheet images were opened and reviewed (2026-10-02).

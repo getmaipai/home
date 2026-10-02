@@ -188,8 +188,10 @@ header nav a:has(> img[alt="logo"]) {
  * centered at x=32 by the shipped padding. Center the whole hit areas on the
  * measured rail center, and center the fold control in the same header row. */
 @media (min-width: 768px) {
-  [data-slot="sidebar"][data-state="expanded"] .sidebar-box [data-slot="sidebar-footer"] [data-slot="sidebar-menu-button"] {
-    translate: -4px 0;
+  /* SHELL-FOLD-01: match the footer's content inset to SidebarGroup's
+   * px-2 inset in SidebarContent (the footer ships p-4). */
+  [data-slot="sidebar"][data-state="expanded"] .sidebar-box [data-slot="sidebar-footer"] {
+    padding-inline: 0.75rem;
   }
 
   [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-menu-button"] {
@@ -198,13 +200,25 @@ header nav a:has(> img[alt="logo"]) {
 
   [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-header"] {
     position: relative;
+    min-height: 56px;
   }
 
   [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-header"] > button[aria-label="Toggle app menu"] {
     position: absolute;
     left: 50%;
-    translate: -50% 0;
+    top: calc(50% + 4.5px);
+    translate: -50% -50%;
   }
+
+  [data-slot="sidebar"][data-state="collapsed"] .sidebar-box [data-slot="sidebar-header"] > a:has(img[alt="logo"]) {
+    display: none;
+  }
+}
+
+/* The footer entries use gap-3 in NavUser; the primary menu uses gap-2.
+ * Keep the icon-to-label rhythm the same in both sets of menu entries. */
+.sidebar-box [data-slot="sidebar-footer"] [data-slot="sidebar-menu-button"] > div.relative.flex.items-center.gap-3 {
+  gap: 0.5rem;
 }
 
 :root {
