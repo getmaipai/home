@@ -187,5 +187,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.userMessage! });
     }
   }
-  return { outcome: { ok: true }, output: { outcomes, toolEvents } };
+  // THIN-4C: how many fetched rows and pages the minor floor dropped this
+  // turn, counted on the trace (never their text).
+  const droppedByFloor = outcomes.reduce((sum, o) => sum + (o.status === "succeeded" ? Number((o.result?.data as { floor_dropped?: unknown } | undefined)?.floor_dropped) || 0 : 0), 0);
+  return { outcome: droppedByFloor > 0 ? { ok: true, dropped_by_floor: droppedByFloor } : { ok: true }, output: { outcomes, toolEvents } };
 };

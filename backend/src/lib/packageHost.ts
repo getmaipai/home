@@ -74,6 +74,7 @@ import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { resolveSafeSearchLevel, safeSearchNumericLevel, type SafeSearchLevel } from "@/lib/safeSearch";
 import { getPersonSettingValue } from "@/lib/settings";
 import { createHash } from "node:crypto";
@@ -675,7 +676,7 @@ export function formatSearxngResults(data: unknown, count = 5): string {
  * `text` as numbered source text; `page` on the result stays the first
  * page's whole document for the old path. */
 export type SearxngPage = { url: string; title: string; text: string };
-type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadResult; pages?: SearxngPage[] };
+type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadResult; pages?: SearxngPage[]; floor_dropped?: number };
 
 /** SEARCH-FALLBACK-01: Wikipedia's own official, documented REST API,
  * search then the page summary - "search" (the Core REST API,
@@ -876,8 +877,8 @@ export function __resetSearchCacheForTests(): void {
   searchInFlight.clear();
 }
 
-export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean } = {}): Promise<SearxngSearchResult> {
-  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args);
+export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand } = {}): Promise<SearxngSearchResult> {
+  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args, opts.minorBand);
   const input = args as { query?: unknown; category?: unknown; read_page?: unknown } | undefined;
   const query = input?.query;
   if (typeof query !== "string" || query.length === 0) return searxngSearchUncached(args, opts);
@@ -889,7 +890,7 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
   const rotated = rotationPool ? rotationEngines(rotationPool) : null;
   const wikipedia = rotationPool?.includes("wikipedia") ? ["wikipedia"] : [];
   const requestEngines = rotated && rotated.length > 0 ? [...rotated, ...wikipedia] : rotated;
-  const key = [baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? "page" : "", isImages ? "images" : "general", safeLevel, (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
+  const key = [baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? "page" : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
   const now = Date.now();
   const cached = searchCache.get(key);
   if (cached && now - cached.storedAt < SEARCH_CACHE_TTL_MS) return cached.result;
@@ -905,7 +906,7 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
     const rows = dedupeRows([...result.rows, ...second.rows]);
     return { text: [result.text, second.text].filter((value) => value !== SEARXNG_NO_RESULTS_TEXT).join("\n"), rows };
   };
-  const promise = (async () => attachSearchPages(await searchRows(), args))().then((result) => {
+  const promise = (async () => attachSearchPages(await searchRows(), args, opts.minorBand))().then((result) => {
     // A search that wanted pages and got none (a rate limit, a timeout, a
     // robots decline) is not cached: a retry should try the pages again.
     if (result.rows.length > 0 && (!wantsPages(input) || (result.pages?.length ?? 0) > 0)) {
@@ -1234,9 +1235,9 @@ export function __setSearchPagesBudgetForTests(ms: number | null): void {
  * pages are read together, at most one per site (so the per-host pace is
  * never the thing that serialises them), and only the ones that finish
  * inside the step's time budget are kept. */
-async function attachSearchPages(found: SearxngSearchResult, args: unknown): Promise<SearxngSearchResult> {
+async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand): Promise<SearxngSearchResult> {
   const input = args as { category?: unknown; read_page?: unknown } | undefined;
-  const result = { ...found, rows: dedupeRows(found.rows) };
+  const result = minorBand ? floorSearchResult({ ...found, rows: dedupeRows(found.rows) }, minorBand) : { ...found, rows: dedupeRows(found.rows) };
   if (!wantsPages(input) || input?.category === "images" || input?.category === "videos") return result;
   const hosts = new Set<string>();
   const candidates: SearxngRow[] = [];
@@ -1273,7 +1274,34 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown): Pro
     first ??= doc;
     pages.push({ url: row.url!, title: doc.title || row.title, text });
   });
-  return pages.length > 0 ? { ...result, ...(first ? { page: first } : {}), pages } : result;
+  if (pages.length === 0) return result;
+  const withPages = { ...result, ...(first ? { page: first } : {}), pages };
+  return minorBand ? floorSearchResult(withPages, minorBand) : withPages;
+}
+
+/** THIN-4C (docs/design/RULES.md rules 0 and 7): everything fetched for a
+ * child or teen passes the same deterministic floor the model's own output
+ * passes (the spec's checkSafety with isMinor, which includes the prompt
+ * injection detector) before it can reach their model call. A result row
+ * whose title or snippet trips a detector is dropped; a page whose text
+ * trips one is dropped and its row keeps the clean snippet. No learned
+ * component, and the Wikipedia fallback's rows go through the same call.
+ * `floor_dropped` counts the drops for the turn's trace. The check is
+ * silent (no parent notice, no log of the text): it is about what we
+ * fetched, not about what the person said. */
+export type MinorBand = "child" | "teen";
+
+export function floorSearchResult(result: SearxngSearchResult, _band: MinorBand): SearxngSearchResult {
+  const trips = (text: string): boolean => checkSafety(text, { isMinor: true }).flagged;
+  const rows = result.rows.filter((row) => !trips(`${row.title}. ${row.snippet ?? ""}`));
+  const pages = result.pages?.filter((page) => !trips(`${page.title}. ${page.text}`));
+  const dropped = (result.floor_dropped ?? 0) + (result.rows.length - rows.length) + ((result.pages?.length ?? 0) - (pages?.length ?? 0));
+  // A minor never gets the whole-document `page` (up to 32,000 characters,
+  // of which only the excerpt in `pages` is checked); only the checked
+  // excerpts go on. The plain `text` form is rebuilt when a row was dropped.
+  const { page: _page, pages: _pages, ...rest } = result;
+  const text = rows.length === result.rows.length ? result.text : rows.length === 0 ? SEARXNG_NO_RESULTS_TEXT : rows.map((row, i) => `${i + 1}. ${row.title}${row.url ? ` (${row.url})` : ""}${row.snippet ? ` - ${row.snippet}` : ""}`).join("\n");
+  return { ...rest, text, rows, ...(pages && pages.length > 0 ? { pages } : {}), ...(dropped > 0 ? { floor_dropped: dropped } : {}) };
 }
 
 /** SEARCH-FALLBACK-01's own gate: `search.wikipedia_fallback` (default
@@ -1888,10 +1916,17 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           // reads the actor's OWN setting only (safe by construction), the
           // exact one this call needs - actor here always is the speaker.
           const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), speakerAgeBand(actor, new Date()));
-          return searxngSearch(args, { safeSearchLevel });
+          const band = speakerAgeBand(actor, new Date());
+          return searxngSearch(args, { safeSearchLevel, ...(band === "adult" ? {} : { minorBand: band }) });
         }
         if (id === "searxng" && method === "page.read") {
-          return searxngPageRead(args);
+          const doc = await searxngPageRead(args);
+          // THIN-4C: a page a child or teen asks for by address passes the
+          // same floor before their model call can see it.
+          if (speakerAgeBand(actor, new Date()) !== "adult" && checkSafety(`${doc.title}. ${doc.text}`, { isMinor: true }).flagged) {
+            throw new HostError("network_unreachable", "That page isn't available.");
+          }
+          return doc;
         }
         notImplemented("integration.call");
       },

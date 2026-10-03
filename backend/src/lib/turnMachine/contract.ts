@@ -279,7 +279,7 @@ export interface TurnState {
  * response body earns anywhere it might echo request content back.
  * Optional: every other node's own failure still reports with `code`
  * alone when it has nothing more to say. */
-export type NodeOutcome = { ok: true; required_miss?: boolean } | { ok: false; code: string; arg?: string; message?: string } | { skipped: true; reason: string };
+export type NodeOutcome = { ok: true; required_miss?: boolean; dropped_by_floor?: number } | { ok: false; code: string; arg?: string; message?: string } | { skipped: true; reason: string };
 
 export type NodeName = "safety" | "commands" | "context" | "model" | "policy" | "tool" | "answer" | "output_gate";
 

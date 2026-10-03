@@ -35785,3 +35785,22 @@ descriptions the model reads said nothing, so the manifest now describes
 `category` as leave-out-by-default (pictures only on request) and `read_page`
 as Home's job. Package version 0.2.3; a running hub needs a restart to pick up
 the manifest.
+
+## THIN-4C: fetched text for a child or teen passes the floor first (2026-10-03)
+
+Rules 0 and 7. For a child or teen (the band `speakerAgeBand` gives the host,
+the same band SEARCH-SAFE-01 reads), `floorSearchResult()` in `packageHost.ts`
+runs the spec's `checkSafety(text, { isMinor: true })` over every result row
+(title and snippet) before any page is fetched, then over each page's text
+after. A row that trips a detector is dropped; a page that trips one is dropped
+and its row keeps the clean snippet. That detector set includes prompt
+injection, so a page saying "ignore previous instructions" never reaches a
+minor's model call, while an adult's page is kept and the model is told page
+text is data. The Wikipedia fallback's rows go through the same function.
+`checkSafety` is called directly, not `evaluateSafety`, because that one logs
+and the turn's notifier hangs off it: this check is about what we fetched, not
+what the person said, so it must not notify a parent or log text. The drops are
+counted as `floor_dropped` on the search result and as `dropped_by_floor` on the
+tool node's trace entry (never the text). No learned component is used. The
+search cache key carries the minor band, so an adult's cached search is never
+served to a child. The output gate is unchanged and still runs on the reply.

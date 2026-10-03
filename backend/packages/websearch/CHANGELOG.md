@@ -2,6 +2,15 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.4] - 2026-10-03
+
+### Changed
+
+- THIN-4C: for a child or teen, the result rows and the page text pass
+  the deterministic safety floor before the model sees them (the
+  prompt-injection detector included). Anything that trips a detector is
+  dropped and counted as `floor_dropped`.
+
 ## [0.2.3] - 2026-10-03
 
 ### Changed
