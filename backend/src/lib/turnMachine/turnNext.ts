@@ -15,7 +15,7 @@ import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome, DocumentTurnAttachment } from "@/lib/turnShared";
 import type { TurnValue } from "@/wire";
 import { attachDocuments } from "./documents";
-import { validateTurnInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
+import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
@@ -90,6 +90,10 @@ export interface RunTurnNextOpts {
   // message replaces. An id that is not a turn of this conversation is dropped
   // by resolveSupersedes(), never trusted.
   supersedes?: string;
+  // THIN-7C: the continuation of an answer that stopped short (routes/turn.ts's
+  // continuation_of and continuation_text). An empty or oversized partial is a
+  // 400 before anything runs.
+  continuation?: { fromTurnId?: string; assistantText: string };
 }
 
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
@@ -168,7 +172,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // used because it also carries the earlier turns' state, which would
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
-  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}) };
+  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
   if (state.temporary) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).
@@ -275,7 +279,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     if (!isOwnerOrAdmin(actor)) throw new BareModeForbidden("bare mode is owner/admin only");
     if (speakerAgeBand(actor, new Date()) !== "adult") throw new BareModeForbidden("bare mode is not available to a minor");
   }
-  const invalid = validateTurnInput(surface, text);
+  const invalid = validateTurnInput(surface, text) ?? validateContinuationInput(opts.continuation);
   if (invalid) return { ok: false, result: invalid };
 
   // THIN-1C: `live` - the precheck asks the Stack itself, never a
@@ -297,6 +301,10 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // as the old path's prepareTurn() derives it.
   const turnId = newConversationTurnId();
   const supersedes = resolveSupersedes(opts.supersedes, conversation.id) ?? undefined;
+  // Old path: a continued turn that does not resolve keeps the id the client
+  // sent (it only ever excludes a row from the window); the stored row's own
+  // resolveSupersedes() in logTurn() is what drops it from the record.
+  const continuation = opts.continuation;
   // THIN-7C: the model, the safety check and the signal read the message with
   // its documents; logResult() is given the typed text, as the old path did.
   text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary);
@@ -383,6 +391,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     spoken: opts.spoken === true,
     ...(bare ? { bare: true } : {}),
     ...(supersedes ? { supersedes } : {}),
+    ...(continuation ? { continuation } : {}),
     startedAt,
     // Overwritten by the context node's own decideReasoning() whenever
     // `context` runs (machine.ts's own applyContext action). A code
@@ -412,7 +421,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // commands") still holds, now with one safety evaluation, traced
   // once, for every turn including a resumed one.
   // THIN-7C: an edit never resumes an ask (the old path cleared it first).
-  const pendingAsk = temporary || bare || supersedes ? null : getPendingAsk(conversation.id);
+  const pendingAsk = temporary || bare || supersedes || continuation ? null : getPendingAsk(conversation.id);
   // APPROVE-CARD-01: a tapped card's own `ask_answer` must match the
   // conversation's CURRENT pending ask by turn id, or it's stale (a
   // second ask parked since the card was shown, the ask was already

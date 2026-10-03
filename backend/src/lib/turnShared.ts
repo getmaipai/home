@@ -622,6 +622,21 @@ export class BareModeForbidden extends Error {
 export type DocumentTurnAttachment = { name: string; mediaType: string; data: string };
 export class DocumentAttachmentError extends Error {}
 
+// THIN-7C: the continuation pieces, moved from turnEngine.ts (which imports
+// them back) so the default path owns them.
+export type TurnContinuation = { fromTurnId?: string; assistantText: string };
+export const CONTINUATION_INSTRUCTION = "Continue the incomplete answer above. Do not repeat any text already given. Start at the first missing point and finish the answer clearly.";
+export function validateContinuationInput(continuation: TurnContinuation | undefined): TurnFailure | null {
+  if (!continuation) return null;
+  if (typeof continuation.assistantText !== "string" || continuation.assistantText.trim().length === 0) {
+    return { ok: false, status: 400, code: "invalid_input", error: "continuation_text is required" };
+  }
+  if (continuation.assistantText.length > MAX_TURN_TEXT_LENGTH) {
+    return { ok: false, status: 400, code: "invalid_input", error: `continuation_text must be ${MAX_TURN_TEXT_LENGTH} characters or fewer` };
+  }
+  return null;
+}
+
 /** The one plain system prompt bare mode sends (moved from bareCompletion.ts). */
 export const BARE_SYSTEM_PROMPT = "You are a helpful assistant.";
 

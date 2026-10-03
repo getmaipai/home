@@ -204,6 +204,12 @@ export interface TurnState {
    * (resolveSupersedes()); absent otherwise. The replaced turn leaves the
    * window, its memories are not recalled, and the stored row records it. */
   supersedes?: string;
+  /** THIN-7C: a continuation of an answer that stopped short: the client's
+   * partial text, replayed to the model as its own words with one instruction
+   * to continue. No command fires and no tool is offered for the turn;
+   * `fromTurnId` (a turn of this conversation, resolved) leaves the window
+   * and is what the stored turn records it continued. */
+  continuation?: { fromTurnId?: string; assistantText: string };
   /** Built from context, never from anything else. */
   messages: LlmMessage[];
   proposals: ActionProposal[];

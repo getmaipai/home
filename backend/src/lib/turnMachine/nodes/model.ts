@@ -16,7 +16,7 @@ import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
 import { planLineForTurnMachine } from "@/lib/register";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
-import { contextToMessages, bareMessages } from "../messages";
+import { contextToMessages, bareMessages, continuationMessages } from "../messages";
 import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
@@ -302,8 +302,8 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   // builder-row fallback, all of it - rather than a second, parallel
   // envelope-only path.
   let envelopeParsed = false;
-  // THIN-7C: a bare turn offers no tool, so text that merely looks like a call is text.
-  if ((!toolCalls || toolCalls.length === 0) && state.bare !== true) {
+  // THIN-7C: a turn that offers no tool takes text that merely looks like a call as text.
+  if ((!toolCalls || toolCalls.length === 0) && !noToolsTurn(state)) {
     const envelope = envelopeToolCall(visible);
     if (envelope) {
       toolCalls = [envelope];
@@ -491,6 +491,11 @@ async function recoveredMissingCall(state: TurnState, messages: LlmMessage[], ut
   return { outcome: { ok: true, required_miss: true }, output: { kind: "tool_calls", calls: [...otherCalls, queryWriterCall], reasoning, queryWriterUsed: true } };
 }
 
+/** THIN-7C: a bare turn and a continuation never offer a tool. */
+function noToolsTurn(state: TurnState): boolean {
+  return state.bare === true || state.continuation !== undefined;
+}
+
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
   // PHRASE-01 (dev.md "The written prompt on tier 1, decided"'s own
   // follow-up): a phrasing round is the model round that runs after at
@@ -515,9 +520,10 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // emission already uses.
   if (isPhrasingRound) state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "checking", state.persona), stage: "composing" });
 
-  // THIN-7C (bare mode): the plain prompt and no tools, ever.
-  const toolsAllowed = input.toolsAllowed && state.bare !== true;
+  // THIN-7C: a bare turn and a continuation offer no tool, ever.
+  const toolsAllowed = input.toolsAllowed && !noToolsTurn(state);
   let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken");
+  if (state.continuation) messages = [...messages, ...continuationMessages(state.continuation.assistantText)];
   let tools: ToolSpec[];
   let tool_choice: "auto" | "none" | undefined;
 

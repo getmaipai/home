@@ -124,8 +124,8 @@ import {
   MAX_TURN_TEXT_LENGTH, visibleReplyMaxTokens, MAX_MEMORY_SNIPPETS, capSection, buildStablePrefix, matchPattern, commandOpeners,
   computedPatternMatch, notifyOncePerTurn, __resetOutputNotificationsForTests, variedConstantReply, speechTextFor,
   StreamSafetyRefusal, StreamUnavailable, CRISIS_STATE_TURNS, conversationInCrisis, CRISIS_RESOURCES_TEXT, notifiedThisTurn, MAX_RULES_SECTION_CHARS,
-  MAX_NATURALNESS_SECTION_CHARS, MAX_COMPANION_SECTION_CHARS, DocumentAttachmentError,
-  type DocumentTurnAttachment, type Surface, type TurnFailure, type SpeakerEvidence, type PresentPerson, type LoadedManifest, type StreamOutcome, type TurnStreamResult,
+  MAX_NATURALNESS_SECTION_CHARS, MAX_COMPANION_SECTION_CHARS, DocumentAttachmentError, CONTINUATION_INSTRUCTION, validateContinuationInput,
+  type TurnContinuation, type DocumentTurnAttachment, type Surface, type TurnFailure, type SpeakerEvidence, type PresentPerson, type LoadedManifest, type StreamOutcome, type TurnStreamResult,
 } from "@/lib/turnShared";
 export {
   validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, stableSuffixFor, loadAllManifests,
@@ -159,17 +159,6 @@ export function projectDocumentForAudience(document: TurnArtifactValue, ageBand:
 
 export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
 
-
-function validateContinuationInput(continuation: TurnContinuation | undefined): TurnFailure | null {
-  if (!continuation) return null;
-  if (typeof continuation.assistantText !== "string" || continuation.assistantText.trim().length === 0) {
-    return { ok: false, status: 400, code: "invalid_input", error: "continuation_text is required" };
-  }
-  if (continuation.assistantText.length > MAX_TURN_TEXT_LENGTH) {
-    return { ok: false, status: 400, code: "invalid_input", error: `continuation_text must be ${MAX_TURN_TEXT_LENGTH} characters or fewer` };
-  }
-  return null;
-}
 
 /** logTurn (conversationHistory.ts) is a real DB write, so it can fail on
  * its own (disk pressure, a lock) even after a completely correct
@@ -357,9 +346,7 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
 /** CHAT-16: what the `[turn]` line says about a composed turn. */
 export type ComposedRecord = Pick<ComposedTurn, "mode" | "model_calls" | "budget_spent" | "fell_back" | "synthetic_ids" | "ungrounded"> & { phase: string };
 
-export type TurnContinuation = { fromTurnId?: string; assistantText: string };
-export { DocumentAttachmentError, type DocumentTurnAttachment };
-const CONTINUATION_INSTRUCTION = "Continue the incomplete answer above. Do not repeat any text already given. Start at the first missing point and finish the answer clearly.";
+export { DocumentAttachmentError, type DocumentTurnAttachment, type TurnContinuation };
 
 function logTurnSafely(
   actor: PersonRow,

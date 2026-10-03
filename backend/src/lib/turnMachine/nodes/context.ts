@@ -114,7 +114,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // way it reads a persisted one, so "context reads no table" for a
   // temporary chat is buildConversationWindow()'s own property, not
   // something this node has to special-case).
-  const window = buildConversationWindow(conversation, { supersedes: state.supersedes });
+  const window = buildConversationWindow(conversation, { supersedes: state.supersedes, excludeTurnId: state.continuation?.fromTurnId });
   for (const message of window.messages) {
     // ContextItem has no role field (the contract's own shape); the
     // window's real user/assistant/tool ordering is real signal

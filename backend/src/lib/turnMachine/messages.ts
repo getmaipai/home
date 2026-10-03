@@ -27,7 +27,9 @@ import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import { promptSurfaceClassFor } from "@/lib/surfaceClass";
-import { buildStablePrefix, BARE_SYSTEM_PROMPT } from "@/lib/turnShared";
+import { buildStablePrefix, BARE_SYSTEM_PROMPT, CONTINUATION_INSTRUCTION } from "@/lib/turnShared";
+import { redactCredentials } from "@/lib/memoryContentPolicy";
+import { sanitizeForPrompt } from "@/lib/promptSanitize";
 import { planLineForTurnMachine } from "@/lib/register";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
@@ -237,4 +239,15 @@ export function bareMessages(context: readonly ContextItem[], utterance: string)
   }
   messages.push({ role: "user", content: utterance });
   return messages;
+}
+
+/** THIN-7C: the tail a continuation adds after the message: the partial text
+ * as the assistant's own words (credentials redacted, sanitized as any
+ * client-supplied text going into a prompt) and the one instruction to carry
+ * on. The old path's own two messages, unchanged. */
+export function continuationMessages(assistantText: string): LlmMessage[] {
+  return [
+    { role: "assistant", content: redactCredentials(sanitizeForPrompt(assistantText)) },
+    { role: "user", content: CONTINUATION_INSTRUCTION },
+  ];
 }
