@@ -16,7 +16,7 @@ import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
 import { planLineForTurnMachine } from "@/lib/register";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
-import { contextToMessages } from "../messages";
+import { contextToMessages, bareMessages } from "../messages";
 import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
@@ -302,7 +302,8 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   // builder-row fallback, all of it - rather than a second, parallel
   // envelope-only path.
   let envelopeParsed = false;
-  if (!toolCalls || toolCalls.length === 0) {
+  // THIN-7C: a bare turn offers no tool, so text that merely looks like a call is text.
+  if ((!toolCalls || toolCalls.length === 0) && state.bare !== true) {
     const envelope = envelopeToolCall(visible);
     if (envelope) {
       toolCalls = [envelope];
@@ -514,7 +515,9 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // emission already uses.
   if (isPhrasingRound) state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "checking", state.persona), stage: "composing" });
 
-  let messages: LlmMessage[] = contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken");
+  // THIN-7C (bare mode): the plain prompt and no tools, ever.
+  const toolsAllowed = input.toolsAllowed && state.bare !== true;
+  let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken");
   let tools: ToolSpec[];
   let tool_choice: "auto" | "none" | undefined;
 
@@ -603,7 +606,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   } else if (input.forceSearchOnly) {
     tools = [toolSpecFor("websearch")].filter((t): t is ToolSpec => t !== null);
     tool_choice = "auto";
-  } else if (!input.toolsAllowed) {
+  } else if (!toolsAllowed) {
     tools = [];
     tool_choice = undefined;
   } else {

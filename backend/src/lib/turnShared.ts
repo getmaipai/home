@@ -605,6 +605,21 @@ export class StreamSafetyRefusal extends Error {
   }
 }
 
+// THIN-7C (ADMIN-COMPARE-01 b, moved from turnBareStream.ts so the default
+// path owns it): bare mode is for an owner or admin who is an adult, and no
+// caller can make it otherwise. routes/turn.ts checks both first and returns
+// a clean 403; this throw is the structural backstop inside the turn itself,
+// unreachable in practice, asserting that a future caller that forgets the
+// route-level check still cannot construct a bare turn for anyone else.
+export class BareModeForbidden extends Error {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+/** The one plain system prompt bare mode sends (moved from bareCompletion.ts). */
+export const BARE_SYSTEM_PROMPT = "You are a helpful assistant.";
+
 // FAST-04: the streaming twin of runTurnStream()'s own `{ ok: false,
 // code: "unavailable" }` return. Once the stream result has been handed
 // back (before the first token is read), an engine failure inside the

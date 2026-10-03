@@ -14,7 +14,7 @@
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome } from "@/lib/turnShared";
 import type { TurnValue } from "@/wire";
-import { validateTurnInput, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
+import { validateTurnInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
@@ -22,6 +22,8 @@ import { classifyTurnSignal } from "@/lib/turnSignal";
 import { turnAgeBand } from "./speaker";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
+import { isOwnerOrAdmin } from "@/lib/access";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
@@ -73,6 +75,10 @@ export interface RunTurnNextOpts {
   // thinking_budget_tokens_toggled for this turn only.
   thinking?: boolean;
   model?: string;
+  // THIN-7C (ADMIN-COMPARE-01 b): the bare-mode bypass, chat surface only.
+  // routes/turn.ts checks owner/admin and adult first (a clean 403); beginTurn()
+  // asserts both again and throws BareModeForbidden, the structural backstop.
+  bare?: boolean;
 }
 
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
@@ -136,6 +142,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // it just launched, the same unconditional-line, no-new-dispatch
     // hookup the two fields above already use for their own outcomes.
     project: projectForOutcomes(state.outcomes) ?? undefined,
+    ...(state.bare ? { bare: true } : {}),
     ...(source === "plugin" && packageId ? { plugin_id: packageId } : {}),
     ...(source === "command" && packageId ? { command_id: packageId } : {}),
     ...(sources && sources.length > 0 ? { sources } : {}),
@@ -150,7 +157,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // used because it also carries the earlier turns' state, which would
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
-  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal };
+  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.bare ? { bare: true } : {}) };
   if (state.temporary) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).
@@ -160,7 +167,8 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // THIN-0C: the judge's queue is keyed on the stored signal; a safety
   // refusal and a credential turn are never the judge's
   // (the old engine file's judgeStatusAtInsert, the function the old path calls).
-  logTurn(actor, surface, text, value, { ...opts, judgeStatus: judgeStatusAtInsert(value, state.signal) });
+  // THIN-7C: a bare turn is never the judge's (ADMIN-COMPARE-01 b).
+  logTurn(actor, surface, text, value, { ...opts, judgeStatus: state.bare ? "skipped" : judgeStatusAtInsert(value, state.signal) });
   // PROJECT-START-01 (lib/projects/post.ts's own header): this turn's
   // own conversation_turns row is only ever written here, at the very
   // end - unlike the legacy the old engine file's prepareTurn(), nothing on
@@ -250,6 +258,12 @@ interface BegunTurn {
  * done. */
 async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts): Promise<{ ok: true; value: BegunTurn } | { ok: false; result: Extract<TurnStreamResult, { ok: false }> }> {
   const startedAt = Date.now();
+  // THIN-7C: "a child's turn can never run bare, whoever flips the switch".
+  // speakerAgeBand() !== "adult" covers both minor bands (child and teen).
+  if (opts.bare === true) {
+    if (!isOwnerOrAdmin(actor)) throw new BareModeForbidden("bare mode is owner/admin only");
+    if (speakerAgeBand(actor, new Date()) !== "adult") throw new BareModeForbidden("bare mode is not available to a minor");
+  }
   const invalid = validateTurnInput(surface, text);
   if (invalid) return { ok: false, result: invalid };
 
@@ -287,7 +301,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // of world, so the interim rule stops forcing a search for it.
   const loaded = loadAllManifests();
   const signal = classifyTurnSignal({ text, ageBand: band, commandOpeners: commandOpeners(loaded), computedPatternMatch: (t) => computedPatternMatch(loaded, t) });
-  const persona = temporary ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
+  const bare = opts.bare === true;
+  const persona = temporary || bare ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything
@@ -319,7 +334,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // belt and braces, by model.ts's own minorThinkingOff regardless of
   // what this resolves to.
   const resolvedBudget = resolveTurnBudget(opts.model);
-  const budget: TurnBudget = opts.thinking === true ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
+  const budget: TurnBudget = opts.thinking === true || bare ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
 
   const state: TurnState = {
     turnId: newConversationTurnId(),
@@ -350,6 +365,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     end: null,
     temporary,
     spoken: opts.spoken === true,
+    ...(bare ? { bare: true } : {}),
     startedAt,
     // Overwritten by the context node's own decideReasoning() whenever
     // `context` runs (machine.ts's own applyContext action). A code
@@ -378,7 +394,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // safety state runs first, then the pending ask is consumed before
   // commands") still holds, now with one safety evaluation, traced
   // once, for every turn including a resumed one.
-  const pendingAsk = temporary ? null : getPendingAsk(conversation.id);
+  const pendingAsk = temporary || bare ? null : getPendingAsk(conversation.id);
   // APPROVE-CARD-01: a tapped card's own `ask_answer` must match the
   // conversation's CURRENT pending ask by turn id, or it's stale (a
   // second ask parked since the card was shown, the ask was already

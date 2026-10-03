@@ -27,7 +27,7 @@ import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import { promptSurfaceClassFor } from "@/lib/surfaceClass";
-import { buildStablePrefix } from "@/lib/turnShared";
+import { buildStablePrefix, BARE_SYSTEM_PROMPT } from "@/lib/turnShared";
 import { planLineForTurnMachine } from "@/lib/register";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
@@ -223,6 +223,18 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // becomes a replay row (TRUEUP-01's own tests), never a line back in
   // the prompt.
   messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}How to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass)}` });
+  messages.push({ role: "user", content: utterance });
+  return messages;
+}
+
+/** THIN-7C (bare mode): one plain system prompt, the window's own turns in
+ * their own roles, the message. Nothing else is rendered: no persona, no plan
+ * line, no memory block (the context node adds none for a bare turn). */
+export function bareMessages(context: readonly ContextItem[], utterance: string): LlmMessage[] {
+  const messages: LlmMessage[] = [{ role: "system", content: BARE_SYSTEM_PROMPT }];
+  for (const item of context) {
+    if (item.source === "window" && item.id !== "window-system-summary") messages.push({ role: windowRoleFromId(item.id), content: item.text });
+  }
   messages.push({ role: "user", content: utterance });
   return messages;
 }

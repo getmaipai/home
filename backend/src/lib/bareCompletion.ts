@@ -22,10 +22,11 @@
 // turn, the admin themselves speaking it).
 import { startCompleteStream, type LlmMessage, type LlmStreamStartResult } from "@/lib/llm";
 import { gateOutputSafety } from "@/lib/turnEngine";
+import { BARE_SYSTEM_PROMPT } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import type { StreamOutcome } from "@/lib/turnEngine";
 
-export const BARE_SYSTEM_PROMPT = "You are a helpful assistant.";
+export { BARE_SYSTEM_PROMPT };
 
 export type BareCompletionResult = { ok: true; tokens: AsyncGenerator<string, StreamOutcome, void> } | Extract<LlmStreamStartResult, { ok: false }>;
 

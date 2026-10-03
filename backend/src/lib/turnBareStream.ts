@@ -27,6 +27,7 @@ import { StatusChannel } from "@/lib/statusChannel";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { StreamSafetyRefusal, deriveCrisisResources, validateTurnInput, type TurnStreamResult, type StreamOutcome } from "@/lib/turnEngine";
+import { BareModeForbidden } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import type { TurnValue } from "@/wire";
 
@@ -45,11 +46,7 @@ const BARE_REFUSAL_TEXT = REFUSAL_FIRST[0]!;
 // path: it should be unreachable in practice, and asserts that even if
 // some future caller forgets the route-level check, this function
 // still refuses to construct a bare turn for a non-admin or a minor.
-export class BareModeForbidden extends Error {
-  constructor(message: string) {
-    super(message);
-  }
-}
+export { BareModeForbidden };
 
 export async function runBareTurnStream(actor: PersonRow, text: string, conversationId?: string, signal?: AbortSignal): Promise<TurnStreamResult> {
   if (!isOwnerOrAdmin(actor)) throw new BareModeForbidden("bare mode is owner/admin only");

@@ -244,6 +244,9 @@ export const turnMachine = setup({
     },
     outputRefused: ({ event }) => ((event as unknown as { output: OutputGateOutput }).output).refused === true,
     hasPreConfirmed: ({ context }) => context.preConfirmed !== undefined,
+    // THIN-7C: bare mode skips the command router; every other node, the
+    // safety node and the output gate included, runs as for any turn.
+    bareTurn: ({ context }) => context.turnState.bare === true,
   },
   actions: {
     applySafety: ({ context }) => applySafety(context.turnState, context.step as SafetyOutput),
@@ -353,6 +356,7 @@ export const turnMachine = setup({
             actions: [assign(({ event }) => ({ step: event.output })), "applySafety", "stepFromPreConfirmed"],
             target: "policy",
           },
+          { guard: "bareTurn", actions: [assign(({ event }) => ({ step: event.output })), "applySafety"], target: "context" },
           { actions: [assign(({ event }) => ({ step: event.output })), "applySafety"], target: "commands" },
         ],
         onError: { target: "refused", actions: [assign({ step: () => ({ safety: { action: "refuse" } }) }), "applySafetyFailure"] },

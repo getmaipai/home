@@ -128,6 +128,12 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     items.push({ id: `window-system-summary`, text: window.summaryLine, source: "window", subjects: [], disclosure: "child_ok" });
   }
 
+  // THIN-7C (bare mode): the raw model sees the conversation and nothing the
+  // household's own data adds: no memory, profile, episode, clock or roster.
+  if (state.bare) {
+    return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state) } };
+  }
+
   // Memories, dated and labeled (U5/REPLY-FIND-04's own shape): never
   // for a temporary chat (no memory:write either - the policy node's
   // own rule - and nothing here should ground a temporary answer in a

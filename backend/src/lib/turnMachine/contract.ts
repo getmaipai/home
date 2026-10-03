@@ -193,6 +193,12 @@ export interface TurnState {
    * whatever `surface` says - withholds reasoning the same as a
    * non-chat surface does (`decideReasoning`, `nodes/context.ts`). */
   spoken: boolean;
+  /** THIN-7C (ADMIN-COMPARE-01 b): the bare-mode bypass, an owner or admin
+   * adult's own turn. No commands, no persona, no recalled memory, no tools:
+   * one plain system prompt, the conversation's history and the message,
+   * thinking on. The safety node and the output gate still run, as for every
+   * turn; nothing here can skip them. */
+  bare?: boolean;
   /** Built from context, never from anything else. */
   messages: LlmMessage[];
   proposals: ActionProposal[];

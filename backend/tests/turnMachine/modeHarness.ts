@@ -5,6 +5,8 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { startRecordingProxy } from "../../scripts/bench/conversationRunner";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { sqlite } from "@/db";
+import type { TurnStreamResult } from "@/lib/turnShared";
+import type { TurnValue } from "@/wire";
 
 /** One scripted chat engine; `seen` collects every request it was sent. */
 export async function withEngine<T>(reply: (request: ChatCompletionRequest) => string, fn: (seen: ChatCompletionRequest[]) => Promise<T>): Promise<T> {
@@ -38,4 +40,15 @@ export function tableCounts(): Record<string, number> {
 /** The tables whose row count changed between two snapshots. */
 export function changedTables(before: Record<string, number>, after: Record<string, number>): string[] {
   return Object.keys(after).filter((name) => after[name] !== before[name]).sort();
+}
+
+/** Reads a stream result to its end and finalizes it, the way routes/turn.ts does. */
+export async function drainStream(result: TurnStreamResult): Promise<{ text: string; value: TurnValue }> {
+  if (!result.ok || result.kind !== "stream") throw new Error(`expected a stream result, got ${JSON.stringify(result)}`);
+  let text = "";
+  for (;;) {
+    const step = await result.tokens.next();
+    if (step.done) return { text, value: result.finalize(text.trim(), step.value) };
+    text += step.value;
+  }
 }
