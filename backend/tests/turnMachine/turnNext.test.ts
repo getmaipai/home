@@ -3132,7 +3132,7 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
             if (!event) break;
             // STATUS-PHRASES-01: the text is now a rotated phrase, not
             // the fixed "On it." - stage alone is this test's own claim.
-            if (event.stage === "tool") {
+            if (event.type === "status" && event.stage === "tool") {
               sawToolStatus = true;
               break;
             }

@@ -271,7 +271,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   // tokens and latency on a think block this same gate discards below
   // anyway.
   const isMinor = speakerAgeBand(actor, new Date()) !== "adult";
-  const dropReasoning = isMinor || surface !== "chat";
+  const dropReasoning = isMinor || surface !== "chat" || body.spoken === true; // THIN-5B: a spoken turn has nowhere to show reasoning
   const modelSelection = await resolveTurnModel(body.model, surface, isMinor, false);
   const result: TurnOpResult = newPathOn()
     ? await (async () => {
@@ -506,6 +506,11 @@ export async function* streamTurnEvents(
       }
     }
   }
+  // THIN-5B: live reasoning rides the status channel (turnNext.ts); the
+  // same minor/surface gate that filters the think-split path filters it.
+  function* sideEvents(): Generator<TurnStreamEvent, void, void> {
+    for (const event of result.status.drain()) if (!(dropReasoning && event.type === "reasoning")) yield event;
+  }
   function* splitEvents(text: string): Generator<TurnStreamEvent, void, void> {
     yield* spanEvents(feedThinkSplit(thinkSplit, text));
   }
@@ -533,7 +538,7 @@ export async function* streamTurnEvents(
     const timer = delay(remainingDelayMs);
     const race = await Promise.race([firstStep, pendingStatus, timer.promise]);
     timer.cancel();
-    if (race === "status") { for (const status of result.status.drain()) yield status; pendingStatus = statusWake(); }
+    if (race === "status") { yield* sideEvents(); pendingStatus = statusWake(); }
     if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: cue }; }
     let current = race === "timeout" || race === "status" ? await firstStep : race;
     // TOOL-EVENTS-02: `result.toolEvents` (the machine's own live
@@ -556,13 +561,13 @@ export async function* streamTurnEvents(
     for (const event of result.toolEvents ?? []) yield event as unknown as TurnStreamEvent;
 
     while (!current.done) {
-      for (const status of result.status.drain()) yield status;
+      yield* sideEvents();
       fullText += current.value;
       yield* splitEvents(current.value);
       const nextToken = iterator.next();
       let next = await Promise.race([nextToken, pendingStatus]);
       while (next === "status") {
-        for (const status of result.status.drain()) yield status;
+        yield* sideEvents();
         pendingStatus = statusWake();
         next = await Promise.race([nextToken, pendingStatus]);
       }
@@ -575,7 +580,7 @@ export async function* streamTurnEvents(
     // visible text that were never actually the start of a tag).
     yield* spanEvents(flushThinkSplit(thinkSplit));
     while (true) {
-      for (const status of result.status.drain()) yield status;
+      yield* sideEvents();
       if (result.status.closed) break;
       await result.status.wait();
     }
@@ -773,7 +778,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   // the tokens and latency on a think block dropReasoning discards
   // below anyway.
   const isMinor = speakerAgeBand(actor, new Date()) !== "adult";
-  const dropReasoning = isMinor || surface !== "chat";
+  const dropReasoning = isMinor || surface !== "chat" || body.spoken === true; // THIN-5B: a spoken turn has nowhere to show reasoning
   const modelSelection = await resolveTurnModel(body.model, surface, isMinor, body.bare === true);
   let result: TurnStreamResult;
   try {

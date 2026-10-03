@@ -729,6 +729,8 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     // short. Idempotent alongside onDone: whichever fires first wins.
     () => queue.close(),
     () => queue.close(),
+    // THIN-5B: reasoning released by the gate goes out as its own event.
+    { releaseReasoning: (text) => status.emit({ type: "reasoning", text }) },
   );
   state.streamGate = gate;
 

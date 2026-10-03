@@ -60,6 +60,90 @@ export interface StreamGateResult {
    * actually streamed" apart from every other AnswerInput kind, which
    * never touches this gate at all. */
   done: boolean;
+  /** THIN-5B: the reasoning text the gate released live, exactly as sent
+   * (empty when none streamed). What is stored is this, never a second
+   * independently recomputed text. */
+  reasoning: string;
+  /** THIN-5B: a reasoning sentence refused. Reasoning stopped there; the
+   * answer is unaffected, and what had already been released stays. */
+  reasoningRefused: boolean;
+}
+
+/** THIN-5B (rules 2 and 10): the reasoning lane of the streaming gate. An
+ * adult's reasoning is released as it is generated and checked as it
+ * arrives: every delta is checked as part of the sentence it extends
+ * before it is released, and each finished sentence is checked again
+ * against the reasoning so far (that cross-sentence check follows the
+ * release of the sentence that completes it, so at worst one sentence
+ * shows before a combined claim is caught; the owner's ruling accepts
+ * this for an adult). Released text is never
+ * retracted. A refusal ends the reasoning only (the answer carries on
+ * and the parent is notified, as for any flagged text). Only ever fed
+ * for a turn the context node decided may show reasoning (an adult's
+ * written chat); a minor's or a spoken turn's reasoning never reaches
+ * it, because the engine client drops it first (llm.ts dropReasoning). */
+class ReasoningLane {
+  private pending = "";
+  private checked = "";
+  private released = "";
+  private isFirstChunk = true;
+  private refused = false;
+  private joinNext = false;
+
+  constructor(
+    private readonly band: AgeBand,
+    private readonly actor: PersonRow,
+    private readonly turnId: string,
+    private readonly release: (text: string) => void,
+  ) {}
+
+  private refuses(text: string): boolean {
+    const safety = forOutput(evaluateSafety(text, this.band));
+    notifyOncePerTurn(this.actor, safety, this.turnId, "[turn]");
+    return safety.action === "refuse";
+  }
+
+  push(delta: string): void {
+    if (this.refused || !delta) return;
+    const candidate = this.pending + delta;
+    if (candidate.trim() && this.refuses(candidate.trim())) {
+      this.refused = true;
+      return;
+    }
+    this.pending = candidate;
+    // A later generation (after a tool round) starts a new paragraph, so
+    // the stored reasoning and the wire stay one and the same text.
+    const out = this.joinNext && this.released.trim() ? `\n\n${delta}` : delta;
+    this.joinNext = false;
+    this.released += out;
+    this.release(out);
+    for (;;) {
+      const end = nextSentenceBoundary(this.pending, this.isFirstChunk);
+      if (end < 0) break;
+      this.isFirstChunk = false;
+      const span = this.pending.slice(0, end);
+      this.pending = this.pending.slice(end);
+      if (span.trim() && this.checked.trim() && this.refuses(`${this.checked}${span}`)) {
+        this.refused = true;
+        return;
+      }
+      this.checked += span;
+    }
+  }
+
+  /** One generation is over: whatever sentence was still open is checked
+   * against the reasoning so far, and the next generation starts clean. */
+  endGeneration(): void {
+    if (!this.refused && this.pending.trim() && this.checked.trim() && this.refuses(`${this.checked}${this.pending}`)) this.refused = true;
+    this.checked += this.pending;
+    this.pending = "";
+    this.isFirstChunk = true;
+    this.joinNext = true;
+  }
+
+  result(): { text: string; refused: boolean } {
+    return { text: this.released, refused: this.refused };
+  }
 }
 
 /** STREAM-NEXT-01 (b): the streaming twin of this file's own whole-reply
@@ -78,6 +162,12 @@ export interface StreamGateResult {
  * (turnNext.ts) is what turns that into the wire's own mid-stream
  * refusal, the same StreamSafetyRefusal shape and behavior
  * the old engine file's own stream already uses. */
+export interface StreamGateOptions {
+  /** THIN-5B: where released reasoning goes (the `reasoning` wire event).
+   * Absent for a gate that never carries reasoning. */
+  releaseReasoning?: (text: string) => void;
+}
+
 export class StreamGate {
   private pending = "";
   private isFirstChunk = true;
@@ -87,6 +177,7 @@ export class StreamGate {
   private envelopeDecided = false;
   private heldAsEnvelope = false;
   private done = false;
+  private readonly reasoningLane: ReasoningLane | undefined;
 
   constructor(
     private readonly band: AgeBand,
@@ -104,7 +195,22 @@ export class StreamGate {
      * queue) knows when to stop waiting. Never fires from push() or
      * reset(), only from the one place a generation is genuinely over. */
     private readonly onDone: () => void,
-  ) {}
+    opts: StreamGateOptions = {},
+  ) {
+    if (opts.releaseReasoning) this.reasoningLane = new ReasoningLane(band, actor, turnId, opts.releaseReasoning);
+  }
+
+  /** THIN-5B: one reasoning delta from the engine, released live under
+   * the check-as-it-arrives rule. Called only for a turn that may show
+   * reasoning. */
+  pushReasoning(delta: string): void {
+    this.reasoningLane?.push(delta);
+  }
+
+  /** THIN-5B: the generation's reasoning is complete. */
+  endReasoning(): void {
+    this.reasoningLane?.endGeneration();
+  }
 
   /** Starts a fresh attempt: clears whatever a PRIOR, now-abandoned
    * generation (an offered/auto round that turned out to call a tool
@@ -242,6 +348,7 @@ export class StreamGate {
     if (this.done) return;
     this.done = true;
     try {
+      this.reasoningLane?.endGeneration();
       if (this.refused || this.heldAsEnvelope) return;
       const remainder = this.pending.trim();
       if (!remainder) return;
@@ -267,7 +374,8 @@ export class StreamGate {
   }
 
   result(): StreamGateResult {
-    return { text: this.delivered, refused: this.refused, lastFlagged: this.lastFlagged, heldAsEnvelope: this.heldAsEnvelope, done: this.done };
+    const lane = this.reasoningLane?.result();
+    return { text: this.delivered, refused: this.refused, lastFlagged: this.lastFlagged, heldAsEnvelope: this.heldAsEnvelope, done: this.done, reasoning: lane?.text ?? "", reasoningRefused: lane?.refused ?? false };
   }
 }
 
@@ -286,7 +394,7 @@ export interface OutputGateInput {
 export type OutputGateOutput =
   // THIN-0M: `safety` is the whole-reply check that refused, so a refusal
   // whose text mentioned self-harm still carries the crisis resources.
-  | { refused: true; text: string; safety?: SafetyResult; reasoning: { emitted: false; withheld_for: TurnState["reasoning"]["withheld_for"] } }
+  | { refused: true; text: string; safety?: SafetyResult; reasoning: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] } }
   | { refused: false; text: string; speech?: string; sources: AnswerOutput["sources"]; reasoningOut?: string; reasoning: { emitted: boolean; withheld_for: TurnState["reasoning"]["withheld_for"] } };
 
 /** The reasoning span's own safety pass ("Reasoning passes the output
@@ -369,8 +477,20 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   const streamed = state.streamGate?.result();
   if (streamed?.done && !streamed.heldAsEnvelope) {
     if (streamed.refused) {
-      const refusedWithheldFor = input.reasoningEmit ? "gate" : input.reasoningWithheldFor;
-      return { outcome: { ok: true }, output: { refused: true, text: REFUSAL_FIRST[0]!, reasoning: { emitted: false, withheld_for: refusedWithheldFor } } };
+      // THIN-5B: reasoning already shown live is not retracted, and the
+      // trace says so rather than claiming none was emitted.
+      const shown = streamed.reasoning.length > 0;
+      const refusedWithheldFor = shown ? null : input.reasoningEmit ? "gate" : input.reasoningWithheldFor;
+      return { outcome: { ok: true }, output: { refused: true, text: REFUSAL_FIRST[0]!, reasoning: { emitted: shown, withheld_for: refusedWithheldFor } } };
+    }
+    // THIN-5B: reasoning the gate already released live is what is stored
+    // and reported, never re-evaluated here (logged equals streamed). A
+    // reasoning refusal ended the stream of it and reads "gate". Reasoning
+    // that never went through the gate (a think block an engine leaked
+    // into `content`) still gets the whole-span pass below.
+    if (input.reasoningEmit && (streamed.reasoning || streamed.reasoningRefused)) {
+      const reasoningOut = streamed.reasoning || undefined;
+      return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: streamed.reasoningRefused ? "gate" : null } } };
     }
     const { reasoningOut, withheldFor } = gateReasoning(input, band, state.actor, state.turnId);
     return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: withheldFor } } };

@@ -263,6 +263,9 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
       if (firstDeltaMs === null) firstDeltaMs = Date.now() - requestSentMs;
       if (step.value.channel === "reasoning") {
         nativeReasoning += step.value.text;
+        // THIN-5B: released live under the same gate as the answer. The
+        // engine client only sends reasoning on a turn that may show it.
+        if (state.reasoning.emit) gate?.pushReasoning(step.value.text);
         continue;
       }
       raw += step.value.text;
@@ -286,6 +289,7 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   if (gate && thinkSplit) {
     for (const span of flushThinkSplit(thinkSplit)) if (!span.reasoning) gate.push(span.text);
   }
+  gate?.endReasoning();
 
   const visible = visibleText(raw);
   // ENGINE-CONTRACT-03 (dev.md "U6 rerun ruling" (a)): a generation the

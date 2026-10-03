@@ -609,7 +609,7 @@ describe("the engine composes a two-outcome turn in one call", () => {
         expect(result.kind).toBe("stream");
         if (result.kind !== "stream") return;
         const statuses: string[] = [];
-        const drainStatus = async () => { const s = await result.status.next(); if (s) statuses.push(s.stage); };
+        const drainStatus = async () => { const s = await result.status.next(); if (s && s.type === "status") statuses.push(s.stage); };
         const iterator = result.tokens[Symbol.asyncIterator]();
         const deltas: string[] = [];
         let step = await iterator.next();
