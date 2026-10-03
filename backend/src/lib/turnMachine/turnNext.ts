@@ -311,6 +311,26 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // sent (it only ever excludes a row from the window); the stored row's own
   // resolveSupersedes() in logTurn() is what drops it from the record.
   const continuation = opts.continuation;
+  // THIN-7C: the pending ask and the stale-tap 409 come before a document is
+  // stored, so a refused request leaves no provisional row or file behind.
+  // THIN-7C: an edit never resumes an ask (the old path cleared it first).
+  const pendingAsk = temporary || opts.bare === true || supersedes || continuation || opts.ephemeral === true ? null : getPendingAsk(conversation.id);
+  // APPROVE-CARD-01: a tapped card's own `ask_answer` must match the
+  // conversation's CURRENT pending ask by turn id, or it's stale (a
+  // second ask parked since the card was shown, the ask was already
+  // answered, or there was never one) - reported as a real 409, never
+  // silently run through ordinary text processing (resumesAsk()'s own
+  // turn-id check is belt-and-braces, not the primary gate: without
+  // this early return a mismatch would just fall through to routing
+  // whatever "Yes"/"No" text rode along with it, exactly like an
+  // unrelated new statement, with no way for the caller to tell a real
+  // answer from a stale one). The existing pending ask, if any, is for
+  // a DIFFERENT turn than this stale tap named - left untouched, not
+  // cleared: this request doesn't get to answer someone else's live
+  // question by accident.
+  if (opts.ask_answer && (!pendingAsk || pendingAsk.turnId !== opts.ask_answer.turn_id)) {
+    return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This confirmation is no longer waiting for an answer." } };
+  }
   // THIN-7C: the model, the safety check and the signal read the message with
   // its documents; logResult() is given the typed text, as the old path did.
   text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary || opts.ephemeral === true);
@@ -427,24 +447,6 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // safety state runs first, then the pending ask is consumed before
   // commands") still holds, now with one safety evaluation, traced
   // once, for every turn including a resumed one.
-  // THIN-7C: an edit never resumes an ask (the old path cleared it first).
-  const pendingAsk = temporary || bare || supersedes || continuation || opts.ephemeral === true ? null : getPendingAsk(conversation.id);
-  // APPROVE-CARD-01: a tapped card's own `ask_answer` must match the
-  // conversation's CURRENT pending ask by turn id, or it's stale (a
-  // second ask parked since the card was shown, the ask was already
-  // answered, or there was never one) - reported as a real 409, never
-  // silently run through ordinary text processing (resumesAsk()'s own
-  // turn-id check is belt-and-braces, not the primary gate: without
-  // this early return a mismatch would just fall through to routing
-  // whatever "Yes"/"No" text rode along with it, exactly like an
-  // unrelated new statement, with no way for the caller to tell a real
-  // answer from a stale one). The existing pending ask, if any, is for
-  // a DIFFERENT turn than this stale tap named - left untouched, not
-  // cleared: this request doesn't get to answer someone else's live
-  // question by accident.
-  if (opts.ask_answer && (!pendingAsk || pendingAsk.turnId !== opts.ask_answer.turn_id)) {
-    return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This confirmation is no longer waiting for an answer." } };
-  }
   const preConfirmed = pendingAsk ? (resumesAsk(pendingAsk, text, opts.ask_answer) ?? undefined) : undefined;
   // Cleared either way a pending ask existed: resumed (so it can't be
   // resumed twice, the stuck-question failure REPLY-FIND-01 already

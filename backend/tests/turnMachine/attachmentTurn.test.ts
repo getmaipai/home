@@ -103,6 +103,17 @@ describe("THIN-7C: document attachments on the default path", () => {
     expect(changedTables(before, tableCounts())).toEqual([]);
   });
 
+  test("a stale confirmation tap carrying a document is a 409 and stores no turn row and no file", async () => {
+    __setTikaRunnerForTests(() => "The boiler service is due in March.");
+    const result = await runTurnNextStream(people.owner, "chat", "Yes", { documentAttachments: [PDF], ask_answer: { turn_id: "some-other-turn-id", approved: true } });
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected a failure result");
+    expect(result.status).toBe(409);
+    expect(result.code).toBe("ask_stale");
+    expect(db.select().from(attachments).all()).toHaveLength(0);
+    expect(db.select().from(conversationTurns).all()).toHaveLength(0);
+  });
+
   test("storage capacity is checked before extraction starts", async () => {
     setHouseholdSettingValue("storage.person.default_cap_bytes", 1);
     let parserCalls = 0;
