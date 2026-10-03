@@ -75,6 +75,7 @@ import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
+import { hostedSearch } from "@/lib/hostedSearch";
 import { resolveSafeSearchLevel, safeSearchNumericLevel, type SafeSearchLevel } from "@/lib/safeSearch";
 import { getPersonSettingValue } from "@/lib/settings";
 import { createHash } from "node:crypto";
@@ -1935,8 +1936,12 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           // actually asking, never a package argument. getPersonSettingValue
           // reads the actor's OWN setting only (safe by construction), the
           // exact one this call needs - actor here always is the speaker.
-          const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), speakerAgeBand(actor, new Date()));
           const band = speakerAgeBand(actor, new Date());
+          const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
+          // THIN-4H: an adult's query goes to the optional hosted provider when a key is set; null means SearXNG.
+          const input = args as { query?: unknown; category?: unknown } | undefined;
+          const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category) : null;
+          if (hosted) return hosted;
           return searxngSearch(args, { safeSearchLevel, ...(band === "adult" ? {} : { minorBand: band }) });
         }
         if (id === "searxng" && method === "page.read") {

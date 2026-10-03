@@ -19,6 +19,7 @@ import { SILERO_VAD_ASSET } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
 import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
 import { telegramConfigured } from "@/lib/telegramChannel";
+import { HOSTED_SEARCH_HOST, hostedSearchKey } from "@/lib/hostedSearch";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -102,6 +103,12 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:telegram", telegramConfigured() ? "api.telegram.org" : null, {
       when: "when a notification you or your household chose to send to Telegram fires",
       what: "the rendered notification text and your linked Telegram chat id. Nothing anyone in the house said or asked otherwise.",
+    }),
+    // THIN-4H: only once an adult has added a hosted search key; with none
+    // set, search stays on the household's own SearXNG and nothing is listed.
+    row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
+      when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",
+      what: "the words searched, and your home's internet address. Nothing else anyone in the house said or saved.",
     }),
     // Step 10: the one periodic (not household-triggered) outbound call
     // this hub makes on its own, per this file's own header - checking

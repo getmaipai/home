@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { AI_SETTINGS_KEYS } from "@/settings/aiKeys";
+import { HOSTED_SEARCH_SETTINGS_KEYS } from "@/settings/hostedSearchKeys";
 import { SPEC_DIR } from "./specDir.js";
 import { areWakewordAssetsInstalled } from "@/lib/wakewordAssets";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
@@ -23,7 +24,8 @@ function loadRegistry(): SettingsKey[] {
   // snapshot is pinned independently. Include newly added Home AI keys
   // until the shared snapshot is advanced.
   const keys = new Set(parsed.map((entry) => entry.key));
-  return [...parsed, ...AI_SETTINGS_KEYS.filter((entry) => !keys.has(entry.key))];
+  // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
+  return [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS].filter((entry) => !keys.has(entry.key))];
 }
 
 let cached: SettingsKey[] | null = null;
