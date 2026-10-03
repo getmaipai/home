@@ -2,10 +2,11 @@
 // resolves the household's selected chat model's turn_budget from the
 // catalog. "A model with no record runs with model_transitions false" -
 // the one fallback the design names, applied here rather than at every
-// call site, so a model added to the catalog without a measured record
-// yet still runs the machine, just with no model-driven transition.
+// call site. THIN-6B (rule 8) narrows it to a child's or teen's turn: an
+// adult's turn on a model without a record gets tools and thinking.
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { CATALOG } from "@/lib/modelCatalog";
+import type { AgeBand } from "@/lib/ageBand";
 import type { TurnBudget } from "./contract";
 
 /** No search, no second round, no model-driven transition: the safest
@@ -30,13 +31,39 @@ export const NO_RECORD_BUDGET: TurnBudget = {
   measured: { false_call_rate: 0, inverse_miss_rate: 0, rewrite_pass_rate: 0, on: "no measured record" },
 };
 
+/** THIN-6B (rules 0 and 8): what an adult gets from a chat model that has
+ * no measured record. Nothing is gated on one catalog id, so the model runs
+ * with the tools and the toggled thinking budget of the catalog's reference
+ * chat record (the tools block and the reasoning split come from the
+ * engine's own template); only the figures that were measured for that one
+ * model are not claimed for this one. Built per call, never shared. */
+function unmeasuredAdultBudget(): TurnBudget {
+  const reference = CATALOG.find((m) => m.role === "chat" && m.turn_budget)?.turn_budget;
+  if (!reference) return NO_RECORD_BUDGET;
+  return { ...reference, measured: { ...NO_RECORD_BUDGET.measured } };
+}
+
 /** Reads the household's selected chat model id (chat.model_id, the
  * same key llmSupervisor.ts already reads) and its catalog entry's
  * turn_budget. A modelId override lets a caller (U2d's second-model
  * acceptance run, a test) resolve a budget without changing the live
- * household setting. */
-export function resolveTurnBudget(modelId?: string): TurnBudget {
-  const id = modelId ?? (getHouseholdSettingValue("chat.model_id") as string | undefined);
+ * household setting.
+ *
+ * Age gates win (rule 0): a model with no record, a failed read of the
+ * selected model, or a band that is not exactly "adult" keeps the no-tools
+ * fail-safe for a child or teen. Only an adult's turn on a recordless model
+ * is lifted to the reference record's tools and thinking. A band left out
+ * reads as a minor. */
+export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget {
+  let id = modelId;
+  if (id === undefined) {
+    try {
+      id = getHouseholdSettingValue("chat.model_id") as string | undefined;
+    } catch {
+      return band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
+    }
+  }
   const entry = id ? CATALOG.find((m) => m.role === "chat" && m.id === id) : undefined;
-  return entry?.turn_budget ?? NO_RECORD_BUDGET;
+  if (entry?.turn_budget) return entry.turn_budget;
+  return band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
 }

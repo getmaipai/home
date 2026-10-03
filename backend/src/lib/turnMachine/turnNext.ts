@@ -363,7 +363,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // already trusts) - the minor gate is still enforced independently,
   // belt and braces, by model.ts's own minorThinkingOff regardless of
   // what this resolves to.
-  const resolvedBudget = resolveTurnBudget(opts.model);
+  const resolvedBudget = resolveTurnBudget(opts.model, band);
   const budget: TurnBudget = opts.thinking === true || bare ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
 
   const state: TurnState = {
