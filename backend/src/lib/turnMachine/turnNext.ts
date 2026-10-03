@@ -551,6 +551,14 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     const failedPattern = state.outcomes.some((outcome) => outcome.via === "pattern" && outcome.status === "failed");
     const source: TurnValue["source"] = failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources);
+    // 2026-10-03: after a successful tool call the reply is the model's
+    // own composition, not a package's canned line. The stats stay on
+    // source "plugin" (per-package counts), and routing tier "tool"
+    // marks the row so the history window gives the reply back as the
+    // assistant's own words instead of a bracketed note the model
+    // imitated as its next reply ("[Web Search answered: ...]").
+    const lastGeneration = state.generations.at(-1);
+    if (source === "plugin" && lastVia === "tool_call" && state.outcomes.at(-1)?.status === "succeeded" && lastGeneration?.reason === "phrasing" && !lastGeneration.error) value.routing = { tier: "tool", score: 1 };
   }
   return finalizeNextReply(state, value);
 }

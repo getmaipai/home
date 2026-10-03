@@ -1436,6 +1436,47 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(note!.content).toContain("Weather"); // weather/manifest.json's own `display`
   });
 
+  // 2026-10-03 live defect: a search turn's reply is the model's own
+  // composition after a tool call (routing tier "tool"). It entered the
+  // window as "[Web Search answered: ...]" in nobody's voice, and the
+  // next turn the 8B model imitated that bracketed note as its reply.
+  test("a model-composed reply after a tool call enters the window as the assistant's own words, never a bracketed note the model can imitate", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "when is the new avengers movie coming out", {
+      reply: { text: "The new Avengers movie, Avengers: Doomsday, is set for December 2026." },
+      source: "plugin",
+      plugin_id: "websearch",
+      routing: { tier: "tool", score: 1 },
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-tool-composed",
+    });
+
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.role === "assistant" && m.content === "The new Avengers movie, Avengers: Doomsday, is set for December 2026.")).toBe(true);
+    expect(window.messages.some((m) => m.content.includes("answered:"))).toBe(false);
+  });
+
+  test("a guard-replaced reply after a tool call is still quoted as a note, never given back as the assistant's words", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const row = logTurn(actor, "chat", "who is in the new avengers movie", {
+      reply: { text: "Here is what the guard said instead." },
+      source: "plugin",
+      plugin_id: "websearch",
+      routing: { tier: "tool", score: 1 },
+      safety: SAFE,
+      conversation_id: conv.value.id,
+      turn_id: "turn-tool-guarded",
+    }, { guardReasons: ["unsupported_claim"] });
+    expect(row.guardReason).not.toBeNull();
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.role === "assistant" && m.content.includes("the guard said"))).toBe(false);
+  });
+
   test("a plugin_error turn enters the window as a system note, never speaking the model's own fallback text as assistant", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");

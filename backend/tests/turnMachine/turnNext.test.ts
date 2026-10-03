@@ -228,6 +228,10 @@ describe("turnNext.ts: the interim rule", () => {
       // scorer reads exactly these two top-level fields.
       expect(result.value.plugin_id).toBe("websearch");
       expect(result.value.sources?.length).toBeGreaterThan(0);
+      // 2026-10-03: the reply is the model's own composition after the
+      // search, so the stored row says so (routing tier "tool"), and the
+      // history window gives it back as the assistant's words.
+      expect(result.value.routing?.tier).toBe("tool");
       // TOOL-EVENTS-01(b): the tool node's own wire events, validated
       // against the spec's own Zod schema (spec/stack/ts/turn-stream-
       // event.ts, the same import chatModelAdapter.ts's frontend
@@ -461,6 +465,25 @@ describe("turnNext.ts: structured_part and artifact reach TurnValue (home#147)",
       expect(result.value.structured_part?.kind).toBe("spec_sheet");
       expect(result.value.structured_part?.tool_id).toBe("almanac-date");
       expect(result.value.structured_part?.rows.some((r) => r.label === "Date")).toBe(true);
+    } finally {
+      CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
+    }
+  });
+
+  test("a package's own reply (no phrasing round) is not tagged routing tier \"tool\", so the window keeps noting it as the package's words", async () => {
+    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
+    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "almanac-date"] };
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => (!request.messages.some((m) => m.role === "tool") && request.tools?.some((t) => t.function.name === "almanac-date") ? [{ id: "call-1", name: "almanac-date", args: "{}" }] : undefined),
+          reply: () => "It is a Saturday.",
+        },
+        () => runTurnNext(people.owner, "chat", "what's today's date"),
+      );
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.source).toBe("plugin");
+      expect(result.value.routing).toBeUndefined();
     } finally {
       CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
     }

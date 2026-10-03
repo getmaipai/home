@@ -2085,11 +2085,16 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
     // ("I haven't added anything to your list") is quoted as a note, in
     // nobody's voice (a review).
     messages.push(
-      t.source === "model" && t.guardReason
+      (t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")) && t.guardReason
         ? { role: "system", content: guardedTurnNote(t) }
         : t.source === "model"
           ? { role: "assistant", content: redactCredentials(t.replyText) }
-          : { role: "system", content: nonModelWindowNote(t) },
+          : // A reply the model composed after a successful tool call
+            // (routing tier "tool", turnNext.ts) is its own words: a
+            // bracketed note here was imitated as the next reply.
+            t.source === "plugin" && t.routingTier === "tool"
+            ? { role: "assistant", content: redactCredentials(t.replyText) }
+            : { role: "system", content: nonModelWindowNote(t) },
     );
   }
 
