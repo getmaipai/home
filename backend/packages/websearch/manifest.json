@@ -1,10 +1,10 @@
 {
   "id": "websearch",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
-  "description": "Search the web for release dates, news, prices and facts, then read the top pages.",
+  "description": "Search the web and read the top pages for release dates, casts, prices and news, instead of answering from memory.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -28,7 +28,7 @@
     "type": "object",
     "required": ["expression"],
     "properties": {
-      "expression": { "type": "string", "minLength": 1, "search_text": true, "description": "The search words, a short plain query about what the person asked." },
+      "expression": { "type": "string", "minLength": 1, "search_text": true, "description": "The search words, a short plain query about what the person asked. A follow-up like \"is he in it\" is about the previous message's subject: search for that subject." },
       "category": { "type": "string", "enum": ["images"], "description": "Leave this out. A search is a general web search by default. Set it to images only when the person asks to see pictures or photos; a question about a date, a fact, a price, the news or a person is never an image search." },
       "read_page": { "type": "boolean", "description": "Leave this out. Home reads the top result pages itself on every search." }
     }

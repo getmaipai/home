@@ -2,6 +2,16 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.5] - 2026-10-03
+
+### Changed
+
+- The description the model reads now says to search for release dates,
+  casts, prices and news instead of answering from memory, and the
+  search-words argument says a follow-up like "is he in it" is about the
+  previous message's subject. Measured live on the 8B chat model: a follow-up after a search
+  turn went from 0 of 5 searches to 5 of 5.
+
 ## [0.2.4] - 2026-10-03
 
 ### Changed
