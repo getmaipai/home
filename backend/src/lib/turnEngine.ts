@@ -125,7 +125,7 @@ import {
   computedPatternMatch, notifyOncePerTurn, __resetOutputNotificationsForTests, variedConstantReply, speechTextFor,
   StreamSafetyRefusal, StreamUnavailable, CRISIS_STATE_TURNS, conversationInCrisis, CRISIS_RESOURCES_TEXT, notifiedThisTurn, MAX_RULES_SECTION_CHARS,
   MAX_NATURALNESS_SECTION_CHARS, MAX_COMPANION_SECTION_CHARS, DocumentAttachmentError, CONTINUATION_INSTRUCTION, validateContinuationInput,
-  type TurnContinuation, type DocumentTurnAttachment, type Surface, type TurnFailure, type SpeakerEvidence, type PresentPerson, type LoadedManifest, type StreamOutcome, type TurnStreamResult,
+  type TurnContinuation, type TurnOpResult, type DocumentTurnAttachment, type Surface, type TurnFailure, type SpeakerEvidence, type PresentPerson, type LoadedManifest, type StreamOutcome, type TurnStreamResult,
 } from "@/lib/turnShared";
 export {
   validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, stableSuffixFor, loadAllManifests,
@@ -157,7 +157,7 @@ export function projectDocumentForAudience(document: TurnArtifactValue, ageBand:
 }
 
 
-export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure;
+export type { TurnOpResult };
 
 
 /** logTurn (conversationHistory.ts) is a real DB write, so it can fail on

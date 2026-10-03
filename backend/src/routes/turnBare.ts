@@ -15,11 +15,10 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { db } from "@/db";
 import { conversations, conversationTurns, people } from "@/db/schema";
 import { buildConversationWindow, toConversationRecord } from "@/lib/conversationHistory";
-import { startBareCompletion } from "@/lib/bareCompletion";
-import { StreamSafetyRefusal } from "@/lib/turnEngine";
+import { startBareCompare } from "@/lib/turnMachine/bareCompare";
+import { StreamSafetyRefusal } from "@/lib/turnShared";
 import { resolvePersona, composePersonaPrompt } from "@/lib/persona";
 import { getPersonSettingValue } from "@/lib/settings";
-import { feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { apiRouter } from "@/lib/openapi";
 import type { BareCompareEvent, BareCompareTrace, TurnStats } from "@/wire";
 
@@ -85,12 +84,10 @@ turnBareRoutes.post("/", requireAuth, async (c) => {
   // since it (if this isn't the conversation's newest) right in the
   // window alongside it.
   const window = buildConversationWindow(conversation, { excludeTurnId: turnId, beforeCreatedAt: turnRow.createdAt });
-  // startBareCompletion() already runs gateOutputSafety() internally,
-  // age-banded off `speakerRow` (the original turn's own speaker, not
-  // the admin doing the comparing) - the same call this route made
-  // inline before the extraction, now the one place either bare-mode
-  // caller can get it from.
-  const started = await startBareCompletion(window.messages, turnRow.userText, speakerRow, turnId);
+  // startBareCompare() streams through the default path's own output gate
+  // (StreamGate), age-banded off `speakerRow` (the original turn's own
+  // speaker, not the admin doing the comparing); nothing it returns is ungated.
+  const started = await startBareCompare(window.messages, turnRow.userText, speakerRow, turnId);
   if (!started.ok) {
     return c.json({ error: started.error, code: started.code }, started.status);
   }
@@ -111,20 +108,10 @@ turnBareRoutes.post("/", requireAuth, async (c) => {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       controller.enqueue(ndjsonLine({ type: "trace", trace }));
-      const thinkState = newThinkSplitState();
       try {
-        // The minor safety pass already ran, inside startBareCompletion()
-        // - unconditional, never gated on bare mode itself, age-banded
-        // off the original speaker. `started.tokens` is that gated
-        // stream, not raw model output.
-        for await (const chunk of started.tokens) {
-          for (const span of feedThinkSplit(thinkState, chunk)) {
-            controller.enqueue(ndjsonLine(span.reasoning ? { type: "reasoning", text: span.text } : { type: "delta", text: span.text }));
-          }
-        }
-        for (const span of flushThinkSplit(thinkState)) {
-          controller.enqueue(ndjsonLine(span.reasoning ? { type: "reasoning", text: span.text } : { type: "delta", text: span.text }));
-        }
+        // `started.chunks` is the gate's own release (reasoning and text),
+        // never raw model output; the safety pass is not conditional on bare mode.
+        for await (const chunk of started.chunks) controller.enqueue(ndjsonLine(chunk));
         controller.enqueue(ndjsonLine({ type: "done" }));
       } catch (err) {
         if (err instanceof StreamSafetyRefusal) {

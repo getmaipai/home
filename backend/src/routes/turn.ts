@@ -3,8 +3,7 @@ import { bodyLimit } from "hono/body-limit";
 import type { MiddlewareHandler } from "hono";
 import { randomBytes } from "node:crypto";
 import { requireAuth } from "@/middleware/auth";
-import { runTurn, runTurnStream, StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnEngine";
-import { runBareTurnStream, BareModeForbidden } from "@/lib/turnBareStream";
+import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue } from "@/lib/replyVariation";
@@ -12,7 +11,6 @@ import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } f
 import { speakerAgeBand } from "@/lib/ageBand";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
-import { getHouseholdSettingValue } from "@/lib/settings";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import type { AppEnv } from "@/types";
@@ -21,21 +19,11 @@ import { turnOwnerId } from "@/lib/conversationHistory";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 
-// U6a (docs/plans/simple-turn-pipeline-2026-09-22.md; the coordinator's
-// ruling, 2026-09-23): one boundary, no second one. This is the only
-// place either route decides old path or new path - conversationRunner.ts's
-// bench harness reads the identical setting the identical way, so a
-// bench run and a real household turn are never on different paths for
-// the same setting value. `runTurnNext`'s own opts surface is narrower
-// than `runTurn`/`runTurnStream`'s (no thinking, supersedes,
-// continuation, ephemeral or robot evidence yet - U2's own scope, not
-// this item's to widen): those fields are silently unavailable on the
-// new path until their own units land, exactly as `bare` mode stays on
-// the frozen path regardless of the setting (a debug bypass, not a
-// household turn).
-function newPathOn(): boolean {
-  return getHouseholdSettingValue("turn.pipeline.next") === true;
-}
+// THIN-7C (docs/design/RULES.md rule 12): this route calls one path, the turn
+// machine (turnMachine/turnNext.ts). Bare mode, document attachments,
+// temporary turns, supersedes, continuation and a Home card's ephemeral query
+// are options of that path, not branches of a second engine. The setting that
+// used to choose between two engines is retired by THIN-7D and read nowhere here.
 
 type ModelSelectionStatus = { requested: string; selected: string | null; fallback: boolean; message?: string };
 
@@ -286,22 +274,10 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   const isMinor = speakerAgeBand(actor, new Date()) !== "adult";
   const dropReasoning = isMinor || surface !== "chat" || body.spoken === true; // THIN-5B: a spoken turn has nowhere to show reasoning
   const modelSelection = await resolveTurnModel(body.model, surface, isMinor, false);
-  const result: TurnOpResult = newPathOn()
-    ? await (async () => {
-        // runTurnNext() always resolves "immediate" (its own header note);
-        // the explicit kind check is TypeScript's, not a real branch.
-        const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, ask_answer: parsedEvidence.data.ask_answer, ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}) });
-        return next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the new path returned a stream result unexpectedly" } : next;
-      })()
-      : await runTurn(actor, surface, body.text ?? "", {
-        thinking: dropReasoning ? false : body.thinking,
-        spoken: body.spoken === true,
-        model: modelSelection.model,
-        conversationId: body.conversation_id,
-        supersedes: body.supersedes,
-        temporary: body.temporary,
-        ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
-      });
+  // runTurnNext() always resolves "immediate" (its own header note); the
+  // explicit kind check is TypeScript's, not a real branch.
+  const next = await runTurnNext(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, supersedes: body.supersedes, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, ask_answer: parsedEvidence.data.ask_answer, ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}) }); // Evidence is only honored on the robot surface.
+  const result: TurnOpResult = next.ok && next.kind === "immediate" ? { ok: true, value: next.value } : next.ok ? { ok: false, status: 503, code: "unavailable", error: "the turn machine returned a stream result unexpectedly" } : next;
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
@@ -631,7 +607,7 @@ export async function* streamTurnEvents(
     // all. finalize() returns that TurnValue as-is, so this is still
     // exactly one "done" line either way, and the resolved case simply
     // has no "delta" lines before it.
-    const value = result.finalize(fullText.trim(), (current as IteratorReturnResult<import("@/lib/turnEngine").StreamOutcome>).value);
+    const value = result.finalize(fullText.trim(), (current as IteratorReturnResult<import("@/lib/turnShared").StreamOutcome>).value);
     // REASONING-02: TurnValue.reasoning is dropped from the `done` event
     // for a minor's turn, the same gate `spanEvents()` already applies to
     // the live `reasoning` stream event above.
@@ -664,7 +640,7 @@ export async function* streamTurnEvents(
     // computed before generation ever started.
     //
     // A StreamUnavailable (FAST-04) is the engine-down case that used
-    // to be an HTTP 503 with `code: "unavailable"` when runTurnStream()
+    // to be an HTTP 503 with `code: "unavailable"` when the turn
     // still waited for the first token before returning; it now happens
     // after turn_meta is out, so it carries the same code on the error
     // event instead.
@@ -753,12 +729,8 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     !item || typeof item.name !== "string" || item.name.length > 255 || typeof item.media_type !== "string" || typeof item.data !== "string" ||
     !/^data:[^;,]+;base64,[A-Za-z0-9+/]*={0,2}$/.test(item.data) || item.data.length > 70_000_000
   )) return c.json({ error: "Invalid document attachment" }, 400);
-  const useNextPath = newPathOn();
   if (documentAttachments.length > 0 && body.bare === true) {
     return c.json({ error: "Document attachments are not available in bare mode", code: "document_attachments_unavailable" }, 400);
-  }
-  if (documentAttachments.length > 0 && useNextPath) {
-    return c.json({ error: "Document attachments are not available on the next turn pipeline", code: "document_attachments_unavailable" }, 400);
   }
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
@@ -790,11 +762,10 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   // but a dropped response body only detaches its subscriber. The explicit
   // cancel route fires this signal when the person really stops the turn.
   const abortController = new AbortController();
-  // ADMIN-COMPARE-01 (b): a route-level branch, never a condition inside
-  // runTurnStream()/turnEngine.ts itself - checked here (the normal,
-  // clean-403 path) even though runBareTurnStream() asserts the
-  // identical two things again on its own (the structural backstop, not
-  // the primary gate).
+  // ADMIN-COMPARE-01 (b): the clean 403, checked here (the primary gate) even
+  // though beginTurn() (turnMachine/turnNext.ts) asserts the identical two
+  // things again on its own and throws BareModeForbidden (the structural
+  // backstop).
   if (body.bare === true) {
     if (!isOwnerOrAdmin(actor)) return c.json({ error: "bare mode is owner/admin only" }, 403);
     if (speakerAgeBand(actor, new Date()) !== "adult") return c.json({ error: "bare mode is not available to a minor" }, 403);
@@ -818,40 +789,33 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   const modelSelection = await resolveTurnModel(body.model, surface, isMinor, body.bare === true);
   let result: TurnStreamResult;
   try {
-    // A code review caught this: `bare` must be checked BEFORE
-    // newPathOn(), not after - bare mode is a debug bypass of the whole
-    // pipeline (ADMIN-COMPARE-01: the raw model, no persona, no
-    // routing, no packages), and the header comment above already
-    // promises it "stays on the frozen path regardless of the
-    // setting"; checking newPathOn() first would silently route a
-    // bare:true request through the full new-path pipeline instead,
-    // defeating the comparison with no error at all.
-    result = body.bare === true
-      ? await runBareTurnStream(actor, body.text ?? "", body.conversation_id, abortController.signal)
-      : useNextPath
-        // STREAM-NEXT-01: runTurnNextStream(), not runTurnNext() - this
-        // route needs the "stream" kind TurnStreamResult (a live status/
-        // tokens pair the machine hasn't finished yet), never the
-        // "immediate" one the blocking POST / route above uses.
-        ? await runTurnNextStream(actor, surface, body.text ?? "", { conversationId: body.conversation_id, temporary: body.temporary, spoken: body.spoken === true, thinking: dropReasoning ? false : body.thinking, model: modelSelection.model, signal: abortController.signal, ask_answer: parsedEvidence.data.ask_answer, ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}) })
-        : await runTurnStream(actor, surface, body.text ?? "", {
-            thinking: dropReasoning ? false : body.thinking,
-            spoken: body.spoken === true,
-            model: modelSelection.model,
-            conversationId: body.conversation_id,
-            supersedes: body.supersedes,
-            continuation: body.continuation_text === undefined ? undefined : { fromTurnId: body.continuation_of, assistantText: body.continuation_text },
-            // A widget's own fixed-utterance query (Home's weather card), never a
-            // household member's own words: skips logTurnSafely() only, so it
-            // never lands in a person's real chat history or the episode store,
-            // while still going through the exact same model/safety/reply path a
-            // typed message does (getmaipai/home BACKLOG, found 2026-09-11).
-            ephemeral,
-            temporary: body.temporary,
-            documentAttachments: documentAttachments.map((item) => ({ name: item.name, mediaType: item.media_type, data: item.data })),
-            signal: abortController.signal,
-            ...(surface === "robot" ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
-          });
+    // STREAM-NEXT-01: runTurnNextStream(), not runTurnNext() - this route needs
+    // the "stream" kind TurnStreamResult (a live status/tokens pair the machine
+    // hasn't finished yet), never the "immediate" one the blocking POST / uses.
+    // THIN-7C: bare mode is a chat-surface debug bypass (ADMIN-COMPARE-01): the
+    // route's 403s above are the primary gate, BareModeForbidden inside the
+    // turn the structural backstop. It always runs on the chat surface, with
+    // the model the active chat role's, and thinking on.
+    const bare = body.bare === true;
+    result = await runTurnNextStream(actor, bare ? "chat" : surface, body.text ?? "", {
+      conversationId: body.conversation_id,
+      temporary: body.temporary,
+      bare,
+      spoken: body.spoken === true,
+      thinking: dropReasoning ? false : body.thinking,
+      model: modelSelection.model,
+      signal: abortController.signal,
+      ask_answer: parsedEvidence.data.ask_answer,
+      supersedes: body.supersedes,
+      continuation: body.continuation_text === undefined ? undefined : { fromTurnId: body.continuation_of, assistantText: body.continuation_text },
+      // A widget's own fixed-utterance query (Home's weather card), never a
+      // household member's own words: nothing is stored for it, while it goes
+      // through the exact same model/safety/reply path a typed message does
+      // (getmaipai/home BACKLOG, found 2026-09-11).
+      ephemeral,
+      documentAttachments: documentAttachments.map((item) => ({ name: item.name, mediaType: item.media_type, data: item.data })),
+      ...(surface === "robot" && !bare ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
+    });
   } catch (err) {
     if (err instanceof BareModeForbidden) return c.json({ error: err.message }, 403);
     if (err instanceof DocumentAttachmentError) return c.json({ error: err.message, code: "invalid_document" }, 400);
@@ -873,10 +837,8 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   if (result.kind === "immediate") {
     // A safety refusal or a plugin reply is already complete, deterministic
     // text - one "done" event, no artificial trickle for something with
-    // nothing left to stream. Bare mode (runBareTurnStream) always lands
-    // here; the old path (runTurnStream) does for its own deterministic
-    // replies. STREAM-NEXT-01: the new path's own runTurnNextStream()
-    // (this route) returns "stream" now, not "immediate" - its own
+    // nothing left to stream. STREAM-NEXT-01: runTurnNextStream() (this
+    // route) returns "stream", not "immediate" - its own
     // `reasoning.emit` gate still runs inside the machine (the state
     // record's "decided once, in context, before the model runs"), so
     // `result.value.reasoning` is already undefined for a minor by

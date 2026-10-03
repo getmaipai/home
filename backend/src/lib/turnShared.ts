@@ -617,6 +617,8 @@ export class BareModeForbidden extends Error {
   }
 }
 
+export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure; // moved from turnEngine.ts (THIN-7C)
+
 // THIN-7C: the document attachment types, moved from turnEngine.ts (which
 // re-exports them) so the default path owns them.
 export type DocumentTurnAttachment = { name: string; mediaType: string; data: string };

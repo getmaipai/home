@@ -1,15 +1,10 @@
-// U6a (docs/plans/simple-turn-pipeline-2026-09-22.md; the coordinator's
-// ruling, 2026-09-23): one boundary, no second one. routes/turn.ts reads
-// turn.pipeline.next per request (POST / and POST /stream both) and
-// calls runTurnNext when it is on, runTurnStream (or runTurn) otherwise -
-// the same setting conversationRunner.ts's bench harness already reads
-// the same way. Proven here at the route: with the setting off, a turn
-// runs the frozen path (spied by the absence of the new path's own
-// stats.nodes[] trace, the one thing only runTurnNext's machine writes);
-// with it on, the new path (the trace present, all eight node names);
-// the response's own event shape (turn_meta, signal, at least one
-// delta, done, in that order - STREAM-NEXT-01's own real streaming for
-// the new path too) is identical either way.
+// U6a (docs/plans/simple-turn-pipeline-2026-09-22.md), as of THIN-7C: the turn
+// routes call one path, the turn machine; the old path and the
+// turn.pipeline.next setting that chose between them are gone from the routes
+// (tests/turnRoutesOnePath.test.ts proves each mode through the route with the
+// setting off). What stays here is the route's own contract on that path: the
+// node trace, the event shape (turn_meta, signal, at least one delta, done, in
+// that order), the thinking flag, documents, and the robot's evidence.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { TestClient } from "./client";
@@ -113,18 +108,6 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
     expect(db.select().from(conversationTurns).all()).toHaveLength(0);
   });
 
-  test("documents receive an explicit refusal on the next pipeline path", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", true);
-    const { client } = await owner();
-    const response = await client.post("/api/turn/stream", {
-      surface: "chat", text: "Summarize this",
-      document_attachments: [{ name: "notes.pdf", media_type: "application/pdf", data: "data:application/pdf;base64,eA==" }],
-    });
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Document attachments are not available on the next turn pipeline", code: "document_attachments_unavailable" });
-    expect(db.select().from(attachments).all()).toHaveLength(0);
-  });
-
   test("documents receive an explicit refusal on the bare path", async () => {
     const { client } = await owner();
     const response = await client.post("/api/turn/stream", {
@@ -179,26 +162,6 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
     expect(db.select().from(attachments).all()).toHaveLength(0);
   });
 
-  test("with turn.pipeline.next off, a turn runs the frozen path - no stats.nodes trace at all", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", false);
-    const { client } = await owner();
-    await withStubReply("Hello! How can I help?", async () => {
-      const res = await client.post("/api/turn/stream", { surface: "chat", text: "hi" });
-      const events = await readNdjson(res);
-      const types = events.map((e) => e.type);
-      // A real streamed reply can arrive in one or several delta chunks,
-      // depending on the stub's own chunking - never asserted as an exact
-      // count, only the contract's own fixed shape: turn_meta first,
-      // signal next, at least one delta, done last.
-      expect(types[0]).toBe("turn_meta");
-      expect(types[1]).toBe("signal");
-      expect(types.at(-1)).toBe("done");
-      expect(types).toContain("delta");
-      const turnId = (events.find((e) => e.type === "done") as { value?: { turn_id: string } })?.value?.turn_id;
-      expect(storedNodeNames(turnId!)).toBeUndefined();
-    });
-  });
-
   // STREAM-NEXT-01: this used to assert exactly ["turn_meta", "signal",
   // "done"] - true only because runTurnNext() always resolved
   // "immediate" and the whole reply arrived as one batched blob, the
@@ -229,13 +192,13 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
   });
 });
 
-describe("POST /api/turn/stream - bare mode stays on the frozen path regardless of the setting", () => {
+describe("POST /api/turn/stream - bare mode runs on the same path as every turn", () => {
   // A code review caught this before landing: checking newPathOn() before
   // body.bare would silently route a bare-mode admin-comparison request
   // (ADMIN-COMPARE-01: the raw model, no persona, no routing, no
   // packages) through the full new-path pipeline instead - a debug
   // feature quietly comparing against the wrong thing, no error at all.
-  test("bare: true with turn.pipeline.next on still runs the frozen bare path, never the new one", async () => {
+  test("bare: true runs the default path with the bare marker (THIN-7C: bare mode is an option of that path)", async () => {
     setHouseholdSettingValue("turn.pipeline.next", true);
     setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
     const { client } = await owner();
@@ -254,17 +217,6 @@ describe("POST /api/turn/stream - bare mode stays on the frozen path regardless 
 });
 
 describe("POST /api/turn - U6a's non-stream twin", () => {
-  test("with turn.pipeline.next off, the response is the ordinary TurnValue shape", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", false);
-    const { client } = await owner();
-    await withStubReply("Hello! How can I help?", async () => {
-      const res = await client.post("/api/turn", { surface: "chat", text: "hi" });
-      const value = (await res.json()) as { reply: { text: string }; turn_id: string };
-      expect(value.reply.text.length).toBeGreaterThan(0);
-      expect(storedNodeNames(value.turn_id)).toBeUndefined();
-    });
-  });
-
   test("with turn.pipeline.next on, the response is the identical TurnValue shape, from the new path", async () => {
     setHouseholdSettingValue("turn.pipeline.next", true);
     setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
