@@ -64,9 +64,17 @@ wins.
    or any client that flags the turn as spoken) and glance surfaces keep
    their own limits.
 6. **A failed tool never fails the answer.** If search or any tool is
-   unavailable, the model answers from what it knows and the reply says
-   the lookup did not happen, in a fixed line worded for the person's
-   age band. Policy refusals (consent, crisis, temporary mode,
+   unavailable, the model answers from what it knows and says in its own
+   words, fresh each time and in the voice and register of the person's
+   band and surface, that the lookup did not happen; there is no fixed or
+   stored wording for it, for anyone (owner's rule 2026-10-03, replacing
+   the fixed per-band line). It is told only the kind of failure (down,
+   timed out, found nothing), never the raw error text, never invents a
+   fact to fill the gap, and passes the same output gate as any reply.
+   Every person gets the same reply; an admin also sees a small error
+   indicator on that reply that opens the raw details (the tool, the
+   error, the timing). Raw details never reach a non-admin, a child or
+   the model. Policy refusals (consent, crisis, temporary mode,
    ungrounded arguments) are not tool failures and keep their own
    replies. A robot with no hub and no network answers the same way.
 7. **Search gives the model pages, not snippets.** Result pages are
