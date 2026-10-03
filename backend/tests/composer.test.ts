@@ -78,7 +78,7 @@ describe("the decision table", () => {
     expect(composed.sources.map((s) => s.url)).toEqual(["https://example.com/marsh-lantern"]);
     expect(composed.synthetic_ids).toBeUndefined();
     const tool = seenMessages.find((m) => m.role === "tool")!;
-    expect(JSON.parse(tool.content)).toMatchObject({ status: "succeeded", package: "websearch", synthesis_hint: "answer from these results", data: { rows: ROWS } });
+    expect(JSON.parse(tool.content)).toMatchObject({ status: "succeeded", package: "websearch", synthesis_hint: "answer from these results", sources: [{ n: 1, url: "https://example.com/marsh-lantern", page_read: false }] });
     expect(seenMessages[seenMessages.length - 1]!.content).toContain("Hint: answer from these results.");
   });
 
@@ -461,10 +461,13 @@ describe("the tool message", () => {
   test("bounds a wide result: rows capped at eight, long strings cut, the content itself capped", () => {
     const rows = Array.from({ length: 20 }, (_, i) => ({ title: `Row ${i}`, url: `https://example.com/${i}`, snippet: "x".repeat(2000) }));
     const content = toolResultContent(outcome({ callId: "c", packageId: "websearch", status: "succeeded", result: { actions: [], data: { rows } } }));
-    const parsed = JSON.parse(content.replace(/…"}$/, "")) as { data: { rows: { snippet: string }[] } };
-    expect(parsed.data.rows.length).toBe(8);
-    expect(parsed.data.rows[0]!.snippet.length).toBeLessThanOrEqual(601);
-    expect(content.length).toBeLessThanOrEqual(6003);
+    // THIN-4A: a search is numbered sources (still eight at most, long
+    // snippets still cut), not the raw data blob.
+    const parsed = JSON.parse(content.replace(/…"}$/, "")) as { sources: { n: number; snippet: string }[] };
+    expect(parsed.sources.length).toBe(8);
+    expect(parsed.sources[7]!.n).toBe(8);
+    expect(parsed.sources[0]!.snippet.length).toBeLessThanOrEqual(601);
+    expect(content.length).toBeLessThanOrEqual(16003);
   });
 
   test("a failed outcome says its household-safe line, never a diagnostic; a pending one says what it asked", () => {

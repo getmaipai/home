@@ -586,7 +586,7 @@ interface SearxngInfobox {
 // reference this instead of each carrying their own copy of the same
 // literal, the exact class of drift SEARCH-ROWS-01 fixes between `text`
 // and `rows` in the first place.
-type SearxngRow = { title: string; url: string; snippet: string | null; image?: string | null; thumbnail?: string | null };
+type SearxngRow = { title: string; url: string | null; snippet: string | null; image?: string | null; thumbnail?: string | null };
 
 /** Formats SearXNG's own `/search?format=json` response into a single
  * readable string - a numbered list, title/url/snippet per result - not
@@ -671,7 +671,11 @@ export function formatSearxngResults(data: unknown, count = 5): string {
   return lines.length > 0 ? lines.join("\n") : SEARXNG_NO_RESULTS_TEXT;
 }
 
-type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadResult };
+/** THIN-4A: one result page the search actually read. The model gets
+ * `text` as numbered source text; `page` on the result stays the first
+ * page's whole document for the old path. */
+export type SearxngPage = { url: string; title: string; text: string };
+type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadResult; pages?: SearxngPage[] };
 
 /** SEARCH-FALLBACK-01: Wikipedia's own official, documented REST API,
  * search then the page summary - "search" (the Core REST API,
@@ -873,7 +877,7 @@ export function __resetSearchCacheForTests(): void {
 }
 
 export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean } = {}): Promise<SearxngSearchResult> {
-  if (opts.bypassCache) return searxngSearchUncached(args, opts);
+  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args);
   const input = args as { query?: unknown; category?: unknown; read_page?: unknown } | undefined;
   const query = input?.query;
   if (typeof query !== "string" || query.length === 0) return searxngSearchUncached(args, opts);
@@ -885,23 +889,26 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
   const rotated = rotationPool ? rotationEngines(rotationPool) : null;
   const wikipedia = rotationPool?.includes("wikipedia") ? ["wikipedia"] : [];
   const requestEngines = rotated && rotated.length > 0 ? [...rotated, ...wikipedia] : rotated;
-  const key = [baseUrl.replace(/\/+$/, ""), query, input?.read_page === true ? "page" : "", isImages ? "images" : "general", safeLevel, (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
+  const key = [baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? "page" : "", isImages ? "images" : "general", safeLevel, (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
   const now = Date.now();
   const cached = searchCache.get(key);
   if (cached && now - cached.storedAt < SEARCH_CACHE_TTL_MS) return cached.result;
   if (cached) searchCache.delete(key);
   const running = searchInFlight.get(key);
   if (running) return running;
-  const promise = (async () => {
+  const searchRows = async (): Promise<SearxngSearchResult> => {
     const result = await searxngSearchUncached(args, { ...opts, safeEngines: requestEngines ?? safeEngines });
     if (!rotationPool || !requestEngines || requestEngines.length === 0 || result.rows.length >= 3) return result;
     const next = rotationEngines(rotationPool);
     if (next.length === 0 || next.join(",") === requestEngines.filter((name) => name !== "wikipedia").join(",")) return result;
     const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...next, ...wikipedia] });
-    const rows = [...result.rows, ...second.rows].filter((row, index, all) => all.findIndex((candidate) => candidate.url === row.url) === index);
+    const rows = dedupeRows([...result.rows, ...second.rows]);
     return { text: [result.text, second.text].filter((value) => value !== SEARXNG_NO_RESULTS_TEXT).join("\n"), rows };
-  })().then((result) => {
-    if (result.rows.length > 0) {
+  };
+  const promise = (async () => attachSearchPages(await searchRows(), args))().then((result) => {
+    // A search that wanted pages and got none (a rate limit, a timeout, a
+    // robots decline) is not cached: a retry should try the pages again.
+    if (result.rows.length > 0 && (!wantsPages(input) || (result.pages?.length ?? 0) > 0)) {
       if (searchCache.size >= SEARCH_CACHE_MAX_ENTRIES) searchCache.delete(searchCache.keys().next().value!);
       searchCache.set(key, { result, storedAt: Date.now() });
     }
@@ -958,9 +965,12 @@ function infoboxToRow(raw: unknown): SearxngRow | null {
   const box = raw as SearxngInfobox;
   if (typeof box?.infobox !== "string" || box.infobox.length === 0) return null;
   const firstUrl = Array.isArray(box.urls) ? (box.urls[0] as { url?: unknown } | undefined)?.url : undefined;
+  // #171 (verdict in docs/dev.md): an infobox with content but no usable
+  // url survives as uncited context (url null, no [n]), never dropped.
   const url = safeRowUrl(typeof box.id === "string" ? box.id : firstUrl);
-  if (!url) return null;
-  return { title: box.infobox, url, snippet: typeof box.content === "string" && box.content.length > 0 ? box.content : null };
+  const snippet = typeof box.content === "string" && box.content.length > 0 ? box.content : null;
+  if (!url && !snippet) return null;
+  return { title: box.infobox, url, snippet };
 }
 
 // Shared by both rows passes (infoboxes first, then results) - the same
@@ -1176,11 +1186,94 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
     throw err;
   }
   await recordSearchHealth({ kind: "ok" });
-  // Never wrapped in the try/catch above (this function's own header
-  // comment says why): a page-read failure is never a SearXNG health
-  // signal, so it propagates to this call's own caller unchanged.
-  const page = input?.read_page === true && rows[0] ? await searxngPageRead({ url: rows[0].url }) : undefined;
-  return { text, rows, ...(page ? { page } : {}) };
+  return { text, rows };
+}
+
+/** THIN-4A (docs/design/RULES.md rule 7): the pages budget. One search
+ * reads at most this many result pages, in rank order, one at a time
+ * (each also goes through the per-host pace, robots check and SSRF guard
+ * in searxngPageRead). The reasoning is in docs/dev.md. */
+export const SEARCH_PAGES_MAX = 3;
+/** Characters of page text kept per page for the model (three pages stay
+ * well inside the tool message's budget). */
+const SEARCH_PAGE_TEXT_CHARS = 2_500;
+
+/** A recipe interpolates every argument to a string, so `read_page`
+ * arrives from a package as "true" (an unset one stays the literal
+ * "{read_page}"); a direct caller may pass the boolean. */
+function wantsPages(input: { read_page?: unknown } | undefined): boolean {
+  return input?.read_page === true || input?.read_page === "true";
+}
+
+/** One entry per url (a row with no url is keyed by its title and
+ * snippet): an engine mix can return the same page several times, and
+ * each copy would take a source number and a page fetch. */
+export function dedupeRows(rows: SearxngRow[]): SearxngRow[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = row.url ?? `${row.title}\u001f${row.snippet ?? ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** The whole page-reading step of one search gives up after this long and
+ * keeps whatever pages arrived, so a slow site costs its own page and not
+ * the answer (the tool node's own deadline is 10 s). */
+let searchPagesBudgetMs = 6_000;
+
+export function __setSearchPagesBudgetForTests(ms: number | null): void {
+  searchPagesBudgetMs = ms ?? 6_000;
+}
+
+/** With `read_page: true`, read the top result pages and attach them.
+ * Runs after the SearXNG request is done and health is recorded, never
+ * inside its try/catch: a page failing for its own reasons is never a
+ * SearXNG health signal, and that row simply keeps its snippet. The
+ * pages are read together, at most one per site (so the per-host pace is
+ * never the thing that serialises them), and only the ones that finish
+ * inside the step's time budget are kept. */
+async function attachSearchPages(found: SearxngSearchResult, args: unknown): Promise<SearxngSearchResult> {
+  const input = args as { category?: unknown; read_page?: unknown } | undefined;
+  const result = { ...found, rows: dedupeRows(found.rows) };
+  if (!wantsPages(input) || input?.category === "images" || input?.category === "videos") return result;
+  const hosts = new Set<string>();
+  const candidates: SearxngRow[] = [];
+  for (const row of result.rows) {
+    if (candidates.length >= SEARCH_PAGES_MAX) break;
+    if (!row.url) continue;
+    let host: string;
+    try {
+      host = new URL(row.url).hostname;
+    } catch {
+      continue;
+    }
+    if (hosts.has(host)) continue;
+    hosts.add(host);
+    candidates.push(row);
+  }
+  const read: (PageReadResult | null)[] = candidates.map(() => null);
+  const reads = candidates.map(async (row, index) => {
+    try {
+      read[index] = await searxngPageRead({ url: row.url! });
+    } catch {
+      // Falls back to the row's own snippet.
+    }
+  });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([Promise.allSettled(reads), new Promise<void>((resolve) => { timer = setTimeout(resolve, searchPagesBudgetMs); })]);
+  clearTimeout(timer);
+  const pages: SearxngPage[] = [];
+  let first: PageReadResult | undefined;
+  candidates.forEach((row, index) => {
+    const doc = read[index];
+    const text = doc?.text.trim().slice(0, SEARCH_PAGE_TEXT_CHARS);
+    if (!doc || !text) return;
+    first ??= doc;
+    pages.push({ url: row.url!, title: doc.title || row.title, text });
+  });
+  return pages.length > 0 ? { ...result, ...(first ? { page: first } : {}), pages } : result;
 }
 
 /** SEARCH-FALLBACK-01's own gate: `search.wikipedia_fallback` (default
@@ -1267,8 +1360,11 @@ function robotsAllows(robots: string, target: URL): boolean {
   return allowed;
 }
 
-async function pageFetch(url: string): Promise<AttemptResult> {
-  if (!tryConsume(SEARXNG_PAGE_RATE_LIMIT_KEY, SEARXNG_PAGE_RATE_LIMIT)) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
+async function pageFetch(url: string, countsAgainstPace = true): Promise<AttemptResult> {
+  // The pace counts pages, not the robots.txt check that goes with each
+  // one (THIN-4A: with both counted, a three-page search spent six
+  // tokens of a three-token burst and read one page).
+  if (countsAgainstPace && !tryConsume(SEARXNG_PAGE_RATE_LIMIT_KEY, SEARXNG_PAGE_RATE_LIMIT)) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
   await validatePublicPageUrl(url);
   return attemptHttpFetch(
     url,
@@ -1346,7 +1442,7 @@ export async function searxngPageRead(args: unknown): Promise<PageReadResult> {
   }
   if (pageReaderForTests) return pageReaderForTests(url);
   const origin = parsedUrl.origin;
-  const robotsResult = await pageFetch(`${origin}/robots.txt`);
+  const robotsResult = await pageFetch(`${origin}/robots.txt`, false);
   if (!robotsResult.ok && robotsResult.status !== 404) pageFailure(robotsResult, `${origin}/robots.txt`);
   if (robotsResult.ok && typeof robotsResult.value === "string" && !robotsAllows(robotsResult.value, parsedUrl)) {
     throw new HostError("network_unreachable", `The site's robots.txt declined the page request for ${url}.`);

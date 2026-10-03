@@ -362,6 +362,38 @@ describe("turnNext.ts: the interim rule", () => {
     }
   });
 
+  // THIN-4A (rule 7): the model never has to ask for the pages. A bare
+  // {expression} call still runs with the pages read, and the model's next
+  // round gets the page text as numbered sources.
+  test("a websearch call with only an expression reads the result pages and the model gets numbered sources", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const { __setPageReaderForTests } = await import("@/lib/packageHost");
+    __setPageReaderForTests(async (url) => ({ type: "document", file_id: "file-1", url, title: "A page", text: "PAGE TEXT FROM THE FIXTURE", chunks: [], links: [], sections: [] }));
+    let toolContent = "";
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => {
+            if (request.messages.some((m) => m.role === "tool")) return undefined;
+            return [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "berlin wall anniversary" }) }];
+          },
+          reply: (request) => {
+            toolContent = String(request.messages.find((m) => m.role === "tool")?.content ?? "");
+            return request.messages.some((m) => m.role === "tool") ? "Here's what I found." : "searching";
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "when did the berlin wall come down"),
+      );
+      expect(result.ok).toBe(true);
+      expect(toolContent).toContain("PAGE TEXT FROM THE FIXTURE");
+      expect(toolContent).toContain('"n":1');
+    } finally {
+      __setPageReaderForTests(null);
+      searxng.stop();
+    }
+  });
+
   // READ-PAGE-01's own bench toggle: category stays stripped always
   // (LIVE-0923-01 never gated it), only read_page's own removal is
   // switchable, and only by this one env var.

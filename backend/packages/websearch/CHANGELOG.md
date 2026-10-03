@@ -2,6 +2,17 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.3] - 2026-10-03
+
+### Changed
+
+- THIN-4A: a search reads up to three of the result pages and hands the
+  model their text as numbered sources (`pages` beside `rows`), falling
+  back to the snippet for a page that will not load. The tool and
+  argument descriptions now say a search is a general web search by
+  default (pictures only on request) and that Home reads the pages
+  itself. The `page` data source row now names the result pages.
+
 ## [0.2.2] - 2026-09-24
 
 ### Added
