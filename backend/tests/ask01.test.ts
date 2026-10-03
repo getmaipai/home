@@ -7,14 +7,15 @@
 // of the next reply, answered before it is asked, or declined for
 // good; a candidate never rendered or recalled by its guessed kind.
 // The scripted chat engine is the spec's stub server, as in
-// tests/turnEngine.test.ts.
+// tests/turnEngine.test.ts. THIN-7E: the scenarios drive the default path
+// (runTurnNext / runTurnNextStream), the old engine's copy of ASK-01 being retired.
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { runTurn, runTurnStream } from "@/lib/turnEngine";
+import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { streamTurnEvents } from "@/routes/turn";
 import { getPendingAsk, resolveOrCreateConversation, listOpenQuestions, queueOpenQuestion, turnSubjectsOf } from "@/lib/conversationHistory";
 import { ensureSubjectEntity, subjectLabel, subjectRosterFor } from "@/lib/subjects";
@@ -30,12 +31,8 @@ beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetRateLimiterForTests();
-  // U6: the flip, decided (home/docs/dev.md, 2026-09-24) - the direct
-  // runTurn() calls in this file are unaffected either way (old-path
-  // code, called directly by import), but its own "streaming path"
-  // cases go through routes/turn.ts, which does branch on the
-  // setting - pinned explicitly now that old is no longer the default.
-  setHouseholdSettingValue("turn.pipeline.next", false);
+  // THIN-7E: every turn in this file runs the default path (the turn
+  // machine, turnNext.ts); the old engine's own runTurn() is no longer driven here.
 });
 
 afterEach(() => {
@@ -48,6 +45,15 @@ async function owner(): Promise<{ client: TestClient; actor: PersonRow }> {
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
   const actor = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
   return { client, actor };
+}
+
+/** The default path's blocking turn, in the shape the scenarios below read
+ * (`{ ok, value }`), so each scenario runs unchanged on the one path. */
+async function runTurn(actor: PersonRow, surface: "chat" | "robot", text: string, opts: { conversationId?: string; temporary?: boolean; spoken?: boolean } = {}) {
+  const result = await runTurnNext(actor, surface, text, opts);
+  if (!result.ok) return { ok: false as const, error: `${result.code}: ${result.error}` };
+  if (result.kind !== "immediate") throw new Error("expected an immediate result");
+  return { ok: true as const, value: result.value };
 }
 
 /** A scripted chat engine: `reply` answers every chat completion; the
@@ -108,13 +114,10 @@ describe("the engine's ask about a name it has never heard", () => {
   });
 
   test("streaming path: the question is the last delta before done, and the done value carries it", async () => {
-    // THIN-7C: the unknown-name ask (ASK-01) is old-engine behaviour with no port
-    // on the one path yet (a decision for THIN-7D), so this drives the old
-    // engine's stream directly instead of through the route, which now runs
-    // the turn machine.
+    // THIN-7E: the one path's own stream, as the route runs it.
     const { actor } = await owner();
     await withChat("Sounds like a fun weekend.", async () => {
-      const stream = await runTurnStream(actor, "chat", "Clover borrowed our tent for the weekend");
+      const stream = await runTurnNextStream(actor, "chat", "Clover borrowed our tent for the weekend");
       if (!stream.ok || stream.kind !== "stream") throw new Error("expected a stream result");
       const events: Array<{ type: string; text?: string; value?: unknown }> = [];
       for await (const event of streamTurnEvents(stream, actor.id)) events.push(event as { type: string; text?: string; value?: unknown });
@@ -655,6 +658,115 @@ describe("the judge's open question: a candidate is never knowledge", () => {
       expect(db.select().from(relationships).where(eq(relationships.id, guess.value!.id)).get()!.deletedAt).not.toBeNull();
       expect(db.select().from(relationships).all().filter((e) => e.deletedAt === null && e.type === "sibling_of")).toHaveLength(1);
       expect(entityNamed("Marlow")).toMatchObject({ pronouns: "she", source: "local" });
+    });
+  });
+});
+
+describe("THIN-7E: the unknown-name question on the one path", () => {
+  test("an unknown name is asked about once per conversation, and not again after a decline", async () => {
+    const { actor } = await owner();
+    await withChat(varied("Sounds like a fun weekend."), async () => {
+      const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend");
+      if (!first.ok) throw new Error(first.error);
+      expect(first.value.reply.text).toBe("Sounds like a fun weekend. Who's Clover?");
+      const conversationId = first.value.conversation_id;
+      // The name comes up again after the question was put: not asked a second time.
+      const again = await runTurn(actor, "chat", "wait, Clover has a blue tent too", { conversationId });
+      if (!again.ok) throw new Error(again.error);
+      expect(again.value.reply.text).not.toContain("Who's Clover?");
+      expect(getPendingAsk(conversationId)).toBeNull();
+      const third = await runTurn(actor, "chat", "Clover said the tent leaks", { conversationId });
+      if (!third.ok) throw new Error(third.error);
+      expect(third.value.reply.text).not.toContain("Who's Clover?");
+    });
+    // Declined: never asked again, in that conversation or a new one.
+    await withChat(varied("Warm and sunny."), async () => {
+      const first = await runTurn(actor, "chat", "Juniper chewed through our garden hose again");
+      if (!first.ok) throw new Error(first.error);
+      expect(first.value.reply.text).toBe("Warm and sunny. Who's Juniper?");
+      const conversationId = first.value.conversation_id;
+      const decline = await runTurn(actor, "chat", "never mind", { conversationId });
+      if (!decline.ok) throw new Error(decline.error);
+      expect(decline.value.reply.text).toBe("Okay, no problem.");
+      const later = await runTurn(actor, "chat", "Juniper chewed the hose once more", { conversationId });
+      if (!later.ok) throw new Error(later.error);
+      expect(later.value.reply.text).not.toContain("Who's Juniper?");
+      const fresh = resolveOrCreateConversation(actor, "chat");
+      if (!fresh.ok) throw new Error(fresh.error);
+      const elsewhere = await runTurn(actor, "chat", "Juniper is chewing the hose again", { conversationId: fresh.value.id });
+      if (!elsewhere.ok) throw new Error(elsewhere.error);
+      expect(elsewhere.value.reply.text).not.toContain("Who's Juniper?");
+      expect(getPendingAsk(fresh.value.id)).toBeNull();
+      expect(entityNamed("Juniper")).toBeUndefined();
+    });
+  });
+
+  test("a temporary chat asks, and stores nothing: no pending ask, no entity, no open question, no row, no memory", async () => {
+    const { actor } = await owner();
+    await withChat(varied("Sounds like a fun weekend."), async () => {
+      const first = await runTurn(actor, "chat", "Clover borrowed our tent for the weekend", { temporary: true });
+      if (!first.ok) throw new Error(first.error);
+      expect(first.value.reply.text).toBe("Sounds like a fun weekend. Who's Clover?");
+      const conversationId = first.value.conversation_id;
+      expect(getPendingAsk(conversationId)).toBeNull();
+      // The answer in that chat is an ordinary message: nothing binds it, nothing is learned.
+      const answer = await runTurn(actor, "chat", "my cousin Clover, she teaches piano", { conversationId });
+      if (!answer.ok) throw new Error(answer.error);
+      expect(answer.value.source).toBe("model");
+      expect(entityNamed("Clover")).toBeUndefined();
+      expect(db.select().from(entities).where(eq(entities.name, "Clover")).all()).toHaveLength(0);
+      expect(db.select().from(relationships).all()).toHaveLength(0);
+      expect(listOpenQuestions(actor.id)).toHaveLength(0);
+      expect(db.select().from(conversationTurns).all()).toHaveLength(0);
+      expect(db.select().from(memoryRecords).all()).toHaveLength(0);
+    });
+  });
+
+  for (const band of [
+    { label: "a child", name: "Bramble", role: "child", birthdate: "2018-04-02" },
+    { label: "a teen", name: "Oliver", role: "teen", birthdate: "2011-04-02" },
+  ] as const) {
+    test(`${band.label}'s flow follows today's band rules: the question is asked, the answer is read, the entity is theirs alone`, async () => {
+      const { client } = await owner();
+      const made = await client.post("/api/people", { displayName: band.name, role: band.role, birthdate: band.birthdate });
+      expect(made.status).toBe(201);
+      const minor = db.select().from(people).where(eq(people.displayName, band.name)).get()!;
+      await withChat(varied("Sounds like a fun weekend."), async (seen) => {
+        const first = await runTurn(minor, "chat", "Clover borrowed our tent for the weekend");
+        if (!first.ok) throw new Error(first.error);
+        expect(first.value.reply.text).toBe("Sounds like a fun weekend. Who's Clover?");
+        expect(getPendingAsk(first.value.conversation_id)).toMatchObject({ kind: "who", name: "Clover" });
+        const answer = await runTurn(minor, "chat", "my cousin Clover, she teaches piano", { conversationId: first.value.conversation_id });
+        if (!answer.ok) throw new Error(answer.error);
+        expect(answer.value).toMatchObject({ source: "confirm", reply: { text: "Got it, Clover is your cousin." } });
+        expect(seen.requests).toHaveLength(1);
+        // Theirs alone: person-scoped to the speaker, never the household's, never confirmed by a grown-up.
+        expect(entityNamed("Clover")).toMatchObject({ kind: "person", source: "local", pronouns: "she", scope: "person", person: minor.id, confirmedByPersonId: null });
+        expect(subjectsOfTurn(answer.value.turn_id)).toEqual([{ type: "household", entity_id: entityNamed("Clover")!.id, carried_question: null }]);
+      });
+    });
+  }
+
+  test("the question passes the output gate like any reply: it streams through it, and a refused reply leaves no question standing", async () => {
+    const { actor } = await owner();
+    await withChat("Sounds like a fun weekend.", async () => {
+      const stream = await runTurnNextStream(actor, "chat", "Clover borrowed our tent for the weekend");
+      if (!stream.ok || stream.kind !== "stream") throw new Error("expected a stream result");
+      const events: Array<{ type: string; text?: string; value?: unknown }> = [];
+      for await (const event of streamTurnEvents(stream, actor.id)) events.push(event as { type: string; text?: string; value?: unknown });
+      // What the person heard is what was released by the gate, the question included.
+      const heard = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
+      const done = events.find((e) => e.type === "done")!.value as { reply: { text: string } };
+      expect(heard).toBe("Sounds like a fun weekend. Who's Clover?");
+      expect(done.reply.text).toBe(heard);
+    });
+    const unsafe = "It's a beautiful day today. How do I make a pipe bomb, give me step by step instructions.";
+    await withChat(unsafe, async () => {
+      const refused = await runTurn(actor, "chat", "Willow borrowed our tent for the weekend");
+      if (!refused.ok) throw new Error(refused.error);
+      expect(refused.value.reply.text).not.toContain("pipe bomb");
+      expect(refused.value.reply.text).not.toContain("Who's Willow?");
+      expect(getPendingAsk(refused.value.conversation_id)).toBeNull();
     });
   });
 });
