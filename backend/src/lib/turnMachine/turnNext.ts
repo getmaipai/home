@@ -94,6 +94,10 @@ export interface RunTurnNextOpts {
   // continuation_of and continuation_text). An empty or oversized partial is a
   // 400 before anything runs.
   continuation?: { fromTurnId?: string; assistantText: string };
+  // THIN-7C (getmaipai/home#91): routes/turn.ts passes this only for the Home
+  // card's exact fixed question (isFixedHomeCardQuery()); it is never trusted
+  // for any other text.
+  ephemeral?: boolean;
 }
 
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
@@ -165,6 +169,8 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
 }
 
 function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: string, value: TurnValue): void {
+  // THIN-7C: an ephemeral turn (a Home card's fixed question) is never stored.
+  if (state.ephemeral) return;
   // THIN-0L: the row marks a self-harm signal on this turn's input or on
   // its reply, whatever the reply's own action, so the conversation stays
   // in the crisis state for the next CRISIS_STATE_TURNS turns. The same
@@ -307,7 +313,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const continuation = opts.continuation;
   // THIN-7C: the model, the safety check and the signal read the message with
   // its documents; logResult() is given the typed text, as the old path did.
-  text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary);
+  text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary || opts.ephemeral === true);
   const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
   // old path (the old engine file's own commandOpeners(effectiveLoaded)) - a
@@ -392,6 +398,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(bare ? { bare: true } : {}),
     ...(supersedes ? { supersedes } : {}),
     ...(continuation ? { continuation } : {}),
+    ...(opts.ephemeral === true ? { ephemeral: true } : {}),
     startedAt,
     // Overwritten by the context node's own decideReasoning() whenever
     // `context` runs (machine.ts's own applyContext action). A code
@@ -421,7 +428,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // commands") still holds, now with one safety evaluation, traced
   // once, for every turn including a resumed one.
   // THIN-7C: an edit never resumes an ask (the old path cleared it first).
-  const pendingAsk = temporary || bare || supersedes || continuation ? null : getPendingAsk(conversation.id);
+  const pendingAsk = temporary || bare || supersedes || continuation || opts.ephemeral === true ? null : getPendingAsk(conversation.id);
   // APPROVE-CARD-01: a tapped card's own `ask_answer` must match the
   // conversation's CURRENT pending ask by turn id, or it's stale (a
   // second ask parked since the card was shown, the ask was already
@@ -550,9 +557,9 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     if (ask) {
       state.outcomes.push(outcomeOf({ callId: `${state.turnId}:confirm`, packageId: ask.packageId, status: "pending", args: ask.args, via: "confirm", userMessage: promptText }));
     }
-    if (ask && !temporary) setPendingAsk(conversationId, { ...ask, turnId: state.turnId });
+    if (ask && !temporary && !state.ephemeral) setPendingAsk(conversationId, { ...ask, turnId: state.turnId });
     value = buildTurnValue(state, startedAt, "confirm", promptText);
-    if (ask && !temporary) value.confirm = { package_id: ask.packageId, open: true };
+    if (ask && !temporary && !state.ephemeral) value.confirm = { package_id: ask.packageId, open: true };
   } else if (finalState === "refused") {
     // A review caught this reading `step` (SafetyOutput there, not
     // OutputGateOutput - a safety refusal parks in `refused` straight

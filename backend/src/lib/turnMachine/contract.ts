@@ -204,6 +204,10 @@ export interface TurnState {
    * (resolveSupersedes()); absent otherwise. The replaced turn leaves the
    * window, its memories are not recalled, and the stored row records it. */
   supersedes?: string;
+  /** THIN-7C (getmaipai/home#91): a Home card's own fixed question, never a
+   * household member's words. Same model, safety and reply path, but nothing
+   * is stored (no turn row, no summary refresh, no parked ask). */
+  ephemeral?: boolean;
   /** THIN-7C: a continuation of an answer that stopped short: the client's
    * partial text, replayed to the model as its own words with one instruction
    * to continue. No command fires and no tool is offered for the turn;
