@@ -1940,7 +1940,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
           // THIN-4H: an adult's query goes to the optional hosted provider when a key is set; null means SearXNG.
           const input = args as { query?: unknown; category?: unknown } | undefined;
-          const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category) : null;
+          const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role) : null;
           if (hosted) return hosted;
           return searxngSearch(args, { safeSearchLevel, ...(band === "adult" ? {} : { minorBand: band }) });
         }

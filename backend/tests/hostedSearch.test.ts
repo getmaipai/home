@@ -71,7 +71,7 @@ async function owner() {
   return db.select().from(people).where(eq(people.displayName, "Oliver")).get()!;
 }
 
-function member(name: string, role: "child" | "teen") {
+function member(name: string, role: "child" | "teen" | "guest") {
   const now = new Date().toISOString();
   const id = `person-hosted-${name.toLowerCase()}`;
   db.insert(people).values({ id, displayName: name, role, avatarSeed: id, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:2:testfix" }).run();
@@ -107,6 +107,38 @@ describe("hosted search key (THIN-4H)", () => {
     const result = await search(member("Willow", "teen"));
     expect(providerHits).toEqual([]);
     expect(result.rows[0]?.title).toBe("Keyless");
+  });
+
+  test("a guest with a key set: no age signal, so the provider is never called", async () => {
+    await owner();
+    setHouseholdSettingValue(HOSTED_SEARCH_KEY_SETTING, SECRET);
+    const result = await search(member("Marsh", "guest"));
+    expect(providerHits).toEqual([]);
+    expect(result.rows[0]?.title).toBe("Keyless");
+  });
+
+  test("a stored key that no longer decrypts falls back to SearXNG, never fails the search", async () => {
+    const adult = await owner();
+    setHouseholdSettingValue(HOSTED_SEARCH_KEY_SETTING, SECRET);
+    db.update(settingsValues).set({ value: "enc:v1:garbage" }).where(eq(settingsValues.key, HOSTED_SEARCH_KEY_SETTING)).run();
+    const result = await search(adult);
+    expect(providerHits).toEqual([]);
+    expect(result.rows[0]?.title).toBe("Keyless");
+  });
+
+  test("provider markup and entities are stripped from titles and snippets", async () => {
+    const adult = await owner();
+    setHouseholdSettingValue(HOSTED_SEARCH_KEY_SETTING, SECRET);
+    provider.stop(true);
+    provider = Bun.serve({
+      port: 0,
+      fetch: () => Response.json({ web: { results: [{ title: "Node &amp; <strong>Bun</strong>", url: "https://hosted.example/", description: "a &lt;b&gt; <strong>runtime</strong> &#x27;fast&#x27;" }] } }),
+    });
+    __setHostedSearchEndpointForTests(`http://127.0.0.1:${provider.port}/res/v1/web/search`);
+    const result = await search(adult);
+    expect(result.rows[0]?.title).toBe("Node & Bun");
+    expect(result.text).toContain("a <b> runtime 'fast'");
+    expect(result.text).not.toContain("<strong>");
   });
 
   test("no key (the default): an adult gets keyless SearXNG as today", async () => {
