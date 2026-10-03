@@ -1,0 +1,69 @@
+# Home: pinning commons and running the gate
+
+Dev tier. Full text moved out of `AGENTS.md`. Load before bumping a `@maipai/*` pin, resolving a lockfile conflict, changing a bundled manifest, claiming something is live on port 8787, or running `scripts/check.sh` for the first time on a machine.
+
+## Pinning `getmaipai/commons`, lockfile conflicts and what is live on 8787
+
+**Pinning `getmaipai/commons`:** this repo resolves `@maipai/core`,
+`@maipai/ui` and `@maipai/spec` each from their own immutable per-tag
+worktree, not from the sibling `getmaipai/commons` checkout itself -
+that checkout is one mutable directory any session on the machine can
+`git checkout` a different tag into, and reading it directly let one
+session's pin change silently detach every other consumer underneath
+it (SHARED-PIN-01, `commons/docs/dev.md`). `scripts/check.sh` calls
+`commons`'s own `scripts/ensure-tag.sh <workspace> <tag>` for each pin,
+which creates `../commons-tags/<workspace>-<tag>` as a detached worktree
+of that tag the first time it's asked for and reuses it after (`../
+commons` by default for locating the `commons` repo itself, override
+with `MAIPAI_COMMONS_DIR`). Each `package.json` `file:` dependency names
+that same worktree path directly (e.g. `file:../../commons-tags/
+core-core-v0.1.0/core`). Bumping a pin is therefore two edits: the tag
+string in `scripts/check.sh` and the matching `file:` path in
+`backend/package.json` or `frontend/package.json`, then run
+`scripts/check.sh` (it creates the new tag's worktree if this is the
+first consumer to ask for it) followed by `bun install --force` in
+`backend/` and `frontend/` (a plain `bun install` doesn't refresh a
+`file:` dependency's snapshot in bun's content-addressed store). Never
+delete `node_modules` and `bun.lock` to get there: a fresh install floats every dependency
+to its latest compatible version, not just the pin you
+changed (2026-09-21: one recovery from a `bun.lock` merge conflict silently
+moved `@assistant-ui/core` 0.3.17 to 0.3.20 and broke the chat's tests before
+it was caught by diffing against a clean `origin/main` worktree). On a
+lockfile conflict, take `main`'s `bun.lock` whole, then `bun install --force`;
+the diff against a clean `origin/main` worktree before committing is what
+proves only your pin moved. The same applies to the main checkout that serves `localhost:8787`:
+a pin bump landed on `main` is not on 8787 until `bun install --force`
+has run in that checkout's `frontend/` and `backend/`, because `bun
+restart` rebuilds with whatever `file:` snapshot the store already
+holds (2026-09-21: 8787 served a build with the kit's single-root fix
+but the previous tag's palette, because the bump to ui-v0.5.13 was
+installed in the session's worktree and never in `main`'s). A done
+report's "what you see on reload" line is proven on 8787 itself after
+the restart, by a probe or a screenshot taken from that port, never
+from a worktree's own build. The same holds for a bundled manifest
+under `backend/packages/`, not just a pin: the running hub re-reads an
+edited manifest by mtime but validates it against whatever spec schema
+it booted with, so a manifest or spec-pin change isn't live on 8787
+until the hub restarts, and the done report for that kind of change
+says whether the restart happened (MANIFEST-REFUSAL-01, fixes #166 -
+the 2026-09-26 incident was exactly a bundled-manifest change landing
+without one).
+
+## Running the gate: prerequisites, docs scope and the lock
+
+package's own tests; `tsc --noEmit` (backend) or `tsc --noEmit && eslint
+.` (frontend) to lint. `bash scripts/check.sh` from the repo root is the
+full pre-commit gate: it needs a sibling `getmaipai/.github` checkout
+(`../.github` by default, override with `MAIPAI_STANDARDS_DIR`, which may be
+relative to the repo root) with its
+own `gen/ts` and `gen/py` already generated, and a sibling
+`getmaipai/commons` checkout present with the pinned tags fetched (see
+"Pinning" above - the gate resolves each into its own worktree itself),
+or the gate fails with a "missing" error that looks unrelated to what
+you changed.
+A commit that touches only docs runs `bash scripts/check.sh --docs` instead (the reading-level lint plus the standards core, seconds not minutes).
+Every scope but docs first takes the machine-wide full-gate lock from
+`../.github/standards/bin/gate-lock.sh` (override with `MAIPAI_GATE_LOCK`)
+and waits its turn behind any other repo's gate on this machine; `bash
+../.github/standards/bin/gate-lock.sh status` shows who holds it and who
+is queued. Never hand-roll a wait for another gate: run `check.sh`.
