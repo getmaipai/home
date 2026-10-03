@@ -8,6 +8,8 @@ import { eq } from "drizzle-orm";
 import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
+import { createStackClient } from "@/lib/stack/client";
+import { __setStackClientForTests } from "@/lib/stackEngine";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -35,11 +37,17 @@ afterEach(() => {
   __resetLlmSupervisorForTests();
   __resetPortOwnershipForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
+  useDefaultScriptedStack();
 });
 
 async function withEngine<T>(
   script: { reasoning: string | undefined; reply: string },
   fn: (seen: ChatCompletionRequest[]) => Promise<T>,
+  // `direct`: the Stack client points straight at this test's engine, so a
+  // stray background request from an earlier test cannot reach it (or its
+  // `seen` list) through the shared env seam. The turn-level tests need the
+  // scripted Stack's roles endpoint and so go through the env seam.
+  direct = false,
 ): Promise<T> {
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const seen: ChatCompletionRequest[] = [];
@@ -47,12 +55,17 @@ async function withEngine<T>(
     scriptedReasoning: (request) => { seen.push(request); return script.reasoning; },
     scriptedChatReply: () => script.reply,
   });
-  process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-  __resetLlmSupervisorForTests();
+  if (direct) {
+    __setStackClientForTests(createStackClient({ baseUrl: stub.url }));
+  } else {
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    __resetLlmSupervisorForTests();
+  }
   try {
     return await fn(seen);
   } finally {
     await stub.stop();
+    if (direct) useDefaultScriptedStack();
   }
 }
 
@@ -71,7 +84,7 @@ describe("THIN-5A: the engine client carries reasoning as its own field", () => 
       const started = await startCompleteStreamPieces("chat", [{ role: "user", content: "what's 17 times 24" }], { thinking: true });
       if (!started.ok) throw new Error(started.error);
       return drain(started.pieces);
-    });
+    }, true);
     expect(pieces.filter((p) => p.channel === "reasoning").map((p) => p.text).join("")).toBe("carry the two");
     expect(pieces.filter((p) => p.channel === "text").map((p) => p.text).join("")).toBe("17 times 24 is 408.");
     expect(pieces.some((p) => /<\/?think>/i.test(p.text))).toBe(false);
@@ -82,33 +95,34 @@ describe("THIN-5A: the engine client carries reasoning as its own field", () => 
       const started = await startCompleteStreamPieces("chat", [{ role: "user", content: "hi" }], { thinking: true });
       if (!started.ok) throw new Error(started.error);
       return drain(started.pieces);
-    });
+    }, true);
     expect(pieces.filter((p) => p.channel === "reasoning").map((p) => p.text).join("")).toBe("the syntax </think> ends a block");
     expect(pieces.filter((p) => p.channel === "text").map((p) => p.text).join("")).toBe("Done.");
   });
 
   test("dropReasoning sets thinking off on the request and drops any reasoning the engine returns anyway", async () => {
     const { pieces, seen } = await withEngine({ reasoning: "secret scratch work", reply: "Hi there." }, async (seen) => {
-      const started = await startCompleteStreamPieces("chat", [{ role: "user", content: "hi" }], { thinking: true, dropReasoning: true });
+      const started = await startCompleteStreamPieces("chat", [{ role: "user", content: "hi mark-5a-drop" }], { thinking: true, dropReasoning: true });
       if (!started.ok) throw new Error(started.error);
       return { pieces: await drain(started.pieces), seen };
-    });
-    expect(seen[0]?.chat_template_kwargs?.enable_thinking).toBe(false);
+    }, true);
+    const mine = seen.find((request) => request.messages.some((message) => typeof message.content === "string" && message.content.includes("mark-5a-drop")));
+    expect(mine?.chat_template_kwargs?.enable_thinking).toBe(false);
     expect(pieces.every((p) => p.channel === "text")).toBe(true);
     expect(pieces.map((p) => p.text).join("")).toBe("Hi there.");
-    expect(JSON.stringify(seen[0])).not.toContain("dropReasoning");
+    expect(JSON.stringify(mine)).not.toContain("dropReasoning");
   });
 
   test("complete() returns reasoning beside plain text, and dropReasoning removes it", async () => {
-    const kept = await withEngine({ reasoning: "carry the two", reply: "408." }, () => complete("chat", [{ role: "user", content: "17 times 24" }], { thinking: true, returnReasoning: true }));
+    const kept = await withEngine({ reasoning: "carry the two", reply: "408." }, () => complete("chat", [{ role: "user", content: "17 times 24" }], { thinking: true, returnReasoning: true }), true);
     expect(kept.ok && kept.value.text).toBe("408.");
     expect(kept.ok && kept.value.reasoning).toBe("carry the two");
-    const dropped = await withEngine({ reasoning: "carry the two", reply: "408." }, () => complete("chat", [{ role: "user", content: "17 times 24" }], { returnReasoning: true, dropReasoning: true }));
+    const dropped = await withEngine({ reasoning: "carry the two", reply: "408." }, () => complete("chat", [{ role: "user", content: "17 times 24" }], { returnReasoning: true, dropReasoning: true }), true);
     expect(dropped.ok && dropped.value.text).toBe("408.");
     expect(dropped.ok && dropped.value.reasoning).toBeUndefined();
     // A caller that did not ask for reasoning never gets it, so a route
     // that returns the value as-is cannot carry unchecked reasoning.
-    const unasked = await withEngine({ reasoning: "carry the two", reply: "408." }, () => complete("chat", [{ role: "user", content: "17 times 24" }], { thinking: true }));
+    const unasked = await withEngine({ reasoning: "carry the two", reply: "408." }, () => complete("chat", [{ role: "user", content: "17 times 24" }], { thinking: true }), true);
     expect(unasked.ok && unasked.value.reasoning).toBeUndefined();
   });
 });
