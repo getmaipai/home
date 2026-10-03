@@ -114,7 +114,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // way it reads a persisted one, so "context reads no table" for a
   // temporary chat is buildConversationWindow()'s own property, not
   // something this node has to special-case).
-  const window = buildConversationWindow(conversation);
+  const window = buildConversationWindow(conversation, { supersedes: state.supersedes });
   for (const message of window.messages) {
     // ContextItem has no role field (the contract's own shape); the
     // window's real user/assistant/tool ordering is real signal
@@ -168,11 +168,9 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       queryVector,
       withholdSensitive,
       anonymous,
-      // #88's own excludeSource (an edited turn's own resend): no
-      // supersede concept exists on the new path yet, so nothing to
-      // exclude - the option rides along so a later edit-and-resend
-      // build only has to supply a value here, never re-wire the call.
-      excludeSource: undefined,
+      // #88's own excludeSource (THIN-7C): an edited turn's own resend never
+      // recalls what the replaced turn put in memory.
+      excludeSource: state.supersedes,
       // A code review caught this call bumping uses/last_used_at on
       // every one of recall()'s top-20 scored candidates (the default)
       // instead of only the up to MAX_MEMORY_SNIPPETS that actually
@@ -274,11 +272,11 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     const earlierMatches: EpisodeMatch[] = [];
     if (window.droppedOlder) {
       const byFloors = contentTerms(input.utterance).length >= 2 && !isBareSocialTurn(input.utterance)
-        ? recallEpisodes(state.actor, input.utterance, queryVector, { now, withinConversationId: conversation.id, excludeTurnIds: window.turnIds, sides: "user", limit: 2, withholdSensitive, anonymous })
+        ? recallEpisodes(state.actor, input.utterance, queryVector, { now, withinConversationId: conversation.id, excludeTurnIds: state.supersedes ? [...window.turnIds, state.supersedes] : window.turnIds, sides: "user", limit: 2, withholdSensitive, anonymous })
         : [];
       earlierMatches.push(...byFloors.map((m) => ({ ...m, earlierInThisConversation: true })));
       if (ASKS_ABOUT_START_RE.test(input.utterance)) {
-        const first = earliestDroppedTurn(state.actor, conversation.id, window.turnIds, null);
+        const first = earliestDroppedTurn(state.actor, conversation.id, state.supersedes ? [...window.turnIds, state.supersedes] : window.turnIds, state.supersedes ?? null);
         if (first && !earlierMatches.some((m) => m.episode.turnId === first.episode.turnId)) earlierMatches.unshift({ ...first, earlierInThisConversation: true });
       }
     }

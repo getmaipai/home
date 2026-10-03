@@ -199,6 +199,11 @@ export interface TurnState {
    * thinking on. The safety node and the output gate still run, as for every
    * turn; nothing here can skip them. */
   bare?: boolean;
+  /** THIN-7C (getmaipai/home#60, #88): the turn this one replaces (an edited
+   * and resent message), already checked to be a turn of this conversation
+   * (resolveSupersedes()); absent otherwise. The replaced turn leaves the
+   * window, its memories are not recalled, and the stored row records it. */
+  supersedes?: string;
   /** Built from context, never from anything else. */
   messages: LlmMessage[];
   proposals: ActionProposal[];
