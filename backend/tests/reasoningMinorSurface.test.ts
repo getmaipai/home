@@ -52,7 +52,7 @@ async function childMember(owner: TestClient, name = "Bramble"): Promise<{ clien
   return { client, actor };
 }
 
-async function withStubReply<T>(reply: string, fn: (seen: { requests: ChatCompletionRequest[] }) => Promise<T>): Promise<T> {
+async function withStubReply<T>(reply: string, fn: (seen: { requests: ChatCompletionRequest[] }) => Promise<T>, reasoning?: string): Promise<T> {
   __resetLlmSupervisorForTests();
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const seen = { requests: [] as ChatCompletionRequest[] };
@@ -61,6 +61,7 @@ async function withStubReply<T>(reply: string, fn: (seen: { requests: ChatComple
       seen.requests.push(request);
       return reply;
     },
+    ...(reasoning !== undefined ? { scriptedReasoning: () => reasoning } : {}),
   });
   process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
   try {
@@ -105,7 +106,9 @@ describe("POST /api/turn/stream - reasoning never reaches a minor", () => {
 
   test("an adult's typed turn still streams reasoning", async () => {
     const { client } = await owner();
-    await withStubReply(THINK_BLOCK_REPLY, async (seen) => {
+    // THIN-7C (rule 2): the engine splits the reasoning out, so the scripted
+    // engine returns it as its own field, not as an inline think block.
+    await withStubReply("17 times 24 is 408.", async (seen) => {
       const res = await client.post("/api/turn/stream", { text: "what's 17 times 24", thinking: true });
       const events = await readNdjson(res);
       expect(seen.requests[0]?.chat_template_kwargs?.enable_thinking).toBe(true);
@@ -113,7 +116,7 @@ describe("POST /api/turn/stream - reasoning never reaches a minor", () => {
       expect(reasoningText).toBe("carry the two");
       const deltaText = events.filter((e) => e.type === "delta").map((e) => e.text ?? "").join("");
       expect(deltaText).toBe("17 times 24 is 408.");
-    });
+    }, "carry the two");
   });
 
   // Belt and braces: the client is never trusted for this, so the model

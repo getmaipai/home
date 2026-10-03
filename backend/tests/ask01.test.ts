@@ -14,7 +14,8 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurn, runTurnStream } from "@/lib/turnEngine";
+import { streamTurnEvents } from "@/routes/turn";
 import { getPendingAsk, resolveOrCreateConversation, listOpenQuestions, queueOpenQuestion, turnSubjectsOf } from "@/lib/conversationHistory";
 import { ensureSubjectEntity, subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { remember } from "@/lib/memory";
@@ -107,10 +108,16 @@ describe("the engine's ask about a name it has never heard", () => {
   });
 
   test("streaming path: the question is the last delta before done, and the done value carries it", async () => {
-    const { client } = await owner();
+    // THIN-7C: the unknown-name ask (ASK-01) is old-engine behaviour with no port
+    // on the one path yet (a decision for THIN-7D), so this drives the old
+    // engine's stream directly instead of through the route, which now runs
+    // the turn machine.
+    const { actor } = await owner();
     await withChat("Sounds like a fun weekend.", async () => {
-      const res = await client.post("/api/turn/stream", { text: "Clover borrowed our tent for the weekend" });
-      const events = await readNdjson(res);
+      const stream = await runTurnStream(actor, "chat", "Clover borrowed our tent for the weekend");
+      if (!stream.ok || stream.kind !== "stream") throw new Error("expected a stream result");
+      const events: Array<{ type: string; text?: string; value?: unknown }> = [];
+      for await (const event of streamTurnEvents(stream, actor.id)) events.push(event as { type: string; text?: string; value?: unknown });
       const deltas = events.filter((e) => e.type === "delta").map((e) => e.text);
       expect(deltas[deltas.length - 1]).toBe(" Who's Clover?");
       const done = events.find((e) => e.type === "done")!.value as { reply: { text: string }; conversation_id: string };

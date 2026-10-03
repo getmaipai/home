@@ -4123,7 +4123,9 @@ describe("POST /api/turn/stream", () => {
     });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/x-ndjson");
-    const events = await readNdjson(res);
+    // THIN-7C: the one path adds status lines (live "thinking" text); the events
+    // that mattered before stay, in order.
+    const events = (await readNdjson(res)).filter((e) => e.type !== "status");
     expect(events).toHaveLength(3);
     expect(events[0]?.type).toBe("turn_meta");
     expect(events[0]?.conversation_id).toBeTruthy();
@@ -4242,40 +4244,35 @@ describe("POST /api/turn/stream", () => {
     async function firstTurnId(res: Response): Promise<string> {
       const reader = res.body!.getReader();
       const next = await reader.read();
-      const event = JSON.parse(new TextDecoder().decode(next.value).trim()) as { type: string; turn_id?: string };
+      const event = JSON.parse(new TextDecoder().decode(next.value).trim().split("\n")[0]!) as { type: string; turn_id?: string };
       expect(event.type).toBe("turn_meta");
       expect(event.turn_id).toBeTruthy();
       return event.turn_id!;
     }
 
+    // THIN-7C: the turn machine asks the Stack, so a slow turn is the default
+    // scripted Stack's own delayed stream; nothing to start or stop here.
     async function slowStub() {
-      __resetLlmSupervisorForTests();
-      // These assertions exercise the already-running URL override
-      // directly. Clearing the preload's scripted Stack keeps its eager
-      // streaming adapter from waiting for the scripted reply before the
-      // route can deliver turn_meta.
-      __setStackClientForTests(null);
-      const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-      let release: () => void = () => {};
-      const gate = new Promise<void>((resolve) => { release = resolve; });
-      const stub = startStubLlmServer(0, { scriptedChatReply: async () => { await gate; return "A delayed answer."; } });
-      process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-      return { stub, release, cleanup: async () => { await stub.stop(); delete process.env.MAIPAI_LLAMA_SERVER_URL; __resetLlmSupervisorForTests(); __resetStackEngineForTests(); } };
+      return { release: () => {}, cleanup: async () => {} };
     }
 
     test("cancels an in-flight stream and aborts the upstream request", async () => {
       const { client } = await owner();
       const scriptedStack = (await import("./stackFixture")).getDefaultScriptedStack();
       const priorAborts = scriptedStack.aborted();
+      const priorRequests = scriptedStack.calls.filter((call) => call === "POST /v1/chat/completions").length;
       __resetLlmSupervisorForTests();
       try {
         const streamResponse = await client.post("/api/turn/stream", { text: "wait for me" });
         expect(streamResponse.status).toBe(200);
         const reader = streamResponse.body!.getReader();
         const first = await reader.read();
-        const firstEvent = JSON.parse(new TextDecoder().decode(first.value).trim()) as { type: string; turn_id?: string };
+        const firstEvent = JSON.parse(new TextDecoder().decode(first.value).trim().split("\n")[0]!) as { type: string; turn_id?: string };
         expect(firstEvent.type).toBe("turn_meta");
         expect(firstEvent.turn_id).toBeTruthy();
+        // The upstream request only exists once the machine reaches the model; cancel after that.
+        const requested = Date.now() + 5_000;
+        while (scriptedStack.calls.filter((call) => call === "POST /v1/chat/completions").length === priorRequests && Date.now() < requested) await new Promise((resolve) => setTimeout(resolve, 10));
         const cancelResponse = await client.post(`/api/turn/${firstEvent.turn_id}/cancel`, {});
         expect(cancelResponse.status).toBe(200);
         expect(await cancelResponse.json()).toEqual({ cancelled: true });
@@ -4302,7 +4299,7 @@ describe("POST /api/turn/stream", () => {
       const { client } = await owner();
       const slow = await slowStub();
       try {
-        const first = await client.post("/api/turn/stream", { text: "cancel twice" });
+        const first = await client.post("/api/turn/stream", { text: "cancel twice, wait for me" });
         const turnId = await firstTurnId(first);
         expect(await (await client.post(`/api/turn/${turnId}/cancel`, {})).json()).toEqual({ cancelled: true });
         expect(await (await client.post(`/api/turn/${turnId}/cancel`, {})).json()).toEqual({ cancelled: false });
@@ -4317,7 +4314,7 @@ describe("POST /api/turn/stream", () => {
       await childClient.post("/api/auth/select", { personId: child.id });
       const slow = await slowStub();
       try {
-        const stream = await childClient.post("/api/turn/stream", { text: "this is mine" });
+        const stream = await childClient.post("/api/turn/stream", { text: "this is mine, wait for me" });
         const turnId = await firstTurnId(stream);
         expect((await client.post(`/api/turn/${turnId}/cancel`, {})).status).toBe(403);
       } finally { slow.release(); await slow.cleanup(); }
@@ -4407,6 +4404,7 @@ describe("POST /api/turn/stream", () => {
       try {
         const res = await client.post("/api/turn/stream", { text: "remember that the wifi password is on the fridge", ephemeral: true });
         expect(res.status).toBe(200);
+        await readNdjson(res); // the row is written when the stream ends
         expect(db.select().from(conversationTurns).all().length).toBe(before + 1);
         expect(warnSpy.mock.calls.some((args) => String(args[0]).includes("ephemeral requested for a non-widget utterance"))).toBe(true);
       } finally {
@@ -4437,6 +4435,7 @@ describe("POST /api/turn/stream", () => {
       const before = db.select().from(conversationTurns).all().length;
       const res = await client.post("/api/turn/stream", { text: "remember that today is trash day", ephemeral: true });
       expect(res.status).toBe(200);
+      await readNdjson(res); // the row is written when the stream ends
       expect(db.select().from(conversationTurns).all().length).toBe(before + 1);
     });
   });
@@ -4807,7 +4806,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     fn: (stub: { url: string; stop: () => void }) => Promise<T>,
   ): Promise<T> {
     __resetLlmSupervisorForTests();
-    __setStackClientForTests(null);
+    // THIN-7C: the route runs the turn machine, which asks the Stack for the engine; the scripted Stack stays and the URL seam points it at the stub.
     const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
     const stub = startStubLlmServer(0, opts);
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
@@ -4919,7 +4918,8 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
       async () => {
         const res = await client.post("/api/turn/stream", { text: "who won the 1998 world cup" });
         expect(res.status).toBe(200);
-        const events = await readNdjson(res);
+        // THIN-7C: status lines are additive on the one path; the order of the rest is the contract.
+        const events = (await readNdjson(res)).filter((e) => e.type !== "status");
         const types = events.map((e) => e.type);
         expect(types[0]).toBe("turn_meta");
         expect(types[1]).toBe("signal");
@@ -4937,7 +4937,7 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     const { client } = await owner();
     await withStub({ scriptedChatReply: () => "Instant answer. Nothing to wait for." }, async () => {
       const res = await client.post("/api/turn/stream", { text: "good morning, how is it going" });
-      const events = await readNdjson(res);
+      const events = (await readNdjson(res)).filter((e) => e.type !== "status");
       expect(events.some((e) => e.type === "spoken_cue")).toBe(false);
       expect(events[0]?.type).toBe("turn_meta");
       expect(events[1]?.type).toBe("signal");
@@ -4951,118 +4951,44 @@ describe("FAST-04: literal patterns before the embed, a stream that starts befor
     await withStub(
       {
         scriptedToolCalls: (request) =>
-          request.tools?.length ? [{ id: "call-1", type: "function", function: { name: "remember", arguments: '{"fact":"Friday is pizza night"}' } }] : undefined,
+          request.tools?.length && request.tool_choice !== "none" ? [{ id: "call-1", type: "function", function: { name: "remember", arguments: '{"fact":"Friday is pizza night"}' } }] : undefined,
+        scriptedChatReply: () => "Got it, Friday is pizza night.",
       },
       async () => {
         // Not starting with "remember", so the literal pattern misses
         // and the turn reaches Tier 2 with `remember` offered.
         const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, can you remember that for me" });
         expect(res.status).toBe(200);
-        const events = await readNdjson(res);
-        expect(events.map((e) => e.type)).toEqual(["turn_meta", "signal", "status", "done"]);
-        const value = events[3]!.value as { source: string; plugin_id?: string; routing?: { tier: string }; reply: { text: string; speech?: string } };
+        // THIN-7C: status lines and the machine's tool events (no "type") are additive.
+        const events = (await readNdjson(res)).filter((e) => e.type !== "status" && e.type !== undefined);
+        // The model phrases the confirmation, so it streams as deltas before the one done.
+        const types = events.map((e) => e.type);
+        expect(types.slice(0, 2)).toEqual(["turn_meta", "signal"]);
+        expect(types.filter((t) => t === "done")).toHaveLength(1);
+        expect(types[types.length - 1]).toBe("done");
+        expect(types.slice(2, -1).every((t) => t === "delta")).toBe(true);
+        const value = events[events.length - 1]!.value as { source: string; plugin_id?: string; routing?: { tier: string }; reply: { text: string; speech?: string } };
         expect(value.source).toBe("plugin");
         expect(value.plugin_id).toBe("remember");
+        // The one path phrases the confirmation with the model (rule 1), so the
+        // reply is the scripted phrasing, not the package's fixed variants.
+        expect(value.reply.text).toBe("Got it, Friday is pizza night.");
         expect(value.routing?.tier).toBe("tool");
-        expect(REMEMBER_CONFIRM_VARIANTS).toContain(value.reply.text);
         expect(turnActiveWithin(0)).toBe(false); // the lease released exactly once, on the stream's own exhaustion
       },
     );
   });
 
-  test("a resolved package reply is never cut by the guards: '72 degrees in Boston' with no grounding in the utterance arrives intact", async () => {
-    const { actor, client } = await owner();
-    // Stored where the turn's own recall() will NOT find it (no shared
-    // words with the utterance below), so the guard context grounds none
-    // of it; the sentence is an attributed quote (FAST-05: the household
-    // shape the invention guard still owns; a bare number or place name
-    // alone no longer counts), so streamed as model text it would be an
-    // invention-guard cut. The `recall` package's own recipe finds it by
-    // topic and returns it as the reply.
-    const stored = remember(actor, { text: "Your brother said it is 72 degrees in Boston", category: "fact", tier: "durable", scope: "person", person: actor.id, source: "test", importance: 0.8 });
-    expect(stored.ok).toBe(true);
-    // Close to recall's own routing.examples (so the stub's scorer offers
-    // it as a Tier 2 tool) without matching its literal patterns, and
-    // sharing no word with the stored fact.
-    const utterance = "what have I told you to remember about the weather";
-    await withStub(
-      {
-        scriptedToolCalls: (request) =>
-          request.tools?.some((t) => t.function.name === "recall")
-            ? [{ id: "call-1", type: "function", function: { name: "recall", arguments: '{"topic":"brother Boston"}' } }]
-            : undefined,
-      },
-      async () => {
-        const res = await client.post("/api/turn/stream", { text: utterance });
-        const events = await readNdjson(res);
-        const done = events.find((e) => e.type === "done");
-        expect(done).toBeTruthy();
-        const value = done!.value as { source: string; plugin_id?: string; reply: { text: string; speech?: string } };
-        expect(value.source).toBe("plugin");
-        expect(value.plugin_id).toBe("recall");
-        expect(value.reply.text).toContain("72 degrees in Boston");
-        // The speech string spells the number (finalizeReply()'s
-        // normalizeForSpeech), which is that feature working, not a cut.
-        expect(value.reply.speech).toContain("seventy-two degrees in Boston");
-        expect(events.some((e) => e.type === "delta")).toBe(false);
-        // The same sentence, streamed as model text against the same
-        // context, IS cut - the proof the resolved path skipped a gate
-        // that would otherwise have fired, not that the gate is lax.
-        const guarded = guardReply(value.reply.text, { utterance, personId: actor.id });
-        expect(guarded.reason).toBe("invention");
-      },
-    );
-  });
-
-  test("the engine failing on the first request itself (after turn_meta is out) emits an error event with code 'unavailable', and the turn is marked finished", async () => {
-    const { client } = await owner();
-    await withStub({ scriptedChatReply: () => "Warm-up reply." }, async (stub) => {
-      // One turn caches the chat client, so the next startCompleteStream()
-      // succeeds; then the engine goes away, so that turn's first token
-      // fetch fails before any header - the failure lands on the
-      // stream's first step, never as an HTTP status.
-      const warm = await client.post("/api/turn/stream", { text: "good morning, how is it going" });
-      expect(warm.status).toBe(200);
-      await readNdjson(warm);
-      await stub.stop();
-      const res = await client.post("/api/turn/stream", { text: "good morning, how is it going" });
-      expect(res.status).toBe(200);
-      const events = await readNdjson(res);
-      expect(events[0]?.type).toBe("turn_meta");
-      const error = events.find((e) => e.type === "error") as { type: string; error: string; code?: string } | undefined;
-      expect(error?.code).toBe("unavailable");
-      expect(error?.error).toContain("chat model unavailable");
-      expect(events.some((e) => e.type === "done")).toBe(false);
-      expect(turnActiveWithin(0)).toBe(false);
-    });
-  });
-
-  test("every proposed call failing and the retry finding the engine gone emits an error event with code 'unavailable', and the turn is marked finished", async () => {
-    const { client } = await owner();
-    await withStub(
-      {
-        scriptedToolCalls: (request) => {
-          if (!request.tools?.length) return undefined;
-          // Point the URL seam at a closed endpoint between the tool
-          // decision and the tool-free retry. The cached external client
-          // is dropped, without asking Home to stop a process it does not own.
-          process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1";
-          __resetLlmSupervisorForTests();
-          return [{ id: "call-1", type: "function", function: { name: "remember", arguments: "{}" } }]; // fails remember's own args schema, so the batch is all-failed
-        },
-      },
-      async () => {
-        const res = await client.post("/api/turn/stream", { text: "Friday is pizza night, can you remember that for me" });
-        expect(res.status).toBe(200); // turn_meta was already committed
-        const events = await readNdjson(res);
-        expect(events[0]?.type).toBe("turn_meta");
-        const error = events.find((e) => e.type === "error") as { type: string; error: string; code?: string } | undefined;
-        expect(error?.code).toBe("unavailable");
-        expect(events.some((e) => e.type === "done")).toBe(false);
-        expect(turnActiveWithin(0)).toBe(false);
-      },
-    );
-  });
+  // THIN-7C (rule 12, retired in writing): three route-level tests of the old
+  // path left with it. "A resolved package reply is never cut by the guards"
+  // drove the recall package as a model tool call, and memory reaches the
+  // model as injected context, never as a tool (rule 1), so there is no
+  // resolved recall reply to protect. The two engine-failure tests ("the
+  // engine failing on the first request itself" and "every proposed call
+  // failing and the retry finding the engine gone") asserted the old stream's
+  // 'unavailable' error event; the one path's engine failures are proven in
+  // tests/turnMachine/turnNext.test.ts (engine_unavailable on a blocking turn
+  // and on the live stream, no assistant turn stored, the lease released).
 });
 
 describe("step 2: person-scoped remember and provenance (via the real remember plugin)", () => {

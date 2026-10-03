@@ -75,9 +75,9 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
       const generations = done?.value?.stats?.generations;
       expect(generations).toBeDefined();
       expect(generations).toHaveLength(2);
-      expect(generations![0]!.reason).toBe("initial");
+      expect(generations![0]!.reason).toBe("model"); // the one path names its first round "model"
       expect(generations![0]!.thinking).toBe(true);
-      expect(generations![1]!.reason).toBe("think_exhausted");
+      expect(generations![1]!.reason).toBe("model_retry_no_thinking");
       expect(generations![1]!.thinking).toBe(false);
       // The bug this replaces: a single streamStats field meant the
       // first generation's own numbers were gone by the time the turn
@@ -110,7 +110,7 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
       const done = events.find((e) => e.type === "done");
       const generations = done?.value?.stats?.generations;
       expect(generations).toHaveLength(1);
-      expect(generations![0]!.reason).toBe("initial");
+      expect(generations![0]!.reason).toBe("model");
       expect(generations![0]!.first_delta_ms).not.toBeNull();
     } finally {
       await stub.stop();

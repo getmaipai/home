@@ -491,9 +491,11 @@ async function recoveredMissingCall(state: TurnState, messages: LlmMessage[], ut
   return { outcome: { ok: true, required_miss: true }, output: { kind: "tool_calls", calls: [...otherCalls, queryWriterCall], reasoning, queryWriterUsed: true } };
 }
 
-/** THIN-7C: a bare turn and a continuation never offer a tool. */
+/** THIN-7C: a bare turn and a continuation never offer a tool. A turn in the
+ * crisis state offers none either (the old path's SAFETY-01 rule; the policy
+ * node's crisis_state refusal stays as the second lock). */
 function noToolsTurn(state: TurnState): boolean {
-  return state.bare === true || state.continuation !== undefined;
+  return state.bare === true || state.continuation !== undefined || state.crisis === true;
 }
 
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {

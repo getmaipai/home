@@ -15,7 +15,7 @@ import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome, DocumentTurnAttachment } from "@/lib/turnShared";
 import type { TurnValue } from "@/wire";
 import { attachDocuments } from "./documents";
-import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
+import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
@@ -129,7 +129,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
   // THIN-0E (#85): a refused stream's result is the whole-reply check
   // (it carries an earlier delivered sentence's self_harm category), so
   // it wins over the last sentence's own flag.
-  const inputCrisisLine = state.crisis ? "If you or someone you know is in crisis, help is available. Call or text 988 (US) any time." : undefined;
+  const inputCrisisLine = state.crisis ? CRISIS_RESOURCES_TEXT : undefined;
   const gated = state.streamGate?.result();
   // THIN-0M: a reply refused as a whole (blocking, or a streamed reply
   // held as an envelope) leaves its check on state.outputSafety instead.

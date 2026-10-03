@@ -535,16 +535,23 @@ export async function* streamTurnEvents(
     let pendingStatus = statusWake();
     const firstStep = iterator.next();
     const timer = delay(remainingDelayMs);
-    const race = await Promise.race([firstStep, pendingStatus, timer.promise]);
+    // A status line wakes the race without ending the wait: the cue's timer
+    // keeps running, so a slow first token still gets its cue (THIN-7C: every
+    // turn now carries status lines, which used to cancel the timer).
+    let race = await Promise.race([firstStep, pendingStatus, timer.promise]);
+    while (race === "status") {
+      yield* sideEvents();
+      pendingStatus = statusWake();
+      race = await Promise.race([firstStep, pendingStatus, timer.promise]);
+    }
     timer.cancel();
-    if (race === "status") { yield* sideEvents(); pendingStatus = statusWake(); }
     if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: cue }; }
     // THIN-5B: while the first answer piece is still coming, side events
     // (live reasoning, status lines) keep going out as they are emitted, so
     // an adult's reasoning is shown while the model is still thinking
     // rather than all at once when the answer starts.
     let current = race as Exclude<typeof race, "status" | "timeout">;
-    if (race === "timeout" || race === "status") {
+    if (race === "timeout") {
       let waited = await Promise.race([firstStep, pendingStatus]);
       while (waited === "status") {
         yield* sideEvents();
