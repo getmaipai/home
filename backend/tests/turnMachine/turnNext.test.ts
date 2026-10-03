@@ -139,8 +139,8 @@ describe("turnNext.ts: the interim rule", () => {
   test("search succeeds, then a dead model returns a typed status and writes no turn", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
-    const original = llm.startCompleteStream.bind(llm);
-    const failure = spyOn(llm, "startCompleteStream").mockImplementation(async (...args) => {
+    const original = llm.startCompleteStreamPieces.bind(llm);
+    const failure = spyOn(llm, "startCompleteStreamPieces").mockImplementation(async (...args) => {
       if (args[1].some((message) => message.role === "tool")) return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: could not reach local engine" };
       return original(...args);
     });
@@ -167,8 +167,8 @@ describe("turnNext.ts: the interim rule", () => {
   test("the live streaming turn emits engine_unavailable and stores no assistant turn", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
-    const original = llm.startCompleteStream.bind(llm);
-    const failure = spyOn(llm, "startCompleteStream").mockImplementation(async (...args) => {
+    const original = llm.startCompleteStreamPieces.bind(llm);
+    const failure = spyOn(llm, "startCompleteStreamPieces").mockImplementation(async (...args) => {
       if (args[1].some((message) => message.role === "tool")) return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: could not reach local engine" };
       return original(...args);
     });
@@ -3259,15 +3259,15 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
      * aborts (`mode: "cancel"`, the identical `chat model unavailable:
      * ...` wrapping llm.ts's own startCompleteStream() gives a genuinely
      * aborted fetch, client.ts's own catch). Either way this is exactly
-     * the `AsyncGenerator<string, ToolCall[] | undefined, void>` shape
-     * startCompleteStream() itself returns - the mock stands in for the
+     * the `AsyncGenerator<LlmStreamPiece, ToolCall[] | undefined, void>` shape
+     * startCompleteStreamPieces() itself returns - the mock stands in for the
      * LLM client boundary alone; every node above it (model.ts's own
      * gate wiring, the machine, turnNext.ts, streamTurnEvents()) runs
      * unmodified and for real. */
     function mockFailingStream(mode: "throw" | "cancel"): ReturnType<typeof spyOn> {
-      return spyOn(llm, "startCompleteStream").mockImplementation(async (_role, _messages, _opts, signal) => {
-        async function* tokens(): AsyncGenerator<string, undefined, void> {
-          for (const word of FIRST_SENTENCE.split(" ")) yield `${word} `;
+      return spyOn(llm, "startCompleteStreamPieces").mockImplementation(async (_role, _messages, _opts, signal) => {
+        async function* tokens(): AsyncGenerator<llm.LlmStreamPiece, undefined, void> {
+          for (const word of FIRST_SENTENCE.split(" ")) yield { channel: "text", text: `${word} ` };
           if (mode === "throw") throw new Error("chat model unavailable: stub engine crashed mid-stream");
           await new Promise<void>((_resolve, reject) => {
             const fail = () => reject(new Error("chat model unavailable: The operation was aborted."));
@@ -3275,7 +3275,7 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
             else signal?.addEventListener("abort", fail, { once: true });
           });
         }
-        return { ok: true, tokens: tokens(), stats: { usage: null, timings: null, stopReason: null } };
+        return { ok: true, pieces: tokens(), stats: { usage: null, timings: null, stopReason: null } };
       });
     }
 
@@ -3470,8 +3470,8 @@ describe("turnNext.ts: the memory judge and the default path (THIN-0C)", () => {
     __resetTurnActivityForTests();
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
-    const original = llm.startCompleteStream.bind(llm);
-    const failure = spyOn(llm, "startCompleteStream").mockImplementation(async (...args) => {
+    const original = llm.startCompleteStreamPieces.bind(llm);
+    const failure = spyOn(llm, "startCompleteStreamPieces").mockImplementation(async (...args) => {
       if (args[1].some((message) => message.role === "tool")) return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: could not reach local engine" };
       return original(...args);
     });

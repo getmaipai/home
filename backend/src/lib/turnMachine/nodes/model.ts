@@ -4,7 +4,7 @@
 // decides whether a turn needs a search or a tool; no signal field, word
 // rule or list does), streamed so the wire's own `reasoning`/`delta` events
 // come from the same call turnNext.ts forwards to the client.
-import { startCompleteStream, envelopeToolCall } from "@/lib/llm";
+import { startCompleteStreamPieces, envelopeToolCall } from "@/lib/llm";
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
@@ -213,7 +213,11 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   // own text.
   const gate = state.streamGate;
   gate?.reset();
-  const started = await startCompleteStream("chat", messages, { model: state.modelId, tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens }, signal);
+  // THIN-5A (rule 2): a turn that shows no reasoning (a minor, a spoken or
+  // non-chat surface, an unidentified speaker) asks the engine for none and
+  // the engine client drops whatever comes back anyway, so it is never held,
+  // checked or stored here.
+  const started = await startCompleteStreamPieces("chat", messages, { model: state.modelId, tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens, dropReasoning: !state.reasoning.emit }, signal);
   if (!started.ok) {
     // GENFAIL-01 (dev.md "generation_failed is never blind again"): a
     // failed attempt used to leave no generation record at all (the
@@ -235,7 +239,10 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
 
   const requestSentMs = Date.now();
   let firstDeltaMs: number | null = null;
+  // THIN-5A: the engine's own two channels, kept apart end to end. `raw`
+  // is `content` only.
   let raw = "";
+  let nativeReasoning = "";
   let toolCalls: ToolCall[] | undefined;
   // STREAM-NEXT-01 (b), ruling point 5: reasoning is never streamed -
   // split live exactly as routes/turn.ts's own streamTurnEvents() does
@@ -248,15 +255,19 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   const thinkSplit = gate ? newThinkSplitState() : undefined;
   try {
     for (;;) {
-      const step = await started.tokens.next();
+      const step = await started.pieces.next();
       if (step.done) {
         toolCalls = step.value;
         break;
       }
       if (firstDeltaMs === null) firstDeltaMs = Date.now() - requestSentMs;
-      raw += step.value;
+      if (step.value.channel === "reasoning") {
+        nativeReasoning += step.value.text;
+        continue;
+      }
+      raw += step.value.text;
       if (gate && thinkSplit) {
-        for (const span of feedThinkSplit(thinkSplit, step.value)) if (!span.reasoning) gate.push(span.text);
+        for (const span of feedThinkSplit(thinkSplit, step.value.text)) if (!span.reasoning) gate.push(span.text);
       }
     }
   } catch (err) {
@@ -312,7 +323,7 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   // later read of the trace needs to tell apart from a real query.
   const websearchRawArgs = toolCalls?.find((c) => c.tool === "websearch")?.rawArgs ?? null;
   state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: websearchRawArgs, envelopeParsed });
-  return { ok: true, text: visible, reasoning: extractReasoningText(raw), toolCalls, thinking };
+  return { ok: true, text: visible, reasoning: nativeReasoning || extractReasoningText(raw), toolCalls, thinking };
 }
 
 /** ENGINE-CONTRACT-02's builder row, shared by every path that reaches
@@ -421,19 +432,19 @@ type QueryWriterResult = { ok: true; expression: string | null } | { ok: false; 
  * this whole call only ever runs on an already-rare required-call
  * miss to begin with. */
 async function runQueryWriter(messages: LlmMessage[], signal: AbortSignal, modelId?: string): Promise<QueryWriterResult> {
-  const started = await startCompleteStream(
+  const started = await startCompleteStreamPieces(
     "chat",
     [...messages, { role: "user", content: QUERY_WRITER_INSTRUCTION }],
-    { model: modelId, response_format: { type: "json_schema", json_schema: QUERY_WRITER_SCHEMA }, thinking: false, max_tokens: QUERY_WRITER_MAX_TOKENS },
+    { model: modelId, response_format: { type: "json_schema", json_schema: QUERY_WRITER_SCHEMA }, thinking: false, dropReasoning: true, max_tokens: QUERY_WRITER_MAX_TOKENS },
     signal,
   );
   if (!started.ok) return { ok: false, code: started.code, message: boundedGenerationError(started.error) };
   let text = "";
   try {
     for (;;) {
-      const step = await started.tokens.next();
+      const step = await started.pieces.next();
       if (step.done) break;
-      text += step.value;
+      if (step.value.channel === "text") text += step.value.text;
     }
   } catch (err) {
     // GENFAIL-01's own code for this exact phase (an established stream
@@ -613,7 +624,10 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // cost control since the reasoning span would be consumed and
   // dropped below regardless (see `reasoning` a few lines down).
   const minorThinkingOff = state.reasoning.withheld_for === "minor" && !state.budget.thinking_for_minors;
-  const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff;
+  // THIN-5A: a turn that shows no reasoning never asks the engine to think
+  // (llm.ts forces it off with dropReasoning), so the reply ceiling, the
+  // record and the empty-reply retry all see the effective flag.
+  const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : "model", signal);
   // DEADLINE-01: a generation that never finished (the model node's own

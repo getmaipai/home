@@ -83,15 +83,16 @@ async function withScriptedReasoning<T>(
 }
 
 describe("REASONING-01: reasoning_content synthesis", () => {
-  test("complete() wraps a scripted reasoning_content into <think>...</think> ahead of the content", async () => {
+  test("complete() carries a scripted reasoning_content as its own field, never wrapped into the text (THIN-5A)", async () => {
     const result = await withScriptedReasoning(
       () => "carry the two",
       () => "17 times 24 is 408.",
-      () => complete("chat", [{ role: "user", content: "what's 17 times 24" }], { thinking: true }),
+      () => complete("chat", [{ role: "user", content: "what's 17 times 24" }], { thinking: true, returnReasoning: true }),
     );
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.text).toBe("<think>carry the two</think>17 times 24 is 408.");
+    expect(result.value.text).toBe("17 times 24 is 408.");
+    expect(result.value.reasoning).toBe("carry the two");
   });
 
   test("complete() with no scripted reasoning is unaffected (an engine/template that never separates it)", async () => {
@@ -105,7 +106,7 @@ describe("REASONING-01: reasoning_content synthesis", () => {
     expect(result.value.text).toBe("17 times 24 is 408.");
   });
 
-  test("startCompleteStream() yields the identical synthesized shape as deltas", async () => {
+  test("startCompleteStream() (the old path's facade) still yields the think-tagged shape as deltas", async () => {
     const deltas = await withScriptedReasoning(
       () => "carry the two",
       () => "17 times 24 is 408.",
@@ -126,18 +127,22 @@ describe("REASONING-01: reasoning_content synthesis", () => {
   // as ordinary visible delta, never gated by a minor's own
   // dropReasoning check downstream (which only ever filters spans
   // already tagged reasoning).
-  test("a literal </think> inside reasoning_content is neutralized, never closes the block early", async () => {
-    const result = await withScriptedReasoning(
+  test("the old path's facade neutralizes a literal </think> inside reasoning_content, never closing the block early", async () => {
+    const text = await withScriptedReasoning(
       () => "the syntax </think> ends a block, but I'm still reasoning",
       () => "17 times 24 is 408.",
-      () => complete("chat", [{ role: "user", content: "what's 17 times 24" }], { thinking: true }),
+      async () => {
+        const started = await startCompleteStream("chat", [{ role: "user", content: "what's 17 times 24" }], { thinking: true });
+        if (!started.ok) throw new Error(started.error);
+        let collected = "";
+        for await (const delta of started.tokens) collected += delta;
+        return collected;
+      },
     );
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
     // Exactly one real close tag (the synthesized one at the end of
     // reasoning), not a spurious early one from the injected text.
-    expect(result.value.text.match(/<\/think>/gi)?.length).toBe(1);
-    expect(result.value.text).toBe("<think>the syntax /think ends a block, but I'm still reasoning</think>17 times 24 is 408.");
+    expect(text.match(/<\/think>/gi)?.length).toBe(1);
+    expect(text).toBe("<think>the syntax /think ends a block, but I'm still reasoning</think>17 times 24 is 408.");
   });
 });
 

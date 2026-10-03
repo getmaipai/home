@@ -20,6 +20,7 @@ import type { ChatRole, ChatCompletionRequest, ChatCompletionChunk, ToolDefiniti
 import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 import { seedFields } from "@/lib/benchSampling";
+import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
 import { isStackRoleEnabled, getStackClient, recordStackChatIdentity, stackFailureResult, resolveStackOffline, type StackFailureResult } from "@/lib/stackEngine";
 import { identityFromHeaders } from "@/lib/stack/client";
 import type { RoleRequest } from "@/lib/stack/types";
@@ -94,6 +95,18 @@ export interface LlmCompleteOptions {
    * unbuilt research problem (a router role, 4.11's other deferred role),
    * not something to improvise as a side effect of this slice. */
   thinking?: boolean;
+  /** THIN-5A (docs/design/RULES.md rule 2): a minor's request, a spoken
+   * turn or any surface with nowhere to show reasoning. Sets thinking
+   * off on the request and drops any reasoning the engine returns
+   * anyway, here at the engine client, so it never reaches a caller to
+   * be stored. Never sent to the engine. */
+  dropReasoning?: boolean;
+  /** THIN-5A: complete() hands back the engine's reasoning only to a
+   * caller that asks for it (the old path's re-wrap seam). Every other
+   * caller (routes/llm.ts, the judges, the package host) gets `text`
+   * alone, so a response body can never carry reasoning that was not
+   * safety-checked with the text. Never sent to the engine. */
+  returnReasoning?: boolean;
   /** Grammar-constrained structured output (step 6, session-a-
    * intelligence.md): passed straight through to client.chatComplete()
    * (already spreads its whole request object, so no other change is
@@ -237,7 +250,12 @@ export function envelopeToolCall(text: string): ToolCall | undefined {
 }
 
 export interface LlmCompleteValue {
+  /** The engine's `content` only. Reasoning is never folded into it. */
   text: string;
+  /** THIN-5A: the engine's own `reasoning_content`, as its own field
+   * (llama.cpp's `--reasoning-format`). Absent when the engine returned
+   * none, or when the request set `dropReasoning`. */
+  reasoning?: string;
   model: string;
   /** Only set (even to `[]`) when `tools` was offered for this call.
    * `undefined` means tools weren't offered at all; `[]` is the model's
@@ -351,7 +369,7 @@ function chatSamplingFor(opts: { temperature?: number; response_format?: unknown
  * Stack's own /v1/chat/completions) can never drift on what a completion
  * actually asks for. */
 function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
-  const { thinking, tools, tool_choice, ...rest } = opts;
+  const { thinking, dropReasoning, returnReasoning: _returnReasoning, tools, tool_choice, ...rest } = opts;
   const offering = !!tools && tools.length > 0;
   return {
     offering,
@@ -363,7 +381,7 @@ function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
       response_format: offering ? undefined : rest.response_format,
       tools: offering ? tools!.map(toToolDefinition) : undefined,
       tool_choice: offering ? (tool_choice ?? "auto") : undefined,
-      chat_template_kwargs: { enable_thinking: !!thinking },
+      chat_template_kwargs: { enable_thinking: !!thinking && !dropReasoning },
       // ENGINE-CONTRACT-01 (dev.md 2026-09-23): GROUND-01's own live
       // rerun may need one pass with the prompt cache off, to read the
       // grounding bar on the forced rows without llama-server b10797's
@@ -384,38 +402,35 @@ function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
   };
 }
 
+// THIN-5A (docs/design/RULES.md rule 2): reasoning travels as its own
+// field (LlmCompleteValue.reasoning, LlmStreamPiece) from the engine
+// client to the gate. The default turn path never wraps it into `<think>`
+// tags and never splits it out again. The two helpers below exist only
+// for the OLD path (turnEngine.ts, turnBareStream.ts, the OpenAI-style
+// callers), whose pipeline still carries a think block inside its text;
+// they are deleted with that path (rule 12).
+
 // REASONING-01 (a review's own named failure mode): a literal
-// `<think>`/`</think>` substring INSIDE reasoning_content itself (the
-// model reasoning about markup, or an adversarial completion) would
-// otherwise create a spurious boundary once feedThinkSplit() re-parses
-// the synthesized text downstream, misclassifying the remainder as
-// ordinary `delta` - never gated by a minor's own dropReasoning check,
-// which only ever filters spans already tagged `reasoning`. Breaks the
-// tag SHAPE (never alters meaning-bearing text otherwise) before
-// reasoning_content ever reaches the synthesized wrapper; the engine's
-// own already-separated reasoning has no legitimate reason to carry
-// this exact markup, so this is always safe. Never applied to `content`:
-// an engine/template that never separates reasoning legitimately leaks
-// real `<think>` markup INTO content (the fallback shape this file still
-// supports unchanged), and neutralizing content unconditionally would
-// break that case. Exported so stackChatDeltas()'s own per-delta twin
-// case applies the identical neutralization.
+// `<think>`/`</think>` substring INSIDE reasoning_content would create a
+// spurious boundary once the old path re-parses the wrapped text. Breaks
+// the tag SHAPE before reasoning is wrapped; never applied to `content`,
+// where an engine that never separates reasoning legitimately leaks real
+// `<think>` markup.
 const THINK_TAG_RE = /<\/?think>/gi;
 export function neutralizeThinkTags(text: string): string {
   return text.replace(THINK_TAG_RE, (tag) => tag.replace(/[<>]/g, ""));
 }
 
-/** REASONING-01: the non-streaming twin of stackChatDeltas()'s/
- * chatCompleteStream()'s own per-chunk synthesis - a single blocking
- * completion's `message.reasoning_content` (llama.cpp's own
- * `--reasoning-format deepseek`/`auto` split, confirmed live against
- * the pinned b10797 build) wrapped into the identical
- * `<think>...</think>` shape wellFormed.ts's whole downstream contract
- * already expects around it. `undefined`/empty reasoning_content
- * (an engine/template that never separates it, tags already embedded
- * in `content` instead, or reasoning off) returns `content` unchanged. */
-function withSynthesizedThink(content: string, reasoningContent?: string | null): string {
-  return reasoningContent ? `<think>${neutralizeThinkTags(reasoningContent)}</think>${content}` : content;
+/** OLD PATH ONLY (retires with turnEngine.ts's pipeline): the shape that
+ * path's text contract expects, `<think>reasoning</think>content`. */
+export function legacyThinkTagged(content: string, reasoning?: string | null): string {
+  return reasoning ? `<think>${neutralizeThinkTags(reasoning)}</think>${content}` : content;
+}
+
+/** THIN-5A: the one place a blocking completion's `reasoning_content`
+ * becomes `LlmCompleteValue.reasoning`; dropped here for a minor. */
+function reasoningField(reasoning: string | null | undefined, opts: LlmCompleteOptions): { reasoning?: string } {
+  return reasoning && opts.returnReasoning === true && !opts.dropReasoning ? { reasoning } : {};
 }
 
 /** HOME-STACK-02b: role="chat" for every real caller today (turnEngine.ts's
@@ -456,7 +471,7 @@ async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: Llm
     const choice = data.choices?.[0];
     if (!choice) return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
-    return { ok: true, value: { text: withSynthesizedThink(choice.message.content, choice.message.reasoning_content), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+    return { ok: true, value: { text: choice.message.content, ...reasoningField(choice.message.reasoning_content, opts), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
 }
 
 export async function complete(
@@ -500,7 +515,7 @@ export async function complete(
     // offered on this call at all," never conflated with "offered, and
     // declined."
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
-    return { ok: true, value: { text: withSynthesizedThink(choice.message.content, choice.message.reasoning_content), model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+    return { ok: true, value: { text: choice.message.content, ...reasoningField(choice.message.reasoning_content, opts), model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
   } catch (err) {
     recoverFromDeadBackend(err);
     const message = err instanceof LlmClientError ? err.message : (err as Error).message;
@@ -510,6 +525,18 @@ export async function complete(
 
 export type LlmStreamStartResult =
   | { ok: true; tokens: AsyncGenerator<string, ToolCall[] | undefined, void>; stats: ChatCompletionStreamStats }
+  | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string };
+
+/** THIN-5A: one piece of a streamed completion, on the channel the
+ * engine itself put it on: `reasoning` is `delta.reasoning_content`,
+ * `text` is `delta.content`. */
+export interface LlmStreamPiece {
+  channel: "reasoning" | "text";
+  text: string;
+}
+
+export type LlmPiecesStartResult =
+  | { ok: true; pieces: AsyncGenerator<LlmStreamPiece, ToolCall[] | undefined, void>; stats: ChatCompletionStreamStats }
   | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string };
 
 /** Real token-by-token streaming (2026-09-04): validates and resolves a
@@ -544,10 +571,11 @@ export type LlmStreamStartResult =
  * `signal` still aborts on a client disconnect); a genuinely wedged
  * Stack stream is a gap to close in a follow-up, not silently patched
  * over here with an untested port of that machinery too. */
-async function* stackChatDeltas(
+async function* stackChatPieces(
   stream: ReadableStream<Uint8Array>,
   stats: ChatCompletionStreamStats,
-): AsyncGenerator<string, ToolCallWire[] | undefined, void> {
+  dropReasoning: boolean,
+): AsyncGenerator<LlmStreamPiece, ToolCallWire[] | undefined, void> {
   const toolCallsByIndex = new Map<number, { id: string; name: string; args: string }>();
   const assembleToolCalls = (): ToolCallWire[] | undefined =>
     toolCallsByIndex.size === 0
@@ -555,11 +583,11 @@ async function* stackChatDeltas(
       : [...toolCallsByIndex.entries()]
           .sort(([a], [b]) => a - b)
           .map(([, call]) => ({ id: call.id, type: "function" as const, function: { name: call.name, arguments: call.args } }));
-  // REASONING-01: the identical `reasoning_content` -> synthesized
-  // `<think>...</think>` port as chatCompleteStream()'s own twin case -
-  // this function's own header comment already promises "ported here
-  // verbatim," so this stays in sync with that copy rather than drifting.
-  let reasoningOpen = false;
+  // THIN-5A: `delta.reasoning_content` (llama-server's own split, typed
+  // at @maipai/spec llm/ts/types.ts:233-241, ChatCompletionChunkDelta) is
+  // yielded as a reasoning piece and `delta.content` as a text piece. No
+  // tag is synthesized; a minor's request drops reasoning here, so it
+  // never reaches a caller to be stored.
   const reader = stream.getReader();
   for await (const line of readTextLines(reader)) {
     if (!line.startsWith("data:")) continue;
@@ -581,29 +609,9 @@ async function* stackChatDeltas(
     if (finishReason) stats.stopReason = finishReason;
     const delta = chunk.choices?.[0]?.delta;
     const reasoning = delta?.reasoning_content;
-    if (reasoning) {
-      if (!reasoningOpen) {
-        yield "<think>";
-        reasoningOpen = true;
-      }
-      // Never `content` here: an engine/template that never separates
-      // reasoning legitimately leaks real `<think>` markup INTO content
-      // (the fallback shape this whole file still supports unchanged) -
-      // neutralizing content unconditionally would break that case.
-      // reasoning_content, by contrast, is only ever populated by the
-      // engine's own already-separated reasoning; it has no legitimate
-      // reason to carry literal tag markup, so it's always safe (and
-      // necessary, for the dropReasoning gate) to neutralize.
-      yield neutralizeThinkTags(reasoning);
-    }
+    if (reasoning && !dropReasoning) yield { channel: "reasoning", text: reasoning };
     const content = delta?.content;
-    if (content) {
-      if (reasoningOpen) {
-        yield "</think>";
-        reasoningOpen = false;
-      }
-      yield content;
-    }
+    if (content) yield { channel: "text", text: content };
     for (const fragment of delta?.tool_calls ?? []) {
       const existing = toolCallsByIndex.get(fragment.index) ?? { id: "", name: "", args: "" };
       if (fragment.id) existing.id = fragment.id;
@@ -615,12 +623,12 @@ async function* stackChatDeltas(
   return assembleToolCalls();
 }
 
-async function startCompleteStreamViaStack(
+async function openStackPieces(
   role: LlmRole,
   messages: LlmMessage[],
   opts: LlmCompleteOptions,
   signal?: AbortSignal,
-): Promise<LlmStreamStartResult> {
+): Promise<LlmPiecesStartResult> {
   const { offering, body } = chatRequestBody(messages, opts);
   const stats: ChatCompletionStreamStats = { usage: null, timings: null, stopReason: null };
   let stream: ReadableStream<Uint8Array>;
@@ -637,29 +645,81 @@ async function startCompleteStreamViaStack(
   }
   recordStackChatIdentity(identityFromHeaders(headers));
   resolveStackOffline(role);
-  async function* tokens(): AsyncGenerator<string, ToolCall[] | undefined, void> {
+  async function* pieces(): AsyncGenerator<LlmStreamPiece, ToolCall[] | undefined, void> {
     try {
-      const wireToolCalls = yield* stackChatDeltas(stream, stats);
+      const wireToolCalls = yield* stackChatPieces(stream, stats, opts.dropReasoning === true);
       return offering && wireToolCalls && wireToolCalls.length > 0 ? wireToolCalls.map(toolCallFromWire) : undefined;
     } catch (err) {
       throw new Error(`chat model unavailable: ${(err as Error).message}`);
     }
   }
-  return { ok: true, tokens: tokens(), stats };
+  return { ok: true, pieces: pieces(), stats };
 }
 
-export async function startCompleteStream(
+/** OLD PATH ONLY (retires with turnEngine.ts's pipeline, rule 12): folds
+ * the native pieces back into the single think-tagged text stream that
+ * pipeline's contract still expects. */
+async function* thinkTaggedTokens(
+  pieces: AsyncGenerator<LlmStreamPiece, ToolCall[] | undefined, void>,
+): AsyncGenerator<string, ToolCall[] | undefined, void> {
+  let reasoningOpen = false;
+  try {
+    for (;;) {
+      const step = await pieces.next();
+      if (step.done) return step.value;
+      if (step.value.channel === "reasoning") {
+        if (!reasoningOpen) {
+          yield "<think>";
+          reasoningOpen = true;
+        }
+        yield neutralizeThinkTags(step.value.text);
+      } else {
+        if (reasoningOpen) {
+          yield "</think>";
+          reasoningOpen = false;
+        }
+        yield step.value.text;
+      }
+    }
+  } finally {
+    await pieces.return(undefined);
+  }
+}
+
+/** The direct-engine seam (MAIPAI_LLAMA_SERVER_URL, benches and tests
+ * only; Home never spawns an engine) goes through spec's client, which
+ * still yields one think-tagged string stream. This is the only place
+ * that stream is split back into pieces, and it retires with the seam. */
+async function* piecesFromTagged(
+  tokens: AsyncGenerator<string, ToolCall[] | undefined, void>,
+  dropReasoning: boolean,
+): AsyncGenerator<LlmStreamPiece, ToolCall[] | undefined, void> {
+  const split = newThinkSplitState();
+  const toPieces = (spans: ThinkSpan[]): LlmStreamPiece[] =>
+    spans.filter((span) => !(span.reasoning && dropReasoning)).map((span) => ({ channel: span.reasoning ? "reasoning" : "text", text: span.text }));
+  try {
+    for (;;) {
+      const step = await tokens.next();
+      if (step.done) {
+        yield* toPieces(flushThinkSplit(split));
+        return step.value;
+      }
+      yield* toPieces(feedThinkSplit(split, step.value));
+    }
+  } finally {
+    await tokens.return(undefined);
+  }
+}
+
+type LlmTokensStartResult = Extract<LlmStreamStartResult, { ok: true }> | Extract<LlmStreamStartResult, { ok: false }>;
+
+/** The direct-engine seam's token stream (see piecesFromTagged()). */
+async function startDirectTokens(
   role: LlmRole,
   messages: LlmMessage[],
-  opts: LlmCompleteOptions = {},
+  opts: LlmCompleteOptions,
   signal?: AbortSignal,
-): Promise<LlmStreamStartResult> {
-  const invalid = validate(role, messages);
-  if (invalid) return invalid;
-
-  // Streaming follows the same Stack-only routing as complete() above.
-  if (isStackRoleEnabled("chat")) return startCompleteStreamViaStack(role, messages, opts, signal);
-
+): Promise<LlmTokensStartResult> {
   let client;
   try {
     client = await getChatClient();
@@ -676,11 +736,7 @@ export async function startCompleteStream(
   // Fix E: `yield*` delegation both forwards every text delta the inner
   // generator yields AND evaluates to its own return value once it ends
   // (spec/llm/ts/client.ts's own chatCompleteStream(), assembled from
-  // `delta.tool_calls` fragments) - the same pattern turnEngine.ts's
-  // gateGuards()/gateOutputSafety() already use for propagating a
-  // return value through a wrapping generator, just via `yield*` instead
-  // of a manual per-item loop, since nothing here needs to inspect or
-  // transform an individual delta the way those two do.
+  // `delta.tool_calls` fragments).
   async function* tokens(): AsyncGenerator<string, ToolCall[] | undefined, void> {
     try {
       const wireToolCalls = yield* client!.chatCompleteStream({ ...body, model: opts.model ?? "chat" }, signal, stats);
@@ -697,6 +753,43 @@ export async function startCompleteStream(
     }
   }
   return { ok: true, tokens: tokens(), stats };
+}
+
+/** THIN-5A: the default turn path's streaming call. Reasoning and text
+ * arrive as separate pieces; `dropReasoning` (a minor, a spoken turn)
+ * sets thinking off and discards any reasoning the engine sends anyway. */
+export async function startCompleteStreamPieces(
+  role: LlmRole,
+  messages: LlmMessage[],
+  opts: LlmCompleteOptions = {},
+  signal?: AbortSignal,
+): Promise<LlmPiecesStartResult> {
+  const invalid = validate(role, messages);
+  if (invalid) return invalid;
+  if (isStackRoleEnabled("chat")) return openStackPieces(role, messages, opts, signal);
+  const direct = await startDirectTokens(role, messages, opts, signal);
+  if (!direct.ok) return direct;
+  return { ok: true, pieces: piecesFromTagged(direct.tokens, opts.dropReasoning === true), stats: direct.stats };
+}
+
+/** OLD PATH ONLY (retires with turnEngine.ts's pipeline, rule 12): the
+ * think-tagged string stream that pipeline still consumes. The default
+ * turn path calls startCompleteStreamPieces() instead. */
+export async function startCompleteStream(
+  role: LlmRole,
+  messages: LlmMessage[],
+  opts: LlmCompleteOptions = {},
+  signal?: AbortSignal,
+): Promise<LlmStreamStartResult> {
+  const invalid = validate(role, messages);
+  if (invalid) return invalid;
+
+  // Streaming follows the same Stack-only routing as complete() above.
+  if (isStackRoleEnabled("chat")) {
+    const opened = await openStackPieces(role, messages, opts, signal);
+    return opened.ok ? { ok: true, tokens: thinkTaggedTokens(opened.pieces), stats: opened.stats } : opened;
+  }
+  return startDirectTokens(role, messages, opts, signal);
 }
 
 export type BackgroundResult = { ok: true; text: string } | { ok: false; unavailable: true };

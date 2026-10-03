@@ -27,7 +27,17 @@ import { repairReply, assessReply, isShortMalformed, repairTail, closeDanglingCl
 import { recallEpisodes, formatEpisodesForPrompt, formatEpisodeLine, episodeQuote, episodeQueryEligible, asksWhatHubSaid, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, contentTerms, earliestDroppedTurn, type EpisodeMatch } from "@/lib/episodes";
 import { intentFor, markIncluded, guardContextFrom, outcomeOf, outcomeText, groundOutcomes, sourcesFromRows, emptyTimings, sensitiveAllowed, effectiveBand, worryingConversation, type TurnContext, type TurnEvidence, type ToolExecutionOutcome, type RejectedReason, type TurnTimings, framedUnknownNames } from "@/lib/turnContext";
 import { newConversationTurnId } from "@/lib/id";
-import { complete, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall } from "@/lib/llm";
+import { complete as completeNative, legacyThinkTagged, startCompleteStream, type LlmMessage, type ToolSpec, type ToolCall, type LlmCompleteOptions, type LlmOpResult } from "@/lib/llm";
+
+/** THIN-5A: llm.ts's complete() now carries reasoning as its own field.
+ * This OLD path's whole pipeline still reads one think-tagged string, so
+ * it re-wraps at this single seam, deleted with the pipeline (rule 12). */
+async function complete(role: Parameters<typeof completeNative>[0], messages: LlmMessage[], opts: LlmCompleteOptions = {}): Promise<LlmOpResult> {
+  const result = await completeNative(role, messages, { ...opts, returnReasoning: true });
+  if (!result.ok) return result;
+  const { reasoning, ...rest } = result.value;
+  return { ok: true, value: { ...rest, text: legacyThinkTagged(rest.text, reasoning) } };
+}
 import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
