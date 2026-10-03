@@ -18,6 +18,9 @@ import { nextHlc } from "@/lib/hlc";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture, IDENTITY_HEADERS, type StackFixture } from "./stackFixture";
+import { db } from "@/db";
+import { conversationTurns } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 let server: WyomingServerHandle;
 let speechStack: StackFixture | undefined;
@@ -35,15 +38,32 @@ afterEach(() => {
   speechStack = undefined;
 });
 
-function makePerson(): string {
+function makePerson(role = "owner", name = "Sprout"): string {
   const id = newPersonId();
   const now = new Date().toISOString();
   sqlite
     .query(
-      "INSERT INTO people (id, display_name, role, avatar_seed, source, local_only, created_at, updated_at, hlc) VALUES (?, 'Sprout', 'owner', ?, 'test', 0, ?, ?, ?)",
+      "INSERT INTO people (id, display_name, role, avatar_seed, source, local_only, created_at, updated_at, hlc) VALUES (?, ?, ?, ?, 'test', 0, ?, ?, ?)",
     )
-    .run(id, randomSuffix(12), now, now, nextHlc());
+    .run(id, name, role, randomSuffix(12), now, now, nextHlc());
   return id;
+}
+
+// The default path asks the Stack for the chat role's health before it
+// takes a turn (turnNext.ts's beginTurn); a fixture that answers chat
+// completions must answer that too.
+const READY_ROLES: Record<string, () => Response> = {
+  "GET /stack/v1/roles": () => Response.json({ roles: ["chat", "embed", "judge", "stt", "tts"].map((id) => ({ id, state: { state: "ready", since: "test" }, reason: null })) }),
+  "GET /stack/v1/health": () => Response.json({ health: [] }),
+};
+
+/** A scripted chat completion: the default path asks the engine to
+ * stream, so a streaming request gets the reply as SSE. */
+async function scriptedChat(req: Request, content: string): Promise<Response> {
+  const body = (await req.json().catch(() => ({}))) as { stream?: boolean };
+  if (!body.stream) return Response.json({ choices: [{ message: { role: "assistant", content } }] }, { headers: IDENTITY_HEADERS });
+  const sse = `data: ${JSON.stringify({ choices: [{ index: 0, delta: { role: "assistant", content }, finish_reason: null }] })}\n\ndata: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\ndata: [DONE]\n\n`;
+  return new Response(sse, { headers: { ...IDENTITY_HEADERS, "content-type": "text/event-stream" } });
 }
 
 /** A minimal scripted Wyoming client over a real TCP socket: sends
@@ -131,8 +151,9 @@ describe("the Wyoming satellite server", () => {
     const token = issueApiToken(personId);
 
     speechStack = startStackFixture({
+      ...READY_ROLES,
       "POST /v1/audio/transcriptions": async () => Response.json({ text: "the scripted utterance" }, { headers: IDENTITY_HEADERS }),
-      "POST /v1/chat/completions": async () => Response.json({ choices: [{ message: { role: "assistant", content: "Good morning." } }] }, { headers: IDENTITY_HEADERS }),
+      "POST /v1/chat/completions": (req) => scriptedChat(req, "Good morning."),
     });
     setHouseholdSettingValue("engines.stack.url", speechStack.url);
     __setStackClientForTests(speechStack.client);
@@ -276,7 +297,7 @@ describe("the Wyoming satellite server", () => {
   test("the transcript/handle path shares the same per-person turn rate limit as every other turn-engine entry point", async () => {
     const personId = makePerson();
     const token = issueApiToken(personId);
-    speechStack = startStackFixture({ "POST /v1/chat/completions": async () => Response.json({ choices: [{ message: { role: "assistant", content: "handled" } }] }, { headers: IDENTITY_HEADERS }) });
+    speechStack = startStackFixture({ ...READY_ROLES, "POST /v1/chat/completions": (req) => scriptedChat(req, "handled") });
     setHouseholdSettingValue("engines.stack.url", speechStack.url);
     __setStackClientForTests(speechStack.client);
     server = startWyomingServer(0);
@@ -389,5 +410,55 @@ describe("the Wyoming satellite server", () => {
   // EADDRINUSE-on-a-port-we-already-own case is ever swallowed.
   test("a non-EADDRINUSE bind failure still throws", () => {
     expect(() => startWyomingServer(999_999)).toThrow(/range/i);
+  });
+  // THIN-7A (rules 9 and 12): a satellite's turn is the robot's turn, a
+  // spoken turn on the one path. The scripted engine is the stub LLM the
+  // turnMachine suite uses; the stored row's trace nodes exist only on the
+  // default path, so they prove which path ran.
+  describe("THIN-7A: a satellite turn runs spoken on the default path", () => {
+    async function handleAs(personId: string, utterance: string, reply: string, reasoning?: string): Promise<{ handled: WyomingMessage; turnRow: { replyText: string; stats: unknown } | undefined }> {
+      __resetLlmSupervisorForTests();
+      const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+      const stub = startStubLlmServer(0, { scriptedChatReply: () => reply, ...(reasoning ? { scriptedReasoning: () => reasoning } : {}) });
+      process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+      try {
+        server = startWyomingServer(0);
+        const client = new ScriptedWyomingClient();
+        await client.connect(server.port);
+        client.send({ type: "authenticate", data: { token: issueApiToken(personId) } });
+        client.send({ type: "transcript", data: { text: utterance } });
+        const [handled] = await client.waitForMessages(1, 5000);
+        const turnRow = db.select().from(conversationTurns).get();
+        return { handled: handled!, turnRow: turnRow as { replyText: string; stats: unknown } | undefined };
+      } finally {
+        await stub.stop();
+        delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      }
+    }
+
+    test("the handled text is the server's speech text, and the stored reply is the written text", async () => {
+      const written = "It is 72°F at 10:04 am, Dr. Smith said.";
+      const { handled, turnRow } = await handleAs(makePerson(), "how do I make a paper airplane", written);
+      expect(handled.type).toBe("handled");
+      expect((handled.data as { text: string }).text).toBe("It is seventy-two degrees Fahrenheit at ten oh four in the morning, Doctor Smith said.");
+      expect(turnRow?.replyText).toBe(written);
+      const nodes = (JSON.parse(turnRow!.stats as string) as { nodes?: { node: string }[] }).nodes ?? [];
+      expect(nodes.length).toBeGreaterThan(0);
+    });
+
+    test("raw reasoning never reaches the satellite", async () => {
+      const { handled } = await handleAs(makePerson(), "what is 17 times 24", "17 times 24 is 408.", "carry the two");
+      expect((handled.data as { text: string }).text).toBe("seventeen times twenty-four is four hundred eight.");
+      expect(JSON.stringify(handled)).not.toContain("carry the two");
+      expect(JSON.stringify(handled)).not.toContain("think>");
+    });
+
+    test("a child's satellite turn is released as the default path releases it", async () => {
+      const { handled, turnRow } = await handleAs(makePerson("child", "Willow"), "hi", "<think>internal reasoning here</think>Hi there!");
+      expect((handled.data as { text: string }).text).toBe("Hi there!");
+      expect(JSON.stringify(handled)).not.toContain("internal reasoning");
+      const nodes = (JSON.parse(turnRow!.stats as string) as { nodes?: { node: string }[] }).nodes ?? [];
+      expect(nodes.map((n) => n.node)).toContain("output_gate");
+    });
   });
 });

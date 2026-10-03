@@ -25,7 +25,7 @@ import { resolveApiToken } from "@/lib/apiToken";
 import { transcribeUtterance } from "@/lib/stt";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { synthesizeSpeech } from "@/lib/tts";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { personWithinTurnBudget } from "@/lib/llm";
 import { visibleText } from "@/lib/wellFormed";
 import type { PersonRow } from "@/types";
@@ -182,19 +182,28 @@ async function handleMessage(
         send(socket, { type: "not-handled", data: { text: "too many requests too quickly" } });
         return;
       }
-      const result = await runTurn(state.actor, "chat", text);
+      // THIN-7A (rules 9 and 12): the one turn path, shaped as spoken
+      // exactly as the robot's turn is (same register, same per-sentence
+      // gate, speech text from the server). "chat" with `spoken: true`,
+      // not "robot": a satellite has no speaker evidence to send, and
+      // the robot's first-sentence projection would cut a 1-to-3
+      // sentence reply to its first. Thinking is off, a spoken turn has
+      // nowhere to show reasoning.
+      const result = await runTurnNext(state.actor, "chat", text, { spoken: true, thinking: false });
       if (!result.ok) {
         send(socket, { type: "not-handled", data: { text: result.error } });
         return;
       }
-      // REASONING-01: `reply.text` may carry a leading think block
-      // (wellFormed.ts's own contract) since llm.ts started synthesizing
-      // one from the engine's own `reasoning_content` - a review caught
-      // this handler forwarding it raw. A voice satellite has no
-      // reasoning display at all: strip it unconditionally, the same
-      // "the client only ever sees the answer" rule the chat frontend's
-      // own stripThinking() already applies.
-      send(socket, { type: "handled", data: { text: visibleText(result.value.reply.text) } });
+      if (result.kind !== "immediate") {
+        send(socket, { type: "not-handled", data: { text: "the turn returned a stream unexpectedly" } });
+        return;
+      }
+      // `reply.speech` is what the satellite synthesizes (THIN-0J); it
+      // carries no reasoning (a spoken turn drops it at the engine
+      // client), and `visibleText` is only the fallback for a reply
+      // that somehow has none.
+      const { speech, text: replyText } = result.value.reply;
+      send(socket, { type: "handled", data: { text: speech ?? visibleText(replyText) } });
       return;
     }
 
