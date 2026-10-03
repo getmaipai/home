@@ -9,6 +9,10 @@ description: How to connect MaiPai to your own SearXNG search server.
 
 MaiPai asks your own search server, called SearXNG, so your questions go to it and not to one big company. You or a techy friend runs SearXNG on a computer at home.
 
+## What MaiPai reads and sends
+
+When you search, MaiPai sends your search words to your SearXNG. It does not need a key or an account. Then MaiPai reads up to three of the pages that came back, one from each site, and answers from what they say. The answer shows numbered links to those pages. Each site sees a normal page request from your home's internet address, and never your question. Your SearXNG sends your search words to the search sites it is set up to use.
+
 ## Get SearXNG ready
 
 1. Use SearXNG's direct address, like `http://192.0.2.10:8888`. Do not use an address that shows a login page first. MaiPai cannot log in, so it gets no results.
