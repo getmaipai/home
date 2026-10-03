@@ -3203,9 +3203,13 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
   // is what actually decides a trailing stray quote never crosses a
   // sentence boundary and so is only ever seen by finish() at all. Same
   // fixture text as that unit test, driven for real this time.
+  // THIN-5C: this is a CHILD's turn, released a whole sentence at a time,
+  // so the tail is repaired before anything is shown. An adult's written
+  // turn streams as it arrives (the next test), where text already shown is
+  // never taken back.
   test("a reply ending in dangling markup is repaired through the full pipeline, not only at the StreamGate unit", async () => {
     await withStub({ reply: () => 'The weather is nice"' }, async () => {
-      const result = await runTurnNextStream(people.owner, "chat", "tell me something");
+      const result = await runTurnNextStream(people.child, "chat", "tell me something");
       if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
       const { delivered, outcome, threw } = await drain(result.tokens);
       expect(threw).toBeUndefined();
@@ -3215,6 +3219,18 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
       expect(value.reply.text).toBe(delivered.join(""));
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get();
       expect(row?.replyText).toBe(value.reply.text);
+    });
+  });
+
+  test("an adult's reply ending in dangling markup keeps what was shown and only gains the closing stop (THIN-5C: never retracted)", async () => {
+    await withStub({ reply: () => 'The weather is nice"' }, async () => {
+      const result = await runTurnNextStream(people.owner, "chat", "tell me something");
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      const { delivered, outcome, threw } = await drain(result.tokens);
+      expect(threw).toBeUndefined();
+      const value = result.finalize(delivered.join(""), outcome);
+      expect(value.reply.text.startsWith('The weather is nice"')).toBe(true);
+      expect(value.reply.text).toBe(delivered.join(""));
     });
   });
 
@@ -3337,7 +3353,10 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
         const errorEvent = events.find((e) => e.type === "error") as { type: "error"; error: string; code?: string } | undefined;
         expect(errorEvent?.code).toBe("turn_cancelled");
         const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.turnId)).get();
-        expect(row?.replyText).toBe(delivered);
+        // An adult's written reply streams as it arrives (THIN-5C), so the
+        // last piece sent can be the space after the final word; the
+        // cancel path stores the trimmed text.
+        expect(row?.replyText).toBe(delivered.trim());
         expect(row?.source).toBe("model");
         const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { error?: string | null }[] };
         expect(stats.generations?.some((g) => g.error)).toBe(true);

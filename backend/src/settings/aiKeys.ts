@@ -87,6 +87,23 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.ai",
     honoured_by: ["home", "bot"],
   }),
+  // THIN-5C (docs/design/RULES.md rule 10, SAFETY.md): the only admin choice
+  // that moves a minor's output gate, and it chooses between two checked
+  // modes; nothing turns the gate off. Household scope: it gives no admin
+  // path into a teen's own settings (the 2026-09-30 ruling stands). A child
+  // and every spoken turn are per sentence whatever this says.
+  SettingsKey.parse({
+    key: "chat.teen_gate_grain",
+    scope: "household",
+    selector: "select",
+    range: { options: ["sentence", "arrival"] },
+    default: "sentence",
+    label: "How a teen's replies are checked",
+    help: "\"Sentence\" checks every sentence before a teen sees it (the default). \"Arrival\" shows a teen's reply as it is written and checks it as it comes, so part of a sentence can show before its check finishes and the reply stops there if the check fails. Children and anything spoken always check every sentence first.",
+    level: "advanced",
+    lives_in: "household.ai",
+    honoured_by: ["home"],
+  }),
   SettingsKey.parse({
     key: "engines.stack.url",
     scope: "household",

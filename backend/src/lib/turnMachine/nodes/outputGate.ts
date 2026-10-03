@@ -26,6 +26,9 @@ import { assessReply, repairReply, repairTail } from "@/lib/wellFormed";
 import { evaluateReply, evaluateSafety, forOutput } from "@/lib/safety";
 import type { AgeBand } from "@/lib/ageBand";
 import { turnAgeBand } from "../speaker";
+import { surfaceClassOf } from "@/lib/surfaceClass";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import type { Surface } from "@/lib/turnShared";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { envelopeToolCall } from "@/lib/llm";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
@@ -162,16 +165,56 @@ class ReasoningLane {
  * (turnNext.ts) is what turns that into the wire's own mid-stream
  * refusal, the same StreamSafetyRefusal shape and behavior
  * the old engine file's own stream already uses. */
+/** THIN-5C (rule 10, SAFETY.md): how the gate releases the answer.
+ * `sentence`: each sentence is checked, then released (a child, every
+ * spoken turn, a teen by default). `arrival`: text is released as it is
+ * generated, each piece checked as part of the sentence it extends before
+ * it goes out, and each finished sentence checked again against the reply
+ * so far (an adult's written chat, a teen if the household says so). In
+ * both, released text is never retracted. */
+export type GateGrain = "sentence" | "arrival";
+
+/** Who gets which grain. A spoken or glance turn is per sentence whatever
+ * the band or any setting; a child is per sentence; an adult's written
+ * chat arrives as generated; a teen's written chat follows the household
+ * setting and defaults to per sentence. A failed read of the setting is
+ * the stricter grain. */
+export function gateGrainFor(band: AgeBand, surface: Surface, spoken: boolean): GateGrain {
+  if (surfaceClassOf(surface, spoken) !== "written") return "sentence";
+  if (band === "adult") return "arrival";
+  if (band === "teen") {
+    try {
+      return getHouseholdSettingValue("chat.teen_gate_grain") === "arrival" ? "arrival" : "sentence";
+    } catch {
+      return "sentence";
+    }
+  }
+  return "sentence";
+}
+
 export interface StreamGateOptions {
   /** THIN-5B: where released reasoning goes (the `reasoning` wire event).
    * Absent for a gate that never carries reasoning. */
   releaseReasoning?: (text: string) => void;
+  /** THIN-5C: defaults to the strict per-sentence grain. */
+  grain?: GateGrain;
 }
 
 export class StreamGate {
   private pending = "";
+  /** THIN-5C: how much of `pending` has already gone out (arrival grain
+   * only; per sentence, nothing in `pending` is ever released). */
+  private pendingReleased = 0;
   private isFirstChunk = true;
+  /** Everything released, exactly as sent. */
   private delivered = "";
+  /** Everything released AND checked as a finished sentence: what a new
+   * sentence is read against. Equals `delivered` per sentence. */
+  private checked = "";
+  private readonly grain: GateGrain;
+  /** Arrival grain: an abandoned round's text was shown and stays shown,
+   * so the next round's text starts a new paragraph. */
+  private joinNext = false;
   private refused: SafetyResult | undefined;
   private lastFlagged: SafetyResult | undefined;
   private envelopeDecided = false;
@@ -198,6 +241,7 @@ export class StreamGate {
     opts: StreamGateOptions = {},
   ) {
     if (opts.releaseReasoning) this.reasoningLane = new ReasoningLane(band, actor, turnId, opts.releaseReasoning);
+    this.grain = opts.grain ?? "sentence";
   }
 
   /** THIN-5B: one reasoning delta from the engine, released live under
@@ -222,10 +266,19 @@ export class StreamGate {
   reset(): void {
     if (this.refused || this.done) return;
     this.pending = "";
+    this.pendingReleased = 0;
     this.isFirstChunk = true;
-    this.delivered = "";
     this.envelopeDecided = false;
     this.heldAsEnvelope = false;
+    // Per sentence, an abandoned round released nothing, so the record
+    // starts clean. As it arrives, what the round showed stays shown and
+    // stays in the record; the next round continues after it.
+    if (this.grain === "arrival") {
+      this.joinNext = this.delivered.trim().length > 0;
+    } else {
+      this.delivered = "";
+      this.checked = "";
+    }
   }
 
   /** Whether a generation's own leading, trimmed text looks like a tool-
@@ -265,8 +318,8 @@ export class StreamGate {
    * version - the non-refusing case is already covered by
    * checkAndNotify()'s own unconditional call above it. */
   private wholeRefusal(next: string): SafetyResult | undefined {
-    if (!this.delivered.trim()) return undefined;
-    const whole = forOutput(evaluateSafety(`${this.delivered}${next}`, this.band));
+    if (!this.checked.trim()) return undefined;
+    const whole = forOutput(evaluateSafety(`${this.checked}${next}`, this.band));
     if (whole.action !== "refuse") return undefined;
     notifyOncePerTurn(this.actor, whole, this.turnId, "[turn]");
     return whole;
@@ -282,6 +335,10 @@ export class StreamGate {
       this.heldAsEnvelope = this.looksLikeEnvelope(trimmedStart[0]!);
     }
     if (this.heldAsEnvelope) return; // held whole - see the class doc
+    if (this.grain === "arrival") {
+      this.pushArriving();
+      return;
+    }
     for (;;) {
       const end = nextSentenceBoundary(this.pending, this.isFirstChunk);
       if (end < 0) break;
@@ -294,6 +351,7 @@ export class StreamGate {
         // still the reply's own whitespace (the old engine file's identical
         // #99 fix - dropping it here would reproduce that bug).
         this.delivered += rawSpan;
+        this.checked += rawSpan;
         this.release(rawSpan);
         continue;
       }
@@ -316,7 +374,57 @@ export class StreamGate {
         return;
       }
       this.delivered += rawSpan;
+      this.checked += rawSpan;
       this.release(rawSpan);
+    }
+  }
+
+  /** THIN-5C, arrival grain: the unreleased part of `pending` is checked
+   * as one more piece of the sentence it extends BEFORE it goes out, so
+   * text is shown as it is generated and never ahead of its own check. A
+   * refusal stops the release there; what already went out stays. Each
+   * finished sentence is then read against the reply so far, which can
+   * catch a claim split across sentences (that check follows the release
+   * of the sentence that completes it, as the owner's ruling accepts for
+   * an adult). */
+  private pushArriving(): void {
+    const prefix = this.pending.trim();
+    if (prefix) {
+      const safety = this.checkAndNotify(prefix);
+      if (safety.flagged) this.lastFlagged = safety;
+      if (safety.action === "refuse") {
+        this.refused = this.wholeRefusal(this.pending) ?? safety;
+        this.onRefuse(this.refused);
+        return;
+      }
+    }
+    const fresh = this.pending.slice(this.pendingReleased);
+    if (fresh) {
+      const out = this.joinNext && fresh.trim() ? `\n\n${fresh}` : fresh;
+      if (fresh.trim()) this.joinNext = false;
+      // The checked text carries the same paragraph break the reader sees,
+      // so a later whole-reply check never reads two rounds glued together.
+      if (out !== fresh) this.checked += "\n\n";
+      this.delivered += out;
+      this.pendingReleased = this.pending.length;
+      this.release(out);
+    }
+    for (;;) {
+      const end = nextSentenceBoundary(this.pending, this.isFirstChunk);
+      if (end < 0) break;
+      this.isFirstChunk = false;
+      const span = this.pending.slice(0, end);
+      this.pending = this.pending.slice(end);
+      this.pendingReleased -= end;
+      if (span.trim()) {
+        const whole = this.wholeRefusal(span);
+        if (whole) {
+          this.refused = whole;
+          this.onRefuse(whole);
+          return;
+        }
+      }
+      this.checked += span;
     }
   }
 
@@ -365,8 +473,22 @@ export class StreamGate {
         this.onRefuse(whole);
         return;
       }
+      if (this.grain === "arrival") {
+        // The tail already went out as it arrived; only what repair
+        // would ADD (a closing stop) can still be released. Anything the
+        // repair would take away cannot be taken back.
+        const repairedTail = repairTail(this.checked, this.pending);
+        if (repairedTail.startsWith(this.pending) && repairedTail.length > this.pending.length) {
+          const suffix = repairedTail.slice(this.pending.length);
+          this.delivered += suffix;
+          this.release(suffix);
+        }
+        this.checked += this.pending;
+        return;
+      }
       const repaired = repairTail(this.delivered, this.pending);
       this.delivered += repaired;
+      this.checked += repaired;
       this.release(repaired);
     } finally {
       this.onDone();

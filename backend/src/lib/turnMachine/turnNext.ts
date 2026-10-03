@@ -38,7 +38,7 @@ import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { postProjectResult } from "@/lib/projects/post";
 import { StatusChannel } from "@/lib/statusChannel";
 import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
-import { StreamGate } from "./nodes/outputGate";
+import { StreamGate, gateGrainFor } from "./nodes/outputGate";
 import { resolveTurnBudget } from "./budget";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
@@ -730,7 +730,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     () => queue.close(),
     () => queue.close(),
     // THIN-5B: reasoning released by the gate goes out as its own event.
-    { releaseReasoning: (text) => status.emit({ type: "reasoning", text }) },
+    { releaseReasoning: (text) => status.emit({ type: "reasoning", text }), grain: gateGrainFor(band, surface, state.spoken) },
   );
   state.streamGate = gate;
 
