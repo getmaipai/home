@@ -184,3 +184,55 @@ describe("THIN-5B: the record tells the truth about reasoning that was shown", (
     expect(shown.join("")).toBe(gate.result().reasoning);
   });
 });
+
+describe("THIN-5B: live means live, not buffered until the answer starts", () => {
+  test("reasoning events reach the wire while the engine is still holding back the answer", async () => {
+    // An engine that streams its reasoning and then waits, answer unsent,
+    // until the test lets go. A route that only drains reasoning when the
+    // first answer piece arrives would deadlock here and time out.
+    let releaseAnswer: () => void = () => {};
+    const answerGate = new Promise<void>((resolve) => { releaseAnswer = resolve; });
+    const encoder = new TextEncoder();
+    const sse = (delta: Record<string, unknown>, finish: string | null = null) => encoder.encode(`data: ${JSON.stringify({ id: "gated", model: "gated", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`);
+    const engine = Bun.serve({
+      port: 0,
+      fetch: async (req) => {
+        const body = (await req.json()) as { stream?: boolean };
+        if (!body.stream) return Response.json({ id: "gated", model: "gated", choices: [{ index: 0, message: { role: "assistant", content: "{}" }, finish_reason: "stop" }] });
+        const stream = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            controller.enqueue(sse({ role: "assistant" }));
+            for (const word of ["Weighing", " the", " pot", " size", " first."]) controller.enqueue(sse({ reasoning_content: word }));
+            await answerGate;
+            controller.enqueue(sse({ content: REPLY }));
+            controller.enqueue(sse({}, "stop"));
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          },
+        });
+        return new Response(stream, { headers: { "content-type": "text/event-stream" } });
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = `http://127.0.0.1:${engine.port}`;
+    __resetLlmSupervisorForTests();
+    try {
+      const result = await runTurnNextStream(people.owner, "chat", "how do I care for a plant", { thinking: true });
+      if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+      let reasoning = "";
+      let sawAnswer = false;
+      for await (const event of streamTurnEvents(result, people.owner.id)) {
+        if (event.type === "reasoning") {
+          reasoning += event.text;
+          // The engine is still holding the answer back: this reasoning is live.
+          if (!sawAnswer && reasoning.includes("first.")) releaseAnswer();
+        }
+        if (event.type === "delta") sawAnswer = true;
+      }
+      expect(reasoning).toBe("Weighing the pot size first.");
+      expect(sawAnswer).toBe(true);
+    } finally {
+      releaseAnswer();
+      engine.stop(true);
+    }
+  }, 8000);
+});

@@ -540,7 +540,20 @@ export async function* streamTurnEvents(
     timer.cancel();
     if (race === "status") { yield* sideEvents(); pendingStatus = statusWake(); }
     if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: cue }; }
-    let current = race === "timeout" || race === "status" ? await firstStep : race;
+    // THIN-5B: while the first answer piece is still coming, side events
+    // (live reasoning, status lines) keep going out as they are emitted, so
+    // an adult's reasoning is shown while the model is still thinking
+    // rather than all at once when the answer starts.
+    let current = race as Exclude<typeof race, "status" | "timeout">;
+    if (race === "timeout" || race === "status") {
+      let waited = await Promise.race([firstStep, pendingStatus]);
+      while (waited === "status") {
+        yield* sideEvents();
+        pendingStatus = statusWake();
+        waited = await Promise.race([firstStep, pendingStatus]);
+      }
+      current = waited;
+    }
     // TOOL-EVENTS-02: `result.toolEvents` (the machine's own live
     // array, turnMachine/contract.ts) is already fully populated the
     // moment this first `iterator.next()` settles - the tool round is
