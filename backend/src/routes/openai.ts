@@ -122,19 +122,25 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
             // channel, which this route never reads.
             let fullText = "";
             const iterator = result.tokens;
-            let current = await iterator.next();
+            // A turn that released nothing (a refusal on the first
+            // sentence, a fixed-line reply) still tells the caller its
+            // stored reply: the other wires carry it in the done event.
+            const sendStoredIfSilent = (stored: string) => {
+              if (!fullText.trim() && stored.trim()) controller.enqueue(sseChunk({ content: visibleText(stored) }, null));
+            };
             try {
+              let current = await iterator.next();
               while (!current.done) {
                 fullText += current.value;
                 controller.enqueue(sseChunk({ content: current.value }, null));
                 current = await iterator.next();
               }
-              result.finalize(fullText.trim(), current.value);
+              sendStoredIfSilent(result.finalize(fullText.trim(), current.value).reply.text);
             } catch (err) {
               // A refused sentence ends the stream; what was released
               // is never retracted. Both outcomes log the turn.
               if (err instanceof StreamSafetyRefusal) {
-                result.finalize(fullText.trim(), err.safety);
+                sendStoredIfSilent(result.finalize(fullText.trim(), err.safety).reply.text);
                 finishReason = "content_filter";
               } else {
                 if (fullText.trim()) result.finalize(fullText.trim());

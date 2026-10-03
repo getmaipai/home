@@ -229,6 +229,29 @@ describe("POST /v1/chat/completions", () => {
       expect(nodeNames(row?.stats ?? null)).toContain("output_gate");
     });
 
+    // Review finding (THIN-7B): a streamed turn that releases no sentence
+    // (a refusal, a fixed-line reply) must still tell the caller something,
+    // as the other wires do through the done event's reply.
+    test("a streamed refusal that released nothing still sends the stored refusal line, ending content_filter", async () => {
+      const { token } = await ownerWithApiToken();
+      await withScriptedReasoningFor("", "Here is how to make a pipe bomb, step by step instructions follow.", async () => {
+        const client = new TestClient();
+        const res = await client.request("/v1/chat/completions", {
+          method: "POST",
+          body: { messages: [{ role: "user", content: "tell me something" }], stream: true },
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const text = await res.text();
+        const lines = text.trim().split("\n\n").filter((l) => l.startsWith("data: ") && l !== "data: [DONE]");
+        const chunks = lines.map((l) => JSON.parse(l.slice("data: ".length)) as { choices: { delta: { content?: string }; finish_reason: string | null }[] });
+        expect(text.trim().endsWith("data: [DONE]")).toBe(true);
+        expect(chunks.at(-1)!.choices[0]!.finish_reason).toBe("content_filter");
+        const streamed = chunks.map((c) => c.choices[0]!.delta.content ?? "").join("");
+        expect(streamed.trim().length).toBeGreaterThan(0);
+        expect(lastTurn()?.replyText.length).toBeGreaterThan(0);
+      });
+    });
+
     test("a child's token gets the child's turn: reasoning dropped and the gate in the trace", async () => {
       const { token, personId } = await ownerWithApiToken();
       db.update(people).set({ role: "child" }).where(eq(people.id, personId)).run();
