@@ -1,10 +1,12 @@
-// THIN-1B (rule 6): direct unit tests of the fixed-line table and of what
-// counts as a lookup that did not happen, the same minimal-input style as
-// answer.test.ts. The end-to-end rows (search down, zero rows, a mixed
-// round, a streamed turn, each age band) live in turnNext.test.ts.
+// THIN-1D (rule 6 as amended 2026-10-03): the note that a lookup did not
+// happen is the model's own words, never a stored line. These are direct unit
+// tests of what counts as a missed lookup, which failure kind the model is
+// told, and the answering round's instruction. The end-to-end rows live in
+// turnNext.test.ts.
 import { describe, expect, test } from "bun:test";
-import { lookupMissed, lookupMissedLine, lookupMissedInstruction } from "@/lib/turnMachine/nodes/lookupFallback";
+import { lookupMissed, lookupFailureKind, lookupMissedInstruction } from "@/lib/turnMachine/nodes/lookupFallback";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
+import * as lookupFallback from "@/lib/turnMachine/nodes/lookupFallback";
 
 function outcome(overrides: Partial<ToolExecutionOutcome>): ToolExecutionOutcome {
   return { callId: "test", packageId: "websearch", status: "succeeded", via: "tool_call", ...overrides };
@@ -15,10 +17,9 @@ function resultWith(data: Record<string, unknown>): ToolExecutionOutcome["result
   return { data } as unknown as ToolExecutionOutcome["result"];
 }
 
-describe("lookupMissedLine: one fixed line per age band", () => {
-  test("the adult, teen and child lines are three different sentences", () => {
-    const lines = new Set([lookupMissedLine("adult"), lookupMissedLine("teen"), lookupMissedLine("child")]);
-    expect(lines.size).toBe(3);
+describe("no stored wording", () => {
+  test("the module exports no fixed line or per-band table", () => {
+    expect(Object.keys(lookupFallback)).not.toContain("lookupMissedLine");
   });
 });
 
@@ -44,12 +45,27 @@ describe("lookupMissed: a lookup that gave the model nothing", () => {
   });
 });
 
+describe("lookupFailureKind: the one thing the model is told", () => {
+  test("maps the outcome's status and code to unavailable, timed out, found nothing or errored", () => {
+    expect(lookupFailureKind(outcome({ status: "failed", errorCode: "search_unavailable" }))).toBe("unavailable");
+    expect(lookupFailureKind(outcome({ status: "failed", errorCode: "deadline_exceeded" }))).toBe("timed_out");
+    expect(lookupFailureKind(outcome({ result: resultWith({ rows: [] }) }))).toBe("found_nothing");
+    expect(lookupFailureKind(outcome({ packageId: "weather", status: "failed", errorCode: "502" }))).toBe("errored");
+  });
+});
+
 describe("lookupMissedInstruction: the answering round after a missed lookup", () => {
-  test("says the lookup did not happen, asks for an answer from what the model knows, and keeps a spoken turn short", () => {
-    const spoken = lookupMissedInstruction("spoken", "who won the game");
+  test("names the failure kind, asks for an answer from what the model knows in its own voice, and keeps a spoken turn short", () => {
+    const spoken = lookupMissedInstruction("spoken", "who won the game", ["timed_out"]);
     expect(spoken).toContain("did not happen");
+    expect(spoken).toContain("timed out");
     expect(spoken).toContain("from what you know");
+    expect(spoken).toContain("your own words");
     expect(spoken).toContain("in one to three sentences");
-    expect(lookupMissedInstruction("written", "who won the game")).not.toContain("three sentences");
+    expect(lookupMissedInstruction("written", "who won the game", ["unavailable"])).not.toContain("three sentences");
+  });
+
+  test("never says a note is added afterwards: the model writes it", () => {
+    expect(lookupMissedInstruction("written", "q", ["errored"])).not.toContain("is added after");
   });
 });

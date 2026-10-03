@@ -88,26 +88,6 @@ function policyRefusalLine(reason: PolicyRefusedReason): string {
   return "I don't actually have that in this conversation, so I won't guess.";
 }
 
-/** SEARCH-EMPTY-01: the identical fixed-code-to-text mapping
- * `policyRefusalLine` above already is, for a tool outcome's own
- * `errorCode` instead of a policy refusal reason. A package's raw
- * `userMessage` is still never delivered verbatim (COMMAND-FAIL-01's
- * own `outcome_error` provenance tag exists specifically because a raw
- * engine error string can carry anything, including a diagnostic no
- * household member should see) - but `search_unavailable`'s own
- * `userMessage` was never a raw diagnostic to begin with; it is one
- * fixed, safe, hand-written string `searxngSearch()` itself throws
- * ("Search isn't working right now.", never anything from the engine's
- * own response body). Named here, by code, the same closed way
- * `policyRefusalLine` names its own three reasons - never a rule
- * reading the string's own content. `null` for every other code keeps
- * the existing floor: an unrecognized failure still falls through to
- * `provenance: "outcome_error"` below and the generic swap. */
-function toolOutageLine(errorCode: string | undefined): string | null {
-  if (errorCode === "search_unavailable") return "Search isn't working right now.";
-  return null;
-}
-
 export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) => {
   switch (input.kind) {
     case "policy_refused":
@@ -138,12 +118,10 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // order, across every round, so flatMap-ing it here is safe
       // either way.
       const sources = state.outcomes.flatMap((o) => o.sources ?? []);
-      // SEARCH-MIXED-01 / THIN-1B: a failed or empty lookup is never handed
-      // to the model (model.ts filters it out of the phrasing round) and
-      // the fixed note for the person's age band is added by model.ts
-      // itself, through the stream gate, so a streamed client receives it
-      // and the stored reply is the concatenation of released text. Nothing
-      // is appended here.
+      // SEARCH-MIXED-01 / THIN-1D: a failed or empty lookup is never handed
+      // to the model (model.ts filters it out of the phrasing round and tells
+      // it the failure kind only); the model's own note is part of its text,
+      // so nothing is appended here.
       return { outcome: { ok: true }, output: { text: input.text, sources } };
     }
     case "context_quote":
@@ -158,19 +136,12 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
     case "from_outcomes": {
       // COMMAND-FAIL-01: this text is machine.ts's own last-resort
       // fallback (`answerInputFrom`), built from `outcomes.at(-1)?.
-      // userMessage` - the SAME field this checks, so a failed last
-      // outcome (a tool round's own final call failing with rounds
-      // exhausted, the only way a failed round reaches this node now that
-      // THIN-1B removed SEARCH-EMPTY-01's `toolAllFailed` exit) is tagged the identical way "immediate"
-      // is - UNLESS `toolOutageLine` recognizes the failure's own code
-      // as one of its fixed, safe lines, in which case that line is
-      // delivered directly and never tagged `outcome_error` at all (it
-      // was never a raw diagnostic to begin with).
+      // userMessage`, so a failed last outcome is tagged the identical way
+      // "immediate" is. THIN-1D: no failed code has a stored line any more
+      // (the old search_unavailable outage line is gone); the answering round
+      // tells a failed lookup in the model's own words (model.ts).
       const sources = input.outcomes.flatMap((o) => o.sources ?? []);
-      const lastOutcome = input.outcomes.at(-1);
-      const lastFailed = lastOutcome?.status === "failed";
-      const outageLine = lastFailed ? toolOutageLine(lastOutcome.errorCode) : null;
-      if (outageLine !== null) return { outcome: { ok: true }, output: { text: outageLine, sources } };
+      const lastFailed = input.outcomes.at(-1)?.status === "failed";
       const provenance = lastFailed ? ("outcome_error" as const) : undefined;
       return { outcome: { ok: true }, output: { text: input.text, sources, provenance } };
     }

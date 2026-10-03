@@ -43,18 +43,13 @@ describe("answerNode: 'from_outcomes' tags provenance from the LAST outcome only
     expect(output.provenance).toBe("outcome_error");
   });
 
-  // SEARCH-EMPTY-01: `search_unavailable` is the one recognized
-  // exception - a fixed, hand-written, safe line `searxngSearch()`
-  // itself throws (never a raw engine string), so `toolOutageLine`
-  // delivers it directly and it is never tagged `outcome_error`. Every
-  // OTHER errorCode, even ones that sound similarly safe, still falls
-  // to the generic tag above - `toolOutageLine`'s own closed mapping,
-  // not a rule reading the message's own content.
-  test("a failed outcome whose code is search_unavailable delivers its own line directly, untagged", async () => {
+  // THIN-1D (inverts the SEARCH-EMPTY-01 row that delivered
+  // "Search isn't working right now." directly): no failed code has a stored
+  // line any more, so `search_unavailable` is tagged like every other code.
+  test("a failed outcome whose code is search_unavailable is tagged outcome_error, never delivered as its own fixed line", async () => {
     const failed = outcome({ status: "failed", errorCode: "search_unavailable", userMessage: "Search isn't working right now." });
     const { output } = await answerNode(STATE, { kind: "from_outcomes", text: "Search isn't working right now.", outcomes: [failed] }, SIGNAL);
-    expect(output.text).toBe("Search isn't working right now.");
-    expect(output.provenance).toBeUndefined();
+    expect(output.provenance).toBe("outcome_error");
   });
 
   test("a failed outcome with an unrecognized code still gets the generic outcome_error tag, never a free pass", async () => {

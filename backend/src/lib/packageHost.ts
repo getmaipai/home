@@ -1120,16 +1120,10 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
       const unresponsiveEngines = unresponsiveNames.length > 0;
       void recordServiceOutcome("searxng", { ok: !unresponsiveEngines, error: unresponsiveEngines ? new Error("captcha or service access wall") : undefined });
       if (text === SEARXNG_NO_RESULTS_TEXT && unresponsiveEngines) {
-        // This exact message reaches a household member verbatim only
-        // because `turnMachine/nodes/answer.ts`'s `toolOutageLine()`
-        // recognizes the "search_unavailable" code by name and delivers
-        // it directly, bypassing the generic COMPOSE_FAILURE_LINE swap
-        // every other failed outcome gets - a review, 2026-09-24, flagged
-        // that the two are in different files with nothing mechanical
-        // tying them together. Adding a new safe, hand-written HostError
-        // message anywhere else in this file (or another integration)
-        // needs a matching branch added there, or it silently gets the
-        // generic line instead.
+        // THIN-1D: this message is the stored outcome's raw detail (read by
+        // the admin indicator, THIN-1E). It never reaches the model or a
+        // household member; the reply's note is the model's own words, told
+        // only the code's failure kind (turnMachine/nodes/lookupFallback.ts).
         throw new HostError("search_unavailable", "Search isn't working right now.");
       }
       // SEARCH-FALLBACK-01: "when SearXNG is down or returns nothing" -
