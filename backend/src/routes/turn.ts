@@ -19,6 +19,7 @@ import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId } from "@/lib/conversationHistory";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
+import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 
 // U6a (docs/plans/simple-turn-pipeline-2026-09-22.md; the coordinator's
 // ruling, 2026-09-23): one boundary, no second one. This is the only
@@ -68,9 +69,21 @@ interface StoredStreamEvent {
   terminal: boolean;
 }
 
+// THIN-5D: a subscriber is a wire. The NDJSON wire writes one line per event;
+// the assistant-stream wire (lib/assistantStreamWire.ts) writes the same
+// events as protocol chunks. Both are fed the identical released events.
 interface StreamSubscriber {
-  controller: ReadableStreamDefaultController<Uint8Array>;
+  write(event: TurnStreamEvent | ToolStreamEvent): void;
+  close(): void;
   resumeFrom: number;
+}
+
+type Wire = "ndjson" | "assistant-stream";
+const ASSISTANT_STREAM_MEDIA_TYPE = "application/x-assistant-stream";
+// Content negotiation: only a request that asks for it by name gets the
+// assistant-stream wire. No Accept, `*/*` and every other value stay NDJSON.
+function wireFor(accept: string | undefined): Wire {
+  return accept?.toLowerCase().includes(ASSISTANT_STREAM_MEDIA_TYPE) ? "assistant-stream" : "ndjson";
 }
 
 interface ResumeSession {
@@ -345,7 +358,7 @@ function detachSubscriber(session: ResumeSession, subscriber: StreamSubscriber):
 function closeSubscriber(session: ResumeSession, subscriber: StreamSubscriber): void {
   detachSubscriber(session, subscriber);
   try {
-    subscriber.controller.close();
+    subscriber.close();
   } catch {
     // A client can cancel between the last enqueue and close. The session
     // already has the terminal event buffered, so there is nothing else to
@@ -362,7 +375,7 @@ function appendSessionEvent(session: ResumeSession, event: TurnStreamEvent): voi
   for (const subscriber of [...session.subscribers]) {
     if (!shouldDeliver(stored, subscriber.resumeFrom)) continue;
     try {
-      subscriber.controller.enqueue(ndjsonLine(event));
+      subscriber.write(event);
       if (stored.terminal) {
         session.terminalDelivered = true;
         closeSubscriber(session, subscriber);
@@ -377,23 +390,33 @@ function appendSessionEvent(session: ResumeSession, event: TurnStreamEvent): voi
   }
 }
 
-function streamResponse(session: ResumeSession, resumeFrom: number | null): Response {
+function streamResponse(session: ResumeSession, resumeFrom: number | null, wire: Wire = "ndjson"): Response {
   let subscriber: StreamSubscriber | undefined;
+  const replay = (sub: StreamSubscriber) => {
+    try {
+      sub.write({ type: "turn_meta", conversation_id: session.conversationId, turn_id: session.turnId, resume_token: session.token });
+      for (const stored of session.events) {
+        if (!shouldDeliver(stored, resumeFrom)) continue;
+        sub.write(stored.event);
+        if (stored.terminal) session.terminalDelivered = true;
+      }
+      if (session.terminal) closeSubscriber(session, sub);
+    } catch {
+      detachSubscriber(session, sub);
+    }
+  };
+  if (wire === "assistant-stream") {
+    const sink = createAssistantStreamSink(() => { if (subscriber) detachSubscriber(session, subscriber); });
+    subscriber = { write: (event) => sink.write(event), close: () => sink.close(), resumeFrom: resumeFrom ?? -1 };
+    session.subscribers.add(subscriber);
+    replay(subscriber);
+    return new Response(sink.readable, { headers: sink.headers });
+  }
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
-      subscriber = { controller, resumeFrom: resumeFrom ?? -1 };
+      subscriber = { write: (event) => controller.enqueue(ndjsonLine(event)), close: () => controller.close(), resumeFrom: resumeFrom ?? -1 };
       session.subscribers.add(subscriber);
-      try {
-        controller.enqueue(ndjsonLine({ type: "turn_meta", conversation_id: session.conversationId, turn_id: session.turnId, resume_token: session.token }));
-        for (const stored of session.events) {
-          if (!shouldDeliver(stored, resumeFrom)) continue;
-          controller.enqueue(ndjsonLine(stored.event));
-          if (stored.terminal) session.terminalDelivered = true;
-        }
-        if (session.terminal) closeSubscriber(session, subscriber);
-      } catch {
-        detachSubscriber(session, subscriber);
-      }
+      replay(subscriber);
     },
     cancel() {
       if (subscriber) detachSubscriber(session, subscriber);
@@ -723,7 +746,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     if (!session || session.expired || (session.terminal && session.terminalDelivered) || session.ownerId !== actor.id || body.turn_id !== session.turnId || body.conversation_id !== session.conversationId || !Number.isInteger(resumeFrom) || resumeFrom! < 0 || resumeFrom! > session.sequence) {
       return c.json({ error: "The turn stream is no longer available.", code: "turn_resume_unavailable" }, 503);
     }
-    return streamResponse(session, resumeFrom!);
+    return streamResponse(session, resumeFrom!, wireFor(c.req.header("accept")));
   }
   const documentAttachments = body.document_attachments ?? [];
   if (!Array.isArray(documentAttachments) || documentAttachments.length > 8 || documentAttachments.some((item) =>
@@ -867,6 +890,11 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     // always ahead of "done" so the tool timeline is already populated
     // by the time the reply itself arrives.
     const toolEventLines = (result.toolEvents ?? []).map((event) => ndjsonLine(event));
+    if (wireFor(c.req.header("accept")) === "assistant-stream") {
+      const sink = createAssistantStreamSink();
+      for (const event of [turnMeta, { type: "signal", signal: result.signal } as TurnStreamEvent, ...(result.toolEvents ?? []), { type: "done", value } as TurnStreamEvent]) sink.write(event);
+      return new Response(sink.readable, { headers: sink.headers });
+    }
     const body = new Blob([ndjsonLine(turnMeta), ndjsonLine({ type: "signal", signal: result.signal }), ...toolEventLines, ndjsonLine({ type: "done", value })]);
     return new Response(body, {
       headers: { "content-type": "application/x-ndjson" },
@@ -908,7 +936,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   resumeSessions.set(session.token, session);
   inFlightTurns.set(session.turnId, session);
   startResumeSession(session);
-  const response = streamResponse(session, null);
+  const response = streamResponse(session, null, wireFor(c.req.header("accept")));
   // The initial response has a signal in its replay buffer, but its meta
   // event is deliberately sent first and the signal stays immediately next.
   return response;
