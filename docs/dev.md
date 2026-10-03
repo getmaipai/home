@@ -35804,3 +35804,26 @@ counted as `floor_dropped` on the search result and as `dropped_by_floor` on the
 tool node's trace entry (never the text). No learned component is used. The
 search cache key carries the minor band, so an adult's cached search is never
 served to a child. The output gate is unchanged and still runs on the reply.
+
+## THIN-4D: the page request budget (2026-10-03)
+
+Stated and enforced in `packageHost.ts`, tested in `tests/searchPages.test.ts`:
+
+- At most `SEARCH_PAGES_MAX` (3) page requests per search, and a failed request
+  counts. Three is the 4A reasoning above.
+- At most one page per site in one search, chosen in rank order, so a search
+  never asks one site for two pages. Across searches the page pace (a burst of
+  3, then one every 2 seconds, one shared bucket, the robots.txt check not
+  counted) spaces everything else.
+- Requests go out one at a time in rank order, so the pace and the first signal
+  mean something.
+- A 403 or 429 (`PageDeclinedError`) or the pace running out (`rate_limited`)
+  ends page reading for that search; the remaining rows keep their snippets.
+- The whole page step has a 6 second budget (the tool node's deadline is 10
+  seconds); a page still in flight at the budget is abandoned and its row keeps
+  the snippet.
+- Honest client identity, the SSRF guard and robots.txt are unchanged and apply
+  to every page request.
+
+The matching sentence in `THIRD-PARTY-SERVICES.md` belongs to `getmaipai/.github`
+and goes through the architect gate there; it is not in this repo.

@@ -9,6 +9,8 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { toolResultContent } from "@/lib/composer";
 import { outcomeOf } from "@/lib/turnContext";
+import { PageDeclinedError } from "@/lib/packageHost";
+import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { toToolDefinition } from "@/lib/llm";
 import { loadAllManifests } from "@/lib/turnShared";
 import { useDefaultScriptedStack } from "./stackFixture";
@@ -134,8 +136,83 @@ describe("search reads the result pages (THIN-4A)", () => {
   });
 });
 
+// THIN-4D: the request budget is stated and enforced. SEARCH_PAGES_MAX is
+// the cap on page requests per search (failed ones count), pages are
+// requested one at a time so the per-host pace and the first signal both
+// mean something, and a block or a 429 stops the rest of that search.
+describe("the page request budget (THIN-4D)", () => {
+  test("failed pages count against the cap: five rows that all fail are still only three requests", async () => {
+    const requested: string[] = [];
+    __setPageReaderForTests(async (url) => {
+      requested.push(url);
+      throw new Error("down");
+    });
+    const server = fakeSearxng(FIVE_ROWS);
+    try {
+      await searxngSearch({ query: "juniper", read_page: true });
+      expect(requested).toHaveLength(SEARCH_PAGES_MAX);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("pages are requested one at a time, in rank order", async () => {
+    let active = 0;
+    let most = 0;
+    const order: string[] = [];
+    __setPageReaderForTests(async (url) => {
+      active += 1;
+      most = Math.max(most, active);
+      order.push(url);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      active -= 1;
+      return page(url, "x");
+    });
+    const server = fakeSearxng(FIVE_ROWS);
+    try {
+      await searxngSearch({ query: "juniper", read_page: true });
+      expect(most).toBe(1);
+      expect(order).toEqual(["https://site1.example.com/page", "https://site2.example.com/page", "https://site3.example.com/page"]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a site declining the request (403 or 429) stops every further fetch in that search", async () => {
+    const requested: string[] = [];
+    __setPageReaderForTests(async (url) => {
+      requested.push(url);
+      throw new PageDeclinedError(`The site declined the page request for ${url}.`);
+    });
+    const server = fakeSearxng(FIVE_ROWS);
+    try {
+      const result = await searxngSearch({ query: "juniper", read_page: true });
+      expect(requested).toEqual(["https://site1.example.com/page"]);
+      expect(result.pages).toBeUndefined();
+      expect(result.rows).toHaveLength(5);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("the pace running out (rate_limited) stops the rest of the search too", async () => {
+    const requested: string[] = [];
+    __setPageReaderForTests(async (url) => {
+      requested.push(url);
+      throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
+    });
+    const server = fakeSearxng(FIVE_ROWS);
+    try {
+      await searxngSearch({ query: "juniper", read_page: true });
+      expect(requested).toHaveLength(1);
+    } finally {
+      server.stop(true);
+    }
+  });
+});
+
 describe("page reading stays inside the tool deadline and the cache stays honest (THIN-4A review)", () => {
-  test("a page that never answers costs only itself: the others arrive inside the step budget", async () => {
+  test("a page that never answers costs the step's time budget and no more; what arrived before it is kept", async () => {
     __setSearchPagesBudgetForTests(100);
     __setPageReaderForTests(async (url) => (url.startsWith("https://site2.") ? new Promise<PageReadResult>(() => {}) : page(url, `Body of ${url}`)));
     const server = fakeSearxng(FIVE_ROWS);
@@ -143,7 +220,7 @@ describe("page reading stays inside the tool deadline and the cache stays honest
       const started = Date.now();
       const result = await searxngSearch({ query: "juniper", read_page: true });
       expect(Date.now() - started).toBeLessThan(2_000);
-      expect(result.pages?.map((p) => p.url)).toEqual(["https://site1.example.com/page", "https://site3.example.com/page"]);
+      expect(result.pages?.map((p) => p.url)).toEqual(["https://site1.example.com/page"]);
     } finally {
       __setSearchPagesBudgetForTests(null);
       server.stop(true);

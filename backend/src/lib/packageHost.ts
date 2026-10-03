@@ -1220,8 +1220,8 @@ export function dedupeRows(rows: SearxngRow[]): SearxngRow[] {
 }
 
 /** The whole page-reading step of one search gives up after this long and
- * keeps whatever pages arrived, so a slow site costs its own page and not
- * the answer (the tool node's own deadline is 10 s). */
+ * keeps whatever pages arrived, so a slow site costs the step's budget and
+ * not the answer (the tool node's own deadline is 10 s). */
 let searchPagesBudgetMs = 6_000;
 
 export function __setSearchPagesBudgetForTests(ms: number | null): void {
@@ -1232,9 +1232,9 @@ export function __setSearchPagesBudgetForTests(ms: number | null): void {
  * Runs after the SearXNG request is done and health is recorded, never
  * inside its try/catch: a page failing for its own reasons is never a
  * SearXNG health signal, and that row simply keeps its snippet. The
- * pages are read together, at most one per site (so the per-host pace is
- * never the thing that serialises them), and only the ones that finish
- * inside the step's time budget are kept. */
+ * pages are requested one at a time, at most one per site, at most
+ * SEARCH_PAGES_MAX requests in all (a failed one still counts), and only
+ * the ones that finish inside the step's time budget are kept. */
 async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand): Promise<SearxngSearchResult> {
   const input = args as { category?: unknown; read_page?: unknown } | undefined;
   const result = minorBand ? floorSearchResult({ ...found, rows: dedupeRows(found.rows) }, minorBand) : { ...found, rows: dedupeRows(found.rows) };
@@ -1254,26 +1254,37 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
     hosts.add(host);
     candidates.push(row);
   }
-  const read: (PageReadResult | null)[] = candidates.map(() => null);
-  const reads = candidates.map(async (row, index) => {
-    try {
-      read[index] = await searxngPageRead({ url: row.url! });
-    } catch {
-      // Falls back to the row's own snippet.
-    }
-  });
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  await Promise.race([Promise.allSettled(reads), new Promise<void>((resolve) => { timer = setTimeout(resolve, searchPagesBudgetMs); })]);
-  clearTimeout(timer);
+  // One request at a time in rank order, so the pace and the first
+  // signal mean something; a 403, a 429 or the pace running out ends the
+  // search's page reading, and the step's time budget ends it too. A page
+  // already in flight at the budget is abandoned (it keeps its own
+  // 10 second timeout) and that row keeps its snippet.
+  const deadline = Date.now() + searchPagesBudgetMs;
   const pages: SearxngPage[] = [];
   let first: PageReadResult | undefined;
-  candidates.forEach((row, index) => {
-    const doc = read[index];
-    const text = doc?.text.trim().slice(0, SEARCH_PAGE_TEXT_CHARS);
-    if (!doc || !text) return;
-    first ??= doc;
-    pages.push({ url: row.url!, title: doc.title || row.title, text });
-  });
+  for (const row of candidates) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const read = searxngPageRead({ url: row.url! });
+      read.catch(() => {}); // an abandoned read that fails later is not an unhandled rejection
+      const doc = await Promise.race([
+        read,
+        new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), remaining); }),
+      ]);
+      if (!doc) break;
+      const text = doc.text.trim().slice(0, SEARCH_PAGE_TEXT_CHARS);
+      if (!text) continue;
+      first ??= doc;
+      pages.push({ url: row.url!, title: doc.title || row.title, text });
+    } catch (err) {
+      if (err instanceof PageDeclinedError || (err instanceof HostError && err.code === "rate_limited")) break;
+      // Any other failure falls back to the row's own snippet.
+    } finally {
+      clearTimeout(timer);
+    }
+  }
   if (pages.length === 0) return result;
   const withPages = { ...result, ...(first ? { page: first } : {}), pages };
   return minorBand ? floorSearchResult(withPages, minorBand) : withPages;
@@ -1404,8 +1415,17 @@ async function pageFetch(url: string, countsAgainstPace = true): Promise<Attempt
   );
 }
 
+/** A site answered a page request with 403 or 429: the first signal to
+ * back off. A search stops requesting further pages the moment it sees one
+ * (THIN-4D). */
+export class PageDeclinedError extends HostError {
+  constructor(message: string) {
+    super("network_unreachable", message);
+  }
+}
+
 function pageFailure(result: AttemptResult, url: string): never {
-  if (result.status === 403 || result.status === 429) throw new HostError("network_unreachable", `The site declined the page request for ${url}.`);
+  if (result.status === 403 || result.status === 429) throw new PageDeclinedError(`The site declined the page request for ${url}.`);
   throw result.error ?? new HostError("network_unreachable", `could not reach ${url}`);
 }
 
