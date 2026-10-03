@@ -43,6 +43,7 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance"
   profile: "profile",
   clock: "clock",
   roster: "household",
+  subjects: "subjects",
   tool_result: "result",
   search_result: "search result",
   document: "document",

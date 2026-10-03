@@ -178,11 +178,13 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // used because it also carries the earlier turns' state, which would
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
-  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
+  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
   if (state.temporary) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).
     appendTemporaryTurn(actor, surface, text, value, { ...opts, judgeStatus: "skipped" });
+    // THIN-7E: a temporary chat asks about an unknown name and stores nothing (the commit is a no-op there).
+    state.askCommit?.(value.reply.text);
     return;
   }
   // THIN-0C: the judge's queue is keyed on the stored signal; a safety
@@ -190,6 +192,9 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // (the old engine file's judgeStatusAtInsert, the function the old path calls).
   // THIN-7C: a bare turn is never the judge's (ADMIN-COMPARE-01 b).
   logTurn(actor, surface, text, value, { ...opts, judgeStatus: state.bare ? "skipped" : judgeStatusAtInsert(value, state.signal) });
+  // THIN-7E (ASK-01): the question the reply ended with stands as the conversation's pending ask only
+  // now that the delivered text is known to carry it (a refusal that lost it commits nothing).
+  state.askCommit?.(value.reply.text);
   // PROJECT-START-01 (lib/projects/post.ts's own header): this turn's
   // own conversation_turns row is only ever written here, at the very
   // end - unlike the legacy the old engine file's prepareTurn(), nothing on
@@ -448,6 +453,9 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // commands") still holds, now with one safety evaluation, traced
   // once, for every turn including a resumed one.
   const preConfirmed = pendingAsk ? (resumesAsk(pendingAsk, text, opts.ask_answer) ?? undefined) : undefined;
+  // THIN-7E (ASK-01): a standing `who` question is read as an answer by the commands node
+  // (askNames.ts), so it is kept on the state although the stored ask is cleared just below.
+  if (pendingAsk?.kind === "who") state.pendingWho = pendingAsk;
   // Cleared either way a pending ask existed: resumed (so it can't be
   // resumed twice, the stuck-question failure REPLY-FIND-01 already
   // named), declined (NEGATIVE_RE), or an unrelated new statement - the
@@ -601,7 +609,8 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // the source label here needed correcting, not the machine.
     const lastVia = state.outcomes.at(-1)?.via;
     const failedPattern = state.outcomes.some((outcome) => outcome.via === "pattern" && outcome.status === "failed");
-    const source: TurnValue["source"] = failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
+    // THIN-7E: the answer to a who question is a "confirm", as the old engine reported it.
+    const source: TurnValue["source"] = state.whoAnswer ? "confirm" : failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources);
     // 2026-10-03: after a successful tool call the reply is the model's
     // own composition, not a package's canned line. The stats stay on

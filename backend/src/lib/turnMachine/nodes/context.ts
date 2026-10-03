@@ -13,6 +13,8 @@
 import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConversation } from "@/lib/conversationHistory";
 import { recall, getProfileParagraph, embedQueryForRecall, bumpUsage } from "@/lib/memory";
 import { subjectRosterFor } from "@/lib/subjects";
+import { subjectsForTurn } from "@/lib/askNames";
+import type { SubjectRef } from "@/lib/unknownNames";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { MAX_MEMORY_SNIPPETS } from "@/lib/turnShared";
@@ -74,6 +76,9 @@ export interface ContextOutput {
    * trusted adult. Absent or false for an adult and for a turn with
    * nothing withheld. */
   disclosureWithheld?: boolean;
+  /** THIN-7E (ASK-01): the turn's subjects and the unknown name the reply asks about. */
+  subjects?: SubjectRef[];
+  unknownAsk?: string | null;
 }
 
 let windowItemSeq = 0;
@@ -133,6 +138,14 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   if (state.bare) {
     return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state) } };
   }
+
+  // THIN-7E (ASK-01, rule 12): the names in the utterance, resolved before the model runs
+  // (askNames.ts over unknownNames.ts). The unknown line ("Names in this message you have
+  // never heard before: ...") and one line per registry subject go ahead of the memory
+  // block; the question itself is appended to the reply by the model node.
+  const recentUserTexts = window.messages.filter((m) => m.role === "user").map((m) => m.content);
+  const resolvedSubjects = subjectsForTurn({ actor: state.actor, text: input.utterance, signal: state.signal, recentUserTexts, conversationId: conversation.id, supersedes: state.supersedes, turnId: state.turnId });
+  if (resolvedSubjects.section) items.push({ id: "subjects", text: resolvedSubjects.section, source: "subjects", subjects: [], disclosure: "child_ok" });
 
   // Memories, dated and labeled (U5/REPLY-FIND-04's own shape): never
   // for a temporary chat (no memory:write either - the policy node's
@@ -304,7 +317,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     items.push({ id: `roster-${i}`, text: name, source: "roster", subjects: [], disclosure: "child_ok" });
   });
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state), disclosureWithheld } };
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state), disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk } };
 };
 
 /** Applies the node's output onto TurnState, the same small
@@ -316,6 +329,8 @@ export function applyContext(state: import("../contract").TurnState, output: Con
   state.temporary = output.temporary;
   state.context = output.items;
   state.reasoning = output.reasoning;
+  if (output.subjects) state.subjects = output.subjects;
+  state.unknownAsk = output.unknownAsk ?? null;
   if (output.disclosureWithheld) {
     // THIN-0B: the plan's inputs, recomputed once with the withheld flag,
     // and the trusted-adult move when a child or teen asked a question

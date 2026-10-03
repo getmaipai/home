@@ -18,6 +18,7 @@ import type { LlmMessage, ToolCall, ToolSpec } from "@/lib/llm";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { GenerationInput } from "@/lib/turnStats";
 import type { PendingAsk } from "@/lib/conversationHistory";
+import type { SubjectRef } from "@/lib/unknownNames";
 import type { PlanInput } from "@/lib/register";
 import type { Persona } from "@/lib/persona";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
@@ -37,7 +38,7 @@ export interface ContextItem {
    * contextQuoteGrounded excludes it, and messages.ts never re-prints
    * it into the prompt's context block, since it is already the final
    * user message contextToMessages() appends). */
-  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "tool_result" | "search_result" | "document" | "notification" | "quoted" | "utterance";
+  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "subjects" | "tool_result" | "search_result" | "document" | "notification" | "quoted" | "utterance";
   /** Entity ids the item mentions (household-subject rule, grounding). */
   subjects: string[];
   disclosure: "child_ok" | "teen_ok" | "adult_only";
@@ -277,6 +278,21 @@ export interface TurnState {
    * (set by the machine's applyOutputRefusal), so the refusal can carry
    * the crisis resources when the refused text mentioned self-harm. */
   outputSafety?: SafetyResult;
+  /** THIN-7E (ASK-01): the `who` question this conversation had standing when the turn
+   * began (beginTurn clears every pending ask before the machine runs). The commands node
+   * reads it as the answer; undefined when none stood or the conversation is temporary. */
+  pendingWho?: PendingAsk;
+  /** THIN-7E: the turn's subjects (context's resolution, or the entity a who-answer made),
+   * logged on the row so a pronoun-only turn keeps its subject. */
+  subjects?: SubjectRef[];
+  /** THIN-7E: the unknown name the reply asks about (context's resolution). */
+  unknownAsk?: string | null;
+  /** THIN-7E: this turn was the answer (or cancel) of a who question, read by the parser;
+   * no model ran. finishTurn() reports it as source "confirm", as the old engine did. */
+  whoAnswer?: boolean;
+  /** THIN-7E: set by the model node with the question it appended; logResult() calls it
+   * with the text that was delivered, and the ask stands only if the question reached the person. */
+  askCommit?: (deliveredText: string) => void;
 }
 
 /** GROUND-01: `arg` is the refusing argument's NAME only, never its

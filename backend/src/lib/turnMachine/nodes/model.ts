@@ -15,6 +15,7 @@ import { visibleReplyMaxTokens } from "@/lib/turnShared";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
 import { planLineForTurnMachine } from "@/lib/register";
+import { askAppendFor, NO_ASK_APPEND } from "@/lib/askNames";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages, bareMessages, continuationMessages } from "../messages";
 import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction } from "./lookupFallback";
@@ -784,6 +785,18 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
 
   // The one exit that ever ships real, streamable text - settle the
   // gate here, once, on the FINAL attempt (post-retry) alone.
+  //
+  // THIN-7E (ASK-01): a plain model reply (no tool ran this turn) may end with the question
+  // about an unknown name, or the judge's next open question. It is pushed through the same
+  // gate as the reply, so the person hears nothing the gate did not check; the ask is stored
+  // by logResult() only if the delivered text carries it. Never for a bare turn, a
+  // continuation or a widget's fixed question (no subjects were resolved for those).
+  const ask =
+    state.subjects !== undefined && !isPhrasingRound && state.outcomes.length === 0 && !state.bare && !state.ephemeral && !state.continuation
+      ? askAppendFor({ actor: state.actor, conversationId: state.conversationId, turnId: state.turnId, replyText: attempt.text, utterance: input.utterance, subjects: state.subjects, unknownAsk: state.unknownAsk ?? null, recentUserTexts: state.context.filter((c) => c.source === "window" && c.id.startsWith("window-user")).map((c) => c.text), temporary: state.temporary })
+      : NO_ASK_APPEND;
+  state.askCommit = ask.commit;
+  if (ask.append) gate?.push(ask.append);
   gate?.finish();
-  return { outcome: { ok: true }, output: { kind: "text", text: attempt.text, thinking: attempt.thinking, reasoning } };
+  return { outcome: { ok: true }, output: { kind: "text", text: attempt.text + ask.append, thinking: attempt.thinking, reasoning } };
 };

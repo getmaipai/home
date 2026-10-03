@@ -20,6 +20,8 @@ import { runPlugin, meetsMinRole } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
 import { speakerIsAnonymous, touchesMemory } from "../speaker";
 import { usableReply } from "@/lib/composer";
+import { answerWhoTurn } from "@/lib/askNames";
+import { classifyTurnSignal } from "@/lib/turnSignal";
 import { COMPUTED_WILDCARD_RESOLVERS, NEVER_FIRES_WILDCARDS } from "@/lib/manifestLint";
 import type { Node, NodeOutcome } from "../contract";
 
@@ -29,9 +31,24 @@ export interface CommandsInput {
 
 export type CommandsOutput =
   | { matched: false }
-  | { matched: true; text: string; speech?: string; outcome: import("@/lib/turnContext").ToolExecutionOutcome };
+  // `whoAnswer` (THIN-7E): the reply is ASK-01's answer to a who question; the outcome is
+  // only the answer node's input and is never recorded on the turn.
+  | { matched: true; text: string; speech?: string; outcome: import("@/lib/turnContext").ToolExecutionOutcome; whoAnswer?: true };
 
 export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, input) => {
+  // THIN-7E (ASK-01): the answer to a question put on an earlier turn, or a judge's open
+  // question answered before it is put, comes before every command, as on the old path
+  // (after `safety`, before routing). The deterministic parser reads it; no model runs.
+  const answered = answerWhoTurn({ actor: state.actor, text: input.utterance, conversationId: state.conversationId, turnId: state.turnId, pendingWho: state.pendingWho ?? null, temporary: state.temporary });
+  if (answered) {
+    state.whoAnswer = true;
+    state.subjects = answered.subjects;
+    // An answer that states a kind is the inform the judge reads (the signal's protocol layer).
+    state.signal = classifyTurnSignal({ text: input.utterance, protocol: answered.protocol, ageBand: state.planBasis.band });
+    const outcome = outcomeOf({ callId: `ask:who`, packageId: "engine", status: "succeeded", via: "command", userMessage: answered.text });
+    return { outcome: { ok: true }, output: { matched: true, text: answered.text, outcome, whoAnswer: true } };
+  }
+
   // THIN-0A (issue #204): "forget that" / "forget what I told you about
   // X" is the engine's own exact command, the same parser and the same
   // conversation lookup the old path calls (the old engine file ~2566), so the
