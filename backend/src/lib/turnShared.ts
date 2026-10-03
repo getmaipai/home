@@ -617,6 +617,11 @@ export class BareModeForbidden extends Error {
   }
 }
 
+// THIN-7C: the document attachment types, moved from turnEngine.ts (which
+// re-exports them) so the default path owns them.
+export type DocumentTurnAttachment = { name: string; mediaType: string; data: string };
+export class DocumentAttachmentError extends Error {}
+
 /** The one plain system prompt bare mode sends (moved from bareCompletion.ts). */
 export const BARE_SYSTEM_PROMPT = "You are a helpful assistant.";
 

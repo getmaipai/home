@@ -124,8 +124,8 @@ import {
   MAX_TURN_TEXT_LENGTH, visibleReplyMaxTokens, MAX_MEMORY_SNIPPETS, capSection, buildStablePrefix, matchPattern, commandOpeners,
   computedPatternMatch, notifyOncePerTurn, __resetOutputNotificationsForTests, variedConstantReply, speechTextFor,
   StreamSafetyRefusal, StreamUnavailable, CRISIS_STATE_TURNS, conversationInCrisis, CRISIS_RESOURCES_TEXT, notifiedThisTurn, MAX_RULES_SECTION_CHARS,
-  MAX_NATURALNESS_SECTION_CHARS, MAX_COMPANION_SECTION_CHARS,
-  type Surface, type TurnFailure, type SpeakerEvidence, type PresentPerson, type LoadedManifest, type StreamOutcome, type TurnStreamResult,
+  MAX_NATURALNESS_SECTION_CHARS, MAX_COMPANION_SECTION_CHARS, DocumentAttachmentError,
+  type DocumentTurnAttachment, type Surface, type TurnFailure, type SpeakerEvidence, type PresentPerson, type LoadedManifest, type StreamOutcome, type TurnStreamResult,
 } from "@/lib/turnShared";
 export {
   validateTurnInput, judgeStatusAtInsert, deriveCrisisResources, identityLine, PRIVACY_SENTENCE, stableSuffixFor, loadAllManifests,
@@ -358,8 +358,7 @@ function logTurnLine(surface: Surface, value: TurnValue, startedAt: number, guar
 export type ComposedRecord = Pick<ComposedTurn, "mode" | "model_calls" | "budget_spent" | "fell_back" | "synthetic_ids" | "ungrounded"> & { phase: string };
 
 export type TurnContinuation = { fromTurnId?: string; assistantText: string };
-export type DocumentTurnAttachment = { name: string; mediaType: string; data: string };
-export class DocumentAttachmentError extends Error {}
+export { DocumentAttachmentError, type DocumentTurnAttachment };
 const CONTINUATION_INSTRUCTION = "Continue the incomplete answer above. Do not repeat any text already given. Start at the first missing point and finish the answer clearly.";
 
 function logTurnSafely(

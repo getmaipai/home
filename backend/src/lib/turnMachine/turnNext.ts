@@ -12,8 +12,9 @@
 // needs: routes/turn.ts's `/stream` route calls it instead, when
 // turn.pipeline.next is on.
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
-import type { Surface, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome } from "@/lib/turnShared";
+import type { Surface, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome, DocumentTurnAttachment } from "@/lib/turnShared";
 import type { TurnValue } from "@/wire";
+import { attachDocuments } from "./documents";
 import { validateTurnInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
@@ -79,6 +80,12 @@ export interface RunTurnNextOpts {
   // routes/turn.ts checks owner/admin and adult first (a clean 403); beginTurn()
   // asserts both again and throws BareModeForbidden, the structural backstop.
   bare?: boolean;
+  // THIN-7C: the document attachments from POST /api/turn/stream (a typed chat
+  // turn). Their text reaches the model and the safety check with the message;
+  // the stored message stays what the person typed. A bad document throws
+  // DocumentAttachmentError (a clean 400 at the route) before anything is
+  // written; a temporary chat takes none.
+  documentAttachments?: readonly DocumentTurnAttachment[];
 }
 
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
@@ -284,6 +291,10 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // THIN-0N: the speaker's effective band (an unidentified robot speaker
   // is the child band), for the signal, the plan and the stream gate,
   // as the old path's prepareTurn() derives it.
+  const turnId = newConversationTurnId();
+  // THIN-7C: the model, the safety check and the signal read the message with
+  // its documents; logResult() is given the typed text, as the old path did.
+  text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary);
   const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
   // old path (the old engine file's own commandOpeners(effectiveLoaded)) - a
@@ -337,7 +348,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const budget: TurnBudget = opts.thinking === true || bare ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
 
   const state: TurnState = {
-    turnId: newConversationTurnId(),
+    turnId,
     conversationId: conversation.id,
     actor,
     surface,
