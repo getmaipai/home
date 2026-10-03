@@ -35827,3 +35827,7 @@ Stated and enforced in `packageHost.ts`, tested in `tests/searchPages.test.ts`:
 
 The matching sentence in `THIRD-PARTY-SERVICES.md` belongs to `getmaipai/.github`
 and goes through the architect gate there; it is not in this repo.
+
+## THIN-7B: /v1/chat/completions is a spoken turn (2026-10-03)
+
+Decision, per THIN-7B: `/v1/chat/completions` runs every request as a spoken turn on the one path (`spoken: true`, thinking off), so its replies are the short spoken register, a child's or teen's reply is gated per sentence as on the default path, and no `reasoning_content` is sent (a spoken turn has nowhere to show it; the response shape is otherwise the OpenAI one). A caller that needs long written replies does not use this route: it posts to `POST /api/turn` or `/api/turn/stream` on the `chat` surface, where adult written chat has no length cap (rule 5). There is no per-request opt-out header: a second register switch on an external-token route would be a new surface to gate for a use the app's own turn route already serves.

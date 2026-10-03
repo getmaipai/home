@@ -33,10 +33,10 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireApiToken } from "@/middleware/auth";
-import { runTurn, runTurnStream, type Surface } from "@/lib/turnEngine";
+import { StreamSafetyRefusal, type Surface } from "@/lib/turnEngine";
+import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { personWithinTurnBudget } from "@/lib/llm";
-import { feedThinkSplit, flushThinkSplit, newThinkSplitState, visibleText, thinkingPrefix, type ThinkSpan } from "@/lib/wellFormed";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { visibleText } from "@/lib/wellFormed";
 import type { ChatMessage, ChatCompletionResponse, ChatCompletionChunk } from "@maipai/spec/llm/ts/types.js";
 import type { AppEnv } from "@/types";
 
@@ -84,18 +84,19 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
   const surface = resolveSurface(c);
   const model = typeof body.model === "string" && body.model.length > 0 ? body.model : "maipai";
 
+  // THIN-7B (rules 9 and 12): the one turn path, as a spoken turn. This
+  // route is the hub as a voice brain for Home Assistant and scripted
+  // clients, so the spoken register, the per-sentence gate for a child
+  // and no reasoning apply, whatever the caller. A caller that needs a
+  // long written reply uses the chat surface (docs/dev.md, THIN-7B).
+  const turnOpts = { spoken: true, thinking: false } as const;
+
   if (body.stream) {
-    // COR-7 (code review, 2026-09-06; a follow-up review found this
-    // route had the identical gap routes/turn.ts's /stream was fixed
-    // for): an external client (Home Assistant, a scripted tool)
-    // disconnecting mid-reply used to leave generation running with
-    // nothing reading it, tying up the engine's one generation slot for
-    // the rest of that reply. Same fix: the signal reaches all the way
-    // to the real fetch (lib/llm.ts's startCompleteStream,
-    // spec/llm/ts/client.ts's chatCompleteStream), fired from the
-    // ReadableStream's own cancel() below.
+    // COR-7 (code review, 2026-09-06): an external client
+    // disconnecting mid-reply must reach the real fetch, so the signal
+    // is fired from the ReadableStream's own cancel() below.
     const abortController = new AbortController();
-    const result = await runTurnStream(actor, surface, text, { signal: abortController.signal });
+    const result = await runTurnNextStream(actor, surface, text, { ...turnOpts, signal: abortController.signal });
     if (!result.ok) {
       return c.json({ error: { message: result.error, code: result.code } }, result.status);
     }
@@ -106,43 +107,42 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
       const chunk: ChatCompletionChunk = { id, model, choices: [{ index: 0, delta, finish_reason: finishReason }] };
       return encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`);
     }
-    // REASONING-01: `reply.text`/`result.tokens` may carry a leading
-    // think block (wellFormed.ts's own contract) since llm.ts started
-    // synthesizing one from the engine's own `reasoning_content` - a
-    // review caught this route forwarding it raw, unstripped, straight
-    // to an external client with no gating at all. Exposed through the
-    // IDENTICAL `reasoning_content` field llama.cpp's own real API
-    // already uses (this route claims that exact wire contract), never
-    // silently dropped - except for a minor's own turn (child or teen,
-    // ageBand.ts's shared band), which never sees it, the same rule the
-    // household's own chat stream applies.
-    const dropReasoning = speakerAgeBand(actor, new Date()) !== "adult";
-    const thinkSplit = newThinkSplitState();
-    function spanChunks(spans: ThinkSpan[]): Uint8Array[] {
-      const chunks: Uint8Array[] = [];
-      for (const span of spans) {
-        if (span.reasoning) {
-          if (!dropReasoning) chunks.push(sseChunk({ reasoning_content: span.text }, null));
-        } else {
-          chunks.push(sseChunk({ content: span.text }, null));
-        }
-      }
-      return chunks;
-    }
 
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
+        let finishReason = "stop";
         try {
           controller.enqueue(sseChunk({ role: "assistant" }, null));
           if (result.kind === "immediate") {
-            for (const chunk of spanChunks(feedThinkSplit(thinkSplit, result.value.reply.text))) controller.enqueue(chunk);
+            controller.enqueue(sseChunk({ content: visibleText(result.value.reply.text) }, null));
           } else {
-            for await (const token of result.tokens) {
-              for (const chunk of spanChunks(feedThinkSplit(thinkSplit, token))) controller.enqueue(chunk);
+            // The released sentences, already past the gate; the stored
+            // reply is their concatenation (rule 9), so finalize() gets
+            // exactly what went out. Reasoning travels on the status
+            // channel, which this route never reads.
+            let fullText = "";
+            const iterator = result.tokens;
+            let current = await iterator.next();
+            try {
+              while (!current.done) {
+                fullText += current.value;
+                controller.enqueue(sseChunk({ content: current.value }, null));
+                current = await iterator.next();
+              }
+              result.finalize(fullText.trim(), current.value);
+            } catch (err) {
+              // A refused sentence ends the stream; what was released
+              // is never retracted. Both outcomes log the turn.
+              if (err instanceof StreamSafetyRefusal) {
+                result.finalize(fullText.trim(), err.safety);
+                finishReason = "content_filter";
+              } else {
+                if (fullText.trim()) result.finalize(fullText.trim());
+                throw err;
+              }
             }
           }
-          for (const chunk of spanChunks(flushThinkSplit(thinkSplit))) controller.enqueue(chunk);
-          controller.enqueue(sseChunk({}, "stop"));
+          controller.enqueue(sseChunk({}, finishReason));
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
         } finally {
           controller.close();
@@ -155,20 +155,20 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
     return new Response(stream, { headers: { "content-type": "text/event-stream", "cache-control": "no-cache" } });
   }
 
-  const result = await runTurn(actor, surface, text);
-  if (!result.ok) {
-    return c.json({ error: { message: result.error, code: result.code } }, result.status);
+  const next = await runTurnNext(actor, surface, text, turnOpts);
+  if (!next.ok) {
+    return c.json({ error: { message: next.error, code: next.code } }, next.status);
   }
-  // REASONING-01: same split, same minor-gated drop, as the streaming
-  // branch above - `reply.text` may carry a leading think block, and
-  // `message.reasoning_content` is the identical field a real llama.cpp
-  // non-streaming reply already uses for it.
-  const dropReasoningNonStream = speakerAgeBand(actor, new Date()) !== "adult";
-  const reasoningContent = dropReasoningNonStream ? "" : thinkingPrefix(result.value.reply.text).replace(/<\/?think>/gi, "");
+  if (next.kind !== "immediate") {
+    return c.json({ error: { message: "the turn returned a stream unexpectedly", code: "unavailable" } }, 503);
+  }
+  // No `reasoning_content`: a spoken turn drops reasoning at the engine
+  // client, and `visibleText` strips a think block that slipped into
+  // the text, so none reaches the caller either way.
   const response: ChatCompletionResponse = {
     id: chunkId(),
     model,
-    choices: [{ index: 0, message: { role: "assistant", content: visibleText(result.value.reply.text), ...(reasoningContent ? { reasoning_content: reasoningContent } : {}) }, finish_reason: "stop" }],
+    choices: [{ index: 0, message: { role: "assistant", content: visibleText(next.value.reply.text) }, finish_reason: "stop" }],
   };
   return c.json(response);
 });

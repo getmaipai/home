@@ -6,7 +6,7 @@ import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, conversationTurns } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 beforeEach(() => {
@@ -26,6 +26,19 @@ async function ownerWithApiToken(): Promise<{ token: string; personId: string }>
   const res = await owner.post("/api/settings/api-token", {});
   const body = (await res.json()) as { token: string };
   return { token: body.token, personId: person.id };
+}
+
+async function withScriptedReasoningFor<T>(reasoning: string, content: string, fn: () => Promise<T>): Promise<T> {
+  __resetLlmSupervisorForTests();
+  const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+  const stub = startStubLlmServer(0, { scriptedReasoning: () => reasoning, scriptedChatReply: () => content });
+  process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+  try {
+    return await fn();
+  } finally {
+    await stub.stop();
+    delete process.env.MAIPAI_LLAMA_SERVER_URL;
+  }
 }
 
 describe("POST /v1/chat/completions", () => {
@@ -127,7 +140,12 @@ describe("POST /v1/chat/completions", () => {
       }
     }
 
-    test("non-streaming: reasoning_content arrives separately from content, no raw think tags in either", async () => {
+    // THIN-7B (rules 0, 9, 12): the route runs a spoken turn on the one
+    // path, and a spoken turn has nowhere to show reasoning: the engine
+    // is asked not to think and anything it returns anyway is dropped,
+    // for an adult as for a minor. The scripted engine returns a
+    // reasoning span regardless, so these prove the drop, not the ask.
+    test("non-streaming: raw reasoning never reaches the response, in content or reasoning_content", async () => {
       const { token } = await ownerWithApiToken();
       await withScriptedReasoning("carry the two", "17 times 24 is 408.", async () => {
         const client = new TestClient();
@@ -137,14 +155,16 @@ describe("POST /v1/chat/completions", () => {
           headers: { authorization: `Bearer ${token}` },
         });
         expect(res.status).toBe(200);
-        const body = (await res.json()) as { choices: { message: { content: string; reasoning_content?: string } }[] };
+        const raw = await res.text();
+        expect(raw).not.toContain("carry the two");
+        expect(raw).not.toContain("think>");
+        const body = JSON.parse(raw) as { choices: { message: { content: string; reasoning_content?: string } }[] };
         expect(body.choices[0]!.message.content).toBe("17 times 24 is 408.");
-        expect(body.choices[0]!.message.reasoning_content).toBe("carry the two");
-        expect(body.choices[0]!.message.content).not.toContain("<think>");
+        expect(body.choices[0]!.message.reasoning_content).toBeUndefined();
       });
     });
 
-    test("streaming: reasoning_content deltas arrive separately from content deltas, no raw think tags in either", async () => {
+    test("streaming: raw reasoning never reaches the stream, in content or reasoning_content deltas", async () => {
       const { token } = await ownerWithApiToken();
       await withScriptedReasoning("carry the two", "17 times 24 is 408.", async () => {
         const client = new TestClient();
@@ -154,14 +174,75 @@ describe("POST /v1/chat/completions", () => {
           headers: { authorization: `Bearer ${token}` },
         });
         const text = await res.text();
+        expect(text).not.toContain("carry the two");
+        expect(text).not.toContain("think>");
         const lines = text.trim().split("\n\n").filter((l) => l.startsWith("data: ") && l !== "data: [DONE]");
         const chunks = lines.map((l) => JSON.parse(l.slice("data: ".length)) as { choices: { delta: { content?: string; reasoning_content?: string } }[] });
-        const reasoningText = chunks.map((c) => c.choices[0]!.delta.reasoning_content ?? "").join("");
-        const contentText = chunks.map((c) => c.choices[0]!.delta.content ?? "").join("");
-        expect(reasoningText).toBe("carry the two");
-        expect(contentText).toBe("17 times 24 is 408.");
-        expect(contentText).not.toContain("<think>");
-        expect(reasoningText).not.toContain("<think>");
+        expect(chunks.map((c) => c.choices[0]!.delta.reasoning_content ?? "").join("")).toBe("");
+        expect(chunks.map((c) => c.choices[0]!.delta.content ?? "").join("")).toBe("17 times 24 is 408.");
+      });
+    });
+  });
+
+  // THIN-7B (rules 9 and 12): the route no longer calls the old engine.
+  // The trace nodes on the stored row exist only on the default path;
+  // `spoken: true` is what makes the turn a spoken one.
+  describe("THIN-7B: the route runs on the one path", () => {
+    function lastTurn(): { replyText: string; stats: string | null } | undefined {
+      return db.select().from(conversationTurns).get() as { replyText: string; stats: string | null } | undefined;
+    }
+    function nodeNames(stats: string | null): string[] {
+      return ((JSON.parse(stats ?? "{}") as { nodes?: { node: string }[] }).nodes ?? []).map((n) => n.node);
+    }
+
+    test("a non-streaming turn is a default-path turn, and the response keeps the OpenAI shape", async () => {
+      const { token } = await ownerWithApiToken();
+      const client = new TestClient();
+      const res = await client.request("/v1/chat/completions", {
+        method: "POST",
+        body: { model: "maipai", messages: [{ role: "user", content: "good morning" }] },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const body = (await res.json()) as { id: string; model: string; choices: { index: number; finish_reason: string; message: { role: string; content: string } }[] };
+      expect(body.model).toBe("maipai");
+      expect(body.choices[0]).toMatchObject({ index: 0, finish_reason: "stop", message: { role: "assistant" } });
+      expect(nodeNames(lastTurn()?.stats ?? null)).toContain("output_gate");
+    });
+
+    test("a streaming turn is a default-path turn, stored whole, and ends the way it did", async () => {
+      const { token } = await ownerWithApiToken();
+      const client = new TestClient();
+      const res = await client.request("/v1/chat/completions", {
+        method: "POST",
+        body: { messages: [{ role: "user", content: "hello there" }], stream: true },
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const text = await res.text();
+      const lines = text.trim().split("\n\n").filter((l) => l.startsWith("data: "));
+      expect(lines.at(-1)).toBe("data: [DONE]");
+      const chunks = lines.slice(0, -1).map((l) => JSON.parse(l.slice("data: ".length)) as { choices: { delta: { content?: string }; finish_reason: string | null }[] });
+      expect(chunks.at(-1)!.choices[0]!.finish_reason).toBe("stop");
+      const streamed = chunks.map((c) => c.choices[0]!.delta.content ?? "").join("");
+      expect(streamed.length).toBeGreaterThan(0);
+      const row = lastTurn();
+      expect(row?.replyText).toBe(streamed.trim());
+      expect(nodeNames(row?.stats ?? null)).toContain("output_gate");
+    });
+
+    test("a child's token gets the child's turn: reasoning dropped and the gate in the trace", async () => {
+      const { token, personId } = await ownerWithApiToken();
+      db.update(people).set({ role: "child" }).where(eq(people.id, personId)).run();
+      await withScriptedReasoningFor("carry the two", "Hi there!", async () => {
+        const client = new TestClient();
+        const res = await client.request("/v1/chat/completions", {
+          method: "POST",
+          body: { messages: [{ role: "user", content: "hi" }] },
+          headers: { authorization: `Bearer ${token}` },
+        });
+        const raw = await res.text();
+        expect(raw).not.toContain("carry the two");
+        expect(JSON.parse(raw).choices[0].message.content).toBe("Hi there!");
+        expect(nodeNames(lastTurn()?.stats ?? null)).toContain("output_gate");
       });
     });
   });
