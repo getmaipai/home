@@ -833,6 +833,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
 });
 
 describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
+  let artifactBodyOverride: string | null = null;
   const ARTIFACT = {
     id: "art-example123",
     conversation_id: "conv-artifact123",
@@ -858,7 +859,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-artifact123", status: "open", surface: "chat" }));
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-      if (url.includes(`/api/artifacts/${ARTIFACT.id}/current`)) return Promise.resolve(Response.json(ARTIFACT));
+      if (url.includes(`/api/artifacts/${ARTIFACT.id}/current`)) return Promise.resolve(Response.json(artifactBodyOverride === null ? ARTIFACT : { ...ARTIFACT, body: artifactBodyOverride }));
       if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
@@ -890,7 +891,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
   // and returns `restore()` for the caller's own `finally`, since the
   // artifact panel's `api.artifactCurrent()` query and everything the
   // test does after this click still need the stub alive.
-  async function openArtifact(view: ReturnType<typeof render>): Promise<() => void> {
+  async function openArtifact(view: ReturnType<typeof render>, waitForText: string = ARTIFACT.body): Promise<() => void> {
     const restore = stubArtifactTurnFetch(
       ndjsonStream([
         { type: "delta", text: "Wrote it." },
@@ -918,7 +919,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     // own heading, ambiguous for a bare findByText) is what proves the
     // canvas is genuinely open, through a real api.artifactCurrent()
     // round trip, not just that the turn completed.
-    await view.findByText(ARTIFACT.body);
+    await view.findByText(waitForText);
     return restore;
   }
 
@@ -967,6 +968,51 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
       await waitFor(() => expect(document.querySelector('[data-slot="desktop-canvas-wrapper"]')).toHaveClass("w-0"));
       expect(view.getByText("Wrote it.")).toBeVisible();
     } finally {
+      restore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
+  });
+
+  // THIN-5F (rule 9, closes CANVAS-READ-01): the pane renders the
+  // document with the chat's own MarkdownText, so Markdown reads as a
+  // page instead of raw lines.
+  test("desktop viewport: the canvas renders a document's Markdown (heading, list, table, link, code) with the chat's renderer", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
+    artifactBodyOverride = [
+      "# Pizza night",
+      "",
+      "- dough",
+      "- sauce",
+      "",
+      "| Topping | Votes |",
+      "| --- | --- |",
+      "| basil | 3 |",
+      "",
+      "See [the recipe](https://example.com/recipe) and `oven` first.",
+    ].join("\n");
+    let restore: () => void = () => {};
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(view.queryByLabelText("Message input")).not.toBeNull());
+      await act(async () => { window.dispatchEvent(new Event("resize")); });
+      restore = await openArtifact(view, "Wrote it.");
+      const pane = document.querySelector('[data-slot="desktop-canvas-wrapper"]') as HTMLElement;
+      await waitFor(() => expect(pane.querySelector(".aui-md")).toBeTruthy());
+      expect(within(pane).getByRole("heading", { name: "Pizza night", level: 1 })).toBeTruthy();
+      expect(within(pane).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["dough", "sauce"]);
+      expect(within(pane).getByRole("table")).toBeTruthy();
+      expect(within(pane).getByRole("link", { name: "the recipe" }).getAttribute("href")).toBe("https://example.com/recipe");
+      expect(pane.querySelector("code")?.textContent).toBe("oven");
+      // Raw Markdown syntax never shows as text.
+      expect(pane.textContent).not.toContain("# Pizza night");
+      expect(pane.textContent).not.toContain("| --- |");
+    } finally {
+      artifactBodyOverride = null;
       restore();
       Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
     }

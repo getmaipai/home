@@ -2,8 +2,9 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ActionBarMorePrimitive, AssistantRuntimeProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolApprovalOption, type ToolCallMessagePartComponent } from "@assistant-ui/react";
+import { ActionBarMorePrimitive, AssistantRuntimeProvider, TextMessagePartProvider, useAssistantToolUI, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime, type ThreadAssistantMessagePart, type ThreadMessage, type ToolApprovalOption, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
+import { MarkdownText } from "@maipai/ui/src/elements/markdown-text";
 // APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
 // default `ToolFallback` renders (its own `import { ToolFallback } from
 // "@maipai/ui/src/assistant-ui/tool-fallback.aui"`) - used here directly
@@ -1192,12 +1193,13 @@ function ArtifactCanvasPanel({ artifactId, onClose }: { artifactId: string; onCl
             <>
               <CanvasSplitHeader title={artifact.title} version={artifact.version} saved onCopy={() => void navigator.clipboard.writeText(artifact.body)} onClose={onClose} />
               <CanvasSplitBody>
-                {artifact.body.split("\n").map((line, index) => (
-                  // No stable id in a plain-text body: index is fine,
-                  // this list never reorders itself, only refetches as
-                  // a whole.
-                  <CanvasSplitLine key={index}>{line || " "}</CanvasSplitLine>
-                ))}
+                {/* THIN-5F (rule 9): the chat's own MarkdownText, exactly as
+                    shipped. It reads its text from a message-part context,
+                    which TextMessagePartProvider supplies from the fetched
+                    body; a refetch swaps the text in place. */}
+                <TextMessagePartProvider text={artifact.body}>
+                  <MarkdownText />
+                </TextMessagePartProvider>
               </CanvasSplitBody>
             </>
           )}
