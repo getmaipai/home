@@ -36,9 +36,10 @@ export const ChatListItems: FC<{
       if (!needle) return true;
       return (item?.title || "New Chat").toLowerCase().includes(needle) || (item?.remoteId !== undefined && !!contentMatchIds?.has(item.remoteId));
     };
-    const regular = threadIds.map((id, index) => ({ index, id, lastMessageAt: byId.get(id)?.lastMessageAt })).filter((entry) => matches(entry.id));
+    const regular = threadIds.map((id, index) => ({ index, id, lastMessageAt: byId.get(id)?.lastMessageAt, pinned: byId.get(id)?.custom?.pinned === true })).filter((entry) => matches(entry.id));
+    const pinned = regular.filter((entry) => entry.pinned);
     const archived = archivedThreadIds.map((id, index) => ({ index, id })).filter((entry) => matches(entry.id));
-    return { regular, archived, groups: groupChatList(regular, new Date()) };
+    return { regular, archived, pinned, groups: groupChatList(regular.filter((entry) => !entry.pinned), new Date()) };
   }, [threadItems, threadIds, archivedThreadIds, query, contentMatchIds]);
 
   if (isLoading) {
@@ -68,6 +69,16 @@ export const ChatListItems: FC<{
 
   return (
     <div data-slot="aui_chat-list-items" className="flex flex-col gap-0.5">
+      {view.pinned.length > 0 && (
+        <div className="flex flex-col gap-0.5">
+          <div data-slot="aui_thread-list-group-label" className="text-muted-foreground px-2.5 pt-3 pb-1 text-sm font-medium">
+            Pinned
+          </div>
+          {view.pinned.map((entry) => (
+            <ThreadListPrimitive.ItemByIndex key={entry.id} index={entry.index} components={{ ThreadListItem }} />
+          ))}
+        </div>
+      )}
       {view.groups.map((group) => (
         <div key={group.label} className="flex flex-col gap-0.5">
           <div data-slot="aui_thread-list-group-label" className="text-muted-foreground px-2.5 pt-3 pb-1 text-sm font-medium">

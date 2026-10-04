@@ -16,8 +16,8 @@ const NEVER_RUNS: ChatModelAdapter = { async *run() { /* the list never starts a
 
 const hoursAgo = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 const daysAgo = (d: number) => hoursAgo(d * 24);
-function row(id: string, title: string | null, lastTurnAt: string, archived = false) {
-  return { id, title, surface: "chat", created_at: lastTurnAt, last_turn_at: lastTurnAt, pinned: false, archived };
+function row(id: string, title: string | null, lastTurnAt: string, archived = false, pinned = false) {
+  return { id, title, surface: "chat", created_at: lastTurnAt, last_turn_at: lastTurnAt, pinned, archived };
 }
 
 const useNeverRunsRuntime = () => useLocalRuntime(NEVER_RUNS);
@@ -64,6 +64,20 @@ describe("ChatListItems", () => {
     expect(labels).toEqual(["Today", "Yesterday", "Previous 7 days", "Older"]);
     const titles = [...view.container.querySelectorAll('[data-slot="aui_thread-list-item-title"]')].map((el) => el.textContent);
     expect(titles).toEqual(["Tomato plant care", "Fixing the garden gate", "Pasta night ideas", "Winter coat sizes"]);
+  });
+
+  test("pinned chats sit in a Pinned group above the date groups, and are not repeated below", async () => {
+    serve([
+      row("conv-today", "Tomato plant care", hoursAgo(0.1)),
+      row("conv-pinned-old", "Family budget", daysAgo(40), false, true),
+      row("conv-yday", "Fixing the garden gate", daysAgo(1)),
+    ]);
+    const view = render(<Harness />);
+    await view.findByText("Family budget");
+    const labels = [...view.container.querySelectorAll('[data-slot="aui_thread-list-group-label"]')].map((el) => el.textContent);
+    expect(labels).toEqual(["Pinned", "Today", "Yesterday"]);
+    const titles = [...view.container.querySelectorAll('[data-slot="aui_thread-list-item-title"]')].map((el) => el.textContent);
+    expect(titles).toEqual(["Family budget", "Tomato plant care", "Fixing the garden gate"]);
   });
 
   test("an empty list says so and points at the way forward", async () => {
