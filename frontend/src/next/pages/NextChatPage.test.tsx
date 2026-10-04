@@ -3980,3 +3980,62 @@ describe("NextChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
     }
   });
 });
+
+describe("NextChatPage (UI-2 A7: Branch in new chat)", () => {
+  function stubForkFetch(forkCalls: string[]): () => void {
+    const original = globalThis.fetch;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/fork") && init?.method === "POST") {
+        forkCalls.push(url);
+        return Promise.resolve(Response.json({ id: "conv-forked123", status: "open", surface: "chat" }, { status: 201 }));
+      }
+      if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-fork-src", status: "open", surface: "chat" }));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      if (url.includes("/api/turn/stream")) {
+        return Promise.resolve(
+          new Response(
+            ndjsonStream([
+              { type: "delta", text: "Sprout likes the garden." },
+              { type: "done", value: { turn_id: "turn-fork123", conversation_id: "conv-fork-src", reply: { text: "Sprout likes the garden." }, source: "model", safety: SAFETY } },
+            ]),
+            { status: 200, headers: { "content-type": "application/x-ndjson" } },
+          ),
+        );
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  }
+
+  test("More > Branch in new chat forks at that reply and opens the new conversation", async () => {
+    const forkCalls: string[] = [];
+    const restore = stubForkFetch(forkCalls);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <ConversationLocation />
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      fireEvent.change(await view.findByLabelText("Message input"), { target: { value: "who likes the garden" } });
+      const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+      await waitFor(() => expect(send.disabled).toBe(false));
+      fireEvent.click(send);
+      expect(await view.findByText("Sprout likes the garden.")).toBeVisible();
+      const trigger = await view.findByRole("button", { name: "More" });
+      act(() => {
+        fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false, pointerId: 1 });
+        fireEvent.click(trigger);
+      });
+      fireEvent.click(await view.findByText("Branch in new chat"));
+      await waitFor(() => expect(forkCalls).toEqual(["/api/conversations/turns/turn-fork123/fork"]));
+      await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toContain("conversation=conv-forked123"));
+    } finally {
+      restore();
+    }
+  });
+});
