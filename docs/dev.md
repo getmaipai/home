@@ -35886,3 +35886,58 @@ Per row against THIN-AB's acceptance (Home's adult replies are not shorter, plai
 - Mechanism, read from the engine requests the proxy recorded: a searched spoken turn makes two engine calls. The first (the tool call) takes 0.2 to 0.4 s warm. The second, the phrasing round after the search, carries 2,550 to 3,343 prompt tokens of which only about 1,500 are cached, so about 1,000 to 1,800 tokens of search evidence and page text are read from scratch: 4.0 to 4.9 s to the first token of the answer in the traced runs. The rest of the first word (about 2 to 3 s) is the search and the page step. A plain spoken question with no search is 0.47 to 0.9 s warm and passes.
 - The mechanism the item suggests, fewer pages on a spoken turn (and less evidence text per page), is the one the numbers point to; it is not applied here, as instructed. Do not tick THIN-4F on this evidence.
 - Plain no-search spoken turns: PASS (0.47 to 0.9 s warm, 4.3 s on the first, cold one).
+
+## THIN-Q1 diagnosis (2026-10-04)
+
+Partial: step 1 is done and step 3 is derived from engine timings; steps 2 and 4 (bisect, cache reversal) were not run, because the Stack answered a memory 503 for the chat role mid-run and the protocol is to stop and report, not work around it. The Stack's `offline_reason`, verbatim: "The current memory budget cannot admit the request. It needs about 0.5 GB with 7.8 GB free, after the working margin the machine's tier keeps back; memory pressure is normal. The chat engine waited 15 s for memory and gave up." (arm A2 on w1-story; the OS reported pressure level normal before and after, and the embed role loaded fine, 238 ms and 19 ms). The admission check refuses a 0.5 GB request with 7.8 GB free; that is a Stack finding in its own right.
+
+| | |
+|---|---|
+| Engine build | `local b10797-832fd6f17` |
+| Model file | `Qwen3-8B-Q4_K_M.gguf` (context 4096 as measured by the Stack) |
+| Hardware | Apple M4 Pro, 24 GB unified memory, one laptop |
+| Method | `chat-ab-01.ts --only k1-heat-pump,w1-story --runs 1`, a scratch data directory, a logging forwarder between the bench and the Stack that wrote every request body, no search reached (search URL a dead local port; neither turn searched). 14 live chat requests in all. |
+
+**Step 1: request bodies, arm A against arm B (same prompt).**
+
+| Field | A bare | A2 | B (Home, adult, chat) |
+|---|---|---|---|
+| system messages | none | none | two: persona line (106 chars, "You are MaiPai, a private, self-hosted AI assistant ... Nothing you say leaves this house.") and a clock line (44 chars) |
+| memory block | none | none | none in the body (the scratch household has no memories; a real household's block is not measured here) |
+| tools block | none | none | 10 tools (almanac-date, almanac-time, convert, math, remember, remind, start_project, timer, weather, websearch), 3,413 JSON chars, `tool_choice: auto` |
+| sampling | engine defaults | CHAT_SAMPLING | CHAT_SAMPLING, field for field the same as A2 |
+| `max_tokens` | 1536 | 1536 | 1536 |
+| thinking | `enable_thinking: false` | same | same |
+| other | | | `cache_prompt: true`, `id_slot: 0` |
+| prompt tokens (k1 / w1) | 32 / 38 | 32 / 38 | 1,046 / 1,052 |
+
+So B differs from A2 by the persona and clock lines (about 30 tokens) and the tools block (about 980 tokens), and by nothing else in the body. No instruction about length is in the request (rule 5 holds on the wire).
+
+**Measurements (1 run each, so direction only).**
+
+| Item | Arm | Words | Completion tokens | First text | Engine prompt eval |
+|---|---|---|---|---|---|
+| k1-heat-pump | A | 518 | 704 | 138 ms | 115 ms (32 tokens) |
+| k1-heat-pump | A2 | 519 | 698 | 109 ms | 41 ms (1 uncached token) |
+| k1-heat-pump | B | 175 | 209 | 2,742 ms | 2,378 ms (1,046 tokens, cache 0) |
+| w1-story | A | 412 | 535 | 226 ms | 174 ms |
+| w1-story | A2 | 503, no result | | | |
+| w1-story | B | 378 | 469 | 3,241 ms | 2,367 ms (1,052 tokens, cache 0) |
+
+**Attribution.**
+
+| Gap | Cause | Number | By design or defect |
+|---|---|---|---|
+| First text 2.7 to 3.2 s | Cold prompt eval of the persona plus tools prefix: the slot held the bare arms' prompt, so all 1,046 tokens were read at about 440 tokens/s | 2,378 ms of the 2,415 ms the engine took to answer headers; the rest of Home before the model is 76 to 327 ms in total (k1: 327 ms of which the memory embed call was 238 ms; w1: 76 ms of which embed 19 ms) | The cache eviction is the bench's alternating arms (rule 13's single engine, one slot); not Home's cost. Whether a real warm turn pays it is **not measured here** (step 4 not run). The 10-tool block on every turn is by design (model decides tools, `tool_choice: auto`); its size is open to question, see items below. |
+| Adult gate holding text back | Check-as-it-arrives gate (rule 10) | At most 57 to 90 ms: first text minus engine header time minus the embed call. Two samples. | By design (rule 10); cost is small in these two samples. |
+| Length 175 against 518 words (k1) | Not sampling: A2 matches A (519 against 518) and B sends the same sampling as A2. Not `max_tokens`, thinking, or any length instruction. What differs is the persona and clock lines and the roughly 980-token tools block in front of the user message. | k1 34 percent of A; w1 92 percent of A (378 against 412), so the effect is not constant | Unproven. Both items together are 2 samples, one run each; w1 shows almost no gap. The bisect (step 2) is what would separate the persona line from the tools block, and is still owed. |
+| Reasoning 2 of 4 against 3 of 4 | Not examined (thin sample, n is 4) | n/a | Needs more runs, not a cause hunt. |
+
+**Proposed backlog items (none implemented).**
+
+1. THIN-Q2 (S): rerun the THIN-Q1 bisect and the warm-cache reversal when the Stack's admission check lets the chat role through. Acceptance: A, A+persona, A+tools, A+both, B at 3 runs each on k1 and two long-form items, cold then warm, words and first text recorded.
+2. STACK-ADMIT-01 (S): the Stack refused a 0.5 GB chat request with 7.8 GB free and pressure normal, after a 15 s wait. Acceptance: a reproduction and a cause, or the margin corrected, with the offline reason naming the real numbers.
+3. THIN-Q3 (M, only if the bisect shows the tools block shortens replies or the cold read recurs warm): shrink or conditionally offer the tools block (about 980 tokens on every adult turn). Acceptance: reply length within the bare model's range on the dataset, with tool calls still working; needs a rule 5 and rule 13 check first, since offering tools by model choice is accepted design.
+4. BENCH-AB-02 (S): the adult group should run each arm in its own block (or warm each arm once) so first text is not dominated by slot eviction, and record the slot's cached token count per row. Acceptance: first-text rows state cold or warm.
+
+Reply text is in the git-ignored bench output; only numbers are recorded here.
