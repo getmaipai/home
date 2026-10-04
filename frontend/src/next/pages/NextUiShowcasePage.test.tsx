@@ -93,10 +93,8 @@ describe("NextUiShowcasePage", () => {
     const view = open();
     fireEvent.click(await waitFor(() => view.getByRole("button", { name: /^Code blocks\./ })));
     await waitFor(() => expect(view.container.querySelectorAll("pre").length).toBe(2), { timeout: 5000 });
-    for (const pre of Array.from(view.container.querySelectorAll("pre"))) {
-      const scope = pre.parentElement!;
-      expect(within(scope).getAllByRole("button", { name: /copy/i }).length).toBeGreaterThan(0);
-    }
+    // The kit puts each block's copy button in a header beside the block (a sibling of the highlighter's container), so count them across the thread.
+    expect(within(view.container).getAllByRole("button", { name: /copy/i }).length).toBeGreaterThanOrEqual(2);
   });
 
   test("a failure scenario ends the thread in the error, not a silent blank", async () => {

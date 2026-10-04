@@ -14,26 +14,32 @@ import type { TurnStreamEvent } from "@maipai/home-backend/src/wire";
 export type AssistantTurnEvent = TurnStreamEvent;
 
 export async function* readAssistantTurnStream(response: Response): AsyncGenerator<AssistantTurnEvent, void, void> {
-  const chunks = response.body!.pipeThrough(new DataStreamDecoder({ strict: false })).getReader();
-  // part-start carries the parent path; the part's own index is its start order.
-  const kinds: ("text" | "reasoning" | undefined)[] = [];
-  let sequence: number | undefined;
-  for (;;) {
-    const { done, value } = await chunks.read();
-    if (done) return;
-    const chunk: AssistantStreamChunk = value;
-    if (chunk.type === "part-start") {
-      if (chunk.path.length === 0) kinds.push(chunk.part.type === "text" || chunk.part.type === "reasoning" ? chunk.part.type : undefined);
-    } else if (chunk.type === "text-delta") {
-      const kind = chunk.path.length === 1 ? kinds[chunk.path[0]!] : undefined;
-      if (!kind) continue;
-      yield { type: kind === "text" ? "delta" : "reasoning", text: chunk.textDelta, ...(sequence === undefined ? {} : { sequence }) } as AssistantTurnEvent;
-      sequence = undefined;
-    } else if (chunk.type === "data") {
-      for (const entry of chunk.data as unknown as Record<string, unknown>[]) {
-        if (entry.type === "sequence") sequence = Number(entry.sequence);
-        else yield entry as unknown as AssistantTurnEvent;
+  if (!response.body) throw new Error("The turn stream had no body.");
+  const chunks = response.body.pipeThrough(new DataStreamDecoder({ strict: false })).getReader();
+  try {
+    // part-start carries the parent path; the part's own index is its start order.
+    const kinds: ("text" | "reasoning" | undefined)[] = [];
+    let sequence: number | undefined;
+    for (;;) {
+      const { done, value } = await chunks.read();
+      if (done) return;
+      const chunk: AssistantStreamChunk = value;
+      if (chunk.type === "part-start") {
+        if (chunk.path.length === 0) kinds.push(chunk.part.type === "text" || chunk.part.type === "reasoning" ? chunk.part.type : undefined);
+      } else if (chunk.type === "text-delta") {
+        const kind = chunk.path.length === 1 ? kinds[chunk.path[0]!] : undefined;
+        if (!kind) continue;
+        yield { type: kind === "text" ? "delta" : "reasoning", text: chunk.textDelta, ...(sequence === undefined ? {} : { sequence }) } as AssistantTurnEvent;
+        sequence = undefined;
+      } else if (chunk.type === "data") {
+        for (const entry of chunk.data as unknown as Record<string, unknown>[]) {
+          if (entry.type === "sequence") sequence = Number(entry.sequence);
+          else yield entry as unknown as AssistantTurnEvent;
+        }
       }
     }
+  } finally {
+    // An early exit (abort, break, a throw in the consumer) must not leave the body locked and the connection open.
+    void chunks.cancel().catch(() => {});
   }
 }

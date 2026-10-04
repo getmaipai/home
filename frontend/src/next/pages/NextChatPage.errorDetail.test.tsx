@@ -11,7 +11,7 @@ import { NextChatPage } from "@/next/pages/NextChatPage";
 import { IncognitoProvider } from "@/next/incognitoContext";
 import type { Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
-import { ndjsonStream } from "../../../tests/ndjsonStream";
+import { assistantStreamBody as ndjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
 
 const ORIGINAL_MATCH_MEDIA = window.matchMedia;
 beforeEach(() => {
@@ -55,7 +55,7 @@ function stubFailedTurn(failed: boolean): { urls: string[]; restore: () => void 
         failed ? { t: "tool_error", call_id: "call-1", package_id: "websearch", error: "unavailable" } : { t: "tool_result", call_id: "call-1", package_id: "websearch", outcome: { text: "3 results" } },
         { type: "delta", text: "I could not look that up." },
         { type: "done", value: { turn_id: "turn-failed123", reply: { text: "I could not look that up." }, source: "model", safety: SAFETY } },
-      ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
     }
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;

@@ -56,4 +56,48 @@ describe("readAssistantTurnStream", () => {
     const events = await drain(respond([META, { type: "delta", text: "partial", sequence: 1 }]));
     expect(events.some((e) => e.type === "done" || e.type === "error")).toBe(false);
   });
+
+  test("a body that arrives in tiny, delayed pieces still yields every delta before done, in order, each with its own sequence", async () => {
+    const wire = await new Response(assistantStreamBody([
+      META,
+      { type: "reasoning", text: "think ", sequence: 1 },
+      { type: "delta", text: "A", sequence: 2 },
+      { type: "status", stage: "lookup", text: "Looking" },
+      { type: "delta", text: "B", sequence: 3 },
+      { type: "delta", text: "C", sequence: 4 },
+      { type: "done", value: { reply: { text: "ABC" } } },
+    ])).text();
+    const bytes = new TextEncoder().encode(wire);
+    let at = 0;
+    const slow = new ReadableStream<Uint8Array>({
+      async pull(controller) {
+        if (at >= bytes.length) return controller.close();
+        await new Promise((r) => setTimeout(r, 1));
+        controller.enqueue(bytes.slice(at, at + 5));
+        at += 5;
+      },
+    });
+    const events = await drain(new Response(slow, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
+    expect(events.map((e) => [e.type, e.text, e.sequence])).toEqual([
+      ["turn_meta", undefined, undefined],
+      ["reasoning", "think ", 1],
+      ["delta", "A", 2],
+      ["status", "Looking", undefined],
+      ["delta", "B", 3],
+      ["delta", "C", 4],
+      ["done", undefined, undefined],
+    ]);
+  });
+
+  test("stopping early cancels the body so the connection is released", async () => {
+    let cancelled = false;
+    const wire = await new Response(assistantStreamBody([META, { type: "delta", text: "A", sequence: 1 }])).text();
+    const bytes = new TextEncoder().encode(wire);
+    const body = new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(bytes); }, pull() {}, cancel() { cancelled = true; } });
+    const reader = readAssistantTurnStream(new Response(body, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
+    expect((await reader.next()).done).toBe(false);
+    await reader.return(undefined);
+    await new Promise((r) => setTimeout(r, 5));
+    expect(cancelled).toBe(true);
+  });
 });
