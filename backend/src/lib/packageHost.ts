@@ -966,12 +966,21 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
     } catch (err) {
       if (!(err instanceof HostError && err.code === "search_unavailable") || next.length === 0) throw err;
       const retryNext = pickSearchEngines(rotationPool!, asked);
-      if (retryNext.length === 0) throw err;
+      if (retryNext.length === 0) {
+        // Benching during the request emptied the pool: the first request left the
+        // Wikipedia fallback for a retry that cannot happen, so try it here.
+        const fallback = opts.allowWikipediaFallback ?? true ? await tryWikipediaFallback(query) : null;
+        if (fallback) return fallback;
+        throw err;
+      }
       return searxngSearchUncached(args, { ...opts, safeEngines: [...retryNext, ...wikipedia] });
     }
     if (!rotationPool || !requestEngines || requestEngines.length === 0 || result.rows.length >= 3) return result;
     const more = pickSearchEngines(rotationPool, asked);
-    if (more.length === 0) return result;
+    if (more.length === 0) {
+      const fallback = result.text === SEARXNG_NO_RESULTS_TEXT && (opts.allowWikipediaFallback ?? true) && next.length > 0 ? await tryWikipediaFallback(query) : null;
+      return fallback ?? result;
+    }
     const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...more, ...wikipedia] });
     const rows = dedupeRows([...result.rows, ...second.rows]);
     return { text: [result.text, second.text].filter((value) => value !== SEARXNG_NO_RESULTS_TEXT).join("\n"), rows };

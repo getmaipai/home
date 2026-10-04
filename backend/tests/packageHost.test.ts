@@ -2155,6 +2155,28 @@ describe("search engine choice: three engines ranked by recent health (THIN-GROU
     } finally { fake.stop(); }
   });
 
+  test("when benching during the request leaves no engine for a retry, the Wikipedia fallback still runs", async () => {
+    const wiki = Bun.serve({ port: 0, fetch: (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/w/rest.php/v1/search/page") return Response.json({ pages: [{ id: 1, key: "Juniper_(topic)", title: "Juniper (topic)" }] });
+      if (url.pathname.startsWith("/api/rest_v1/page/summary/")) return Response.json({ title: "Juniper (topic)", extract: "Juniper is a roster-safe example topic.", content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Juniper_(topic)" } } });
+      return new Response("not found", { status: 404 });
+    } });
+    const previous = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = `http://127.0.0.1:${wiki.port}`;
+    const fake = fakeSearxng(() => ({ results: [], unresponsive_engines: ["alpha", "bravo", "charlie", "delta"].map((e) => [e, "Suspended: too many requests"]) }));
+    try {
+      const result = await searxngSearch({ query: "juniper" });
+      expect(fake.asked).toHaveLength(1);
+      expect(result.rows[0]!.title).toBe("Juniper (topic)");
+    } finally {
+      if (previous === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previous;
+      wiki.stop(true);
+      fake.stop();
+    }
+  });
+
   test("a retry that is also empty stops there: one retry only", async () => {
     const fake = fakeSearxng(() => ({ results: [], unresponsive_engines: [["alpha", "Suspended: too many requests"]] }));
     try {
