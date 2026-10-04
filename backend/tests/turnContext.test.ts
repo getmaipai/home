@@ -1,6 +1,6 @@
 // CHAT-01 (docs/dev/session-a.md): the ephemeral turn context, the one
 // view the prompt and the guards share. These are the unit tests of its
-// own rules; tests/turnEngine.test.ts proves them through runTurn() with
+// own rules; tests/chatTurn.test.ts proves them through runTurn() with
 // scripted completions.
 import { describe, expect, test } from "bun:test";
 import { guardContextFrom, intentFor, markIncluded, includedEvidence, framedUnknownNames, sourcesFromRows, sensitiveAllowed, asksHowKnown, outcomeText, type TurnContext, type TurnEvidence } from "@/lib/turnContext";
@@ -98,7 +98,6 @@ function context(overrides: Partial<TurnContext> = {}): TurnContext {
     roster: ["Sage", "Pippa"],
     signal: signalFor("where is Pippa"),
     subjects: [],
-    subjectPronouns: [],
     ...overrides,
   };
 }
@@ -194,8 +193,7 @@ describe("ASK-01: the guards' unknown names are the context line's", () => {
       { type: "household" as const, entity_id: "ent-abcdef", carried_question: null },
     ];
     expect(framedUnknownNames({ subjects: refs })).toEqual(["Clover"]);
-    expect(guardContextFrom(context({ subjects: refs, subjectPronouns: [{ name: "Clover", pronouns: "she" }], utterance: "Clover borrowed our tent and she loved it" })).unknownNames).toEqual(["Clover"]);
-    expect(guardContextFrom(context({ subjects: refs, utterance: "Clover borrowed our tent and she loved it" })).pronounsInPlay).toEqual(["she"]);
+    expect(guardContextFrom(context({ subjects: refs, utterance: "Clover borrowed our tent and she loved it" })).unknownNames).toEqual(["Clover"]);
   });
 });
 

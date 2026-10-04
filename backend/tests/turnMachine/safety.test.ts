@@ -1,6 +1,6 @@
 // THIN-0N (rules 0 and 12, found reviewing THIN-0D): the safety node
 // moderates at the speaker's EFFECTIVE band, the same derivation the old
-// path makes at turnEngine.ts's prepareTurn() (turnContext.ts's
+// path makes at the retired turn engine's prepareTurn() (turnContext.ts's
 // effectiveBand()). On a robot, a speaker the body cannot name is the
 // child band even when the signed-in person is an adult. Direct unit
 // tests of the node, in the style of commands.test.ts and policy.test.ts.

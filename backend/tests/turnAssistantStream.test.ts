@@ -4,7 +4,7 @@
 // own DataStreamEncoder framing (assistant-stream 0.3.44,
 // src/core/serialization/data-stream/DataStream.ts); a request that does
 // not ask gets the NDJSON events byte for byte as before (turnBare*,
-// turnEngine and safety01 tests pin those). Both wires are the same
+// the retired turn engine and safety01 tests pin those). Both wires are the same
 // released events, so the stored reply is the concatenation of released
 // text on either, resume keeps the one shared sequence counter, and the
 // crisis resources of THIN-0E ride the terminal error on both.
@@ -23,7 +23,6 @@ const ACCEPT = { accept: "application/x-assistant-stream" };
 
 beforeEach(() => {
   resetDb();
-  setHouseholdSettingValue("turn.pipeline.next", true);
 });
 afterEach(() => {
   __resetLlmSupervisorForTests();

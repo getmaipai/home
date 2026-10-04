@@ -13,7 +13,7 @@ import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 import { finishBench } from "../scripts/bench/finish";
 
 const BACKEND = join(import.meta.dir, "..");
-const ENTRY_POINTS = ["routing.ts", "tool-calling.ts", "naturalness.ts", "persona-eval.ts", "memory-eval.ts", "memory/run.ts", "judge-eval.ts", "parity-bisect.ts", "parity-bisect2.ts", "parity-bisect3.ts", "parity-bisect4.ts", "prefix-class-01-verify.ts", "style-adapter.ts"];
+const ENTRY_POINTS = ["tool-calling.ts", "naturalness.ts", "persona-eval.ts", "memory/run.ts", "judge-eval.ts", "parity-bisect.ts", "parity-bisect2.ts", "parity-bisect3.ts", "parity-bisect4.ts", "prefix-class-01-verify.ts", "style-adapter.ts"];
 
 let stub: { url: string; stop: () => Promise<void> };
 beforeAll(() => {
@@ -43,7 +43,7 @@ describe("CHAT-22: the bench setup refuses anything but a fresh temp directory a
     const sentinel = join(dir, "sentinel.txt");
     writeFileSync(sentinel, "a household lives here");
     const before = statSync(sentinel).mtimeMs;
-    const { code, out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir });
+    const { code, out } = await runBench("tool-calling.ts", { ...stubEnv(), MAIPAI_DATA_DIR: dir });
     expect(code).toBe(2);
     expect(out).toContain("bench setup refused");
     expect(readFileSync(sentinel, "utf-8")).toBe("a household lives here");
@@ -52,7 +52,7 @@ describe("CHAT-22: the bench setup refuses anything but a fresh temp directory a
   });
 
   test("a directory outside the system temp root is refused", async () => {
-    const { code, out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: join(BACKEND, "definitely-not-a-bench-dir") });
+    const { code, out } = await runBench("tool-calling.ts", { ...stubEnv(), MAIPAI_DATA_DIR: join(BACKEND, "definitely-not-a-bench-dir") });
     expect(code).toBe(2);
     expect(out).toContain("not under the system temp root");
     expect(existsSync(join(BACKEND, "definitely-not-a-bench-dir"))).toBe(false);
@@ -60,7 +60,7 @@ describe("CHAT-22: the bench setup refuses anything but a fresh temp directory a
 
   test("no engine URL means no run: nothing is spawned or downloaded", async () => {
     const dir = mkdtempSync(join(tmpdir(), "maipai-bench-nourl-"));
-    const { code, out } = await runBench("routing.ts", { MAIPAI_DATA_DIR: dir, MAIPAI_EMBED_URL: stub.url });
+    const { code, out } = await runBench("tool-calling.ts", { MAIPAI_DATA_DIR: dir, MAIPAI_EMBED_URL: stub.url });
     expect(code).toBe(2);
     expect(out).toContain("MAIPAI_LLAMA_SERVER_URL is not set");
     expect(readdirSync(dir)).toEqual([]);
@@ -68,7 +68,7 @@ describe("CHAT-22: the bench setup refuses anything but a fresh temp directory a
 
   test("a chat URL nothing answers is refused before any case runs, not scored as a full run", async () => {
     const dir = mkdtempSync(join(tmpdir(), "maipai-bench-deadurl-"));
-    const { code, out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_LLAMA_SERVER_URL: "http://127.0.0.1:1", MAIPAI_DATA_DIR: dir });
+    const { code, out } = await runBench("tool-calling.ts", { ...stubEnv(), MAIPAI_LLAMA_SERVER_URL: "http://127.0.0.1:1", MAIPAI_DATA_DIR: dir });
     expect(code).toBe(2);
     expect(out).toContain("no engine answers at MAIPAI_LLAMA_SERVER_URL");
     expect(out).not.toContain("bench finished");
@@ -76,7 +76,7 @@ describe("CHAT-22: the bench setup refuses anything but a fresh temp directory a
 
   test("a sibling of the temp root is not under it", async () => {
     const sibling = `${tmpdir().replace(/\/+$/, "")}-not-temp`;
-    const { code, out } = await runBench("routing.ts", { ...stubEnv(), MAIPAI_DATA_DIR: sibling });
+    const { code, out } = await runBench("tool-calling.ts", { ...stubEnv(), MAIPAI_DATA_DIR: sibling });
     expect(code).toBe(2);
     expect(out).toContain("not under the system temp root");
     expect(existsSync(sibling)).toBe(false);

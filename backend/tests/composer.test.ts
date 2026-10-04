@@ -1,18 +1,7 @@
 // CHAT-16 (K2, K6): the composer's decision table, its budget, its
-// messages and its machine, with a scripted completion; then the engine
-// on both paths, a two-outcome turn composed in one call with the native
-// tool messages the stub saw in order.
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { db } from "@/db";
-import { people, conversationTurns } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { resetDb } from "./reset-db";
-import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { remember } from "@/lib/memory";
-import { runTurn, runTurnStream } from "@/lib/turnEngine";
-import { TestClient } from "./client";
-import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
+// messages and its machine, with a scripted completion. (The old engine's
+// two-outcome composition turns left with it, THIN-7D.)
+import { describe, expect, test } from "bun:test";
 import { outcomeText, groundOutcomes, type ToolExecutionOutcome, type TurnContext } from "@/lib/turnContext";
 import type { LlmMessage } from "@/lib/llm";
 import {
@@ -438,7 +427,7 @@ describe("the grounding", () => {
     const signal = classifyTurnSignal({ text: utterance, ageBand: "adult" });
     const rows = [{ title: "Lantern Bay (cartoon): Marlow", url: "https://example.com/lantern-bay", snippet: "Marlow the plough horse lives on the Quill farm near the bay." }];
     const search = outcome({ callId: "t:ladder", packageId: "websearch", status: "succeeded", via: "forced", args: { expression: "lantern bay cartoon horse" }, result: { actions: [], data: { rows, query: "lantern bay cartoon horse" }, synthesis_hint: "answer from these results" } });
-    const ctx: TurnContext = { turnId: "t", conversationId: "c", actorId: "p", surface: "chat", utterance, history: [], evidence: [], includedEvidenceIds: [], offeredToolIds: ["websearch"], outcomes: [search], intent: intentFor(utterance, signal), persona: { id: "d", displayName: "MaiPai", examples: [] }, ageBand: "adult", now: new Date(), locale: "en-US", roster: ["Sage"], signal, subjects: [], subjectPronouns: [] };
+    const ctx: TurnContext = { turnId: "t", conversationId: "c", actorId: "p", surface: "chat", utterance, history: [], evidence: [], includedEvidenceIds: [], offeredToolIds: ["websearch"], outcomes: [search], intent: intentFor(utterance, signal), persona: { id: "d", displayName: "MaiPai", examples: [] }, ageBand: "adult", now: new Date(), locale: "en-US", roster: ["Sage"], signal, subjects: [] };
     const composed = "He lives on the Quill farm near the bay, a plough horse.";
     expect(guardReply(composed, { ...guardContextFrom(ctx), personId: "p" })).toMatchObject({ reason: "invention", replaced: true });
     groundOutcomes(ctx, [search]);
@@ -506,235 +495,6 @@ describe("K6: the machine", () => {
   });
 });
 
-// The engine: a two-outcome turn composed in one call on both paths,
-// the native tool messages seen by the stub in order.
-describe("the engine composes a two-outcome turn in one call", () => {
-  beforeEach(() => {
-    resetDb();
-    __resetThrottleForTests();
-    __resetLlmSupervisorForTests();
-  });
-  afterEach(() => {
-    delete process.env.MAIPAI_LLAMA_SERVER_URL;
-    __resetLlmSupervisorForTests();
-  });
-
-  async function owner() {
-    const client = new TestClient();
-    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    const actor = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
-    return { client, actor };
-  }
-
-  const COMPOSED = "Saved that, and Friday is pizza night.";
-
-  async function withTwoCalls<T>(fn: (stub: { requests: () => ChatCompletionRequest[] }) => Promise<T>): Promise<T> {
-    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const stub = startStubLlmServer(0, {
-      scriptedToolCalls: (request) => {
-        if (!request.tools || request.tools.length === 0 || request.messages.some((m) => m.role === "tool")) return undefined;
-        return [
-          { id: "call-1", type: "function", function: { name: "remember", arguments: JSON.stringify({ fact: "the wifi password is on the fridge" }) } },
-          { id: "call-2", type: "function", function: { name: "recall", arguments: JSON.stringify({ topic: "pizza night" }) } },
-        ];
-      },
-      scriptedChatReply: (request) => (request.messages.some((m) => m.role === "tool") ? COMPOSED : "Sure."),
-    });
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-    try {
-      return await fn(stub);
-    } finally {
-      await stub.stop();
-    }
-  }
-
-  const composition = (requests: ChatCompletionRequest[]) => requests.filter((r) => r.messages.some((m) => m.role === "tool"));
-
-  function expectNativeToolMessages(request: ChatCompletionRequest) {
-    const messages = request.messages;
-    const assistantAt = messages.findIndex((m) => m.role === "assistant" && (m.tool_calls?.length ?? 0) > 0);
-    expect(assistantAt).toBeGreaterThan(0);
-    expect(messages[assistantAt]!.tool_calls?.map((c) => [c.id, c.function.name])).toEqual([["call-1", "remember"], ["call-2", "recall"]]);
-    expect(messages.slice(assistantAt + 1, assistantAt + 3).map((m) => [m.role, m.tool_call_id])).toEqual([["tool", "call-1"], ["tool", "call-2"]]);
-    expect(messages[messages.length - 1]!.role).toBe("user");
-    expect(messages[messages.length - 1]!.content).toContain("one to three sentences");
-    expect(request.tools).toBeUndefined();
-    const recalled = JSON.parse(messages[assistantAt + 2]!.content) as { reply?: string };
-    expect(recalled.reply).toContain("pizza night");
-  }
-
-  const turnLine = (lines: string[]) => lines.filter((l) => l.startsWith("[turn] {")).map((l) => JSON.parse(l.slice(7)) as { composed?: string; phase?: string; outcomes?: { package: string }[] }).at(-1)!;
-
-  function captureLog(): { lines: string[]; restore: () => void } {
-    const lines: string[] = [];
-    const original = console.log;
-    console.log = (...args: unknown[]) => {
-      lines.push(args.map(String).join(" "));
-      original(...args);
-    };
-    return { lines, restore: () => (console.log = original) };
-  }
-
-  test("runTurn(): remember and recall run, one composition phrases both, the stub saw the retained ids and the tool messages in order, the turn line says so", async () => {
-    const { actor } = await owner();
-    expect(remember(actor, { text: "Friday is pizza night", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.8 }).ok).toBe(true);
-    const log = captureLog();
-    try {
-      await withTwoCalls(async (stub) => {
-        const result = await runTurn(actor, "chat", "our wifi password is on the fridge, please remember this, and what night is pizza night");
-        if (!result.ok) throw new Error(result.error);
-        expect(result.value.source).toBe("plugin");
-        expect(result.value.plugin_id).toBe("remember+recall");
-        expect(result.value.reply.text).toBe(COMPOSED);
-        expect(stub.requests().length).toBe(2);
-        expect(composition(stub.requests()).length).toBe(1);
-        expectNativeToolMessages(composition(stub.requests())[0]!);
-        const row = db.select({ outcomes: conversationTurns.outcomes }).from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
-        expect((JSON.parse(row!.outcomes!) as { packageId: string; status: string }[]).map((o) => [o.packageId, o.status])).toEqual([["remember", "succeeded"], ["recall", "succeeded"]]);
-      });
-    } finally {
-      log.restore();
-    }
-    expect(turnLine(log.lines)).toMatchObject({ composed: "composition calls=1", phase: "finished" });
-  });
-
-  test("runTurnStream(): the same turn streams the composition's deltas after a composing status, the done value is the package's, one composition call", async () => {
-    const { actor } = await owner();
-    expect(remember(actor, { text: "Friday is pizza night", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.8 }).ok).toBe(true);
-    const log = captureLog();
-    try {
-      await withTwoCalls(async (stub) => {
-        const result = await runTurnStream(actor, "chat", "our wifi password is on the fridge, please remember this, and what night is pizza night");
-        if (!result.ok) throw new Error(result.error);
-        expect(result.kind).toBe("stream");
-        if (result.kind !== "stream") return;
-        const statuses: string[] = [];
-        const drainStatus = async () => { const s = await result.status.next(); if (s && s.type === "status") statuses.push(s.stage); };
-        const iterator = result.tokens[Symbol.asyncIterator]();
-        const deltas: string[] = [];
-        let step = await iterator.next();
-        while (!step.done) {
-          deltas.push(step.value);
-          step = await iterator.next();
-        }
-        await drainStatus();
-        await drainStatus();
-        const value = result.finalize(deltas.join("").trim(), step.value);
-        expect(statuses).toEqual(["tool", "composing"]);
-        expect(deltas.join("").trim()).toBe(COMPOSED);
-        expect(value.source).toBe("plugin");
-        expect(value.plugin_id).toBe("remember+recall");
-        expect(value.reply.text).toBe(COMPOSED);
-        expect(composition(stub.requests()).length).toBe(1);
-        expectNativeToolMessages(composition(stub.requests())[0]!);
-      });
-    } finally {
-      log.restore();
-    }
-    expect(turnLine(log.lines)).toMatchObject({ composed: "composition calls=1", phase: "finished" });
-  });
-
-  test("a composed search answer is grounded by its rows: a person-trait line the invention guard would cut on a model turn reaches the person, on both paths, on the direct route", async () => {
-    const { actor } = await owner();
-    const { setHouseholdSettingValue } = await import("@/lib/settings");
-    const COMPOSED_TRAIT = "He lives on the Quill farm near the bay, a plough horse.";
-    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const stub = startStubLlmServer(0, {
-      scriptedChatReply: (request) => (request.messages.some((m) => m.role === "tool") ? COMPOSED_TRAIT : "Sure."),
-    });
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-    const searxng = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "Lantern Bay (cartoon): Marlow", url: "https://example.com/lantern-bay", content: "Marlow the plough horse lives on the Quill farm near the bay." }] }) });
-    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
-    const log = captureLog();
-    try {
-      const result = await runTurn(actor, "chat", "search the web for the horse in the old Lantern Bay cartoon");
-      if (!result.ok) throw new Error(result.error);
-      expect(result.value.source).toBe("plugin");
-      expect(result.value.plugin_id).toBe("websearch");
-      expect(result.value.reply.text).toBe(COMPOSED_TRAIT);
-      expect(result.value.sources?.length).toBe(1);
-      expect(stub.requests().length).toBe(1);
-      // The direct route's instruction names the question the search
-      // answered: the pattern's own capture, never "what I just asked".
-      expect(stub.requests()[0]!.messages[stub.requests()[0]!.messages.length - 1]!.content).toContain('Answer this question of mine from the tool results above, in one to three sentences, in your own voice: "the horse in the old Lantern Bay cartoon".');
-      expect(turnLine(log.lines)).toMatchObject({ composed: "composition calls=1 ids=synthetic", phase: "finished" });
-      const streamed = await runTurnStream(actor, "chat", "search the web for the horse in the old Lantern Bay cartoon");
-      if (!streamed.ok || streamed.kind !== "stream") throw new Error("expected a stream");
-      const iterator = streamed.tokens[Symbol.asyncIterator]();
-      let step = await iterator.next();
-      const deltas: string[] = [];
-      while (!step.done) { deltas.push(step.value); step = await iterator.next(); }
-      const value = streamed.finalize(deltas.join("").trim(), step.value);
-      expect(value.reply.text).toBe(COMPOSED_TRAIT);
-      expect(value.plugin_id).toBe("websearch");
-      expect(value.sources?.length).toBe(1);
-      expect(turnLine(log.lines)).toMatchObject({ composed: "composition calls=1 ids=synthetic" });
-    } finally {
-      log.restore();
-      await stub.stop();
-      searxng.stop(true);
-    }
-  });
-
-  test("a streamed lookup holds invented sentences and delivers the rows instead", async () => {
-    const { actor } = await owner();
-    const { setHouseholdSettingValue } = await import("@/lib/settings");
-    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const stub = startStubLlmServer(0, { scriptedChatReply: (request) => request.messages.some((message) => message.role === "tool") ? "The horse is named Invented Meadow in the Invented Chronicle (2024)." : "Sure." });
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-    const searxng = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "Lantern Bay (cartoon)", url: "https://example.com/lantern-bay", content: "The old Lantern Bay cartoon's horse is called Copper." }] }) });
-    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
-    const log = captureLog();
-    try {
-      const streamed = await runTurnStream(actor, "chat", "search the web for the horse in the old Lantern Bay cartoon");
-      if (!streamed.ok || streamed.kind !== "stream") throw new Error("expected a stream");
-      const iterator = streamed.tokens[Symbol.asyncIterator]();
-      const deltas: string[] = [];
-      let step = await iterator.next();
-      while (!step.done) { deltas.push(step.value); step = await iterator.next(); }
-      const value = streamed.finalize(deltas.join("").trim(), step.value);
-      expect(value.reply.text).toContain("Copper");
-      expect(value.reply.text).not.toContain("Invented Meadow");
-      expect(log.lines.some((line) => line.includes('"composed":"grounded_fallback calls=1') && line.includes('"ungrounded":"Invented Meadow"'))).toBe(true);
-    } finally {
-      log.restore();
-      await stub.stop();
-      searxng.stop(true);
-    }
-  });
-
-  test("a single succeeded call with its own reply is delivered direct, no composition call, on both paths", async () => {
-    const { actor } = await owner();
-    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-    const stub = startStubLlmServer(0, {
-      scriptedToolCalls: (request) => (request.tools && request.tools.length > 0 && !request.messages.some((m) => m.role === "tool") ? [{ id: "call-1", type: "function", function: { name: "remember", arguments: JSON.stringify({ fact: "Friday is pizza night" }) } }] : undefined),
-    });
-    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-    const log = captureLog();
-    try {
-      const result = await runTurn(actor, "chat", "Friday is pizza night, can you remember that for me");
-      if (!result.ok) throw new Error(result.error);
-      expect(result.value.plugin_id).toBe("remember");
-      expect(stub.requests().length).toBe(1);
-      expect(turnLine(log.lines)).toMatchObject({ composed: "direct calls=0" });
-      const streamed = await runTurnStream(actor, "chat", "Friday is pizza night, can you remember that for me");
-      if (!streamed.ok || streamed.kind !== "stream") throw new Error("expected a stream");
-      const iterator = streamed.tokens[Symbol.asyncIterator]();
-      let step = await iterator.next();
-      const deltas: string[] = [];
-      while (!step.done) { deltas.push(step.value); step = await iterator.next(); }
-      expect(deltas).toEqual([]);
-      expect(step.value && "resolved" in step.value).toBe(true);
-      streamed.finalize("", step.value);
-      expect(stub.requests().length).toBe(2);
-      expect(turnLine(log.lines)).toMatchObject({ composed: "direct calls=0" });
-    } finally {
-      log.restore();
-      await stub.stop();
-    }
-  });
-});
-
 describe("structuredPartForOutcomes", () => {
   const fullWeatherOutcome = () =>
     outcome({
@@ -794,7 +554,7 @@ describe("structuredPartForOutcomes", () => {
 // different wire fields). A review of this item's first pass found
 // wire.ts's own "No writer yet" comment on TurnValue.artifact still
 // true after the recipe/host layer landed: this function, and
-// turnEngine.ts's own one-line hookup beside structured_part, are what
+// the retired turn engine's own one-line hookup beside structured_part, are what
 // closes that gap - covered here since logTurnSafely() itself isn't
 // practically unit-testable in isolation.
 describe("artifactForOutcomes", () => {

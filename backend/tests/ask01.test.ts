@@ -7,7 +7,7 @@
 // of the next reply, answered before it is asked, or declined for
 // good; a candidate never rendered or recalled by its guessed kind.
 // The scripted chat engine is the spec's stub server, as in
-// tests/turnEngine.test.ts. THIN-7E: the scenarios drive the default path
+// tests/chatTurn.test.ts. THIN-7E: the scenarios drive the default path
 // (runTurnNext / runTurnNextStream), the old engine's copy of ASK-01 being retired.
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { TestClient } from "./client";

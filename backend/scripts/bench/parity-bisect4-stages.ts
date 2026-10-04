@@ -24,7 +24,8 @@ import {
   WRITTEN_POLICY,
   INFORMATION_HANDLING_POLICY,
 } from "@/lib/persona";
-import { identityLine, STABLE_SYSTEM_SUFFIX, STABLE_SYSTEM_SUFFIX_SENTENCES, buildStablePrefix } from "@/lib/turnEngine";
+import { identityLine, buildStablePrefix } from "@/lib/turnShared";
+import { STABLE_SYSTEM_SUFFIX, STABLE_SYSTEM_SUFFIX_SENTENCES } from "./oldStableSuffix";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";

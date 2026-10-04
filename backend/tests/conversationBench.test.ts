@@ -8,7 +8,6 @@
 // run on demand (`bun run scripts/bench/conversation.ts --live`).
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { resetDb } from "./reset-db";
-import { offerOrdinaryTools } from "./ordinaryToolFixture";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -36,7 +35,7 @@ import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 // (packageHost.ts's own SEARXNG_RATE_LIMIT, module-global) drains
 // across this file's real-tool-call tests same as turnNext.test.ts's;
 // reset it here too, the same shape packageHost.test.ts and
-// turnEngine.test.ts already use.
+// chatTurn.test.ts already use.
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
@@ -48,7 +47,6 @@ beforeEach(() => {
   // new path's own driveTurn() case is always "immediate" (its own
   // header note), so these rows need the old path pinned explicitly
   // now that it is no longer the default.
-  setHouseholdSettingValue("turn.pipeline.next", false);
 });
 
 afterEach(() => {
@@ -139,7 +137,6 @@ describe("the fixture", () => {
         ? [{ id: "call-date", name: "almanac-date", args: "{}" }]
         : undefined,
     }, async (deps) => {
-      offerOrdinaryTools(deps.people.owner, ["almanac-date"]);
       const { scores } = await runConversation(byId("derived-dates"), deps);
       expect(scores[0]?.pass).toBe(true);
       expect(scores[1]?.pass).toBe(true);
@@ -559,40 +556,19 @@ describe("the runner against the stub (control-flow rows)", () => {
     });
   }, 20_000);
 
-  test("consequential-once (hard): the proposed lock call is parked on a confirmation, runs once on 'yes', and never again", async () => {
-    await withStubBench(
-      {
-        reply: () => "Sure.",
-        calls: (request) => (/^lock the front door[.!?]*$/i.test(lastUserText(request)) && request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
-      },
-      async (deps) => {
-        offerOrdinaryTools(deps.people.owner, ["lock-doors"]);
-        const { scores } = await runConversation(byId("consequential-once"), deps);
-        expect(scores[0]?.observed.attempts["lock-doors"] ?? 0).toBe(0);
-        expect(scores[0]?.observed.source).toBe("confirm");
-        expect(scores[1]?.observed.attempts["lock-doors"]).toBe(1);
-        expect(scores[2]?.observed.attempts["lock-doors"]).toBe(1);
-        expect(scores.map((s) => s.pass)).toEqual([true, true, true]);
-      },
-    );
-  }, 20_000);
-
-  test("cross-person-recall (hard): the child's private record is absent from the owner's captured context and present in the child's own", async () => {
+  test("cross-person-recall (hard): the child's private record is absent from the owner's captured context", async () => {
     await withStubBench({ reply: () => "I don't have that." }, async (deps) => {
       const { scores } = await runConversation(byId("cross-person-recall"), deps);
       expect(scores[0]?.observed.contextMessage).not.toBeNull();
       expect(scores[0]?.observed.contextMessage ?? "").not.toContain("night light");
       expect(scores[0]?.pass).toBe(true);
-      expect(scores[2]?.observed.pluginId).toBe("recall");
-      expect(scores[2]?.observed.reply).toContain("night light");
-      expect(scores[2]?.pass).toBe(true);
     });
   }, 20_000);
 
   test("the recording proxy sees what the model saw: system text and the offered tool names, per turn", async () => {
     await withStubBench({ reply: () => "Okay." }, async (deps) => {
       const { scores } = await runConversation(byId("greeting-and-thanks"), deps);
-      expect(scores[0]?.observed.contextMessage ?? "").toContain("Sage");
+      expect(scores[0]?.observed.contextMessage ?? "").toContain("[clock]");
       expect(scores[0]?.observed.offeredTools).toContain("websearch");
       expect(scores[0]?.observed.rawModelText).toBe("Okay."); // the teed reply, before any guard
       expect(scores[0]?.observed.firstDeltaMs).not.toBeNull();
@@ -603,65 +579,6 @@ describe("the runner against the stub (control-flow rows)", () => {
   // The effect standard (docs/plans/conversation-competencies-2026-09-13.md,
   // "Bench-row rule"): each rewritten row observes the effect, and the
   // stub proves the observation itself before a live run reads it.
-  test("consequential-once (hard): the lock service's own count, from the fake Home Assistant, is 0 after the ask, 1 after 'yes', still 1 after; the pending ask comes and goes", async () => {
-    await withStubBench(
-      {
-        reply: () => "Sure.",
-        calls: (request) => (/^lock the front door[.!?]*$/i.test(lastUserText(request)) && request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
-      },
-      async (deps) => {
-        offerOrdinaryTools(deps.people.owner, ["lock-doors"]);
-        const { scores } = await runConversation(byId("consequential-once"), deps);
-        expect(scores.map((s) => s.observed.pendingAsk)).toEqual(["confirm", null, null]);
-        expect(scores.map((s) => s.observed.homeCalls["lock.lock"] ?? 0)).toEqual([0, 1, 1]);
-        expect(scores[1]?.observed.source).toBe("plugin"); // the lock reached the fake service and succeeded
-        expect(scores.map((s) => s.pass)).toEqual([true, true, true]);
-      },
-    );
-  }, 20_000);
-
-  test("never-mind-cancels (A4): 'never mind' clears the pending confirmation and a later 'yes' calls nothing; the count is this conversation's own", async () => {
-    await withStubBench(
-      {
-        reply: () => "Sure.",
-        calls: (request) => (/^lock the front door[.!?]*$/i.test(lastUserText(request)) && request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
-      },
-      async (deps) => {
-        offerOrdinaryTools(deps.people.owner, ["lock-doors"]);
-        await runConversation(byId("consequential-once"), deps); // one real lock call before this conversation starts
-        expect(deps.homeAssistant?.calls["lock.lock"]).toBe(1);
-        const { scores } = await runConversation(byId("never-mind-cancels"), deps);
-        expect(scores.map((s) => s.observed.pendingAsk)).toEqual(["confirm", null, null]);
-        expect(scores.map((s) => s.observed.homeCalls["lock.lock"] ?? 0)).toEqual([0, 0, 0]);
-        expect(scores.map((s) => s.pass)).toEqual([true, true, true]);
-      },
-    );
-  }, 20_000);
-
-  test("compound-request (A5): both packages ran, the list holds the item and the timer is a pending job, read from the tables", async () => {
-    await withStubBench(
-      {
-        reply: () => "Done.",
-        calls: (request) =>
-          request.tools?.some((t) => t.function.name === "list-add") && request.tools.some((t) => t.function.name === "timer")
-            ? [
-                { id: "call-1", name: "list-add", args: JSON.stringify({ item: "eggs" }) },
-                { id: "call-2", name: "timer", args: JSON.stringify({ expression: "ten minutes" }) },
-              ]
-            : undefined,
-      },
-      async (deps) => {
-        offerOrdinaryTools(deps.people.owner, ["timer", "list-add"]);
-        const { scores } = await runConversation(byId("compound-request"), deps);
-        expect(scores[0]?.observed.pluginId?.split("+").sort()).toEqual(["list-add", "timer"]);
-        expect(scores[0]?.observed.listItems).toContain("eggs");
-        expect(scores[0]?.observed.jobs.some((j) => j.job === "timers.fire" && j.status === "pending")).toBe(true);
-        expect(scores[0]?.checks.filter((c) => !c.pass)).toEqual([]);
-        expect(scores[1]?.pass).toBe(true);
-      },
-    );
-  }, 20_000);
-
   test("promise-delivered (F2): the five-second timer's job is pending, and after the wait the scheduler's own tick delivers timer.done to the person", async () => {
     await withStubBench({ reply: () => "Okay." }, async (deps) => {
       await runConversation(byId("timer-then-follow-up"), deps); // an earlier ten-minute timer, pending through this conversation

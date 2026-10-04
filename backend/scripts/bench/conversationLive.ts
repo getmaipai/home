@@ -1,6 +1,6 @@
 // The baseline conversation bench, live mode (docs/plans/measure-first-
 // 2026-09-13.md section 2; design in docs/dev/session-a.md): the twenty
-// fixture conversations through the real runTurnStream() against the
+// fixture conversations through the real runTurnNextStream() against the
 // household engines by URL, every outcome read from the system's own
 // state (conversationRunner.ts), one table, totals by category, the
 // hard-row verdicts and the ranked failures. Not part of check.sh: a
@@ -37,7 +37,7 @@ const score = await import("./conversationScore");
 const { CONVERSATIONS } = await import("./conversationFixture");
 const { runJudgeBatch } = await import("@/lib/memoryJudge");
 const { __setTurnActivityClockForTests } = await import("@/lib/turnActivity");
-const { loadAllManifests, ordinaryToolIds } = await import("@/lib/turnEngine");
+const { resolveTurnBudget } = await import("@/lib/turnMachine/budget");
 const { CHAT_SAMPLING } = await import("@/lib/llm");
 const { __setSamplingSeedForBench, __setPromptClockForBench } = await import("@/lib/benchSampling");
 
@@ -168,7 +168,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const header = {
     commit: await commitHash(),
     date: new Date().toISOString(),
-    // The bench is the process that runs the turns (runTurnStream() in
+    // The bench is the process that runs the turns (runTurnNextStream() in
     // process, as every bench through setup.ts does); no hub backend is
     // involved, only the engines by URL.
     pid: process.pid,
@@ -198,7 +198,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
             ? "the default seed; the same pass set is expected from another run of this commit on the same day"
             : "a chosen seed; may differ from a default-seed run of this commit",
     },
-    ordinaryTools: ordinaryToolIds(loadAllManifests(), { byPlugin: [] }),
+    ordinaryTools: resolveTurnBudget(undefined, "adult").tools_offered.slice().sort(),
     fixtures: SELECTED.map((c) => c.id),
     ...(only ? { partial: `--only ${[...only].join(",")}: ${SELECTED.length} of ${CONVERSATIONS.length} conversations` } : {}),
   };

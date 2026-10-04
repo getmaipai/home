@@ -65,7 +65,6 @@ async function main(): Promise<void> {
   const { eq } = await import("drizzle-orm");
 
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
-  setHouseholdSettingValue("turn.pipeline.next", true);
   setHouseholdSettingValue("search.searxng_url", searxngUrl);
 
   console.log("\n## Run header\n");

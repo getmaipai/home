@@ -821,7 +821,7 @@ async function main(): Promise<void> {
 async function run(teacher: LlamaServerClient, teacherModel: string, waitForQuiet: () => Promise<void>): Promise<void> {
 
   // CHAT-22: setup.ts must be imported (and awaited) before anything
-  // that reaches "@/db" - persona.ts, plugins.ts, turnEngine.ts and
+  // that reaches "@/db" - persona.ts, plugins.ts, the retired turn engine and
   // llm.ts all transitively do, through @/lib/access and @/lib/settings.
   const setup = await import("../bench/setup");
   await setup.startBench();
@@ -829,7 +829,7 @@ async function run(teacher: LlamaServerClient, teacherModel: string, waitForQuie
   const { complete } = await import("@/lib/llm");
   const { loadManifestOnly } = await import("@/lib/plugins");
   const { PERSONAS, NATURALNESS_POLICY } = await import("@/lib/persona");
-  const { identityLine, buildStablePrefix, stableSuffixFor } = await import("@/lib/turnEngine");
+  const { identityLine, buildStablePrefix, stableSuffixFor } = await import("@/lib/turnShared");
   const { visibleText } = await import("@/lib/wellFormed");
 
   // STYLE-CORPUS-01b (Jesse, 2026-09-28): the neutral-reply system

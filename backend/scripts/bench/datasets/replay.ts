@@ -27,7 +27,6 @@ import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { readFileSync } from "node:fs";
-import type { TurnValue } from "@/wire";
 import { startRecordingProxy } from "../recordingProxy";
 import { loadLongMemEval } from "./longmemeval";
 import { loadLocomo } from "./locomo";
@@ -47,10 +46,10 @@ process.env.MAIPAI_LLAMA_SERVER_URL = proxy.url;
 
 const setup = await import("../setup");
 const { startBench, finishBench } = setup;
-const { runTurnStream } = await import("@/lib/turnEngine");
+const { runTurnNext } = await import("@/lib/turnMachine/turnNext");
 const { logTurn, createConversation, maybeRefreshConversationSummary } = await import("@/lib/conversationHistory");
 const { classifyTurnSignal, fallbackSignal } = await import("@/lib/turnSignal");
-const { judgeStatusAtInsert } = await import("@/lib/turnEngine");
+const { judgeStatusAtInsert } = await import("@/lib/turnShared");
 const { runJudgeBatch } = await import("@/lib/memoryJudge");
 const { completeBackground } = await import("@/lib/llm");
 const { evaluateSafety } = await import("@/lib/safety");
@@ -254,8 +253,8 @@ async function ingestRow(actorId: string, conversationId: string, row: { userTex
   safety.checked_at = at.toISOString();
   // The dataset's own reply-side text never passes through generation,
   // so it never meets the real output-safety gate a live reply would.
-  // Not fully replicated here (that needs the guard/redaction pipeline
-  // turnEngine.ts's own gateOutputSafety() runs, out of scope to pull
+  // Not fully replicated here (that needs the output gate
+  // the turn path's own gate runs, out of scope to pull
   // in for a research bench over already-published, human-curated
   // benchmark text) - loud instead, so a run that does hit one is
   // visible in the log rather than silently stored and made
@@ -310,39 +309,11 @@ interface AskedQuestion {
 }
 
 async function askQuestion(actor: Awaited<ReturnType<typeof personRow>>, conversationId: string, question: string): Promise<AskedQuestion> {
-  const result = await runTurnStream(actor, "chat", question, { conversationId });
-  if (!result.ok) throw new Error(`replay: runTurnStream refused the question: ${result.error}`);
-  if (result.kind === "immediate") return { reply: result.value.reply.text, turnId: result.value.turn_id };
-  // A review caught the previous version of this function draining
-  // `result.tokens` with a bare `for await` and returning - which never
-  // calls `result.finalize()`, the one thing that actually persists the
-  // conversation_turns row (turnEngine.ts's own logTurnSafely(), inside
-  // finalize()). Without it, turnGuardAndSource() below would find no
-  // row for nearly every question (a plain Q&A routes through the
-  // "model" tier, i.e. kind: "stream", not "immediate") and silently
-  // read guardReason/source as null across the whole run. Mirrored from
-  // conversationRunner.ts's own driveTurn(): read the generator manually
-  // so its own `.done` return value (the finalize outcome) is captured,
-  // then ALWAYS call finalize() - a second review caught the first fix
-  // here skipping it (`resolved ?? result.finalize(...)`, which
-  // short-circuits past finalize whenever a tool call already resolved
-  // the turn) even though finalize() is exactly the driveTurn() pattern
-  // for that path too: it is the one place logTurnSafely() runs, safe
-  // to call unconditionally, and itself returns the resolved value when
-  // there is one - skipping it was reintroducing the identical
-  // never-persisted-for-some-questions bug for the tool-resolved subset.
-  const iterator = result.tokens[Symbol.asyncIterator]();
-  let text = "";
-  let step = await iterator.next();
-  while (!step.done) {
-    text += step.value;
-    step = await iterator.next();
-  }
-  const outcome = step.value;
-  const resolved = outcome && typeof outcome === "object" && "resolved" in outcome ? (outcome as { resolved: TurnValue }).resolved : null;
-  const finalized = result.finalize(text, outcome as Parameters<typeof result.finalize>[1]);
-  const value = resolved ?? finalized;
-  return { reply: value.reply.text, turnId: value.turn_id };
+  const result = await runTurnNext(actor, "chat", question, { conversationId });
+  if (!result.ok) throw new Error(`replay: runTurnNext refused the question: ${result.error}`);
+  // runTurnNext() resolves the whole reply and logs the turn row itself.
+  if (result.kind !== "immediate") throw new Error("replay: runTurnNext returned a stream for a whole-reply question");
+  return { reply: result.value.reply.text, turnId: result.value.turn_id };
 }
 
 /** The live turn's own guard/source, the same two fields the household
@@ -393,7 +364,7 @@ async function runLongMemEval(questions: readonly LongMemEvalQuestion[], convers
         const created = createConversation(actor, { surface: "chat" });
         if (!created.ok) throw new Error(`replay: createConversation failed: ${created.error}`);
         for (const session of conv.sessions) await ingestSession(personId, created.value.id, session, parseLongMemEvalDate(session.timestamp), isLongMemEvalHouseholdMember);
-        // ACT-01's own real path debounces this post-turn (turnEngine.ts's
+        // ACT-01's own real path debounces this post-turn (the retired turn engine's
         // private scheduleSummaryRefresh(), unreachable from here); called
         // directly instead so buildConversationWindow() has a real summary
         // once a haystack runs past its own newest-turns-kept bound,

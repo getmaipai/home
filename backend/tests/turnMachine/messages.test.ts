@@ -30,7 +30,7 @@ import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { ContextItem } from "@/lib/turnMachine/contract";
 import { fallbackSignal } from "@/lib/turnSignal";
 import { planFor, type PlanInput } from "@/lib/register";
-import { buildStablePrefix, companionReanchorLine, identityLine, PRIVACY_SENTENCE } from "@/lib/turnEngine";
+import { buildStablePrefix, identityLine, PRIVACY_SENTENCE } from "@/lib/turnShared";
 import { DEFAULT_PERSONA } from "@/lib/persona";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
@@ -42,7 +42,8 @@ const signal: TurnSignal = fallbackSignal("what's the weather", "adult");
 const planInput: PlanInput = { signal, surface: "chat", surfaceClass: "spoken", brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", vocabulary: "advanced" }, band: "adult", deferred: false, disclosureWithheld: false };
 const plan = planFor(planInput);
 const STABLE_PREFIX = buildStablePrefix(DEFAULT_PERSONA);
-const REANCHOR = companionReanchorLine(DEFAULT_PERSONA).trim();
+// The retired engine's re-anchor wording, asserted absent from the volatile message.
+const REANCHOR = `Remember: you are ${DEFAULT_PERSONA.display_name}.`;
 
 function messages(context: ContextItem[], utterance = "what's the weather") {
   return contextToMessages(context, utterance, DEFAULT_PERSONA, plan, signal, "spoken");
@@ -149,7 +150,7 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
 });
 
 // U4b's own additions, tested directly against the real functions they
-// carry over from turnEngine.ts/register.ts, never a re-typed copy.
+// carry over from the retired turn engine/register.ts, never a re-typed copy.
 describe("contextToMessages(): U4b, the persona prefix, the reanchor and the plan line", () => {
   test("the stable message opens with buildStablePrefix(persona) verbatim", () => {
     const out = messages([]);

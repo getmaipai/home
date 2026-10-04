@@ -15,7 +15,7 @@ import { useDefaultScriptedStack } from "../stackFixture";
 import { createBenchPeople, type BenchPeople } from "../../scripts/bench/conversationRunner";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { runTurnNextStream } from "@/lib/turnMachine/turnNext";
-import { StreamSafetyRefusal } from "@/lib/turnEngine";
+import { StreamSafetyRefusal } from "@/lib/turnShared";
 import { db } from "@/db";
 import { conversationTurns, memoryRecords } from "@/db/schema";
 import { drainStream, withEngine } from "./modeHarness";

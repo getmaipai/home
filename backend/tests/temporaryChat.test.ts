@@ -14,17 +14,14 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { db } from "@/db";
-import { people, conversations, conversationTurns, replyConstraints, openQuestions } from "@/db/schema";
+import { people, conversations, conversationTurns, replyConstraints } from "@/db/schema";
 import { runJudgeBatch, judgeQueueStats } from "@/lib/memoryJudge";
 import * as llm from "@/lib/llm";
 import { isTemporaryConversation, resolveOrCreateConversation, setPendingAsk, getPendingAsk } from "@/lib/conversationHistory";
-import { resolvePendingAsk } from "@/lib/turnEngine";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
-import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
-const SAFE: SafetyResult = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-01-01T00:00:00.000Z" };
 
 // U6: the flip, decided (home/docs/dev.md, 2026-09-24) - this file
 // drives real turns through `resolvePendingAsk`/`routes/turn.ts`, the
@@ -32,7 +29,6 @@ const SAFE: SafetyResult = { flagged: false, categories: [], action: "allow", no
 // default.
 beforeEach(() => {
   resetDb();
-  setHouseholdSettingValue("turn.pipeline.next", false);
 });
 afterEach(() => {
   __resetLlmSupervisorForTests();
@@ -209,10 +205,10 @@ describe("POST /api/turn/stream with temporary: true - the reply-constraints lea
   });
 });
 
-describe("temporary conversations - the open-questions writer an independent review found (queueOpenQuestion, turnEngine.ts)", () => {
-  // A "who"/"relay" open question is only ever queued from inside
-  // resolvePendingAsk(), and only once a PRIOR turn's own pendingAsk was
-  // read back non-null - so proving queueOpenQuestion() can't run for a
+describe("temporary conversations - the open-questions writer an independent review found (queueOpenQuestion)", () => {
+  // A "who"/"relay" open question is only ever queued once a PRIOR turn's
+  // own pendingAsk was read back non-null (the old engine's resolvePendingAsk;
+  // tests/turnMachine/temporaryTurn.test.ts drives the one path) - so proving queueOpenQuestion() can't run for a
   // temporary conversation means proving that read is always null for
   // one, at every point in the chain: it's never written in the first
   // place (setPendingAsk() below), and even a value that somehow got in
@@ -226,15 +222,5 @@ describe("temporary conversations - the open-questions writer an independent rev
     if (!result.ok) throw new Error(result.error);
     setPendingAsk(result.value.id, { kind: "who", prompt: "Who's Clover?", packageId: "engine", args: {}, name: "Clover" });
     expect(getPendingAsk(result.value.id)).toBeNull();
-  });
-
-  test("resolvePendingAsk() finds nothing to resolve on a temporary conversation and queues no open question", async () => {
-    const { actor } = await owner();
-    const result = resolveOrCreateConversation(actor, "chat", undefined, { temporary: true });
-    if (!result.ok) throw new Error(result.error);
-    setPendingAsk(result.value.id, { kind: "who", prompt: "Who's Clover?", packageId: "engine", args: {}, name: "Clover" });
-    const value = await resolvePendingAsk("nevermind", actor, result.value, [], "turn-temp-1", SAFE, undefined);
-    expect(value).toBeNull();
-    expect(db.select().from(openQuestions).all().length).toBe(0);
   });
 });

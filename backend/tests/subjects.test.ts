@@ -9,7 +9,7 @@ import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { resolveOrCreateConversation, logTurn, listOpenQuestions } from "@/lib/conversationHistory";
 import { judgeTurn } from "@/lib/memoryJudge";
 import { recall, archiveByProvenance, forgetByIds, forget, supersede } from "@/lib/memory";
-import { buildPromptParts } from "@/lib/turnEngine";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { subjectLabel, subjectRosterFor } from "@/lib/subjects";
 import { db } from "@/db";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
@@ -37,6 +37,21 @@ async function owner(): Promise<{ client: TestClient; actor: PersonRow }> {
   await client.post("/api/auth/setup", { displayName: "Marlow", secret: "correcthorse" });
   const actor = db.select().from(people).where(eq(people.displayName, "Marlow")).get()!;
   return { client, actor };
+}
+
+/** What the model is sent for one turn on the one path: every message, joined. */
+async function promptFor(actor: PersonRow, text: string): Promise<string> {
+  const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+  let seen: ChatCompletionRequest["messages"] = [];
+  const stub = startStubLlmServer(0, { scriptedChatReply: (request) => { seen = request.messages; return "Okay."; } });
+  process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+  __resetLlmSupervisorForTests();
+  try {
+    await runTurnNext(actor, "chat", text);
+    return seen.map((m) => String(m.content)).join("\n");
+  } finally {
+    await stub.stop();
+  }
 }
 
 const SAFE: TurnValue["safety"] = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() };
@@ -507,15 +522,15 @@ describe("the review's cases", () => {
 });
 
 describe("recall and the prompt know whose fact it is", () => {
-  test("recall by the subject's name finds the record; the prompt line says 'about Quill (your coworker)' for a stated relation", async () => {
+  test("recall by the subject's name finds the record; the prompt's subjects line says 'Quill (your coworker)' for a stated relation", async () => {
     const { actor } = await owner();
     await judgeWith(actor, "my coworker Quill likes seltzer", [{ ...QUILL_FACT, relation: { type: "colleague_of", name: "Quill", stated: true } }]);
     const matches = recall(actor, "what does Quill drink");
     expect(matches.length).toBe(1);
     expect(matches[0]!.record.text).toBe("Quill likes seltzer");
-    const parts = buildPromptParts(actor, "what does Quill drink", matches);
-    expect(parts.context).toContain("- remembered ");
-    expect(parts.context).toMatch(/- remembered \w+ \d{1,2}: Quill likes seltzer \(about Quill \(your coworker\); as of/);
+    const context = await promptFor(actor, "what does Quill drink");
+    expect(context).toMatch(/\[remembered \([\d-]+\)\] Quill likes seltzer/);
+    expect(context).toContain("[subjects] About: Quill (your coworker).");
   });
 
   test("an unconfirmed inferred relation is never said to the model (the name alone), and is plain once an adult confirms it", async () => {
@@ -528,8 +543,8 @@ describe("recall and the prompt know whose fact it is", () => {
     // entity's ("Who's Quill?" states both).
     expect(subjectLabel(actor, quill.id)).toBeNull();
     expect(listOpenQuestions(actor.id).map((q) => q.text)).toEqual(["Who's Quill?"]);
-    const parts = buildPromptParts(actor, "what does Quill drink", recall(actor, "what does Quill drink"));
-    expect(parts.context).not.toContain("coworker");
+    const context = await promptFor(actor, "what does Quill drink");
+    expect(context).not.toContain("coworker");
 
     const edge = db.select().from(relationships).all().find((e) => e.toId === quill.id)!;
     const res = await client.request(`/api/relationships/${edge.id}`, { method: "PATCH", body: { confirm: true } });

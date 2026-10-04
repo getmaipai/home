@@ -20,7 +20,6 @@ import { PACKAGES_DIR, installedPackageVersionDir } from "@/lib/paths";
 import { __resetPackageCachesForTests } from "@/lib/plugins";
 import { __resetDenoHostForTests } from "@/lib/denoHost";
 import { getWidgetData } from "@/lib/widgets";
-import { runTurn } from "@/lib/turnEngine";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import type { PersonRow } from "@/types";
 
@@ -81,20 +80,6 @@ describe("#86: a package's failure fallback meets the output boundary", () => {
       const body = (await res.json()) as { error: string; fallback_reply?: { reply?: { text: string; speech?: string } } };
       expect(body.fallback_reply?.reply?.text).toBe(REFUSAL_FIRST[0]);
       expect(JSON.stringify(body)).not.toContain("pipe bomb");
-    },
-    20_000,
-  );
-
-  test(
-    "the chat turn's plugin_error reply (the same fallback, spoken by the engine) is refused too, so the three outlets agree",
-    async () => {
-      installFixture();
-      const { row } = await child();
-      const result = await runTurn(row, "chat", "tell me about Seattle");
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value.source).toBe("safety_refuse");
-      expect(JSON.stringify(result.value)).not.toContain("pipe bomb");
     },
     20_000,
   );

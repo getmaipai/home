@@ -13,12 +13,10 @@
 // (conversationRunner.ts, conversationScore.ts - one definition, never
 // a second harness):
 //
-//   bun run backend/scripts/bench/replay.ts                     scripted (default), old path
+//   bun run backend/scripts/bench/replay.ts                     scripted (default)
 //   bun run backend/scripts/bench/replay.ts --live               a side engine, a spare port
 //   bun run backend/scripts/bench/replay.ts --hub-live           U2d's own acceptance run only
-//   bun run backend/scripts/bench/replay.ts --hub-live --new     ...on the new path (turn.pipeline.next)
 //   bun run backend/scripts/bench/replay.ts --hub-live --keep-data   ...and keep the isolated data dir's turn traces after
-//   bun run backend/scripts/bench/replay.ts --hub-live --interleaved   RERUN-PROTOCOL-01: both paths, old/new/old/new per row, the bar's five conditions as pass/fail lines
 //
 // Scripted mode needs no engine at all: it starts one in-process stub
 // (@maipai/spec's own stubServer, the same double
@@ -42,9 +40,8 @@
 // check before starting, one request at a time, a 30s quiet wait after
 // any real household [turn] line), never used for an ordinary bench.
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir, loadavg } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
 import type { BenchConversation, TurnExpectation } from "./conversationFixture";
 import { HONESTY_LINES, EMPTY_PROMISE_LINES } from "./conversationFixture";
 import type { TurnScore, TurnObserved } from "./conversationScore";
@@ -127,12 +124,6 @@ const LIVE = process.argv.includes("--live");
 // [turn] line), never the bare --live mode above, which stays pointed
 // at a side instance on a spare port per this file's own header.
 const HUB_LIVE = process.argv.includes("--hub-live");
-// U2's own acceptance ("the replay set on the new path with the flag
-// on"): flips the real household setting turn.pipeline.next, the same
-// one conversationRunner.ts's driveTurn() already reads, rather than a
-// bench-only branch - a replay run is either the old path's turn or
-// the new path's turn, exactly as a real household turn would be.
-const NEW_PATH = process.argv.includes("--new");
 // U6 rerun (dev.md 2026-09-23, "the flip did not hold"): the bench's
 // own isolated MAIPAI_DATA_DIR is a mkdtempSync temp dir, deleted once
 // the run finishes - a real row failure that needs the turn's own
@@ -196,49 +187,6 @@ export function summarizeRepeats(rows: readonly { id: string; category: "failed"
   });
 }
 
-// RERUN-PROTOCOL-01 (dev.md "U6 rerun ruling" (c)): Fable's own
-// acceptance protocol, built into the bench as its own mode rather than
-// a manual procedure someone has to remember. `--interleaved` (with
-// `--hub-live`) runs old, new, old, new - the same row, before moving
-// to the next - so load cancels between the two paths instead of
-// biasing whichever happened to run in the machine's own quieter half.
-const INTERLEAVED = process.argv.includes("--interleaved");
-
-export interface InterleavedStep {
-  path: "old" | "new";
-  row: { id: string; category: "failed" | "control"; conv: BenchConversation };
-  repeat: number;
-}
-
-/** Pure (no engine, no filesystem) so a test drives it directly against
- * a small synthetic row list rather than a live run. */
-export function interleavedPlan(rows: readonly { id: string; category: "failed" | "control"; conv: BenchConversation }[], repeats: number): InterleavedStep[] {
-  const steps: InterleavedStep[] = [];
-  for (const row of rows) {
-    for (let repeat = 1; repeat <= repeats; repeat++) {
-      steps.push({ path: "old", row, repeat });
-      steps.push({ path: "new", row, repeat });
-    }
-  }
-  return steps;
-}
-
-/** A best-effort, diagnostic-only line - never part of any scored
- * condition, never thrown over. `who` is POSIX (both macOS and Linux
- * carry it); a machine without it, or without a shell at all, gets
- * "unknown" instead of a crashed run. */
-function systemLoadLine(): string {
-  const load = loadavg().map((n) => n.toFixed(2)).join(", ");
-  let users = "unknown";
-  try {
-    const out = execSync("who", { encoding: "utf-8", timeout: 2000 });
-    users = String(out.split("\n").filter((l) => l.trim().length > 0).length);
-  } catch {
-    // No `who`, no shell, or it timed out - diagnostic only.
-  }
-  return `load average ${load}; ${users} logged-in user line(s)`;
-}
-
 /** RERUN-PROTOCOL-01 (c).1: "stats.nodes[] printed per turn: context,
  * each model generation with its thinking flag, prompt tokens, cached
  * tokens and wall time, the tool call with the package and its wall
@@ -297,13 +245,11 @@ export interface BarScore {
 }
 
 /** RERUN-PROTOCOL-01: the five conditions dev.md "U6 rerun ruling" (d)
- * names as what flips U6, each read straight off the interleaved run's
- * own scores - never re-derived by hand from a printed table again.
+ * names as what flips U6, each read straight off the run's own scores - never re-derived by hand from a printed table again.
  * Pure, so a test drives it with synthetic rows the same way
  * summarizeRepeats() already is. */
-export function computeBarSummary(oldScores: ReadonlyMap<string, readonly BarScore[]>, newScores: ReadonlyMap<string, readonly BarScore[]>, rows: readonly { id: string; category: "failed" | "control" }[], repeats: number): BarCondition[] {
+export function computeBarSummary(newScores: ReadonlyMap<string, readonly BarScore[]>, rows: readonly { id: string; category: "failed" | "control" }[], repeats: number): BarCondition[] {
   const conditions: BarCondition[] = [];
-  const isForced = (s: BarScore) => s.observed.requiredHonored === true || s.observed.requiredHonored === false;
 
   const namedFailedRows = rows.filter((r) => BAR_CLEAN_FAILED_ROW_IDS.includes(r.id));
   const failedVerdicts = summarizeRepeats(namedFailedRows, newScores, repeats);
@@ -390,19 +336,6 @@ export function computeBarSummary(oldScores: ReadonlyMap<string, readonly BarSco
         : `${generationCount - idleGapCount}/${generationCount} generations at rate, reference ${referenceRate.toFixed(1)} tok/s${worstIdleGap ? `; worst: ${worstIdleGap.row}#${worstIdleGap.repeat} predicted_ms=${worstIdleGap.predictedMs.toFixed(0)} expected_ms=${worstIdleGap.expectedMs.toFixed(0)} (${idleGapCount} over the allowance)` : ""}`,
   });
 
-  const forcedTotals: number[] = [];
-  for (const row of rows) {
-    for (let r = 1; r <= repeats; r++) {
-      for (const s of (newScores.get(`${row.id}#${r}`) ?? []).filter(isForced)) forcedTotals.push(s.observed.totalMs);
-    }
-  }
-  const forcedMedian = median(forcedTotals);
-  conditions.push({
-    label: "every forced-search turn's total is under 10s median",
-    pass: forcedTotals.length === 0 || forcedMedian < 10_000,
-    detail: forcedTotals.length === 0 ? "no forced-search turns this run" : `median ${forcedMedian.toFixed(0)}ms across ${forcedTotals.length} forced turns`,
-  });
-
   let multiTurnRows = 0;
   const cacheFailures: string[] = [];
   for (const row of rows) {
@@ -448,8 +381,7 @@ export function computeBarSummary(oldScores: ReadonlyMap<string, readonly BarSco
   return conditions;
 }
 
-/** The `--hub-live`/`--live`/scripted upstream selection every mode
- * shares - factored out so `runInterleaved()` doesn't duplicate it. */
+/** The `--hub-live`/`--live`/scripted upstream selection. */
 async function resolveUpstream(): Promise<{ stub: { url: string; stop: () => void } | null; proxy: RecordingProxy | null }> {
   let stub: { url: string; stop: () => void } | null = null;
   let proxy: RecordingProxy | null = null;
@@ -486,166 +418,8 @@ async function resolveUpstream(): Promise<{ stub: { url: string; stop: () => voi
   return { stub, proxy };
 }
 
-async function runInterleaved(): Promise<void> {
-  if (HUB_LIVE) {
-    const { refuseIfGateRunning } = await import("./liveHubQuiet");
-    refuseIfGateRunning("replay --interleaved");
-  }
-
-  const fixture = loadFixture();
-  let ownDataDir: string | null = null;
-  if (!process.env.MAIPAI_DATA_DIR) {
-    ownDataDir = mkdtempSync(join(tmpdir(), "owner-replay-interleaved-"));
-    process.env.MAIPAI_DATA_DIR = ownDataDir;
-  }
-
-  const { stub, proxy } = await resolveUpstream();
-  const setup = await import("./setup");
-  const { startBench, finishBench } = setup;
-  const runner = await import("./conversationRunner");
-  const { setHouseholdSettingValue } = await import("@/lib/settings");
-
-  await startBench();
-
-  console.log("\n## Run header\n");
-  console.log(
-    JSON.stringify(
-      {
-        mode: HUB_LIVE ? "hub-live interleaved (127.0.0.1:8788, waits for household quiet)" : LIVE ? "live interleaved" : "scripted interleaved (no live model - see file header)",
-        date: new Date().toISOString(),
-        chat: process.env.MAIPAI_LLAMA_SERVER_URL,
-        embed: process.env.MAIPAI_EMBED_URL,
-        repeats: REPEATS,
-        failedRows: fixture.failed.length,
-        controlRows: fixture.control.length,
-      },
-      null,
-      2,
-    ),
-  );
-
-  const beforeTurn = HUB_LIVE ? (await import("./liveHubQuiet")).waitForHubQuiet.bind(null, undefined, (msg: string) => console.log(msg.replace("live-hub-quiet", "replay --interleaved"))) : undefined;
-
-  const log = runner.captureTurnLog();
-  const people = runner.createBenchPeople();
-  const homeAssistant = runner.startFakeHomeAssistant();
-  const searxng = runner.startFakeSearxng();
-  const oldScoresByConversationId = new Map<string, TurnScore[]>();
-  const newScoresByConversationId = new Map<string, TurnScore[]>();
-  const rows: { id: string; category: "failed" | "control"; conv: BenchConversation }[] = [
-    ...fixture.failed.map((conv) => ({ id: conv.id, category: "failed" as const, conv })),
-    ...fixture.control.map((conv) => ({ id: conv.id, category: "control" as const, conv })),
-  ];
-  const plan = interleavedPlan(rows, REPEATS);
-
-  try {
-    for (const step of plan) {
-      setHouseholdSettingValue("turn.pipeline.next", step.path === "new");
-      if (step.path === "new") setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
-      console.log(`\n[replay --interleaved] ${step.path} repeat ${step.repeat}/${REPEATS}: ${step.row.id}`);
-      console.log(`       ${systemLoadLine()}`);
-      const run = await runner
-        .runConversation(step.row.conv, {
-          people,
-          proxy,
-          log,
-          drainJudge: async () => {},
-          backdate: (days, turnIds) => runner.backdateBenchRows(people, days, turnIds),
-          homeAssistant,
-          beforeTurn,
-        })
-        .catch((err: Error) => {
-          console.error(`[replay --interleaved] ${step.path} ${step.row.id} repeat ${step.repeat} threw: ${err.message}`);
-          return { scores: [], turnIds: [] as string[] };
-        });
-      // Rerun 3 diagnostic (asked live, not part of the bar itself):
-      // the interleaved log otherwise has no per-turn attribution for
-      // a failed check or a cache_n reading - every generation and
-      // node-trace line for every turn of a step printed back to back
-      // with nothing naming which turn it belongs to. A "-- turn N --"
-      // header makes renderNodeTrace's existing lines attributable
-      // without re-deriving anything by hand; the failed-check and
-      // reply-first-line lines read straight off the same TurnScore
-      // the bar itself scores from.
-      for (const s of run.scores) {
-        console.log(`       -- turn ${s.turnIndex + 1} --`);
-        for (const line of renderNodeTrace(s.observed)) console.log(line);
-        const failed = s.checks.filter((c) => !c.pass);
-        if (failed.length > 0) console.log(`       turn ${s.turnIndex + 1} FAILED: ${failed.map((c) => `${c.name} (${c.detail})`).join("; ")}`);
-        const firstLine = (s.observed.reply ?? "").split("\n")[0]?.slice(0, 200) ?? "";
-        console.log(`       turn ${s.turnIndex + 1} reply (totalMs=${s.observed.totalMs}): "${firstLine}"`);
-      }
-      const target = step.path === "old" ? oldScoresByConversationId : newScoresByConversationId;
-      target.set(`${step.row.id}#${step.repeat}`, run.scores);
-    }
-  } finally {
-    log.stop();
-    homeAssistant.stop();
-    searxng.stop();
-  }
-
-  console.log("\n## Bar summary\n");
-  for (const c of computeBarSummary(oldScoresByConversationId, newScoresByConversationId, rows, REPEATS)) {
-    console.log(`${c.pass ? "PASS" : "FAIL"} ${c.label}`);
-    console.log(`     ${c.detail}`);
-  }
-
-  // Worst plain pair (RERUN-PROTOCOL-01 fix-up): diagnostic only, never
-  // a bar condition (the ratio bar it used to feed is retired, above) -
-  // named because a reader asking "which turn got slowest relative to
-  // the old path" still needs an answer even though the ratio itself no
-  // longer gates anything.
-  const isForcedScore = (s: TurnScore) => s.observed.requiredHonored === true || s.observed.requiredHonored === false;
-  let worstPlainPair: { row: string; repeat: number; turnIndex: number; oldMs: number; newMs: number; ratio: number } | null = null;
-  for (const row of rows) {
-    for (let r = 1; r <= REPEATS; r++) {
-      const oldTurns = (oldScoresByConversationId.get(`${row.id}#${r}`) ?? []).filter((s) => !isForcedScore(s));
-      const newTurns = (newScoresByConversationId.get(`${row.id}#${r}`) ?? []).filter((s) => !isForcedScore(s));
-      for (let i = 0; i < Math.min(oldTurns.length, newTurns.length); i++) {
-        const oldMs = oldTurns[i]!.observed.totalMs;
-        const newMs = newTurns[i]!.observed.totalMs;
-        if (oldMs <= 0) continue;
-        const ratio = newMs / oldMs;
-        if (!worstPlainPair || ratio > worstPlainPair.ratio) worstPlainPair = { row: row.id, repeat: r, turnIndex: newTurns[i]!.turnIndex + 1, oldMs, newMs, ratio };
-      }
-    }
-  }
-  if (worstPlainPair) console.log(`\nworst plain pair (diagnostic, not a bar condition): ${worstPlainPair.row}#${worstPlainPair.repeat} turn ${worstPlainPair.turnIndex} - old ${worstPlainPair.oldMs}ms, new ${worstPlainPair.newMs}ms (${worstPlainPair.ratio.toFixed(2)}x)`);
-
-  // RERUN-PROTOCOL-01 fix-up (this session's own proposal, U6: the flip,
-  // decided): the full per-conversation, per-repeat TurnScore set,
-  // written beside the log every run - so a question like "what were
-  // the exact old/new totals for this pair" or "what did cache_n do
-  // across this row's own turns" is answered by reading this file, not
-  // by re-deriving it from console text after the fact (the gap that
-  // made rerun 3's own follow-up questions expensive to answer).
-  const scoresOutDir = join(process.cwd(), "data-scratch");
-  const scoresOutPath = join(scoresOutDir, `interleaved-scores-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
-  try {
-    const { mkdirSync, writeFileSync } = await import("node:fs");
-    mkdirSync(scoresOutDir, { recursive: true });
-    writeFileSync(
-      scoresOutPath,
-      JSON.stringify({ old: Object.fromEntries(oldScoresByConversationId), new: Object.fromEntries(newScoresByConversationId) }, null, 2),
-    );
-    console.log(`interleaved scores written to ${scoresOutPath}`);
-  } catch (err) {
-    console.error(`[replay --interleaved] could not write the scores JSON: ${(err as Error).message}`);
-  }
-
-  runner.cleanupBenchPeople(people);
-  if (proxy) proxy.stop();
-  if (stub) stub.stop();
-  // RERUN-PROTOCOL-01 (c).1: "--keep-data on for the run" - always,
-  // this mode's own data dir is never deleted, unlike the single-path
-  // modes above where --keep-data stays opt-in.
-  if (ownDataDir) console.log(`\nturn traces kept at ${ownDataDir}`);
-
-  finishBench({ executed: [...oldScoresByConversationId.values(), ...newScoresByConversationId.values()].flat().length, engine: HUB_LIVE ? `hub-live: ${process.env.MAIPAI_LLAMA_SERVER_URL}` : LIVE ? `live: ${process.env.MAIPAI_LLAMA_SERVER_URL}` : "scripted (stub, no live model)" });
-}
-
 if (import.meta.main) {
-  await (INTERLEAVED ? runInterleaved() : runMain());
+  await runMain();
 }
 
 async function runMain(): Promise<void> {
@@ -671,28 +445,23 @@ async function runMain(): Promise<void> {
 
   await startBench();
 
-  if (NEW_PATH) {
-    const { setHouseholdSettingValue } = await import("@/lib/settings");
-    setHouseholdSettingValue("turn.pipeline.next", true);
-    // A live run caught this missing entirely: resolveTurnBudget()
-    // (turnMachine/budget.ts) reads the household's own chat.model_id
-    // setting to find the model's measured turn_budget record in
-    // modelCatalog.ts - with nothing set here, every --new run resolved
-    // to NO_RECORD_BUDGET (rounds 0, tools_offered [], model_transitions
-    // false), so the model was NEVER offered a single tool, on any row,
-    // the whole time - not a turn-machine bug, a bench setup gap
-    // (interimRuleMeasure.ts already set this correctly; replay.ts
-    // never did). MAIPAI_REPLAY_MODEL_ID lets U2d's own second-model
-    // acceptance run point this at a different catalog entry.
-    setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
-  }
+  const { setHouseholdSettingValue } = await import("@/lib/settings");
+  // A live run caught this missing entirely: resolveTurnBudget()
+  // (turnMachine/budget.ts) reads the household's own chat.model_id
+  // setting to find the model's measured turn_budget record in
+  // modelCatalog.ts - with nothing set here, every run resolved to
+  // NO_RECORD_BUDGET (rounds 0, tools_offered [], model_transitions
+  // false), so the model was NEVER offered a single tool, on any row -
+  // a bench setup gap, not a turn-machine bug. MAIPAI_REPLAY_MODEL_ID
+  // lets U2d's own second-model acceptance run point this at a different
+  // catalog entry.
+  setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
 
   console.log("\n## Run header\n");
   console.log(
     JSON.stringify(
       {
         mode: HUB_LIVE ? "hub-live (127.0.0.1:8788, waits for household quiet)" : LIVE ? "live" : "scripted (no live model - see file header)",
-        path: NEW_PATH ? "new (turn.pipeline.next)" : "old (turnEngine.ts)",
         date: new Date().toISOString(),
         chat: process.env.MAIPAI_LLAMA_SERVER_URL,
         embed: process.env.MAIPAI_EMBED_URL,
@@ -739,6 +508,10 @@ async function runMain(): Promise<void> {
           });
         scoresByConversationId.set(`${row.id}#${repeat}`, run.scores);
         allScores.push(...run.scores);
+        for (const s of run.scores) {
+          console.log(`       -- turn ${s.turnIndex + 1} --`);
+          for (const line of renderNodeTrace(s.observed)) console.log(line);
+        }
       }
     }
   } finally {
@@ -772,6 +545,12 @@ async function runMain(): Promise<void> {
   if (totalForcedRepeats > 0) {
     console.log(`\n## ENGINE-CONTRACT-01 miss share\n`);
     console.log(`${totalEngineRepeats}/${totalForcedRepeats} repeats classified engine (tool_choice required not honoured)`);
+  }
+
+  console.log("\n## Bar summary\n");
+  for (const c of computeBarSummary(scoresByConversationId, rows, REPEATS)) {
+    console.log(`${c.pass ? "PASS" : "FAIL"} ${c.label}`);
+    console.log(`     ${c.detail}`);
   }
 
   console.log("\n## Full table\n");

@@ -141,7 +141,6 @@ async function runMain(): Promise<void> {
   // reads this same setting (replay.ts's own "--new" flag flips it the
   // identical way), so this bench is never a --new toggle, always on.
   const { setHouseholdSettingValue } = await import("@/lib/settings");
-  setHouseholdSettingValue("turn.pipeline.next", true);
   setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
 
   console.log("\n## Run header\n");

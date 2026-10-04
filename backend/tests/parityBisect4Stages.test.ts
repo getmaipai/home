@@ -9,7 +9,8 @@ import {
   WRITTEN_POLICY,
   INFORMATION_HANDLING_POLICY,
 } from "@/lib/persona";
-import { identityLine, STABLE_SYSTEM_SUFFIX, STABLE_SYSTEM_SUFFIX_SENTENCES, buildStablePrefix } from "@/lib/turnEngine";
+import { identityLine, buildStablePrefix } from "@/lib/turnShared";
+import { STABLE_SYSTEM_SUFFIX, STABLE_SYSTEM_SUFFIX_SENTENCES } from "../scripts/bench/oldStableSuffix";
 import { buildStages4, QUESTION, BENCHMARKING_QUESTION, FLOOR_SENTENCE, THINKING_ON_MAX_TOKENS } from "../scripts/bench/parity-bisect4-stages";
 
 describe("parity-bisect4-stages: buildStages4()", () => {

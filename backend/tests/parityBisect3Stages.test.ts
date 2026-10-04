@@ -12,7 +12,8 @@ import {
   INFORMATION_HANDLING_POLICY,
   WRITTEN_POLICY,
 } from "@/lib/persona";
-import { identityLine, STABLE_SYSTEM_SUFFIX_SENTENCES } from "@/lib/turnEngine";
+import { identityLine } from "@/lib/turnShared";
+import { STABLE_SYSTEM_SUFFIX_SENTENCES } from "../scripts/bench/oldStableSuffix";
 import { buildStages3, QUESTION } from "../scripts/bench/parity-bisect3-stages";
 
 describe("parity-bisect3-stages: buildStages3()", () => {

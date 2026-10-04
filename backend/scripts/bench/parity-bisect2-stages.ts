@@ -6,7 +6,7 @@
 // module scope, so a test can import buildStages2() directly.
 //
 // Every real fragment is imported from its own module, never re-typed
-// here - identityLine/STABLE_SYSTEM_SUFFIX (turnEngine.ts) and
+// here - identityLine/STABLE_SYSTEM_SUFFIX (the retired turn engine) and
 // FORMALITY_FRAGMENT_WRITTEN/COMPLEXITY_FRAGMENT/
 // ENGAGEMENT_FRAGMENT_WRITTEN/FILLER_FRAGMENT/WRITTEN_POLICY/
 // INFORMATION_HANDLING_POLICY (persona.ts) were exported for exactly
@@ -28,7 +28,8 @@ import {
   INFORMATION_HANDLING_POLICY,
   composePersonaPrompt,
 } from "@/lib/persona";
-import { identityLine, STABLE_SYSTEM_SUFFIX } from "@/lib/turnEngine";
+import { identityLine } from "@/lib/turnShared";
+import { STABLE_SYSTEM_SUFFIX } from "./oldStableSuffix";
 
 export const QUESTION = "how does a prompt cache make a language model faster and why does that matter";
 // Matches PARITY-BISECT-01's own floor convention: the engine's own

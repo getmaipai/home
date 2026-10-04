@@ -15,7 +15,7 @@ import { createBenchPeople, startRecordingProxy, type BenchPeople } from "../../
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
-import { __setSummaryRefreshDelayForTests } from "@/lib/turnEngine";
+import { __setSummaryRefreshDelayForTests } from "@/lib/summaryRefresh";
 import * as history from "@/lib/conversationHistory";
 import { getConversation, logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import type { TurnValue } from "@/wire";

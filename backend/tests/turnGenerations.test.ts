@@ -24,7 +24,6 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 // pinned explicitly now that it is no longer the default.
 beforeEach(() => {
   resetDb();
-  setHouseholdSettingValue("turn.pipeline.next", false);
 });
 afterEach(() => {
   __resetLlmSupervisorForTests();

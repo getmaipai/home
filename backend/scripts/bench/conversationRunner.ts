@@ -1,5 +1,5 @@
 // The baseline conversation bench's runner: drives one fixture
-// conversation through the real `runTurnStream()` and reads every
+// conversation through the real `runTurnNextStream()` and reads every
 // outcome from the system's own state afterwards (the turn row, the
 // memory rows written with the turn as source, the `[turn]` and
 // `[route]` log lines, the context message the model saw through the
@@ -12,13 +12,12 @@
 import { eq, and, or, ne, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { conversationTurns, memoryRecords, people, lists, entities, relationships, episodes as episodesTable } from "@/db/schema";
-import { runTurnStream, loadAllManifests, commandOpeners, judgeStatusAtInsert, type TurnStreamResult, type Surface } from "@/lib/turnEngine";
-import { runTurnNext } from "@/lib/turnMachine/turnNext";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { loadAllManifests, commandOpeners, judgeStatusAtInsert, type TurnStreamResult, type Surface } from "@/lib/turnShared";
+import { runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { resolveNames } from "@/lib/unknownNames";
-import { createConversation, getPendingAsk, turnSignalOf, turnPlanOf, logTurn, outcomesForConversation, listOpenQuestions, queueOpenQuestion, resolveOpenQuestionsAbout } from "@/lib/conversationHistory";
+import { createConversation, getPendingAsk, turnSubjectsOf, turnSignalOf, turnPlanOf, logTurn, outcomesForConversation, listOpenQuestions, queueOpenQuestion, resolveOpenQuestionsAbout } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { evaluateSafety } from "@/lib/safety";
@@ -29,7 +28,8 @@ import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { createEntity, updateEntity } from "@/lib/entities";
-import { findEntityByName } from "@/lib/subjects";
+import { findEntityByName, registryNameById } from "@/lib/subjects";
+import type { SubjectRef } from "@/lib/unknownNames";
 import { createRelationship, updateRelationship } from "@/lib/relationships";
 import { listJobs, runDueJobs } from "@/lib/scheduler";
 import { runPlugin, registerAllPackageNotificationTypes } from "@/lib/plugins";
@@ -385,14 +385,9 @@ async function driveTurn(
   const elapsed = () => performance.now() - t0;
   let result: TurnStreamResult;
   try {
-    // U2d's own acceptance ("the replay set on the new path with the
-    // flag on"): reads the real household setting, never a bench-only
-    // flag, so a replay run exercises exactly what a household turn
-    // would - turnNext.ts's own TurnStreamResult is always "immediate"
-    // (its own header note), which this function already handles below.
-    result = getHouseholdSettingValue("turn.pipeline.next") === true
-      ? await runTurnNext(actor, opts.surface ?? "chat", say, { conversationId: opts.conversationId, signal: controller.signal })
-      : await runTurnStream(actor, opts.surface ?? "chat", say, { conversationId: opts.conversationId, supersedes: opts.supersedes, signal: controller.signal });
+    // The one turn path (THIN-7D), streamed the way the route streams it
+    // (a live turn is "stream", a package or refusal reply "immediate").
+    result = await runTurnNextStream(actor, opts.surface ?? "chat", say, { conversationId: opts.conversationId, supersedes: opts.supersedes, signal: controller.signal });
   } catch (err) {
     return { value: null, text: "", timings: { firstDeltaMs: null, firstSentenceMs: null, totalMs: elapsed() }, error: (err as Error).message, interrupted: false, spokenCue: null };
   }
@@ -478,6 +473,13 @@ async function driveTurn(
   const value = result.finalize(text, outcome as Parameters<typeof result.finalize>[1]);
   const finalValue = resolved ?? value;
   return { value: finalValue, text: finalValue.reply.text, timings: { firstDeltaMs: firstDeltaMs ?? elapsed(), firstSentenceMs: firstSentenceMs ?? elapsed(), totalMs: elapsed() }, error: null, interrupted, spokenCue };
+}
+
+/** A stored SubjectRef as the {type, name} pair a row asserts on. */
+function namedSubject(ref: SubjectRef): { type: "household" | "world" | "unresolved"; name: string } {
+  if (ref.type === "household") return { type: ref.type, name: registryNameById(ref.entity_id) ?? ref.entity_id };
+  if (ref.type === "world") return { type: ref.type, name: ref.display_name };
+  return { type: ref.type, name: ref.surface_form };
 }
 
 /** A row can script the hub's own reply for this turn instead of calling
@@ -866,7 +868,8 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       reconciledRow: row !== undefined && row.replyText.trim().length > 0,
       deliveries,
       subject: line?.subject ?? null,
-      subjects: line?.subjects?.map((s) => ({ ...s, rejected: false })),
+      // The one path stores the turn's subjects on its row (the [turn] line no longer carries them).
+      subjects: (line?.subjects ?? (row ? turnSubjectsOf(row).map(namedSubject) : undefined))?.map((s) => ({ ...s, rejected: false })),
       entities: db
         .select({ kind: entities.kind, name: entities.name, source: entities.source, pronouns: entities.pronouns, description: entities.description })
         .from(entities)

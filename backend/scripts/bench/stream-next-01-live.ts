@@ -10,8 +10,8 @@
 // instruction.
 //
 // Bars (getmaipai-26's ruling):
-//   1. A plain turn's first visible sentence arrives no later than the
-//      old path's, interleaved (old, new, old, new, ...).
+//   1. A plain turn's first visible sentence arrival, measured (it was
+//      compared with the old path's until that path was deleted, THIN-7D).
 //   2. A forced-search turn's tool_call (the live "On it." status line -
 //      STREAM-NEXT-01 (a) - the wire has never carried a structured
 //      tool_call event on either path's own live stream) reaches the
@@ -185,42 +185,36 @@ async function runMain(): Promise<void> {
 
   let executed = 0;
 
-  // Bar 1: a plain turn, interleaved old/new, each rep its own fresh conversation.
-  console.log("\n## Bar 1: plain turn, first delta (old path vs new path, interleaved)\n");
-  const plainResults: { path: "old" | "new"; firstDeltaMs: number | null }[] = [];
+  // Bar 1: a plain turn, each rep its own fresh conversation.
+  console.log("\n## Bar 1: plain turn, first delta\n");
+  const plainResults: { firstDeltaMs: number | null }[] = [];
   for (let rep = 0; rep < REPS; rep++) {
-    for (const path of ["old", "new"] as const) {
-      setSettingOrThrow("turn.pipeline.next", path === "new");
-      // A live "hi" turn resolves in well under a second - fast enough
-      // to drain routes/turn.ts's own personWithinTurnBudget() (5
-      // tokens, refilling at 0.5/s) before the natural pacing of a
-      // slower turn would have. Reset before every request, the same
-      // test-only reset the rest of this codebase's suite already uses
-      // for the identical reason - a rate-limit 429 is not this bar's
-      // own signal to measure.
-      __resetRateLimiterForTests();
-      const sendAtMs = performance.now();
-      const res = await client.post("/api/turn/stream", { surface: "chat", text: PLAIN_TURN_TEXT, temporary: true });
-      if (res.status !== 200) {
-        console.error(`  rep ${rep} (${path}): request failed, status ${res.status}`);
-        continue;
-      }
-      const events = await readTimed(res, sendAtMs);
-      const firstDeltaMs = firstEventAt(events, (e) => e.type === "delta");
-      const hadTool = events.some((t) => t.event.type === "status" && t.event.stage === "tool");
-      executed++;
-      console.log(`  rep ${rep} (${path}): first_delta_ms=${firstDeltaMs?.toFixed(0) ?? "n/a"}${hadTool ? " [WARNING: this rep called a tool, not a plain reply - excluded from the bar]" : ""}`);
-      if (!hadTool) plainResults.push({ path, firstDeltaMs });
+    // A live "hi" turn resolves in well under a second - fast enough
+    // to drain routes/turn.ts's own personWithinTurnBudget() (5
+    // tokens, refilling at 0.5/s) before the natural pacing of a
+    // slower turn would have. Reset before every request, the same
+    // test-only reset the rest of this codebase's suite already uses
+    // for the identical reason - a rate-limit 429 is not this bar's
+    // own signal to measure.
+    __resetRateLimiterForTests();
+    const sendAtMs = performance.now();
+    const res = await client.post("/api/turn/stream", { surface: "chat", text: PLAIN_TURN_TEXT, temporary: true });
+    if (res.status !== 200) {
+      console.error(`  rep ${rep}: request failed, status ${res.status}`);
+      continue;
     }
+    const events = await readTimed(res, sendAtMs);
+    const firstDeltaMs = firstEventAt(events, (e) => e.type === "delta");
+    const hadTool = events.some((t) => t.event.type === "status" && t.event.stage === "tool");
+    executed++;
+    console.log(`  rep ${rep}: first_delta_ms=${firstDeltaMs?.toFixed(0) ?? "n/a"}${hadTool ? " [WARNING: this rep called a tool, not a plain reply - excluded from the bar]" : ""}`);
+    if (!hadTool) plainResults.push({ firstDeltaMs });
   }
-  const oldDeltas = plainResults.filter((r) => r.path === "old" && r.firstDeltaMs !== null).map((r) => r.firstDeltaMs!);
-  const newDeltas = plainResults.filter((r) => r.path === "new" && r.firstDeltaMs !== null).map((r) => r.firstDeltaMs!);
-  console.log(`\n  old path median first_delta_ms: ${median(oldDeltas)?.toFixed(0) ?? "n/a"} (n=${oldDeltas.length})`);
-  console.log(`  new path median first_delta_ms: ${median(newDeltas)?.toFixed(0) ?? "n/a"} (n=${newDeltas.length})`);
+  const plainDeltas = plainResults.filter((r) => r.firstDeltaMs !== null).map((r) => r.firstDeltaMs!);
+  console.log(`\n  median first_delta_ms: ${median(plainDeltas)?.toFixed(0) ?? "n/a"} (n=${plainDeltas.length})`);
 
   // Bar 2/3: a forced-search turn, new path only, against the real SearXNG.
-  console.log("\n## Bar 2/3: forced-search turn (new path, live SearXNG)\n");
-  setSettingOrThrow("turn.pipeline.next", true);
+  console.log("\n## Bar 2/3: search turn (live SearXNG)\n");
   const searchResults: { toolStatusMs: number | null; firstDeltaMs: number | null }[] = [];
   for (let rep = 0; rep < REPS; rep++) {
     __resetRateLimiterForTests();
@@ -264,8 +258,7 @@ async function runMain(): Promise<void> {
   // Bar 1 - the earliest point a real TTS pipeline, wired to consume
   // the stream (the shipped contract: "reply.speech is spoken sentence
   // by sentence as it streams"), could begin synthesizing.
-  console.log("\n## VOICE-LIVE-02 re-measure proxy: a spoken turn's own first delta (new path)\n");
-  setSettingOrThrow("turn.pipeline.next", true);
+  console.log("\n## VOICE-LIVE-02 re-measure proxy: a spoken turn's own first delta\n");
   const spokenDeltas: number[] = [];
   for (let rep = 0; rep < 3; rep++) {
     __resetRateLimiterForTests();

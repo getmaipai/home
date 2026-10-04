@@ -5,13 +5,13 @@
 // buildStages() needs a module that never reaches that import).
 import type { LlmMessage, ToolSpec, LlmCompleteOptions } from "@/lib/llm";
 import type { Persona } from "@/lib/persona";
-import { buildStablePrefix } from "@/lib/turnEngine";
+import { buildStablePrefix } from "@/lib/turnShared";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 
 export const QUESTION = "how does a prompt cache make a language model faster and why does that matter";
-// llama-server's own documented default (turnEngine.ts's CHAT_SAMPLING
+// llama-server's own documented default (the retired turn engine's CHAT_SAMPLING
 // comment: "plain chat used to run at llama-server's own default of
 // 0.8"); passed explicitly wherever a stage means "the engine's own
 // defaults" - llm.ts's chatSamplingFor() only applies CHAT_SAMPLING

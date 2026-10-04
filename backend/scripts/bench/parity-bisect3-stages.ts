@@ -20,7 +20,8 @@ import {
   WRITTEN_POLICY,
   INFORMATION_HANDLING_POLICY,
 } from "@/lib/persona";
-import { identityLine, STABLE_SYSTEM_SUFFIX_SENTENCES } from "@/lib/turnEngine";
+import { identityLine } from "@/lib/turnShared";
+import { STABLE_SYSTEM_SUFFIX_SENTENCES } from "./oldStableSuffix";
 
 export const QUESTION = "how does a prompt cache make a language model faster and why does that matter";
 // Matches BISECT-01/02's own floor convention: the engine's own

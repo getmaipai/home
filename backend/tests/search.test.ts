@@ -142,9 +142,9 @@ describe("GET /api/search: apps", () => {
 describe("GET /api/search: settings", () => {
   test("a word from a real setting's own label lists it, opening Settings on that section", async () => {
     const { client } = await owner();
-    const groups = await search(client, "reply engine");
-    const found = group(groups, "setting")?.results.find((r) => r.id === "turn.pipeline.next");
-    expect(found).toMatchObject({ kind: "setting", title: "Use the new reply engine", subtitle: "On uses the rebuilt engine (the default since U6). Off falls back to the old one.", href: "/next/settings?tab=household&section=household.ai" });
+    const groups = await search(client, "teen's replies");
+    const found = group(groups, "setting")?.results.find((r) => r.id === "chat.teen_gate_grain");
+    expect(found).toMatchObject({ kind: "setting", title: "How a teen's replies are checked", subtitle: expect.stringContaining("checks every sentence before a teen sees it"), href: "/next/settings?tab=household&section=household.ai" });
   });
 
   // A review caught this: NextSettingsPage.tsx renders the Household
@@ -155,7 +155,7 @@ describe("GET /api/search: settings", () => {
   test("a non-admin actor never sees a household-scope setting - they have no tab to reach it on", async () => {
     const { client: ownerClient } = await owner();
     const { client: childClient } = await addPerson(ownerClient, "Sprout", "child");
-    const groups = await search(childClient, "reply engine");
+    const groups = await search(childClient, "teen's replies");
     expect(group(groups, "setting")).toBeUndefined();
   });
 });

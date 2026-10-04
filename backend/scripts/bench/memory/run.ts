@@ -28,7 +28,7 @@ import { people } from "@/db/schema";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { remember, supersede } from "@/lib/memory";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { KNOWLEDGE_UPDATE_CASES, ABSTENTION_CASES, TEMPORAL_CASES, MULTI_SESSION_CASES, EPISODE_CASES, type KnowledgeUpdateSeed } from "./fixture";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -119,7 +119,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
     if (!superseded.ok) throw new Error(`supersede failed for "${c.id}": ${superseded.error}`);
     sqlite.query("UPDATE memory_records SET created_at = ? WHERE id = ?").run(backdatedIso(c.after.ageDays), superseded.value.created.id);
 
-    const turnResult = await runTurn(actor as PersonRow, "chat", c.question);
+    const turnResult = await runTurnNext(actor as PersonRow, "chat", c.question);
     const reply = turnResult.ok ? turnResult.value.reply.text : "";
     const lower = reply.toLowerCase();
     const pass = lower.includes(c.mustContainCurrent.toLowerCase()) && !lower.includes(c.mustNotContainStale.toLowerCase());
@@ -129,7 +129,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   // Abstention: nothing seeded on purpose - these questions have no
   // answer anywhere in this household's memory.
   for (const c of ABSTENTION_CASES) {
-    const turnResult = await runTurn(actor as PersonRow, "chat", c.question);
+    const turnResult = await runTurnNext(actor as PersonRow, "chat", c.question);
     const reply = turnResult.ok ? turnResult.value.reply.text : "";
     // A code review (2026-09-06) found this was a plain, case-sensitive
     // .includes() - "May" (the month) is a real substring of "Maybe",
@@ -146,7 +146,7 @@ async function main(): Promise<{ executed: number; engine: string }> {
   // Temporal: two dated facts, a question asking their relative order.
   for (const c of TEMPORAL_CASES) {
     for (const s of c.seeds) seedDated(actor as PersonRow, s, BENCH_SOURCE);
-    const turnResult = await runTurn(actor as PersonRow, "chat", c.question);
+    const turnResult = await runTurnNext(actor as PersonRow, "chat", c.question);
     const reply = turnResult.ok ? turnResult.value.reply.text : "";
     const lowerReply = reply.toLowerCase();
     const earlierIdx = lowerReply.indexOf(c.earlierMention.toLowerCase());
@@ -165,11 +165,11 @@ async function main(): Promise<{ executed: number; engine: string }> {
   }
 
   // Multi-session recall: a fact seeded directly (simulating an earlier,
-  // separate conversation) recalled in a fresh runTurn() call - never
+  // separate conversation) recalled in a fresh runTurnNext() call - never
   // the same conversation the seed itself came from.
   for (const c of MULTI_SESSION_CASES) {
     seedDated(actor as PersonRow, c.seed, c.seed.source);
-    const turnResult = await runTurn(actor as PersonRow, "chat", c.question);
+    const turnResult = await runTurnNext(actor as PersonRow, "chat", c.question);
     const reply = turnResult.ok ? turnResult.value.reply.text : "";
     const pass = reply.toLowerCase().includes(c.mustContain.toLowerCase());
     results.push({ category: "multi-session", id: c.id, pass, question: c.question, reply });
