@@ -9,6 +9,7 @@ import { Page } from "@maipai/ui/src/primitives/Page";
 import { List } from "@maipai/ui/src/primitives/List";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { SplitView } from "@maipai/ui/src/primitives/SplitView";
+import { ElementsAdoptionPanel } from "@/dev/ElementsAdoptionPanel";
 import { AdminGatedContent } from "@/apps/settings/AdminGatedContent";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { AdminContext, AssistantMoreItems, ChatThinkingIndicator, MessageFooterExtra, NextReasoningGroup, SourcesActionBarTrigger, SourcesOpenContext, StructuredResultTools, SuppressSourcesFallback, ToolTimelineTool } from "@/next/pages/NextChatPage";
@@ -70,7 +71,11 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, banner, setScenario, sett
     aui.thread().cancelRun();
   };
 
+  const scenarioIds = useMemo(() => new Set(scenarios.map((scenario) => scenario.id)), [scenarios]);
   return (
+    <div className="flex h-full min-h-0 flex-col">
+    <ElementsAdoptionPanel scenarioIds={scenarioIds} onPlay={(id) => { const scenario = scenarios.find((entry) => entry.id === id); if (scenario) send(scenario); }} />
+    <div className="min-h-0 flex-1">
     <SplitView
       detailOpen={current !== null}
       listLabel="Scenarios"
@@ -123,6 +128,8 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, banner, setScenario, sett
         </div>
       }
     />
+    </div>
+    </div>
   );
 }
 
