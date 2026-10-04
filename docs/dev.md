@@ -35941,3 +35941,47 @@ So B differs from A2 by the persona and clock lines (about 30 tokens) and the to
 4. BENCH-AB-02 (S): the adult group should run each arm in its own block (or warm each arm once) so first text is not dominated by slot eviction, and record the slot's cached token count per row. Acceptance: first-text rows state cold or warm.
 
 Reply text is in the git-ignored bench output; only numbers are recorded here.
+
+## THIN-Q2 results (2026-10-04)
+
+Question: which of Home's two additions to the request, the persona and clock lines or the tools block, shortens adult written replies and delays first text. Measurement only.
+
+| | |
+|---|---|
+| Engine build | `local b10797-832fd6f17` |
+| Model file | `Qwen3-8B-Q4_K_M.gguf` (context 4096 as measured by the Stack) |
+| Hardware | Apple M4 Pro, 24 GB unified memory, one laptop, shared with other lanes' gates during the run |
+| Bench | `chat-ab-01.ts --arms A2,AP,AT,APT,B --runs 3` on k1-heat-pump (explanation), w1-story (long-form), f4-recipe (formatting); scratch data directory; Stack chat role only; one request at a time; about 78 live chat requests in all |
+| Arms | A2: bare prompt plus `CHAT_SAMPLING` (arm A and A2 matched in the THIN-Q1 table, 518 against 519 words, so sampling is held constant at B's). AP: A2 plus the persona line (106 chars) and clock line (44 chars) captured from a real B request. AT: A2 plus the 10-tool block and `tool_choice` captured from the same request. APT: both, which is B's request body minus `cache_prompt` and `id_slot`. B: the real pipeline. |
+| Blocks | Each arm ran as a block (arm, then item, then 3 runs), so runs 2 and 3 of a block hit a warm slot. Cache state is read from the engine's own `cached_tokens` per row, not assumed. |
+| Memory 503 | None. The Stack's chat role answered every bare request. |
+
+**Reply length, words (3 runs each; AT and APT pooled over two blocks of 3 because the first blocks' timings were taken under heavy machine load, 6 runs, one AT run discarded as an empty tool-turn error).**
+
+| Item | A2 bare (median, range) | AP persona+clock | AT tools block | APT both |
+|---|---|---|---|---|
+| explanation (k1-heat-pump) | 569 (561 to 622) | 532 (392 to 558) | 264 (155 to 333) | 268 (183 to 312) |
+| long-form (w1-story, asks for 400 words) | 399 (385 to 423) | 343 (343 to 362) | 341 (296 to 363) | 350 (328 to 372) |
+| formatting (f4-recipe) | 368 (324 to 377) | 276 (235 to 317) | 248 (231 to 333) | 236 (227 to 278) |
+
+Change against A2 (medians): persona and clock alone -6 percent, -14 percent, -25 percent; tools block alone -54 percent, -15 percent, -33 percent; both -53 percent, -12 percent, -36 percent. No run in any arm finished on anything but `stop`, and no AT or APT run called a tool (one AT run came back empty and was repeated).
+
+**First text (ms), cache state named.**
+
+| Arm | Cold (cached tokens near 0) | Warm (cached at least half) |
+|---|---|---|
+| A2 | 154, 222, 227 | median 84 to 95 |
+| AP | 294 (cached 0), 2,766 (cached 0, the slot was evicted mid-block) | median 85 to 95 |
+| AT | 2,377 and 2,391 (k1, cached 0, 995-token prompt) | k1 67 to 87; 94 to 100 on f4; 362 to 551 on w1 |
+| APT | 31,411 (k1, cached 0, a machine-load outlier) | 160 to 580; every APT row was taken while other lanes' gates were running |
+
+The first row of an AT or APT block on the second and third items shows cached 966 to 1,018 of about 1,000 tokens: the persona and tools prefix was already in the slot, so those are warm-prefix rows, not cold ones.
+
+**Verdict.**
+
+1. The tools block is the larger cause. Alone it halves the explanation (-54 percent) and cuts formatting by a third; the story, which the prompt itself sizes at 400 words, still loses 15 percent. Adding the persona and clock lines on top of the tools block changes nothing measurable (APT is inside AT's range on all three items).
+2. The persona and clock lines are a smaller second cause that is real but not large: -14 percent and -25 percent on two items, -6 percent (inside the spread) on the explanation. A2's own run-to-run spread is 8 to 15 percent of its median (561 to 622, 385 to 423, 324 to 377), so the tools-block effect on two of three items and the persona effect on w1 and f4 are outside variance; the persona effect on k1 is not.
+3. First text: the whole gap is the cold read of the persona plus tools prefix. A cold AT request cost 2.4 s (995 tokens, cached 0), the same as the 2.4 s of THIN-Q1. Once the slot holds the prefix, AT's first text is 67 to 100 ms where the machine was quiet, the same as bare. Whether a real household turn pays the cold read depends on whether the slot kept the prefix since the last turn; that is a Stack slot question, not Home's own cost.
+4. Arm B itself was not measured: all 9 B turns, taken while the machine was loaded (load average 9 to 230 from other lanes), hit the pipeline's 20 s model-node deadline ("chat model unavailable: node deadline exceeded") and answered the apology line, so no B words are recorded. APT stands in for B's request body; the earlier single B run (k1 175 words) sits at the low end of AT and APT's range. The B timings need a quiet machine and are left as an open item.
+
+Machine caveat: the load average rose to 230 during the first AT and APT blocks (other lanes' gates), stretching total times to 75 to 160 s. Word counts do not depend on speed, so the length table stands; first-text rows taken in those blocks are marked as noisy above.
