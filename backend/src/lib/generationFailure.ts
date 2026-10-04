@@ -36,6 +36,11 @@ export function classifyGenerationFailure(message: string | undefined): Classifi
     const lowMemory = (refusal.offline_reason ?? "").toLowerCase().includes("memory");
     return { kind: lowMemory ? "memory" : "busy", transient: true };
   }
+  // THIN-GROUND-01: the engine's 400 when the prompt does not fit its context
+  // (llama.cpp: "exceeds the available context size", exceed_context_size_error).
+  // Not transient: the same prompt would be refused again; model.ts retries
+  // once itself with the evidence cut.
+  if (anyOf(text, "exceed_context_size", "exceeds the available context", "exceeds the context")) return { kind: "context_too_large", transient: false };
   if (anyOf(text, "timed out", "timeout")) return { kind: "slow", transient: true };
   if (anyOf(text, "connection reset", "econnreset", "socket hang up", "closed unexpectedly")) return { kind: "unreachable", transient: true };
   if (anyOf(text, "loading", "queue", "memory")) return { kind: text.includes("memory") ? "memory" : "busy", transient: true };

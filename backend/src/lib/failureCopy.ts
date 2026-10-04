@@ -1,6 +1,6 @@
 // THIN-DL-02: the one table of failure wording, with no imports so any module
 // may read it. Kinds and the classifier live in generationFailure.ts.
-export type FailureKind = "busy" | "memory" | "slow" | "unreachable" | "other";
+export type FailureKind = "busy" | "memory" | "slow" | "unreachable" | "context_too_large" | "other";
 
 interface FailureCopy {
   adult: string;
@@ -24,6 +24,10 @@ export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
   unreachable: {
     adult: "I can't reach the AI on this computer. Check that MaiPai's AI is running, then send that again.",
     minor: "I can't get to my thinking part right now. Please tell a grown-up.",
+  },
+  context_too_large: {
+    adult: "That was too much text for me to read in one go. Try a shorter question.",
+    minor: "That was too much for me to read at once. Try a shorter question.",
   },
   other: {
     adult: "Something went wrong while I was writing that. Send it again, and if it keeps happening, check Repairs.",

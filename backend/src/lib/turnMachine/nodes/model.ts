@@ -570,6 +570,9 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   if (state.continuation) messages = [...messages, ...continuationMessages(state.continuation.assistantText)];
   let tools: ToolSpec[];
   let tool_choice: "auto" | "none" | undefined;
+  // THIN-GROUND-01: the phrasing round's messages again with the evidence block
+  // cut to half, for the one retry after the engine says the prompt did not fit.
+  let withHalvedEvidence: (() => LlmMessage[]) | null = null;
 
   if (isPhrasingRound) {
     // PHRASE-01's own continuation: the forced call's own messages,
@@ -645,7 +648,9 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
           ? `${phrasing}${lookupMissedClause(missedKinds)}`
           : phrasing;
     const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? answering : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${answering}` };
-    messages = phrasedOutcomes.length === 0 ? [...state.messages, instruction] : [...state.messages, assistantMessage, ...resultMessages, instruction];
+    const history = state.messages;
+    messages = phrasedOutcomes.length === 0 ? [...history, instruction] : [...history, assistantMessage, ...resultMessages, instruction];
+    if (phrasedOutcomes.length > 0) withHalvedEvidence = () => [...history, assistantMessage, ...toolResultMessages(phrasedOutcomes, Math.floor(searchEvidenceMaxChars(state.budget.context_tokens) / 2)), instruction];
     // The same tools block the forced/offered round itself sent -
     // reused verbatim (see contract.ts's own `lastTools` doc comment:
     // the Qwen3 template renders the tools block into the prompt's own
@@ -689,6 +694,15 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : "model", signal);
+  // THIN-GROUND-01: the engine refused the prompt as larger than its context.
+  // One retry with the evidence block halved and the tools block unchanged; a
+  // second refusal falls through to the failure line for that kind.
+  if (!attempt.ok && withHalvedEvidence && !signal.aborted && classifyGenerationFailure(attempt.message).kind === "context_too_large") {
+    console.error(`[model] the engine refused the prompt as too large (${attempt.message ?? attempt.code}); retrying once with the evidence cut to half`);
+    messages = withHalvedEvidence();
+    state.messages = messages;
+    attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, "phrasing", signal);
+  }
   // DEADLINE-01: a generation that never finished (the model node's own
   // deadline, a dead engine) gets a real, fixed model_failed line, never
   // the empty string this used to deliver silently through `answer` as if
