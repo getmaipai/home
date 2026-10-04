@@ -4,7 +4,7 @@ import { hostname } from "node:os";
 import { Bonjour } from "bonjour-service";
 import { resetDb } from "./reset-db";
 import { __resetHubIdentityForTests, getHubInstanceId, setHubName } from "@/lib/hubIdentity";
-import { listIssues } from "@/lib/issues";
+import { listIssues, raiseIssue } from "@/lib/issues";
 import { advertiseMdns, stopMdnsAdvertisement, isMdnsAdvertising, mdnsHostLabel } from "@/lib/mdns";
 
 // bun test runs with NODE_ENV=test, where advertising is off by default
@@ -184,9 +184,22 @@ describe("advertised host label (MDNS-HOST-01)", () => {
     }
   });
 
+  test("turning mDNS off resolves an advertise_failed Repairs issue left by an earlier boot", async () => {
+    await raiseIssue({ source: "mdns", key: "advertise_failed", severity: "warning", title: "t", detail: "d" });
+    expect(listIssues().filter((i) => i.source === "mdns" && !i.resolved_at)).toHaveLength(1);
+    process.env.MAIPAI_MDNS = "off";
+    try {
+      await advertiseMdns({ port: 48805, tls: false });
+      expect(listIssues().filter((i) => i.source === "mdns" && !i.resolved_at)).toHaveLength(0);
+    } finally {
+      process.env.MAIPAI_MDNS = "on";
+    }
+  });
+
   test("with MAIPAI_MDNS unset, NODE_ENV=test and a scratch Home (the one-hub opt-out) both mean off", async () => {
     const spy = spyOn(Bonjour.prototype, "publish");
-    const saved = { ...process.env };
+    const keys = ["MAIPAI_MDNS", "NODE_ENV", "MAIPAI_TEST_ALLOW_MULTIPLE_HUBS"] as const;
+    const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
     try {
       delete process.env.MAIPAI_MDNS;
       process.env.NODE_ENV = "test";
@@ -196,7 +209,10 @@ describe("advertised host label (MDNS-HOST-01)", () => {
       await advertiseMdns({ port: 48804, tls: false });
       expect(spy).not.toHaveBeenCalled();
     } finally {
-      process.env = saved;
+      for (const k of keys) {
+        if (saved[k] === undefined) delete process.env[k];
+        else process.env[k] = saved[k];
+      }
       spy.mockRestore();
     }
   });

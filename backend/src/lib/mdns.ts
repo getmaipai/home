@@ -106,7 +106,10 @@ export async function advertiseMdns(opts: AdvertiseOptions): Promise<void> {
   let mine: Bonjour | null = null;
   try {
     await stopMdnsAdvertisement();
-    if (!mdnsEnabled()) return;
+    if (!mdnsEnabled()) {
+      resolveIssue(ISSUE_SOURCE, ISSUE_KEY); // nothing is trying to advertise, so an old warning is stale
+      return;
+    }
     const b = new Bonjour();
     bonjour = b;
     mine = b;
