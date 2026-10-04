@@ -19,7 +19,8 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture, IDENTITY_HEADERS, type StackFixture } from "./stackFixture";
 import { db } from "@/db";
-import { conversationTurns } from "@/db/schema";
+import { conversationTurns, people } from "@/db/schema";
+import { createConversation, listTemporaryConversations } from "@/lib/conversationHistory";
 import { eq } from "drizzle-orm";
 
 let server: WyomingServerHandle;
@@ -243,6 +244,32 @@ describe("the Wyoming satellite server", () => {
     const messages = await client.waitForMessages(1);
     expect(messages[0]!.type).toBe("info");
     expect(client.isClosed()).toBe(false);
+    client.end();
+  });
+
+  // THIN-INC row 6: a satellite transcript names no conversation and carries no temporary flag, so
+  // it can neither write into a person's Incognito chat nor make one.
+  test("a transcript leaves the person's temporary chat and the Incognito list as they were", async () => {
+    const personId = makePerson();
+    const token = issueApiToken(personId);
+    const actor = db.select().from(people).where(eq(people.id, personId)).get()!;
+    const created = createConversation(actor, { surface: "chat", mode: "temporary" });
+    if (!created.ok) throw new Error(created.error);
+    speechStack = startStackFixture({
+      ...READY_ROLES,
+      "POST /v1/chat/completions": (req) => scriptedChat(req, "Good morning."),
+    });
+    setHouseholdSettingValue("engines.stack.url", speechStack.url);
+    __setStackClientForTests(speechStack.client);
+    server = startWyomingServer(0);
+    const client = new ScriptedWyomingClient();
+    await client.connect(server.port);
+    client.send({ type: "authenticate", data: { token } });
+    client.send({ type: "transcript", data: { text: "good morning", temporary: true, conversation_id: created.value.id } });
+    const [handled] = await client.waitForMessages(1);
+    expect(handled!.type).toBe("handled");
+    const listed = listTemporaryConversations(actor);
+    expect(listed.map((c) => [c.id, c.turn_count])).toEqual([[created.value.id, 0]]);
     client.end();
   });
 
