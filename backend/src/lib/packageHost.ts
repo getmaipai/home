@@ -1723,6 +1723,13 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
       remember(text: string, category?: string, scope?: string, person?: string | null): string {
         requirePermission("memory:write");
+        // R1: a package that declares `incognito: "ephemeral"` writes
+        // nothing that persists past a temporary chat, whatever its
+        // permission string says (the manifest field, not only the
+        // `memory:write` rule the policy node reads).
+        if (manifest.incognito === "ephemeral" && turn?.conversationId && isTemporaryConversation(turn.conversationId)) {
+          throw new HostError("permission_denied", "Nothing is remembered in a temporary chat.");
+        }
         // Step 2: "the remember recipe writes scope: person and person:
         // actor.id for first-person statements... and household
         // otherwise." A recipe step that already declares its own scope

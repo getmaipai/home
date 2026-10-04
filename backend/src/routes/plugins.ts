@@ -2,27 +2,37 @@ import { Hono } from "hono";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { listInstalledManifests, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { routingStats } from "@/lib/conversationHistory";
+import { db } from "@/db";
+import { packageInstalls } from "@/db/schema";
+import { capabilityGate, nodeCapabilities } from "@/lib/capabilities";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import type { AppEnv } from "@/types";
 
 export const pluginsRoutes = new Hono<AppEnv>();
 
-// No store yet (session-d step 6), so `latest_version` and `channel`
-// have nothing real to report against: every bundled package is pinned
-// to its own manifest version on the "stable" channel until the store
-// exists to say otherwise.
+// `channel` is the install row's own (a store install records stable or
+// beta); a bundled package has no install row and ships on "stable".
+// `latest_version` is the installed version: no live catalog source is
+// wired yet (STORE-01), so nothing newer is known and the field is kept
+// only so the response shape does not change. A package whose `requires`
+// names a capability this hub has off is left out (CAP-GATE-01); one whose
+// `optional` capability is off stays and carries `degraded`.
 pluginsRoutes.get("/", requireAuth, async (c) => {
   const statuses = allPackageStatuses();
   const actor = c.get("person");
-  const manifests = listInstalledManifests().filter((manifest) => meetsMinRole(actor.role, manifest.min_role));
+  const caps = await nodeCapabilities();
+  const channels = new Map(db.select({ id: packageInstalls.packageId, channel: packageInstalls.channel }).from(packageInstalls).all().map((r) => [r.id, r.channel]));
+  const manifests = listInstalledManifests().filter((manifest) => meetsMinRole(actor.role, manifest.min_role) && capabilityGate(manifest, caps).missing.length === 0);
   const rows = manifests.map((manifest) => {
     const status = statuses.get(manifest.id);
+    const degraded = capabilityGate(manifest, caps).degraded;
     return {
       ...manifest,
       installed_version: manifest.version,
       latest_version: manifest.version,
-      channel: "stable" as const,
+      channel: channels.get(manifest.id) === "beta" ? ("beta" as const) : ("stable" as const),
+      ...(degraded.length > 0 ? { degraded } : {}),
       status: status?.status ?? "enabled",
       smoke: {
         last_run_at: status?.lastSmokeAt ?? null,

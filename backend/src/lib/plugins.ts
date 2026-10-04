@@ -33,6 +33,8 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow } from "@/lib/benchSampling";
+import { isTemporaryConversation } from "@/lib/conversationHistory";
+import { capabilityGate, internetIsDown, nodeCapabilities } from "@/lib/capabilities";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -500,6 +502,31 @@ export function safeFailureMessage(result: Extract<PluginOpResult<PluginResult>,
   return catalogued?.spoken_fallback ?? "Sorry, I couldn't do that.";
 }
 
+/** R1 / CAP-GATE-01: the manifest fields that used to be display only.
+ * `incognito: "blocked"` does not run in a temporary chat (`ephemeral` is
+ * held by the host, which refuses a write that would persist),
+ * `offline: "unavailable"` does not run while the hub has no network
+ * (the failure kind is the existing `network_unreachable`, never raw
+ * text, rule 6), and a `requires` capability the node says is off does
+ * not run. Messages are plain and name no internals. */
+function unavailable(code: string, error: string): PluginOpResult<never> {
+  return { ok: false, status: 502, code, error, fallback_reply: { reply: { text: error }, actions: [] } };
+}
+
+async function refuseByManifestGates(manifest: PackageManifest, turn?: { id: string; conversationId?: string }): Promise<PluginOpResult<never> | null> {
+  if (manifest.incognito === "blocked" && turn?.conversationId && isTemporaryConversation(turn.conversationId)) {
+    return { ok: false, status: 403, code: "incognito_blocked", error: `${manifest.display} isn't available in a temporary chat.` };
+  }
+  if (manifest.offline === "unavailable" && internetIsDown()) {
+    return unavailable("network_unreachable", `${manifest.display} needs the internet and there is no connection right now.`);
+  }
+  const { missing } = capabilityGate(manifest, await nodeCapabilities());
+  if (missing.length > 0) {
+    return unavailable("capability_off", `${manifest.display} needs ${missing.join(" and ")}, which is off on this hub.`);
+  }
+  return null;
+}
+
 /** Runs a bundled package - Tier 0's own recipe, or (session-d-packages-
  * and-store.md step 5) Tier 1's Deno sandbox - for `actor`, checking
  * min_role first (4.9: the floor role a person needs to invoke this
@@ -536,6 +563,8 @@ export async function runPlugin(
   if (!meetsMinRole(actor.role, manifest.min_role)) {
     return { ok: false, status: 403, error: `${id} needs role ${manifest.min_role} or higher` };
   }
+  const refused = await refuseByManifestGates(manifest, turn);
+  if (refused) return refused;
   const argsError = validateArgs(id, manifest, inputs);
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}` };
 
