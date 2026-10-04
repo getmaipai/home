@@ -12,6 +12,8 @@ import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool
 import { isBarePronoun } from "@/lib/text";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnShared";
+import { streamWatchdog, replyIsUncapped } from "../deadline";
+import { classifyGenerationFailure, partialReplyNote, RETRY_BACKOFF_MS, type FailureKind } from "@/lib/generationFailure";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
 import { planLineForTurnMachine } from "@/lib/register";
@@ -51,9 +53,24 @@ import type { StreamGate } from "./outputGate";
  * (runOneGeneration's own catch, above, pushes it onto
  * state.generations before returning `{ ok: false }` at all) - settling
  * the gate one way or the other never touches that. */
-function settleFailedGate(gate: StreamGate | undefined): void {
-  if (gate && gate.result().text.length > 0) gate.finish();
-  else gate?.reset();
+function settleFailedGate(gate: StreamGate | undefined, state?: TurnState, message?: string, cancelled = false): void {
+  if (gate && gate.result().text.length > 0) {
+    // THIN-DL-02: the person keeps what was written, and a plain closing
+    // note says it stopped (never a retry once text was released).
+    if (state && !cancelled) gate.push(`\n\n${partialReplyNote(classifyGenerationFailure(message).kind, state.plan?.age_band !== "adult")}`);
+    gate.finish();
+  } else gate?.reset();
+}
+
+/** The turn's own signal aborted for a reason other than a deadline: the
+ * person cancelled (closed the tab), so no closing note is written. */
+function isDeadlineAbort(signal: AbortSignal): boolean {
+  return (signal.reason as { name?: string } | undefined)?.name === "TimeoutError";
+}
+
+/** The model node's failed output, carrying the failure kind to `answer`. */
+function failedOutput(attempt: { message?: string }): ModelOutput {
+  return { kind: "model_failed", failure: classifyGenerationFailure(attempt.message).kind };
 }
 
 export interface ModelInput {
@@ -86,7 +103,7 @@ export type ModelOutput =
   // used to receive for this case and pass straight through as a real,
   // silent empty reply. `answer.ts` renders this with a fixed line,
   // never empty text.
-  | { kind: "model_failed"; reasoning?: string };
+  | { kind: "model_failed"; reasoning?: string; failure?: FailureKind };
 
 export function toolSpecFor(id: string): ToolSpec | null {
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
@@ -156,7 +173,7 @@ interface GenerationAttempt {
 // own NodeOutcome (contract.ts), the same reason a caller shouldn't
 // need to cross-reference two different records to read why a turn
 // failed.
-type GenerationResult = GenerationAttempt | { ok: false; code: string; message?: string };
+type GenerationResult = GenerationAttempt | { ok: false; code: string; message?: string; released?: boolean };
 
 // GENFAIL-01 (a code review, 2026-09-23): the same GROUND-01 caution
 // `arg` already carries (contract.ts's own NodeOutcome doc) - the
@@ -178,7 +195,47 @@ function boundedGenerationError(message: string | undefined): string | undefined
  * it through the streaming client (COR-7's own signal support), and
  * drains it manually so the generator's return value (the tool calls)
  * survives - `for await...of` would discard it. */
-async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal): Promise<GenerationResult> {
+async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, nodeAbort: AbortSignal): Promise<GenerationResult> {
+  // DEADLINE-02: first-token and stall timers on the whole generation,
+  // from the request on (a pre-stream wait is the first-token wait).
+  // THIN-DL-02: a transient failure before anything reached the person is
+  // retried quietly after a short pause, inside the same window: an
+  // adult's written turn twice more, a minor's or spoken turn once.
+  const uncapped = replyIsUncapped(state);
+  const pauses = uncapped ? RETRY_BACKOFF_MS.adult : RETRY_BACKOFF_MS.minor;
+  const windowMs = uncapped ? state.budget.deadlines_ms.first_token_ms : state.budget.deadlines_ms.model;
+  const began = Date.now();
+  for (let attempt = 0; ; attempt++) {
+    // A retry waits only for what is left of the window.
+    const firstTokenMs = attempt === 0 ? state.budget.deadlines_ms.first_token_ms : Math.max(1, Math.min(state.budget.deadlines_ms.first_token_ms, windowMs - (Date.now() - began)));
+    const watchdog = streamWatchdog(nodeAbort, firstTokenMs, state.budget.deadlines_ms.stall_ms);
+    let result: GenerationResult;
+    try {
+      result = await runWatchedGeneration(state, messages, tools, tool_choice, thinking, maxTokens, reason, watchdog.signal, watchdog.beat);
+    } finally {
+      watchdog.clear();
+    }
+    // The client may word an abort its own way; the watchdog's reason is the
+    // real cause and goes on the record and into the classifier.
+    const timeoutReason = watchdog.signal.aborted && !nodeAbort.aborted ? (watchdog.signal.reason as { name?: string; message?: string } | undefined) : undefined;
+    if (!result.ok && timeoutReason?.name === "TimeoutError" && timeoutReason.message && !(result.message ?? "").includes(timeoutReason.message)) {
+      result = { ...result, message: boundedGenerationError(`${result.message ?? "chat model unavailable"}: ${timeoutReason.message}`) };
+    }
+    if (result.ok || result.released || nodeAbort.aborted) return result;
+    const pause = pauses[attempt];
+    if (pause === undefined || !classifyGenerationFailure(result.message).transient) return result;
+    if (Date.now() - began + pause >= windowMs) return result;
+    console.error(`[model] generation "${reason}" failed before any text (${result.message ?? result.code}); retrying quietly, attempt ${attempt + 2}`);
+    await new Promise<void>((resolve) => {
+      const done = () => { clearTimeout(timer); nodeAbort.removeEventListener("abort", done); resolve(); };
+      const timer = setTimeout(done, pause);
+      nodeAbort.addEventListener("abort", done, { once: true });
+    });
+    if (nodeAbort.aborted) return result;
+  }
+}
+
+async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal, beat: () => void): Promise<GenerationResult> {
   // STREAM-NEXT-01 (b): `state.streamGate` is undefined for every caller
   // but turnNext.ts's own runTurnNextStream(), so this is a no-op
   // everywhere else. reset() clears whatever a PRIOR, now-abandoned
@@ -209,7 +266,7 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
     // class had no line here at all.
     console.error(`[model] generation "${reason}" failed before streaming started: ${started.code}${boundedError ? ` - ${boundedError}` : ""}`);
     state.generations.push({ reason, thinking, maxTokens, requestSentMs: Date.now() - state.startedAt, firstDeltaMs: null, stats: null, error: boundedError });
-    return { ok: false, code: started.code, message: boundedError };
+    return { ok: false, code: started.code, message: boundedError, released: false };
   }
 
   const requestSentMs = Date.now();
@@ -235,6 +292,7 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
         toolCalls = step.value;
         break;
       }
+      beat();
       if (firstDeltaMs === null) firstDeltaMs = Date.now() - requestSentMs;
       if (step.value.channel === "reasoning") {
         nativeReasoning += step.value.text;
@@ -258,7 +316,7 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
     const message = boundedGenerationError(err instanceof Error ? err.message : String(err));
     console.error(`[model] generation "${reason}" failed mid-stream: ${message ?? "(no message)"}`);
     state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message });
-    return { ok: false, code: "generation_failed", message };
+    return { ok: false, code: "generation_failed", message, released: raw.length > 0 || (state.reasoning.emit && nativeReasoning.length > 0) };
   }
 
   if (gate && thinkSplit) {
@@ -411,7 +469,16 @@ type QueryWriterResult = { ok: true; expression: string | null } | { ok: false; 
  * is untested combination this codebase has no other caller of, and
  * this whole call only ever runs on an already-rare required-call
  * miss to begin with. */
-async function runQueryWriter(messages: LlmMessage[], signal: AbortSignal, modelId?: string): Promise<QueryWriterResult> {
+async function runQueryWriter(messages: LlmMessage[], nodeAbort: AbortSignal, modelId: string | undefined, deadlines: TurnState["budget"]["deadlines_ms"]): Promise<QueryWriterResult> {
+  const watchdog = streamWatchdog(nodeAbort, deadlines.first_token_ms, deadlines.stall_ms);
+  try {
+    return await runWatchedQueryWriter(messages, watchdog.signal, watchdog.beat, modelId);
+  } finally {
+    watchdog.clear();
+  }
+}
+
+async function runWatchedQueryWriter(messages: LlmMessage[], signal: AbortSignal, beat: () => void, modelId?: string): Promise<QueryWriterResult> {
   const started = await startCompleteStreamPieces(
     "chat",
     [...messages, { role: "user", content: QUERY_WRITER_INSTRUCTION }],
@@ -424,6 +491,7 @@ async function runQueryWriter(messages: LlmMessage[], signal: AbortSignal, model
     for (;;) {
       const step = await started.pieces.next();
       if (step.done) break;
+      beat();
       if (step.value.channel === "text") text += step.value.text;
     }
   } catch (err) {
@@ -458,7 +526,7 @@ async function runQueryWriter(messages: LlmMessage[], signal: AbortSignal, model
  * like every other generation failure in this file does - never
  * silently folded into an ordinary required_miss. */
 async function recoveredMissingCall(state: TurnState, messages: LlmMessage[], utterance: string, otherCalls: readonly ToolCall[], reasoning: string | undefined, signal: AbortSignal): Promise<{ outcome: NodeOutcome; output: ModelOutput }> {
-  const written = await runQueryWriter(messages, signal, state.modelId);
+  const written = await runQueryWriter(messages, signal, state.modelId, state.budget.deadlines_ms);
   if (!written.ok) return builderFallbackOutput(utterance, otherCalls, reasoning, written.code, written.message);
   if (written.expression === null) return builderFallbackOutput(utterance, otherCalls, reasoning);
   const queryWriterCall: ToolCall = { tool: "websearch", args: { expression: written.expression }, id: "query-writer" };
@@ -626,13 +694,13 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // the empty string this used to deliver silently through `answer` as if
   // the model had genuinely said nothing.
   if (!attempt.ok) {
-    settleFailedGate(gate);
+    settleFailedGate(gate, state, attempt.message, signal.aborted && !isDeadlineAbort(signal));
     const failureMessage = attempt.message ?? "";
     if ((await roleHealth("chat")).availability === "unavailable" || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
       state.engineUnavailable = true;
       return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
     }
-    return { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
+    return { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: failedOutput(attempt) };
   }
 
   // ENVELOPE-NONE-01 (a code review, 2026-09-23): `tool_choice: "none"`
@@ -669,13 +737,13 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && (thinkingOn || phrasingToolCallDiscarded)) {
     attempt = await runOneGeneration(state, messages, tools, tool_choice, false, replyMaxTokensFor(state, false), "model_retry_no_thinking", signal);
     if (!attempt.ok) {
-      settleFailedGate(gate);
+      settleFailedGate(gate, state, attempt.message, signal.aborted && !isDeadlineAbort(signal));
       const failureMessage = attempt.message ?? "";
       if ((await roleHealth("chat")).availability === "unavailable" || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
         state.engineUnavailable = true;
         return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
       }
-      return { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: { kind: "model_failed" } };
+      return { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: failedOutput(attempt) };
     }
     if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) attempt = { ...attempt, toolCalls: undefined };
   }

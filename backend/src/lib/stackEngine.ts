@@ -8,6 +8,7 @@
 // (never inventing a cause the Stack itself didn't state).
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { createStackClient, type StackClient } from "@/lib/stack/client";
+import { FAILURE_COPY } from "@/lib/failureCopy";
 import { StackError, type StackErrorKind } from "@/lib/stack/errors";
 import { hostLabel, type EngineIdentity } from "@/lib/engineIdentity";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
@@ -143,9 +144,7 @@ const refusals = new Map<string, StackRefusal>();
  * footing nodes/model.ts's "could not reach" check already stands on). */
 export function householdStackRefusalLine(offline_reason: string | undefined): string {
   const lowMemory = offline_reason !== undefined && offline_reason.toLowerCase().includes("memory");
-  return lowMemory
-    ? "MaiPai's AI couldn't start because the computer is low on memory. Try again in a moment."
-    : "MaiPai's AI couldn't start right now. Try again in a moment.";
+  return lowMemory ? FAILURE_COPY.memory.adult : FAILURE_COPY.busy.adult;
 }
 
 function rememberStackRefusal(role: string, offline_reason: string | undefined): void {
@@ -191,7 +190,7 @@ export function getActiveChatEngineIdentity(): EngineIdentity | null {
  * to Repairs, below, not the chat reply) - every other StackError kind
  * keeps its own stated reason, which is real information a household
  * member or a log line can act on. */
-const OFFLINE_COMPANION_LINE = "I can't think right now.";
+export const OFFLINE_COMPANION_LINE = "I can't think right now.";
 
 export interface StackFailureResult {
   ok: false;

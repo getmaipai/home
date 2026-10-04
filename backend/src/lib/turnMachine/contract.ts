@@ -133,7 +133,11 @@ export interface TurnBudget {
    * turn and every spoken or glance turn keep their max_words-derived
    * cap (rule 0). */
   reply_ceiling_tokens: number;
-  deadlines_ms: { model: number; tool: number; total: number };
+  /** model and total are wall-clock for a child's, a teen's and every
+   * spoken turn; an adult's written reply is bounded by first_token_ms
+   * (request to the first piece, an engine may be loading) and stall_ms
+   * (silence between pieces) instead (DEADLINE-02, rule 5). */
+  deadlines_ms: { model: number; tool: number; total: number; first_token_ms: number; stall_ms: number };
   measured: { false_call_rate: number; inverse_miss_rate: number; rewrite_pass_rate: number; on: string };
 }
 

@@ -10,7 +10,7 @@ import type { TurnState, NodeName, NodeOutcome, ActionProposal } from "./contrac
 
 type NodeFn<In, Out> = (state: TurnState, input: In, signal: AbortSignal) => Promise<{ outcome: NodeOutcome; output: Out }>;
 import { TraceRecorder } from "./trace";
-import { nodeSignal } from "./deadline";
+import { nodeSignal, modelNodeDeadlineMs } from "./deadline";
 import { safetyNode, applySafety, safetyRoute, inputSafetyAfterFailure, type SafetyOutput } from "./nodes/safety";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { commandsNode, type CommandsOutput } from "./nodes/commands";
@@ -112,7 +112,7 @@ export const turnMachine = setup({
       runNode(
         input.trace,
         "model",
-        input.turnState.budget.deadlines_ms.model,
+        modelNodeDeadlineMs(input.turnState),
         input.turnState,
         input.abortSignal,
         { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds },
@@ -506,7 +506,7 @@ function answerInputFrom(context: MachineContext): AnswerInput {
     // DEADLINE-01: a generation that never finished at all - kept
     // distinct from "text" with an empty string, which used to reach
     // here and deliver a real, silent empty reply.
-    if (s.kind === "model_failed") return { kind: "model_failed" };
+    if (s.kind === "model_failed") return { kind: "model_failed", failure: s.failure };
   }
   if (context.turnState.outcomes.length > 0) {
     const outcomes = context.turnState.outcomes;

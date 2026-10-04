@@ -10,6 +10,7 @@
 // at once, never a live stream. STREAM-NEXT-01 (below, this file's own
 // runTurnNextStream()) is the "stream" variant a live client actually
 // needs: routes/turn.ts's `/stream` route calls it.
+import { turnTotalWaitMs } from "./deadline";
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, TurnFailure, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome, DocumentTurnAttachment } from "@/lib/turnShared";
 import type { TurnValue } from "@/wire";
@@ -500,7 +501,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   const engageIfEngineReached = () => {
     if (state.nodes.some((n) => n.node === "context" || n.node === "model")) begun.lease.engage();
   };
-  const finalSnapshot = await waitFor(machineActor, (s) => s.status === "done", { timeout: state.budget.deadlines_ms.total + 5000, signal: abortSignal }).catch((err: unknown) => {
+  const finalSnapshot = await waitFor(machineActor, (s) => s.status === "done", { timeout: turnTotalWaitMs(state), signal: abortSignal }).catch((err: unknown) => {
     engageIfEngineReached();
     throw new TurnMachineTimeout(`turn machine failed: ${(err as Error).message}`);
   });

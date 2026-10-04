@@ -15,7 +15,7 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import * as settings from "@/lib/settings";
 import { CATALOG } from "@/lib/modelCatalog";
-import { NO_RECORD_BUDGET, resolveTurnBudget } from "@/lib/turnMachine/budget";
+import { FIRST_TOKEN_DEADLINE_MS, NO_RECORD_BUDGET, STALL_DEADLINE_MS, resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 
 const UNKNOWN_MODEL = "some-other-chat-model-q4";
@@ -100,7 +100,7 @@ describe("resolveTurnBudget: a model with no measured record", () => {
 
   test("a model with a record keeps its record for every band", () => {
     const record = CATALOG.find((m) => m.id === RECORDED_MODEL)?.turn_budget;
-    for (const band of ["child", "teen", "adult"] as const) expect(resolveTurnBudget(RECORDED_MODEL, band)).toBe(record!);
+    for (const band of ["child", "teen", "adult"] as const) expect(resolveTurnBudget(RECORDED_MODEL, band)).toEqual({ ...record!, deadlines_ms: { ...record!.deadlines_ms, first_token_ms: FIRST_TOKEN_DEADLINE_MS, stall_ms: STALL_DEADLINE_MS } });
   });
 });
 

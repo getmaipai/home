@@ -9,6 +9,20 @@ import { CATALOG } from "@/lib/modelCatalog";
 import type { AgeBand } from "@/lib/ageBand";
 import type { TurnBudget } from "./contract";
 
+/** DEADLINE-02: the stream watchdog's defaults, used when a model's record
+ * (which carries only model, tool and total) names none. */
+export const FIRST_TOKEN_DEADLINE_MS = 90000;
+export const STALL_DEADLINE_MS = 20000;
+
+type RecordedDeadlines = { model: number; tool: number; total: number; first_token_ms?: number; stall_ms?: number };
+
+/** A catalog record's budget with the two stream fields filled in; the old
+ * keys read exactly as measured. */
+function withStreamDeadlines(budget: Omit<TurnBudget, "deadlines_ms"> & { deadlines_ms: RecordedDeadlines }): TurnBudget {
+  const d = budget.deadlines_ms;
+  return { ...budget, deadlines_ms: { ...d, first_token_ms: d.first_token_ms ?? FIRST_TOKEN_DEADLINE_MS, stall_ms: d.stall_ms ?? STALL_DEADLINE_MS } };
+}
+
 /** No search, no second round, no model-driven transition: the safest
  * possible shape, identical to what the design says a record-less model
  * gets. Never mutated; returned as-is by resolveTurnBudget() below. */
@@ -27,7 +41,7 @@ export const NO_RECORD_BUDGET: TurnBudget = {
   // figure - smaller than a measured model's ceiling, matching this
   // budget's already-smaller context_tokens.
   reply_ceiling_tokens: 1024,
-  deadlines_ms: { model: 20000, tool: 10000, total: 45000 },
+  deadlines_ms: { model: 20000, tool: 10000, total: 45000, first_token_ms: FIRST_TOKEN_DEADLINE_MS, stall_ms: STALL_DEADLINE_MS },
   measured: { false_call_rate: 0, inverse_miss_rate: 0, rewrite_pass_rate: 0, on: "no measured record" },
 };
 
@@ -40,7 +54,7 @@ export const NO_RECORD_BUDGET: TurnBudget = {
 function unmeasuredAdultBudget(): TurnBudget {
   const reference = CATALOG.find((m) => m.role === "chat" && m.turn_budget)?.turn_budget;
   if (!reference) return NO_RECORD_BUDGET;
-  return { ...reference, measured: { ...NO_RECORD_BUDGET.measured } };
+  return withStreamDeadlines({ ...reference, measured: { ...NO_RECORD_BUDGET.measured } });
 }
 
 /** Reads the household's selected chat model id (chat.model_id, the
@@ -64,6 +78,6 @@ export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget 
     }
   }
   const entry = id ? CATALOG.find((m) => m.role === "chat" && m.id === id) : undefined;
-  if (entry?.turn_budget) return entry.turn_budget;
+  if (entry?.turn_budget) return withStreamDeadlines(entry.turn_budget);
   return band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
 }
