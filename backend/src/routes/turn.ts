@@ -13,7 +13,8 @@ import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
-import type { AppEnv } from "@/types";
+import type { AppEnv, PersonRow } from "@/types";
+import { valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId } from "@/lib/conversationHistory";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
@@ -77,6 +78,8 @@ function wireFor(accept: string | undefined): Wire {
 interface ResumeSession {
   token: string;
   ownerId: string;
+  // THIN-1E: who the stream is for, so the done value's raw error detail is admin-only.
+  viewer: PersonRow;
   // REASONING-01: a minor's own turn (child or teen, ageBand.ts's shared
   // band) never emits a `reasoning` event (docs/dev.md's own
   // "REASONING-01" section) - computed once here from the real actor at
@@ -285,7 +288,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   // (unlike /stream's own hand-built events), so a minor's reasoning
   // field is stripped here rather than at a shared boundary - the same
   // dropReasoning gate the streaming route's own version uses.
-  return c.json({ ...result.value, ...(dropReasoning && result.value.reasoning !== undefined ? { reasoning: undefined } : {}), ...(modelSelection.status ? { model_status: modelSelection.status } : {}) });
+  return c.json(valueForViewer({ ...result.value, ...(dropReasoning && result.value.reasoning !== undefined ? { reasoning: undefined } : {}), ...(modelSelection.status ? { model_status: modelSelection.status } : {}) }, actor));
 });
 
 const encoder = new TextEncoder();
@@ -413,7 +416,7 @@ function startResumeSession(session: ResumeSession): void {
         // between two `delta` sequence numbers would never be redelivered
         // on a resume exactly at that boundary.
         const event = rawEvent.type === "delta" || rawEvent.type === "reasoning" ? { ...rawEvent, sequence: ++session.sequence } : rawEvent;
-        appendSessionEvent(session, event);
+        appendSessionEvent(session, event.type === "done" ? { ...event, value: valueForViewer(event.value, session.viewer) } : event);
       }
     } catch (err) {
       // streamTurnEvents() maps generation failures to a terminal event. This
@@ -851,7 +854,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     // `result.value.reasoning` is already undefined for a minor by
     // construction; stripped here too anyway, the same belt-and-braces
     // every other reasoning site in this route already keeps.
-    const value = { ...result.value, ...(dropReasoning && result.value.reasoning !== undefined ? { reasoning: undefined } : {}), ...(modelSelection.status ? { model_status: modelSelection.status } : {}) };
+    const value = valueForViewer({ ...result.value, ...(dropReasoning && result.value.reasoning !== undefined ? { reasoning: undefined } : {}), ...(modelSelection.status ? { model_status: modelSelection.status } : {}) }, actor);
     // TOOL-EVENTS-01(b): the new path's own tool_call/tool_result/
     // tool_error lines (chatModelAdapter.ts's toolTimelinePart, its
     // frontend consumer half, landed first) - present only when this
@@ -873,6 +876,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   const session: ResumeSession = {
     token: resumeToken,
     ownerId: actor.id,
+    viewer: actor,
     // The shared, birthdate-aware band (ageBand.ts's own header: role
     // alone is "an independent, less accurate signal") - a review
     // caught the first draft reading actor.role directly, which both

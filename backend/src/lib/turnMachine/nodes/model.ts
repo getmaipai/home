@@ -13,6 +13,7 @@ import { isBarePronoun } from "@/lib/text";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnShared";
 import { streamWatchdog, replyIsUncapped } from "../deadline";
+import { stackRefusal } from "@/lib/stackEngine";
 import { classifyGenerationFailure, partialReplyNote, RETRY_BACKOFF_MS, type FailureKind } from "@/lib/generationFailure";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, searchEvidenceMaxChars } from "@/lib/composer";
@@ -265,7 +266,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     // turn's own time before anyone queries a DB row, and this failure
     // class had no line here at all.
     console.error(`[model] generation "${reason}" failed before streaming started: ${started.code}${boundedError ? ` - ${boundedError}` : ""}`);
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: Date.now() - state.startedAt, firstDeltaMs: null, stats: null, error: boundedError });
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: Date.now() - state.startedAt, firstDeltaMs: null, stats: null, error: boundedError, offlineReason: stackRefusal("chat")?.offline_reason ?? null });
     return { ok: false, code: started.code, message: boundedError, released: false };
   }
 
@@ -315,7 +316,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     // the one place that used to throw the message away.
     const message = boundedGenerationError(err instanceof Error ? err.message : String(err));
     console.error(`[model] generation "${reason}" failed mid-stream: ${message ?? "(no message)"}`);
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message });
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message, offlineReason: stackRefusal("chat")?.offline_reason ?? null });
     return { ok: false, code: "generation_failed", message, released: raw.length > 0 || (state.reasoning.emit && nativeReasoning.length > 0) };
   }
 

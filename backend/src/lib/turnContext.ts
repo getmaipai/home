@@ -132,6 +132,8 @@ export interface ToolExecutionOutcome {
   at?: string;
   result?: PluginResult;
   errorCode?: string;
+  /** THIN-1E: how long the call ran, for the admin error detail. */
+  durationMs?: number;
   /** Safe for the household; never a developer diagnostic. */
   userMessage?: string;
   source?: OutcomeSource;

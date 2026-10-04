@@ -9,6 +9,7 @@
 // process exits.
 import { runPlugin } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
+import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
@@ -130,7 +131,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       if (outcome.status === "succeeded") {
         toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text } });
       } else {
-        toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.userMessage! });
+        toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
       }
       continue;
     }
@@ -139,11 +140,13 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // node asks for them itself; the model never chooses it (the wire
     // events above keep the model's own filtered args).
     const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true } : args;
+    const startedAt = Date.now();
     const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId }), signal);
+    const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
-      const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", userMessage: "That took too long, sorry." });
+      const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, userMessage: "That took too long, sorry." });
       outcomes.push(outcome);
-      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.userMessage! });
+      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
       continue;
     }
     const result = raced;
@@ -167,6 +170,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       // `.code` at all; `commands.ts` carrying the same gap is a
       // pre-existing, separate finding, not fixed here).
       errorCode: result.ok ? undefined : (result.code ?? String(result.status)),
+      durationMs,
       userMessage: result.ok ? undefined : result.error,
     });
     outcomes.push(outcome);
@@ -184,7 +188,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       const sites = outcome.sources?.slice(0, TOOL_RESULT_SITES_MAX).map((s) => ({ host: s.site, url: s.url }));
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: result.value.reply?.text, ...(sites?.length ? { sites } : {}) } });
     } else {
-      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.userMessage! });
+      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
     }
   }
   // THIN-4C: how many fetched rows and pages the minor floor dropped this
