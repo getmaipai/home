@@ -1,0 +1,21 @@
+/* UI-1 (gap matrix A3): two restyles of the shipped reply markdown, by
+   selector only (the kit's MarkdownText is never forked). Scoped to .aui-md,
+   not the chat pane, so the canvas document looks identical (THIN-5F). */
+
+/* A fence with no language arrives as an empty label; name it like LM Studio
+   and Open WebUI do instead of leaving a blank header. */
+.aui-code-header-language:empty::before {
+  content: "text";
+}
+
+/* GFM task items carry their own checkbox: it is the marker, so the bullet
+   goes and the box sits where the bullet was. */
+.aui-md li.task-list-item {
+  list-style: none;
+  margin-inline-start: -1.25rem;
+}
+
+.aui-md li.task-list-item > input[type="checkbox"] {
+  margin-inline-end: 0.5rem;
+  vertical-align: middle;
+}

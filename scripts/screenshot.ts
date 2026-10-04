@@ -56,6 +56,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
 import { startScreenshotStack } from "./screenshotStack";
+import { RICH_REPLY_MARKDOWN, RICH_REPLY_PROMPT } from "../frontend/src/next/pages/richReplyFixture";
 import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
 // getmaipai/home#114: each backend asks Bun.serve() to bind port 0 atomically and reports
@@ -277,7 +278,8 @@ const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
 const nextChatPolishReview = process.argv.includes("--next-chat-polish-review");
 const nextShellFoldReview = process.argv.includes("--next-shell-fold-review");
-const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview;
+const nextChatRichReview = process.argv.includes("--next-chat-rich-review");
+const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview || nextChatRichReview;
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
@@ -3519,6 +3521,70 @@ async function captureNextShellFoldReview(browser: Browser, sessionValue: string
   }
 }
 
+/** UI-1 (gap matrix A3): one reply carrying code, math, a wide table, a task
+ * list, a link and a diagram (richReplyFixture.ts, shared with the frontend
+ * test), captured at desktop and phone, light and dark. Fails when any
+ * element is missing from the page, so a screenshot is never the only proof. */
+async function captureNextChatRichReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const conversation = await seedTitledConversation("captureNextChatRichReview", cookie, "Homework helper");
+  const evidenceTag = process.env.UI_EVIDENCE_TAG ?? "after";
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        if (slug === "desktop" && theme === THEMES[0]) {
+          await page.getByRole("textbox", { name: "Message input" }).fill(RICH_REPLY_PROMPT);
+          await page.getByRole("button", { name: "Send message", exact: true }).click();
+          await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+          await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+        }
+        await page.locator(".aui-md").first().waitFor();
+        await page.waitForTimeout(2500);
+        const report = await page.evaluate(() => ({
+          codeHeaders: document.querySelectorAll(".aui-code-header-root").length,
+          copyButtons: document.querySelectorAll(".aui-code-header-root button").length,
+          languages: [...document.querySelectorAll(".aui-code-header-language")].map((n) => n.textContent),
+          shikiBlocks: document.querySelectorAll(".aui-shiki-base").length,
+          inlineCode: document.querySelectorAll(".aui-md-inline-code").length,
+          katex: document.querySelectorAll(".katex").length,
+          katexDisplay: document.querySelectorAll(".katex-display").length,
+          tableWrappers: document.querySelectorAll(".aui-md-table-wrapper").length,
+          checkboxes: document.querySelectorAll(".aui-md input[type=checkbox]").length,
+          links: [...document.querySelectorAll(".aui-md a")].map((a) => `${a.getAttribute("target")}|${a.getAttribute("rel")}`),
+          mermaid: document.querySelectorAll(".aui-md svg").length,
+          pageScrollsSideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          codeBox: (() => {
+            const h = document.querySelector(".aui-code-header-root")?.getBoundingClientRect();
+            const pre = document.querySelector(".aui-shiki-base pre");
+            const r = pre?.getBoundingClientRect();
+            const cs = pre ? getComputedStyle(pre) : null;
+            const code = pre?.querySelector("code");
+            const ccs = code ? getComputedStyle(code) : null;
+            return { headerBottom: h?.bottom, preTop: r?.top, preMarginTop: cs?.marginTop, prePad: cs?.padding, codeDisplay: ccs?.display, codeMarginTop: ccs?.marginTop, codePadTop: ccs?.paddingTop, firstChild: pre?.firstElementChild?.tagName };
+          })(),
+        }));
+        console.log(`captureNextChatRichReview: ${slug}/${theme} ${JSON.stringify(report)}`);
+        await settleAnimations(page);
+        const filename = `next-chat-rich-${evidenceTag}-${viewport.width}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, filename), fullPage: slug === "phone" });
+        dedicatedScreenshots.push({ file: filename, route: "/chat", viewport: viewport.slug, theme });
+        console.log(`Wrote ${join(outDir, filename)}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureNextChatPolishReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -5326,6 +5392,7 @@ async function main() {
     return undefined;
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    if (text.includes(RICH_REPLY_PROMPT)) return RICH_REPLY_MARKDOWN;
     if (text.includes("Friday is pizza night")) return "Friday is pizza night.";
     if (text.includes("What is 2 plus 2?")) return "<think>The user is asking a simple arithmetic question. 2 plus 2 equals 4.</think>2 plus 2 is 4.";
     if (text.includes("herbs")) return "Basil, parsley, and chives are useful kitchen herbs. Keep mint in its own pot so it does not spread.";
@@ -5645,6 +5712,12 @@ async function main() {
 
     if (nextDashboardReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview) {
       await captureNextDashboardReview(browser, sessionValue);
+    }
+
+    if (nextChatRichReview) {
+      await captureNextChatRichReview(browser, sessionValue);
+      console.log("completed named review: --next-chat-rich-review");
+      return;
     }
 
     if (nextChatReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview) {
