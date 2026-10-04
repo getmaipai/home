@@ -35831,3 +35831,58 @@ and goes through the architect gate there; it is not in this repo.
 ## THIN-7B: /v1/chat/completions is a spoken turn (2026-10-03)
 
 Decision, per THIN-7B: `/v1/chat/completions` runs every request as a spoken turn on the one path (`spoken: true`, thinking off), so its replies are the short spoken register, a child's or teen's reply is gated per sentence as on the default path, and no `reasoning_content` is sent (a spoken turn has nowhere to show it; the response shape is otherwise the OpenAI one). A caller that needs long written replies does not use this route: it posts to `POST /api/turn` or `/api/turn/stream` on the `chat` surface, where adult written chat has no length cap (rule 5). There is no per-request opt-out header: a second register switch on an external-token route would be a new surface to gate for a use the app's own turn route already serves.
+
+## CHAT-AB-01 rerun (2026-10-04, THIN-AB and THIN-4F spoken arm)
+
+Bench: `backend/scripts/bench/chat-ab-01.ts` with `datasets/chat-ab-01.json` (now tracked). One engine for every arm: the MaiPai Stack's own chat role (the Stack launched it itself on the first request; the bench started no engine). Arms: A bare, A2 bare plus `CHAT_SAMPLING`, B the default turn path as an adult (written, chat surface), C the default turn path as the child bench person (written, chat surface, streamed the way `routes/turn.ts` streams), S the spoken turn (the owner with the spoken flag, streamed). Thinking off in all arms, no seeds, 1 run per item (`--runs 1`), run against a scratch data directory, never the live hub. Reply texts are in the git-ignored bench output; only the numbers are recorded here.
+
+| | |
+|---|---|
+| Engine build | `local b10797-832fd6f17` (response header `x-maipai-engine`) |
+| Model file | `Qwen3-8B-Q4_K_M.gguf` (Stack role model `qwen3-8b-instruct-q4-k-m`, context 4096 as measured by the Stack) |
+| Hardware | Apple M4 Pro, 24 GB unified memory, one laptop; the Studio was not measured |
+| Search | the household's own SearXNG, paced 30 s apart, the bench stops searching at the first block signal |
+
+**Environment findings, read these first.**
+
+1. The machine was under memory pressure (`warn`). The Stack could not load the embed role (about 0.1 GB needed, 2.9 GB free after its margin): it waits 15 s for memory and then answers 503. Every turn's memory lookup sits on the critical path, so with the embed role forwarded as is, the spoken turns measured **15.6 to 19.2 s** to the first word (four runs, no search, 15.6, 15.9, 19.1, 19.2) with a 3.8 s engine request after the embed wait. All numbers below were taken with the stand-in answering the embedding call 503 at once (`MAIPAI_AB_EMBED=off`, recorded in the run's environment block), which is what the turn does when the embed role is offline, minus the 15 s wait. That wait is itself a finding for the owner: on a memory-tight machine a refused embed role costs 15 s per turn, spoken turns included.
+2. The adult arm hit the same pressure twice: the Stack answered 503 for the chat role on one A2 request (k5-inflation) and on arm B's q1-inception, which returned "the computer is low on memory". Both rows are counted as errors, not retried.
+3. One engine has one prompt-cache slot. The arms alternate A, A2, B per item, so each arm B turn starts with the bare arms' prompt in the slot and re-reads its roughly 1,500 token prefix (cached tokens 0 in the proxy record). That inflates arm B's time to first text by about 2 s against a stand-alone run. The spoken and child groups ran as their own groups, back to back, and show warm numbers (cached tokens near 1,450).
+4. The SearXNG backend `brave` answered "too many requests" during the spoken group (on the third searching question) and during the adult group (on its fourth). The bench stopped all searching at the first signal, as the protocol says, so later search questions in that group were answered without a search and are not counted as search rows. Eight real queries went out in all during the spoken group's debugging and runs; no more were sent.
+
+**Adult written, medians per category (1 run per item; words, first text ms, total ms).**
+
+| Category (items) | A bare | A2 bare+sampling | B Home's turn |
+|---|---|---|---|
+| explanation (6) | 572 w, 193 ms, 19.7 s | 610 w, 107 ms, 20.8 s (1 error) | 317 w, 2,689 ms, 12.8 s |
+| reasoning (4), correct | 200 w, 303 ms, 3/4 | 238 w, 107 ms, 3/4 | 108 w, 2,695 ms, 2/4 |
+| formatting (4) | 318 w, 222 ms | 256 w, 101 ms | 215 w, 2,814 ms |
+| long-form (4) | 418 w, 214 ms | 438 w, 94 ms | 252 w, 3,055 ms |
+| real search, 4 questions | 56 w, 166 ms, 2.8 s | 58 w, 94 ms, 2.2 s | 37 w, 8.6 s (1 error); searched on 2 of 4 (olympics, tallest building) |
+
+Per row against THIN-AB's acceptance (Home's adult replies are not shorter, plainer or slower to first text than the bare model's beyond what the safety gate costs):
+
+- Reply length: **FAIL.** B's median is 45 to 60 percent of A's on explanation, reasoning, formatting and long-form (for example the heat-pump question 384 words against 622, the lighthouse story 352 against 388). The earlier partial table showed the same direction.
+- First text: **FAIL as measured.** B's median is about 2.7 s against 0.1 to 0.3 s for the bare arms. About 2 s of that is the cold prompt cache from the interleaving (finding 3); the rest is the turn's own pre-model work. Not separable from this run; a rerun with the arms grouped is needed to say what the safety gate costs.
+- Reasoning correctness: **FAIL, thin sample.** B 2/4 against A 3/4 (n is 4, one run each).
+- Formatting and plainness: not machine-checked; a person reads the replies in the bench output.
+- Real search: **PASS with caveat.** B searched on two of four questions and cited sources ("[4]"); on Kilimanjaro it answered from memory, and the Inception row errored on memory pressure.
+
+**Child (arm C, streamed, 6 items).** All six rows ran, no errors. First delta and total: heat pump 4,104 ms and 5.7 s (cold slot), seasons 707 ms, quarters 569 ms (correct), recipe 302 ms, short story 612 ms, Kilimanjaro 666 ms. Replies are short by design (73, 43, 45, 63, 55 and 7 words, where the same adult turns gave 384, 249, 83, 197, 352 and 50). The 400-word story request got 55 words. Rows ran: **PASS**. Whether that length is right for a child is a person's call, not this table's.
+
+**Spoken (arm S, THIN-4F).** Median first word is the first answer delta, timed from the start of the turn, through the route's own `streamTurnEvents` with its 900 ms cue.
+
+| Question | Searched | First word | Cue at |
+|---|---|---|---|
+| seasons (plain) | no | 4,322 ms (cold slot) | 902 ms |
+| quarters (plain) | no | 474 ms | none |
+| olympics ("look up...") | yes | 8,317 ms | 902 ms |
+| tallest building | yes | 7,378 ms | 901 ms |
+| Tour de France | yes (brave signalled) | 5,626 ms | 902 ms |
+| Nobel, marathon record, Eurovision | search stopped by the bench | not counted | |
+
+- Spoken first word on a searching question, warm: **median 7,378 ms over 3 valid runs** (8.3, 7.4, 5.6 s). Two earlier runs of the same questions with a cold prompt slot gave 12.1 and 13.5 s. This is **over the 3 s bar: FAIL**, and it is fewer than the 5 runs the item asks for, because the bench stopped searching at the block signal rather than push on.
+- Compare: the old engine's 1.40 s median and the new engine's 6.21 s median (STREAM-NEXT-01 table above), then 0.28 to 0.45 s on the later proxy measurement that had no real page reading. This measurement is on the real search with page reading, on the 8B model on this laptop, and is above the 6.21 s figure's neighbourhood again.
+- Mechanism, read from the engine requests the proxy recorded: a searched spoken turn makes two engine calls. The first (the tool call) takes 0.2 to 0.4 s warm. The second, the phrasing round after the search, carries 2,550 to 3,343 prompt tokens of which only about 1,500 are cached, so about 1,000 to 1,800 tokens of search evidence and page text are read from scratch: 4.0 to 4.9 s to the first token of the answer in the traced runs. The rest of the first word (about 2 to 3 s) is the search and the page step. A plain spoken question with no search is 0.47 to 0.9 s warm and passes.
+- The mechanism the item suggests, fewer pages on a spoken turn (and less evidence text per page), is the one the numbers point to; it is not applied here, as instructed. Do not tick THIN-4F on this evidence.
+- Plain no-search spoken turns: PASS (0.47 to 0.9 s warm, 4.3 s on the first, cold one).

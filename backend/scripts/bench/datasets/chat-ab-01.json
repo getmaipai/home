@@ -1,0 +1,254 @@
+{
+  "id": "chat-ab-01",
+  "note": "CHAT-AB-01: 22 single-turn items (2 runs per arm) and 2 nine-turn scripts (1 run per arm). `expectedAll` is a list of needles that must all appear (word-boundary, case-insensitive); each needle may be written as `a|b` for alternatives. Only the `reasoning` items and the multi-turn facts are machine-checked; every other reply is read by a person.",
+  "items": [
+    {
+      "id": "k1-heat-pump",
+      "category": "knowledge",
+      "prompt": "How does a heat pump work, and why can it deliver more heat than the electricity it uses?"
+    },
+    {
+      "id": "k2-revolutions",
+      "category": "knowledge",
+      "prompt": "Compare the French Revolution and the American Revolution: what caused each, and how did they end up so different?"
+    },
+    {
+      "id": "k3-vaccines",
+      "category": "knowledge",
+      "prompt": "Explain how a vaccine trains the immune system, and why some vaccines need booster shots."
+    },
+    {
+      "id": "k4-seasons",
+      "category": "knowledge",
+      "prompt": "Why do we have seasons? I always hear it is about distance from the sun, and I think that is wrong."
+    },
+    {
+      "id": "k5-inflation",
+      "category": "knowledge",
+      "prompt": "What causes inflation, and why do central banks raise interest rates to fight it?"
+    },
+    {
+      "id": "k6-headphones",
+      "category": "knowledge",
+      "prompt": "How do noise-cancelling headphones actually work, and why are they better at humming engines than at voices?"
+    },
+    {
+      "id": "r1-train",
+      "category": "reasoning",
+      "prompt": "A train leaves at 9:15 am and travels 210 km at 70 km/h. It then stops for 25 minutes, and finally travels another 90 km at 60 km/h. What time does it arrive?",
+      "expectedAll": [
+        "2:10|14:10"
+      ]
+    },
+    {
+      "id": "r2-quarters",
+      "category": "reasoning",
+      "prompt": "Oliver buys 3 notebooks at $4.50 each and 2 pens at $1.25 each. He pays with a $20 bill and wants his change entirely in quarters. How many quarters does he get back?",
+      "expectedAll": [
+        "16 quarters|sixteen quarters|16 quarter|16 of them"
+      ]
+    },
+    {
+      "id": "r3-ages",
+      "category": "reasoning",
+      "prompt": "Juniper is twice as old as her brother was when she was as old as he is now. Their ages add up to 42. How old is each of them now?",
+      "expectedAll": [
+        "24",
+        "18"
+      ]
+    },
+    {
+      "id": "r4-tank",
+      "category": "reasoning",
+      "prompt": "A tank fills in 6 hours with pipe A alone and in 9 hours with pipe B alone. A drain empties a full tank in 18 hours. With A, B and the drain all open, how long does it take to fill an empty tank?",
+      "expectedAll": [
+        "4.5|4 1/2|4\u00bd|four and a half|4 hours and 30|4 hours 30|4 hours, 30"
+      ]
+    },
+    {
+      "id": "f1-table",
+      "category": "formatting",
+      "prompt": "Compare Python, Rust and Go in a markdown table covering speed, learning curve, memory safety, concurrency and best use cases. Add two sentences of advice after the table."
+    },
+    {
+      "id": "f2-code",
+      "category": "formatting",
+      "prompt": "Write a Python function that merges overlapping intervals in a list like [(1,3),(2,6),(8,10)], then explain how it works and its time complexity."
+    },
+    {
+      "id": "f3-latex",
+      "category": "formatting",
+      "prompt": "Derive the quadratic formula by completing the square. Show each step as a LaTeX formula."
+    },
+    {
+      "id": "f4-recipe",
+      "category": "formatting",
+      "prompt": "Give me a step-by-step recipe for a simple tomato soup for four people, with an ingredient list and numbered steps."
+    },
+    {
+      "id": "w1-story",
+      "category": "writing",
+      "prompt": "Write a 400-word short story about a lighthouse keeper named Willow who finds something unexpected washed up after a storm."
+    },
+    {
+      "id": "w2-email",
+      "category": "writing",
+      "prompt": "Write an email from Nadia to her landlord reporting that the heater has been broken for five days, asking for a repair date, and staying polite but firm."
+    },
+    {
+      "id": "w3-study-plan",
+      "category": "writing",
+      "prompt": "Make me a six-week study plan to learn introductory statistics for an exam, with weekly goals, daily time estimates and a few practice ideas."
+    },
+    {
+      "id": "w4-pros-cons",
+      "category": "writing",
+      "prompt": "Write a balanced pros-and-cons essay on working from home full time, ending with a short conclusion."
+    },
+    {
+      "id": "q1-inception",
+      "category": "world",
+      "prompt": "Who directed the movie Inception and what is it about?"
+    },
+    {
+      "id": "q2-kilimanjaro",
+      "category": "world",
+      "prompt": "How tall is Mount Kilimanjaro?"
+    },
+    {
+      "id": "q3-olympics",
+      "category": "world",
+      "prompt": "Which city hosted the 2024 Summer Olympics and how many countries took part?"
+    },
+    {
+      "id": "q4-tallest",
+      "category": "world",
+      "prompt": "What is the tallest building in the world and how tall is it?"
+    }
+  ],
+  "scripts": [
+    {
+      "id": "mt1-party",
+      "category": "multiturn",
+      "facts": [
+        {
+          "id": "arrival",
+          "text": "sister Marlow arrives on Thursday",
+          "needles": [
+            "thursday"
+          ]
+        },
+        {
+          "id": "budget",
+          "text": "the budget is 650 dollars",
+          "needles": [
+            "650"
+          ]
+        },
+        {
+          "id": "cake",
+          "text": "the cake must be pistachio",
+          "needles": [
+            "pistachio"
+          ]
+        }
+      ],
+      "turns": [
+        "I am planning a surprise party for my friend Oliver. Three things I need you to keep in mind: my sister Marlow arrives on Thursday, the budget is 650 dollars, and the cake has to be pistachio. Got it?",
+        "Unrelated question: how do airplanes stay in the air?",
+        "Can you explain how a compost pile turns scraps into soil?",
+        "What is the difference between baking soda and baking powder?",
+        "Give me some tips for sleeping better.",
+        "How does a mortgage work?",
+        "Explain how bridges carry weight.",
+        "Quick check before I start: what is my budget, what flavor does the cake have to be, and which day does my sister arrive?",
+        "Now write me a three-line checklist for the party with the budget, the cake flavor and my sister's arrival day."
+      ]
+    },
+    {
+      "id": "mt2-move",
+      "category": "multiturn",
+      "facts": [
+        {
+          "id": "code",
+          "text": "the door code is 4471",
+          "needles": [
+            "4471"
+          ]
+        },
+        {
+          "id": "movers",
+          "text": "Rivet Movers come at 8 am Saturday",
+          "needles": [
+            "8 am",
+            "8am",
+            "8:00",
+            "8 a.m.",
+            "eight o'clock",
+            "eight am"
+          ]
+        },
+        {
+          "id": "couch",
+          "text": "the couch is 94 inches long",
+          "needles": [
+            "94"
+          ]
+        }
+      ],
+      "turns": [
+        "I am moving into a new apartment this weekend. Remember these three things: the door code is 4471, Rivet Movers come at 8 am on Saturday, and my couch is 94 inches long, which is the only thing I worry about fitting.",
+        "Totally different topic: why is the sky blue?",
+        "How does a refrigerator keep things cold?",
+        "What makes bread rise?",
+        "Explain how tides work.",
+        "How do noise-cancelling headphones work?",
+        "What is the difference between a virus and a bacterium?",
+        "Remind me: what is the door code, what time do the movers come, and how long is my couch?",
+        "Please write a short moving-day note to myself with the door code, the mover arrival time and the couch length."
+      ]
+    }
+  ],
+  "child": {
+    "items": [
+      "k1-heat-pump",
+      "k4-seasons",
+      "r2-quarters",
+      "f4-recipe",
+      "w1-story",
+      "q2-kilimanjaro"
+    ]
+  },
+  "spoken": {
+    "general": [
+      "k4-seasons",
+      "r2-quarters"
+    ],
+    "searching": [
+      {
+        "id": "sp1-olympics",
+        "prompt": "Please look up which city hosted the most recent Summer Olympics and how many countries took part."
+      },
+      {
+        "id": "sp2-tallest",
+        "prompt": "Search the web for the tallest building in the world and tell me how tall it is."
+      },
+      {
+        "id": "sp3-tdf",
+        "prompt": "Can you look up who won the most recent Tour de France?"
+      },
+      {
+        "id": "sp4-nobel",
+        "prompt": "Look up who won the most recent Nobel Prize in Physics and what it was for."
+      },
+      {
+        "id": "sp5-marathon",
+        "prompt": "Search for the current men's marathon world record and who holds it."
+      },
+      {
+        "id": "sp6-eurovision",
+        "prompt": "Look up which country won the most recent Eurovision Song Contest."
+      }
+    ]
+  }
+}
