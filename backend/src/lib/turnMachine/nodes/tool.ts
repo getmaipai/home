@@ -156,7 +156,9 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // THIN-4A (rule 7): a search gives the model the result pages, so the
     // node asks for them itself; the model never chooses it (the wire
     // events above keep the model's own filtered args).
-    const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true } : args;
+    // THIN-4F: a spoken turn reads fewer pages with less text each.
+    const spokenSearch = (state.planBasis?.surfaceClass ?? "spoken") === "spoken";
+    const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}) } : args;
     const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId }), signal);
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });

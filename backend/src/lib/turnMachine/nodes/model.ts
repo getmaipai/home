@@ -639,7 +639,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     // result.
     const phrasedOutcomes = state.outcomes.filter((o) => !lookupMissed(o));
     const assistantMessage = toolCallAssistantMessage(phrasedOutcomes);
-    const resultMessages = toolResultMessages(phrasedOutcomes, searchEvidenceMaxChars(state.budget.context_tokens));
+    // THIN-4F: a spoken surface's answering round re-reads only the top rows' short text.
+    const resultMessages = toolResultMessages(phrasedOutcomes, searchEvidenceMaxChars(state.budget.context_tokens), surfaceClass === "spoken");
     // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as
     // `searchResultCount` - a falsy `snippet` (missing or empty string,
     // the exact shape turn-dbyu1niupc actually stored) on EVERY counted
