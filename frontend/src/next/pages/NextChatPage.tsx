@@ -122,7 +122,7 @@ const SpecSheetToolRender: ToolCallMessagePartComponent<Record<string, never>, S
   return <SpecSheet title={result.title} subtitle={result.subtitle} rows={result.rows} visibleCount={result.rows.length} />;
 };
 
-function StructuredResultTools() {
+export function StructuredResultTools() {
   // `display: "standalone"` (AssistantToolUIProps's own option): without
   // it, Thread's own chain-of-thought grouping tucks a tool-call part
   // behind a collapsed "1 tool call" trigger by default (found live -
@@ -183,7 +183,7 @@ const ConfirmAskAnswerContext = createContext<(turnId: string, approved: boolean
 // AssistantMoreItems is a bare ComponentType slot with no props of its
 // own) - `AdminContext` for the one gate this whole action needs, so it
 // never shows for anyone who'd just get a 403 from the route.
-const AdminContext = createContext(false);
+export const AdminContext = createContext(false);
 type CompareTarget = { turnId: string; conversationId: string; ourText: string };
 const CompareOpenContext = createContext<(target: CompareTarget) => void>(() => {});
 
@@ -197,7 +197,7 @@ const CompareOpenContext = createContext<(target: CompareTarget) => void>(() => 
  * Without closing on that unmount, `SourcesFooterContent` (a plain
  * sibling outside the bar, so it doesn't autohide) would keep the panel
  * open with its own trigger gone - a review-caught orphaned-open state. */
-const SourcesOpenContext = createContext<{
+export const SourcesOpenContext = createContext<{
   isOpen: (turnId: string) => boolean;
   toggle: (turnId: string) => void;
   close: (turnId: string) => void;
@@ -363,7 +363,7 @@ function BareModeSwitchMenuItem() {
   );
 }
 
-function AssistantMoreItems() {
+export function AssistantMoreItems() {
   const temporary = useContext(TemporaryChatContext).on;
   return (
     <>
@@ -752,7 +752,7 @@ const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>
   );
 };
 
-function ToolTimelineTool() {
+export function ToolTimelineTool() {
   useAssistantToolUI({ toolName: "tool_timeline", render: ToolTimelineToolRender, display: "standalone" });
   return null;
 }
@@ -770,7 +770,7 @@ function ToolTimelineTool() {
 // prose. No `elapsed`: Home has no turn-elapsed source for a running
 // message today (the message-timing row owns finished-turn timing) - a
 // named gap, not invented data.
-function ChatThinkingIndicator() {
+export function ChatThinkingIndicator() {
   const running = useAuiState((s) => s.message.status?.type === "running");
   const activity = useTurnActivity();
   const [slow, setSlow] = useState(false);
@@ -828,7 +828,7 @@ function NextChatWelcome() {
 // through the documented `components.ReasoningGroup` slot (never a
 // fork of the vendored file): the shipped Root/Trigger/Content/Text
 // primitives, unstyled beyond the variant choice.
-function NextReasoningGroup({ children, group }: PropsWithChildren<{ group: ThreadGroupPart }>) {
+export function NextReasoningGroup({ children, group }: PropsWithChildren<{ group: ThreadGroupPart }>) {
   const running = group.status.type === "running";
   return (
     <ReasoningRoot streaming={running} defaultOpen={false} variant="ghost">
@@ -940,7 +940,7 @@ function faviconUrl(domain: string): string {
 // reasoning `inlineToggle`/`collapsedToggle` above already give for not
 // using it on the rail toggle, just on this file's other side of the
 // page. Still every piece a shipped primitive, composed, not forked.
-function SourcesActionBarTrigger() {
+export function SourcesActionBarTrigger() {
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   const sources = useAuiState((s) => sourcesFromMessage(s.message));
   const { isOpen, toggle, close } = useContext(SourcesOpenContext);
@@ -1127,7 +1127,7 @@ function BareModelBadge() {
 // (the bare-model badge, sources, Details) - each keyed by its own
 // state and rendering (or not) on its own, so this wrapper is pure
 // composition, no shared logic between them.
-function MessageFooterExtra() {
+export function MessageFooterExtra() {
   return (
     <>
       <BareModelBadge />
@@ -1142,7 +1142,7 @@ function MessageFooterExtra() {
 // shape as ChatPage.tsx's `SuppressLegacySourcesFallback` (`623878a6`),
 // for the identical reason: the real render now happens in the two
 // slots above, not in the message body.
-function SuppressSourcesFallback() {
+export function SuppressSourcesFallback() {
   useAssistantToolUI({ toolName: "sources", render: () => null, display: "standalone" });
   return null;
 }
