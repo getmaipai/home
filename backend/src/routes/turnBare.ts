@@ -12,6 +12,7 @@
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
+import { statsForViewer } from "@/lib/turnErrorDetail";
 import { db } from "@/db";
 import { conversations, conversationTurns, people } from "@/db/schema";
 import { buildConversationWindow, toConversationRecord } from "@/lib/conversationHistory";
@@ -101,7 +102,7 @@ turnBareRoutes.post("/", requireAuth, async (c) => {
     source: turnRow.source,
     plugin_id: turnRow.pluginId,
     command_id: turnRow.commandId,
-    stats: parseStats(turnRow.stats),
+    stats: statsForViewer(parseStats(turnRow.stats) ?? undefined, actor) ?? null,
     persona_fragments: composePersonaPrompt(resolvePersona(getPersonSettingValue(speakerRow, "persona.active_id"))),
   };
 

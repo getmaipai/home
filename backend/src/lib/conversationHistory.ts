@@ -2346,7 +2346,16 @@ export function exportPerson(actor: PersonRow, personId: string): ConversationOp
   if (!canAccessPerson(actor, personId)) {
     return { ok: false, status: 403, error: "cannot export another person's conversation history" };
   }
-  const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, personId)).all();
+  const readsErrorDetail = canReadErrorDetail(actor);
+  // THIN-1E: the archive carries the same scrubbed outcomes and stats the listings do.
+  const rows = db.select().from(conversationTurns).where(eq(conversationTurns.personId, personId)).all().map((row) => {
+    if (readsErrorDetail) return row;
+    let stats = row.stats;
+    if (stats) {
+      try { stats = JSON.stringify(statsForViewer(JSON.parse(stats) as TurnStats, actor)); } catch { stats = null; }
+    }
+    return { ...row, outcomes: null, stats };
+  });
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return { ok: true, value: rows };
 }

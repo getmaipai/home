@@ -9,7 +9,7 @@ import { db } from "@/db";
 import { conversationTurns, people } from "@/db/schema";
 import { newConversationTurnId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { createConversation, list, listConversationTurns } from "@/lib/conversationHistory";
+import { createConversation, exportPerson, list, listConversationTurns } from "@/lib/conversationHistory";
 import { toolNode } from "@/lib/turnMachine/nodes/tool";
 import type { ActionProposal, TurnState } from "@/lib/turnMachine/contract";
 import type { PersonRow } from "@/types";
@@ -91,7 +91,44 @@ describe("GET /api/turn-error-detail/:id", () => {
   });
 });
 
+describe("whose turns an admin may open", () => {
+  test("an admin reads a child's failed turn but never a teen's", async () => {
+    const { client } = await owner();
+    await teen(client);
+    await child(client);
+    const teenRow = db.select().from(people).where(eq(people.displayName, "Bramble")).get()! as PersonRow;
+    const childRow = db.select().from(people).where(eq(people.displayName, "Poppy")).get()! as PersonRow;
+    const teenTurn = insertFailedTurn(teenRow.id, null);
+    const childTurn = insertFailedTurn(childRow.id, null);
+    const refused = await client.get(`/api/turn-error-detail/${teenTurn}`);
+    expect(refused.status).toBe(403);
+    expect(await refused.text()).not.toContain("SearXNG");
+    expect((await client.get(`/api/turn-error-detail/${childTurn}`)).status).toBe(200);
+  });
+});
+
 describe("the raw text never rides a payload a non-admin gets", () => {
+  test("the per-person export for a teen and a child carries neither the tool error nor the generation error, and an admin's keeps both", async () => {
+    const { client, row } = await owner();
+    await teen(client);
+    await child(client);
+    for (const name of ["Bramble", "Poppy"]) {
+      const person = db.select().from(people).where(eq(people.displayName, name)).get()! as PersonRow;
+      insertFailedTurn(person.id, null);
+      const exported = exportPerson(person, person.id);
+      if (!exported.ok) throw new Error("no export");
+      const wire = JSON.stringify(exported.value);
+      expect(wire).not.toContain("SearXNG");
+      expect(wire).not.toContain("slot crashed");
+      expect(wire).not.toContain("memory and gave up");
+      expect(exported.value).toHaveLength(1);
+    }
+    insertFailedTurn(row.id, null);
+    const own = exportPerson(row, row.id);
+    if (!own.ok) throw new Error("no export");
+    expect(JSON.stringify(own.value)).toContain("slot crashed");
+  });
+
   test("a stored turn listing for a teen and a child carries neither the tool error nor the generation error", async () => {
     const { client } = await owner();
     await teen(client);

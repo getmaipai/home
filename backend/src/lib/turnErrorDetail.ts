@@ -41,6 +41,11 @@ export function canReadErrorDetail(actor: PersonRow): boolean {
   return (actor.role === "owner" || actor.role === "admin") && speakerAgeBand(actor, new Date()) === "adult";
 }
 
+/** Whose turn it is, or null when there is no such turn. */
+export function turnOwnerId(turnId: string): string | null {
+  return db.select({ personId: conversationTurns.personId }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()?.personId ?? null;
+}
+
 /** The stored detail of one turn, redacted, or null when the turn does not exist. */
 export function turnErrorDetail(turnId: string): TurnErrorDetail | null {
   const row = db.select({ outcomes: conversationTurns.outcomes, stats: conversationTurns.stats }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();

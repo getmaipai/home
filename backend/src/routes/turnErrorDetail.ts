@@ -5,7 +5,8 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
-import { canReadErrorDetail, turnErrorDetail } from "@/lib/turnErrorDetail";
+import { canAccessPerson } from "@/lib/access";
+import { canReadErrorDetail, turnErrorDetail, turnOwnerId } from "@/lib/turnErrorDetail";
 
 export const turnErrorDetailRoutes = apiRouter();
 
@@ -44,7 +45,11 @@ const getRoute = createRoute({
 turnErrorDetailRoutes.openapi(getRoute, (c) => {
   // requireRole matches the role alone; a minor-aged admin record still reads nothing.
   if (!canReadErrorDetail(c.get("person"))) return c.json({ error: "Forbidden" }, 403);
-  const detail = turnErrorDetail(c.req.valid("param").id);
+  const turnId = c.req.valid("param").id;
+  // An admin reaches only the turns of people an admin may reach (never a teen's or another adult's).
+  const ownerId = turnOwnerId(turnId);
+  if (ownerId && !canAccessPerson(c.get("person"), ownerId)) return c.json({ error: "Forbidden" }, 403);
+  const detail = turnErrorDetail(turnId);
   if (!detail) return c.json({ error: "Not found" }, 404);
   return c.json(detail, 200);
 });
