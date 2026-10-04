@@ -782,7 +782,6 @@ interface SearxngEngine {
 // (packageCache.ts's header) for exactly this reason.
 const SEARXNG_ENGINES_CACHE_TTL_MS = 60 * 60 * 1000;
 let searxngEnginesCache: { baseUrl: string; fetchedAt: number; engines: SearxngEngine[] } | null = null;
-let searxngRotationIndex = 0;
 const searxngBenchedUntil = new Map<string, number>();
 const SEARXNG_ENGINE_BENCH_MS = 30 * 60 * 1000;
 
@@ -795,8 +794,8 @@ export function __resetSearxngEnginesCacheForTests(): void {
 }
 
 export function __resetSearchRotationForTests(): void {
-  searxngRotationIndex = 0;
   searxngBenchedUntil.clear();
+  searxngEngineHealth.clear();
 }
 
 /** The engine names this instance's own `/config` marks `enabled` and
@@ -855,12 +854,62 @@ function availableRotationPool(pool: string[]): string[] {
   return pool.filter((name) => (searxngBenchedUntil.get(name) ?? 0) <= now);
 }
 
-function rotationEngines(pool: string[], count = 2): string[] {
-  const available = availableRotationPool(pool).filter((name) => name !== "wikipedia");
-  if (available.length === 0) return [];
-  if (available.length <= count) return available;
-  const start = searxngRotationIndex++ % available.length;
-  return Array.from({ length: count }, (_, i) => available[(start + i) % available.length]!);
+/** THIN-GROUND-01 part 2: one search names this many engines. It is still ONE
+ * request to SearXNG, which fans out, so Home's request count and page-read
+ * budget are unchanged. */
+const SEARCH_ENGINE_COUNT = 3;
+/** The last this-many searches an engine was asked in are its health. */
+const ENGINE_HEALTH_WINDOW = 10;
+const searxngEngineHealth = new Map<string, { ok: boolean; count: number }[]>();
+
+/** A small in-memory health score: the share of recent searches the engine
+ * answered with results (smoothed, so one miss does not sink an engine and an
+ * untried one starts in the middle at 0.5), plus a tie-break on how many
+ * results it gave. No word or query rule: only what SearXNG reported back. */
+function engineScore(name: string): number {
+  const history = searxngEngineHealth.get(name);
+  if (!history || history.length === 0) return 0.5;
+  const successes = history.filter((h) => h.ok).length;
+  const meanCount = history.reduce((sum, h) => sum + h.count, 0) / history.length;
+  return (successes + 1) / (history.length + 2) + Math.min(meanCount, 20) / 1000;
+}
+
+/** Up to three engines from the pool, best recent health first, the ones
+ * benched (searxngBenchedUntil) and any in `exclude` left out, ties broken by
+ * the pool's own stable order. wikipedia is never one of the three: the caller
+ * appends it when configured. */
+function pickSearchEngines(pool: string[], exclude: readonly string[] = [], count = SEARCH_ENGINE_COUNT): string[] {
+  return availableRotationPool(pool)
+    .filter((name) => name !== "wikipedia" && !exclude.includes(name))
+    .map((name, order) => ({ name, order, score: engineScore(name) }))
+    .sort((a, b) => b.score - a.score || a.order - b.order)
+    .slice(0, count)
+    .map((entry) => entry.name);
+}
+
+/** Scores the engines one request asked for from what SearXNG answered, and
+ * leaves the one debug line that makes the score observable. Each result names
+ * the engines that returned it. A response whose results carry no engine names
+ * at all says nothing about any engine, so it scores none. */
+function recordEngineHealth(asked: readonly string[] | null | undefined, value: Record<string, unknown>, unresponsive: readonly string[]): void {
+  if (!asked || asked.length === 0) return;
+  const results = Array.isArray(value.results) ? value.results : [];
+  const counts = new Map<string, number>();
+  let attributed = false;
+  for (const raw of results) {
+    const row = raw as { engine?: unknown; engines?: unknown };
+    const names = Array.isArray(row.engines) ? row.engines.filter((n): n is string => typeof n === "string") : typeof row.engine === "string" ? [row.engine] : [];
+    if (names.length > 0) attributed = true;
+    for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  const answered = asked.filter((name) => (counts.get(name) ?? 0) > 0);
+  console.debug(`[search] engines asked=${asked.join(",")} answered=${answered.join(",")} unresponsive=${unresponsive.filter((n) => asked.includes(n)).join(",")} results=${results.length}`);
+  if (results.length > 0 && !attributed) return;
+  for (const name of asked) {
+    const count = counts.get(name) ?? 0;
+    const history = [...(searxngEngineHealth.get(name) ?? []), { ok: count > 0 && !unresponsive.includes(name), count }];
+    searxngEngineHealth.set(name, history.slice(-ENGINE_HEALTH_WINDOW));
+  }
 }
 
 /** `host.integration.call("searxng", "search", { query })`'s real
@@ -894,7 +943,7 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
   const safeLevel = opts.safeSearchLevel ?? "off";
   const safeEngines = safeLevel === "strict" || safeLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general") : null;
   const rotationPool = !isImages && input?.category !== "videos" ? await webRotationPool(baseUrl, safeLevel) : null;
-  const rotated = rotationPool ? rotationEngines(rotationPool) : null;
+  const rotated = rotationPool ? pickSearchEngines(rotationPool) : null;
   const wikipedia = rotationPool?.includes("wikipedia") ? ["wikipedia"] : [];
   const requestEngines = rotated && rotated.length > 0 ? [...rotated, ...wikipedia] : rotated;
   const key = [baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? "page" : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
@@ -905,11 +954,25 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
   const running = searchInFlight.get(key);
   if (running) return running;
   const searchRows = async (): Promise<SearxngSearchResult> => {
-    const result = await searxngSearchUncached(args, { ...opts, safeEngines: requestEngines ?? safeEngines });
+    const asked = (requestEngines ?? []).filter((name) => name !== "wikipedia");
+    // THIN-GROUND-01 part 2: the one retry. Engines SearXNG reports unresponsive
+    // are benched as the response is read; when nothing came back, the next
+    // engines from the pool (never ones already asked) get one more request. The
+    // first request leaves the Wikipedia fallback for the retry to try.
+    const next = rotationPool && asked.length > 0 ? pickSearchEngines(rotationPool, asked) : [];
+    let result: SearxngSearchResult;
+    try {
+      result = await searxngSearchUncached(args, { ...opts, safeEngines: requestEngines ?? safeEngines, ...(next.length > 0 ? { allowWikipediaFallback: false } : {}) });
+    } catch (err) {
+      if (!(err instanceof HostError && err.code === "search_unavailable") || next.length === 0) throw err;
+      const retryNext = pickSearchEngines(rotationPool!, asked);
+      if (retryNext.length === 0) throw err;
+      return searxngSearchUncached(args, { ...opts, safeEngines: [...retryNext, ...wikipedia] });
+    }
     if (!rotationPool || !requestEngines || requestEngines.length === 0 || result.rows.length >= 3) return result;
-    const next = rotationEngines(rotationPool);
-    if (next.length === 0 || next.join(",") === requestEngines.filter((name) => name !== "wikipedia").join(",")) return result;
-    const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...next, ...wikipedia] });
+    const more = pickSearchEngines(rotationPool, asked);
+    if (more.length === 0) return result;
+    const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...more, ...wikipedia] });
     const rows = dedupeRows([...result.rows, ...second.rows]);
     return { text: [result.text, second.text].filter((value) => value !== SEARXNG_NO_RESULTS_TEXT).join("\n"), rows };
   };
@@ -1123,6 +1186,7 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
         ? value.unresponsive_engines.flatMap((raw: unknown) => Array.isArray(raw) && typeof raw[0] === "string" ? [raw[0]] : [])
         : [];
       for (const name of unresponsiveNames) searxngBenchedUntil.set(name, Date.now() + SEARXNG_ENGINE_BENCH_MS);
+      recordEngineHealth(opts.safeEngines, value, unresponsiveNames);
       const unresponsiveEngines = unresponsiveNames.length > 0;
       void recordServiceOutcome("searxng", { ok: !unresponsiveEngines, error: unresponsiveEngines ? new Error("captcha or service access wall") : undefined });
       if (text === SEARXNG_NO_RESULTS_TEXT && unresponsiveEngines) {

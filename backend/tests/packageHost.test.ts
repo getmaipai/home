@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -2025,7 +2025,7 @@ describe("searxng search cache", () => {
 });
 
 describe("searxng search rotation", () => {
-  test("rotates two enabled web engines and keeps wikipedia when configured", async () => {
+  test("asks three enabled web engines in one request and keeps wikipedia when configured (THIN-GROUND-01 part 2)", async () => {
     const seen: string[] = [];
     const config = { engines: [
       { name: "alpha", enabled: true, safesearch: true, categories: ["general", "web"] },
@@ -2043,11 +2043,11 @@ describe("searxng search rotation", () => {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await searxngSearch({ query: "one" });
       await searxngSearch({ query: "two" });
-      expect(seen).toEqual(["alpha,bravo,wikipedia", "bravo,charlie,wikipedia"]);
+      expect(seen).toEqual(["alpha,bravo,charlie,wikipedia", "alpha,bravo,charlie,wikipedia"]);
     } finally { server.stop(true); }
   });
 
-  test("never rotates onto an image or video engine, even one SearXNG also files under web (THIN-GROUND-01)", async () => {
+  test("never asks an image or video engine, even one SearXNG also files under web (THIN-GROUND-01)", async () => {
     // The real /config shape: "bing images" and "bing videos" carry "web" as a
     // second category, so a pool built on "web" alone sorted them in beside
     // "bing" and a fresh process's first search asked "bing,bing images", which
@@ -2070,7 +2070,7 @@ describe("searxng search rotation", () => {
     try {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       for (const query of ["one", "two", "three"]) await searxngSearch({ query });
-      expect(seen).toEqual(["bing,brave", "brave,google cse", "google cse,bing"]);
+      expect(seen).toEqual(["bing,brave,google cse", "bing,brave,google cse", "bing,brave,google cse"]);
     } finally { server.stop(true); }
   });
 
@@ -2092,6 +2092,87 @@ describe("searxng search rotation", () => {
       await searxngSearch({ query: "child" }, { safeSearchLevel: "strict" });
       expect(seen[0]).toBe("safe,safe-two");
     } finally { server.stop(true); }
+  });
+});
+
+describe("search engine choice: three engines ranked by recent health (THIN-GROUND-01 part 2)", () => {
+  const poolConfig = { engines: ["alpha", "bravo", "charlie", "delta"].map((name) => ({ name, enabled: true, safesearch: true, categories: ["general", "web"] })) };
+  const hit = (engine: string, n: number) => ({ title: `${engine} ${n}`, url: `https://${engine}.example.com/${n}`, content: "content", engine, engines: [engine] });
+
+  /** A fake SearXNG: /config is the pool above, /search is answered by `reply(asked, call)`. */
+  function fakeSearxng(reply: (asked: string[], call: number) => Record<string, unknown>) {
+    const asked: string[][] = [];
+    const server = Bun.serve({ port: 0, fetch: (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/config") return Response.json(poolConfig);
+      asked.push((url.searchParams.get("engines") ?? "").split(",").filter(Boolean));
+      return Response.json(reply(asked.at(-1)!, asked.length));
+    } });
+    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+    return { asked, stop: () => server.stop(true) };
+  }
+
+  test("a fresh process asks the first three of the stable list", async () => {
+    const fake = fakeSearxng((asked) => ({ results: asked.map((e) => hit(e, 1)) }));
+    try {
+      await searxngSearch({ query: "fresh" });
+      expect(fake.asked).toEqual([["alpha", "bravo", "charlie"]]);
+    } finally { fake.stop(); }
+  });
+
+  test("an engine that answered nothing drops below an untried one, and the best answerer stays first", async () => {
+    // alpha asked, no rows from it; bravo and charlie answered with rows.
+    const fake = fakeSearxng((asked, call) => ({ results: call === 1 ? [hit("bravo", 1), hit("bravo", 2), hit("charlie", 1)] : asked.map((e) => hit(e, 1)) }));
+    try {
+      await searxngSearch({ query: "first" });
+      await searxngSearch({ query: "second" });
+      expect(fake.asked[0]).toEqual(["alpha", "bravo", "charlie"]);
+      expect(fake.asked[1]).toEqual(["bravo", "charlie", "delta"]);
+    } finally { fake.stop(); }
+  });
+
+  test("an engine SearXNG reports unresponsive is benched and not asked next time", async () => {
+    const fake = fakeSearxng((asked, call) => ({
+      results: asked.filter((e) => e !== "bravo").flatMap((e) => [hit(e, 1), hit(e, 2)]),
+      ...(call === 1 ? { unresponsive_engines: [["bravo", "Suspended: too many requests"]] } : {}),
+    }));
+    try {
+      await searxngSearch({ query: "one" });
+      await searxngSearch({ query: "two" });
+      expect(fake.asked[1]).not.toContain("bravo");
+      expect(fake.asked[1]).toHaveLength(3);
+    } finally { fake.stop(); }
+  });
+
+  test("zero results with asked engines unresponsive: one retry on the next engines from the pool, and no third request", async () => {
+    const fake = fakeSearxng((asked, call) => call === 1
+      ? { results: [], unresponsive_engines: [["alpha", "Suspended: too many requests"], ["bravo", "Suspended: CAPTCHA"]] }
+      : { results: asked.map((e) => hit(e, 1)) });
+    try {
+      const result = await searxngSearch({ query: "avengers" }, { allowWikipediaFallback: false });
+      expect(fake.asked).toEqual([["alpha", "bravo", "charlie"], ["delta"]]);
+      expect(result.rows.map((r) => r.title)).toEqual(["delta 1"]);
+    } finally { fake.stop(); }
+  });
+
+  test("a retry that is also empty stops there: one retry only", async () => {
+    const fake = fakeSearxng(() => ({ results: [], unresponsive_engines: [["alpha", "Suspended: too many requests"]] }));
+    try {
+      await expect(searxngSearch({ query: "nothing" }, { allowWikipediaFallback: false })).rejects.toThrow();
+      expect(fake.asked).toHaveLength(2);
+    } finally { fake.stop(); }
+  });
+
+  test("each search leaves one debug line naming the engines asked and the engines that answered", async () => {
+    const fake = fakeSearxng(() => ({ results: [hit("bravo", 1), hit("charlie", 1)] }));
+    const debug = spyOn(console, "debug").mockImplementation(() => {});
+    try {
+      await searxngSearch({ query: "observable" });
+      const line = debug.mock.calls.map((c) => String(c[0])).find((l) => l.includes("[search]"));
+      expect(line).toBeDefined();
+      expect(line).toContain("asked=alpha,bravo,charlie");
+      expect(line).toContain("answered=bravo,charlie");
+    } finally { debug.mockRestore(); fake.stop(); }
   });
 });
 
