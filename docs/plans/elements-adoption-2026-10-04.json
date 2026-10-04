@@ -16,7 +16,8 @@
    "size": "S",
    "showcaseScenario": "NEW: activity-graph",
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "agent-card.tsx",
@@ -31,7 +32,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "agent-handoff.tsx",
@@ -46,7 +48,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "agent-plan.tsx",
@@ -61,7 +64,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "agent-status.tsx",
@@ -76,7 +80,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "approval-card.tsx",
@@ -97,7 +102,8 @@
    "batch": 3,
    "replacesHandBuilt": [
     "frontend/src/next/pages/NextChatPage.tsx:421-480"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "artifact-card.tsx",
@@ -117,7 +123,8 @@
    "size": "S",
    "showcaseScenario": "NEW: artifact-card",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "attachment.aui.tsx",
@@ -133,7 +140,8 @@
    "size": "S",
    "showcaseScenario": "NEW: attachments (image, pdf, upload error)",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "background-inbox.tsx",
@@ -148,7 +156,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": 6,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": false
   },
   {
    "file": "canvas-split.tsx",
@@ -166,7 +175,8 @@
    "batch": 2,
    "replacesHandBuilt": [
     "frontend/src/next/pages/NextChatPage.tsx:1150-1371"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "chart.tsx",
@@ -181,7 +191,8 @@
    "size": "M",
    "showcaseScenario": "NEW: chart (area, line, bars)",
    "batch": 6,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": false
   },
   {
    "file": "chat-panel.tsx",
@@ -196,7 +207,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "checkpoint-history.tsx",
@@ -211,7 +223,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "code-diff.tsx",
@@ -226,7 +239,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "code-runner.tsx",
@@ -241,7 +255,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "command-palette.tsx",
@@ -256,7 +271,8 @@
    "size": "S",
    "showcaseScenario": "NEW: command-palette",
    "batch": 4,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "comparison-card.tsx",
@@ -271,7 +287,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "composer.tsx",
@@ -288,7 +305,8 @@
    "batch": 5,
    "replacesHandBuilt": [
     "frontend/src/apps/chat/composerAddMenu.tsx:87-222"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "computer-use.tsx",
@@ -303,7 +321,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "confidence-marker.tsx",
@@ -318,7 +337,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "connection-state.tsx",
@@ -333,7 +353,8 @@
    "size": "S",
    "showcaseScenario": "NEW: connection-dropped (drop, reconnect, resumed)",
    "batch": 4,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "context-breakdown.tsx",
@@ -348,7 +369,8 @@
    "size": "M",
    "showcaseScenario": "NEW: context-breakdown",
    "batch": 6,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": false
   },
   {
    "file": "context-display.tsx",
@@ -364,7 +386,8 @@
    "size": "S",
    "showcaseScenario": "NEW: context-footer",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "conversation-map.tsx",
@@ -379,7 +402,8 @@
    "size": "S",
    "showcaseScenario": "NEW: conversation-map (long thread)",
    "batch": 4,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "conversation-search.tsx",
@@ -394,7 +418,8 @@
    "size": "S",
    "showcaseScenario": "NEW: find-in-chat",
    "batch": 4,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "cost-meter.tsx",
@@ -409,7 +434,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "data-table.tsx",
@@ -427,7 +453,8 @@
    "size": "S",
    "showcaseScenario": "table",
    "batch": 5,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "day-separator.tsx",
@@ -444,7 +471,8 @@
    "batch": 3,
    "replacesHandBuilt": [
     "frontend/src/apps/chat/chatDayDivider.tsx:35-93"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "diagram.tsx",
@@ -459,7 +487,8 @@
    "size": "S",
    "showcaseScenario": "NEW: mermaid (flow, sequence)",
    "batch": 5,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "directive-text.tsx",
@@ -474,7 +503,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "document-reference.tsx",
@@ -489,7 +519,8 @@
    "size": "M",
    "showcaseScenario": "NEW: document-reference",
    "batch": 5,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": false
   },
   {
    "file": "draft-restore.tsx",
@@ -504,7 +535,8 @@
    "size": "S",
    "showcaseScenario": "NEW: draft-restore",
    "batch": 4,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "edit-message.tsx",
@@ -520,7 +552,8 @@
    "size": "S",
    "showcaseScenario": "NEW: edit-branch",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "elicitation-form.tsx",
@@ -535,7 +568,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": 6,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": false
   },
   {
    "file": "empty-state.tsx",
@@ -553,7 +587,8 @@
    "batch": 2,
    "replacesHandBuilt": [
     "frontend/src/next/pages/NextChatPage.tsx:780-816"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "error-state.tsx",
@@ -568,7 +603,8 @@
    "size": "S",
    "showcaseScenario": "failure-engine-down, failure-unavailable, failure-generic",
    "batch": 4,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "feedback-dialog.tsx",
@@ -585,7 +621,8 @@
    "batch": 3,
    "replacesHandBuilt": [
     "frontend/src/apps/chat/chatActionBar.tsx:33-114"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "file-tree.tsx",
@@ -600,7 +637,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "file.tsx",
@@ -616,7 +654,8 @@
    "size": "S",
    "showcaseScenario": "NEW: file-card",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "flow-graph.tsx",
@@ -631,7 +670,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "follow-up-suggestions.aui.tsx",
@@ -646,7 +686,8 @@
    "size": "S",
    "showcaseScenario": "NEW: follow-ups",
    "batch": 5,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "github.tsx",
@@ -661,7 +702,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "globals.css",
@@ -676,7 +718,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "hooks/use-attachment-src.ts",
@@ -691,7 +734,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "hooks/use-copy-to-clipboard.ts",
@@ -706,7 +750,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "hooks/use-mobile.ts",
@@ -721,7 +766,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "image-generation.tsx",
@@ -736,7 +782,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "image.tsx",
@@ -752,7 +799,8 @@
    "size": "S",
    "showcaseScenario": "links, NEW: image-result",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "inline-citation.tsx",
@@ -772,7 +820,8 @@
    "batch": 5,
    "replacesHandBuilt": [
     "frontend/src/next/pages/NextChatPage.tsx:986-1040"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "job-progress.tsx",
@@ -791,7 +840,8 @@
    "size": "S",
    "showcaseScenario": "NEW: job-progress",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "launcher-bubble.tsx",
@@ -806,7 +856,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "loading-state.tsx",
@@ -821,7 +872,8 @@
    "size": "S",
    "showcaseScenario": "reasoning",
    "batch": 4,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "map-answer.tsx",
@@ -839,7 +891,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": 6,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": false
   },
   {
    "file": "markdown-text.test.tsx",
@@ -854,7 +907,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "markdown-text.tsx",
@@ -870,7 +924,8 @@
    "size": "S",
    "showcaseScenario": "table, code, math, lists, headings, NEW: mermaid",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "math-block.tsx",
@@ -885,7 +940,8 @@
    "size": "S",
    "showcaseScenario": "NEW: math-steps",
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "mcp-server-panel.tsx",
@@ -900,7 +956,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "memory-chips.tsx",
@@ -920,7 +977,8 @@
    "batch": 3,
    "replacesHandBuilt": [
     "frontend/src/apps/chat/chatActionBar.tsx:183-265"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "mermaid-diagram.tsx",
@@ -936,7 +994,8 @@
    "size": "S",
    "showcaseScenario": "NEW: mermaid",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "message-actions.tsx",
@@ -954,7 +1013,8 @@
    "replacesHandBuilt": [
     "frontend/src/apps/chat/chatActionBar.tsx:116-265",
     "frontend/src/next/pages/NextChatPage.tsx:284-372"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "message-attachment.tsx",
@@ -969,7 +1029,8 @@
    "size": "S",
    "showcaseScenario": "NEW: attachments",
    "batch": 3,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "message-branches.tsx",
@@ -985,7 +1046,8 @@
    "size": "S",
    "showcaseScenario": "NEW: edit-branch",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "message-pair.tsx",
@@ -1000,7 +1062,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "message-queue.tsx",
@@ -1015,7 +1078,8 @@
    "size": "M",
    "showcaseScenario": "NEW: message-queue",
    "batch": 5,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "message-timing.tsx",
@@ -1034,7 +1098,8 @@
    "replacesHandBuilt": [
     "frontend/src/apps/chat/chatTurnStats.tsx:24-61",
     "frontend/src/next/pages/NextChatPage.tsx:1041-1100"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "mobile-composer.tsx",
@@ -1049,7 +1114,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "model-picker.tsx",
@@ -1064,7 +1130,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "model-selector.tsx",
@@ -1080,7 +1147,8 @@
    "size": "S",
    "showcaseScenario": "NEW: model-chip",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "number-ticker.tsx",
@@ -1095,7 +1163,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "onboarding.tsx",
@@ -1110,7 +1179,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "permission-grant.tsx",
@@ -1125,7 +1195,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "prompt-library.tsx",
@@ -1140,7 +1211,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "quota-banner.tsx",
@@ -1155,7 +1227,8 @@
    "size": "S",
    "showcaseScenario": "NEW: quota-storage",
    "batch": 5,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "quote-reply.tsx",
@@ -1170,7 +1243,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "range.ts",
@@ -1185,7 +1259,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "read-aloud.tsx",
@@ -1202,7 +1277,8 @@
    "batch": 6,
    "replacesHandBuilt": [
     "frontend/src/apps/chat/chatActionBar.tsx:116-181"
-   ]
+   ],
+   "realTurnToday": false
   },
   {
    "file": "reasoning-effort.tsx",
@@ -1217,7 +1293,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "reasoning-panel.tsx",
@@ -1232,7 +1309,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "reasoning.aui.tsx",
@@ -1248,7 +1326,8 @@
    "size": "S",
    "showcaseScenario": "reasoning, child",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "reasoning.tsx",
@@ -1264,7 +1343,8 @@
    "size": "S",
    "showcaseScenario": "reasoning",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "recommendation-card.tsx",
@@ -1279,7 +1359,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "regenerate-menu.tsx",
@@ -1294,7 +1375,8 @@
    "size": "S",
    "showcaseScenario": "NEW: regenerate-with",
    "batch": 3,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "research-report.tsx",
@@ -1309,7 +1391,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "retrieval-chunks.tsx",
@@ -1324,7 +1407,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "reviewable-diff.tsx",
@@ -1339,7 +1423,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "schedule-card.tsx",
@@ -1357,7 +1442,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": 6,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": false
   },
   {
    "file": "score-breakdown.tsx",
@@ -1372,7 +1458,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "scroll-anchor.tsx",
@@ -1387,7 +1474,8 @@
    "size": "S",
    "showcaseScenario": "essay",
    "batch": 3,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "settings-panel.tsx",
@@ -1402,7 +1490,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "shared-conversation.tsx",
@@ -1417,7 +1506,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "shiki-highlighter.tsx",
@@ -1433,7 +1523,8 @@
    "size": "S",
    "showcaseScenario": "code",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "sources.aui.tsx",
@@ -1453,7 +1544,8 @@
    "size": "S",
    "showcaseScenario": "search",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "sources.tsx",
@@ -1471,7 +1563,8 @@
    "replacesHandBuilt": [
     "frontend/src/next/pages/NextChatPage.tsx:929-1040",
     "frontend/src/apps/chat/chatSourceCaption.tsx:19-67"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "speaker-identity.tsx",
@@ -1486,7 +1579,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "spec-sheet.tsx",
@@ -1515,7 +1609,8 @@
    "size": "S",
    "showcaseScenario": "NEW: spec-sheet (weather)",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "stopped-run.tsx",
@@ -1532,7 +1627,8 @@
    "batch": 3,
    "replacesHandBuilt": [
     "frontend/src/apps/chat/chatContinue.ts"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "streaming-text.tsx",
@@ -1547,7 +1643,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "subagent-list.tsx",
@@ -1562,7 +1659,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "suggestions.tsx",
@@ -1577,7 +1675,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "surfaces.test.tsx",
@@ -1592,7 +1691,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "surfaces.tsx",
@@ -1607,7 +1707,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "task-card.tsx",
@@ -1622,7 +1723,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "task.ts",
@@ -1637,7 +1739,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "terminal-block.tsx",
@@ -1652,7 +1755,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "thinking-indicator.test.tsx",
@@ -1667,7 +1771,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "thinking-indicator.tsx",
@@ -1683,7 +1788,8 @@
    "size": "S",
    "showcaseScenario": "reasoning, search",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "thread-list.aui.test.tsx",
@@ -1698,7 +1804,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "thread-list.aui.tsx",
@@ -1714,7 +1821,8 @@
    "size": "M",
    "showcaseScenario": "NEW: thread-list (titles, pinned, archived)",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "thread-list.tsx",
@@ -1729,7 +1837,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "thread-search.tsx",
@@ -1746,7 +1855,8 @@
    "batch": 4,
    "replacesHandBuilt": [
     "frontend/src/next/pages/NextChatPage.tsx:1372-1875"
-   ]
+   ],
+   "realTurnToday": true
   },
   {
    "file": "thread.aui.test.tsx",
@@ -1761,7 +1871,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "thread.aui.tsx",
@@ -1777,7 +1888,8 @@
    "size": "M",
    "showcaseScenario": "all existing scenarios",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "threadlist-sidebar.aui.tsx",
@@ -1792,7 +1904,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "timeline.tsx",
@@ -1807,7 +1920,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "todo-list.tsx",
@@ -1825,7 +1939,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": 6,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": false
   },
   {
    "file": "tool-call.tsx",
@@ -1840,7 +1955,8 @@
    "size": "S",
    "showcaseScenario": "search, failed-tool",
    "batch": 3,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "tool-error.tsx",
@@ -1855,7 +1971,8 @@
    "size": "S",
    "showcaseScenario": "failed-tool",
    "batch": 4,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "tool-fallback.aui.tsx",
@@ -1871,7 +1988,8 @@
    "size": "S",
    "showcaseScenario": "search",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "tool-group.aui.tsx",
@@ -1887,7 +2005,8 @@
    "size": "S",
    "showcaseScenario": "search",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "tool-group.tsx",
@@ -1902,7 +2021,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "tool-timeline.tsx",
@@ -1920,7 +2040,8 @@
    "size": "S",
    "showcaseScenario": "search",
    "batch": 1,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "tooltip-icon-button.tsx",
@@ -1935,7 +2056,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "trace-waterfall.tsx",
@@ -1950,7 +2072,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "typing-indicator.tsx",
@@ -1965,7 +2088,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/avatar.tsx",
@@ -1980,7 +2104,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/badge.tsx",
@@ -1995,7 +2120,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/button.tsx",
@@ -2010,7 +2136,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/collapsible.tsx",
@@ -2025,7 +2152,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/command.tsx",
@@ -2040,7 +2168,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/dialog.tsx",
@@ -2055,7 +2184,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/input.tsx",
@@ -2070,7 +2200,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/popover.tsx",
@@ -2085,7 +2216,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/separator.tsx",
@@ -2100,7 +2232,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/sheet.tsx",
@@ -2115,7 +2248,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/sidebar.tsx",
@@ -2130,7 +2264,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/skeleton.tsx",
@@ -2145,7 +2280,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/textarea.tsx",
@@ -2160,7 +2296,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "ui/tooltip.tsx",
@@ -2175,7 +2312,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "voice-conversation.test.tsx",
@@ -2190,7 +2328,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "voice-conversation.tsx",
@@ -2206,7 +2345,8 @@
    "size": "M",
    "showcaseScenario": "spoken",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "voice.tsx",
@@ -2222,7 +2362,8 @@
    "size": "S",
    "showcaseScenario": "spoken",
    "batch": 2,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "web-preview.tsx",
@@ -2237,7 +2378,8 @@
    "size": "M",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   },
   {
    "file": "web-search.tsx",
@@ -2252,7 +2394,8 @@
    "size": "S",
    "showcaseScenario": null,
    "batch": null,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": null
   },
   {
    "file": "guardrail-notice.tsx",
@@ -2267,7 +2410,9 @@
    "size": "S",
    "showcaseScenario": "failure-safety, crisis",
    "batch": 4,
-   "replacesHandBuilt": []
+   "replacesHandBuilt": [],
+   "realTurnToday": true
   }
- ]
+ ],
+ "implementedDefinition": "IMPLEMENTED = mounted in the shared chat thread (ChatThread.tsx or elementBindings.ts, else NextChatPage.tsx) AND a real turn can produce its data today AND a test references it. Fixture-only = 'in playground only'. Scanner (not written) outputs: implemented, in playground only, not yet."
 }

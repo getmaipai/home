@@ -324,6 +324,26 @@ Dependencies: B5's follow-up generator (a small model call after each adult repl
 already mounted and fix the starters being switched off. Not in any batch: the 17 FOR LATER and 35 DOES NOT FIT elements. `elicitation-form` sits in B6 but also waits on a tool elicitation event (tools design). The upper bound of this plan is 64 of 116; the remaining FOR LATER items (voice extras, projects, MCP,
 code runner, image generation, share, prompt library, onboarding) need their own feature records.
 
+### 5a. IMPLEMENTED definition and order by real chat capability (owner priority, added after the first push)
+
+Normal chat comes first; the playground only verifies it. An Element counts as **IMPLEMENTED** only when all three hold: (a) it is mounted in the shared chat thread
+(`frontend/src/apps/chat/ChatThread.tsx` or `elementBindings.ts` from `cloud/shared-chat-thread`; until that lands, mounted in `NextChatPage.tsx`), (b) a **real turn** can
+produce the part or data it renders today (backend or tool output exists, cited in the row's data column), and (c) a test references it. A showcase fixture alone never counts: such
+Elements are reported as **in playground only**. The scanner reports three counts: implemented, in playground only, not yet. It is not written (needs the owner's go-ahead), so no count is
+asserted here; the JSON carries the definition and a `realTurnToday` flag per item for the scanner to confirm.
+
+Real-turn status from this audit: **real today** (data on the wire now): every batch B1 to B4 element, `follow-up-suggestions.aui` starters (adapter exists, only unmounted), `inline-citation` (sources
+exist; the `[n]` mapper THIN-4B is the missing piece), `data-table` and `diagram` (markdown tables and mermaid arrive in `delta`), `message-queue` (client only), `quota-banner` (storage overview, `wire.ts:903`),
+`composer` pieces. **Playground only until a backend piece lands:** `map-answer`, `schedule-card`, `todo-list`, `chart`, `background-inbox`, `context-breakdown`, `read-aloud`, `elicitation-form`, `document-reference`,
+and the follow-up generator half of `follow-up-suggestions.aui` (batch B6 and the second half of B5).
+
+Order by what gets a real chat capability live first (replaces the effort order above where they differ):
+1. **B1** (reasoning, tools, markdown, branches, edit are all real now) then **B4** (plain errors, find, command palette: real error events exist, `wire.ts:401`).
+2. **B3** (sources list, action bar, confirm card for lights and locks, stop and continue).
+3. **B2** (artifact, job progress, model chip, thread list, attachments, voice).
+4. **B5 starters first** (one-line mount of the existing adapter: a real capability at once), then inline `[n]` citations (THIN-4B), then the rest of B5.
+5. **B6** last: each element goes live only with its additive tool output (section 3), and stays "in playground only" until a real turn emits it.
+
 ## 6. Elements that need a new dependency or a spec or commons tag
 
 - **New dependency: none.** Every Element's imports are in the kit's `package.json` (verified against the tag: `@base-ui/react`, `beautiful-mermaid`, `cmdk`, `heat-graph`, `katex`, `react-shiki`).
