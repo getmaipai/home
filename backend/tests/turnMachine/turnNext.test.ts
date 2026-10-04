@@ -1996,12 +1996,13 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
       // The raw details stay on the stored outcome record (for THIN-1E).
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, first.value.turn_id)).get();
       const outcomes = row?.outcomes
-        ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string; userMessage?: string }[])
+        ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string; detail?: string }[])
         : [];
       const websearchOutcome = outcomes.find((o) => o.packageId === "websearch");
       expect(websearchOutcome?.status).toBe("failed");
       expect(websearchOutcome?.errorCode).toBe("search_unavailable");
-      expect(websearchOutcome?.userMessage).toBeTruthy();
+      // R2: the raw text is the outcome's admin-only `detail` now, never a `userMessage`.
+      expect(websearchOutcome?.detail).toBeTruthy();
     } finally {
       searxng.stop();
     }
@@ -2040,8 +2041,8 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
       expect(requests.filter(answeringRound).every((r) => r.messages.at(-1)?.content?.toString().includes("errored"))).toBe(true);
       // Kept on the record 1E reads.
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
-      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; userMessage?: string }[]) : [];
-      expect(outcomes.find((o) => o.packageId === "websearch")?.userMessage).toContain(MARKER);
+      const outcomes = row?.outcomes ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; detail?: string }[]) : [];
+      expect(outcomes.find((o) => o.packageId === "websearch")?.detail).toContain(MARKER);
     } finally {
       spy.mockRestore();
     }

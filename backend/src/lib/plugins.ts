@@ -537,7 +537,7 @@ export async function runPlugin(
     return { ok: false, status: 403, error: `${id} needs role ${manifest.min_role} or higher` };
   }
   const argsError = validateArgs(id, manifest, inputs);
-  if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}` };
+  if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}`, code: "bad_arguments" };
 
   if (manifest.tier === 1) {
     // ALM-01: the almanac handlers are sandboxed Tier 1 packages, so the

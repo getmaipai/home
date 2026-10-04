@@ -128,7 +128,10 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       const sources = input.outcomes.flatMap((o) => o.sources ?? []);
       const lastFailed = input.outcomes.at(-1)?.status === "failed";
       const provenance = lastFailed ? ("outcome_error" as const) : undefined;
-      return { outcome: { ok: true }, output: { text: input.text, sources, provenance } };
+      // R2: a failed tool run carries no household-facing message (its raw error is
+      // the admin-only `detail`), so the text is empty; the shared technical-failure line
+      // stands in for it where no model round follows.
+      return { outcome: { ok: true }, output: { text: input.text || (lastFailed ? COMPOSE_FAILURE_LINE : ""), sources, provenance } };
     }
     // DEADLINE-01: the same shared line composer.ts's own all-failed
     // batch already uses for a technical failure - the identical

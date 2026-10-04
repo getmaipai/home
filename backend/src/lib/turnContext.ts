@@ -108,6 +108,9 @@ export function asksHowKnown(utterance: string): boolean {
   return /^(?:\s*)(?:how do you know(?: that)?|where did that come from|are you sure|did you make that up|source\?)\s*[.!?]*\s*$/i.test(utterance);
 }
 
+/** Why a tool run did not give the model anything (rule 6): the five kinds. */
+export type FailureKind = "unavailable" | "timed_out" | "errored" | "bad_arguments" | "found_nothing";
+
 /** CHAT-15: one record per package call a turn proposed, ran, parked
  * or rejected, whichever path produced it (the model's tool calls, a
  * literal or fuzzy winner, an answered confirmation or ask, a
@@ -132,8 +135,16 @@ export interface ToolExecutionOutcome {
   at?: string;
   result?: PluginResult;
   errorCode?: string;
-  /** Safe for the household; never a developer diagnostic. */
+  /** Safe for the household; never a developer diagnostic. A failed tool run
+   * sets no `userMessage` any more: it sets `failureKind` and `detail`. */
   userMessage?: string;
+  /** T5/R2 (rule 6): why a tool run failed, as one of five fixed kinds. The
+   * only thing about a failure the model or a client is ever told. */
+  failureKind?: FailureKind;
+  /** T5/R2 (rule 6): the raw error text of a failed tool run, for an admin's
+   * details view (THIN-1E) only. Stored on the outcome record; no prompt,
+   * wire event, reply or composer builder reads it. */
+  detail?: string;
   source?: OutcomeSource;
   sources?: Source[];
 }

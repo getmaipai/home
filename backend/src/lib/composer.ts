@@ -908,7 +908,7 @@ export function toolResultContent(outcome: ToolExecutionOutcome, searchMaxChars?
         }
       : outcome.status === "pending"
         ? { status: "pending", package: outcome.packageId, asked: pendingText(outcome) }
-        : { status: "failed", package: outcome.packageId, error: outcome.userMessage ?? outcome.errorCode ?? "failed" };
+        : { status: "failed", package: outcome.packageId, error: outcome.userMessage ?? outcome.failureKind ?? outcome.errorCode ?? "failed" };
   const text = JSON.stringify(payload);
   return text.length > TOOL_CONTENT_MAX_CHARS ? `${text.slice(0, TOOL_CONTENT_MAX_CHARS)}…"}` : text;
 }
