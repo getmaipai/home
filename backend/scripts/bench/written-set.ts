@@ -1,8 +1,8 @@
 // U4/RESP-01 (docs/plans/turn-machine-state-record-2026-09-22.md;
 // BACKLOG.md's U4 row: "Tests: the written-set bench, the seeded voice
 // set"): twenty typed questions on the written register - a fact, a
-// how-to, a comparison, a list, and small talk - run on the new path
-// (turn.pipeline.next) at surface "chat", judged for completeness by a
+// how-to, a comparison, a list, and small talk - run on the turn path
+// at surface "chat", judged for completeness by a
 // reader rather than a deterministic check (`humanVerdict: true`,
 // conversationScore.ts's own convention for a row no regex can grade:
 // "complete for a typed reader, structured where it helps, not padded"
@@ -148,7 +148,7 @@ async function runMain(): Promise<void> {
     JSON.stringify(
       {
         mode: LIVE ? "live" : "scripted (no live model - completeness is unjudged, see file header)",
-        path: "new (turn.pipeline.next)",
+        path: "turn machine",
         surface: "chat",
         date: new Date().toISOString(),
         chat: process.env.MAIPAI_LLAMA_SERVER_URL,

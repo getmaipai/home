@@ -859,7 +859,7 @@ export interface PerformanceLabels {
 /** U2's per-node trace, aggregated (ADMIN-LAYERS-01's future full panel
  * builds on this same field - the coordinator's 2026-09-22 addition to
  * this item). `turns_with_trace` is 0, and `nodes` is empty, on any hub
- * where `turn.pipeline.next` has never produced a row yet - the honest
+ * where no turn has produced a trace yet - the honest
  * empty state, not an error. */
 export interface PerformanceLayerStats {
   node: string;

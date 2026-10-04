@@ -14,8 +14,8 @@ interface NodeRow extends Record<string, unknown> {
 
 /** The coordinator's 2026-09-22 addition to ADMIN-PERF-01, a preview of
  * ADMIN-LAYERS-01's own fuller Layers panel: median and p95 per node of
- * U2's per-node trace (`stats.nodes[]`, only on rows made with
- * `turn.pipeline.next` on). Same shared-table shape as every other table
+ * U2's per-node trace (`stats.nodes[]`, on every row the
+ * turn machine made). Same shared-table shape as every other table
  * here. The empty state below is the honest one - not an error, and
  * not a table with a "no data" row - the same `AsyncState` `isEmpty`
  * pattern would render if this whole page's query failed; here it's
@@ -38,7 +38,7 @@ export function LayersCard({ layers }: { layers: PerformanceLayers }) {
             </div>
             <div className="flex flex-col gap-0.5">
               <p className="text-sm font-medium">No traced turns yet</p>
-              <p className="text-sm text-muted-foreground">The new turn pipeline (turn.pipeline.next) hasn&apos;t run on this hub, so there&apos;s no per-layer trace to show.</p>
+              <p className="text-sm text-muted-foreground">No turn on this hub has left a per-layer trace yet.</p>
             </div>
           </div>
         ) : (

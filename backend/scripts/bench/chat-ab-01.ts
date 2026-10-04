@@ -9,7 +9,7 @@
 //   A2   A plus CHAT_SAMPLING (imported from src/lib/llm.ts, not copied).
 //   B    the real default turn path as an adult, written chat turn:
 //        runConversation() from conversationRunner.ts (the construction path
-//        every live bench uses) with turn.pipeline.next on, real tools, and
+//        every live bench uses) with real tools and
 //        real search through a pass-through tee (see "the search tee").
 //
 //   C    (THIN-AB) the real default turn path as the child bench person, written
@@ -583,7 +583,7 @@ async function environment(): Promise<Record<string, unknown>> {
     chatSamplingForA2: CHAT_SAMPLING,
     hardware: `${sh("sysctl -n machdep.cpu.brand_string")}, ${Math.round(Number(sh("sysctl -n hw.memsize")) / 1024 ** 3)} GB unified memory`,
     thinking: "off in all arms (arms A and A2 send enable_thinking=false; the pipeline sends thinking off)",
-    arms: { A: `no system prompt, no sampling fields, max_tokens ${MAX_TOKENS}, stream`, A2: "A plus CHAT_SAMPLING", C: "the child bench person on the default turn path, chat surface, streamed", S: "the owner on the default turn path, chat surface with the spoken flag, streamed; first word is the first answer delta", B: "runConversation() through a loopback stand-in for the Stack that forwards to the same engine, with turn.pipeline.next on, adult owner, chat surface, memory judge off (no background engine), real SearXNG through a pass-through tee, Wikipedia fallback at its default (on)" },
+    arms: { A: `no system prompt, no sampling fields, max_tokens ${MAX_TOKENS}, stream`, A2: "A plus CHAT_SAMPLING", C: "the child bench person on the default turn path, chat surface, streamed", S: "the owner on the default turn path, chat surface with the spoken flag, streamed; first word is the first answer delta", B: "runConversation() through a loopback stand-in for the Stack that forwards to the same engine, adult owner, chat surface, memory judge off (no background engine), real SearXNG through a pass-through tee, Wikipedia fallback at its default (on)" },
     seeds: "none sent by any arm; the engine and the pipeline sample with their own random seeds, so the two runs of an item differ",
     searchTee: "all arm B searches paced at least 30 s apart; stops at the first rate-limit or block signal",
   };
@@ -591,7 +591,6 @@ async function environment(): Promise<Record<string, unknown>> {
 
 async function main(): Promise<void> {
   await startBench();
-  setHouseholdSettingValue("turn.pipeline.next", true);
   setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
   const set = setHouseholdSettingValue("search.searxng_url", teeUrl);
   if (!set.ok) throw new Error(`could not point search at the tee: ${set.error}`);

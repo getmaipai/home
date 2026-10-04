@@ -9,8 +9,7 @@
 // routes/turn.ts's own blocking POST / route both want the whole reply
 // at once, never a live stream. STREAM-NEXT-01 (below, this file's own
 // runTurnNextStream()) is the "stream" variant a live client actually
-// needs: routes/turn.ts's `/stream` route calls it instead, when
-// turn.pipeline.next is on.
+// needs: routes/turn.ts's `/stream` route calls it.
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, TurnFailure, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome, DocumentTurnAttachment } from "@/lib/turnShared";
 import type { TurnValue } from "@/wire";

@@ -117,7 +117,6 @@ export const RULES = {
   "worrying": "the conversation read as worrying and the grown-up line was added",
   // The direct routes.
   "crisis.state": "the crisis state answered the turn",
-  "crisis.stop": "a stop in the crisis state was acknowledged",
   "credential": "a credential in the utterance took the fixed line",
   "command.forget": "the forget command ran",
   "command.household": "a household command matched",
