@@ -1362,6 +1362,57 @@ export function createConversation(
   return { ok: true, value };
 }
 
+/** Branch in new chat: copies the chosen path of the actor's own saved
+ * conversation, from its first turn down to and including `turnId`, into a
+ * new open conversation (the old one closes, as createConversation does).
+ * Rows are fresh copies (new ids, parent links remapped, no supersedes, the
+ * chosen sibling only) and are marked judged: their memories were already
+ * extracted from the originals, so the judge must not run on them again.
+ * The original conversation is never touched. Own conversations only, even
+ * for an admin: a fork would put another person's words in this actor's
+ * history. */
+export function forkConversationAtTurn(actor: PersonRow, turnId: string): ConversationOpResult<Conversation> {
+  const target = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+  if (!target || !target.conversationId || target.personId !== actor.id || target.status !== "done") {
+    return { ok: false, status: 404, error: "Turn not found" };
+  }
+  const source = db.select().from(conversations).where(eq(conversations.id, target.conversationId)).get();
+  if (!source || source.status === "deleted" || source.personId !== actor.id) {
+    return { ok: false, status: 404, error: "Turn not found" };
+  }
+  const path: ConversationTurnRow[] = [];
+  for (let row: ConversationTurnRow | undefined = target; row && path.length < 10_000; ) {
+    path.unshift(row);
+    row = row.parentTurnId ? db.select().from(conversationTurns).where(eq(conversationTurns.id, row.parentTurnId)).get() : undefined;
+  }
+  const created = createConversation(actor, { surface: source.surface as Surface, companionId: source.companionId, mode: source.mode as Conversation["mode"] });
+  if (!created.ok) return created;
+  const fork = created.value;
+  const ids = new Map(path.map((row) => [row.id, newConversationTurnId()]));
+  sqlite.transaction(() => {
+    for (const row of path) {
+      db.insert(conversationTurns)
+        .values({
+          ...row,
+          id: ids.get(row.id)!,
+          conversationId: fork.id,
+          parentTurnId: row.parentTurnId ? (ids.get(row.parentTurnId) ?? null) : null,
+          supersedes: null,
+          branchChosen: true,
+          judgeStatus: "done",
+          hlc: nextHlc(),
+        })
+        .run();
+    }
+  })();
+  if (source.title) {
+    const title = `${source.title} (branch)`.slice(0, 200);
+    const renamed = updateConversationTitle(actor, fork.id, title);
+    if (renamed.ok) return renamed;
+  }
+  return { ok: true, value: fork };
+}
+
 /** Explicitly continue an owned saved conversation. Reading a thread does
  * not call this. Preserve the stale-ID guard in resolveOrCreateConversation.
  *

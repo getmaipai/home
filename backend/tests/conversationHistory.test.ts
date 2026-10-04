@@ -42,6 +42,7 @@ import {
   buildConversationWindow,
   maybeRefreshConversationSummary,
   chooseConversationTurn,
+  forkConversationAtTurn,
   getPendingAsk,
   setPendingAsk,
   insertProvisionalTurn,
@@ -2469,5 +2470,58 @@ describe("resume a saved chat explicitly", () => {
       expect((await client.post(`/api/conversations/${id}/resume`, {})).status).toBe(404);
       expect(getConversation(actor, active.id)).toMatchObject({ ok: true, value: { status: "open" } });
     }
+  });
+});
+
+describe("forkConversationAtTurn (Branch in new chat)", () => {
+  const value = (conversationId: string, turnId: string, text: string): TurnValue => ({ reply: { text }, source: "model", safety: SAFE, conversation_id: conversationId, turn_id: turnId });
+
+  test("copies the chosen path up to the turn into a new open conversation, leaving the original untouched", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "first", value(conv.value.id, "turn-a", "answer a"));
+    logTurn(actor, "chat", "retry", value(conv.value.id, "turn-a2", "answer a2"), { supersedes: "turn-a" });
+    logTurn(actor, "chat", "second", value(conv.value.id, "turn-b", "answer b"));
+    logTurn(actor, "chat", "third", value(conv.value.id, "turn-c", "answer c"));
+
+    const forked = forkConversationAtTurn(actor, "turn-b");
+    if (!forked.ok) throw new Error(forked.error);
+    expect(forked.value.id).not.toBe(conv.value.id);
+
+    const copies = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, forked.value.id)).all();
+    expect(copies.map((r) => r.replyText).sort()).toEqual(["answer a2", "answer b"]);
+    const byText = (t: string) => copies.find((r) => r.replyText === t)!;
+    expect(byText("answer a2").parentTurnId).toBeNull();
+    expect(byText("answer b").parentTurnId).toBe(byText("answer a2").id);
+    expect(copies.every((r) => r.branchChosen && r.supersedes === null && r.status === "done" && r.judgeStatus === "done")).toBe(true);
+    expect(copies.some((r) => ["turn-a", "turn-a2", "turn-b"].includes(r.id))).toBe(false);
+
+    const original = db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, conv.value.id)).all();
+    expect(original).toHaveLength(4);
+    expect(db.select().from(conversations).where(eq(conversations.id, conv.value.id)).get()!.status).toBe("closed");
+    expect(db.select().from(conversations).where(eq(conversations.id, forked.value.id)).get()!.status).toBe("open");
+  });
+
+  test("refuses another person's turn and an unknown turn", async () => {
+    const { client, actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "hi", value(conv.value.id, "turn-a", "hello"));
+    const otherRow = await addPerson(client, "Oliver", "adult");
+    expect(forkConversationAtTurn(otherRow, "turn-a")).toMatchObject({ ok: false, status: 404 });
+    expect(forkConversationAtTurn(actor, "turn-missing")).toMatchObject({ ok: false, status: 404 });
+  });
+
+  test("POST /api/conversations/turns/:id/fork returns the new conversation", async () => {
+    const { client, actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "hi", value(conv.value.id, "turn-a", "hello"));
+    const res = await client.post("/api/conversations/turns/turn-a/fork", {});
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { id: string };
+    expect(body.id).not.toBe(conv.value.id);
+    expect((await client.post("/api/conversations/turns/turn-nope/fork", {})).status).toBe(404);
   });
 });
