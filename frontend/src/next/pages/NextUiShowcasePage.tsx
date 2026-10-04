@@ -157,6 +157,9 @@ export function NextUiShowcasePage({ person }: { person: Roster }) {
 
   return (
     <AdminGatedContent title="Chat showcase" person={person} deniedText="The Chat showcase is for owners and admins.">
+      {/* The chat page's own full-height slot (tokens.css keys its rules on this
+          data-slot), so the thread scrolls inside the viewport instead of the page. */}
+      <div data-slot="next-chat-shell" className="flex h-full flex-col overflow-hidden">
       <Page title="Chat showcase">
         <AsyncState data={query.isError ? null : query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={query.error?.message}>
           {(scenarios) => (
@@ -173,6 +176,7 @@ export function NextUiShowcasePage({ person }: { person: Roster }) {
           )}
         </AsyncState>
       </Page>
+      </div>
     </AdminGatedContent>
   );
 }

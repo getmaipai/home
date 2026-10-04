@@ -141,7 +141,7 @@ const MD_LINKS = `A link, a bare URL and a picture.
 
 Read the [household handbook](https://example.com/handbook) or visit https://example.com directly.
 
-![A small blue square](data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%2796%27%20height%3D%2796%27%3E%3Crect%20width%3D%2796%27%20height%3D%2796%27%20rx%3D%2712%27%20fill%3D%27%232563eb%27%2F%3E%3C%2Fsvg%3E)`;
+![The MaiPai icon, served by the hub](/brand/pwa-icon-192.png)`;
 
 const SOURCES = [
   { id: "src-market01", kind: "web", title: "Saturday market opening hours", url: "https://example.com/market", site: "example.com", created_at: "2026-10-04T00:00:00.000Z", source: "sync", hlc: "0" },
@@ -198,7 +198,7 @@ export const UI_FIXTURES: UiFixture[] = [
     id: "spoken", title: "Spoken-surface turn", description: "A spoken cue first, then short sentences with the speech text carried on done (sentence-gated speech needs the voice engine).",
     events: turn("spoken", "Dinner is at six. Willow is setting the table.", { lead: [{ type: "spoken_cue", text: "One moment." }], value: { reply: { text: "Dinner is at six. Willow is setting the table.", speech: "Dinner is at six. Willow is setting the table." } } }),
   },
-  { id: "links", title: "Image and links", description: "A markdown link, a bare URL and an inline picture.", events: turn("links", MD_LINKS) },
+  { id: "links", title: "Image and links", description: "A markdown link, a bare URL and a picture served by the hub itself (a data: picture is blocked, so none is used).", events: turn("links", MD_LINKS) },
 ];
 
 export function findFixture(id: string): UiFixture | undefined {
