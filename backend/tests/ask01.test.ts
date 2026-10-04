@@ -186,9 +186,9 @@ describe("the answer to the ask", () => {
     });
   });
 
-  test("a pet: kind from the noun, pronouns he, source local; a later she about him is skipped", async () => {
+  test("a pet: kind from the noun, pronouns he, source local; a later turn gives the model the pronouns", async () => {
     const { actor } = await owner();
-    await withChat((request) => (request.messages.some((m) => m.role === "user" && typeof m.content === "string" && m.content.includes("heat")) ? "She should stay in the shade. Rabbits overheat fast." : "Oh no."), async () => {
+    await withChat((request) => (request.messages.some((m) => m.role === "user" && typeof m.content === "string" && m.content.includes("heat")) ? "He should stay in the shade. Rabbits overheat fast." : "Oh no."), async (seen) => {
       const first = await runTurn(actor, "chat", "Juniper chewed through our garden hose again");
       if (!first.ok) throw new Error(first.error);
       const conversationId = first.value.conversation_id;
@@ -200,7 +200,9 @@ describe("the answer to the ask", () => {
       expect(db.select().from(relationships).all().map((e) => e.type).sort()).toEqual(["owned_by", "owns"]);
       const third = await runTurn(actor, "chat", "should he be outside in this heat", { conversationId });
       if (!third.ok) throw new Error(third.error);
-      expect(third.value.reply.text).toBe("Rabbits overheat fast.");
+      // the pronoun-mismatch sentence skip is retired (no hacky rules); the model is given the pronouns instead
+      expect(third.value.reply.text).toBe("He should stay in the shade. Rabbits overheat fast.");
+      expect(contextOf(seen.requests[seen.requests.length - 1]!)).toContain("About: Juniper (yours), he: rabbit.");
     });
   });
 
