@@ -8,6 +8,7 @@
 import type { Node, ToolExecutionOutcome, PolicyDecision } from "../contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { failureLine, type FailureKind } from "@/lib/generationFailure";
+import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 
 /** The reasons `policy` can refuse a proposal WITHOUT parking an ask
  * (consent_needed/confirm_needed always carry one, so machine.ts's
@@ -128,7 +129,10 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       const sources = input.outcomes.flatMap((o) => o.sources ?? []);
       const lastFailed = input.outcomes.at(-1)?.status === "failed";
       const provenance = lastFailed ? ("outcome_error" as const) : undefined;
-      return { outcome: { ok: true }, output: { text: input.text, sources, provenance } };
+      // R2: a failed tool run carries no household-facing message (its raw error is
+      // the admin-only `detail`), so the text is empty; the shared technical-failure line
+      // stands in for it where no model round follows.
+      return { outcome: { ok: true }, output: { text: input.text || (lastFailed ? COMPOSE_FAILURE_LINE : ""), sources, provenance } };
     }
     // DEADLINE-01: the same shared line composer.ts's own all-failed
     // batch already uses for a technical failure - the identical

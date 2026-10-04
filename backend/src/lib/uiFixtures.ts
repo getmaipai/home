@@ -178,7 +178,7 @@ export const UI_FIXTURES: UiFixture[] = [
   },
   {
     id: "failed-tool", title: "Failed tool", description: "The lookup failed and the reply says so in words: the failed tool chip, and for an admin the quiet error-details control beside the reply (its detail is read from a stored row this scenario writes).",
-    storedOutcomes: [{ callId: "call-fail-1", packageId: "websearch", status: "failed", via: "tool_call", at: "2026-10-04T10:00:00.000Z", durationMs: 812, errorCode: "search_unavailable", userMessage: "The search engine timed out after 10 s (example.com/search answered 504)." }],
+    storedOutcomes: [{ callId: "call-fail-1", packageId: "websearch", status: "failed", via: "tool_call", at: "2026-10-04T10:00:00.000Z", durationMs: 812, errorCode: "search_unavailable", failureKind: "unavailable", detail: "The search engine timed out after 10 s (example.com/search answered 504)." }],
     events: turn("failed-tool", "I could not look that up just now, so this is from what I already know: the market usually opens in the morning, but please check before you go.", {
       lead: [
         { type: "status", stage: "lookup", text: "Looking that up" },

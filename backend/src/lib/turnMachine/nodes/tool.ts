@@ -8,7 +8,7 @@
 // underlying call keeps running unobserved until it finishes or the
 // process exits.
 import { runPlugin } from "@/lib/plugins";
-import { outcomeOf } from "@/lib/turnContext";
+import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
@@ -52,6 +52,25 @@ function withDeadline<T>(promise: Promise<T>, signal: AbortSignal): Promise<T | 
   });
 }
 
+/** The arguments a call is actually run and recorded with: for a search, the
+ * model's own `category` and (outside a bench) `read_page` are never trusted
+ * (LIVE-0923-01, READ-PAGE-01 below). Exported so a retry round compares a new
+ * call against what the failed one really ran with. */
+export function modelFacingArgs(tool: string, args: Record<string, unknown>): Record<string, unknown> {
+  if (tool !== "websearch") return args;
+  const stripKeys = new Set(["category", ...(process.env.MAIPAI_BENCH_KEEP_READ_PAGE === "1" ? [] : ["read_page"])]);
+  return Object.fromEntries(Object.entries(args).filter(([k]) => !stripKeys.has(k)));
+}
+
+/** R2 (rule 6, tools design T5): a failed run's kind, from its fixed code only. */
+function failureKindOf(code: string | undefined): FailureKind {
+  if (code === "bad_arguments") return "bad_arguments";
+  if (code === "search_unavailable") return "unavailable";
+  return "errored";
+}
+
+const MAX_DETAIL_CHARS = 2000;
+
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   const outcomes: ToolExecutionOutcome[] = [];
   const toolEvents: ToolStreamEvent[] = [];
@@ -91,8 +110,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // KEEP_READ_PAGE=1` is that bench's own on/off toggle, the same
     // shape `llm.ts`'s `MAIPAI_BENCH_CACHE_PROMPT_FALSE` already uses -
     // never read outside a bench, never a real household setting.
-    const stripKeys = new Set(["category", ...(process.env.MAIPAI_BENCH_KEEP_READ_PAGE === "1" ? [] : ["read_page"])]);
-    const args = tool === "websearch" ? Object.fromEntries(Object.entries(proposal.request.args).filter(([k]) => !stripKeys.has(k))) : proposal.request.args;
+    const args = modelFacingArgs(tool, proposal.request.args);
     // The proposal is accepted the moment this node starts it - before
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.
@@ -139,14 +157,16 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // THIN-4A (rule 7): a search gives the model the result pages, so the
     // node asks for them itself; the model never chooses it (the wire
     // events above keep the model's own filtered args).
-    const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true } : args;
+    // THIN-4F: a spoken turn reads fewer pages with less text each.
+    const spokenSearch = (state.planBasis?.surfaceClass ?? "spoken") === "spoken";
+    const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}) } : args;
     const startedAt = Date.now();
     const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId }), signal);
     const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
-      const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, userMessage: "That took too long, sorry." });
+      const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });
       outcomes.push(outcome);
-      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.failureKind! });
       continue;
     }
     const result = raced;
@@ -171,7 +191,9 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       // pre-existing, separate finding, not fixed here).
       errorCode: result.ok ? undefined : (result.code ?? String(result.status)),
       durationMs,
-      userMessage: result.ok ? undefined : result.error,
+      // R2: the raw error text is the admin-only `detail`, never a `userMessage`.
+      failureKind: result.ok ? undefined : failureKindOf(result.code),
+      detail: result.ok ? undefined : result.error.slice(0, MAX_DETAIL_CHARS),
     });
     outcomes.push(outcome);
     if (result.ok) {
@@ -188,7 +210,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       const sites = outcome.sources?.slice(0, TOOL_RESULT_SITES_MAX).map((s) => ({ host: s.site, url: s.url }));
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: result.value.reply?.text, ...(sites?.length ? { sites } : {}) } });
     } else {
-      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.failureKind! });
     }
   }
   // THIN-4C: how many fetched rows and pages the minor floor dropped this

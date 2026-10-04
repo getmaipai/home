@@ -15,7 +15,7 @@ const DetailSchema = z.object({
   tools: z.array(z.object({
     tool_id: z.string(),
     call_id: z.string(),
-    kind: z.enum(["unavailable", "timed_out", "found_nothing", "errored"]),
+    kind: z.enum(["unavailable", "timed_out", "found_nothing", "errored", "bad_arguments"]),
     error_code: z.string().optional(),
     error_text: z.string().optional(),
     at: z.string().optional(),

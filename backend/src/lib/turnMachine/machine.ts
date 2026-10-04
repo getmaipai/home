@@ -10,7 +10,7 @@ import type { TurnState, NodeName, NodeOutcome, ActionProposal } from "./contrac
 
 type NodeFn<In, Out> = (state: TurnState, input: In, signal: AbortSignal) => Promise<{ outcome: NodeOutcome; output: Out }>;
 import { TraceRecorder } from "./trace";
-import { nodeSignal, modelNodeDeadlineMs } from "./deadline";
+import { nodeSignal, modelNodeDeadlineMs, retryDeadlineMs } from "./deadline";
 import { safetyNode, applySafety, safetyRoute, inputSafetyAfterFailure, type SafetyOutput } from "./nodes/safety";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { commandsNode, type CommandsOutput } from "./nodes/commands";
@@ -18,6 +18,7 @@ import { contextNode, applyContext, type ContextOutput } from "./nodes/context";
 import { modelNode, rawUtteranceWebsearchCall, type ModelOutput } from "./nodes/model";
 import { policyNode, type PolicyOutput, type PolicyEntry } from "./nodes/policy";
 import { toolNode, type ToolOutput } from "./nodes/tool";
+import { retryEligible } from "./nodes/lookupFallback";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { answerNode, type AnswerInput, type AnswerOutput, type PolicyRefusedReason } from "./nodes/answer";
 import { outputGateNode, type OutputGateOutput } from "./nodes/outputGate";
@@ -67,6 +68,12 @@ interface MachineContext {
   abortSignal: AbortSignal;
   preConfirmed?: ActionProposal;
   roundsUsed: number;
+  // T5 / THIN-2G: set once, by the `tool` state, when every call of the first
+  // tool round failed and the one retry round is about to run; never cleared,
+  // so a second failed round can never start another. `roundsUsed` stays 0
+  // until the retry round's own tool round ends, which is how the retry round
+  // itself is told apart (retryRound() below).
+  retryUsed: boolean;
   // QUERY-WRITER-01: set by the `model` state's own onDone action
   // whenever THIS round's tool_calls came from the query-writer
   // generation (nodes/model.ts's `recoveredMissingCall()`), never from
@@ -87,6 +94,17 @@ interface MachineContext {
   // `output_gate` can still gate it - see the `model` state's own
   // onDone actions.
   modelReasoning: string | undefined;
+}
+
+/** T5 / THIN-2G: true while the one retry round (its model call, its policy
+ * check, its tool run) is the round in progress. */
+function retryRound(context: MachineContext): boolean {
+  return context.retryUsed && context.roundsUsed === 0;
+}
+
+/** A spoken turn's retry round runs under a shorter deadline (T5). */
+function deadlineFor(context: MachineContext, baseMs: number): number {
+  return retryRound(context) ? retryDeadlineMs(baseMs, context.turnState.spoken || context.turnState.planBasis.surfaceClass === "spoken") : baseMs;
 }
 
 function proposalsFrom(policy: PolicyOutput): { toRun: ActionProposal[]; parkedAsk: { prompt: string; proposal: ActionProposal } | null } {
@@ -112,10 +130,10 @@ export const turnMachine = setup({
       runNode(
         input.trace,
         "model",
-        modelNodeDeadlineMs(input.turnState),
+        deadlineFor(input, modelNodeDeadlineMs(input.turnState)),
         input.turnState,
         input.abortSignal,
-        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds },
+        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds, retry: retryRound(input) },
         modelNode,
       ),
     ),
@@ -125,7 +143,7 @@ export const turnMachine = setup({
     }),
     tool: fromPromise<ToolOutput, MachineContext>(({ input }) => {
       const { toRun } = proposalsFrom(input.step as PolicyOutput);
-      return runNode(input.trace, "tool", input.turnState.budget.deadlines_ms.tool, input.turnState, input.abortSignal, { proposals: toRun }, toolNode);
+      return runNode(input.trace, "tool", deadlineFor(input, input.turnState.budget.deadlines_ms.tool), input.turnState, input.abortSignal, { proposals: toRun }, toolNode);
     }),
     answer: fromPromise<AnswerOutput, MachineContext>(({ input }) => runNode(input.trace, "answer", input.turnState.budget.deadlines_ms.model, input.turnState, input.abortSignal, input.step as AnswerInput, answerNode)),
     output_gate: fromPromise<OutputGateOutput, MachineContext>(({ input }) =>
@@ -214,6 +232,23 @@ export const turnMachine = setup({
     // directly keeps this guard's condition identical to what
     // `answerInputFrom()` will actually read, by construction, however
     // many calls the round carried.
+    // T5 / THIN-2G: every call of the first tool round failed (a malformed call
+    // counts), no failed tool writes, and the round was offered by a budget that
+    // lets the model call tools. The retry round needs the failed round's own
+    // tools block to stay identical to (a resumed confirmation never had one).
+    toolRoundFailed: ({ context, event }) => {
+      const output = (event as unknown as { output: ToolOutput }).output;
+      // roundsUsed === 0: only the FIRST tool round can be retried, because retryRound()
+      // tells the retry round apart by that very count (a failure after an earlier
+      // successful round would otherwise run a round with none of the retry floors).
+      return !context.retryUsed && context.turnState.budget.model_transitions && context.roundsUsed === 0 && context.turnState.budget.rounds > 0 &&context.turnState.lastTools.length > 0 && retryEligible(output.outcomes);
+    },
+    // A retry round whose every call policy refused (an ungrounded or
+    // unknown tool) is a failed lookup like any other: on to the phrasing round.
+    retryRefused: ({ context, event }) => {
+      const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
+      return retryRound(context) && toRun.length === 0 && parkedAsk === null;
+    },
     toolProvidesOwnReply: ({ event }) => {
       const output = (event as unknown as { output: ToolOutput }).output;
       const last = output.outcomes.at(-1);
@@ -311,7 +346,7 @@ export const turnMachine = setup({
   },
 }).createMachine({
   id: "turn",
-  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, queryWriterUsed: false, step: null, modelReasoning: undefined }),
+  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, retryUsed: false, queryWriterUsed: false, step: null, modelReasoning: undefined }),
   initial: "safety",
   states: {
     safety: {
@@ -391,6 +426,9 @@ export const turnMachine = setup({
           // the refused policy output, since queryWriterFallback builds
           // its own fresh one.
           { guard: "queryWriterRefused", target: "queryWriterFallback" },
+          // T5: nothing the retry round called could run; on to the phrasing round
+          // (roundsUsed 1 is what makes the next model call the phrasing one).
+          { guard: "retryRefused", actions: assign({ roundsUsed: ({ context }) => context.roundsUsed + 1 }), target: "model" },
           { guard: "policyAllRefused", actions: assign(({ event }) => ({ step: event.output })), target: "answer" },
           { actions: assign(({ event }) => ({ step: event.output })), target: "tool" },
         ],
@@ -444,6 +482,14 @@ export const turnMachine = setup({
             guard: "toolProvidesOwnReply",
             actions: [assign(({ event }) => ({ step: event.output })), "recordOutcomes", "derivePlanFromEvidence"],
             target: "answer",
+          },
+          // T5 / THIN-2G: one more offered round (roundsUsed is not advanced, so
+          // the model call is offered, not the phrasing round) when every call of
+          // this round failed; then the existing phrasing round.
+          {
+            guard: "toolRoundFailed",
+            actions: [assign(({ event }) => ({ step: event.output, retryUsed: true })), "recordOutcomes", "derivePlanFromEvidence"],
+            target: "model",
           },
           {
             guard: "moreRoundsAvailable",

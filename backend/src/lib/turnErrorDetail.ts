@@ -41,6 +41,11 @@ export function canReadErrorDetail(actor: PersonRow): boolean {
   return (actor.role === "owner" || actor.role === "admin") && speakerAgeBand(actor, new Date()) === "adult";
 }
 
+/** The raw error text a failed run kept (T5/R2 `detail`; older rows kept it in `userMessage`). */
+function rawText(o: ToolExecutionOutcome): string | undefined {
+  return o.detail ?? o.userMessage;
+}
+
 /** Whose turn it is, or null when there is no such turn. */
 export function turnOwnerId(turnId: string): string | null {
   return db.select({ personId: conversationTurns.personId }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()?.personId ?? null;
@@ -58,7 +63,7 @@ export function turnErrorDetail(turnId: string): TurnErrorDetail | null {
       call_id: o.callId,
       kind: lookupFailureKind(o),
       ...(o.errorCode ? { error_code: redactCredentials(o.errorCode) } : {}),
-      ...(o.userMessage ? { error_text: redactCredentials(o.userMessage) } : {}),
+      ...(rawText(o) ? { error_text: redactCredentials(rawText(o)!) } : {}),
       ...(o.at ? { at: o.at } : {}),
       ...(o.durationMs !== undefined ? { duration_ms: o.durationMs } : {}),
     });

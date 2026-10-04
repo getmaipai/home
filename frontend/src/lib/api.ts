@@ -127,7 +127,7 @@ export type ProjectView = Project & { posted_artifact: { id: string; version: nu
 // THIN-1E: mirrors backend/src/lib/turnErrorDetail.ts (hand-copied, like the other admin read shapes: the backend file has "@/"-aliased imports).
 export interface TurnErrorDetail {
   turn_id: string;
-  tools: { tool_id: string; call_id: string; kind: "unavailable" | "timed_out" | "found_nothing" | "errored"; error_code?: string; error_text?: string; at?: string; duration_ms?: number }[];
+  tools: { tool_id: string; call_id: string; kind: "unavailable" | "timed_out" | "found_nothing" | "errored" | "bad_arguments"; error_code?: string; error_text?: string; at?: string; duration_ms?: number }[];
   generations: { reason: string; error: string; request_sent_ms: number; offline_reason?: string }[];
 }
 

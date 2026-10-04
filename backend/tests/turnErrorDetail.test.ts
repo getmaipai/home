@@ -39,7 +39,7 @@ function insertFailedTurn(personId: string, conversationId: string | null): stri
   db.insert(conversationTurns).values({
     id, personId, conversationId, surface: "chat", userText: "weather?", replyText: "I could not look that up.", source: "model",
     safetyAction: "allow", minorSpeaker: false, createdAt: new Date().toISOString(), hlc: nextHlc(),
-    outcomes: JSON.stringify([{ callId: "c1", packageId: "websearch", status: "failed", via: "tool_call", at: "2026-10-04T10:00:00.000Z", durationMs: 812, errorCode: "search_unavailable", userMessage: `${RAW} token=${SECRET}` }]),
+    outcomes: JSON.stringify([{ callId: "c1", packageId: "websearch", status: "failed", via: "tool_call", at: "2026-10-04T10:00:00.000Z", durationMs: 812, errorCode: "search_unavailable", failureKind: "unavailable", detail: `${RAW} token=${SECRET}` }]),
     stats: JSON.stringify(stats()),
   }).run();
   return id;
@@ -177,10 +177,10 @@ describe("the raw text never rides a payload a non-admin gets", () => {
     const proposal: ActionProposal = { kind: "read_only", request: { tool: "not-a-real-package", args: {}, callId: "call-1" } };
     const { output } = await toolNode(state, { proposals: [proposal] }, new AbortController().signal);
     const failed = output.outcomes[0]!;
-    expect(failed.userMessage).toBeTruthy();
+    expect(failed.detail).toBeTruthy();
     const line = output.toolEvents.find((e) => (e as { t: string }).t === "tool_error") as { error: string };
-    expect(line.error).not.toContain(failed.userMessage!);
-    expect(["unavailable", "timed_out", "found_nothing", "errored"]).toContain(line.error);
+    expect(line.error).not.toContain(failed.detail!);
+    expect(["unavailable", "timed_out", "found_nothing", "errored", "bad_arguments"]).toContain(line.error);
     expect(typeof failed.durationMs).toBe("number");
   });
 });
