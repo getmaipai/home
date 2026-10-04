@@ -2047,6 +2047,33 @@ describe("searxng search rotation", () => {
     } finally { server.stop(true); }
   });
 
+  test("never rotates onto an image or video engine, even one SearXNG also files under web (THIN-GROUND-01)", async () => {
+    // The real /config shape: "bing images" and "bing videos" carry "web" as a
+    // second category, so a pool built on "web" alone sorted them in beside
+    // "bing" and a fresh process's first search asked "bing,bing images", which
+    // returns picture rows whose snippet is the title and no dates.
+    const seen: string[] = [];
+    const config = { engines: [
+      { name: "bing", enabled: true, safesearch: true, categories: ["general", "web"] },
+      { name: "bing images", enabled: true, safesearch: true, categories: ["images", "web"] },
+      { name: "bing videos", enabled: true, safesearch: true, categories: ["videos", "web"] },
+      { name: "brave", enabled: true, safesearch: true, categories: ["general", "web"] },
+      { name: "google cse", enabled: true, safesearch: true, categories: ["general", "web"] },
+      { name: "google cse images", enabled: true, safesearch: true, categories: ["images", "web"] },
+    ] };
+    const server = Bun.serve({ port: 0, fetch: (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/config") return Response.json(config);
+      seen.push(url.searchParams.get("engines") ?? "");
+      return Response.json({ results: [1, 2, 3].map((n) => ({ title: `Result ${n}`, url: `https://example.com/${seen.length}-${n}`, content: "content" })) });
+    } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      for (const query of ["one", "two", "three"]) await searxngSearch({ query });
+      expect(seen).toEqual(["bing,brave", "brave,google cse", "google cse,bing"]);
+    } finally { server.stop(true); }
+  });
+
   test("a child rotates only through safe-search engines", async () => {
     const seen: string[] = [];
     const config = { engines: [

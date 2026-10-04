@@ -839,8 +839,14 @@ async function webRotationPool(baseUrl: string, safeLevel: SafeSearchLevel): Pro
   }
   const engines = searxngEnginesCache?.baseUrl === baseUrl ? searxngEnginesCache.engines : null;
   if (!engines) return null;
-  const safe = safeLevel === "strict" || safeLevel === "moderate" ? new Set(engines.filter((e) => e.enabled && e.safesearch && e.categories.includes("web")).map((e) => e.name)) : null;
-  const pool = engines.filter((e) => e.enabled && e.categories.includes("web") && (!safe || safe.has(e.name))).map((e) => e.name).sort();
+  // THIN-GROUND-01: an engine is a text-search engine only when SearXNG files it
+  // under "general" as well as "web". "bing images" and "bing videos" carry "web"
+  // as a second category, and a pool built on "web" alone sorted them in beside
+  // "bing", so a fresh process's first search asked "bing,bing images" and the
+  // model got picture rows whose snippet is the title and which carry no dates.
+  const textEngine = (e: SearxngEngine): boolean => e.enabled && e.categories.includes("web") && e.categories.includes("general");
+  const safe = safeLevel === "strict" || safeLevel === "moderate" ? new Set(engines.filter((e) => textEngine(e) && e.safesearch).map((e) => e.name)) : null;
+  const pool = engines.filter((e) => textEngine(e) && (!safe || safe.has(e.name))).map((e) => e.name).sort();
   return pool.length > 0 ? pool : null;
 }
 

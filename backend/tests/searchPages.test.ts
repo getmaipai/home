@@ -7,7 +7,7 @@ import { resetDb } from "./reset-db";
 import { searxngSearch, __setPageReaderForTests, __setSearchPagesBudgetForTests, dedupeRows, __resetSearchCacheForTests, __resetSearchRotationForTests, __resetSearxngEnginesCacheForTests, SEARCH_PAGES_MAX, type PageReadResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { toolResultContent } from "@/lib/composer";
+import { toolResultContent, searchEvidenceMaxChars } from "@/lib/composer";
 import { outcomeOf } from "@/lib/turnContext";
 import { PageDeclinedError } from "@/lib/packageHost";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
@@ -282,6 +282,36 @@ describe("page reading stays inside the tool deadline and the cache stays honest
     const content = JSON.parse(toolResultContent(outcomeWithHint));
     expect(content.sources).toHaveLength(6);
     expect(content.sources[2].page_text.length).toBeGreaterThan(100);
+    expect(content.synthesis_hint).toBe("the hint");
+  });
+
+  test("the search message fits the engine's real context: eight sources and three long pages stay under the cap the context sets (THIN-GROUND-01)", () => {
+    // A 4,096-token engine context refused a 12,352-character search message
+    // (4,456 prompt tokens), so the person got "Something went wrong" on a
+    // search turn whose evidence had arrived.
+    const rows = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ title: `Title ${n}`, url: `https://site${n}.example.com/path/to/a/page`, snippet: `Snippet ${n} `.repeat(12) }));
+    const pages = rows.slice(0, 3).map((r) => ({ url: r.url, title: r.title, text: `${r.title} starts here. ${"word ".repeat(600)}` }));
+    const big = outcomeOf({ callId: "c", packageId: "websearch", status: "succeeded", via: "tool_call", args: {}, result: { reply: { text: "found" }, data: { query: "q", rows, pages }, synthesis_hint: "the hint" } as never });
+    const cap = searchEvidenceMaxChars(4000);
+    expect(cap).toBe(5600);
+    const text = toolResultContent(big, cap);
+    expect(text.length).toBeLessThanOrEqual(cap);
+    const content = JSON.parse(text);
+    expect(content.sources).toHaveLength(8);
+    expect(content.sources[0].page_text).toStartWith("Title 1 starts here.");
+    expect(content.synthesis_hint).toBe("the hint");
+    // A model with a large window keeps the old ceiling, a tiny one keeps a floor.
+    expect(searchEvidenceMaxChars(32_000)).toBe(16_000);
+    expect(searchEvidenceMaxChars(500)).toBe(2000);
+  });
+
+  test("a small window with long snippets still gets valid JSON under the cap (THIN-GROUND-01)", () => {
+    const rows = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ title: `Title ${n}`, url: `https://site${n}.example.com/p`, snippet: `Snippet ${n} `.repeat(60) }));
+    const outcomeLong = outcomeOf({ callId: "c", packageId: "websearch", status: "succeeded", via: "tool_call", args: {}, result: { reply: { text: "found" }, data: { query: "q", rows }, synthesis_hint: "the hint" } as never });
+    const text = toolResultContent(outcomeLong, searchEvidenceMaxChars(500));
+    expect(text.length).toBeLessThanOrEqual(2000);
+    const content = JSON.parse(text);
+    expect(content.sources).toHaveLength(8);
     expect(content.synthesis_hint).toBe("the hint");
   });
 

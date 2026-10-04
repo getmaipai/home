@@ -37,6 +37,8 @@ const SEARCH_PACE_MS = 20_000;
 const MEMORY_503_WAIT_MS = 60_000;
 const SECRET = "correcthorsebattery";
 const FORCE = process.argv.includes("--force-beside-gate");
+// MAIPAI_SMOKE_ONLY=adult-search,adult-followup runs just those turns, in order (a measurement run).
+const ONLY = process.env.MAIPAI_SMOKE_ONLY ? process.env.MAIPAI_SMOKE_ONLY.split(",") : null;
 
 const TURNS: TurnSpec[] = [
   { id: "adult-search", person: "adult", text: "when is the new avengers movie coming out" },
@@ -45,6 +47,14 @@ const TURNS: TurnSpec[] = [
   { id: "child-plain", person: "child", text: "why is the sky blue", maxWords: 120 },
   { id: "adult-spoken", person: "adult", text: "tell me one fun fact about octopuses", spoken: true, maxWords: 80 },
 ];
+
+if (ONLY) {
+  const unknown = ONLY.filter((id) => !TURNS.some((turn) => turn.id === id));
+  if (unknown.length > 0) {
+    console.error(`smoke:chat: MAIPAI_SMOKE_ONLY names unknown turns: ${unknown.join(", ")} (known: ${TURNS.map((turn) => turn.id).join(", ")})`);
+    process.exit(2);
+  }
+}
 
 function fail(message: string): never {
   console.error(`smoke:chat: ${message}`);
@@ -278,7 +288,7 @@ async function main(): Promise<void> {
     const people = await seedAndLogin(base, searxng);
     let conversation: string | null = null;
     let previousSearched = false;
-    for (const spec of TURNS) {
+    for (const spec of TURNS.filter((turn) => !ONLY || ONLY.includes(turn.id))) {
       const session = spec.person === "adult" ? people.adult : people.child;
       if (previousSearched) await sleep(SEARCH_PACE_MS);
       let streamed = await streamTurn(base, session, spec, spec.followUp ? conversation : null);

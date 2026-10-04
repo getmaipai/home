@@ -15,7 +15,7 @@ import { visibleReplyMaxTokens } from "@/lib/turnShared";
 import { streamWatchdog, replyIsUncapped } from "../deadline";
 import { classifyGenerationFailure, partialReplyNote, RETRY_BACKOFF_MS, type FailureKind } from "@/lib/generationFailure";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
-import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction } from "@/lib/composer";
+import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, searchEvidenceMaxChars } from "@/lib/composer";
 import { planLineForTurnMachine } from "@/lib/register";
 import { askAppendFor, NO_ASK_APPEND } from "@/lib/askNames";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
@@ -618,7 +618,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // result.
     const phrasedOutcomes = state.outcomes.filter((o) => !lookupMissed(o));
     const assistantMessage = toolCallAssistantMessage(phrasedOutcomes);
-    const resultMessages = toolResultMessages(phrasedOutcomes);
+    const resultMessages = toolResultMessages(phrasedOutcomes, searchEvidenceMaxChars(state.budget.context_tokens));
     // SEARCH-ROWS-01 (#169): `allSnippetsEmpty` rides the same reduce as
     // `searchResultCount` - a falsy `snippet` (missing or empty string,
     // the exact shape turn-dbyu1niupc actually stored) on EVERY counted

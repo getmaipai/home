@@ -36007,3 +36007,49 @@ A transient failure before any text reached the person is retried quietly (`gene
 Per turn it prints the reply (trimmed), time to first delta and total time, the tool that answered (`websearch` when a search ran), the source count and any failure kind. FAIL: an error event or non-200, an empty reply, one of the static failure sentences, a reply that starts with a bracketed `... answered:` wrapper, a search turn with no sources, a child reply over 120 words or a spoken reply over 80. WARN: the follow-up did not call `websearch` (the model decides), or the long answer is under 150 words. After the turns it prints the engine build and model file (the `x-maipai-engine` and `x-maipai-model` headers, as the turn stats carry them), the Stack's chat role, the load average and `vm_stat` memory, then stops the scratch Home, removes its data directory and confirms its ports are free. The exit code is nonzero on any FAIL.
 
 A Stack answer of "unavailable" (the memory 503 and its `offline_reason`) is printed verbatim, the script waits 60 seconds and retries that turn once, and a second failure is a FAIL carrying the reason. The script refuses to start while a gate (`scripts/check.sh`, `bun test`, `vite build`) is running, with a message naming it; `--force-beside-gate` runs anyway with a warning, and its timings then mean nothing. Web search needs a SearXNG: set `MAIPAI_SMOKE_SEARXNG_URL`, or the script reads the household's configured one (read-only, never printed) from the live database. Without one the search turns FAIL with no sources, which is the honest result. The verdict logic is `backend/scripts/smoke/chatChecks.ts`, tested in `backend/tests/chatSmokeChecks.test.ts`.
+
+`MAIPAI_SMOKE_ONLY=adult-search,adult-followup bun run smoke:chat` runs just the named turns, in order (a measurement run; THIN-GROUND-01 used it for the first two turns).
+
+## THIN-GROUND-01 results (2026-10-04)
+
+Question: why `smoke:chat` turn 1 ("when is the new avengers movie coming out") answers wrongly and turn 2 ("and is robert downey in it") sometimes does not search, when the live hub answered turn 1 correctly earlier.
+
+| | |
+|---|---|
+| Engine build | `local b10797-832fd6f17` |
+| Model file | `Qwen3-8B-Q4_K_M.gguf`, context 4096 as the Stack measured it, thinking off, `tool_choice` auto then none |
+| Hardware | Apple M4 Pro, 24 GB unified memory, one laptop, no gate or bench running beside the runs |
+| Method | the smoke's first two turns, 5 runs per arm, one request at a time. A logging forwarder between the scratch Home and the Stack saved every chat request body and reply; a second forwarder in front of the household's SearXNG let one arm force the engine list. Saved requests: system text, tools, `tool_choice`, the tool message with every source and its page text, and the instruction. |
+| Correct | turn 1 names Avengers: Doomsday and December 18, 2026; turn 2 says Robert Downey Jr. is cast in Doomsday as Doctor Doom |
+
+**Diagnosis, from the saved requests.**
+
+1. The date was never in the evidence the model saw. In all 5 baseline runs the four sources were identical: a May 2025 Thunderbolts article (2,500 characters of page text), a 2024 article quoting a tweet "in theaters May 2026" (2,392 characters), and two snippet-only rows whose snippet is the title. No source carried Dec. 18, 2026. The answers ("May 5, 2025", "May 2026") are faithful to that evidence; the model is not mixing sources in a way a prompt would cure.
+2. The evidence was identical every run because the scratch Home's engine rotation starts at index 0. The pool was built from engines SearXNG files under `web`, and that includes `bing images`, `bing videos`, `brave.images`, `google cse images` and the other media engines (their categories are `["images","web"]`). Sorted, the first pair is `bing,bing images`. Bing returned unrelated social posts for this query and `bing images` returned picture rows (snippet equal to the title, no date text). The live hub's rotation has moved on by the time a person asks, so it lands on `google cse` for some turns (its rows carry "Dec. 18, 2026" in the snippet text) and not others. That is the nondeterminism: same code, different engine pair.
+3. With `google cse` forced, the unchanged model and prompt got turn 1 right 5 of 5 and turn 2 searched and right 5 of 5. So the 8B model, the answering instruction and thinking off are not the cause on this question.
+4. A second defect, found in one arm: the search message can reach 12,352 characters (8 rows, 3 pages of 2,500 characters). With the 10-tool block that was 4,456 prompt tokens against the engine's 4,096, and the engine answered 400 `exceed_context_size_error`; the person saw "Something went wrong". `SEARCH_SOURCES_MAX_CHARS` was a flat 16,000 characters.
+5. Turn 2 not searching (1 of 5 baseline runs, 1 of 5 in a mixed arm) followed a turn 1 reply that already asserted RDJ in Doomsday, so the model answered from its own history; the follow-up clause in the websearch description is present and is not displaced (it sits in the tool's `expression` description, and turn 1 and turn 2 requests carry the same 10-tool block). With good evidence turn 2 searched 5 of 5.
+
+**Arms (5 runs each).**
+
+| Arm | Evidence | T1 correct | T1 confidently wrong | T1 honest "not found" | T2 searched | T2 correct | Search turns that errored |
+|---|---|---|---|---|---|---|---|
+| Baseline (real SearXNG, rotation 0 = bing + bing images) | stale, no date | 0 | 5 | 0 | 4 | 3 | 0 |
+| Forced `google cse` (control) | has Dec. 18 | 5 | 0 | 0 | 5 | 5 | 0 |
+| Fix 1 only (pool excludes media engines; real SearXNG, rotation 0 = bing + brave) | unrelated posts | 0 | 0 | 5 | 5 | 3 | 2 (context overflow) |
+| Fixes 1 and 2 (adds the context-sized evidence cap), the landed state | unrelated posts | 0 | 2 | 3 | 5 | 5 | 0 |
+| Landed state, forced `google cse` (no regression check) | has Dec. 18 | 5 | 0 | 0 | 5 | 5 | 0 |
+
+Per-arm detail: a "confidently wrong" turn 1 states a date as fact that no source supports (baseline: May 5, 2025 or May 2026; landed state: "October 4, 2026" taken from a Cinnabon giveaway post). Turn 1 on the control: first text 4.7 to 9.5 s (search, page reads and the answering round), total 6.3 to 12.8 s.
+
+**Tried and dropped.**
+
+| Try | Arms | Result |
+|---|---|---|
+| A grounding-first answering instruction (the results are the source of every specific fact, quote a date as written, check each result's date against the clock, say when results disagree or are older, never attach one result's facts to another's subject) | stale evidence, 5 runs | no change: 0 of 5 correct, still confidently "May 20, 2026". Real evidence (unrelated posts), 5 runs: worse, 5 of 5 confidently wrong, it invented "October 15, 2026" from post dates because it was told to quote a date. Reverted. |
+| Native thinking on the answering round only (`enable_thinking` true, +3,072 tokens, set at the forwarder) | stale evidence, 5 runs | no gain: 0 of 5 correct, 4 of 5 still confident ("May 20, 2026"), turn 2 searched 4 of 5, 1 of 5 errored; first text on a thinking turn 35.3 s against about 5 s without. Dropped. |
+| Mixed evidence (`bing images,google cse` through SearXNG) | 5 runs | 2 of 5 correct; the 3 wrong runs are the runs where google cse returned nothing and the evidence was the stale set again. Turn 1 follows the evidence every time. |
+
+**What landed.** (1) `webRotationPool` keeps an engine only when SearXNG lists both `web` and `general` for it (test: `packageHost.test.ts`, "never rotates onto an image or video engine"). On this instance the pool goes from 10 engines (2 of the 10 consecutive pairs include google cse) to 4 (bing, brave, google cse, yahoo; 2 of 4 pairs include google cse, and a suspended engine is benched for 30 minutes, after which the pair is bing + google cse). (2) `searchEvidenceMaxChars(context_tokens)`: 1.4 characters per context token, 2,000 to 16,000, used by the phrasing round's tool message (test: `searchPages.test.ts`). The old 16,000-character ceiling stays for a large window.
+
+**What did not clear the bar, and why.** Smoke turn 1 is still not correct in a fresh process: its first search asks `bing,brave`, brave is suspended on this instance, and bing returns unrelated posts for this query (it answers other queries well), so 3 of 5 runs say honestly that the results do not answer it and 2 of 5 are confidently wrong from an unrelated post's date. Candidate fixes that stay inside the rules and are left for the owner: ask three engines per search (SearXNG's own merge ranks the google cse rows first; measured by hand: `bing,brave,google cse` returns the Doomsday rows on top), or run the next pair when an engine in the first was suspended and put the better-ranked rows first (a request-budget change under THIRD-PARTY-SERVICES.md); a second search round when the first found nothing relevant (rule 1 keeps the decision with the model). Only a larger model, or reading dates off pages (`publishedDate` is empty for every engine here; dates arrive inside snippet and page text), would fix the "May 2026 tweet in a 2024 article" evidence, since nothing in it says it is stale. The Stack running the chat engine at a 4,096-token context on a 24 GB machine is a Stack finding (RULES.md rule 4), not a Home one.
