@@ -3,7 +3,7 @@
 // canvas both mount (NextChatPage.tsx, THIN-5F). The canvas has no message
 // around its text, so it mounts the same MarkdownText through MarkdownDocument. The first block pins what
 // the kit already renders, so the BACKLOG's "kit support" claim is proven on
-// a real DOM; the second pins Home's own token-only restyle (chatReplyMarkdown.css).
+// a real DOM; the second pins the one dark-theme colour fix (chatReplyMarkdown.css).
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -68,25 +68,12 @@ describe("a reply with every rich element (UI-1, A3)", () => {
   });
 });
 
-describe("Home's token-only restyle of the shipped reply markdown (UI-1)", () => {
+describe("Home's one stylesheet over the shipped reply markdown (UI-1)", () => {
   const css = () => readFileSync(join(import.meta.dir, "chatReplyMarkdown.css"), "utf8");
-
-  test("a fence with no language is labelled text, not left blank", () => {
-    expect(css()).toMatch(/\.aui-code-header-language:empty::before\s*{[^}]*content:\s*"text"/);
-  });
-
-  test("a task item drops its bullet so the checkbox is the marker", () => {
-    expect(css()).toMatch(/\.aui-md\s+li\.task-list-item\s*{[^}]*list-style:\s*none/);
-  });
 
   test("code colours follow the dark theme: the shiki palette is light-dark(), which needs color-scheme", () => {
     expect(css()).toMatch(/\.dark\s+\.aui-shiki-base\s*{[^}]*color-scheme:\s*dark/);
     expect(css()).toMatch(/\.light\s+\.aui-shiki-base\s*{[^}]*color-scheme:\s*light/);
-  });
-
-  test("tables use small uppercase headers and thin row rules, no heavy borders", () => {
-    expect(css()).toMatch(/\.aui-md\s+th\.aui-md-th\s*{[^}]*text-transform:\s*uppercase/);
-    expect(css()).toMatch(/\.aui-md\s+td\.aui-md-td\s*{[^}]*border-inline-width:\s*0/);
   });
 
   test("the chat page loads the stylesheet", () => {

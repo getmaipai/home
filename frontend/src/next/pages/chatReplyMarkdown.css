@@ -1,50 +1,14 @@
-/* UI-1 (gap matrix A3): two restyles of the shipped reply markdown, by
-   selector only (the kit's MarkdownText is never forked). Scoped to .aui-md,
-   not the chat pane, so the canvas document looks identical (THIN-5F). */
-
-/* A fence with no language arrives as an empty label; name it like LM Studio
-   and Open WebUI do instead of leaving a blank header. */
-.aui-code-header-language:empty::before {
-  content: "text";
-}
-
-/* GFM task items carry their own checkbox: it is the marker, so the bullet
-   goes and the box sits where the bullet was. */
-.aui-md li.task-list-item {
-  list-style: none;
-  margin-inline-start: -1.25rem;
-}
-
-.aui-md li.task-list-item > input[type="checkbox"] {
-  margin-inline-end: 0.5rem;
-  vertical-align: middle;
-}
-
-/* The kit's highlighter paints with light-dark(), which follows the element's
-   color-scheme. The app themes with a .light / .dark class on <html> and
-   leaves color-scheme at "normal", so dark code resolved to the light palette
-   (near-black text on a dark block). Say the scheme where the colours are used. */
+/* The kit's MarkdownText is used exactly as shipped; its look comes from the
+   tokens it reads. This is the one exception, and it is a defect fix, not a
+   look: the kit's highlighter paints with light-dark(), which follows the
+   element's color-scheme. The app themes with a .light / .dark class on <html>
+   and leaves color-scheme at "normal", so dark code resolved to the light
+   palette (near-black text on a dark block). It belongs in the kit's tokens
+   (commons); until then the scheme is stated where the colours are used. */
 .light .aui-shiki-base {
   color-scheme: light;
 }
 
 .dark .aui-shiki-base {
   color-scheme: dark;
-}
-
-/* Tables: small muted uppercase headers over thin row rules, no side borders
-   or filled header, like Open WebUI and ChatGPT. Selector-only over the kit's
-   own th/td classes; the horizontal scroller around the table is untouched. */
-.aui-md th.aui-md-th {
-  background: transparent;
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  border-bottom: 1px solid var(--border);
-}
-
-.aui-md td.aui-md-td {
-  border-inline-width: 0;
 }
