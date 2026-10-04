@@ -13,7 +13,8 @@ import { IncognitoProvider, useIncognitoContext } from "@/next/incognitoContext"
 import { __setUnwiredControlsForTests } from "@/apps/chat/composerAddMenu";
 import type { NotificationDeliveryView, Roster } from "@/lib/api";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
-import { ndjsonStream, staggeredNdjsonStream } from "../../../tests/ndjsonStream";
+import { ndjsonStream as bareNdjsonStream } from "../../../tests/ndjsonStream";
+import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
 import { waitForGone } from "../../../tests/waitForGone";
 
 // CHAT-UI-03 (6): the rail's own default-collapsed state now reads
@@ -158,7 +159,7 @@ function stubMultiTurnFetch(): () => void {
         { type: "delta", text },
         { type: "done", value: { turn_id: `turn-temp${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
       ]);
-      return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      return Promise.resolve(new Response(body, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
     }
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
@@ -493,7 +494,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-weather123", status: "open", surface: "chat" }));
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     return () => {
@@ -604,7 +605,9 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       );
       await sendMessage(view, "when's high tide");
       await view.findByText("High tide is at 4pm.");
-      const trigger = view.getByRole("button", { name: /Sources/ });
+      // Issue #205: the visible label carries the real count; with the icon's
+      // fallback letter beside it, a bare "Sources" read as "NSources".
+      const trigger = view.getByRole("button", { name: "1 Source" });
       expect(trigger).toBeVisible();
       // Collapsed by default - the source's own title isn't in the DOM
       // yet (a Collapsible unmounts its own content when closed).
@@ -625,6 +628,28 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       expect(capturedImgSrcs).toContain(`/api/favicon?domain=${encodeURIComponent("example.com")}`);
     } finally {
       Object.defineProperty(HTMLImageElement.prototype, "src", originalSrcDescriptor);
+      restore();
+    }
+  });
+
+  test("two sources label the trigger with their count (issue #205)", async () => {
+    const make = (n: number) => ({ id: `src-n${n}`, kind: "web" as const, title: `Source ${n}`, url: `https://news${n}.example.com/a`, site: `news${n}.example.com`, snippet: null, source: "turn-two123", created_at: "2026-09-22T00:00:00.000Z", hlc: `1788000000000:${n}:test` });
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { type: "delta", text: "Two sites agree." },
+        { type: "done", value: { turn_id: "turn-two123", reply: { text: "Two sites agree." }, source: "model", safety: SAFETY, sources: [make(1), make(2)] } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "do they agree");
+      await view.findByText("Two sites agree.");
+      expect(view.getByRole("button", { name: "2 Sources" })).toBeVisible();
+    } finally {
       restore();
     }
   });
@@ -677,6 +702,32 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       expect(view.queryByText("websearch")).toBeNull();
       fireEvent.click(trigger);
       expect(await view.findByText("websearch")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a failed tool call still renders its chip and the reply (a failed tool never fails the answer)", async () => {
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: { query: "tide chart" }, call_id: "call-err-1" },
+        { t: "tool_error", call_id: "call-err-1", package_id: "websearch", error: "lookup failed" },
+        { type: "delta", text: "I could not look that up." },
+        { type: "done", value: { turn_id: "turn-tools-err", reply: { text: "I could not look that up." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "when's high tide");
+      await view.findByText("I could not look that up.");
+      const trigger = view.getByRole("button", { name: /1 tool call/ });
+      fireEvent.click(trigger);
+      expect(await view.findByText("websearch")).toBeVisible();
+      expect(view.queryByText(/lookup failed/)).toBeNull();
     } finally {
       restore();
     }
@@ -860,7 +911,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
       if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-artifact123", status: "open", surface: "chat" }));
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
       if (url.includes(`/api/artifacts/${ARTIFACT.id}/current`)) return Promise.resolve(Response.json(artifactBodyOverride === null ? ARTIFACT : { ...ARTIFACT, body: artifactBodyOverride }));
-      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     return () => {
@@ -1222,7 +1273,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
       if (url.includes("/api/turn/stream")) {
         const body = streamBodies[Math.min(call, streamBodies.length - 1)]!;
         call++;
-        return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+        return Promise.resolve(new Response(body, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       }
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
@@ -1451,7 +1502,7 @@ describe("NextChatPage (getmaipai/home#181: project result reload)", () => {
             },
           },
         ]);
-        return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+        return Promise.resolve(new Response(body, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       }
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
@@ -1680,7 +1731,7 @@ describe("NextChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
         return Promise.resolve(new Response(JSON.stringify(row), { status: 200 }));
       }
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       if (url.includes(`/api/projects/${projectRunning().id}/cancel`)) {
         cancelCalls++;
         return Promise.resolve(Response.json(projectRunning()));
@@ -2427,7 +2478,7 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-details123", status: "open", surface: "chat" }));
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       if (url.includes("/api/engines")) return Promise.resolve(Response.json(enginesResponse));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
@@ -2585,7 +2636,7 @@ describe("NextChatPage (MODEL-SEL-01: session model picker)", () => {
       if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(ndjsonStream([
         { type: "delta", text: "Chosen." },
         { type: "done", value: { turn_id: "turn-modelpick1", reply: { text: "Chosen." }, source: "model", safety: SAFETY } },
-      ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;
     return () => { globalThis.fetch = original; };
@@ -2735,7 +2786,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
         return Promise.resolve(new Response(ndjsonStream([
           { type: "delta", text },
           { type: "done", value: { turn_id: `turn-persist${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
-        ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+        ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       }
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;
@@ -2829,7 +2880,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
         return Promise.resolve(new Response(ndjsonStream([
           { type: "delta", text: "Here is the reply." },
           { type: "done", value: { turn_id: "turn-first-read-aloud", reply: { text: "Here is the reply." }, source: "model", safety: SAFETY } },
-        ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+        ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       }
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;
@@ -2930,7 +2981,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
         return Promise.resolve(new Response(ndjsonStream([
           { type: "delta", text },
           { type: "done", value: { turn_id: `turn-edit${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
-        ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+        ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       }
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;
@@ -2988,7 +3039,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
       if (url.includes("/api/conversations") && init?.method === "POST") { conversationCount++; return Promise.resolve(Response.json({ id: `conv-model-${conversationCount}`, status: "open", surface: "chat" })); }
       if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/turn/stream")) { turnCount++; const text = `Reply ${turnCount}.`; return Promise.resolve(new Response(ndjsonStream([{ type: "delta", text }, { type: "done", value: { turn_id: `turn-model-${turnCount}`, reply: { text }, source: "model", safety: SAFETY } }]), { status: 200, headers: { "content-type": "application/x-ndjson" } })); }
+      if (url.includes("/api/turn/stream")) { turnCount++; const text = `Reply ${turnCount}.`; return Promise.resolve(new Response(ndjsonStream([{ type: "delta", text }, { type: "done", value: { turn_id: `turn-model-${turnCount}`, reply: { text }, source: "model", safety: SAFETY } }]), { status: 200, headers: ASSISTANT_STREAM_HEADERS })); }
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;
     try {
@@ -3054,7 +3105,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       if (url === "/api/turn/stream") {
         turnCount++;
         const text = `Reply ${turnCount}.`;
-        return Promise.resolve(new Response(ndjsonStream([{ type: "delta", text }, { type: "done", value: { turn_id: `turn-model-persist-${turnCount}`, reply: { text }, source: "model", safety: SAFETY } }]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+        return Promise.resolve(new Response(ndjsonStream([{ type: "delta", text }, { type: "done", value: { turn_id: `turn-model-persist-${turnCount}`, reply: { text }, source: "model", safety: SAFETY } }]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       }
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;
@@ -3306,7 +3357,7 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
       if (url.includes("/api/plugins")) return Promise.resolve(Response.json([PLUGIN]));
       if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: imageRoleReady, roles: imageRoleReady ? [IMAGE_ROLE] : [], engines: [], budget: null }));
-      if (streamBody && url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (streamBody && url.includes("/api/turn/stream")) return Promise.resolve(new Response(streamBody, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
     return () => {
@@ -3496,7 +3547,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-compare123", status: "open", surface: "chat" }));
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-      if (url.includes("/api/turn/bare")) return Promise.resolve(new Response(ndjsonStream(bareEvents), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      if (url.includes("/api/turn/bare")) return Promise.resolve(new Response(bareNdjsonStream(bareEvents), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
       if (url.includes("/api/turn/stream")) {
         return Promise.resolve(
           new Response(
@@ -3504,7 +3555,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
               { type: "delta", text: "It's sunny." },
               { type: "done", value: { turn_id: "turn-compare123", conversation_id: "conv-compare123", reply: { text: "It's sunny." }, source: "model", safety: SAFETY } },
             ]),
-            { status: 200, headers: { "content-type": "application/x-ndjson" } },
+            { status: 200, headers: ASSISTANT_STREAM_HEADERS },
           ),
         );
       }
@@ -3703,7 +3754,7 @@ describe("NextChatPage (ADMIN-COMPARE-01: compare with the bare model)", () => {
                 { type: "delta", text: "The bare model says hi." },
                 { type: "done", value: { turn_id: "turn-bare999", conversation_id: "conv-compare123", reply: { text: "The bare model says hi." }, source: "model", safety: SAFETY, bare: true } },
               ]),
-              { status: 200, headers: { "content-type": "application/x-ndjson" } },
+              { status: 200, headers: ASSISTANT_STREAM_HEADERS },
             ),
           );
         }
@@ -3762,7 +3813,7 @@ describe("NextChatPage (DICT-01: the mic button's not-installed state)", () => {
               { type: "delta", text: "Typed while STT is uninstalled." },
               { type: "done", value: { turn_id: "turn-dict1", reply: { text: "Typed while STT is uninstalled." }, source: "model", safety: SAFETY } },
             ]),
-            { status: 200, headers: { "content-type": "application/x-ndjson" } },
+            { status: 200, headers: ASSISTANT_STREAM_HEADERS },
           ),
         );
       }
@@ -3900,7 +3951,7 @@ describe("NextChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
         return Promise.resolve(new Response(ndjsonStream([
           { type: "delta", text },
           { type: "done", value: { turn_id: `turn-autoread${turnCount}`, reply: { text }, source: "model", safety: SAFETY } },
-        ]), { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+        ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       }
       if (url.includes("/api/tts")) ttsCount++;
       return Promise.resolve(Response.json({}));

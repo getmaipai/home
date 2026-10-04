@@ -3,7 +3,7 @@ import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, Pending
 import { createChatModelAdapter, stripThinking } from "@/apps/chat/chatModelAdapter";
 import { createLocalImageAttachmentAdapter, clearStagedImageAttachments } from "@/apps/chat/localImageAttachmentAdapter";
 import { FakeAudioContext, fakeWavBody } from "../../../tests/fakeAudioContext";
-import { ndjsonStream, staggeredNdjsonStream } from "../../../tests/ndjsonStream";
+import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
 
 afterEach(() => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
@@ -34,15 +34,17 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   const originalFetch = globalThis.fetch;
   const ttsCalls: string[] = [];
   const turnBodies: unknown[] = [];
+  const turnAccepts: (string | null)[] = [];
   let turnCalls = 0;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/api/turn/stream")) {
       turnBodies.push(JSON.parse(String(init?.body ?? "{}")));
+      turnAccepts.push(new Headers(init?.headers).get("accept"));
       if (typeof streamBody === "function") return streamBody();
       const call = turnCalls++;
       const body = call === 0 ? streamBody : additionalStreams[call - 1] ?? streamBody;
-      return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      return Promise.resolve(new Response(body, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
     }
     if (url.includes("/api/tts")) {
       const body = JSON.parse(String(init?.body ?? "{}")) as { text?: string };
@@ -54,6 +56,7 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   return {
     ttsCalls,
     turnBodies,
+    turnAccepts,
     restore: () => {
       globalThis.fetch = originalFetch;
     },
@@ -300,73 +303,47 @@ describe("createChatModelAdapter streaming", () => {
     }
   });
 
-  // A code review (2026-09-06) found that a delta landing entirely inside
-  // an open <think> block still yielded an empty-string "text" content
-  // part - enough for assistant-ui's built-in "no-text" indicator check
-  // (thread.aui.tsx) to treat the message as having text and hide its
-  // pulsing "Assistant is working" dot, well before there was anything
-  // visible to replace it with. Someone without audio (speakers off, or
-  // deaf) lost the only signal that MaiPai was still working.
-  test("no content is yielded while inside a <think> block with nothing visible yet - the loading indicator stays up", async () => {
+  // THIN-5E: the server splits a reply's <think> spans into reasoning parts
+  // (routes/turn.ts feedThinkSplit, covered by backend/tests/wellFormed.test.ts
+  // and neutralizeThinkTags), so a text part never carries the tags and the
+  // client no longer re-parses them. These keep the user-visible behaviours the
+  // old in-adapter tag scanner protected, on the wire the chat now reads.
+  test("a reasoning-only stretch yields no text part, so the working indicator stays up", async () => {
     const { stream, release } = staggeredNdjsonStream(
-      [{ type: "delta", text: "<think>reasoning about the" }],
+      [{ type: "reasoning", text: "reasoning about the" }],
       [
-        { type: "delta", text: " answer here</think>The real answer." },
-        { type: "done", value: { reply: { text: "<think>reasoning about the answer here</think>The real answer." }, source: "model", safety: SAFETY } },
+        { type: "delta", text: "The real answer." },
+        { type: "done", value: { reply: { text: "The real answer." }, source: "model", safety: SAFETY } },
       ],
     );
     const env = stubEnvironment(stream);
     try {
-      const adapter = createChatModelAdapter({
-        consumeThinking: () => false,
-        consumeSupersedes: () => undefined,
-        onCrisisResources: () => {},
-        turnSchedulerRef: { current: null },
-      });
-      const abortSignal = new AbortController().signal;
-      const options = {
-        messages: [fakeUserMessage("what's the answer")],
-        runConfig: {},
-        abortSignal,
-        context: {},
-        unstable_getMessage: () => fakeUserMessage("what's the answer"),
-      } as unknown as ChatModelRunOptions;
-      const yields: ChatModelRunResult[] = [];
-      const done = (async () => {
-        for await (const r of runAdapter(adapter, options)) yields.push(r);
-      })();
-
-      // Only the still-open <think> block has arrived so far - nothing
-      // visible exists yet, so nothing should have yielded (the indicator
-      // stays up rather than being replaced by an empty text part).
+      const done = collect([fakeUserMessage("what's the answer")]);
       await new Promise((resolve) => setTimeout(resolve, 10));
-      expect(yields).toHaveLength(0);
-
       release();
-      await done;
-      expect(lastText(yields)).toBe("The real answer.");
+      const { yields } = await done;
+      expect(yields[0]?.content).toEqual([{ type: "reasoning", text: "reasoning about the" }]);
+      expect(lastText(yields)).toBeUndefined();
+      expect(yields[yields.length - 1]?.content).toEqual([
+        { type: "reasoning", text: "reasoning about the" },
+        { type: "text", text: "The real answer." },
+      ]);
     } finally {
       env.restore();
     }
   });
 
-  test("a <think> block never yielded or spoken - only the real answer after it", async () => {
+  test("reasoning is never spoken or shown as text - only the answer is", async () => {
     const env = stubEnvironment(
       ndjsonStream([
-        { type: "delta", text: "<think>reasoning about the" },
-        { type: "delta", text: " answer here</think>The real answer." },
-        { type: "done", value: { reply: { text: "<think>reasoning about the answer here</think>The real answer." }, source: "model", safety: SAFETY } },
+        { type: "reasoning", text: "reasoning about the answer here" },
+        { type: "delta", text: "The real answer." },
+        { type: "done", value: { reply: { text: "The real answer." }, source: "model", safety: SAFETY } },
       ]),
     );
     try {
       const { yields } = await collect([fakeUserMessage("what's the answer")]);
-      for (const y of yields) {
-        const part = y.content?.[0];
-        const text = part && part.type === "text" ? part.text : "";
-        expect(text).not.toContain("reasoning about");
-        expect(text).not.toContain("<think>");
-      }
-      expect(lastText(yields)).toBe("The real answer.");
+      for (const y of yields) for (const part of y.content ?? []) if (part.type === "text") expect(part.text).not.toContain("reasoning about");
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(env.ttsCalls).toEqual(["The real answer."]);
     } finally {
@@ -374,86 +351,36 @@ describe("createChatModelAdapter streaming", () => {
     }
   });
 
-  // A code review (2026-09-04) found the opening <think> tag was only
-  // ever detected if it arrived whole in one delta - real token-level
-  // streaming can split it across several. Reproduces that exact shape:
-  // the tag split character by character.
-  test("a <think> tag split across many small deltas is still recognized and never leaks", async () => {
-    const fullText = "<think>reasoning about the answer here</think>The real answer.";
-    const deltas = fullText.split("").map((char) => ({ type: "delta", text: char }));
-    const env = stubEnvironment(
-      ndjsonStream([...deltas, { type: "done", value: { reply: { text: fullText }, source: "model", safety: SAFETY } }]),
-    );
-    try {
-      const { yields } = await collect([fakeUserMessage("what's the answer")]);
-      expect(lastText(yields)).toBe("The real answer.");
-      for (const y of yields) {
-        const part = y.content?.[0];
-        const text = part && part.type === "text" ? part.text : "";
-        expect(text).not.toContain("reasoning about");
-      }
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(env.ttsCalls).toEqual(["The real answer."]);
-    } finally {
-      env.restore();
-    }
-  });
-
-  // A code review (2026-09-04) found the original <think> detector only
-  // ever searched for the opening tag at the very START of the unresolved
-  // remainder - real text arriving ahead of the tag within the SAME delta
-  // got the tag, and everything after it, dumped straight into `visible`.
-  test("real text arriving before a <think> tag in the same delta is still stripped, not dumped raw", async () => {
-    const fullText = "Let me think. <think>reasoning about the answer</think>The real answer.";
-    const env = stubEnvironment(
-      ndjsonStream([{ type: "delta", text: fullText }, { type: "done", value: { reply: { text: fullText }, source: "model", safety: SAFETY } }]),
-    );
-    try {
-      const { yields } = await collect([fakeUserMessage("what's the answer")]);
-      expect(lastText(yields)).toBe("Let me think. The real answer.");
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(env.ttsCalls).toEqual(["Let me think.", "The real answer."]);
-    } finally {
-      env.restore();
-    }
-  });
-
-  // A code review (2026-09-04) found the original <think> detector was a
-  // one-shot flag: it could resolve the FIRST block but had no way to
-  // re-arm for a second one appearing later in the same stream.
-  test("two separate <think> blocks in one reply are both resolved out, not just the first", async () => {
-    const fullText = "<think>a</think>Hi there. <think>b</think>How can I help?";
+  // The adapter shows released text exactly as sent; it holds nothing back
+  // looking for a tag the wire never carries (rule 9: no client-side parsing).
+  test("a released delta is shown as sent, never held back for a possible <think> tag", async () => {
     const env = stubEnvironment(
       ndjsonStream([
-        { type: "delta", text: "<think>a</think>Hi there. " },
-        { type: "delta", text: "<think>b</think>How can I help?" },
+        { type: "delta", text: "Use the <thi" },
+        { type: "done", value: { reply: { text: "Use the <thi" }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("how")]);
+      const first = yields.find((y) => y.content?.some((part) => part.type === "text"));
+      expect(first?.content).toEqual([{ type: "text", text: "Use the <thi" }]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("sentences split across deltas are spoken whole, and a trailing fragment is flushed at done", async () => {
+    const fullText = "First. Second sentence here. Third part no period";
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "First. Second sen" },
+        { type: "delta", text: "tence here. Third part no period" },
         { type: "done", value: { reply: { text: fullText }, source: "model", safety: SAFETY } },
       ]),
     );
     try {
-      const { yields } = await collect([fakeUserMessage("hi")]);
-      expect(lastText(yields)).toBe("Hi there. How can I help?");
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(env.ttsCalls).toEqual(["Hi there.", "How can I help?"]);
-    } finally {
-      env.restore();
-    }
-  });
-
-  // A code review (2026-09-04) found `finalText.slice(spokenLength)` (the
-  // "done" handler's trailing-fragment flush) assumed `spokenLength`
-  // (tracked against the incremental preview) lined up with `finalText`
-  // (stripThinking()'s own, separately-computed text) character for
-  // character - they don't when whitespace right after </think> is
-  // stripped by one but kept by the other.
-  test("a trailing fragment after a <think> block isn't corrupted by the whitespace stripThinking() strips but the live preview kept", async () => {
-    const fullText = "First. <think>reasoning</think>  Second sentence here. Third part no period";
-    const env = stubEnvironment(
-      ndjsonStream([{ type: "delta", text: fullText }, { type: "done", value: { reply: { text: fullText }, source: "model", safety: SAFETY } }]),
-    );
-    try {
       const { yields } = await collect([fakeUserMessage("what's the answer")]);
-      expect(lastText(yields)).toBe("First. Second sentence here. Third part no period");
+      expect(lastText(yields)).toBe(fullText);
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(env.ttsCalls).toEqual(["First.", "Second sentence here.", "Third part no period"]);
     } finally {
@@ -1561,5 +1488,75 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
       /* the failure itself is expected and irrelevant here */
     }
     expect(consumed).toBe(true);
+  });
+});
+
+describe("the chat asks for the assistant-stream wire", () => {
+  test("every turn request, first send and reconnect alike, sends Accept: application/x-assistant-stream", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "turn_meta", conversation_id: "c1", turn_id: "t1", resume_token: "r1" }, { type: "delta", text: "Hi", sequence: 1 }]),
+      [ndjsonStream([{ type: "delta", text: " there", sequence: 2 }, { type: "done", value: { turn_id: "t1", reply: { text: "Hi there" }, safety: SAFETY } }])],
+    );
+    try {
+      const { yields, error } = await collect([fakeUserMessage("hello")]);
+      expect(error).toBeUndefined();
+      expect(lastText(yields)).toBe("Hi there");
+      expect(env.turnAccepts).toEqual(["application/x-assistant-stream", "application/x-assistant-stream"]);
+    } finally {
+      env.restore();
+    }
+  });
+});
+
+describe("behaviours the old NDJSON adapter carried, proven on the assistant-stream path", () => {
+  async function collectWith(deps: Partial<Parameters<typeof createChatModelAdapter>[0]>, text: string) {
+    const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, onCrisisResources: () => {}, turnSchedulerRef: { current: null }, ...deps });
+    const messages = [fakeUserMessage(text)];
+    const options = { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions;
+    const yields: ChatModelRunResult[] = [];
+    for await (const r of runAdapter(adapter, options)) yields.push(r);
+    return yields;
+  }
+
+  test("Incognito: the single-shot temporary choice rides the request once, and the reply streams as usual", async () => {
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "Sure.", sequence: 1 }, { type: "done", value: { reply: { text: "Sure." }, safety: SAFETY, turn_id: "t9", conversation_id: "c9" } }]));
+    let armed = true;
+    try {
+      const yields = await collectWith({ consumeTemporary: () => { const was = armed; armed = false; return was ? true : undefined; } }, "hi");
+      expect(lastText(yields)).toBe("Sure.");
+      expect(env.turnBodies[0]).toMatchObject({ temporary: true });
+      expect(armed).toBe(false);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a done event's crisis_resources are offered alongside the reply, not in place of it", async () => {
+    const line = "If you're in crisis, call or text 988.";
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "I'm here with you.", sequence: 1 }, { type: "done", value: { reply: { text: "I'm here with you." }, safety: SAFETY, crisis_resources: line, turn_id: "t8", conversation_id: "c8" } }]));
+    const shown: string[] = [];
+    try {
+      const yields = await collectWith({ onCrisisResources: (text) => shown.push(text) }, "I feel awful");
+      expect(lastText(yields)).toBe("I'm here with you.");
+      expect(shown).toEqual([line]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("released text reaches the screen piece by piece as it arrives: no client-side buffering or re-splitting", async () => {
+    const { stream, release } = staggeredNdjsonStream([{ type: "delta", text: "Half a sen", sequence: 1 }], [{ type: "delta", text: "tence.", sequence: 2 }, { type: "done", value: { reply: { text: "Half a sentence." }, safety: SAFETY, turn_id: "t7", conversation_id: "c7" } }]);
+    const env = stubEnvironment(stream);
+    try {
+      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, onCrisisResources: () => {}, turnSchedulerRef: { current: null }, speakReplies: false });
+      const messages = [fakeUserMessage("hi")];
+      const run = runAdapter(adapter, { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions);
+      const first = await run.next();
+      expect(first.value?.content?.[0]).toMatchObject({ type: "text", text: "Half a sen" });
+      release();
+      for await (const _ of run) void _;
+    } finally {
+      env.restore();
+    }
   });
 });
