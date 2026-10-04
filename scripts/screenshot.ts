@@ -506,14 +506,6 @@ async function seedHousehold(): Promise<string> {
       if (!response.ok) throw new Error(`seed ${key} failed: ${response.status}`);
     }
   }
-  if (chatArtifactCapture) {
-    const pipeline = await fetch(`${BASE_URL}/api/settings`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-      body: JSON.stringify({ scope: "household", key: "turn.pipeline.next", value: false }),
-    });
-    if (!pipeline.ok) throw new Error(`seed turn.pipeline.next failed: ${pipeline.status}`);
-  }
 
   const seededPeople = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } });
   if (!seededPeople.ok) throw new Error(`seed people lookup failed: ${seededPeople.status}`);
@@ -2818,12 +2810,6 @@ async function captureNextChatToolsSitesReview(browser: Browser, sessionValue: s
     body: JSON.stringify({ scope: "household", key: "chat.model_id", value: "qwen3-8b-instruct-q4-k-m" }),
   });
   if (!setModel.ok) throw new Error(`captureNextChatToolsSitesReview: seeding chat.model_id failed: ${setModel.status}`);
-  const setPipeline = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "turn.pipeline.next", value: true }),
-  });
-  if (!setPipeline.ok) throw new Error(`captureNextChatToolsSitesReview: seeding turn.pipeline.next failed: ${setPipeline.status}`);
 
   // Two combos, not the full cross product (the dominant pattern this
   // file already uses for "both sizes, both themes" - capturePeopleAnd
@@ -3565,13 +3551,6 @@ async function captureNextChatPolishReview(browser: Browser, sessionValue: strin
         await page.getByRole("textbox", { name: "Message input" }).waitFor();
       }
 
-      const legacyPipeline = await fetch(`${BASE_URL}/api/settings`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-        body: JSON.stringify({ scope: "household", key: "turn.pipeline.next", value: false }),
-      });
-      if (!legacyPipeline.ok) throw new Error(`seed document turn.pipeline.next=false failed: ${legacyPipeline.status}`);
-
       await page.getByRole("textbox", { name: "Message input" }).fill("Could you write that up as a document about pizza night?");
       await page.getByRole("button", { name: "Send message", exact: true }).click();
       const stopButton = page.getByRole("button", { name: "Stop generating", exact: true });
@@ -3592,18 +3571,6 @@ async function captureNextChatPolishReview(browser: Browser, sessionValue: strin
       await page.screenshot({ path: join(outDir, `next-chat-polish-filemenu-${viewport.width}-dark.png`), fullPage: slug === "phone" });
       await page.keyboard.press("Escape");
 
-      const pipeline = await fetch(`${BASE_URL}/api/settings`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-        body: JSON.stringify({ scope: "household", key: "turn.pipeline.next", value: true }),
-      });
-      if (!pipeline.ok) throw new Error(`seed polish turn.pipeline.next failed: ${pipeline.status}`);
-      const pipelineReadback = await fetch(`${BASE_URL}/api/settings?scope=household`, { headers: { Cookie: `session=${sessionValue}` } });
-      if (!pipelineReadback.ok) throw new Error(`read polish turn.pipeline.next failed: ${pipelineReadback.status}`);
-      const pipelineValues = await pipelineReadback.json() as Array<{ key: string; value: unknown }>;
-      const nextPipelineValue = pipelineValues.find((setting) => setting.key === "turn.pipeline.next")?.value;
-      console.log(`[chat-polish-review] trace pipeline setting ${JSON.stringify(nextPipelineValue)}`);
-      if (nextPipelineValue !== true) throw new Error("captureNextChatPolishReview: turn.pipeline.next did not read back true");
       const traceResponsePromise = page.waitForResponse((response) => response.url().includes("/api/turn/stream") && response.request().method() === "POST");
       await page.getByRole("textbox", { name: "Message input" }).fill("Could you please remember that Friday is pizza night?");
       await page.getByRole("button", { name: "Send message", exact: true }).click();
@@ -4739,7 +4706,7 @@ async function captureNextRepairsReview(browser: Browser, sessionValue: string):
 /** ADMIN-PERF-01's own acceptance ("captures at 1440 and 390"): both
  * viewports, both themes, of `/performance`. This throwaway
  * backend has no Stack configured and no traced turns yet (the seeded
- * boot never ran `turn.pipeline.next`), so the real, expected capture
+ * boot ran no turn), so the real, expected capture
  * is the two honest empty states side by side - Layers' own "No traced
  * turns yet" and Engines' own "No Stack configured" - the same
  * mirrored-from-NextEnginesPage empty-state posture as every other

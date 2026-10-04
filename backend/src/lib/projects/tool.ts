@@ -1,15 +1,13 @@
 // PROJECT-START-01: `start_project` itself, the model's own tool for
 // starting a project (docs/plans/harness-turns-and-projects-2026-09-26.md,
 // "How a project starts"). A virtual tool, the same shape nodes/model.ts's
-// own `answer_from_this_conversation` (ANSWER_FROM_CONTEXT_TOOL_ID)
-// already is: no backend/packages/start_project directory, no
-// manifest.json, no recipe.json - `runPlugin()`'s generic op vocabulary
+// own (now retired) `answer_from_this_conversation` was: no
+// backend/packages/start_project directory, no manifest.json, no recipe.json - `runPlugin()`'s generic op vocabulary
 // (integration.call, pick, format, artifact...) has no op for "start a
 // background job and return immediately while it keeps running," so this
 // tool is special-cased at its own three touch points (nodes/model.ts's
-// toolSpecFor(), nodes/policy.ts's policyNode, nodes/tool.ts's toolNode)
-// exactly the way ANSWER_FROM_CONTEXT_TOOL_ID already is, never routed
-// through plugins.ts's loadManifestOnly()/runPlugin() at all.
+// toolSpecFor(), nodes/policy.ts's policyNode, nodes/tool.ts's toolNode),
+// never routed through plugins.ts's loadManifestOnly()/runPlugin() at all.
 //
 // Its own classification is deliberately NOT hardcoded here (the design
 // record: "the package/recipe declares this, the tool doesn't hardcode
