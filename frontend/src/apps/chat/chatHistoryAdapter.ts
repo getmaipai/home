@@ -202,8 +202,8 @@ export function rowsToBranchableMessages(
           : row.replyText,
       createdAt,
       status: { type: "complete", reason: "stop" },
-      // Fix B4 (docs/dev.md's "Chat reliability" B4): chatSourceCaption.tsx
-      // reads these straight off the reloaded message to show "via <package>"
+      // Fix B4 (docs/dev.md's "Chat reliability" B4): the retired caption
+      // read these straight off the reloaded message to show "via <package>"
       // for a non-model reply - the same row fields Fix B3
       // (conversationHistory.ts's buildConversationWindow()) already uses.
       // `judgeStatus` (CHAT-20): chatMemoryState.ts's own

@@ -562,7 +562,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             const sources = event.value.sources;
             // Fix B4 (docs/dev.md's "Chat reliability" B4): the same
             // metadata shape chatHistoryAdapter.ts attaches on reload, so
-            // chatSourceCaption.tsx renders identically whether a message
+            // the retired caption rendered identically whether a message
             // just streamed in live or came back from GET /api/conversations/
             // :id/turns - camelCase keys to match that adapter's row fields,
             // even though TurnValue itself is snake_case on the wire.
@@ -638,8 +638,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   conversationId,
                   documentAvailable: event.value.document_available === true,
                   // A real TurnValue field now (CHAT-16 landed) - kept
-                  // on metadata.custom for chatSourceCaption.tsx's own
-                  // retired-page read and for symmetry with
+                  // on metadata.custom for the retired caption's
+                  // page read and for symmetry with
                   // chatHistoryAdapter.ts's reload-path row, alongside
                   // the real tool-call part above.
                   sources,

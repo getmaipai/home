@@ -1072,8 +1072,8 @@ describe("createChatModelAdapter tool timeline (TOOL-EVENTS-01, frontend half)",
 // transient activity line both producer sides drive - the render side
 // (thread.aui.tsx's "indicator" case reading chatTurnActivity.ts's
 // useTurnActivity()) is the same "read straight off the message's own
-// metadata" shape chatSourceCaption.tsx/chatMemoryChip.tsx already have
-// direct coverage for, so what's new here is only the producer: what the
+// metadata" shape the old source caption and chatMemoryChip.tsx already
+// have direct coverage for, so what's new here is only the producer: what the
 // adapter yields and when, one test per acceptance promise. No live
 // screenshot is possible for this item: the backend doesn't emit a real
 // `status` event yet (Session A, CHAT-16) - this file's own stubbed
