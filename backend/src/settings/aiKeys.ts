@@ -64,23 +64,6 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
   // declared only because the pinned spec (spec-v0.1.71 settings/keys.json)
   // still carries it and the registry must match the spec; the spec removal
   // is the follow-up THIN-7F, after which this entry is deleted.
-  // U2 (docs/plans/turn-machine-state-record-2026-09-22.md, "The
-  // setting"): off keeps runTurnStream() (turnEngine.ts); on runs the
-  // new turnNext.ts machine instead. The route reads it per turn.
-  // honoured_by carries "bot" too (the design record's own words)
-  // since the robot runs the identical machine, just with
-  // model_transitions off in its budget record.
-  // U6: the flip, decided (dev.md, 2026-09-24) - default true. Rerun
-  // 3's own numbers are the acceptance: five named rows 15/15, three
-  // controls 9/9, no engine-classed row, no empty reply, no refusal;
-  // forced search 3,495ms median under the 10s bar. Two accepted
-  // exceptions, named in docs/BACKLOG.md's own U6 row: the cache bar
-  // (PHRASE-02's own mechanism, five rows, plus one scorer defect this
-  // session's own fix corrected) and the retired plain-turn ratio
-  // (never a real regression - the reply floor makes a longer reply
-  // the design, replaced by the idle-gap bar above). The old path
-  // (`buildSystemPrompt`, `runTurnStream`) stays reachable until the
-  // plan's own section 2 deletions.
   SettingsKey.parse({
     key: "turn.pipeline.next",
     scope: "household",
