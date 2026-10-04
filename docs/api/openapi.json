@@ -5225,6 +5225,132 @@
         }
       }
     },
+    "/api/turn-error-detail/{id}": {
+      "get": {
+        "tags": [
+          "turn"
+        ],
+        "summary": "The raw error detail of a turn whose tool call or generation failed (owner/admin only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stored detail, credentials redacted; empty lists when nothing failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "turn_id": {
+                      "type": "string"
+                    },
+                    "tools": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tool_id": {
+                            "type": "string"
+                          },
+                          "call_id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "unavailable",
+                              "timed_out",
+                              "found_nothing",
+                              "errored",
+                              "bad_arguments"
+                            ]
+                          },
+                          "error_code": {
+                            "type": "string"
+                          },
+                          "error_text": {
+                            "type": "string"
+                          },
+                          "at": {
+                            "type": "string"
+                          },
+                          "duration_ms": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "tool_id",
+                          "call_id",
+                          "kind"
+                        ]
+                      }
+                    },
+                    "generations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "reason": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": "string"
+                          },
+                          "request_sent_ms": {
+                            "type": "number"
+                          },
+                          "offline_reason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "reason",
+                          "error",
+                          "request_sent_ms"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "turn_id",
+                    "tools",
+                    "generations"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such turn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/turns/{id}/feedback": {
       "get": {
         "tags": [
@@ -13993,6 +14119,138 @@
           },
           "403": {
             "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dev/ui-fixtures": {
+      "get": {
+        "tags": [
+          "Developer"
+        ],
+        "summary": "The Chat showcase's scenarios",
+        "description": "Owner/admin only: the canned turns the Chat showcase can play, each with a one-line description.",
+        "responses": {
+          "200": {
+            "description": "The scenarios, in showcase order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "fixtures": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "description"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "fixtures"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dev/ui-fixtures/{fixture_id}/stream": {
+      "post": {
+        "tags": [
+          "Developer"
+        ],
+        "summary": "Play one scenario as an assistant-stream turn",
+        "description": "Owner/admin only, and refused for a temporary (Incognito) request: streams the named fixture's events through the real assistant-stream encoder, at the chosen pace. Stores nothing, except the failed-tool scenario's own turn row (no conversation) that the error-detail control reads.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "fixture_id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pace": {
+                    "type": "string",
+                    "enum": [
+                      "instant",
+                      "normal",
+                      "slow"
+                    ],
+                    "default": "normal"
+                  },
+                  "temporary": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The fixture as an assistant-stream turn.",
+            "content": {
+              "application/x-assistant-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin, or a temporary request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown fixture",
             "content": {
               "application/json": {
                 "schema": {
