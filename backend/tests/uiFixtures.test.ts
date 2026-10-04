@@ -6,7 +6,7 @@ import { DataStreamDecoder, type AssistantStreamChunk } from "assistant-stream";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { owner, teen, child } from "./support/testAuth";
-import { UI_FIXTURES } from "@/lib/uiFixtures";
+import { LIVE_IN_CHAT, UI_FIXTURES } from "@/lib/uiFixtures";
 
 beforeEach(() => resetDb());
 
@@ -30,6 +30,13 @@ describe("/api/dev/ui-fixtures", () => {
     const body = (await res.json()) as { fixtures: { id: string; title: string; description: string }[] };
     expect(body.fixtures.map((f) => f.id)).toEqual(UI_FIXTURES.map((f) => f.id));
     for (const f of body.fixtures) expect(f.description.length).toBeGreaterThan(10);
+  });
+
+  test("every scenario says whether a real turn can produce it: yes, or needs: <piece>", async () => {
+    for (const f of UI_FIXTURES) expect(LIVE_IN_CHAT[f.id], f.id).toMatch(/^(yes|needs: .+)$/);
+    const { client } = await owner();
+    const body = (await (await client.get("/api/dev/ui-fixtures")).json()) as { fixtures: { id: string; live_in_chat: string }[] };
+    expect(body.fixtures.map((f) => f.live_in_chat)).toEqual(UI_FIXTURES.map((f) => LIVE_IN_CHAT[f.id] as string));
   });
 
   test("a non-admin gets 403 on the list and on a stream", async () => {

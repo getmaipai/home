@@ -201,6 +201,22 @@ export const UI_FIXTURES: UiFixture[] = [
   { id: "links", title: "Image and links", description: "A markdown link, a bare URL and a picture served by the hub itself (a data: picture is blocked, so none is used).", events: turn("links", MD_LINKS) },
 ];
 
+// Is this scenario's part something a real turn can produce today? "yes", or
+// "needs: <the missing piece>" when it exists only as a fixture. An explicit
+// table (not derived): the binding registry of cloud/shared-chat-thread
+// (frontend/src/apps/chat/elementBindings.ts) had not landed when this was
+// written; derive from it once it does. tests/uiFixtures.test.ts fails for a
+// scenario with no entry here.
+export const LIVE_IN_CHAT: Record<string, string> = {
+  "table": "yes", "code": "yes", "math": "yes", "lists": "yes", "headings": "yes",
+  "essay": "yes", "reasoning": "yes", "search": "yes",
+  "failed-tool": "needs: THIN-1E (the admin error detail); a failed tool's chip itself is live",
+  "failure-engine-down": "yes", "failure-engine-down-spoken": "yes", "failure-unavailable": "yes",
+  "failure-generic": "yes", "failure-cancelled": "yes", "failure-safety": "yes", "cutoff": "yes",
+  "crisis": "yes", "incognito": "yes", "child": "yes", "spoken": "yes",
+  "links": "needs: not checked that the output gate lets a model-written markdown image through",
+};
+
 export function findFixture(id: string): UiFixture | undefined {
   return UI_FIXTURES.find((f) => f.id === id);
 }

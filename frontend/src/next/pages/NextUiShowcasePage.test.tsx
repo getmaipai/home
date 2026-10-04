@@ -51,7 +51,7 @@ beforeEach(() => {
   streamed = [];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
-    if (url === "/api/dev/ui-fixtures") return Promise.resolve(Response.json({ fixtures: UI_FIXTURES.map(({ id, title, description }) => ({ id, title, description })) }));
+    if (url === "/api/dev/ui-fixtures") return Promise.resolve(Response.json({ fixtures: UI_FIXTURES.map(({ id, title, description }) => ({ id, title, description, live_in_chat: id === "links" ? "needs: a check" : "yes" })) }));
     const match = /\/api\/dev\/ui-fixtures\/([^/]+)\/stream$/.exec(url);
     if (match && init?.method === "POST") {
       streamed.push(`${match[1]}:${JSON.parse(String(init.body)).pace}`);
@@ -78,6 +78,14 @@ describe("NextUiShowcasePage", () => {
     const view = open();
     await waitFor(() => expect(view.getAllByRole("button", { name: /^Table\./ })).toHaveLength(1));
     for (const fixture of UI_FIXTURES) expect(view.getByRole("button", { name: new RegExp(`^${fixture.title.replace(/[()]/g, "\\$&")}\\.`) })).toBeTruthy();
+  });
+
+  test("each scenario carries a Live in chat or Needs chip, and the header counts them", async () => {
+    const view = open();
+    await waitFor(() => expect(view.container.querySelector("[data-slot=live-in-chat-count]")).not.toBeNull());
+    expect(view.container.querySelector("[data-slot=live-in-chat-count]")!.textContent).toBe(`Live in chat: ${UI_FIXTURES.length - 1} of ${UI_FIXTURES.length} scenarios`);
+    expect(view.getAllByText("Live in chat")).toHaveLength(UI_FIXTURES.length - 1);
+    expect(view.getByText("Needs: a check")).toBeTruthy();
   });
 
   test("the Table button plays the table turn through the chat thread: a real table element, at the chosen pace", async () => {

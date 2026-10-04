@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, useAui, useLocalRuntime } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
+import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Page } from "@maipai/ui/src/primitives/Page";
@@ -74,7 +75,8 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, banner, setScenario, sett
   const scenarioIds = useMemo(() => new Set(scenarios.map((scenario) => scenario.id)), [scenarios]);
   return (
     <div className="flex h-full min-h-0 flex-col">
-    <ElementsAdoptionPanel scenarioIds={scenarioIds} onPlay={(id) => { const scenario = scenarios.find((entry) => entry.id === id); if (scenario) send(scenario); }} />
+    <p className="px-4 text-sm text-muted-foreground" data-slot="live-in-chat-count">Live in chat: {scenarios.filter((scenario) => scenario.live_in_chat === "yes").length} of {scenarios.length} scenarios</p>
+    <ElementsAdoptionPanel scenarioIds={scenarioIds} liveByScenario={Object.fromEntries(scenarios.map((scenario) => [scenario.id, scenario.live_in_chat]))} onPlay={(id) => { const scenario = scenarios.find((entry) => entry.id === id); if (scenario) send(scenario); }} />
     <div className="min-h-0 flex-1">
     <SplitView
       detailOpen={current !== null}
@@ -99,6 +101,7 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, banner, setScenario, sett
               <span className="flex min-w-0 flex-col py-1">
                 <span className="font-medium">{scenario.title}</span>
                 <span className="text-sm text-muted-foreground">{scenario.description}</span>
+                <span className="pt-1"><Badge variant={scenario.live_in_chat === "yes" ? "default" : "outline"}>{scenario.live_in_chat === "yes" ? "Live in chat" : `Needs: ${scenario.live_in_chat.replace(/^needs: /, "")}`}</Badge></span>
               </span>
             )}
           />
