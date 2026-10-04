@@ -215,7 +215,7 @@ export default tseslint.config(
         // tokens.css), applied directly rather than as a Tailwind
         // utility since it's driven by `useSurface().far`, not a media
         // query.
-        { ignore: ["brand-logo-light", "brand-logo-dark", "surface-far", "aui-action-bar-more-item"] },
+        { ignore: ["brand-logo-light", "brand-logo-dark", "surface-far"] },
       ],
       "better-tailwindcss/no-conflicting-classes": "error",
       "better-tailwindcss/no-restricted-classes": [
@@ -257,6 +257,16 @@ export default tseslint.config(
       "shadcn/no-inline-styles": "error",
       "shadcn/no-unknown-classes": "error",
       "shadcn/require-static-classes": "error",
+    },
+  },
+  {
+    // This kit primitive class is only used by the chat action bar Elements.
+    files: ["src/apps/chat/chatThreadSlots.tsx", "src/apps/chat/chatActionBar.tsx"],
+    rules: {
+      "better-tailwindcss/no-unknown-classes": [
+        "error",
+        { ignore: ["brand-logo-light", "brand-logo-dark", "surface-far", "aui-action-bar-more-item"] },
+      ],
     },
   },
   {
