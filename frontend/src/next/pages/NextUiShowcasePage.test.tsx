@@ -100,6 +100,6 @@ describe("NextUiShowcasePage", () => {
   test("a failure scenario ends the thread in the error, not a silent blank", async () => {
     const view = open();
     fireEvent.click(await waitFor(() => view.getByRole("button", { name: /^Failure: engine down \(chat\)\./ })));
-    await waitFor(() => expect(view.container.textContent).toContain("AI isn't running right now"), { timeout: 5000 });
+    await waitFor(() => expect(view.container.textContent).toContain("I can't reach the AI on this computer"), { timeout: 5000 });
   });
 });

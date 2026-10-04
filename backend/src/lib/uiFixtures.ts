@@ -1,4 +1,5 @@
 import type { TurnStreamEvent, TurnValue } from "../wire";
+import { failureLine, partialReplyNote } from "./failureCopy";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 // UI-SHOWCASE: canned turns for the admin's Chat showcase (/dev/ui). A fixture
@@ -13,6 +14,8 @@ export interface UiFixture {
   title: string;
   description: string;
   events: Event[];
+  /** THIN-1E: the stored failure behind this fixture's turn, so the admin's error-detail popover has a real row to read. */
+  storedOutcomes?: unknown[];
   /** Milliseconds between events at "normal" and "slow"; "instant" is always 0. */
   pace?: { normal: number; slow: number };
 }
@@ -174,7 +177,8 @@ export const UI_FIXTURES: UiFixture[] = [
     }),
   },
   {
-    id: "failed-tool", title: "Failed tool (placeholder)", description: "PLACEHOLDER: the lookup failed and the reply says so in words; the admin error-detail indicator (THIN-1E) is not on this branch yet, so only the failed tool chip shows.",
+    id: "failed-tool", title: "Failed tool", description: "The lookup failed and the reply says so in words: the failed tool chip, and for an admin the quiet error-details control beside the reply (its detail is read from a stored row this scenario writes).",
+    storedOutcomes: [{ callId: "call-fail-1", packageId: "websearch", status: "failed", via: "tool_call", at: "2026-10-04T10:00:00.000Z", durationMs: 812, errorCode: "search_unavailable", userMessage: "The search engine timed out after 10 s (example.com/search answered 504)." }],
     events: turn("failed-tool", "I could not look that up just now, so this is from what I already know: the market usually opens in the morning, but please check before you go.", {
       lead: [
         { type: "status", stage: "lookup", text: "Looking that up" },
@@ -184,13 +188,13 @@ export const UI_FIXTURES: UiFixture[] = [
       value: { rung: "failed" },
     }),
   },
-  { id: "failure-engine-down", title: "Failure: engine down (chat)", description: "The chat engine is not running: the plain line an adult sees, code engine_unavailable.", events: failing("failure-engine-down", "", { type: "error", error: "MaiPai's AI isn't running right now.", code: "engine_unavailable" }) },
-  { id: "failure-engine-down-spoken", title: "Failure: engine down (spoken or child)", description: "The engine is down on a spoken or non-chat surface: the short grown-ups line, code engine_unavailable.", events: failing("failure-engine-down-spoken", "", { type: "error", error: "I can't think right now. I've told the grown-ups.", code: "engine_unavailable" }) },
-  { id: "failure-unavailable", title: "Failure: unavailable", description: "A generic unavailable failure after the turn started, code unavailable.", events: failing("failure-unavailable", "", { type: "error", error: "The engine did not answer in time.", code: "unavailable" }) },
-  { id: "failure-generic", title: "Failure: mid-stream error", description: "The engine fails with no catalogue code (the plain generic error event).", events: failing("failure-generic", "", { type: "error", error: "Something went wrong while writing that reply." }) },
+  { id: "failure-engine-down", title: "Failure: engine down (chat)", description: "The chat engine is not running: the plain line an adult sees, code engine_unavailable.", events: failing("failure-engine-down", "", { type: "error", error: failureLine("unreachable", false), code: "engine_unavailable" }) },
+  { id: "failure-engine-down-spoken", title: "Failure: engine down (spoken or child)", description: "The engine is down on a spoken or non-chat surface: the short grown-ups line, code engine_unavailable.", events: failing("failure-engine-down-spoken", "", { type: "error", error: failureLine("unreachable", true), code: "engine_unavailable" }) },
+  { id: "failure-unavailable", title: "Failure: unavailable", description: "A generic unavailable failure after the turn started, code unavailable.", events: failing("failure-unavailable", "", { type: "error", error: failureLine("busy", false), code: "unavailable" }) },
+  { id: "failure-generic", title: "Failure: mid-stream error", description: "The engine fails with no catalogue code (the plain generic error event).", events: failing("failure-generic", "", { type: "error", error: failureLine("other", false) }) },
   { id: "failure-cancelled", title: "Failure: cancelled", description: "The turn was cancelled on the server, code turn_cancelled.", events: failing("failure-cancelled", "", { type: "error", error: "cancelled", code: "turn_cancelled" }) },
   { id: "failure-safety", title: "Failure: safety refusal with crisis resources", description: "The output gate cut a reply for safety: the error carries the crisis resources (988) and code safety_refused.", events: failing("failure-safety", "I want to help with that, but", { type: "error", error: "I can't continue with that reply.", code: "safety_refused", crisis_resources: CRISIS }) },
-  { id: "cutoff", title: "Mid-stream cutoff", description: "Half a reply streams, then the connection ends with the closing note.", events: failing("cutoff", "The recipe starts with two cups of flour, a pinch of salt and then you", { type: "error", error: "The reply was cut off before it finished.", code: "unavailable" }) },
+  { id: "cutoff", title: "Mid-stream cutoff", description: "Half a reply streams, then the connection ends with the closing note.", events: failing("cutoff", "The recipe starts with two cups of flour, a pinch of salt and then you", { type: "error", error: partialReplyNote("slow", false), code: "unavailable" }) },
   { id: "crisis", title: "Crisis resources on a finished reply", description: "A finished, gentle reply that carries the crisis resources beside it (allow_with_resources).", events: turn("crisis", "I'm really glad you told me. You deserve support from someone who can be with you right now.", { value: { crisis_resources: CRISIS, safety: { ...SAFE, flagged: true, categories: ["self_harm"], action: "allow_with_resources" } } }) },
   { id: "incognito", title: "Incognito turn", description: "A reply whose turn is not stored (no conversation row). Turn the shell's Incognito toggle on to see the restyled UI around it.", events: turn("incognito", "This chat is not saved. Nothing from it is remembered once you close it.", { value: { conversation_id: "temporary" } }) },
   { id: "child", title: "Child-band short reply", description: "A short, simple reply with no reasoning block, as a child's turn is released.", events: turn("child", "Great question! Plants drink water through their roots, like a straw. 🌱") },
