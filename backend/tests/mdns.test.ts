@@ -1,6 +1,7 @@
 import { describe, expect, test, afterEach, spyOn } from "bun:test";
 import { readFileSync } from "node:fs";
 import { hostname } from "node:os";
+import { randomUUID } from "node:crypto";
 import { Bonjour } from "bonjour-service";
 import { resetDb } from "./reset-db";
 import { __resetHubIdentityForTests, getHubInstanceId, setHubName } from "@/lib/hubIdentity";
@@ -72,7 +73,7 @@ describe("advertiseMdns()/stopMdnsAdvertisement()", () => {
   // display name intact in TXT (#193).
   async function publishRival(rival: Bonjour, name: string, port: number): Promise<void> {
     await new Promise<void>((resolve) => {
-      const svc = rival.publish({ name, type: "maipai", port, txt: { id: "rival", name: "Rival Hub", tls: "0", v: "1" } });
+      const svc = rival.publish({ host: `maipai-test-${randomUUID().slice(0, 8)}.local`, name, type: "maipai", port, txt: { id: "rival", name: "Rival Hub", tls: "0", v: "1" } });
       svc.on("up", () => resolve());
     });
   }

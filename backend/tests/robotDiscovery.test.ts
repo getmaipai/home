@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { randomUUID } from "node:crypto";
 import { Bonjour } from "bonjour-service";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -22,7 +23,7 @@ async function advertiseFakeRobot(
   txt: Record<string, string>,
 ): Promise<Bonjour> {
   const bonjour = new Bonjour();
-  bonjour.publish({ name: uniqueServiceName, type: "reachy-mini", port, txt });
+  bonjour.publish({ host: `maipai-test-${randomUUID().slice(0, 8)}.local`, name: uniqueServiceName, type: "reachy-mini", port, txt });
   return bonjour;
 }
 
