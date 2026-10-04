@@ -3,7 +3,7 @@
 > **Superseded 2026-09-17.** The 16 GB card in the enclosure fell off
 > the laptop's Thunderbolt link five times across four cables (power,
 > heat and cable ruled out; the laptop's Thunderbolt path is the
-> fault). The owner's decision: one machine for the whole hub, a Mac
+> fault). The owner's decision, in [the Studio day-one plan](studio-day-one-2026-09-23.md): one machine for the whole hub, a Mac
 > Studio with 128 GB of unified memory; the card is returned. The
 > measurements below (the 27B at 33.7 tok/s and 879 tok/s prompt on
 > the card alone, the 8B at 78.7) stand as the record of what the
