@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, useAui, useLocalRuntime } from "@assistant-ui/react";
-import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -12,7 +11,8 @@ import { SplitView } from "@maipai/ui/src/primitives/SplitView";
 import { ElementsAdoptionPanel } from "@/dev/ElementsAdoptionPanel";
 import { AdminGatedContent } from "@/apps/settings/AdminGatedContent";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
-import { AdminContext, AssistantMoreItems, ChatThinkingIndicator, MessageFooterExtra, NextReasoningGroup, SourcesActionBarTrigger, SourcesOpenContext, StructuredResultTools, SuppressSourcesFallback, ToolTimelineTool } from "@/next/pages/NextChatPage";
+import { ChatThread } from "@/apps/chat/ChatThread";
+import { AdminContext, SourcesOpenContext } from "@/apps/chat/chatThreadContexts";
 import { listShowcaseScenarios, openShowcaseStream, type ShowcasePace, type ShowcaseScenario } from "@/lib/uiFixturesApi";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Roster } from "@/lib/api";
@@ -23,8 +23,8 @@ import type { Roster } from "@/lib/api";
 // button sends one user message; the real chat adapter (createChatModelAdapter)
 // opens the stream at /api/dev/ui-fixtures/<id>/stream instead of
 // /api/turn/stream and reads it with the same DataStreamDecoder reader, and
-// the kit's Thread renders it with the chat page's own reasoning, sources
-// and tool parts. Nothing is stored.
+// ChatThread (the one composition the chat page renders too) shows it with
+// the chat's own reasoning, sources and tool parts. Nothing is stored.
 const PACES: ShowcasePace[] = ["instant", "normal", "slow"];
 const PACE_LABELS: Record<string, string> = { instant: "Instant", normal: "Normal pace", slow: "Slow pace" };
 type Settle = "ready" | "error" | "idle" | "waiting" | "responding";
@@ -115,15 +115,7 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, banner, setScenario, sett
             </Alert>
           ) : null}
           <div className="min-h-0 flex-1">
-            <Thread
-              components={{
-                AssistantMoreItems,
-                AssistantActionBarExtra: SourcesActionBarTrigger,
-                AssistantMessageFooterExtra: MessageFooterExtra,
-                Indicator: ChatThinkingIndicator,
-                ReasoningGroup: NextReasoningGroup,
-              }}
-            />
+            <ChatThread />
           </div>
         </div>
       }
@@ -173,9 +165,6 @@ export function NextUiShowcasePage({ person }: { person: Roster }) {
             <AssistantRuntimeProvider runtime={runtime}>
               <AdminContext.Provider value>
                 <SourcesOpenContext.Provider value={sourcesValue}>
-                  <StructuredResultTools />
-                  <ToolTimelineTool />
-                  <SuppressSourcesFallback />
                   <ShowcaseWorkspace scenarios={scenarios} pace={pace} setPace={setPace} banner={banner} setScenario={(id) => { scenarioRef.current = id; }} settleRef={settleRef} />
                 </SourcesOpenContext.Provider>
               </AdminContext.Provider>

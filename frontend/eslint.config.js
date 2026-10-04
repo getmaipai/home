@@ -215,7 +215,7 @@ export default tseslint.config(
         // tokens.css), applied directly rather than as a Tailwind
         // utility since it's driven by `useSurface().far`, not a media
         // query.
-        { ignore: ["brand-logo-light", "brand-logo-dark", "surface-far"] },
+        { ignore: ["brand-logo-light", "brand-logo-dark", "surface-far", "aui-action-bar-more-item"] },
       ],
       "better-tailwindcss/no-conflicting-classes": "error",
       "better-tailwindcss/no-restricted-classes": [
@@ -239,7 +239,16 @@ export default tseslint.config(
     // rule made mechanical. Scoped to src/next only: the old shell
     // retires with SHELL-09 and is not worth fixing, and the vendored
     // trees live in the kit and are never linted.
-    files: ["src/next/**/*.{ts,tsx}"],
+    // SHARED-THREAD-01: the chat thread pieces moved out of
+    // NextChatPage.tsx into src/apps/chat keep the same rules.
+    files: [
+      "src/next/**/*.{ts,tsx}",
+      "src/apps/chat/ChatThread.tsx",
+      "src/apps/chat/elementBindings.ts",
+      "src/apps/chat/chatThreadContexts.ts",
+      "src/apps/chat/chatThreadSlots.tsx",
+      "src/apps/chat/chatToolUis.tsx",
+    ],
     plugins: { shadcn },
     rules: {
       "shadcn/no-restyle": "error",

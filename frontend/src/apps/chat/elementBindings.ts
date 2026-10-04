@@ -1,0 +1,87 @@
+// SHARED-THREAD-01: the ONE registry of which Element renders what in the chat
+// thread. ChatThread.tsx reads it, and ChatThread is the only thing the chat
+// page (NextChatPage) and the /dev/ui showcase (NextUiShowcasePage) render for
+// the thread, so a binding added here shows up in both with no second edit.
+//
+// How to add an Element:
+//   1. Add the binding here: a tool id in TOOL_BINDINGS (the tool-call part's
+//      toolName and the component that renders its result), or a slot in
+//      THREAD_SLOTS (the kit Thread's `components` map: reasoning groups,
+//      message footer, action bar, composer pieces).
+//   2. Add a showcase fixture for it (backend/src/lib/uiFixtures.ts) so the
+//      playground has a scenario that exercises it.
+//   Nothing else: not NextChatPage, not NextUiShowcasePage. The guard test
+//   (chatThreadShared.test.ts) fails if either page imports the kit's Thread.
+//   A new renderer component goes in chatToolUis.tsx (tool results) or
+//   chatThreadSlots.tsx (slots); a new context it reads needs a safe default in
+//   chatThreadContexts.ts, because the showcase mounts without the chat page's
+//   providers.
+//
+// Elements adoption scanner (scripts/elements-adoption.ts, when cloud/elements-
+// audit lands): an Element counts as used when ChatThread.tsx or this file
+// imports it, directly or through the renderers this file imports
+// (chatToolUis.tsx, chatThreadSlots.tsx). Do not require the import to sit in
+// NextChatPage.tsx: the Elements live in those files now.
+import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
+import {
+  AssistantMoreItems,
+  ChatThinkingIndicator,
+  ComposerExtraControls,
+  ComposerModelSelector,
+  MessageFooterExtra,
+  NextChatWelcome,
+  NextReasoningGroup,
+  SourcesActionBarTrigger,
+} from "@/apps/chat/chatThreadSlots";
+import { ArtifactCardToolRender, ConfirmToolRender, ProjectToolRender, SourcesNoopRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
+import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
+import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
+
+export type ToolBinding = {
+  /** The tool-call part's `toolName` on the wire (chatModelAdapter.ts). */
+  toolName: string;
+  /** The shipped Element the renderer composes, for the adoption audit. */
+  element: string;
+  // The renderers carry their own result types; the registry stores them erased.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous result shapes, each renderer types its own
+  render: ToolCallMessagePartComponent<any, any>;
+};
+
+// `display: "standalone"` is applied to every binding (ChatThread): without it
+// Thread's chain-of-thought grouping tucks a tool-call part behind a collapsed
+// "1 tool call" trigger (found live: a weather card nobody can see without an
+// extra click is a real regression for a family hub, not a cosmetic nit).
+// Any tool id not listed here still renders through Thread's own ToolFallback.
+export const TOOL_BINDINGS: readonly ToolBinding[] = [
+  { toolName: "weather", element: "spec-sheet", render: SpecSheetToolRender },
+  { toolName: "almanac-date", element: "spec-sheet", render: SpecSheetToolRender },
+  { toolName: "write_document", element: "artifact-card", render: ArtifactCardToolRender },
+  { toolName: "confirm", element: "tool-fallback (Approval)", render: ConfirmToolRender },
+  { toolName: "project", element: "job-progress", render: ProjectToolRender },
+  { toolName: "tool_timeline", element: "tool-timeline", render: ToolTimelineToolRender },
+  { toolName: "sources", element: "sources", render: SourcesNoopRender },
+];
+
+// The kit Thread's `components` slots. Per-page behaviour (what a sent edit
+// does, whether the model picker is allowed) is a ChatThread prop, never a
+// different component here.
+export const THREAD_SLOTS = {
+  Welcome: NextChatWelcome,
+  AssistantMoreItems,
+  AssistantActionBarExtra: SourcesActionBarTrigger,
+  AssistantMessageFooterExtra: MessageFooterExtra,
+  Indicator: ChatThinkingIndicator,
+  ComposerAddAttachmentOverride: ComposerAddMenu,
+  // VOICE-LIVE-01: the trailing-side append point beside Send/dictate;
+  // ComposerVoiceControls gates its own render on stt+tts being ready.
+  ComposerExtraEnd: ComposerExtraControls,
+  // VOICE-LIVE-04b: owns the composer's text-field region (waveform or a real
+  // ComposerPrimitive.Input), so it is unconditional.
+  ComposerInputOverride: ComposerDictationWaveform,
+  ReasoningGroup: NextReasoningGroup,
+} as const;
+
+// The composer's model selector renders nothing under two models, so the
+// showcase (no model list) shows no picker; the chat page gates it further on
+// its own `modelPickerAllowed`.
+export const MODEL_SELECTOR_SLOT = ComposerModelSelector;
