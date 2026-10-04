@@ -238,7 +238,10 @@ export const turnMachine = setup({
     // tools block to stay identical to (a resumed confirmation never had one).
     toolRoundFailed: ({ context, event }) => {
       const output = (event as unknown as { output: ToolOutput }).output;
-      return !context.retryUsed && context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds && context.turnState.lastTools.length > 0 && retryEligible(output.outcomes);
+      // roundsUsed === 0: only the FIRST tool round can be retried, because retryRound()
+      // tells the retry round apart by that very count (a failure after an earlier
+      // successful round would otherwise run a round with none of the retry floors).
+      return !context.retryUsed && context.turnState.budget.model_transitions && context.roundsUsed === 0 && context.turnState.budget.rounds > 0 &&context.turnState.lastTools.length > 0 && retryEligible(output.outcomes);
     },
     // A retry round whose every call policy refused (an ungrounded or
     // unknown tool) is a failed lookup like any other: on to the phrasing round.
