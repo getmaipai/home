@@ -64,7 +64,7 @@ describe("ChatThread", () => {
     expect(view.container.textContent).toContain("21 C");
     // reasoning group slot (NextReasoningGroup)
     expect(view.container.textContent?.toLowerCase()).toContain("reasoning");
-    // the "sources" binding keeps the fallback tool card out of the message body
-    expect(view.container.textContent).not.toContain("sources");
+    // The "sources" binding keeps the fallback tool card out of the message body.
+    expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
   });
 });
