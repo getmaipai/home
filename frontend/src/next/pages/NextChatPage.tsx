@@ -55,6 +55,7 @@ import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
+import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { ComposerAddMenu, PackageScopeContext } from "@/apps/chat/composerAddMenu";
 import "@/next/pages/nextChatTouchTargets.css";
 import "@/next/pages/chatReplyMarkdown.css";
@@ -363,8 +364,10 @@ function BareModeSwitchMenuItem() {
 }
 
 function AssistantMoreItems() {
+  const temporary = useContext(TemporaryChatContext).on;
   return (
     <>
+      {temporary ? null : <BranchInNewChatMenuItem />}
       <CompareWithBareModelMenuItem />
       <BareModeSwitchMenuItem />
       <MessageDetailsMenuItem />

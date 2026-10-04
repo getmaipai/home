@@ -662,6 +662,7 @@ export const api = {
   conversationTurns: (id: string) => request<ConversationTurnWithMemoryIds[]>(`/api/conversations/${encodeURIComponent(id)}/turns`),
   chooseConversationTurn: (id: string) =>
     request<{ turn_id: string; parent_turn_id: string | null; branch_chosen: boolean }>(`/api/conversations/turns/${encodeURIComponent(id)}/choose`, { method: "POST" }),
+  forkConversationTurn: (id: string) => request<Conversation>(`/api/conversations/turns/${encodeURIComponent(id)}/fork`, { method: "POST" }),
   conversationTurnDocument: (id: string) => request<TurnArtifact>(`/api/conversations/turns/${encodeURIComponent(id)}/document`),
   // SHELL-02 slice 4: always the CURRENT version of whichever artifact
   // this id belongs to (routes/artifacts.ts's own /current, resolved

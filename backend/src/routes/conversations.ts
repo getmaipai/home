@@ -30,6 +30,7 @@ import {
   batchDeleteConversations,
   clearConversations,
   chooseConversationTurn,
+  forkConversationAtTurn,
   type ConversationOpResult,
 } from "@/lib/conversationHistory";
 import { recallEpisodes } from "@/lib/episodes";
@@ -100,6 +101,12 @@ conversationsRoutes.post("/turns/:id/choose", requireAuth, async (c) => {
   const result = chooseConversationTurn(c.get("person"), c.req.param("id"));
   if (!result.ok) return fail(c, result);
   return c.json({ turn_id: result.value.id, parent_turn_id: result.value.parentTurnId, branch_chosen: result.value.branchChosen });
+});
+
+conversationsRoutes.post("/turns/:id/fork", requireAuth, async (c) => {
+  const result = forkConversationAtTurn(c.get("person"), c.req.param("id"));
+  if (!result.ok) return fail(c, result);
+  return c.json(result.value, 201);
 });
 
 conversationsRoutes.get("/export", requireAuth, async (c) => {
