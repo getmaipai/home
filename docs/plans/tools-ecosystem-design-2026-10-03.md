@@ -190,24 +190,38 @@ attacks in Obsidian and Open WebUI, and popularity is not safety (ratings are de
 
 ## 8. Owner decisions
 
-O1. Keep working bundled tools, or replace them with maintained servers as soon as one exists?
-O2. May a connector reach a public site from the home IP when a household opts in (YouTube, ESPN)?
-O3. May Home run an AGPL or GPL server as a separate process over stdio?
-O4. Does Home refuse any server whose tool calls a hosted model? (Sampling, Roots and Logging are deprecated in MCP
-2026-07-28, so Home simply never advertises sampling.)
-O5. Are hosted MCP servers ever allowed, opt-in and adult-only?
-O6. Starting cap (16), and whether recent use may rank tools above the cap.
-O7. Minors: deny by default with an adult toggle per package, or an allowlist the platform ships.
-O8. Spec tag for the `model_tool` block, and the index and manifest fields in K1 and K5: your word to cut each.
-O9. Do we accept that "signed catalog package" means we sign the pin and the permissions, not the third party's code, and that a contributor who refuses the assignment is simply not accepted into Tier 1?
-O10. Do commercial or paid packages exist, and may one carry a non-AGPL licence?
-O11. Does Tier 2 exist in the first release? (Recommended: no.)
-O12. May a child ever use a Tier 1 package with admin per-package approval, or Tier 0 only?
-O13. The stale-index window N, and what a child's profile does when the catalog is unreachable longer than that.
-O14. Key custody: who holds the offline root key and the CI key, and how rotation works.
-O15. Who reviews Tier 1 permission diffs and at what service level? (Obsidian's unstaffed manual queue ran seven months.)
-O16. May the Stack install a Node or uv runtime on the household machine for MCP servers, and is a remote MCP server ever allowed (adult, opt-in, privacy row)?
-O17. Counsel review of the aggregation line (K6) before any wrapper ships.
+Taken on 2026-10-03: the owner answered "approve all" to the coordinator's recommendation for each of O1 to O17 below,
+before leaving on a trip. The list was shown to him in the same reply, after the answer, so every item stays
+reversible until it is built; anything touching a tag, a key or a legal question is also gated at build time.
+
+- O1. Keep working bundled tools, adopt community tools for new capability, and replace lights and locks with Home
+  Assistant's own MCP server. APPROVED.
+- O2. A connector may reach a public site (YouTube, ESPN) only when a household opts in, adults only, per connector,
+  one video or request at a time. APPROVED.
+- O3. Home may run an AGPL or GPL server as a separate process over stdio or HTTP, never linked, subject to O17. APPROVED.
+- O4. Home never advertises MCP sampling and refuses any server whose tool calls a hosted model (sampling, Roots and
+  Logging are deprecated upstream in MCP 2026-07-28). APPROVED.
+- O5. No hosted or remote MCP servers in the first release; local or LAN only. APPROVED.
+- O6. The offered-tool cap starts at 16, replaced by the bench's measurement; a person's recent use may rank tools
+  above the cap. APPROVED.
+- O7. Minors: no third-party tools by default, with an adult toggle per package. APPROVED.
+- O8. Agents may cut `commons` spec tags tied to approved items (the `model_tool` block, the index fields) and must
+  report each tag. APPROVED.
+- O9. "Signed catalog package" means we sign the pin and the permissions, not a third party's code; a contributor who
+  refuses the assignment is not accepted into the reviewed tier. APPROVED.
+- O10. No paid or commercial packages in the first release. APPROVED.
+- O11. No unreviewed tier (Tier 2) in the first release. APPROVED.
+- O12. Children use first-party (Tier 0) packages only. APPROVED.
+- O13. A stale catalog index (older than 14 days) disables non-first-party packages for minors; the owner may change N.
+  APPROVED.
+- O14. The owner holds the offline root key; the CI release key lives in a protected GitHub environment. OPEN ACTION for
+  the owner before the signing step (K7.2) can finish.
+- O15. Reviews of reviewed-tier packages: the coordinator prepares, the owner decides, one-week target, once
+  submissions exist. APPROVED.
+- O16. The Stack may install Node (and later uv) for MCP servers on the household machine; remote servers are never in
+  the first release. APPROVED.
+- O17. Counsel reviews the licence line (K6) before any third-party wrapper ships; Home Assistant's built-in server is
+  first-party and exempt. APPROVED.
 
 ## 9. Not verified
 

@@ -117,7 +117,7 @@ would break our rule 1). None of the clients I could read ships declared fallbac
 
 Literature (all S):
 
-- [Retry, Switch, or Abstain?](https://arxiv.org/abs/2608.11977) (BENCH2ROBUST): across 7 models, injected tool failures
+- [Retry, Switch, or Abstain?](https://arxiv.org/abs/2608.11977) (BENCH2ROBUST): across 7 models, injected tool failures <!-- prose-lint: allow -->
   open a near-universal robustness gap. Scenarios split into retry-recovers, primary-blocked-so-switch, and
   all-blocked-so-stop. Giving the model structured recovery context raised success by 11.7 to 16.8 points on Retail.
 - [Failure Makes the Agent Stronger](https://arxiv.org/abs/2509.18847): reflecting on why a call failed and then repairing
@@ -128,7 +128,7 @@ Literature (all S):
 Evaluation of THIN-2G (one bounded retry round, model decides, same tools byte-identical, plain line naming tool and kind):
 
 - **Adopt** the core: model-decided, one round, `tool_choice: auto`, identical tools block, then the phrasing round. It
-  matches what OpenAI SDK and LangGraph do (error to the model) and BENCH2ROBUST's finding that naming the failure helps.
+  matches what OpenAI SDK and LangGraph do (error to the model) and BENCH2ROBUST's finding that naming the failure helps. <!-- prose-lint: allow -->
 - **Adopt** rejecting parallel hedging and declared fallback chains: doubles latency-bound work and tokens on an 8B model
   and sends every weather question to the search engine. No source I read argues for hedging at this scale.
 - **Change 1: count a malformed call as a failure.** If llama-server returns arguments that fail the tool's schema, that is a
@@ -137,7 +137,7 @@ Evaluation of THIN-2G (one bounded retry round, model decides, same tools byte-i
 - **Change 2: exclude consequential tools.** A retry round never re-offers or re-calls a `physical` or `write` tool without
   the confirmation of section 6. A failed `lock-doors` must never silently succeed on a second attempt.
 - **Change 3: forbid only the byte-identical call.** THIN-2G forbids repeating the failed call with the same arguments. Keep
-  that, but allow the same tool with changed arguments (a geocode fix for weather). BENCH2ROBUST's retry-recovers scenario
+  that, but allow the same tool with changed arguments (a geocode fix for weather). BENCH2ROBUST's retry-recovers scenario <!-- prose-lint: allow -->
   is real for timeouts, and a hard rule against re-calling the same tool would block it.
 - Keep: spoken turns use the shorter timeout; raw error text never reaches the model (rule 6); a child's retry passes the
   same page-text floor (THIN-4C).
