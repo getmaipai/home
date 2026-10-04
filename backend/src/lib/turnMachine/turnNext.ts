@@ -41,6 +41,7 @@ import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { postProjectResult } from "@/lib/projects/post";
 import { StatusChannel } from "@/lib/statusChannel";
 import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
+import { scheduleConversationTitle } from "@/lib/conversationTitle";
 import { StreamGate, gateGrainFor } from "./nodes/outputGate";
 import { resolveTurnBudget } from "./budget";
 import { turnMachine } from "./machine";
@@ -213,6 +214,8 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // debounced, fire-and-forget scheduler the old path calls after its own
   // logTurn() (a temporary turn returned above, so schedules none).
   scheduleSummaryRefresh(value.conversation_id);
+  // CHAT-TITLE-01: a topic title after the first exchange, off the reply's path; a no-op once titled.
+  scheduleConversationTitle(value.conversation_id);
 }
 
 /** Whether the utterance is a plain "yes" to a stored confirm/lookup ask

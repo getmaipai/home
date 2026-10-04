@@ -6,6 +6,7 @@ import { __resetCommandsCacheForTests } from "@/lib/commands";
 import { __resetTurnActivityForTests } from "@/lib/turnActivity";
 import { __resetOutputNotificationsForTests } from "@/lib/turnShared";
 import { __clearPendingSummaryRefreshesForTests } from "@/lib/summaryRefresh";
+import { __clearPendingConversationTitlesForTests } from "@/lib/conversationTitle";
 import { __resetPackageCachesForTests } from "@/lib/plugins";
 import { __resetServiceHealthForTests } from "@/lib/serviceHealth";
 import { __resetSkillCacheForTests } from "@/lib/skills";
@@ -180,6 +181,7 @@ export function resetDb(): void {
   // own beforeEach gets this for free, matching __resetTurnActivityForTests()
   // just above for the identical reason.
   __clearPendingSummaryRefreshesForTests();
+  __clearPendingConversationTitlesForTests();
   // lib/plugins.ts's/lib/skills.ts's own mtime-keyed manifest/recipe/skill
   // caches (same pass): no test writes a bundled package's files today,
   // but they're cleared here too on the same "don't rely on that staying

@@ -635,6 +635,7 @@ export function listTemporaryConversations(actor: PersonRow, personId?: string):
       companion_id: conversation.companion_id,
       title: conversation.title,
       pinned: conversation.pinned,
+      archived: false,
       turn_count: turns.length,
       last_turn_at: turns.at(-1)?.createdAt ?? null,
       created_at: conversation.created_at,
@@ -1404,6 +1405,7 @@ function toConversationSummary(row: ConversationRow, turnCount: number, lastTurn
     companion_id: row.companionId,
     title: row.title,
     pinned: row.pinned,
+    archived: row.archived,
     turn_count: turnCount,
     last_turn_at: lastTurnAt,
     created_at: row.createdAt,
@@ -1439,14 +1441,21 @@ export function matchQueryFor(query: string): string | null {
   return terms.map((t) => `"${t.replace(/"/g, '""')}"`).join(" AND ");
 }
 
-export function listConversations(actor: PersonRow, personId?: string, query?: string): ConversationSummary[] {
+/** CONV-ARCHIVE-01: which shelved chats a listing carries. `exclude` (the
+ * default, so every older caller is unchanged) hides them, `only` is the
+ * archive view, `include` returns both with `archived` set on each row. */
+export interface ListConversationsOptions { archived?: "exclude" | "include" | "only" }
+
+export function listConversations(actor: PersonRow, personId?: string, query?: string, options: ListConversationsOptions = {}): ConversationSummary[] {
   const target = personId ?? actor.id;
   if (!canAccessPerson(actor, target)) return [];
+  const archivedMode = options.archived ?? "exclude";
   let rows = db
     .select()
     .from(conversations)
     .where(and(eq(conversations.personId, target), not(eq(conversations.status, "deleted")), not(eq(conversations.mode, "temporary"))))
-    .all();
+    .all()
+    .filter((row) => archivedMode === "include" || row.archived === (archivedMode === "only"));
   const normalizedQuery = query?.trim() ?? "";
   if (normalizedQuery) {
     // `%`/`_` are LIKE wildcards (a bare backslash isn't, without an
@@ -1717,8 +1726,22 @@ export function updateConversationTitle(actor: PersonRow, id: string, title: str
   if (!parsed.success) {
     return { ok: false, status: 400, error: parsed.error.issues.map((i) => i.message).join("; ") };
   }
-  db.update(conversations).set({ title: nextTitle, pinned: nextPinned, updatedAt: now, hlc: newHlc }).where(eq(conversations.id, id)).run();
+  // CHAT-TITLE-01: a person's own rename is final (a model title never overwrites it); clearing
+  // the title hands it back to the model.
+  const renamed = title !== undefined && title !== found.value.title;
+  db.update(conversations).set({ title: nextTitle, pinned: nextPinned, ...(renamed ? { titleSource: nextTitle === null ? null : "user" } : {}), updatedAt: now, hlc: newHlc }).where(eq(conversations.id, id)).run();
   return { ok: true, value: parsed.data };
+}
+
+/** CONV-ARCHIVE-01: shelve or restore a chat. Same access rule as a rename. Leaves updated_at
+ * alone (a restored chat returns to where its last activity put it); only the sync clock moves. */
+export function updateConversationArchived(actor: PersonRow, id: string, archived: boolean): ConversationOpResult<Conversation> {
+  if (typeof archived !== "boolean") return { ok: false, status: 400, error: "archived must be a boolean" };
+  const found = getConversation(actor, id);
+  if (!found.ok) return found;
+  if (isTemporaryConversation(id)) return { ok: false, status: 400, error: "a temporary chat cannot be archived" };
+  db.update(conversations).set({ archived, hlc: nextHlc() }).where(eq(conversations.id, id)).run();
+  return found;
 }
 
 /** COMP-02: switch only the presentation mode of an owned conversation.

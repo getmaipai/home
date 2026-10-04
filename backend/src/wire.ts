@@ -336,6 +336,8 @@ export interface ConversationSummary {
   companion_id: string | null;
   title: string | null;
   pinned: boolean;
+  /** CONV-ARCHIVE-01: shelved chats leave the default list. */
+  archived: boolean;
   turn_count: number;
   last_turn_at: string | null;
   created_at: string;
