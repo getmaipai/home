@@ -62,10 +62,24 @@ const GROUP = (() => {
   if (!["adult", "child", "spoken"].includes(g)) throw new Error(`--group must be adult, child or spoken (got ${g})`);
   return g as "adult" | "child" | "spoken";
 })();
+// THIN-Q2 / BENCH-AB-02: --arms A2,AP,AT,APT,B picks the adult arms (default
+// A,A2,B) and runs them in BLOCKS (arm, then item, then run), so the engine
+// slot's prompt cache is warm for repeats and every row carries the engine's
+// own cached-token count (cold or warm is read from it, never assumed).
+//   AP   A2 plus Home's persona and clock system lines (captured from a real B turn)
+//   AT   A2 plus Home's tools block and tool_choice (captured from a real B turn)
+//   APT  A2 plus both (the request body B sends, minus Home's own extras)
+const ARMS = (() => {
+  const at = process.argv.indexOf("--arms");
+  if (at < 0) return null;
+  const list = (process.argv[at + 1] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  for (const a of list) if (!["A", "A2", "AP", "AT", "APT", "B"].includes(a)) throw new Error(`--arms: unknown arm ${a}`);
+  return list as Arm[];
+})();
 const SEARCH_PACE_MS = 30_000;
 const MAX_TOKENS = 1536;
 
-type Arm = "A" | "A2" | "B" | "C" | "S";
+type Arm = "A" | "A2" | "AP" | "AT" | "APT" | "B" | "C" | "S";
 type Category = "knowledge" | "reasoning" | "formatting" | "writing" | "world" | "multiturn";
 
 interface SearchQuery {
@@ -87,6 +101,10 @@ interface RunRecord {
   words: number;
   ttftMs: number | null;
   totalMs: number | null;
+  /** Prompt tokens the engine served from its cache (usage.prompt_tokens_details.cached_tokens or timings.cache_n); null when not reported. */
+  cachedTokens?: number | null;
+  /** Block mode only (BENCH-AB-02): "cold" when the engine served under half of the prompt from its cache, else "warm". */
+  cache?: "cold" | "warm" | null;
   promptTokens: number | null;
   completionTokens: number | null;
   finishReason: string | null;
@@ -152,7 +170,7 @@ function render(runs: RunRecord[], env: unknown): string {
       if (turn !== null && ![1, 8, 9].includes(turn)) continue;
       const first = forItem.find((r) => r.turn === turn && r.rep === 1) ?? forItem.find((r) => r.turn === turn)!;
       lines.push(turn === null ? `**Prompt:** ${first.prompt}` : `**Turn ${turn} prompt:** ${first.prompt}`, "");
-      for (const arm of ["A", "A2", "B", "C", "S"] as Arm[]) {
+      for (const arm of ["A", "A2", "AP", "AT", "APT", "B", "C", "S"] as Arm[]) {
         const r = forItem.find((x) => x.arm === arm && x.turn === turn && x.rep === 1);
         if (!r) continue;
         const meta = `${r.words} words, TTFT ${fmt(r.ttftMs)} ms, total ${fmt(r.totalMs)} ms, finish ${r.finishReason ?? "n/a"}` + (r.correct !== null ? `, contains expected answer: ${r.correct}` : "") + (r.factsRecalled ? `, facts recalled: ${r.factsRecalled.filter((f) => f.recalled).length}/${r.factsRecalled.length}` : "") + (r.stream ? `, first word ${fmt(r.stream.firstWordMs)} ms, cue ${fmt(r.stream.spokenCueMs)} ms, searched ${r.stream.searched}` : "") + (r.b ? `, model calls ${r.b.engineRequests}, search fired ${r.b.searchFired}${r.b.searchForced ? " (forced)" : ""}` : "") + (r.error ? `, ERROR: ${r.error}` : "");
@@ -165,7 +183,7 @@ function render(runs: RunRecord[], env: unknown): string {
   lines.push("Medians over every run of the category (single-turn items: 2 runs each; multi-turn: all 9 turns of both scripts). Checkable-correct counts the reasoning items only. Multi-turn recall counts stated facts recalled at turns 8 and 9 (3 facts x 2 scripts = 6 per turn).", "");
   lines.push("| Category | Arm | Runs | Median words | Median TTFT ms | Median total ms | Checkable correct | Recall turn 8 | Recall turn 9 |", "|---|---|---:|---:|---:|---:|---|---|---|");
   for (const category of ["knowledge", "reasoning", "formatting", "writing", "world", "multiturn"] as Category[]) {
-    for (const arm of ["A", "A2", "B", "C", "S"] as Arm[]) {
+    for (const arm of ["A", "A2", "AP", "AT", "APT", "B", "C", "S"] as Arm[]) {
       const rs = runs.filter((r) => r.category === category && r.arm === arm);
       if (rs.length === 0) continue;
       const ok = rs.filter((r) => r.error === null);
@@ -238,6 +256,9 @@ if (!probe.ok) {
 const engineHeaders = { "x-maipai-engine": probe.headers.get("x-maipai-engine") ?? "unknown", "x-maipai-model": probe.headers.get("x-maipai-model") ?? "unknown" };
 await probe.text();
 const roleRow = (id: string, wire: string) => ({ id, label: id, wire, residency: "resident", endpoints: [], quality: ["everyday"], sharesModelWith: null, state: { state: "ready", reason: null }, reason: null, model: null, check: { state: "passed", at: null, reason: null, stale: false } });
+// The persona/clock system lines and the tools block of a real B request,
+// frozen by the first one that carries tools (arms AP, AT, APT replay them).
+const captured: { system: { role: string; content: string }[]; tools: unknown[]; toolChoice: unknown } = { system: [], tools: [], toolChoice: undefined };
 const stackStandIn = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",
@@ -255,7 +276,16 @@ const stackStandIn = Bun.serve({
     if (req.method === "POST" && (path === "/v1/chat/completions" || path === "/v1/embeddings")) {
       const target = path === "/v1/chat/completions" ? proxy.url : embedUrl;
       const sentAt = performance.now();
-      const upstream = await fetch(`${target.replace(/\/$/, "")}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: await req.text(), signal: req.signal });
+      const bodyText = await req.text();
+      if (path === "/v1/chat/completions" && captured.tools.length === 0) {
+        try {
+          const b = JSON.parse(bodyText) as { messages?: { role: string; content: string }[]; tools?: unknown[]; tool_choice?: unknown };
+          if (b.tools && b.tools.length > 0) Object.assign(captured, { system: (b.messages ?? []).filter((m) => m.role === "system"), tools: b.tools, toolChoice: b.tool_choice });
+        } catch {
+          // not JSON: nothing to capture
+        }
+      }
+      const upstream = await fetch(`${target.replace(/\/$/, "")}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: bodyText, signal: req.signal });
       if (process.env.MAIPAI_AB_TRACE === "1") console.log(`[stand-in] ${path} headers after ${Math.round(performance.now() - sentAt)} ms, status ${upstream.status}`);
       return new Response(upstream.body, { status: upstream.status, headers: { "content-type": upstream.headers.get("content-type") ?? "application/json", ...engineHeaders } });
     }
@@ -335,25 +365,27 @@ interface BareResult {
   promptTokens: number | null;
   completionTokens: number | null;
   finishReason: string | null;
+  cachedTokens: number | null;
   error: string | null;
 }
 
-async function bareCompletion(messages: { role: string; content: string }[], sampling: Record<string, unknown>): Promise<BareResult> {
+async function bareCompletion(messages: { role: string; content: string }[], sampling: Record<string, unknown>, extra: Record<string, unknown> = {}): Promise<BareResult> {
   const t0 = performance.now();
   let reply = "";
   let ttftMs: number | null = null;
   let promptTokens: number | null = null;
   let completionTokens: number | null = null;
   let finishReason: string | null = null;
+  let cachedTokens: number | null = null;
   try {
     const res = await fetch(`${directUrl}/v1/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       // Thinking off is also the engine's launch default (--reasoning off);
       // sent per request too so the arm does not depend on that.
-      body: JSON.stringify({ model: STACK_CHAT_MODEL, messages, max_tokens: MAX_TOKENS, stream: true, stream_options: { include_usage: true }, chat_template_kwargs: { enable_thinking: false }, ...sampling }),
+      body: JSON.stringify({ model: STACK_CHAT_MODEL, messages, max_tokens: MAX_TOKENS, stream: true, stream_options: { include_usage: true }, chat_template_kwargs: { enable_thinking: false }, ...sampling, ...extra }),
     });
-    if (!res.ok || !res.body) return { reply, ttftMs, totalMs: performance.now() - t0, promptTokens, completionTokens, finishReason, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}` };
+    if (!res.ok || !res.body) return { reply, ttftMs, totalMs: performance.now() - t0, promptTokens, completionTokens, finishReason, cachedTokens, error: `HTTP ${res.status}: ${(await res.text()).slice(0, 200)}` };
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -368,7 +400,7 @@ async function bareCompletion(messages: { role: string; content: string }[], sam
         if (!line.startsWith("data:")) continue;
         const payload = line.slice(5).trim();
         if (!payload || payload === "[DONE]") continue;
-        const chunk = JSON.parse(payload) as { choices?: { delta?: { content?: string | null }; finish_reason?: string | null }[]; usage?: { prompt_tokens?: number; completion_tokens?: number }; timings?: { prompt_n?: number; predicted_n?: number; cache_n?: number } };
+        const chunk = JSON.parse(payload) as { choices?: { delta?: { content?: string | null }; finish_reason?: string | null }[]; usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } }; timings?: { prompt_n?: number; predicted_n?: number; cache_n?: number } };
         const choice = chunk.choices?.[0];
         const piece = choice?.delta?.content;
         if (piece) {
@@ -379,16 +411,18 @@ async function bareCompletion(messages: { role: string; content: string }[], sam
         if (chunk.usage) {
           promptTokens = chunk.usage.prompt_tokens ?? promptTokens;
           completionTokens = chunk.usage.completion_tokens ?? completionTokens;
+          cachedTokens = chunk.usage.prompt_tokens_details?.cached_tokens ?? cachedTokens;
         }
         if (chunk.timings) {
           promptTokens ??= (chunk.timings.prompt_n ?? 0) + (chunk.timings.cache_n ?? 0);
           completionTokens ??= chunk.timings.predicted_n ?? null;
+          cachedTokens ??= chunk.timings.cache_n ?? null;
         }
       }
     }
-    return { reply, ttftMs, totalMs: performance.now() - t0, promptTokens, completionTokens, finishReason, error: null };
+    return { reply, ttftMs, totalMs: performance.now() - t0, promptTokens, completionTokens, finishReason, cachedTokens, error: null };
   } catch (err) {
-    return { reply, ttftMs, totalMs: performance.now() - t0, promptTokens, completionTokens, finishReason, error: (err as Error).message };
+    return { reply, ttftMs, totalMs: performance.now() - t0, promptTokens, completionTokens, finishReason, cachedTokens, error: (err as Error).message };
   }
 }
 
@@ -454,6 +488,7 @@ async function runPipeline(id: string, prompts: string[]): Promise<{ turns: Omit
       totalMs: score.observed.totalMs,
       promptTokens: requests.some((r) => r.promptTokens !== undefined) ? promptSum : null,
       completionTokens: completion,
+      cachedTokens: requests[0]?.cachedTokens ?? null,
       // The pipeline does not record the engine's finish reason; not reconstructed.
       finishReason: null as string | null,
       error: failed ? reply : null,
@@ -603,7 +638,66 @@ async function main(): Promise<void> {
       }
     }
   }
-  if (GROUP === "adult") for (const item of dataset.items.filter((i) => wanted(i.id))) {
+  if (GROUP === "adult" && ARMS) {
+    // Block mode (THIN-Q2, BENCH-AB-02): arm, then item, then run. A 503 for
+    // memory is retried once after 60 s; a second one stops the run.
+    const retry503 = async <T extends { error: string | null }>(go: () => Promise<T>): Promise<T> => {
+      let r = await go();
+      if (r.error && /503|memory budget|offline/i.test(r.error)) {
+        console.log(`[chat-ab-01] 503, offline_reason verbatim: ${r.error}`);
+        await new Promise((res) => setTimeout(res, 60_000));
+        r = await go();
+        if (r.error && /503|memory budget|offline/i.test(r.error)) {
+          console.log(`[chat-ab-01] SECOND 503, stopping: ${r.error}`);
+          save(runs, env);
+          throw new Error(`second memory 503: ${r.error}`);
+        }
+      }
+      return r;
+    };
+    if (ARMS.some((a) => ["AP", "AT", "APT"].includes(a)) && captured.tools.length === 0) {
+      console.log("[chat-ab-01] capture turn (one real B request, to freeze Home's persona, clock and tools block)");
+      await retry503(async () => {
+        const out = await runPipeline("capture", ["Say hi"]);
+        const t = out.turns[0];
+        return { error: t ? t.error : "the pipeline returned no turn" };
+      });
+      if (captured.tools.length === 0) throw new Error("capture failed: no B request carried a tools block");
+      console.log(`[chat-ab-01] captured ${captured.system.length} system messages (${captured.system.map((m) => m.content.length).join("+")} chars) and ${captured.tools.length} tools (${JSON.stringify(captured.tools).length} chars)`);
+    }
+    for (const arm of ARMS) {
+      for (const item of dataset.items.filter((i) => wanted(i.id))) {
+        const category = item.category as Category;
+        for (let rep = 1; rep <= SINGLE_RUNS; rep++) {
+          console.log(`[chat-ab-01] block ${arm} ${item.id} run ${rep}`);
+          await waitForHubQuiet(undefined, (m) => console.log(m));
+          if (arm === "B") {
+            const t = await retry503(async () => {
+              const out = await runPipeline(`${item.id}-${rep}`, [item.prompt]);
+              return out.turns[0] ?? { error: "the pipeline returned no turn" };
+            });
+            if (!("reply" in t)) {
+              runs.push({ ...base, arm, item: item.id, category, rep, turn: null, prompt: item.prompt, reply: "", words: 0, ttftMs: null, totalMs: null, promptTokens: null, completionTokens: null, finishReason: null, correct: null, factsRecalled: null, error: t.error });
+            } else {
+              runs.push({ ...base, ...t, arm, item: item.id, category, rep, turn: null, prompt: item.prompt, correct: null, factsRecalled: null });
+            }
+          } else {
+            const withP = arm === "AP" || arm === "APT";
+            const withT = arm === "AT" || arm === "APT";
+            const messages = [...(withP ? captured.system : []), { role: "user", content: item.prompt }];
+            const extra = withT ? { tools: captured.tools, ...(captured.toolChoice !== undefined ? { tool_choice: captured.toolChoice } : {}) } : {};
+            // A is the bare arm with no sampling fields; every other bare arm sends CHAT_SAMPLING, as B does.
+            const r = await retry503(() => bareCompletion(messages, arm === "A" ? {} : { ...CHAT_SAMPLING }, extra));
+            runs.push({ ...base, arm, item: item.id, category, rep, turn: null, prompt: item.prompt, reply: r.reply, words: words(r.reply), ttftMs: r.ttftMs, totalMs: r.totalMs, cachedTokens: r.cachedTokens, promptTokens: r.promptTokens, completionTokens: r.completionTokens, finishReason: r.finishReason, correct: null, factsRecalled: null, error: r.error });
+          }
+          const last = runs[runs.length - 1]!;
+          last.cache = last.cachedTokens == null || last.promptTokens == null ? null : last.cachedTokens < last.promptTokens / 2 ? "cold" : "warm";
+          save(runs, env);
+        }
+      }
+    }
+  }
+  if (GROUP === "adult" && !ARMS) for (const item of dataset.items.filter((i) => wanted(i.id))) {
     const category = item.category as Category;
     for (let rep = 1; rep <= SINGLE_RUNS; rep++) {
       for (const arm of ["A", "A2", "B"] as Arm[]) {
