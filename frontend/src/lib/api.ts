@@ -628,10 +628,11 @@ export const api = {
   // `person` for the parental view (an owner/admin listing a child's own
   // threads; the route's own list() enforces that access check server-
   // side and returns an empty list for anyone it denies, never a 403).
-  conversationList: (person?: string, query?: string) => {
+  conversationList: (person?: string, query?: string, archived?: "include" | "only") => {
     const params = new URLSearchParams();
     if (person) params.set("person", person);
     if (query) params.set("q", query);
+    if (archived) params.set("archived", archived);
     const suffix = params.toString();
     return request<ConversationSummary[]>(`/api/conversations${suffix ? `?${suffix}` : ""}`);
   },
@@ -693,6 +694,12 @@ export const api = {
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: JSON.stringify({ pinned }),
+    }),
+  // CONV-ARCHIVE-01: shelve or restore; the body names only `archived`, so title and pin are untouched.
+  setConversationArchived: (id: string, archived: boolean) =>
+    request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ archived }),
     }),
   setConversationMode: (id: string, mode: Conversation["mode"]) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {

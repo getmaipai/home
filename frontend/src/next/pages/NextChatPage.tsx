@@ -14,7 +14,9 @@ import { MarkdownText } from "@maipai/ui/src/elements/markdown-text";
 // "no hand-built UI" rule).
 import { ToolFallback } from "@maipai/ui/src/assistant-ui/tool-fallback.aui";
 import { ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "@maipai/ui/src/elements/reasoning.aui";
-import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
+import { ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
+import { ChatListItems } from "@/apps/chat/chatListItems";
+import { useChatContentMatches } from "@/apps/chat/chatListSearch";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
 import { Source, SourceIcon, SourceTitle } from "@maipai/ui/src/elements/sources.aui";
@@ -1378,7 +1380,8 @@ function NextThreadList({
 }) {
   const [search, setSearch] = useState("");
   const availability = useContext(ChatAvailabilityContext);
-  const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
+  const hasThreads = useAuiState((s) => s.threads.threadIds.length + s.threads.archivedThreadIds.length > 0);
+  const contentMatchIds = useChatContentMatches(hasThreads ? search : "");
   return (
     <ThreadListRoot>
       <div className="flex items-center gap-1">
@@ -1386,7 +1389,7 @@ function NextThreadList({
         <ThreadListNew label="New chat" className="min-h-12" onClick={onNewThread} disabled={availability === "unavailable"} />
       </div>
       {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} label="Search chats" />}
-      <ThreadListItems searchQuery={hasThreads ? search : ""} />
+      <ChatListItems search={hasThreads ? search : ""} contentMatchIds={contentMatchIds} />
     </ThreadListRoot>
   );
 }
