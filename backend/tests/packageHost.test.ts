@@ -1,8 +1,8 @@
-import { describe, expect, test, beforeEach, spyOn } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, type AttemptResult } from "@/lib/packageHost";
+import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
@@ -17,6 +17,8 @@ import { remember } from "@/lib/memory";
 import { listIssues } from "@/lib/issues";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import { useDefaultScriptedStack } from "./stackFixture";
+import { SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_CONNECT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs } from "@/lib/webSearchBudget";
+import { retryDeadlineMs } from "@/lib/turnMachine/deadline";
 
 beforeEach(() => {
   resetDb();
@@ -2205,5 +2207,132 @@ describe("packageHost data.forget", () => {
     host.memory.remember("likes pizza", "preference", "person", actor.id);
     const deleted = host.data.forget(actor.id);
     expect(deleted).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("SEARCH-BUDGET-01", () => {
+  const wikiBase = "http://wikipedia.test";
+
+  function fakeWikipedia(url: URL): Response {
+    if (url.pathname === "/w/rest.php/v1/search/page") return Response.json({ pages: [{ key: "Budget_result" }] });
+    if (url.pathname.startsWith("/api/rest_v1/page/summary/")) {
+      return Response.json({ title: "Budget result", description: "A fallback source.", extract: "Wikipedia supplied the fallback source text.", content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Budget_result" } } });
+    }
+    return new Response("not found", { status: 404 });
+  }
+
+  async function setupBudgetSearch(url: string): Promise<void> {
+    await owner();
+    setHouseholdSettingValue("search.searxng_url", url);
+    setHouseholdSettingValue("search.wikipedia_fallback", true);
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wikiBase;
+  }
+
+  beforeEach(() => __resetSearxngEnginesCacheForTests());
+  afterEach(() => {
+    __setPackageFetchForTests(null);
+    delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+  });
+
+  test("a listener that accepts and never replies returns Wikipedia sources within the tool deadline", async () => {
+    let acceptedRequests = 0;
+    const hanging = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: () => { acceptedRequests++; return new Promise<Response>(() => {}); } });
+    let fallbackCalls = 0;
+    const realFetch = globalThis.fetch.bind(globalThis);
+    __setPackageFetchForTests(async (input, init) => {
+      const url = new URL(typeof input === "string" || input instanceof URL ? input.toString() : input.url);
+      if (url.origin === wikiBase) {
+        fallbackCalls++;
+        return fakeWikipedia(url);
+      }
+      return realFetch(input, init);
+    });
+    await setupBudgetSearch(`http://127.0.0.1:${hanging.port}`);
+    const started = Date.now();
+    try {
+      const result = await searxngSearch({ query: "budget fallback listener" });
+      expect(result.rows.length).toBeGreaterThan(0);
+      expect(result.rows[0]?.title).toBe("Budget result");
+      expect(acceptedRequests).toBeGreaterThan(0);
+      expect(fallbackCalls).toBe(2);
+      expect(Date.now() - started).toBeLessThan(ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS);
+    } finally {
+      hanging.stop(true);
+    }
+  }, 20_000);
+
+  test("a closed SearXNG port returns Wikipedia sources", async () => {
+    let fallbackCalls = 0;
+    const realFetch = globalThis.fetch.bind(globalThis);
+    __setPackageFetchForTests(async (input, init) => {
+      const url = new URL(typeof input === "string" || input instanceof URL ? input.toString() : input.url);
+      if (url.origin === wikiBase) {
+        fallbackCalls++;
+        return fakeWikipedia(url);
+      }
+      return realFetch(input, init);
+    });
+    await setupBudgetSearch("http://127.0.0.1:1");
+    const result = await searxngSearch({ query: "budget fallback closed port" });
+    expect(result.rows.length).toBeGreaterThan(0);
+    expect(fallbackCalls).toBe(2);
+  });
+
+  test("a non-connecting SearXNG address returns Wikipedia through an injected fetch", async () => {
+    let fallbackCalls = 0;
+    let searxngAborted = false;
+    __setPackageFetchForTests(async (input, init) => {
+      const url = new URL(typeof input === "string" || input instanceof URL ? input.toString() : input.url);
+      if (url.origin === wikiBase) {
+        fallbackCalls++;
+        return fakeWikipedia(url);
+      }
+      return new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal;
+        if (signal?.aborted) {
+          searxngAborted = true;
+          reject(new DOMException("aborted", "AbortError"));
+          return;
+        }
+        signal?.addEventListener("abort", () => {
+          searxngAborted = true;
+          reject(new DOMException("aborted", "AbortError"));
+        }, { once: true });
+      });
+    });
+    await setupBudgetSearch("http://192.0.2.1:8080");
+    const result = await searxngSearch({ query: "budget fallback no connect" });
+    expect(result.rows.length).toBeGreaterThan(0);
+    expect(searxngAborted).toBe(true);
+    expect(fallbackCalls).toBe(2);
+  }, 20_000);
+
+  test("a healthy SearXNG result returns its sources without Wikipedia", async () => {
+    let fallbackCalls = 0;
+    __setPackageFetchForTests(async (input) => {
+      const url = new URL(typeof input === "string" || input instanceof URL ? input.toString() : input.url);
+      if (url.origin === wikiBase) {
+        fallbackCalls++;
+        return fakeWikipedia(url);
+      }
+      if (url.pathname === "/config") return Response.json({ engines: [] });
+      return Response.json({ results: [{ title: "SearXNG source", url: "https://example.com/result", content: "SearXNG answer" }] });
+    });
+    await setupBudgetSearch("http://search.test");
+    const result = await searxngSearch({ query: "budget healthy search" });
+    expect(result.rows[0]?.title).toBe("SearXNG source");
+    expect(fallbackCalls).toBe(0);
+  });
+
+  test("spoken search keeps its existing 3s first-word shape, tool deadline, and retry shortening", () => {
+    expect(SEARXNG_CONNECT_LIMIT_MS).toBe(3_000);
+    expect(SEARXNG_ATTEMPT_LIMIT_MS).toBe(5_000);
+    expect(webSearchToolDeadlineMs("adult", "written", 10_000)).toBe(15_000);
+    expect(webSearchToolDeadlineMs("adult", "spoken", 10_000)).toBe(10_000);
+    expect(SEARCH_PAGES_MAX_SPOKEN).toBe(2);
+    expect(SEARCH_PAGE_TEXT_CHARS_SPOKEN).toBe(500);
+    expect(webSearchToolDeadlineMs("child", "written", 10_000)).toBe(10_000);
+    expect(webSearchToolDeadlineMs("teen", "written", 10_000)).toBe(10_000);
+    expect(retryDeadlineMs(webSearchToolDeadlineMs("adult", "spoken", 10_000), true)).toBe(5_000);
   });
 });

@@ -529,6 +529,7 @@ export async function runPlugin(
   actor: PersonRow,
   inputs: Record<string, unknown>,
   turn?: { id: string; conversationId?: string },
+  options: { signal?: AbortSignal; deadlineAt?: number } = {},
 ): Promise<PluginOpResult<PluginResult>> {
   const manifestResult = loadManifestOnly(id);
   if (!manifestResult.ok) return manifestResult;
@@ -555,7 +556,7 @@ export async function runPlugin(
   const loaded = loadPackage(id);
   if (!loaded.ok) return loaded;
   const { recipe } = loaded.value;
-  const host = createHost(actor, manifest, [], turn);
+  const host = createHost(actor, manifest, [], turn, options);
   try {
     return { ok: true, value: await runRecipe(recipe, inputs, host) };
   } catch (err) {

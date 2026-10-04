@@ -81,6 +81,7 @@ import { getPersonSettingValue } from "@/lib/settings";
 import { createHash } from "node:crypto";
 import { parseHTML } from "linkedom";
 import { Readability } from "@mozilla/readability";
+import { ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_CONNECT_LIMIT_MS } from "@/lib/webSearchBudget";
 
 // host.fetch's real network I/O settings (2026-09-05). Rate limit: "a
 // page every few seconds, not dozens a second" (.github/CLAUDE.md) - a
@@ -93,7 +94,11 @@ const FETCH_RATE_LIMIT = { capacity: 5, refillPerSecond: 0.2 };
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
 const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
-const packageFetch = globalThis.fetch.bind(globalThis);
+type PackageFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+let packageFetch: PackageFetch = (input, init) => globalThis.fetch(input, init);
+export function __setPackageFetchForTests(fetcher: PackageFetch | null): void {
+  packageFetch = fetcher ?? ((input, init) => globalThis.fetch(input, init));
+}
 
 // host.home.call_service's real settings (2026-09-05, closing the first of
 // the two gaps docs/dev.md named for it). A shorter timeout than
@@ -114,10 +119,10 @@ const HOME_ASSISTANT_TIMEOUT_MS = 5_000;
 // household-configured-baseUrl shape (no SSRF guard, one shared rate
 // limit) Home Assistant already established above - see
 // backend/src/settings/searchKeys.ts's own header for why this is
-// bring-your-own-instance rather than a bundled sidecar. A longer
-// timeout than Home Assistant's: SearXNG fans a query out to several
-// real search engines and waits on the slowest one, not a single LAN
-// round-trip.
+// bring-your-own-instance rather than a bundled sidecar. SEARCH-BUDGET-01
+// gives the full search attempt a five-second cap, with each connection
+// limited to three seconds; the turn's remaining budget belongs to its
+// Wikipedia fallback.
 const SEARXNG_RATE_LIMIT_KEY = "searxng";
 // SEARCH-PACE-01 (docs/plans/search-resilience-2026-09-24.md): tightened
 // from {capacity: 10, refillPerSecond: 0.5} (a burst of 10, then one
@@ -128,7 +133,8 @@ const SEARXNG_RATE_LIMIT_KEY = "searxng";
 // engines. A person asking several things in a row is still a burst of
 // three; nothing beyond that was ever a person's own pace.
 const SEARXNG_RATE_LIMIT = { capacity: 3, refillPerSecond: 1 / 6 };
-const SEARXNG_TIMEOUT_MS = 10_000;
+const SEARXNG_TIMEOUT_MS = SEARXNG_ATTEMPT_LIMIT_MS;
+const SEARXNG_PAGE_TIMEOUT_MS = 10_000;
 // SEARCH-PACE-01: a review (2026-09-24) caught this budget shared with
 // `pageFetch()` below - fetching a linked page is a different kind of
 // traffic from querying SearXNG itself (one household question with
@@ -162,7 +168,6 @@ const WIKIPEDIA_RATE_LIMIT = { capacity: 3, refillPerSecond: 0.5 };
 // into a shared, reduced timeout budget across both fallback steps
 // tonight, since SearXNG genuinely being unreachable (the common case)
 // fails Wikipedia's own two calls fast, not slow.
-const WIKIPEDIA_TIMEOUT_MS = 10_000;
 // A function, not a frozen constant, the same shape `voiceCatalogUrl()`
 // already uses for its own fixed third-party URL: MAIPAI_WIKIPEDIA_BASE_URL
 // lets a test point this at a local fixture instead of the real
@@ -294,15 +299,26 @@ async function attemptHttpFetch(
   body: string | undefined,
   timeoutMs: number = FETCH_TIMEOUT_MS,
   validateHop?: (hopUrl: string) => Promise<void>,
+  options: { signal?: AbortSignal; connectTimeoutMs?: number } = {},
 ): Promise<AttemptResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onParentAbort = () => controller.abort(options.signal?.reason);
+  if (options.signal?.aborted) onParentAbort();
+  else options.signal?.addEventListener("abort", onParentAbort, { once: true });
   try {
     let currentUrl = url;
     let currentMethod = method;
     let currentBody = body;
     for (let hop = 0; ; hop++) {
-      const response = await packageFetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" });
+      if (controller.signal.aborted) throw new DOMException("request aborted", "AbortError");
+      const connectTimer = options.connectTimeoutMs === undefined ? undefined : setTimeout(() => controller.abort(), options.connectTimeoutMs);
+      let response: Response;
+      try {
+        response = await packageFetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" });
+      } finally {
+        clearTimeout(connectTimer);
+      }
       const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
       if (location) {
         if (hop >= MAX_FETCH_REDIRECTS) {
@@ -355,6 +371,7 @@ async function attemptHttpFetch(
     return { ok: false, networkFailure: true, error: new HostError("network_unreachable", `could not reach ${url}: ${message}`) };
   } finally {
     clearTimeout(timer);
+    options.signal?.removeEventListener("abort", onParentAbort);
   }
 }
 
@@ -707,9 +724,11 @@ type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadRe
  * an identical copy of this same four-step sequence, which a future
  * change (a retry, a different null convention) would otherwise have
  * to make twice and could silently drift between. */
-async function wikipediaGetJson(url: string, base: string, hint: string): Promise<Record<string, unknown> | null> {
+async function wikipediaGetJson(url: string, base: string, hint: string, signal?: AbortSignal, deadlineAt?: number): Promise<Record<string, unknown> | null> {
   if (!tryConsume(WIKIPEDIA_RATE_LIMIT_KEY, WIKIPEDIA_RATE_LIMIT)) return null;
-  const result = await attemptHttpFetch(url, "GET", { "user-agent": FETCH_USER_AGENT }, undefined, WIKIPEDIA_TIMEOUT_MS);
+  const remaining = deadlineAt === undefined ? ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS : deadlineAt - Date.now();
+  if (remaining <= 0 || signal?.aborted) return null;
+  const result = await attemptHttpFetch(url, "GET", { "user-agent": FETCH_USER_AGENT }, undefined, remaining, undefined, { signal });
   if (!result.ok) return null;
   try {
     return expectJsonObject(result.value, base, hint);
@@ -725,17 +744,17 @@ async function wikipediaGetJson(url: string, base: string, hint: string): Promis
 // child or teen's band into. This fallback runs identically regardless
 // of who is asking; Wikipedia's own content policy (no dedicated
 // "child mode") is the only floor, not anything this file controls.
-async function wikipediaFallback(query: string): Promise<SearxngSearchResult | null> {
+async function wikipediaFallback(query: string, signal?: AbortSignal, deadlineAt?: number): Promise<SearxngSearchResult | null> {
   const base = wikipediaBaseUrl();
   const searchUrl = `${base}/w/rest.php/v1/search/page?q=${encodeURIComponent(query)}&limit=1`;
-  const searchValue = await wikipediaGetJson(searchUrl, base, "Wikipedia's search API didn't return JSON");
+  const searchValue = await wikipediaGetJson(searchUrl, base, "Wikipedia's search API didn't return JSON", signal, deadlineAt);
   if (!searchValue) return null;
   const pages = Array.isArray(searchValue.pages) ? searchValue.pages : [];
   const top = pages[0] as { key?: unknown } | undefined;
   if (!top || typeof top.key !== "string" || top.key.length === 0) return null;
 
   const summaryUrl = `${base}/api/rest_v1/page/summary/${encodeURIComponent(top.key)}`;
-  const summary = await wikipediaGetJson(summaryUrl, base, "Wikipedia's summary API didn't return JSON");
+  const summary = await wikipediaGetJson(summaryUrl, base, "Wikipedia's summary API didn't return JSON", signal, deadlineAt);
   if (!summary) return null;
   const rawExtract = typeof summary.extract === "string" ? summary.extract.trim() : "";
   if (!rawExtract) return null;
@@ -808,11 +827,12 @@ export function __resetSearchRotationForTests(): void {
  * outright over a filter this could not build) or an empty array when
  * the instance genuinely has no safe-search-capable engine for this
  * category - the caller treats both the same way. */
-async function safesearchEnginesFor(baseUrl: string, category: "general" | "images"): Promise<string[] | null> {
+async function safesearchEnginesFor(baseUrl: string, category: "general" | "images", options: { signal?: AbortSignal; deadlineAt?: number } = {}): Promise<string[] | null> {
   const now = Date.now();
   if (!searxngEnginesCache || searxngEnginesCache.baseUrl !== baseUrl || now - searxngEnginesCache.fetchedAt > SEARXNG_ENGINES_CACHE_TTL_MS) {
     const url = `${baseUrl.replace(/\/+$/, "")}/config`;
-    const result = await attemptHttpFetch(url, "GET", {}, undefined, SEARXNG_TIMEOUT_MS);
+    const remaining = options.deadlineAt === undefined ? SEARXNG_TIMEOUT_MS : Math.max(1, Math.min(SEARXNG_TIMEOUT_MS, options.deadlineAt - Date.now()));
+    const result = await attemptHttpFetch(url, "GET", {}, undefined, remaining, undefined, { signal: options.signal, connectTimeoutMs: SEARXNG_CONNECT_LIMIT_MS });
     if (!result.ok) return null;
     let value: Record<string, unknown>;
     try {
@@ -831,10 +851,10 @@ async function safesearchEnginesFor(baseUrl: string, category: "general" | "imag
   return searxngEnginesCache.engines.filter((e) => e.enabled && e.safesearch && e.categories.includes(category)).map((e) => e.name);
 }
 
-async function webRotationPool(baseUrl: string, safeLevel: SafeSearchLevel): Promise<string[] | null> {
+async function webRotationPool(baseUrl: string, safeLevel: SafeSearchLevel, options: { signal?: AbortSignal; deadlineAt?: number } = {}): Promise<string[] | null> {
   const now = Date.now();
   if (!searxngEnginesCache || searxngEnginesCache.baseUrl !== baseUrl || now - searxngEnginesCache.fetchedAt > SEARXNG_ENGINES_CACHE_TTL_MS) {
-    await safesearchEnginesFor(baseUrl, "general");
+    await safesearchEnginesFor(baseUrl, "general", options);
   }
   const engines = searxngEnginesCache?.baseUrl === baseUrl ? searxngEnginesCache.engines : null;
   if (!engines) return null;
@@ -933,16 +953,36 @@ export function __resetSearchCacheForTests(): void {
   searchInFlight.clear();
 }
 
-export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand } = {}): Promise<SearxngSearchResult> {
-  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args, opts.minorBand);
+type SearchOptions = { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; signal?: AbortSignal; deadlineAt?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number };
+
+export async function searxngSearch(args: unknown, opts: SearchOptions = {}): Promise<SearxngSearchResult> {
+  const parentSignal = opts.signal;
+  const attemptController = new AbortController();
+  const onParentAbort = () => attemptController.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) onParentAbort();
+  else parentSignal?.addEventListener("abort", onParentAbort, { once: true });
+  const fallbackDeadlineAt = opts.deadlineAt ?? Date.now() + ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS;
+  const attemptDeadlineAt = Math.min(fallbackDeadlineAt, Date.now() + SEARXNG_ATTEMPT_LIMIT_MS);
+  const attemptTimer = setTimeout(() => attemptController.abort(new DOMException("SearXNG attempt deadline exceeded", "TimeoutError")), Math.max(0, attemptDeadlineAt - Date.now()));
+  const searchOptions: SearchOptions = { ...opts, signal: attemptController.signal, fallbackSignal: parentSignal, fallbackDeadlineAt, deadlineAt: attemptDeadlineAt };
+  try {
+    return await searxngSearchWithOptions(args, searchOptions);
+  } finally {
+    clearTimeout(attemptTimer);
+    parentSignal?.removeEventListener("abort", onParentAbort);
+  }
+}
+
+async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {}): Promise<SearxngSearchResult> {
+  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args, opts.minorBand, opts.fallbackSignal);
   const input = args as { query?: unknown; category?: unknown; read_page?: unknown } | undefined;
   const query = input?.query;
   if (typeof query !== "string" || query.length === 0) return searxngSearchUncached(args, opts);
   const { baseUrl } = requireSearxngSettings();
   const isImages = input?.category === "images";
   const safeLevel = opts.safeSearchLevel ?? "off";
-  const safeEngines = safeLevel === "strict" || safeLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general") : null;
-  const rotationPool = !isImages && input?.category !== "videos" ? await webRotationPool(baseUrl, safeLevel) : null;
+  const safeEngines = safeLevel === "strict" || safeLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general", opts) : null;
+  const rotationPool = !isImages && input?.category !== "videos" ? await webRotationPool(baseUrl, safeLevel, opts) : null;
   const rotated = rotationPool ? pickSearchEngines(rotationPool) : null;
   const wikipedia = rotationPool?.includes("wikipedia") ? ["wikipedia"] : [];
   const requestEngines = rotated && rotated.length > 0 ? [...rotated, ...wikipedia] : rotated;
@@ -969,7 +1009,7 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
       if (retryNext.length === 0) {
         // Benching during the request emptied the pool: the first request left the
         // Wikipedia fallback for a retry that cannot happen, so try it here.
-        const fallback = opts.allowWikipediaFallback ?? true ? await tryWikipediaFallback(query) : null;
+        const fallback = opts.allowWikipediaFallback ?? true ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt) : null;
         if (fallback) return fallback;
         throw err;
       }
@@ -978,14 +1018,14 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
     if (!rotationPool || !requestEngines || requestEngines.length === 0 || result.rows.length >= 3) return result;
     const more = pickSearchEngines(rotationPool, asked);
     if (more.length === 0) {
-      const fallback = result.text === SEARXNG_NO_RESULTS_TEXT && (opts.allowWikipediaFallback ?? true) && next.length > 0 ? await tryWikipediaFallback(query) : null;
+      const fallback = result.text === SEARXNG_NO_RESULTS_TEXT && (opts.allowWikipediaFallback ?? true) && next.length > 0 ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt) : null;
       return fallback ?? result;
     }
     const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...more, ...wikipedia] });
     const rows = dedupeRows([...result.rows, ...second.rows]);
     return { text: [result.text, second.text].filter((value) => value !== SEARXNG_NO_RESULTS_TEXT).join("\n"), rows };
   };
-  const promise = (async () => attachSearchPages(await searchRows(), args, opts.minorBand))().then((result) => {
+  const promise = (async () => attachSearchPages(await searchRows(), args, opts.minorBand, opts.fallbackSignal))().then((result) => {
     // A search that wanted pages and got none (a rate limit, a timeout, a
     // robots decline) is not cached: a retry should try the pages again.
     if (result.rows.length > 0 && (!wantsPages(input) || (result.pages?.length ?? 0) > 0)) {
@@ -1069,7 +1109,7 @@ function appendRows(items: unknown, cap: number, n: number, out: SearxngRow[], b
   return n;
 }
 
-async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; safeEngines?: string[] | null } = {}): Promise<SearxngSearchResult> {
+async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safeEngines?: string[] | null } = {}): Promise<SearxngSearchResult> {
   // SEARCH-FALLBACK-01: `opts` is never part of the recipe's own public
   // `args` schema (a model can never set it) - the one caller that
   // needs to turn the fallback off is `searxngHealth.ts`'s own canary,
@@ -1122,7 +1162,7 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
   // safesearch level above is still sent and still the floor even when
   // this list is empty or unavailable - never blocking a search
   // outright over a filter that couldn't be built.
-  const safeEngines = opts.safeEngines !== undefined ? opts.safeEngines : opts.safeSearchLevel === "strict" || opts.safeSearchLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general") : null;
+  const safeEngines = opts.safeEngines !== undefined ? opts.safeEngines : opts.safeSearchLevel === "strict" || opts.safeSearchLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general", opts) : null;
   const engines = safeEngines && safeEngines.length > 0 ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
   const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}&safesearch=${safesearchLevel}${engines}`;
   if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) {
@@ -1158,7 +1198,8 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
   let text: string;
   let rows: SearxngRow[];
   try {
-    const result = await attemptHttpFetch(url, "GET", {}, undefined, SEARXNG_TIMEOUT_MS);
+    const remaining = opts.deadlineAt === undefined ? SEARXNG_TIMEOUT_MS : Math.max(1, Math.min(SEARXNG_TIMEOUT_MS, opts.deadlineAt - Date.now()));
+    const result = await attemptHttpFetch(url, "GET", {}, undefined, remaining, undefined, { signal: opts.signal, connectTimeoutMs: SEARXNG_CONNECT_LIMIT_MS });
     if (result.ok) {
       const value = expectJsonObject(
         result.value,
@@ -1212,7 +1253,7 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
       // answer a household member's question from, and Wikipedia is
       // one more real chance to before giving up.
       if (text === SEARXNG_NO_RESULTS_TEXT && allowWikipediaFallback) {
-        const fallback = await tryWikipediaFallback(query);
+        const fallback = await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt);
         if (fallback) {
           // A review, 2026-09-24, caught the first cut returning here
           // before this call - SearXNG really did just answer "ok"
@@ -1255,7 +1296,7 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
     // mapping), which would have silently masked a real code defect as
     // a clean Wikipedia answer instead of the loud failure a bug needs.
     if (allowWikipediaFallback && err instanceof HostError && (err.code === "network_unreachable" || err.code === "search_unavailable")) {
-      const fallback = await tryWikipediaFallback(query);
+      const fallback = await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt);
       if (fallback) return fallback;
     }
     throw err;
@@ -1307,7 +1348,7 @@ export function dedupeRows(rows: SearxngRow[]): SearxngRow[] {
 
 /** The whole page-reading step of one search gives up after this long and
  * keeps whatever pages arrived, so a slow site costs the step's budget and
- * not the answer (the tool node's own deadline is 10 s). */
+ * not the answer (the tool node still owns the final deadline). */
 let searchPagesBudgetMs = 6_000;
 
 export function __setSearchPagesBudgetForTests(ms: number | null): void {
@@ -1321,7 +1362,7 @@ export function __setSearchPagesBudgetForTests(ms: number | null): void {
  * pages are requested one at a time, at most one per site, at most
  * SEARCH_PAGES_MAX requests in all (a failed one still counts), and only
  * the ones that finish inside the step's time budget are kept. */
-async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand): Promise<SearxngSearchResult> {
+async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand, signal?: AbortSignal): Promise<SearxngSearchResult> {
   const input = args as { category?: unknown; read_page?: unknown; spoken?: unknown } | undefined;
   const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : SEARCH_PAGES_MAX;
   const pageChars = wantsSpoken(input) ? SEARCH_PAGE_TEXT_CHARS_SPOKEN : SEARCH_PAGE_TEXT_CHARS;
@@ -1351,11 +1392,12 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
   const pages: SearxngPage[] = [];
   let first: PageReadResult | undefined;
   for (const row of candidates) {
+    if (signal?.aborted) break;
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const read = searxngPageRead({ url: row.url! });
+      const read = searxngPageRead({ url: row.url! }, signal);
       read.catch(() => {}); // an abandoned read that fails later is not an unhandled rejection
       const doc = await Promise.race([
         read,
@@ -1411,10 +1453,10 @@ export function floorSearchResult(result: SearxngSearchResult, _band: MinorBand)
  * itself already refused to run at all if `search.searxng_url` were
  * unset). `null` on any failure, the identical "the caller falls back
  * to what it already had" contract `wikipediaFallback()` itself uses. */
-async function tryWikipediaFallback(query: string): Promise<SearxngSearchResult | null> {
+async function tryWikipediaFallback(query: string, signal?: AbortSignal, deadlineAt?: number): Promise<SearxngSearchResult | null> {
   const enabled = getHouseholdSettingValue("search.wikipedia_fallback") as boolean | undefined;
   if (enabled === false) return null;
-  return wikipediaFallback(query);
+  return wikipediaFallback(query, signal, deadlineAt);
 }
 
 export interface PageReadLink {
@@ -1487,7 +1529,7 @@ function robotsAllows(robots: string, target: URL): boolean {
   return allowed;
 }
 
-async function pageFetch(url: string, countsAgainstPace = true): Promise<AttemptResult> {
+async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSignal): Promise<AttemptResult> {
   // The pace counts pages, not the robots.txt check that goes with each
   // one (THIN-4A: with both counted, a three-page search spent six
   // tokens of a three-token burst and read one page).
@@ -1498,8 +1540,9 @@ async function pageFetch(url: string, countsAgainstPace = true): Promise<Attempt
     "GET",
     { accept: "text/html,application/xhtml+xml" },
     undefined,
-    SEARXNG_TIMEOUT_MS,
+    SEARXNG_PAGE_TIMEOUT_MS,
     async (hopUrl) => validatePublicPageUrl(hopUrl),
+    { signal },
   );
 }
 
@@ -1567,7 +1610,7 @@ export function parseReadablePage(html: string, url: string): PageReadResult {
  * compatible with this AGPL-3.0 package. Cheerio plus an HTML-to-text
  * helper was rejected because it would leave article extraction as a
  * second parser surface. */
-export async function searxngPageRead(args: unknown): Promise<PageReadResult> {
+export async function searxngPageRead(args: unknown, signal?: AbortSignal): Promise<PageReadResult> {
   const url = (args as { url?: unknown } | undefined)?.url;
   if (typeof url !== "string" || url.length === 0) throw new HostError("invalid_input", "page.read needs a string \"url\" argument");
   let parsedUrl: URL;
@@ -1578,12 +1621,12 @@ export async function searxngPageRead(args: unknown): Promise<PageReadResult> {
   }
   if (pageReaderForTests) return pageReaderForTests(url);
   const origin = parsedUrl.origin;
-  const robotsResult = await pageFetch(`${origin}/robots.txt`, false);
+  const robotsResult = await pageFetch(`${origin}/robots.txt`, false, signal);
   if (!robotsResult.ok && robotsResult.status !== 404) pageFailure(robotsResult, `${origin}/robots.txt`);
   if (robotsResult.ok && typeof robotsResult.value === "string" && !robotsAllows(robotsResult.value, parsedUrl)) {
     throw new HostError("network_unreachable", `The site's robots.txt declined the page request for ${url}.`);
   }
-  const result = await pageFetch(url);
+  const result = await pageFetch(url, true, signal);
   if (!result.ok) pageFailure(result, url);
   if (typeof result.value !== "string") throw new HostError("network_unreachable", `The site did not return readable HTML for ${url}.`);
   return parseReadablePage(result.value, url);
@@ -1667,7 +1710,7 @@ function mapWriteFailure(status: number, error: string): never {
  * together in scope (the conversation a turn belongs to), so building
  * one object at the call site is the natural shape, not friction added
  * for its own sake. */
-export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }): Host {
+export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number } = {}): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
   function requirePermission(perm: string): void {
@@ -2027,12 +2070,12 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
           // THIN-4H: an adult's query goes to the optional hosted provider when a key is set; null means SearXNG.
           const input = args as { query?: unknown; category?: unknown } | undefined;
-          const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role) : null;
+          const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role, runtime.signal) : null;
           if (hosted) return hosted;
-          return searxngSearch(args, { safeSearchLevel, ...(band === "adult" ? {} : { minorBand: band }) });
+          return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, ...(band === "adult" ? {} : { minorBand: band }) });
         }
         if (id === "searxng" && method === "page.read") {
-          const doc = await searxngPageRead(args);
+          const doc = await searxngPageRead(args, runtime.signal);
           // THIN-4C: a page a child or teen asks for by address passes the
           // same floor before their model call can see it.
           if (speakerAgeBand(actor, new Date()) !== "adult" && checkSafety(`${doc.title}. ${doc.text}`, { isMinor: true }).flagged) {

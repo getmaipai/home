@@ -75,12 +75,17 @@ function cleanUrl(value: unknown): string | null {
  * path does not apply or did not answer (no key, not an adult, an image or
  * video search, or any provider failure). Null means "use SearXNG": a
  * failed provider never fails the answer (rule 6). */
-export async function hostedSearch(query: string, band: AgeBand, safeLevel: SafeSearchLevel, category: unknown, role?: string): Promise<HostedSearchResult | null> {
+export async function hostedSearch(query: string, band: AgeBand, safeLevel: SafeSearchLevel, category: unknown, role?: string, parentSignal?: AbortSignal): Promise<HostedSearchResult | null> {
   if (!hostedSearchAllowed(band)) return null;
   // A guest carries no age or identity signal (the band reads "adult" for
   // lack of a minor signal), so a guest's query stays on the household's SearXNG.
   if (role === "guest") return null;
   if (category === "images" || category === "videos") return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const onParentAbort = () => controller.abort(parentSignal?.reason);
+  if (parentSignal?.aborted) onParentAbort();
+  else parentSignal?.addEventListener("abort", onParentAbort, { once: true });
   try {
     // Inside the try: a stored key that no longer decrypts must fall back to
     // SearXNG, never fail the search.
@@ -92,7 +97,7 @@ export async function hostedSearch(query: string, band: AgeBand, safeLevel: Safe
     url.searchParams.set("safesearch", safeLevel);
     const response = await fetch(url, {
       headers: { accept: "application/json", "x-subscription-token": key },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: controller.signal,
     });
     if (!response.ok) return null;
     const body = (await response.json()) as { web?: { results?: unknown } };
@@ -112,5 +117,8 @@ export async function hostedSearch(query: string, band: AgeBand, safeLevel: Safe
   } catch {
     // Never log the error object: a fetch error can carry request headers.
     return null;
+  } finally {
+    clearTimeout(timer);
+    parentSignal?.removeEventListener("abort", onParentAbort);
   }
 }

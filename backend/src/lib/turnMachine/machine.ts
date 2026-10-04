@@ -24,6 +24,7 @@ import { answerNode, type AnswerInput, type AnswerOutput, type PolicyRefusedReas
 import { outputGateNode, type OutputGateOutput } from "./nodes/outputGate";
 import { planFor } from "@/lib/register";
 import { outcomeText } from "@/lib/turnContext";
+import { webSearchToolDeadlineMs } from "@/lib/webSearchBudget";
 
 const IMPL_VERSION = "1";
 
@@ -143,7 +144,12 @@ export const turnMachine = setup({
     }),
     tool: fromPromise<ToolOutput, MachineContext>(({ input }) => {
       const { toRun } = proposalsFrom(input.step as PolicyOutput);
-      return runNode(input.trace, "tool", deadlineFor(input, input.turnState.budget.deadlines_ms.tool), input.turnState, input.abortSignal, { proposals: toRun }, toolNode);
+      const hasWebSearch = toRun.some(({ request }) => request.tool === "websearch");
+      const baseDeadline = hasWebSearch
+        ? webSearchToolDeadlineMs(input.turnState.planBasis.band, input.turnState.planBasis.surfaceClass, input.turnState.budget.deadlines_ms.tool)
+        : input.turnState.budget.deadlines_ms.tool;
+      const toolDeadline = deadlineFor(input, baseDeadline);
+      return runNode(input.trace, "tool", toolDeadline, input.turnState, input.abortSignal, { proposals: toRun, deadlineAt: Date.now() + toolDeadline }, toolNode);
     }),
     answer: fromPromise<AnswerOutput, MachineContext>(({ input }) => runNode(input.trace, "answer", input.turnState.budget.deadlines_ms.model, input.turnState, input.abortSignal, input.step as AnswerInput, answerNode)),
     output_gate: fromPromise<OutputGateOutput, MachineContext>(({ input }) =>

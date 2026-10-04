@@ -1,12 +1,8 @@
 // U2c, the `tool` node (turn-machine-state-record-2026-09-22.md's state
 // table): "runPlugin under the tool deadline; the outcome recorded in
-// model order." runPlugin() itself takes no signal (a real gap, same
-// class as LLM-TIMEOUT-01's chatComplete gap - noted, not solved here);
-// this node enforces its own deadline at its own boundary with
-// Promise.race against the node's signal, so a wedged package still
-// returns a "tool" outcome and the machine moves on, even though the
-// underlying call keeps running unobserved until it finishes or the
-// process exits.
+// model order." The node's signal reaches runPlugin() so search requests
+// stop at cancellation; the race still records a timeout if a package
+// ignores the signal.
 import { runPlugin } from "@/lib/plugins";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
@@ -17,6 +13,7 @@ import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "
 
 export interface ToolInput {
   proposals: readonly ActionProposal[];
+  deadlineAt?: number;
 }
 
 export interface ToolOutput {
@@ -161,7 +158,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const spokenSearch = (state.planBasis?.surfaceClass ?? "spoken") === "spoken";
     const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}) } : args;
     const startedAt = Date.now();
-    const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId }), signal);
+    const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt }), signal);
     const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });
