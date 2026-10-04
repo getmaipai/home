@@ -1,4 +1,4 @@
-import type { TurnStreamEvent, TurnValue } from "@/wire";
+import type { TurnStreamEvent, TurnValue } from "../wire";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 // UI-SHOWCASE: canned turns for the admin's Chat showcase (/dev/ui). A fixture

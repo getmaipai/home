@@ -74,3 +74,16 @@ describe("/api/dev/ui-fixtures", () => {
     }
   });
 });
+
+describe("the web chat's own reader", () => {
+  test("every fixture, through the real route and the chat's DataStreamDecoder reader, yields its own events in order", async () => {
+    const { readAssistantTurnStream } = await import("../../frontend/src/lib/assistantTurnStream");
+    const { client } = await owner();
+    for (const f of UI_FIXTURES) {
+      const read: Record<string, unknown>[] = [];
+      for await (const event of readAssistantTurnStream(await play(client, f.id))) read.push(event as unknown as Record<string, unknown>);
+      const strip = (e: Record<string, unknown>) => ({ ...e, sequence: undefined });
+      expect(read.map(strip), f.id).toEqual(f.events.map((e) => strip(e as unknown as Record<string, unknown>)));
+    }
+  });
+});

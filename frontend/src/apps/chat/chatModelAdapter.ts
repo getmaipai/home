@@ -164,6 +164,11 @@ export interface ChatModelAdapterDeps {
   // adapter already drives, on only for the turn it itself sent, off
   // again the moment the call ends, never a second speech pipeline).
   speakReplies?: boolean | (() => boolean);
+  /** UI-SHOWCASE: opens the turn's stream somewhere other than
+   * POST /api/turn/stream (the admin Chat showcase's canned fixtures). The
+   * response is read by the same assistant-stream decoder. Unset on the
+   * real chat. */
+  openStream?(text: string, abortSignal: AbortSignal): Promise<Response>;
 }
 
 // The real end-to-end streaming adapter (docs/plans/session-b-ui.md step
@@ -307,7 +312,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // conversation setting; the old ChatPage fallback consumes its
           // one-message action.
           const thinking = deps.getThinking ? deps.getThinking() : deps.consumeThinking?.();
-          const response = await api.streamTurn(text ?? "Please read the attached document.", abortSignal, {
+          const response = await (deps.openStream?.(text ?? "", abortSignal) ?? api.streamTurn(text ?? "Please read the attached document.", abortSignal, {
             thinking: reconnectAttempts === 0 && !bare ? thinking : undefined,
             model: !bare ? selectedModel : undefined,
             // `undefined`, not `false`, when a surface has no bare-mode
@@ -333,7 +338,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // never resent on a reconnect retry within the same send.
             askAnswer: reconnectAttempts === 0 ? deps.consumeAskAnswer?.() : undefined,
             documentAttachments: reconnectAttempts === 0 && documentPayloads.length > 0 ? documentPayloads : undefined,
-          });
+          }));
           for await (const event of readAssistantTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event
           // unconditionally, including every `delta` - the hottest path
