@@ -65,8 +65,9 @@ describe("saved conversations", () => {
 
   test("when the hub never writes a title the stream is empty and nothing is renamed", async () => {
     const methods: string[] = [];
-    globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      methods.push(init?.method ?? "GET");
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      // Only this chat's own requests count: a request from another test's still-mounted component can reach this mock.
+      if (String(input).endsWith("/conv-example123")) methods.push(init?.method ?? "GET");
       return Response.json({ id: "conv-example123", title: null });
     }) as unknown as typeof fetch;
     const message: ThreadMessage = { id: "msg-1", createdAt: new Date(), role: "user", content: [{ type: "text", text: "Plan a garden" }], attachments: [], metadata: { custom: {} } };
