@@ -157,3 +157,26 @@ wins.
 14. **Companion voice is a per-request mechanism, never prompt prose.**
     Voice adapters are chosen per request and keyed by base model; the
     rules above are compatible with a companion chosen per turn.
+
+## App shell
+
+Record: the owner's rule of 2026-10-04 (his words are the record: "that
+column collapses to a rail; everything to the right of it should look and
+feel like the native app we are emulating").
+
+Governs: frontend/src/next/**, frontend/src/apps/**
+
+S1. **The main navigation is permanent.** The column that lists the apps
+    (Home, Chat, Library, Family, Settings and Help today; more apps later)
+    is present on every page at every width and collapses to an icon rail.
+    It is never removed, hidden or merged into an app, and app content
+    (thread lists, filters, sub-navigation) never lives inside it.
+S2. **Each app area emulates its native app.** Everything to the right of
+    the rail looks and feels like the app it copies, with that app's own
+    layout intact: chat is ChatGPT's layout, including its own history
+    sidebar, slim title bar, centered message column and compact composer;
+    video is YouTube's; and so on. Only the rail is ours. Parts are kit
+    Elements and shipped primitives, restyled by tokens only (rule 9).
+S3. **A test holds the rail.** A test fails when the main navigation does
+    not render on an app page at desktop and mobile widths, as the full
+    column or as the rail with accessible labels.
