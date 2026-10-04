@@ -1,7 +1,7 @@
 // Conversation history (platform plan 4.14, split): "conversations are
 // per person and per surface... retention defaults: conversations ninety
 // days then summarised... each is a household setting with a floor for
-// kid safety logs." This is the store: every real turnEngine.runTurn()
+// kid safety logs." This is the store: every real the retired turn engine.runTurn()
 // path (safety refusals included) writes one row, kept per person,
 // visible per the exact rule memory.ts and settings.ts already share
 // (lib/access.ts's canAccessPerson, whose own comment names this file's
@@ -53,13 +53,13 @@ import { artifactsByTurn } from "@/lib/artifacts";
 import { projectsByTurn } from "@/lib/projects/store";
 import { nextHlc, compareHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
-import type { TurnValue, Surface } from "@/lib/turnEngine";
+import type { Surface } from "@/lib/turnShared";
 import type { TurnStats } from "@/lib/turnStats";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Rung } from "@/lib/ruleNames";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
-import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds, Media, StructuredPart } from "@/wire";
+import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds, Media, StructuredPart, TurnValue } from "@/wire";
 export type { ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
 export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 
@@ -68,7 +68,7 @@ export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 // shape through the @maipai/home-backend workspace dependency; re-exported
 // here since this is where callers already look for it.
 import type { ConversationTurnRow } from "@/wire";
-import type { SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
+import type { SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
 
 function mediaFields(raw: string | null): { media?: Media; media_items?: Media[] } {
   if (!raw) return {};
@@ -178,7 +178,7 @@ export function outcomesForConversation(conversationId: string, limit = 50): { t
  * failed before producing a reply (unsupported_surface, invalid_input,
  * the model being unavailable) since nothing was actually said.
  *
- * `value.turn_id`/`value.conversation_id` (step 3): turnEngine.ts's
+ * `value.turn_id`/`value.conversation_id` (step 3): the retired turn engine's
  * prepareTurn() resolves the conversation and mints this turn's own id
  * up front now, before the reply is generated (step 2's provenance
  * carrier too), so this row uses those exact ids rather than minting a
@@ -295,7 +295,7 @@ const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnR
   return storedRow;
 });
 
-/** getmaipai/home#131: called once, at the very start of `turnEngine.ts`'s
+/** getmaipai/home#131: called once, at the very start of the retired turn engine's
  * `prepareTurn()` (right after `newConversationTurnId()` mints the id),
  * before anything else - including the safety check - runs. Writes a
  * real, minimal row so the turn's own id satisfies `artifacts.turnId`'s
@@ -455,7 +455,7 @@ function buildTurnRow(
     // Every new turn starts unjudged (step 6's own poison-guard state,
     // lib/memoryJudge.ts), unless ACT-01's eligibility read the signal
     // and found no clause the judge may extract from: then the turn is
-    // skipped at insert (turnEngine.ts's judgeStatusAtInsert()), never
+    // skipped at insert (the retired turn engine's judgeStatusAtInsert()), never
     // queued, about a third of turns off the 4B.
     judgeStatus: opts.judgeStatus ?? null,
     judgeAttempts: 0,
@@ -485,7 +485,7 @@ function buildTurnRow(
     // (listConversationTurns()/list() below).
     reasoning: minorSpeaker ? null : (value.reasoning ?? proseReasoning ?? null),
     // getmaipai/home#130: the same structured part the done event already
-    // carries (turnEngine.ts's logTurnSafely() sets value.structured_part
+    // carries (the retired turn engine's logTurnSafely() sets value.structured_part
     // from structuredPartForOutcomes() beside this exact row), persisted
     // as JSON so the reload path can rebuild the identical tool-call part
     // chatModelAdapter.ts builds live. Null for every prose reply and
@@ -563,7 +563,7 @@ export function logTurn(
 // CLAUDE.md principle 1 rules out), not a second kind of state.
 //
 // Every existing `conversation.mode === "temporary"` gate already
-// scattered through this file and turnEngine.ts (logTurnSafely's turn-row
+// scattered through this file and the retired turn engine (logTurnSafely's turn-row
 // skip, insertProvisionalTurn's skip, the rolling-summary skip,
 // appendedAsk's skip, crisis-continuity's skip) fires correctly the
 // moment the `Conversation` object passed around has `mode: "temporary"`
@@ -662,7 +662,7 @@ function createTemporaryConversation(actor: PersonRow, surface: Surface, compani
   return record;
 }
 
-/** logTurnSafely()'s (turnEngine.ts) own persistence point for a
+/** logTurnSafely()'s (the retired turn engine) own persistence point for a
  * temporary turn: never the DB, but still remembered for the rest of
  * this session so the next turn in the same temporary chat has real
  * context - the gap a naive "just skip persistence" design would have
@@ -781,7 +781,7 @@ export function presentOf(row: Pick<ConversationTurnRow, "present">): PresentPer
 // checks) - a placeholder safetyAction/replyText from this same turn's
 // own not-yet-finished row must never stand in for real history.
 export function recentTurnSafety(conversationId: string, limit: number): { safetyAction: string; source: string; replyText: string; crisisSignal: boolean }[] {
-  // TEMP-CHAT-01: conversationInCrisis() (turnEngine.ts) reads this to
+  // TEMP-CHAT-01: conversationInCrisis() (the retired turn engine) reads this to
   // decide whether the crisis-resources overlay stays up across the
   // turns right after a self-harm mention - a temporary conversation's
   // own turns still each run the real safety check and still each set
@@ -1009,7 +1009,7 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
     // vanished between session validation and this call, a lock) block
     // the turn itself - the exact "logging must never turn a successful
     // generation into a reported failure" contract logTurn() already
-    // holds (see logTurnSafely()'s own comment in turnEngine.ts),
+    // holds (see logTurnSafely()'s own comment in the retired turn engine),
     // extended here since conversation resolution now runs before a
     // reply is even generated (step 3), not only after. The in-memory
     // record is returned anyway so the turn can still proceed - a real
@@ -1019,7 +1019,7 @@ function insertNewConversation(actor: PersonRow, surface: Surface, companionId?:
   return record;
 }
 
-/** The implicit path every real turn goes through (turnEngine.ts's
+/** The implicit path every real turn goes through (the retired turn engine's
  * prepareTurn()): `conversationId` absent resolves to the actor's own
  * currently open conversation for this surface, creating one if none
  * exists yet; given, it must be a real, non-deleted conversation
@@ -1133,7 +1133,7 @@ export interface PendingAsk {
   carriedQuestion?: string;
   /** Only set for kind:"ask" (a recipe result's own `ask.expects` hint,
    * spec/schemas/result.schema.json) - free text, not a structured
-   * matcher; turnEngine.ts's own consumption is documented at its call
+   * matcher; the retired turn engine's own consumption is documented at its call
    * site since the shape genuinely doesn't say more than this. */
   expects?: string;
   /** CHAT-15: set once a confirmation has asked "yes or no?" after an
@@ -1180,7 +1180,7 @@ export function setPendingAsk(conversationId: string, ask: PendingAsk | null): v
 // or relationship (a candidate, never knowledge, until the person
 // answers); AGE-01's relay and CRED-01's clarification take the same
 // path. Keyed by person: the pending one is asked once, at the end of
-// that person's next reply on any conversation (turnEngine.ts appends
+// that person's next reply on any conversation (the retired turn engine appends
 // it after the last delta), becomes a `who` pending ask on that
 // conversation, and is answered, declined or expired from there. Never
 // re-asked: "not now" declines it for good.
@@ -1315,7 +1315,7 @@ export function resolveOpenQuestionsAbout(personId: string, entityId: string, st
  * at a time" invariant stays meaningful for the next bare turn. */
 // The spec's own enum (Conversation.shape.surface.options), not a
 // hand-copied second list: one definition, reused for real runtime
-// validation of a value that - unlike turnEngine.ts's own Surface
+// validation of a value that - unlike the retired turn engine's own Surface
 // parameter - arrives here straight from an unchecked request body.
 const VALID_SURFACES = new Set(Conversation.shape.surface.options as readonly string[]);
 // `mode` has a default in the generated schema, so unwrap the default
@@ -1905,7 +1905,7 @@ export interface ConversationWindow {
  * display name (lib/commands.ts's own CommandRow carries no separate
  * `name` field). Queried directly against the `commands` table rather
  * than through lib/commands.ts's listCommands(): that module imports
- * lib/turnEngine.ts (matchPattern), which imports THIS file, so pulling
+ * the retired turn engine (matchPattern), which imports THIS file, so pulling
  * it in here would close a real import cycle for one lookup this file
  * can already do itself with the schema it has open. */
 function commandTriggerFor(commandId: string): string | null {
@@ -1915,7 +1915,7 @@ function commandTriggerFor(commandId: string): string | null {
 
 /** A `plugin_id`'s own display name(s), never the bare id - a code review
  * (2026-09-07) found this needed to handle more than one package: Tier 2's
- * `attemptTier2Tools()` (turnEngine.ts) joins two tools' ids with `"+"`
+ * `attemptTier2Tools()` (the retired turn engine) joins two tools' ids with `"+"`
  * (`"currency+weather"`) when a turn calls both, which is not a real
  * package id `loadManifestOnly()` will ever resolve on its own - the
  * bare compound string was leaking straight into the window note instead
@@ -2000,7 +2000,7 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
 }
 
 /** The follow-up-turn context (step 3: "and tomorrow?" needs the prior
- * exchange in the prompt to mean anything, `turnEngine.ts` sends
+ * exchange in the prompt to mean anything, the retired turn engine sends
  * `[system, user]` and nothing else today). The newest
  * WINDOW_NEWEST_TURNS_KEPT turns are always included verbatim, whatever
  * their size; older turns are added back to front (most-recent-of-the-
@@ -2026,7 +2026,7 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
   // read as the assistant having already answered with nothing.
   // TEMP-CHAT-01: a temporary conversation has no conversation_turns rows
   // to query - its turns live in temporarySessions instead (appended by
-  // appendTemporaryTurn(), turnEngine.ts's own persistence point for
+  // appendTemporaryTurn(), the retired turn engine's own persistence point for
   // one). Read from there and feed the identical windowing/redaction/
   // message-building logic below: one implementation of "what a window
   // looks like", not two, regardless of where its rows came from.
@@ -2514,7 +2514,7 @@ export interface RoutingStats {
   plugin: number;
   pluginError: number;
   /** A command primitive fires before the plugin floor even runs
-   * (turnEngine.ts's prepareTurn(), "checked before the plugin floor"),
+   * (the retired turn engine's prepareTurn(), "checked before the plugin floor"),
    * but for this metric's purposes it's the same kind of thing plugin/
    * pluginError are: a deterministic match that never reached the model.
    * A code review (2026-09-05) found the original version of this

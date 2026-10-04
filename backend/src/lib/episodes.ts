@@ -669,7 +669,7 @@ export function answerTerms(text: string): string {
 
 // One formatter per locale (a code review: this ran per episode and now
 // runs twice per episode, once for the block and once for the turn
-// context's evidence; turnEngine.ts caches its own for the same reason).
+// context's evidence; the retired turn engine caches its own for the same reason).
 const shortDateFormats = new Map<string, Intl.DateTimeFormat>();
 function shortDateFormat(locale: string): Intl.DateTimeFormat {
   let fmt = shortDateFormats.get(locale);

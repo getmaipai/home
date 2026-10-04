@@ -56,20 +56,6 @@ function settleFailedGate(gate: StreamGate | undefined): void {
   else gate?.reset();
 }
 
-export const ANSWER_FROM_CONTEXT_TOOL_ID = "answer_from_this_conversation";
-
-const ANSWER_FROM_CONTEXT_TOOL: ToolSpec = {
-  id: ANSWER_FROM_CONTEXT_TOOL_ID,
-  description: "Answer the question from a line already in this conversation, instead of searching the web. Only use this when the answer is genuinely already here.",
-  args: {
-    type: "object",
-    required: ["quote"],
-    properties: {
-      quote: { type: "string", description: "The exact line from the conversation this answer comes from." },
-    },
-  },
-};
-
 export interface ModelInput {
   utterance: string;
   /** machine.ts's own round counter: `budget.model_transitions &&
@@ -82,15 +68,6 @@ export interface ModelInput {
    * boundary, since offering no tools is what makes a text answer
    * certain, never a second, separate cap checked somewhere else. */
   toolsAllowed: boolean;
-  /** The ungrounded-quote retry guard (the state record: "a quote that is
-   * not there is an ungrounded argument and the search runs instead"):
-   * true only on the one re-entry machine.ts's `answer_from_context_check`
-   * state makes after policy rejected an ungrounded quote. Offers the
-   * search tool alone (still `tool_choice` "auto", never forced), never
-   * `answer_from_this_conversation` again, which is what guarantees this
-   * retries exactly once. Only reachable when a budget offers that tool;
-   * no catalog record does (stage 7 removes it with the old path). */
-  forceSearchOnly?: boolean;
 }
 
 export type ModelOutput =
@@ -103,7 +80,6 @@ export type ModelOutput =
   // via the raw utterance (queryWriterFallback) instead of the generic
   // honesty line every other refusal gets.
   | { kind: "tool_calls"; calls: ToolCall[]; reasoning?: string; queryWriterUsed?: boolean }
-  | { kind: "answer_from_context"; quote: string; reasoning?: string }
   // DEADLINE-01 (dev.md "U6 rerun ruling" (a)): a generation that never
   // finished at all (the model node's own deadline, a dead engine) -
   // distinct from `text` with an empty string, which `answerInputFrom()`
@@ -112,12 +88,10 @@ export type ModelOutput =
   // never empty text.
   | { kind: "model_failed"; reasoning?: string };
 
-function toolSpecFor(id: string): ToolSpec | null {
-  if (id === ANSWER_FROM_CONTEXT_TOOL_ID) return ANSWER_FROM_CONTEXT_TOOL;
-  // PROJECT-START-01: start_project is a virtual tool the same way
-  // answer_from_this_conversation is (tool.ts's own header) - it never
-  // has a backend/packages/start_project manifest.json for
-  // loadManifestOnly() to find below.
+export function toolSpecFor(id: string): ToolSpec | null {
+  // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
+  // header) - it never has a backend/packages/start_project manifest.json
+  // for loadManifestOnly() to find below.
   if (id === START_PROJECT_TOOL_ID) return startProjectToolSpec();
   const loaded = loadManifestOnly(id);
   if (!loaded.ok) return null;
@@ -478,8 +452,7 @@ async function runQueryWriter(messages: LlmMessage[], signal: AbortSignal, model
  * and only fall back to the raw utterance when it fails outright -
  * grounding's own refusal of an ungrounded query-writer answer (a bare
  * pronoun it couldn't resolve either) is handled one layer up, in
- * machine.ts's own `queryWriterFallback` state, the same shape
- * `answer_from_context_check`'s existing retry already uses, never
+ * machine.ts's own `queryWriterFallback` state, never
  * re-implemented here. A genuine generation failure (`written.ok ===
  * false`) carries its own code/message into the builder row exactly
  * like every other generation failure in this file does - never
@@ -612,9 +585,6 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // it and costs the cache hit this item exists to restore).
     tools = state.lastTools;
     tool_choice = "none";
-  } else if (input.forceSearchOnly) {
-    tools = [toolSpecFor("websearch")].filter((t): t is ToolSpec => t !== null);
-    tool_choice = "auto";
   } else if (!toolsAllowed) {
     tools = [];
     tool_choice = undefined;
@@ -716,19 +686,6 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // the spans and emits nothing" - so a withheld turn's reasoning
   // never even reaches ModelOutput, let alone the trace or the wire.
   const reasoning = state.reasoning.emit ? attempt.reasoning : undefined;
-
-  if (attempt.toolCalls && attempt.toolCalls.length > 0) {
-    const contextAnswer = attempt.toolCalls.find((c) => c.tool === ANSWER_FROM_CONTEXT_TOOL_ID);
-    if (contextAnswer) {
-      // Only ever reachable on a forced (interim-rule) round, so `gate`
-      // is already undefined here - reset() is a defensive no-op, never
-      // load-bearing, kept only so every exit point settles the gate the
-      // same explicit way.
-      gate?.reset();
-      const quote = typeof contextAnswer.args === "object" && contextAnswer.args && "quote" in contextAnswer.args ? String((contextAnswer.args as { quote: unknown }).quote) : "";
-      return { outcome: { ok: true }, output: { kind: "answer_from_context", quote, reasoning } };
-    }
-  }
 
   // ENGINE-CONTRACT-02 (dev.md 2026-09-23, "U6: the flip verdict"): the
   // model node verifies a websearch call carries a non-empty string

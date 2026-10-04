@@ -14,16 +14,16 @@
 // Authenticated by lib/apiToken.ts's interim per-person API token
 // (requireApiToken, middleware/auth.ts), never a cookie session - see
 // that file's own header for why this is a real, if temporary,
-// mechanism rather than a stub. `surface` (turnEngine.ts's Surface enum)
+// mechanism rather than a stub. `surface` (the retired turn engine's Surface enum)
 // comes from an `X-MaiPai-Surface` header per the plan's own "surface
 // from a header" - deliberately NOT widening IMPLEMENTED_SURFACES to add
 // a new value for "an external OpenAI client": an unsupported surface
 // still fails exactly as honestly as it does for every other caller
-// (turnEngine.ts's own "not implemented yet" error), which is the
+// (the retired turn engine's own "not implemented yet" error), which is the
 // correct answer until a real surface for this actually exists.
 //
 // A full OpenAI multi-turn `messages` array does not map onto MaiPai's
-// own server-side conversation history (turnEngine.ts already resolves
+// own server-side conversation history (the retired turn engine already resolves
 // or creates the real conversation and reads its own rolling window) -
 // mapping the two would mean maintaining two parallel notions of
 // "what's been said so far" that could drift. This route takes the LAST
@@ -33,7 +33,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireApiToken } from "@/middleware/auth";
-import { StreamSafetyRefusal, type Surface } from "@/lib/turnEngine";
+import { StreamSafetyRefusal, type Surface } from "@/lib/turnShared";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { personWithinTurnBudget } from "@/lib/llm";
 import { visibleText } from "@/lib/wellFormed";

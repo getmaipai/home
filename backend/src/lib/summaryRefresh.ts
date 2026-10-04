@@ -1,5 +1,5 @@
 // THIN-0G (rule 12, rule 4): the post-turn, debounced refresh of a
-// conversation's rolling summary, moved out of turnEngine.ts unchanged so
+// conversation's rolling summary, moved out of the retired turn engine unchanged so
 // the default path (turnMachine/turnNext.ts) schedules it through the same
 // code as the old path. Debounce, delay and background engine are the old
 // path's; redaction of credentials happens inside
@@ -8,7 +8,7 @@ import { maybeRefreshConversationSummary } from "@/lib/conversationHistory";
 import { DEFAULT_IDLE_WINDOW_MS } from "@/lib/turnActivity";
 
 // One pending timer per conversation, not one per turn - see
-// turnEngine.ts's logTurnSafely() comment for the bug this fixes. Exported only for
+// the retired turn engine's logTurnSafely() comment for the bug this fixes. Exported only for
 // __clearPendingSummaryRefreshesForTests() below.
 const pendingSummaryRefreshes = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -38,7 +38,7 @@ export function __setSummaryRefreshDelayForTests(ms: number | null): void {
 /** Test-only: cancels every pending debounced summary-refresh timer
  * without letting it fire. A code review found every test file calling
  * runTurn() (memoryJudge.test.ts, notifications.test.ts, safety.test.ts,
- * tier2.test.ts, turnEngine.test.ts itself, and more) leaves one of these
+ * tier2.test.ts, chatTurn.test.ts itself, and more) leaves one of these
  * timers outstanding at DEFAULT_IDLE_WINDOW_MS (20s) - most test files
  * finish well before that, so the timer fires later, against whatever the
  * NEXT test's resetDb() has already replaced the database with (a

@@ -2,7 +2,7 @@
 // reply rule, one definition for every producer of a reply. The model
 // cannot be asked not to stop early; the engine is the only party that
 // sees the end of stream, so the rule lives at the boundary that
-// already owns safety and guards (finalizeReply in turnEngine.ts), on
+// already owns safety and guards (finalizeReply in the retired turn engine), on
 // the streaming path's first chunk and final span, and on every bench
 // row as a measured number. No store behind it: the bench's scorer and
 // the guards read it too.
@@ -51,7 +51,7 @@ export function thinkingPrefix(text: string): string {
 export interface ThinkSpan { reasoning: boolean; text: string; }
 
 /** Carries `feedThinkSplit()`'s state across chunks of one stream:
- * `inThink` mirrors turnEngine.ts's own `holdForLookup()` state machine
+ * `inThink` mirrors the retired turn engine's own `holdForLookup()` state machine
  * (the identical two tag tests), so this agrees with every internal
  * `<think>` detection the pipeline already does; `buffer` holds back
  * whatever COULD be the start of a split tag until the next chunk
@@ -92,7 +92,7 @@ function partialTagOverlapLength(buffer: string, tag: string): number {
  * currently being watched for are ever held back, resolved by whatever
  * the next chunk brings. REASONING-01's own wire-boundary split
  * (routes/turn.ts's streamTurnEvents()) is this function's one caller;
- * nothing upstream (turnEngine.ts, wellFormed.ts's own other functions)
+ * nothing upstream (the retired turn engine, wellFormed.ts's own other functions)
  * changes - those functions receive the pipeline's combined text exactly
  * as they always have. */
 export function feedThinkSplit(state: ThinkSplitState, chunk: string): ThinkSpan[] {
@@ -171,7 +171,7 @@ export function flushThinkSplit(state: ThinkSplitState): ThinkSpan[] {
 /** REASONING-02: the same reasoning text a live `reasoning` wire event
  * would have carried for this exact text, in one pass - for a caller
  * that has a whole completed (or buffered-so-far) string in hand rather
- * than a token stream, e.g. turnEngine.ts's peekAndHandle()/runTurn()
+ * than a token stream, e.g. the retired turn engine's peekAndHandle()/runTurn()
  * attaching TurnValue.reasoning when a tool call resolves before any
  * close tag ever streamed (an open, unclosed think block -
  * flushThinkSplit()'s truncated-block case). Returns undefined for no

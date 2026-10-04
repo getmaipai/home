@@ -18,7 +18,7 @@ export type { HardwareInfo, CudaDevice } from "./lib/hardware";
 // 2026-09-04, caught this exact mirror-can-drift risk when these three
 // shapes were still hand-duplicated in api.ts; the first fix attempt
 // re-exported the real files directly and failed to typecheck for
-// exactly this reason). turnEngine.ts, conversationHistory.ts, and
+// exactly this reason). the retired turn engine, conversationHistory.ts, and
 // personShape.ts re-export from here rather than defining these inline,
 // so there is still exactly one definition, just relocated to the one
 // file both a "@/"-aliased backend module and an external package can
@@ -86,7 +86,7 @@ export interface TurnStats {
    * writes"): one entry per node the new path (turnNext.ts) ran or
    * skipped, in order, beside `generations` above - "one trace, not a
    * second log." Absent (undefined, never an empty array standing in
-   * for "didn't run") on every row the old path (turnEngine.ts) still
+   * for "didn't run") on every row the old path (the retired turn engine) still
    * produces; PERF-ALERT-01's stage split and `scripts/bench/replay.ts`
    * both read this only when it's present. Deliberately structural,
    * the same reason TurnGeneration above is hand-declared rather than
@@ -100,7 +100,7 @@ export interface TurnStats {
 }
 
 /** LAT-00: one real model call, projected to plain values for the wire -
- * see turnEngine.ts's GenerationRecord for the working shape this comes
+ * see the retired turn engine's GenerationRecord for the working shape this comes
  * from (a live stats reference, read once settled). */
 export interface TurnGeneration {
   reason: string;
@@ -214,7 +214,7 @@ export interface TurnValue {
   crisis_resources?: string;
   /** Session A step 3 (conversations): every real turn resolves or
    * creates a conversation and mints its own turn id up front
-   * (turnEngine.ts's prepareTurn(), also step 2's provenance carrier for
+   * (the retired turn engine's prepareTurn(), also step 2's provenance carrier for
    * anything a plugin remembered mid-turn) - both are always real by the
    * time a TurnValue exists, never optional. */
   conversation_id: string;
@@ -265,7 +265,7 @@ export interface TurnValue {
    * same way `document_available` names a COMP-01 document without
    * carrying its body inline. Written by `lib/composer.ts`'s
    * `artifactForOutcomes()` (ARTIFACT-02), the bundled `write_document`
-   * package's own outcome, hooked into `turnEngine.ts`'s
+   * package's own outcome, hooked into the retired turn engine's
    * `logTurnSafely()` beside `structured_part`; a client fetches the
    * full version from GET /api/artifacts/:id. */
   artifact?: { id: string; version: number };

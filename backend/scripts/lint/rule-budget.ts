@@ -36,7 +36,6 @@ import { RULE_NAMES } from "../../src/lib/ruleNames.js";
  * join this list at the baseline of 0 they start and stay at - not just
  * `turnNext.ts`, every node and the machine definition itself. */
 export const TURN_PATH_FILES: readonly string[] = [
-  "turnEngine.ts",
   "turnShared.ts",
   "turnContext.ts",
   "guards.ts",

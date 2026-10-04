@@ -137,14 +137,14 @@ export function pickThinkingCue(personId: string, banned: readonly string[] = []
 }
 
 // Maps a still-exact match of one of the OTHER known constant reply
-// strings - turnEngine.ts's own plugin-error/plugin-done fallbacks, plus
+// strings - the retired turn engine's own plugin-error/plugin-done fallbacks, plus
 // the package layer's known constant confirmations - to its pool. Keyed
 // on each constant's CURRENT exact text (not a source or plugin id) since,
 // for example, spec/interpreters produces NOTHING_RECALLED for any recipe
 // that uses a `recall` step, not just the bundled `recall` package. If
 // any of these source strings ever changes, this map's key must change
 // with it - there is no way to enforce that at the type level across a
-// turnEngine.ts literal, a spec/ string constant, and a package's own
+// the retired turn engine literal, a spec/ string constant, and a package's own
 // recipe.json, so it's called out here instead. The safety refusal is
 // the one constant NOT in this map: it alone needs pickRefusalVariant's
 // first/repeat distinction, not plain rotation.
@@ -155,7 +155,7 @@ export function pickThinkingCue(personId: string, banned: readonly string[] = []
 const REMEMBER_CONFIRM_CONSTANT = "Got it, I'll remember that.";
 
 const KNOWN_CONSTANT_POOLS: ReadonlyMap<string, readonly string[]> = new Map([
-  ["Sorry, I couldn't do that.", PLUGIN_ERROR_VARIANTS], // turnEngine.ts's own plugin_error fallback
+  ["Sorry, I couldn't do that.", PLUGIN_ERROR_VARIANTS], // the retired turn engine's own plugin_error fallback
   ["Done.", PLUGIN_DONE_VARIANTS], // a home_call_service command's own success text; CHAT-16 (K2) took the engine's no-reply plugin fallback to the composer, which never says it
   ["I don't remember anything about that.", RECALL_NOTHING_VARIANTS], // spec/interpreters/{ts,py}/recipe-interpreter's NOTHING_RECALLED
   [REMEMBER_CONFIRM_CONSTANT, REMEMBER_CONFIRM_VARIANTS],

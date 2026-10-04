@@ -69,7 +69,7 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
   if (!result.ok) {
     // Fix B (docs/dev.md's "Chat reliability" B2): a code review
     // (2026-09-07) found this route was the one caller that dropped
-    // `fallback_reply` on a genuine 502 - chat (turnEngine.ts) and
+    // `fallback_reply` on a genuine 502 - chat (the retired turn engine) and
     // widgets.ts both already speak the manifest's own honest fallback
     // text for the identical failure; a direct test-run of a package
     // should see the same thing, not just the raw internal error string.

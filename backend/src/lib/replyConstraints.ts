@@ -56,7 +56,7 @@ export function setReplyConstraint(input: { conversationId: string; person: stri
 // and the next three done turns of that conversation, never longer - a
 // banned phrase never decays. Optional and backward compatible: with no
 // `currentTurnId` this returns every row exactly as before, which is
-// what the frozen path's one call site (turnEngine.ts, no decay) keeps
+// what the frozen path's one call site (the retired turn engine, no decay) keeps
 // getting.
 const LENGTH_SHAPE_TURN_WINDOW = 3;
 

@@ -25,7 +25,7 @@
 // release has ever been cut, so `main`'s own `releases/` layout has
 // never existed on a real machine either) and cross-cutting "never
 // during a conversation/generation/download/playback" checks into
-// turnEngine.ts, packageHost.ts and voice playback - all other
+// the retired turn engine, packageHost.ts and voice playback - all other
 // sessions' files. Attempting it now would be unverifiable by
 // construction (nothing real to restart, nothing real to roll back to)
 // and risks stepping on infrastructure step 11 hasn't decided the shape

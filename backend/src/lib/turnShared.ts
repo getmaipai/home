@@ -1,7 +1,7 @@
 // THIN-0H (rule 12, ported before deleted): the pieces of the old turn
 // engine that the default path (turnMachine/) still imports, moved here
-// unchanged so nothing under turnMachine/ depends on turnEngine.ts and the
-// old file can be deleted (THIN-7D). turnEngine.ts imports these back and
+// unchanged so nothing under turnMachine/ depends on the retired turn engine and the
+// old file can be deleted (THIN-7D). the retired turn engine imports these back and
 // re-exports them, so every existing caller keeps working. Behaviour is
 // identical; only the file moved.
 import { evaluateSafety, carriesCrisisSignal } from "@/lib/safety";
@@ -617,14 +617,14 @@ export class BareModeForbidden extends Error {
   }
 }
 
-export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure; // moved from turnEngine.ts (THIN-7C)
+export type TurnOpResult = { ok: true; value: TurnValue } | TurnFailure; // moved from the retired turn engine (THIN-7C)
 
-// THIN-7C: the document attachment types, moved from turnEngine.ts (which
+// THIN-7C: the document attachment types, moved from the retired turn engine (which
 // re-exports them) so the default path owns them.
 export type DocumentTurnAttachment = { name: string; mediaType: string; data: string };
 export class DocumentAttachmentError extends Error {}
 
-// THIN-7C: the continuation pieces, moved from turnEngine.ts (which imports
+// THIN-7C: the continuation pieces, moved from the retired turn engine (which imports
 // them back) so the default path owns them.
 export type TurnContinuation = { fromTurnId?: string; assistantText: string };
 export const CONTINUATION_INSTRUCTION = "Continue the incomplete answer above. Do not repeat any text already given. Start at the first missing point and finish the answer clearly.";

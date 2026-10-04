@@ -66,7 +66,7 @@ export function canAccessPerson(actor: PersonRow, personId: string, roleOf?: Map
   return role === "child";
 }
 
-// Every active (non-deleted) person in the household - turnEngine.ts's
+// Every active (non-deleted) person in the household - the retired turn engine's
 // household block (session-a-intelligence.md step 1, platform plan 4.5's
 // "who lives here" volatile-zone content) needs the whole roster, not one
 // row. Sorted by createdAt then id so the prompt's household list is

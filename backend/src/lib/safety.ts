@@ -9,7 +9,7 @@ import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpret
 // Session C step 7 (session-c-brain-and-voice.md): evaluateSafety() below
 // used to derive its own `isMinor` boolean straight from `actor.role`
 // (a MINOR_ROLES set, since removed) - a real, less accurate proxy than
-// the birthdate-derived AgeBand turnEngine.ts's own prompt already
+// the birthdate-derived AgeBand the retired turn engine's own prompt already
 // computes for the identical actor on the identical turn ("the safety
 // layer reads the ceiling through the band instead of the role proxy").
 // A code review found notifications.ts's own "adults" audience filter
@@ -24,7 +24,7 @@ function isMinorBand(band: AgeBand): boolean {
   return band !== "adult";
 }
 
-/** The one, real caller in a running conversation turn (turnEngine.ts's
+/** The one, real caller in a running conversation turn (the retired turn engine's
  * prepareTurn(), runTurn(), and runTurnStream()'s gateOutputSafety() all
  * pass the actor's real AgeBand, computed once via lib/ageBand.ts's
  * speakerAgeBand()) - also exercised directly (routes/safety.ts,

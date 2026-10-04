@@ -1,7 +1,7 @@
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { Persona } from "@/lib/persona";
-import type { Surface } from "@/lib/turnEngine";
+import type { Surface } from "@/lib/turnShared";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 
 type Move = keyof ReplyPlan["moves"];
@@ -11,7 +11,7 @@ export interface PlanInput {
   signal: TurnSignal;
   surface: Surface;
   // Optional, defaulting to "spoken" (today's act table, unchanged) so
-  // every existing caller - turnEngine.ts's four call sites, the frozen
+  // every existing caller - the retired turn engine's four call sites, the frozen
   // path - compiles and behaves exactly as before with no edit. Only
   // the new path (turnNext.ts) passes "written" or "spoken" explicitly.
   surfaceClass?: SurfaceClass;
@@ -200,7 +200,7 @@ export function planFor(input: PlanInput): ReplyPlan {
 }
 
 /** `surfaceClass` optional, defaulting to "spoken" - the same default
- * `PlanInput.surfaceClass` uses, so turnEngine.ts's one call site (the
+ * `PlanInput.surfaceClass` uses, so the retired turn engine's one call site (the
  * frozen path) needs no edit and reads exactly today's wording. On the
  * written class the length clause names no sentence count: a written
  * turn's budget is evidence-sized, not act-capped, so a fixed "one or

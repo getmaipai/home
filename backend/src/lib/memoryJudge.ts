@@ -1136,7 +1136,7 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
   // sanitizeForPrompt (SEC-8, code review, 2026-09-06): speaker.displayName
   // is free text the speaker set on their own profile, interpolated
   // straight into buildExtractionPrompt()'s system prompt below - the
-  // same class of injection turnEngine.ts's speakerLine()/householdLine()
+  // same class of injection the retired turn engine's speakerLine()/householdLine()
   // were fixed for.
   // #88: superseded between selection and judging (an edit landed while
   // the batch ran): off the current branch, marked done, nothing written.
@@ -1603,7 +1603,7 @@ const PROFILE_SCHEMA = {
 
 // PROFILE-CHANNEL-01: the paragraph this function writes is injected into
 // EVERY turn's prompt unconditionally (getProfileParagraph(), read
-// straight off the pinned PROFILE_SOURCE row - turnEngine.ts never sends
+// straight off the pinned PROFILE_SOURCE row - the retired turn engine never sends
 // it through recall() at all), so it is the one memory channel MEM-ELIG-01's
 // query-eligibility gate can never reach, whatever the person's utterance
 // is. A fact that reads as an event (something that happened or is

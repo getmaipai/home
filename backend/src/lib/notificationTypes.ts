@@ -61,7 +61,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   // parent" under `immediate`) and a real, previously-unrealized gap:
   // safety.ts's evaluateSafety() has computed `notify_parent` since it
   // was written, and until this, the only place it went was a console
-  // log line (turnEngine.ts never read it). CLAUDE.md's Safety
+  // log line (the retired turn engine never read it). CLAUDE.md's Safety
   // invariants make this non-configurable by design, not by omission:
   // "no admin setting... may disable or weaken" a child-safety
   // protection, and a parent losing visibility into a flagged

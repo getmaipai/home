@@ -17,7 +17,7 @@
 // a time BEFORE hand-off to the speaker (guardSentence) - the same "a
 // sentence is out of the speaker the moment it is handed over" reasoning
 // bot-legacy's own docstring gives. Guards NEVER run on a safety refusal,
-// a command, or a plugin's own reply (turnEngine.ts only ever calls
+// a command, or a plugin's own reply (the retired turn engine only ever calls
 // these on `source: "model"` text) - a package's own `speech` string is
 // never rewritten by anything here, only the model's own words are ever
 // second-guessed.
@@ -60,7 +60,7 @@ export type GuardReason =
    * empty reply, a fragment) and the one regeneration was not either;
    * the fixed line stands in. Never the honesty vocabulary: nothing
    * was unknown, the output broke. Set by the reply boundary
-   * (turnEngine.ts's finalizeReply and the streaming hold), not by
+   * (the retired turn engine's finalizeReply and the streaming hold), not by
    * guardSentence(). */
   | "malformed"
   /** ASK-01 (dev.md section 3, part 5): a sentence that claims prior
@@ -70,11 +70,6 @@ export type GuardReason =
    * itself ("I don't know Nadia yet, who's that?"), so the fix is the
    * replacement. */
   | "false_familiarity"
-  /** ASK-01: a reply pronoun that contradicts the subject's stored
-   * pronouns, or the pronoun the person used for the name on this
-   * turn or the last two (`subjectPronouns`, `pronounsInPlay`).
-   * Skipped wherever it sits. */
-  | "pronoun_mismatch"
   | "false_capability"
   | "banned_phrase"
   /** REP-01: on an objection (target hub with a repair, or the objection
@@ -153,13 +148,6 @@ export interface GuardContext {
    * or bare, for the role shape (the set: "who is Raven" answered "the
    * child who shares the house" on a bare name). */
   unresolvedNames?: readonly string[];
-  /** ASK-01: the pronoun family each subject of the turn takes ("he",
-   * "she", "they"), from the entity's stored pronouns or the pronoun the
-   * person used for the name this turn; the reply may not contradict it. */
-  subjectPronouns?: readonly { name: string; pronouns: string }[];
-  /** ASK-01: the pronoun families the person used in the utterance and
-   * the last two turns; a family in play is never a mismatch. */
-  pronounsInPlay?: readonly string[];
   /** FAST-05: the household's own people (display names and nicknames),
    * so a location claim can tell a household subject ("Pippa is at
    * soccer practice", which needs a source) from the world ("Paris is
@@ -843,42 +831,6 @@ function guardFalseFamiliarity(sentence: string, ctx: GuardContext): GuardReason
  * replacement (the ask itself). */
 function unknownNamedIn(sentence: string, ctx: GuardContext): string | null {
   return (ctx.unknownNames ?? []).find((n) => mentions(sentence, n)) ?? null;
-}
-
-// ASK-01 part 5: a reply pronoun from a family the subject does not
-// take and the person has not used. "he" and "she" only: "they" is
-// also the plural, and "it" a thing. Read only where the subject is
-// the one possible referent: a sentence or an utterance that names
-// another person (a roster name, a proper noun, a relation noun like
-// "my sister") can be talking about them.
-const PRONOUN_FAMILY_RE = /(?<![\p{L}])(he|him|his|himself|she|her|hers|herself)(?![\p{L}])/giu;
-const OTHER_REFERENT_RE = /\b(?:sister|brother|mom|mum|mother|dad|father|wife|husband|aunt|uncle|grandma|grandpa|grandmother|grandfather|daughter|son|niece|nephew|cousin|girlfriend|boyfriend|partner|friend|coworker|co-worker|colleague|neighbou?r|teacher|boss|manager|doctor|dentist|vet|nurse|coach|babysitter|nanny|roommate|landlord|kid|child|baby)\b/i;
-function guardPronounMismatch(sentence: string, ctx: GuardContext): GuardReason | null {
-  const subjects = ctx.subjectPronouns ?? [];
-  if (subjects.length === 0) return null;
-  const allowed = new Set<string>([...subjects.map((s) => s.pronouns.split("/")[0]!.toLowerCase()), ...(ctx.pronounsInPlay ?? []).map((p) => p.toLowerCase())]);
-  // A subject whose pronouns are "they" or unknown constrains nothing
-  // about he/she in the reply beyond what is in play.
-  const constrained = subjects.some((s) => /^(?:he|she)\b/i.test(s.pronouns));
-  if (!constrained) return null;
-  if (OTHER_REFERENT_RE.test(sentence) || OTHER_REFERENT_RE.test(ctx.utterance)) return null;
-  // A capitalized word past the sentence's first is a name, and so is
-  // the first word when the roster knows it ("Bruno mentioned he saw
-  // her", a review); a name that is not the subject's is another
-  // referent.
-  const subjectNames = new Set(subjects.map((s) => s.name.toLowerCase()));
-  const rosterNames = new Set((ctx.roster ?? []).map((r) => r.trim().toLowerCase().split(/\s+/)[0]!));
-  // A household member named in the utterance beside the subject is a
-  // referent too, with pronouns the registry does not store ("Rover
-  // chased Pippa": "she" is Pippa's; a review).
-  if ([...rosterNames].some((r) => !subjectNames.has(r) && mentions(ctx.utterance, r))) return null;
-  const otherName = [...sentence.matchAll(/(?<![\p{L}])(\p{Lu}[\p{L}'-]+)(?![\p{L}])/gu)].some((m) => (m.index !== 0 || rosterNames.has(m[1]!.toLowerCase())) && !subjectNames.has(m[1]!.toLowerCase()));
-  if (otherName) return null;
-  for (const m of sentence.matchAll(PRONOUN_FAMILY_RE)) {
-    const family = /^(?:he|him|his|himself)$/i.test(m[1]!) ? "he" : "she";
-    if (!allowed.has(family)) return "pronoun_mismatch";
-  }
-  return null;
 }
 
 function guardInvention(sentence: string, ctx: GuardContext): GuardReason | null {
@@ -1706,7 +1658,7 @@ export function bankLineNote(sentence: string): string | null {
 // LOOKUP-02: the deliverable denial is dropped wherever it sits (the
 // engine already ran the lookup or is about to); the honest line stands
 // in only when the denial was the whole reply.
-const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "pronoun_mismatch", "false_capability", "banned_phrase", "self_assertion", "example_parrot"]);
+const SKIPPABLE: ReadonlySet<GuardReason> = new Set(["claimed_experience", "claimed_statement", "false_capability", "banned_phrase", "self_assertion", "example_parrot"]);
 
 /** Whether the utterance has a statement-like act or shape. */
 export function isStatementTurn(ctx: Pick<GuardContext, "act" | "shape" | "utterance">): boolean {
@@ -1728,7 +1680,7 @@ export function shouldRetryAfterSkip(reason: GuardReason, ctx: GuardContext): bo
   return reason === "banned_phrase" || reason === "self_assertion" || reason === "example_parrot" || (reason === "claimed_experience" && !experienceTurn(ctx));
 }
 
-/** Exported so turnEngine.ts's streaming path (`gateGuards()`) makes the
+/** Exported so the retired turn engine's streaming path (`gateGuards()`) makes the
  * SAME cut-vs-replace-the-rest distinction guardReply() does below - one
  * definition of "which reasons are padding vs the reply's own thesis,"
  * never a second copy re-guessed at the call site. */
@@ -1760,7 +1712,6 @@ const REPLACEMENT_FOR: Record<GuardReason, readonly string[]> = {
   // ASK-01: the ask itself stands in (replacementFor() names the name);
   // a pronoun slip that emptied the reply is an output break.
   false_familiarity: DONT_KNOW,
-  pronoun_mismatch: MALFORMED,
   false_capability: ["That lookup didn't work, sorry."],
   banned_phrase: MALFORMED,
   self_assertion: MALFORMED,
@@ -1780,7 +1731,7 @@ export function dontKnowYetLine(name: string): string {
 }
 
 /** The honest line a guard hit replaces text with, for a given reason -
- * exported so the streaming path (turnEngine.ts's `gateGuards`) can
+ * exported so the streaming path (the retired turn engine's `gateGuards`) can
  * build the SAME replacement `guardReply()` uses below, one sentence at
  * a time instead of the whole-reply cut/replace decision. For
  * `unsupported_action` the line is narrated from the flagged sentence's
@@ -1799,7 +1750,7 @@ export function replacementFor(reason: GuardReason, personId: string, flagged?: 
 /** Runs every guard against one sentence, in the order a real reply
  * would trip them (an outright claim or echo before a subtler grounding
  * check). `null` means the sentence may stand as written. Exported for
- * the streaming path (turnEngine.ts calls this per sentence, before
+ * the streaming path (the retired turn engine calls this per sentence, before
  * hand-off to the speaker, the same "a sentence is out of the speaker
  * the moment it is handed over" reasoning bot-legacy's own guards.py
  * docstring gives).
@@ -1841,7 +1792,6 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
     guardExampleParrot(s, ctx) ??
     (isFirstSentence ? guardNearEcho(s, ctx) : null) ??
     guardFalseFamiliarity(s, ctx) ??
-    guardPronounMismatch(s, ctx) ??
     guardUnrelatedRecall(s, ctx) ??
     guardInvention(s, ctx)
   );
@@ -1849,7 +1799,7 @@ export function guardSentence(sentence: string, ctx: GuardContext, isFirstSenten
 
 /** The exact sentence split guardReply() itself applies below - exported
  * so a caller that needs to check just the reply's FIRST sentence in
- * isolation (turnEngine.ts's own invention-retry, getmaipai/home#67)
+ * isolation (the retired turn engine's own invention-retry, getmaipai/home#67)
  * uses the IDENTICAL split guardReply() will apply moments later,
  * rather than a second, independently-typed regex that could drift from
  * it (a code review, 2026-09-07, found a first cut doing exactly that). */
@@ -1862,7 +1812,7 @@ export function splitIntoSentences(reply: string): string[] {
  * sentences came before it) or replaces the whole reply the moment a
  * non-cuttable reason fires - bot-legacy's own guard_reply(), same
  * shape. Never called on a safety refusal, a command, or a package's own
- * `speech` string - turnEngine.ts only ever runs this on `source:
+ * `speech` string - the retired turn engine only ever runs this on `source:
  * "model"` text. */
 export function guardReply(reply: string, ctx: GuardContext): Guarded {
   const sentences = splitIntoSentences(reply);

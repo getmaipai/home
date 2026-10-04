@@ -125,7 +125,7 @@ export function currentArtifactRow(artifactKey: string): ArtifactRow | null {
 }
 
 /** SHELL-02 slice 4: the reload path's own read of the same fact
- * `TurnValue.artifact` carries live (turnEngine.ts's `logTurnSafely()`)
+ * `TurnValue.artifact` carries live (the retired turn engine's `logTurnSafely()`)
  * - whichever version THIS turn minted or updated, a fixed historical
  * fact even once a later turn supersedes it (the same shape
  * `structured_part` reads/writes, `artifacts_turn_id_idx` already
