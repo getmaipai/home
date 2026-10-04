@@ -212,38 +212,17 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       scheduler.onError = () => deps.onSpeechError?.();
       scheduler.onEnded = () => deps.onSpeakingChange?.(false);
 
-      // `raw` is every byte received so far, unstripped. `visible` is the
-      // real, displayable/speakable answer built up incrementally with
-      // every <think>...</think> block (llm.ts's `thinking` option)
-      // resolved out of it as soon as each one closes - nothing inside an
-      // open block is ever shown or spoken, streaming raw reasoning into
-      // the thread word by word being exactly the dump stripThinking()
-      // (above) was built to prevent, just done incrementally instead of
-      // after the fact. `scanPos` is how far into `raw` has been fully
-      // resolved into `visible` or discarded as think-block content, so a
-      // later delta only re-scans genuinely new bytes. `insideThink` toggles
-      // on/off around each block rather than latching permanently once one
-      // resolves (a code review, 2026-09-04, found the original one-shot
-      // flag couldn't handle a second block appearing later in the same
-      // stream - unusual for this hub's own model, but nothing here should
-      // assume it can't happen). `spokenLength` is how much of `visible`
-      // has already been handed to the scheduler.
-      let raw = "";
-      let scanPos = 0;
+      // `visible` is the released answer text, exactly as the wire sent it:
+      // the server splits <think> spans into reasoning parts before release
+      // (routes/turn.ts), so a text part never carries the tags and nothing
+      // here parses them. `spokenLength` is how much of `visible` has already
+      // been handed to the scheduler.
       let visible = "";
-      let insideThink = false;
       // SHELL-02: the reasoning Element's own part (thread.aui.tsx),
       // built from the `reasoning` wire event (REASONING-01, wire.ts) -
       // already tag-split server-side, so unlike `visible` above this
-      // never needs resolveRaw()'s own <think> scanning.
+      // never needs any <think> scanning.
       let reasoningText = "";
-      // How far into `raw` a search for the relevant tag has already come
-      // up empty, so the next delta's search resumes from there instead of
-      // re-scanning already-confirmed-clean text from `scanPos` every time
-      // (a code review, 2026-09-04, found the original version re-scanned
-      // the whole accumulated reasoning block from scratch on every single
-      // delta - real, avoidable quadratic cost on a long think block).
-      let searchFrom = 0;
       let spokenLength = 0;
       let sawTerminalEvent = false;
       let resumeToken: string | undefined;
@@ -275,69 +254,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // Insertion order (Map's own iteration order) is step order -
       // there is no separate sequence field on these events.
       const toolCalls = new Map<string, { packageId: string; state: "running" | "ok" | "error"; sites?: { host: string; url: string }[] }>();
-
-      // Resolves as much of `raw.slice(scanPos)` as currently possible into
-      // `visible`, holding back only a still-ambiguous suffix that might
-      // yet become "<think>" (real token-level streaming can split the tag
-      // itself across several deltas - a tokenizer's own boundaries rarely
-      // align with a tag's characters). A code review (2026-09-04) found
-      // the original version only ever recognized the tag when it sat at
-      // the very START of the unresolved remainder - real text arriving
-      // ahead of a tag within the same delta (a network chunk batching a
-      // lead-in phrase with a reasoning block, or a second block's tag not
-      // landing exactly on a delta boundary) got the tag and everything
-      // after it dumped into `visible` unresolved. This searches the whole
-      // remainder for the tag, not just its start.
-      function resolveRaw(): void {
-        const OPEN_TAG = "<think>";
-        const CLOSE_TAG = "</think>";
-        for (;;) {
-          if (insideThink) {
-            const closeIdx = raw.indexOf(CLOSE_TAG, Math.max(scanPos, searchFrom));
-            if (closeIdx === -1) {
-              // Hold back only the last CLOSE_TAG.length - 1 characters,
-              // which could still become the start of "</think>" once more
-              // arrives; everything before that has been confirmed clean.
-              searchFrom = Math.max(scanPos, raw.length - (CLOSE_TAG.length - 1));
-              return;
-            }
-            scanPos = closeIdx + CLOSE_TAG.length;
-            // stripThinking()'s own regex (`<\/think>\s*`) consumes
-            // whitespace right after the closing tag too. A code review
-            // (2026-09-04) found this didn't, so `visible` kept whitespace
-            // stripThinking() drops - `visible`'s coordinate space silently
-            // drifted out of sync with `finalText` (below), and
-            // `spokenLength` (tracked against `visible`) then sliced
-            // `finalText` at the wrong offset once "done" recomputed the
-            // authoritative text, corrupting the trailing spoken fragment.
-            while (scanPos < raw.length && /\s/.test(raw[scanPos]!)) scanPos++;
-            searchFrom = scanPos;
-            insideThink = false;
-            continue;
-          }
-          const remainder = raw.slice(scanPos);
-          const openIdx = remainder.indexOf(OPEN_TAG);
-          if (openIdx === -1) {
-            // No complete opening tag yet - hold back only a trailing
-            // suffix that's still a genuine prefix of "<think>" (it could
-            // complete the tag once more text arrives); everything before
-            // that is definitely real, visible text.
-            let holdBack = 0;
-            for (let i = 1; i < OPEN_TAG.length && i <= remainder.length; i++) {
-              if (OPEN_TAG.startsWith(remainder.slice(remainder.length - i))) holdBack = i;
-            }
-            const safeLength = remainder.length - holdBack;
-            visible += remainder.slice(0, safeLength);
-            scanPos += safeLength;
-            return;
-          }
-          visible += remainder.slice(0, openIdx); // everything before the tag is real text
-          scanPos += openIdx + OPEN_TAG.length;
-          searchFrom = scanPos;
-          insideThink = true;
-          continue;
-        }
-      }
 
       // One definition (a review caught this built twice, copy-pasted,
       // between buildContent() and the done handler below): `turnId`
@@ -471,8 +387,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               lastAcknowledgedSequence = event.sequence;
             }
             deps.onReplyState?.("responding");
-            raw += event.text;
-            resolveRaw();
+            visible += event.text;
             if (activityShown) {
               // Lane 11 item 1's own acceptance: "the first delta removes
               // it" - a real content update can still be empty this same
@@ -483,9 +398,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               activityShown = false;
               yield { metadata: { custom: {} } };
             }
-            // Only yield once there's something to show. A delta that lands
-            // entirely inside an open <think> block leaves `visible` "" -
-            // yielding that anyway would hand assistant-ui a real (if empty)
+            // Only yield once there's something to show. An empty delta
+            // yielding anyway would hand assistant-ui a real (if empty)
             // "text" part, which is enough to satisfy MessagePrimitive.
             // GroupedParts's "no-text" check (thread.aui.tsx's built-in
             // pulsing "Assistant is working" indicator) and hide it, well
