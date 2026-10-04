@@ -103,11 +103,16 @@ describe("a spoken turn with a search (THIN-4F)", () => {
 });
 
 describe("a written adult turn with a search is unchanged (THIN-4F)", () => {
-  test("it reads the full page budget and the answering round carries the full 2,500-character page text", async () => {
+  test("it reads the full page budget and the answering round carries the written page text, not the spoken cut", async () => {
     const { toolContent, fetched } = await searchTurn({ spoken: false });
     expect(fetched.length).toBe(SEARCH_PAGES_MAX);
     const payload = JSON.parse(toolContent) as { sources: { page_text?: string }[] };
-    expect(payload.sources.filter((s) => s.page_text).map((s) => s.page_text!.length)).toEqual([2_500, 2_500, 2_500]);
+    // THIN-GROUND-01 sizes the written evidence from the model's window (this stub's 4,096
+    // tokens halve each 2,500-character page once), so the promise is "the written cap,
+    // far above the spoken one", not a fixed 2,500.
+    const pageLengths = payload.sources.filter((s) => s.page_text).map((s) => s.page_text!.length);
+    expect(pageLengths).toHaveLength(SEARCH_PAGES_MAX);
+    for (const length of pageLengths) expect(length).toBeGreaterThan(SPOKEN_SOURCE_TEXT_CHARS * 2);
     expect(toolContent.length).toBeGreaterThan(SPOKEN_EVIDENCE_TOKENS_MAX * 4);
   });
 });
