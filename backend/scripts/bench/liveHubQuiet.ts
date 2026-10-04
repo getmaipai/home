@@ -70,9 +70,13 @@ function gatePidsByCwd(): Map<number, string> {
  * worktree's gate doesn't count for this run (its own short targeted
  * test runs, not a real gate). Never set as a standing default; the
  * operator sets it per invocation, for the worktree named that turn. */
-export function refuseIfGateRunning(scriptName: string): void {
+export function runningGates(): [number, string][] {
   const ignore = (process.env.MAIPAI_BENCH_IGNORE_GATE_CWD ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  const busy = [...gatePidsByCwd()].filter(([, cwd]) => !ignore.some((substr) => cwd.includes(substr)));
+  return [...gatePidsByCwd()].filter(([, cwd]) => !ignore.some((substr) => cwd.includes(substr)));
+}
+
+export function refuseIfGateRunning(scriptName: string): void {
+  const busy = runningGates();
   if (busy.length > 0) {
     console.error(`${scriptName} refused: a gate (scripts/check.sh, bun test, or vite build) is already running (${busy.map(([pid, cwd]) => `${pid} in ${cwd}`).join(", ")}). Never beside a gate.`);
     process.exit(2);

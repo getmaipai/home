@@ -13,6 +13,7 @@
     "db:migrate": "bun run src/db/migrate.ts",
     "gen:settings": "bun run scripts/gen-settings-registry.ts",
     "gen:api-docs": "bun run scripts/gen-api-docs.ts",
+    "smoke:chat": "bun run scripts/smoke/chat.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
