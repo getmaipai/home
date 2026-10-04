@@ -75,3 +75,9 @@ export function streamWatchdog(parent: AbortSignal, firstTokenMs: number, stallM
     },
   };
 }
+
+/** T5 / THIN-2G: the retry round of a spoken turn gets half the deadline, so a
+ * failed lookup never pushes the first word past the spoken turn's budget. */
+export function retryDeadlineMs(deadlineMs: number, spoken: boolean): number {
+  return spoken ? Math.floor(deadlineMs / 2) : deadlineMs;
+}

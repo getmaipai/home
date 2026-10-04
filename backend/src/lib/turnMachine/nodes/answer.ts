@@ -8,6 +8,7 @@
 import type { Node, ToolExecutionOutcome, PolicyDecision } from "../contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { failureLine, type FailureKind } from "@/lib/generationFailure";
+import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 
 /** The reasons `policy` can refuse a proposal WITHOUT parking an ask
  * (consent_needed/confirm_needed always carry one, so machine.ts's

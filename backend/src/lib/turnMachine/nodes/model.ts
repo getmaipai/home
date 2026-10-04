@@ -20,7 +20,7 @@ import { planLineForTurnMachine } from "@/lib/register";
 import { askAppendFor, NO_ASK_APPEND } from "@/lib/askNames";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages, bareMessages, continuationMessages } from "../messages";
-import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction } from "./lookupFallback";
+import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryInstruction, retryTools, isRepeatOfFailed } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
 
@@ -85,6 +85,10 @@ export interface ModelInput {
    * boundary, since offering no tools is what makes a text answer
    * certain, never a second, separate cap checked somewhere else. */
   toolsAllowed: boolean;
+  /** T5 / THIN-2G: the one retry round after every call of a tool round failed
+   * (machine.ts sets it). Offered like the failed round (same tools block,
+   * tool_choice auto) plus a plain line naming the failed tool and kind. */
+  retry?: boolean;
 }
 
 export type ModelOutput =
@@ -540,7 +544,21 @@ function noToolsTurn(state: TurnState): boolean {
   return state.bare === true || state.continuation !== undefined || state.crisis === true;
 }
 
+/** T5 / THIN-2G: the retry round's own floors around what the model chose: a
+ * call to a tool the retry block does not offer (a write tool among them) or
+ * byte-identical to a call that already failed is dropped, and when nothing is
+ * left the round becomes the phrasing round. The model still decides what to
+ * try (rule 1); no word rule picks the tool. */
 export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
+  const result = await modelRound(state, input, signal);
+  if (!input.retry || result.output.kind !== "tool_calls") return result;
+  const offered = new Set(state.lastTools.map((t) => t.id));
+  const calls = result.output.calls.filter((c) => offered.has(c.tool) && !isRepeatOfFailed(c, state.outcomes));
+  if (calls.length === 0) return modelRound(state, { ...input, toolsAllowed: false, retry: false }, signal);
+  return { ...result, output: { ...result.output, calls } };
+};
+
+const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
   // PHRASE-01 (dev.md "The written prompt on tier 1, decided"'s own
   // follow-up): a phrasing round is the model round that runs after at
   // least one tool round already completed this turn (`state.outcomes`
@@ -658,6 +676,17 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
     // it and costs the cache hit this item exists to restore).
     tools = state.lastTools;
     tool_choice = "none";
+  } else if (input.retry) {
+    // T5 / THIN-2G: the failed round's own messages byte for byte, then one
+    // instruction (the plan line ahead of it on the spoken class, as the
+    // phrasing round does); the failed call and its error are not replayed, only
+    // the tool id and the kind are named.
+    const promptSurfaceClass: SurfaceClass = promptSurfaceClassFor(state.planBasis.surfaceClass ?? "spoken", state.plan.age_band);
+    const failures = state.outcomes.filter(lookupMissed).map((o) => ({ tool: o.packageId, kind: lookupFailureKind(o) }));
+    const retrying = retryInstruction(promptSurfaceClass, input.utterance, failures);
+    messages = [...state.messages, { role: "user", content: promptSurfaceClass === "written" ? retrying : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${retrying}` }];
+    tools = retryTools(state.lastTools, state.temporary);
+    tool_choice = "auto";
   } else if (!toolsAllowed) {
     tools = [];
     tool_choice = undefined;
@@ -693,7 +722,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // record and the empty-reply retry all see the effective flag.
   const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
-  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : "model", signal);
+  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal);
   // THIN-GROUND-01: the engine refused the prompt as larger than its context.
   // One retry with the evidence block halved and the tools block unchanged; a
   // second refusal falls through to the failure line for that kind.
