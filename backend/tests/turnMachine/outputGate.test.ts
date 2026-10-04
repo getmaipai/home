@@ -13,7 +13,7 @@
 // built is unused, not faked.
 import { describe, expect, test } from "bun:test";
 import { outputGateNode, StreamGate } from "@/lib/turnMachine/nodes/outputGate";
-import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
+import { failureLine } from "@/lib/generationFailure";
 import type { TurnState } from "@/lib/turnMachine/contract";
 import type { PersonRow } from "@/lib/memoryIngestion";
 
@@ -37,7 +37,7 @@ describe("outputGateNode: the gate never delivers a bare envelope (ENGINE-CONTRA
       SIGNAL,
     );
     expect(output.refused).toBe(false);
-    expect(output.text).toBe(COMPOSE_FAILURE_LINE);
+    expect(output.text).toBe(failureLine("other", true));
     expect(output.text).not.toContain("function_call");
     expect(output.text).not.toContain("websearch");
   });
@@ -50,7 +50,7 @@ describe("outputGateNode: the gate never delivers a bare envelope (ENGINE-CONTRA
       SIGNAL,
     );
     expect(output.refused).toBe(false);
-    expect(output.text).toBe(COMPOSE_FAILURE_LINE);
+    expect(output.text).toBe(failureLine("other", true));
   });
 
   // Never REFUSAL_FIRST: a wire-shape miss is not a safety refusal, so
@@ -96,7 +96,7 @@ describe("outputGateNode: a reply tagged outcome_error never reaches the person 
       SIGNAL,
     );
     expect(output.refused).toBe(false);
-    expect(output.text).toBe(COMPOSE_FAILURE_LINE);
+    expect(output.text).toBe(failureLine("other", true));
     expect(output.text).not.toContain("MCP error");
     expect(output.text).not.toContain("wikipedia");
   });
@@ -118,7 +118,7 @@ describe("outputGateNode: a reply tagged outcome_error never reaches the person 
     // text (unrelated to this check) - proving the content survives,
     // not exact byte equality, is the actual claim here.
     expect(output.text).toContain("MCP error");
-    expect(output.text).not.toBe(COMPOSE_FAILURE_LINE);
+    expect(output.text).not.toBe(failureLine("other", true));
   });
 
   test("marked refused: false, never the safety-refusal branch machine.ts routes on", async () => {

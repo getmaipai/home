@@ -7,7 +7,7 @@
 // never has to know which one ran).
 import type { Node, ToolExecutionOutcome, PolicyDecision } from "../contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
-import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
+import { failureLine, type FailureKind } from "@/lib/generationFailure";
 
 /** The reasons `policy` can refuse a proposal WITHOUT parking an ask
  * (consent_needed/confirm_needed always carry one, so machine.ts's
@@ -33,7 +33,7 @@ export type AnswerInput =
   // deadline, a dead engine) on a turn where the builder row wasn't a
   // fit either (tool_choice not "required") - a real, honest line,
   // never the empty string this case used to deliver silently.
-  | { kind: "model_failed" };
+  | { kind: "model_failed"; failure?: FailureKind };
 
 export interface AnswerOutput {
   text: string;
@@ -135,6 +135,8 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
     // "something broke, not a refusal" case, one level up, imported
     // rather than re-typed so the two copies can't drift.
     case "model_failed":
-      return { outcome: { ok: true }, output: { text: COMPOSE_FAILURE_LINE, sources: [] } };
+      // THIN-DL-02: the line follows the failure kind (generationFailure.ts),
+      // never the generic apology.
+      return { outcome: { ok: true }, output: { text: failureLine(input.failure ?? "other", state.plan?.age_band !== "adult"), sources: [] } };
   }
 };

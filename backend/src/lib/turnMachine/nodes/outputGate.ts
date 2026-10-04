@@ -31,7 +31,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import type { Surface } from "@/lib/turnShared";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import { envelopeToolCall } from "@/lib/llm";
-import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
+import { failureLine } from "@/lib/generationFailure";
 import { notifyOncePerTurn } from "@/lib/turnShared";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { nextSentenceBoundary } from "@maipai/spec/safety/ts/sentenceChunker.js";
@@ -564,7 +564,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     // reasoning at all, so `input.reasoningWithheldFor` - context's own
     // decision (`"minor"`, `"surface"`, `"presence"`, or null) - passes
     // through unchanged, never overwritten by this unrelated catch.
-    return { outcome: { ok: true }, output: { refused: false, text: COMPOSE_FAILURE_LINE, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningWithheldFor } } };
+    return { outcome: { ok: true }, output: { refused: false, text: failureLine("other", state.plan?.age_band !== "adult"), sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningWithheldFor } } };
   }
 
   // COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): the same
@@ -577,7 +577,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   // error, an HTTP status) never reaches a household member, whatever
   // node produced it.
   if (input.reply.provenance === "outcome_error") {
-    return { outcome: { ok: true }, output: { refused: false, text: COMPOSE_FAILURE_LINE, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningWithheldFor } } };
+    return { outcome: { ok: true }, output: { refused: false, text: failureLine("other", state.plan?.age_band !== "adult"), sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningWithheldFor } } };
   }
 
   // THIN-0N: the speaker's effective band, as the old path's prepareTurn().

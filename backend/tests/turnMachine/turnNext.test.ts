@@ -36,6 +36,7 @@ import { eq } from "drizzle-orm";
 import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
+import { partialReplyNote } from "@/lib/generationFailure";
 import { remember, embedMemoryRecordSafely, PROFILE_SOURCE } from "@/lib/memory";
 import { DEFAULT_PERSONA, resolvePersona } from "@/lib/persona";
 import { identityLine } from "@/lib/turnShared";
@@ -3334,7 +3335,9 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
         const events: TurnStreamEvent[] = [];
         for await (const event of streamTurnEvents(result, people.owner.id)) events.push(event);
         const delivered = events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("");
-        expect(delivered.trim()).toBe(FIRST_SENTENCE);
+        // THIN-DL-02: the kept text, then a plain closing note that it stopped.
+        expect(delivered.startsWith(FIRST_SENTENCE)).toBe(true);
+        expect(delivered).toContain(partialReplyNote("other", false));
         // Unlike the old path's own equivalent crash (chatTurn.test.ts:
         // "a failed generation never also claims success"), a crash here
         // finishes the state machine normally - `answer`'s own

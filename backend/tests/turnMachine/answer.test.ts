@@ -6,7 +6,7 @@
 import { describe, expect, test } from "bun:test";
 import { answerNode } from "@/lib/turnMachine/nodes/answer";
 import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract";
-import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
+import { FAILURE_COPY, failureLine, type FailureKind } from "@/lib/generationFailure";
 
 const STATE = { outcomes: [] } as unknown as TurnState;
 const SIGNAL = new AbortController().signal;
@@ -64,9 +64,28 @@ test("answerNode: 'model_text' never carries the provenance tag - only a real ou
   expect(modelText.output.provenance).toBeUndefined();
 });
 
-test("answerNode keeps the generic line for non-engine model failures", async () => {
-  const { output } = await answerNode(STATE, { kind: "model_failed" }, SIGNAL);
-  expect(output.text).toBe(COMPOSE_FAILURE_LINE);
+// THIN-DL-02: a failed generation is told by its kind, never the generic
+// apology, and a minor gets the short, kind wording.
+describe("answerNode: a failed generation is told by its kind (THIN-DL-02)", () => {
+  const ADULT = { plan: { age_band: "adult" }, outcomes: [] } as unknown as TurnState;
+  const CHILD = { plan: { age_band: "child" }, outcomes: [] } as unknown as TurnState;
+  for (const kind of ["busy", "memory", "slow", "unreachable", "other"] as FailureKind[]) {
+    test(`kind "${kind}": adult and child wording, never the generic line`, async () => {
+      const adult = await answerNode(ADULT, { kind: "model_failed", failure: kind }, SIGNAL);
+      const child = await answerNode(CHILD, { kind: "model_failed", failure: kind }, SIGNAL);
+      expect(adult.output.text).toBe(FAILURE_COPY[kind].adult);
+      expect(child.output.text).toBe(FAILURE_COPY[kind].minor);
+      expect(child.output.text.length).toBeLessThan(adult.output.text.length);
+      for (const text of [adult.output.text, child.output.text]) {
+        expect(text).not.toContain("couldn't do that");
+        expect(text).not.toContain("\u2014");
+      }
+    });
+  }
+  test("a failure with no kind still gets the plain other-kind line", async () => {
+    const { output } = await answerNode(ADULT, { kind: "model_failed" }, SIGNAL);
+    expect(output.text).toBe(failureLine("other", false));
+  });
 });
 
 // MANIFEST-REFUSAL-01 (fixes getmaipai/home#166): a manifest that fails
