@@ -1,0 +1,14 @@
+/* The kit's MarkdownText is used exactly as shipped; its look comes from the
+   tokens it reads. This is the one exception, and it is a defect fix, not a
+   look: the kit's highlighter paints with light-dark(), which follows the
+   element's color-scheme. The app themes with a .light / .dark class on <html>
+   and leaves color-scheme at "normal", so dark code resolved to the light
+   palette (near-black text on a dark block). It belongs in the kit's tokens
+   (commons); until then the scheme is stated where the colours are used. */
+.light .aui-shiki-base {
+  color-scheme: light;
+}
+
+.dark .aui-shiki-base {
+  color-scheme: dark;
+}
