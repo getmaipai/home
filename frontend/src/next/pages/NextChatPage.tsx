@@ -40,6 +40,7 @@ import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
+import { TurnErrorDetails } from "@/next/pages/TurnErrorDetails";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -716,13 +717,20 @@ function toolTimelineRestingLabel(stepCount: number, stats: TurnStats | undefine
 const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>, TimelineCall[]> = ({ result }) => {
   const [open, setOpen] = useState(false);
   const stats = useAuiState((s) => s.message.metadata?.custom?.stats as TurnStats | undefined);
+  const isAdmin = useContext(AdminContext);
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   if (!result?.length) return null;
   const running = result.some((call) => call.state === "running");
+  // THIN-1E: an admin's quiet way into the raw details of a failed call.
+  const failed = isAdmin && !!turnId && result.some((call) => call.state === "error");
   return (
+    <div className="flex items-start gap-1">
     <ToolTimeline
       steps={result.map((call) => ({ verb: TIMELINE_VERB[call.state], chip: call.label ?? call.packageId, icon: ToolTimelineIcon, sites: call.sites }))}
       visibleSteps={result.length}
       streaming={running}
+      // `w-auto`: the indicator below sits beside the timeline, not at the end of its full-width box.
+      className={failed ? "w-auto" : undefined}
       open={open}
       onOpenChange={setOpen}
       activeLabel="Working…"
@@ -735,6 +743,8 @@ const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>
       // function `SourcesFooterContent` below already passes to `SourceIcon`.
       faviconUrl={faviconUrl}
     />
+    {failed ? <TurnErrorDetails turnId={turnId} /> : null}
+    </div>
   );
 };
 
