@@ -605,7 +605,9 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       );
       await sendMessage(view, "when's high tide");
       await view.findByText("High tide is at 4pm.");
-      const trigger = view.getByRole("button", { name: /Sources/ });
+      // Issue #205: the visible label carries the real count; with the icon's
+      // fallback letter beside it, a bare "Sources" read as "NSources".
+      const trigger = view.getByRole("button", { name: "1 Source" });
       expect(trigger).toBeVisible();
       // Collapsed by default - the source's own title isn't in the DOM
       // yet (a Collapsible unmounts its own content when closed).
@@ -626,6 +628,28 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       expect(capturedImgSrcs).toContain(`/api/favicon?domain=${encodeURIComponent("example.com")}`);
     } finally {
       Object.defineProperty(HTMLImageElement.prototype, "src", originalSrcDescriptor);
+      restore();
+    }
+  });
+
+  test("two sources label the trigger with their count (issue #205)", async () => {
+    const make = (n: number) => ({ id: `src-n${n}`, kind: "web" as const, title: `Source ${n}`, url: `https://news${n}.example.com/a`, site: `news${n}.example.com`, snippet: null, source: "turn-two123", created_at: "2026-09-22T00:00:00.000Z", hlc: `1788000000000:${n}:test` });
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { type: "delta", text: "Two sites agree." },
+        { type: "done", value: { turn_id: "turn-two123", reply: { text: "Two sites agree." }, source: "model", safety: SAFETY, sources: [make(1), make(2)] } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "do they agree");
+      await view.findByText("Two sites agree.");
+      expect(view.getByRole("button", { name: "2 Sources" })).toBeVisible();
+    } finally {
       restore();
     }
   });
@@ -678,6 +702,32 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       expect(view.queryByText("websearch")).toBeNull();
       fireEvent.click(trigger);
       expect(await view.findByText("websearch")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a failed tool call still renders its chip and the reply (a failed tool never fails the answer)", async () => {
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: { query: "tide chart" }, call_id: "call-err-1" },
+        { t: "tool_error", call_id: "call-err-1", package_id: "websearch", error: "lookup failed" },
+        { type: "delta", text: "I could not look that up." },
+        { type: "done", value: { turn_id: "turn-tools-err", reply: { text: "I could not look that up." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "when's high tide");
+      await view.findByText("I could not look that up.");
+      const trigger = view.getByRole("button", { name: /1 tool call/ });
+      fireEvent.click(trigger);
+      expect(await view.findByText("websearch")).toBeVisible();
+      expect(view.queryByText(/lookup failed/)).toBeNull();
     } finally {
       restore();
     }

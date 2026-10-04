@@ -961,10 +961,10 @@ function SourcesActionBarTrigger() {
               <SourceIcon key={source.url} url={source.url} faviconUrl={faviconUrl} className={index === 0 ? "ring-2 ring-background" : "-ml-1.5 ring-2 ring-background"} />
             ))}
           </span>
-          <span>Sources</span>
+          <span>{sources.length === 1 ? "1 Source" : `${sources.length} Sources`}</span>
         </ElementsButton>
       </TooltipTrigger>
-      <TooltipContent>{sources.length === 1 ? "1 source" : `${sources.length} sources`}</TooltipContent>
+      <TooltipContent>Show sources</TooltipContent>
     </Tooltip>
   );
 }
