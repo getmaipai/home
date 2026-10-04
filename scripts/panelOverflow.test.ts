@@ -1,5 +1,20 @@
 import { describe, test, expect } from "bun:test";
+import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { findClippedStrips, findOverflowingPanels } from "./panelOverflow";
+
+// The scripts shard normally has no DOM. Keep this test self-contained while
+// allowing it to share a process with a runner that already registered one.
+if (typeof document === "undefined") {
+  const nativeStreams = {
+    ReadableStream: globalThis.ReadableStream,
+    WritableStream: globalThis.WritableStream,
+    TransformStream: globalThis.TransformStream,
+    AbortController: globalThis.AbortController,
+    AbortSignal: globalThis.AbortSignal,
+  };
+  GlobalRegistrator.register();
+  Object.assign(globalThis, nativeStreams);
+}
 
 // Stands in for happy-dom's own always-zeroed getBoundingClientRect()
 // (this codebase's established reason real layout checks like this one
