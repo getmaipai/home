@@ -36053,3 +36053,51 @@ Per-arm detail: a "confidently wrong" turn 1 states a date as fact that no sourc
 **What landed.** (1) `webRotationPool` keeps an engine only when SearXNG lists both `web` and `general` for it (test: `packageHost.test.ts`, "never rotates onto an image or video engine"). On this instance the pool goes from 10 engines (2 of the 10 consecutive pairs include google cse) to 4 (bing, brave, google cse, yahoo; 2 of 4 pairs include google cse, and a suspended engine is benched for 30 minutes, after which the pair is bing + google cse). (2) `searchEvidenceMaxChars(context_tokens)`: 1.4 characters per context token, 2,000 to 16,000, used by the phrasing round's tool message (test: `searchPages.test.ts`). The old 16,000-character ceiling stays for a large window.
 
 **What did not clear the bar, and why.** Smoke turn 1 is still not correct in a fresh process: its first search asks `bing,brave`, brave is suspended on this instance, and bing returns unrelated posts for this query (it answers other queries well), so 3 of 5 runs say honestly that the results do not answer it and 2 of 5 are confidently wrong from an unrelated post's date. Candidate fixes that stay inside the rules and are left for the owner: ask three engines per search (SearXNG's own merge ranks the google cse rows first; measured by hand: `bing,brave,google cse` returns the Doomsday rows on top), or run the next pair when an engine in the first was suspended and put the better-ranked rows first (a request-budget change under THIRD-PARTY-SERVICES.md); a second search round when the first found nothing relevant (rule 1 keeps the decision with the model). Only a larger model, or reading dates off pages (`publishedDate` is empty for every engine here; dates arrive inside snippet and page text), would fix the "May 2026 tweet in a 2024 article" evidence, since nothing in it says it is stale. The Stack running the chat engine at a 4,096-token context on a 24 GB machine is a Stack finding (RULES.md rule 4), not a Home one.
+
+## Gate speed (2026-10-04)
+
+GATE-SPEED-01. Owner's instruction: optimize for the fastest coding and delivery. Measured on the dev laptop (14 cores: 10 performance, 4 efficiency; 24 GB), while Codex lanes were running their own suites (load average 4 to 10), so every number is a loaded-machine number and the before and after rows were taken the same afternoon.
+
+### Where the time went (before)
+
+| Step | Seconds |
+|---|---|
+| backend `bun test` (one process, 279 files, 4,596 tests) | 271 |
+| frontend `bun test` (one process, 145 files, 1,203 tests) | 50 |
+| frontend a11y capture | 65 |
+| backend typecheck, API docs, settings drift, rule budget, scripts typecheck | 16 |
+| frontend typecheck, eslint, build | 12 |
+| reading-level lint, standards core (gitleaks, PII, prose, ports, licence, architect) | 5 |
+| hooks per commit (five PreToolUse scripts) | 0.2 |
+| `code-review` at low (one run on a 4-commit diff) | 18 |
+
+The earlier 465 s full-gate number was the same suite on a more loaded machine. The one backend process used 0.75 of a core on average (203 s user in 271 s wall), so 13 of 14 cores sat idle. Slowest backend files: `benchSetup` 21.8 s, `mdns` 14.7, `sidecars` 13.7, `chatTurn` 13.1, `conversationHistory` 12.1, `denoHost` 10.4; the whole list of 30, and the frontend's 15 (`FaceEnrollmentCapture` 22.6 s, `chatMemoryState` 6.8, `NextChatPage` 6.0, everything else under 1.2 s), is in `scripts/gate/test-timings.json` (all 279 and 145 files). The longest single file is 22 s, so that is the floor for any split by file.
+
+### What changed
+
+1. Sharded suites (`scripts/gate/shardTests.ts`). The backend, frontend and scripts suites run as parallel bun processes, files packed by measured seconds (heaviest first, new unmeasured files first so a new red test fails in seconds). Shard count: `MAIPAI_GATE_SHARDS`, else half the cores, capped by free memory at 0.8 GB per shard (a backend shard measured about 0.4 GB) and by 6. Each shard has its own `TMPDIR`, deleted when the run ends, which also stops the gate leaking temp folders. The preload already gives every process its own data dir and ports. Each shard runs `bun test --bail`; the first failure stops the others, prints the failing test and the shard's file order, and the runner exits with that shard's code. `bun scripts/gate/shardTests.ts --dir backend --root tests --record` re-measures the timings.
+2. Steps overlap. The suites start first and run while typecheck, lint, drift checks, build and the a11y capture run; each output is buffered and printed whole.
+3. Stamps (`scripts/gate/stamp.ts`). The a11y capture is skipped when a SHA-256 of every file it can read (frontend, backend, scripts, minus test files, plus the lockfile, the package files, `check.sh` itself and the bun version) matches the last green run, stored in `data-scratch/gate-stamps/`. Any change reruns it.
+4. Locks. The lock was already skipped by the docs scope. A frontend-only diff now takes its own lock (`GATE_LOCK_NAME=frontend` in `gate-lock.sh`), so it never waits behind a backend or full gate. A waiting gate prints its queue position and the holder every minute (the last full gate waited 221 s behind another session's, silently before).
+5. Scope widening. `origin/main` was only as fresh as the last fetch, so a stale ref made the merge-base old and other people's already-pushed commits (a `scripts/` file, a lockfile) counted as this change and widened a docs diff to full. `check.sh` now runs one `git fetch origin main` (8 s cap, failure ignored) before the merge-base. The scope line already names the widening file: `== scope: full (scripts/ changed (scripts/check.sh) - ...)`.
+6. Escape hatches: `MAIPAI_GATE_SHARDED=0` (one plain `bun test`), `MAIPAI_GATE_NO_STAMPS=1`, `MAIPAI_GATE_NO_FETCH=1`.
+
+### Before and after
+
+| Gate | Before | After | Note |
+|---|---|---|---|
+| Backend suite alone | 271 s | 41 to 65 s (5 to 6 shards) | 101 s on one run at load 9 |
+| Frontend suite alone | 50 s | 23 s (3 shards) | |
+| Full gate, a11y stamped | about 295 s (steps summed) | 61 s | measured on the final tip, lock wait excluded |
+| Full gate, a11y runs | about 295 s | about 75 s | two measured runs, 72 and 74 s |
+| Frontend-only gate | about 131 s | 77 s | a11y (65 s) is now the whole gate |
+| Docs gate | 4 s (but a stale origin/main widened it to the full gate) | 4 s, never widened by someone else's push | measured: scope docs, 4 s wall |
+
+The red demonstrations: a deliberately failing test dropped into `backend/tests/` made the sharded run exit 1, print `(fail) deliberately red gate probe`, and stop the other shards (33 s when every file is unmeasured, 1 s once new files run first); the same in a throwaway fixture suite is in `scripts/gate/shardTests.test.ts`. The first sharded runs also found three real order dependences that a single process had been hiding: the legacy-import "refuses without a backup" test (fixed), `VoiceCatalogSection` calling `navigator.mediaDevices.enumerateDevices` after another file replaced it with a fake (fixed), and a cross-process port collision: a `Bun.serve({ port: 0 })` fixture in one shard received an HTTP 401 from another shard's server on the same port (one in roughly eight sharded runs; `packageHost.test.ts` "engine benched"). That one is not fixed: it needs the fixtures bound to `127.0.0.1` explicitly. A flaky red costs one 60 s rerun now instead of five minutes.
+
+### What is not done
+
+- Affected-test selection by import graph, per-batch full runs and a pre-push hook are rule changes for the owner (see the report that came with this work).
+- Frontend build and a11y both run `vite build`; the a11y capture builds on its own behind a lock, so the gate's own build step is redundant when a11y runs, but running them together races on `dist/`.
+- The review hook only checks that some `code-review` ran in the last 30 minutes; it is not tied to the diff.
+- `pkill -f "bun test"` from another session kills shard processes; the sharded gate then exits non-zero, never a false green.
