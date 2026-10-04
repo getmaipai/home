@@ -60,6 +60,7 @@ stop_tree() {
   kill "$1" $tree 2>/dev/null || true
 }
 on_exit() {
+  tests_kill 2>/dev/null || true
   if [ -n "$BACKEND_PID" ]; then stop_tree "$BACKEND_PID"; fi
   if [ -n "$FRONTEND_PID" ]; then stop_tree "$FRONTEND_PID"; fi
   wait 2>/dev/null || true
@@ -86,6 +87,16 @@ trap on_exit EXIT
 # origin/main is preferred when it exists but main is a safe fallback
 # in a checkout with no remote configured.
 gate_diff_base() {
+  # GATE-SPEED-01 (e): origin/main is only as fresh as the last fetch. A
+  # stale ref makes the merge-base old, so commits other people already
+  # pushed count as "this change" and can widen a docs diff to full (a
+  # scripts/ or package.json file in them). One short best-effort fetch
+  # (8 s cap, offline is fine) keeps the base current; set
+  # MAIPAI_GATE_NO_FETCH=1 to skip it.
+  if [ "${MAIPAI_GATE_NO_FETCH:-0}" != 1 ] && [ -z "${_GATE_FETCHED:-}" ]; then
+    perl -e 'alarm 8; exec @ARGV' git fetch --quiet origin main >/dev/null 2>&1 || true
+    _GATE_FETCHED=1
+  fi
   if git rev-parse --verify origin/main >/dev/null 2>&1; then
     git merge-base HEAD origin/main
   elif git rev-parse --verify main >/dev/null 2>&1; then
@@ -230,6 +241,10 @@ if [ "$SCOPE" != "docs" ]; then
     echo "== gate-lock: $GATE_LOCK is missing (getmaipai/.github checkout older than gate-lock.sh, or set MAIPAI_GATE_LOCK); not running a $SCOPE gate without the machine-wide lock"
     exit 1
   fi
+  # A frontend-only diff takes its own lock, so it never waits behind a
+  # backend or full gate (GATE-SPEED-01 d); frontend gates still queue
+  # behind each other.
+  if [ "$SCOPE" = "frontend" ]; then export GATE_LOCK_NAME=frontend; fi
   GATE_LOCK_LABEL="home-$$"
   if ! GATE_LOCK_PID=$$ bash "$GATE_LOCK" acquire "$GATE_LOCK_LABEL" "${GATE_LOCK_ITEM:-}"; then
     echo "== gate-lock: could not take the machine-wide full-gate lock (see above); not running the $SCOPE gate"
@@ -324,7 +339,58 @@ fi
 # own measurement reads.
 stage_end() { local now; now=$(date +%s); [ -n "${STAGE_T:-}" ] && echo "   (${STAGE_NAME}: $((now-STAGE_T))s)" >&2; }
 
+# GATE-SPEED-01 (a): test suites run as parallel bun processes split by
+# measured file duration (scripts/gate/shardTests.ts): same pass/fail
+# meaning, fail fast, one exit code, temp folders removed at the end.
+# MAIPAI_GATE_SHARDED=0 runs the old single `bun test` instead.
+# usage: run_tests <workspace> <root> <shards, empty = chosen from cores and memory>
+run_tests() {
+  local dir="$1" root="$2" shards="$3"
+  if [ "${MAIPAI_GATE_SHARDED:-1}" = 0 ]; then
+    (cd "$dir" && bun test)
+  else
+    bun scripts/gate/shardTests.ts --dir "$dir" --root "$root" ${shards:+--shards "$shards"}
+  fi
+}
+
+# GATE-SPEED-01 (b): the a11y capture (the slowest step outside the test
+# suites, ~65 s) is skipped when every file it can read is byte-identical
+# to the last green run (scripts/gate/stamp.ts; test files are not inputs
+# because the capture never runs them). MAIPAI_GATE_NO_STAMPS=1 forces it.
+run_a11y() {
+  local specs=(frontend backend scripts ':!**/*.test.ts' ':!**/*.test.tsx' ':!backend/tests')
+  if bun scripts/gate/stamp.ts check a11y -- "${specs[@]}"; then
+    echo "   (a11y skipped: its inputs are unchanged since the last green run)" >&2
+    return 0
+  fi
+  bun run a11y >/dev/null
+  bun scripts/gate/stamp.ts mark a11y -- "${specs[@]}"
+}
+
+# GATE-SPEED-01 (c): a suite starts in the background while the lint,
+# typecheck and build steps run beside it; its output is buffered and
+# printed whole where it finishes. tests_start/tests_finish take a label.
+# A failing step exits the gate, and tests_kill (EXIT trap) stops the suite.
+TESTS_PIDS=""
+tests_kill() { local p; for p in $TESTS_PIDS; do stop_tree "$p"; done; TESTS_PIDS=""; }
+tests_start() {
+  local label="$1"; shift
+  local log; log="$(mktemp)"
+  run_tests "$@" > "$log" 2>&1 &
+  printf -v "TESTS_PID_$label" '%s' "$!"
+  printf -v "TESTS_LOG_$label" '%s' "$log"
+  TESTS_PIDS="$TESTS_PIDS $!"
+}
+tests_finish() {
+  local label="$1" pidvar="TESTS_PID_$1" logvar="TESTS_LOG_$1" rc=0
+  wait "${!pidvar}" || rc=$?
+  cat "${!logvar}"
+  rm -f "${!logvar}"
+  return "$rc"
+}
+
 run_backend_suite() {
+  tests_start backend backend tests ""
   stage "backend: settings registry, regenerate and check for drift"
   # $SPEC_DIR is a per-tag worktree shared by every consumer pinning
   # spec-v0.1.2 (home, bot, and any other session's check.sh run) - a
@@ -363,10 +429,10 @@ run_backend_suite() {
   (cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json)
 
   stage "scripts: bun test"
-  (cd scripts && bun test)
+  run_tests scripts . 1
 
-  stage "backend: bun test"
-  (cd backend && bun test)
+  stage "backend: bun test (started first, running beside the steps above)"
+  tests_finish backend
 }
 
 if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
@@ -376,13 +442,12 @@ if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
   BACKEND_LOG="$(mktemp)"
   FRONTEND_LOG="$(mktemp)"
 
-  ( run_backend_suite; stage_end ) > "$BACKEND_LOG" 2>&1 &
+  ( trap tests_kill EXIT; run_backend_suite; stage_end ) > "$BACKEND_LOG" 2>&1 &
   BACKEND_PID=$!
-  ( stage "frontend: typecheck"
+  ( trap tests_kill EXIT
+    tests_start frontend frontend . "${MAIPAI_GATE_FRONTEND_SHARDS:-3}"
+    stage "frontend: typecheck"
     (cd frontend && bunx tsc --noEmit)
-
-    stage "frontend: bun test"
-    (cd frontend && bun test)
 
     stage "frontend: eslint"
     (cd frontend && bunx eslint . --cache --cache-location .eslintcache)
@@ -391,7 +456,10 @@ if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
     (cd frontend && bunx vite build >/dev/null)
 
     stage "frontend: a11y"
-    bun run a11y >/dev/null
+    run_a11y
+
+    stage "frontend: bun test (started first, ran beside the steps above)"
+    tests_finish frontend
     stage_end
   ) > "$FRONTEND_LOG" 2>&1 &
   FRONTEND_PID=$!
@@ -448,8 +516,7 @@ else
   fi
 
   if { [ "$SCOPE" = "frontend" ] || [ "$SCOPE" = "full" ]; } && [ -d frontend/src ]; then
-    stage "frontend: bun test"
-    (cd frontend && bun test)
+    tests_start frontend frontend . "${MAIPAI_GATE_FRONTEND_SHARDS:-3}"
 
     stage "frontend: eslint"
     (cd frontend && bunx eslint . --cache --cache-location .eslintcache)
@@ -468,7 +535,10 @@ else
     # not the stage GATE-SCOPE-01 exists to route around (that is the
     # backend suite's own stub-engine flakiness and runtime).
     stage "frontend: a11y"
-    bun run a11y >/dev/null
+    run_a11y
+
+    stage "frontend: bun test (started before eslint, ran beside it)"
+    tests_finish frontend
   fi
 fi
 

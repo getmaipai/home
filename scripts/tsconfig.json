@@ -14,5 +14,5 @@
     "noEmit": true,
     "typeRoots": ["../backend/node_modules/@types"]
   },
-  "include": ["*.ts", "types/*.d.ts"]
+  "include": ["*.ts", "gate/*.ts", "types/*.d.ts"]
 }
