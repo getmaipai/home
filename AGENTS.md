@@ -16,7 +16,7 @@ chat turn, search, the turn stream, the chat UI, the canvas or the engine launch
 record is history, never permission. A change that breaks a rule is rejected in review whatever it cites. If the work needs a rule
 to change, stop and report that to the coordinator: only the owner changes a rule. In short, for the chat turn: age and surface gates
 outrank everything; the model decides when to search; the engine's native features are the implementation; no length cap on adult
-written chat; a failed tool never fails the answer; shipped parts only; port before delete.
+written chat; a failed tool never fails the answer; shipped parts only (the chat screen is assistant-ui Elements from the kit, never hand-written; see rule 9); port before delete.
 
 ## Layout
 

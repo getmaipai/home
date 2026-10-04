@@ -103,6 +103,19 @@ wins.
    this record first. Named gaps today: sentence-gated speech scheduling
    with the spoken cue, the `[n]` citation mapper, the output gate, the
    prose tool-call fallback.
+   **Chat UI is assistant-ui Elements, never hand-written (owner's rule
+   2026-10-04).** Every piece of the chat screen (message parts, actions,
+   composer, model chip, reasoning and tool disclosures, sources, lists,
+   search, panes, charts, tables, errors, empty states, voice) is an
+   Element from the kit's `src/elements` (assistant-ui's library, vendored
+   by the `commons` ui package), used as it ships and wired to our data.
+   Before writing any chat component the author looks the job up in
+   `frontend/src/dev/elements-adoption.json`; if an Element does it, the
+   hand-written version is a defect, found in review and deleted in the
+   same change that wires the Element (tests re-pointed, never weakened).
+   A real gap is named in this record first. `bun run elements:status`
+   prints how many Elements are implemented; a lint keeps the list of
+   hand-built chat components from growing.
 10. **The safety gate stays, and its strictness follows the person.**
     The output gate is the safety floor and is not a formatting step.
     For a child, and for every spoken turn, every sentence is checked
