@@ -1,7 +1,7 @@
 // CHAT-01 (docs/dev/session-a.md): one ephemeral turn context, the
 // decision record's "One ephemeral turn context" (docs/dev.md,
 // 2026-09-07) made real. Runtime views over existing records, built once
-// per turn by turnEngine.ts's prepareTurn() and read by both the prompt
+// per turn by the retired turn engine's prepareTurn() and read by both the prompt
 // and the guards, never persisted and never a second record system.
 // The point: the prompt's context message and guards.ts's GuardContext
 // used to be assembled from the same retrieval results by two separate
@@ -13,23 +13,23 @@
 // evidence item is included when the text the prompt shows for it
 // survived every cap intact, and the guard input is derived from the
 // included items alone.
-import type { Surface } from "@/lib/turnEngine";
+import type { Surface } from "@/lib/turnShared";
 import type { LlmMessage } from "@/lib/llm";
 import type { GuardContext } from "@/lib/guards";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import { shapeOf } from "@/lib/turnSignal";
-import { pronounFamiliesIn, type SubjectRef } from "@/lib/unknownNames";
+import type { SubjectRef } from "@/lib/unknownNames";
 import { bannedPhrasesFor } from "@/lib/replyConstraints";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { nextHlc } from "@/lib/hlc";
-import type { SpeakerEvidence, PresentPerson } from "@/lib/turnEngine";
+import type { SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 
 /** AGE-02(b): the child-band conversation floor. Subjects may carry the
- * roster role as ephemeral metadata supplied by turnEngine.ts. */
+ * roster role as ephemeral metadata supplied by the retired turn engine. */
 export function worryingConversation(signal: TurnSignal, subjects: readonly (SubjectRef & { role?: string; utterance?: string })[], safety: Pick<SafetyResult, "notify_parent">): boolean {
   if (safety.notify_parent) return true;
   if (signal.age_band !== "child") return false;
@@ -321,10 +321,6 @@ export interface TurnContext {
    * utterance named nobody), so a household one stands a lookup down
    * only when the utterance refers back with a pronoun. */
   subjectsCarried?: boolean;
-  /** ASK-01: the pronoun family each subject takes, from the entity's
-   * stored pronouns or the pronoun the person used for the name this
-   * turn, for the guards' pronoun check. */
-  subjectPronouns: { name: string; pronouns: string }[];
 }
 
 /** ASK-01: the household-framed unknown names on the turn, for the
@@ -410,12 +406,9 @@ export function guardContextFrom(ctx: TurnContext): Omit<GuardContext, "personId
     repair: ctx.signal.repair,
     lookupServed: ctx.offeredToolIds.includes("websearch") && !householdFrame(ctx) && lookupRequest(ctx),
     previousReply: [...ctx.history].reverse().find((m) => m.role === "assistant")?.content,
-    // ASK-01: the unknown names, the subjects' pronouns, and the
-    // pronoun families the person used this turn and the last two.
+    // ASK-01: the unknown names.
     unknownNames: framedUnknownNames(ctx),
     unresolvedNames: ctx.subjects.filter((s): s is Extract<SubjectRef, { type: "unresolved" }> => s.type === "unresolved").map((s) => s.surface_form),
-    subjectPronouns: ctx.subjectPronouns,
-    pronounsInPlay: [...pronounFamiliesIn([ctx.utterance, ...ctx.history.filter((m) => m.role === "user").slice(-2).map((m) => m.content)].join(" "))],
     subjects: ctx.subjects,
     bannedPhrases: bannedPhrasesFor(ctx.conversationId),
   };

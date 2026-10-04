@@ -3,7 +3,7 @@
 // authored by a household at runtime through a real settings flow, not a
 // filesystem package a developer ships. The routing MECHANISM is not
 // new - a command's trigger is matched exactly (case-insensitive,
-// trimmed, no wildcard) via turnEngine.ts's own matchPattern, the exact
+// trimmed, no wildcard) via the retired turn engine's own matchPattern, the exact
 // same function a plugin's own zero-wildcard `routing.patterns` entry
 // already uses. What's new is a lighter-weight AUTHORING path: no
 // manifest.json, no recipe.json, no five-example bronze-tier bar - a
@@ -23,7 +23,7 @@ import { meetsMinRole } from "@/lib/plugins";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { homeCallService, isHomeAssistantSecurityDomain } from "@/lib/packageHost";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
-import { matchPattern } from "@/lib/turnEngine";
+import { matchPattern } from "@/lib/turnShared";
 import { ROLE_LADDER, type Role } from "@/middleware/auth";
 import type { PersonRow } from "@/types";
 
@@ -141,7 +141,7 @@ export function createCommand(
   if (typeof trigger !== "string" || trigger.trim().length === 0) {
     return { ok: false, status: 400, error: "trigger is required" };
   }
-  // matchCommand() reuses turnEngine.ts's own matchPattern() as-is (this
+  // matchCommand() reuses the retired turn engine's own matchPattern() as-is (this
   // file's own header comment: "the routing MECHANISM is not new"), and
   // that function treats a bare `*` as a wildcard-capture pattern, not a
   // literal character - a code review (2026-09-05) found nothing here
@@ -205,7 +205,7 @@ export function deleteCommand(actor: PersonRow, id: string): CommandOpResult<{ i
 }
 
 /** The deterministic command floor (checked before the plugin floor in
- * turnEngine.ts's prepareTurn(), same "a real trigger always wins"
+ * the retired turn engine's prepareTurn(), same "a real trigger always wins"
  * posture route()'s own pattern match already has - a command IS
  * exactly that, just household-authored instead of bundled). Exact
  * match only, gated by whether the speaker's own role clears this

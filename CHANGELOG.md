@@ -47,6 +47,15 @@ checklist (`docs/dev.md`); no release has been cut yet.
 - Helper tests for shape and throttle validation were added to the backend
   test suite.
 
+### Removed
+- The old turn engine (`turnEngine.ts`) and everything that only it used are
+  deleted (docs/design/RULES.md rule 12): every turn runs on the one path.
+  The household setting `turn.pipeline.next` ("Use the new reply engine") is
+  retired with it; nothing reads it, and a stored value for it is ignored. The
+  old engine's reply guards that no live path calls, the pronoun-mismatch
+  guard among them (retired by ruling: the model is given the pronouns), and
+  the answer-from-this-conversation retry nothing could reach are gone too.
+
 ### Security
 - A 2026-09-06 code review found `POST /api/llm/chat` and `POST /api/llm/embed`
   gave any signed-in person, including a child, raw model access with none

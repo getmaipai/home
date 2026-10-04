@@ -14,7 +14,6 @@ import { tokenize, isBarePronoun } from "@/lib/text";
 import { START_PROJECT_TOOL_ID, projectTypeForArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
-import { ANSWER_FROM_CONTEXT_TOOL_ID } from "./model";
 import { speakerIsAnonymous, touchesMemory } from "../speaker";
 
 export interface PolicyInput {
@@ -96,9 +95,8 @@ interface ArgSchema {
 }
 
 // isBarePronoun() moved to @/lib/text.ts (CONFIRM-01): nodes/model.ts's
-// own offeredButInvalid check needs the identical test, and this file
-// already imports from model.ts (ANSWER_FROM_CONTEXT_TOOL_ID), so the
-// reverse import would have been circular. The `terms.length === 0`
+// own offeredButInvalid check needs the identical test, so it lives
+// where both can import it. The `terms.length === 0`
 // branch below is for a genuinely numbers-only argument, not a
 // punctuation-dressed pronoun - isBarePronoun() is checked first,
 // ahead of it, for exactly that reason.
@@ -211,22 +209,6 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
   const roster = rosterNames(state.context);
 
   for (const call of input.calls) {
-    // The interim rule's own alternative tool: never a package, grounded
-    // by the model node's own quote check against the window before it
-    // ever reaches here (that node returns "answer_from_context" and
-    // skips policy entirely - see machine.ts) - listed here only so a
-    // model that calls it outside the interim rule (tool_choice "auto"
-    // still offers it when it's in the budget's tools_offered) is
-    // refused cleanly rather than crashing on a missing manifest. This
-    // should never actually happen in practice; GROUND-01 gives it its
-    // own reason precisely so a trace that DOES show it stands out from
-    // an ordinary ungrounded search.
-    if (call.tool === ANSWER_FROM_CONTEXT_TOOL_ID) {
-      noteRefusal("context_tool_in_policy", call.tool);
-      entries.push({ proposal: placeholderProposal(call.tool, call), decision: { allow: false, reason: "context_tool_in_policy" } });
-      continue;
-    }
-
     // PROJECT-START-01: `start_project` is never a real package (tool.ts's
     // own header), so it never goes through loadManifestOnly() below -
     // its classification comes from the NAMED project type's own registry

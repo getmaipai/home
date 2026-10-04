@@ -419,7 +419,7 @@ export interface RecallOptions extends ListOptions {
   /** Whether recall() bumps uses/last_used_at on the records it returns.
    * Defaults to true: the direct recall API and the `recall` package
    * (a result someone actually asked for and got back counts as
-   * "used"). The turn engine (turnEngine.ts) sets this false and bumps
+   * "used"). The turn engine (the retired turn engine) sets this false and bumps
    * only the subset that actually reached the model's prompt
    * (buildSystemPrompt's MAX_MEMORY_SNIPPETS truncation), via the
    * separate bumpUsage() below - not every scored candidate above
@@ -434,7 +434,7 @@ export interface RecallOptions extends ListOptions {
    /** The query's own embedding (step 5), pre-computed by the caller:
     * recall() itself stays synchronous (pure scoring given a vector it's
     * handed is CPU work, not I/O), so any caller that can afford the
-    * async embed() round trip (turnEngine.ts's prepareTurn, already
+    * async embed() round trip (the retired turn engine's prepareTurn, already
     * async; packageHost.ts's Host.memory.recall, made async for exactly
     * this) computes it first. Omitted (or when the embed backend is
     * down) falls back to keyword overlap for every candidate - the exact
@@ -536,7 +536,7 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  * embed backend, a down one, a malformed response) - recall() itself
  * already treats a missing queryVector as "fall back to keyword
  * overlap," so a caller never needs its own try/catch around this.
- * Shared by turnEngine.ts's prepareTurn() and packageHost.ts's
+ * Shared by the retired turn engine's prepareTurn() and packageHost.ts's
  * Host.memory.recall, the two real async callers.
  *
  * Still no nomic query/passage instruction prefix here, deliberately
@@ -545,7 +545,7 @@ function cosineSimilarity(a: Float32Array, b: Float32Array): number {
  * path is retired. Prefixing this file's own writes would need every ALREADY-
  * STORED `memoryEmbeddings` row re-embedded to match - a real migration
  * over a household's actual memories, not a hash-bump-and-forget the
- * way package examples could take. `turnEngine.ts`'s prepareTurn() also
+ * way package examples could take. the retired turn engine's prepareTurn() also
  * reuses the IDENTICAL utterance vector for recall (avoiding a second
  * HTTP round trip, a 2026-09-06 review fix), so a
  * query prefix here would silently mismatch routing.ts's own document
@@ -570,7 +570,7 @@ export async function embedQueryForRecall(query: string): Promise<QueryVector | 
   }
 }
 
-/** Shared by recall()'s default behavior and turnEngine.ts's own
+/** Shared by recall()'s default behavior and the retired turn engine's own
  * turn-scoped call: bumps uses/last_used_at on exactly these matches,
  * mutating each match's own `record` in place so a caller that already
  * has the returned array sees the updated count without a re-read.
@@ -617,7 +617,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   if (opts.scope) conditions.push(eq(memoryRecords.scope, opts.scope));
   if (opts.person) conditions.push(eq(memoryRecords.person, opts.person));
   let rows = db.select().from(memoryRecords).where(and(...conditions)).all().filter((r) => validAt(r, asOf));
-  // Never the profile paragraph: turnEngine.ts's buildSystemPrompt()
+  // Never the profile paragraph: the retired turn engine's buildSystemPrompt()
   // already injects it unconditionally via getProfileParagraph(), "not
   // a recall() candidate... never something that competes with other
   // facts for a cosine-scored slot" (step 7's own design). Without this
@@ -782,7 +782,7 @@ export function recall(actor: PersonRow, query: string, opts: RecallOptions = {}
   return top as RecallResult;
 }
 
-/** Exported for turnEngine.ts's turn-scoped call: bumps usage only on the
+/** Exported for the retired turn engine's turn-scoped call: bumps usage only on the
  * records that actually reached the model's prompt (buildSystemPrompt's
  * own MAX_MEMORY_SNIPPETS truncation of recall()'s top-20 candidates),
  * per step 2's "bump only on records that reached the prompt." */
@@ -1489,13 +1489,13 @@ export function demoteNeverRecalledDurables(now: Date = new Date()): number {
 // only by the consolidate job... never by the extractor directly"
 // (session-a-intelligence.md). Exported from here, not lib/memoryJudge.ts
 // (which does the actual writing, in its own runConsolidation() pass),
-// so turnEngine.ts's read side and memoryJudge.ts's write side agree on
+// so the retired turn engine's read side and memoryJudge.ts's write side agree on
 // exactly one definition of "which record IS the profile" without a
 // circular import between the two files - this constant is the shape of
 // the store, not a judge-specific concern.
 export const PROFILE_SOURCE = "memory.consolidate:profile";
 
-/** turnEngine.ts's own read side (buildSystemPrompt(): "injected whole
+/** the retired turn engine's own read side (buildSystemPrompt(): "injected whole
  * at the top of the memory block before recalled items"). A targeted
  * lookup by (person, source), not a recall() candidate: the profile
  * paragraph is unconditional context about who's speaking, not

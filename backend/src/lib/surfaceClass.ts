@@ -8,7 +8,7 @@
 // person is listening, not reading; nothing sets it yet (no dictation
 // marker exists today - RESP-01's own point 1), so this is plumbed and
 // tested, ahead of a real caller.
-import type { Surface } from "@/lib/turnEngine";
+import type { Surface } from "@/lib/turnShared";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 
 export type SurfaceClass = "written" | "spoken" | "glance";

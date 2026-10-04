@@ -7,7 +7,7 @@
 // (resolveNames, replyAsksAbout, parseWhoAnswer, applyWhoAnswer, whoQuestion,
 // looksLikeWhoAnswer, candidateByName ...) and conversationHistory.ts's open
 // questions, called as they are. What this file holds is the glue the old engine
-// kept inside turnEngine.ts (resolveTurnSubjects, subjectsSectionFor, the pending
+// kept inside the retired turn engine (resolveTurnSubjects, subjectsSectionFor, the pending
 // ask's `who` branch, appendedAsk), re-expressed over the default path's own
 // state so nothing under turnMachine/ imports the old engine. THIN-7D
 // deletes the old copies; these are then the only ones.

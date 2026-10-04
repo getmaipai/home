@@ -11,8 +11,7 @@ import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { startKiwixSidecar } from "@/lib/kiwixSidecar";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/lib/llmSupervisor";
-import { buildOldPathStablePrefix, ordinaryToolSpecs } from "@/lib/turnEngine";
-import { toToolDefinition } from "@/lib/llm";
+import { turnWarmupPrompt } from "@/lib/turnMachine/warmup";
 import { engineWarmupsForStackRoles } from "@/lib/engineBoot";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
@@ -56,13 +55,9 @@ try {
 }
 
 // FAST-01: set up the warmup prompt provider for cache priming after engine
-// spawn. ROUTE-02: with the ordinary tool block, the same one every
-// conversation-shaped turn sends, so the primed prefix is the one reused.
-// TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): this primes the OLD
-// path's own cache (ordinaryToolSpecs() is that path's own fixed tool
-// list), so it needs buildOldPathStablePrefix() specifically -
-// buildStablePrefix() itself now serves the new path's shrunk suffix.
-setWarmupPrompt(() => ({ system: buildOldPathStablePrefix(), tools: ordinaryToolSpecs().map(toToolDefinition) }));
+// spawn: the one turn path's stable prefix and tools block, so the primed
+// prefix is the one a real turn reuses.
+setWarmupPrompt(turnWarmupPrompt);
 
 // COR-6 (code review, 2026-09-06): before anything below this line can
 // possibly write a fresh hlc, recover monotonicity from every table that

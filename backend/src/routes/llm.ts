@@ -15,7 +15,7 @@ const RATE_LIMIT_RESPONSE = { error: "Too many requests too quickly.", code: "tu
 // signed-in person with no safety check at all - a second, unfiltered
 // front door to the model that bypassed the turn engine's non-removable
 // child-safety layer entirely (evaluateSafety() ran nowhere on this
-// path). Now that turnEngine.ts's runTurn/runTurnStream are the real,
+// path). Now that the retired turn engine's runTurn/runTurnStream are the real,
 // complete household chat surface, this route is downgraded to exactly
 // what its own history always said it was heading toward: an
 // owner/admin diagnostics tool, not a second way for a household member

@@ -38,7 +38,7 @@ export type SignalClause = TurnSignal["clauses"][number];
 export type ClauseSubject = SignalClause["subject"];
 
 /** The pending-ask state machine's reading of the turn, when it consumed
- * it (turnEngine.ts's resolvePendingAsk()): the signal is that answer.
+ * it (the retired turn engine's resolvePendingAsk()): the signal is that answer.
  * `who` and `lookup` arrive with ASK-01 and LOOKUP-01. */
 export interface ProtocolAnswer {
   kind: "confirm" | "ask" | "who" | "lookup";
@@ -63,12 +63,12 @@ export interface SignalInput {
   literalWin?: boolean;
   /** SIGNAL-02: true when a compute or clock package's own manifest
    * `routing.patterns` matches this clause's text and its resolver
-   * accepts the captured remainder (turnEngine.ts's
+   * accepts the captured remainder (the retired turn engine's
    * `computedPatternMatch()`, the identical gate `nodes/commands.ts`'s
    * own OPENER-01 loop applies) - injected by the caller, which already
    * has the loaded manifests, the same shape `commandOpeners` above and
-   * `resolveEntity` already use. This file never imports turnEngine.ts
-   * directly (that would be circular - turnEngine.ts already imports
+   * `resolveEntity` already use. This file never imports the retired turn engine
+   * directly (that would be circular - the retired turn engine already imports
    * this file). */
   computedPatternMatch?: (text: string) => boolean;
   ageBand: TurnSignal["age_band"];
@@ -337,7 +337,7 @@ function clauseSubject(text: string, stance: Stance, input: SignalInput): Clause
   // never a search - either the compute evaluator accepts the question's
   // body as a real expression, or a compute/clock package's own manifest
   // pattern matches and its resolver accepts the captured remainder
-  // (turnEngine.ts's computedPatternMatch(), injected by the caller,
+  // (the retired turn engine's computedPatternMatch(), injected by the caller,
   // the identical gate nodes/commands.ts's own OPENER-01 loop applies).
   if (isComputedExpression(text) || input.computedPatternMatch?.(text)) return { kind: "computed" };
   return { kind: "world" };

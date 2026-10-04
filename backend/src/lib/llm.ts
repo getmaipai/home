@@ -28,7 +28,7 @@ import type { RoleRequest } from "@/lib/stack/types";
 // Session C step 0 (wave-2.md): a person every couple of seconds, burst
 // of a few - Session A's own per-person limit (its step 11) hadn't
 // landed on main when this session started. Lives here, the one module
-// both routes/turn.ts (via lib/turnEngine.ts) and routes/llm.ts already
+// both routes/turn.ts (via the retired turn engine) and routes/llm.ts already
 // sit above, rather than in either route file: a turn's own reply
 // generation goes through this identical model call, so a route-to-route
 // import (one HTTP handler reaching into another's module) would be the
@@ -102,7 +102,7 @@ export interface LlmCompleteOptions {
    * be stored. Never sent to the engine. */
   dropReasoning?: boolean;
   /** THIN-5A: complete() hands back the engine's reasoning only to a
-   * caller that asks for it (the old path's re-wrap seam). Every other
+   * caller that asks for it. Every other
    * caller (routes/llm.ts, the judges, the package host) gets `text`
    * alone, so a response body can never carry reasoning that was not
    * safety-checked with the text. Never sent to the engine. */
@@ -121,7 +121,7 @@ export interface LlmCompleteOptions {
    * calling support decide and call, replacing the deleted grammar-
    * forced JSON-array mechanism (`toolCallSchema()`/`parseToolCalls()`,
    * a real, measured problem of their own - see this fix's docs/dev.md
-   * writeup for why). Capped at two calls per turn (turnEngine.ts's own
+   * writeup for why). Capped at two calls per turn (the retired turn engine's own
    * pre-filter picks which candidates to offer at all) - two independent
    * calls, never a chained pipeline. */
   tools?: ToolSpec[];
@@ -405,10 +405,9 @@ function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
 // THIN-5A (docs/design/RULES.md rule 2): reasoning travels as its own
 // field (LlmCompleteValue.reasoning, LlmStreamPiece) from the engine
 // client to the gate. The default turn path never wraps it into `<think>`
-// tags and never splits it out again. The two helpers below exist only
-// for the OLD path (turnEngine.ts, turnBareStream.ts, the OpenAI-style
-// callers), whose pipeline still carries a think block inside its text;
-// they are deleted with that path (rule 12).
+// tags and never splits it out again. The think-tag helpers below serve
+// only startCompleteStream(), the string-stream facade the benches and
+// tests still read.
 
 // REASONING-01 (a review's own named failure mode): a literal
 // `<think>`/`</think>` substring INSIDE reasoning_content would create a
@@ -421,19 +420,13 @@ export function neutralizeThinkTags(text: string): string {
   return text.replace(THINK_TAG_RE, (tag) => tag.replace(/[<>]/g, ""));
 }
 
-/** OLD PATH ONLY (retires with turnEngine.ts's pipeline): the shape that
- * path's text contract expects, `<think>reasoning</think>content`. */
-export function legacyThinkTagged(content: string, reasoning?: string | null): string {
-  return reasoning ? `<think>${neutralizeThinkTags(reasoning)}</think>${content}` : content;
-}
-
 /** THIN-5A: the one place a blocking completion's `reasoning_content`
  * becomes `LlmCompleteValue.reasoning`; dropped here for a minor. */
 function reasoningField(reasoning: string | null | undefined, opts: LlmCompleteOptions): { reasoning?: string } {
   return reasoning && opts.returnReasoning === true && !opts.dropReasoning ? { reasoning } : {};
 }
 
-/** HOME-STACK-02b: role="chat" for every real caller today (turnEngine.ts's
+/** HOME-STACK-02b: role="chat" for every real caller today (the retired turn engine's
  * own turns and personaJudge.ts/memoryJudge.ts's judge calls all pass
  * "chat" - there is no separate judge role on the wire, only a different
  * prompt), sent to the Stack as its own `model` per the role wire so a
@@ -511,7 +504,7 @@ export async function complete(
     }
     // `[]` (the model looked and genuinely found nothing worth calling)
     // and a real, non-empty array are both real decisions the caller
-    // (turnEngine.ts) branches on; only `undefined` means "tools weren't
+    // (the retired turn engine) branches on; only `undefined` means "tools weren't
     // offered on this call at all," never conflated with "offered, and
     // declined."
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
@@ -544,11 +537,11 @@ export type LlmPiecesStartResult =
  * down engine still gets a proper HTTP status before any byte streams -
  * only the actual generation (the `tokens` generator) is where a failure
  * can no longer change the response status, since by then the caller
- * (turnEngine.ts's runTurnStream) has already committed to a streaming
+ * (the retired turn engine's runTurnStream) has already committed to a streaming
  * response. A mid-stream failure surfaces there as a thrown error from
  * the generator, not a return value. */
 /** `signal` (COR-7, code review, 2026-09-06) lets a caller abort
- * generation from outside - turnEngine.ts's runTurnStream() threads
+ * generation from outside - the retired turn engine's runTurnStream() threads
  * through the AbortController routes/turn.ts's ReadableStream.cancel()
  * fires when an HTTP client disconnects mid-stream, so that stops
  * occupying the shared chat engine slot instead of running to
@@ -656,9 +649,8 @@ async function openStackPieces(
   return { ok: true, pieces: pieces(), stats };
 }
 
-/** OLD PATH ONLY (retires with turnEngine.ts's pipeline, rule 12): folds
- * the native pieces back into the single think-tagged text stream that
- * pipeline's contract still expects. */
+/** Folds the native pieces back into the single think-tagged text stream
+ * startCompleteStream() yields. */
 async function* thinkTaggedTokens(
   pieces: AsyncGenerator<LlmStreamPiece, ToolCall[] | undefined, void>,
 ): AsyncGenerator<string, ToolCall[] | undefined, void> {
@@ -772,9 +764,8 @@ export async function startCompleteStreamPieces(
   return { ok: true, pieces: piecesFromTagged(direct.tokens, opts.dropReasoning === true), stats: direct.stats };
 }
 
-/** OLD PATH ONLY (retires with turnEngine.ts's pipeline, rule 12): the
- * think-tagged string stream that pipeline still consumes. The default
- * turn path calls startCompleteStreamPieces() instead. */
+/** The think-tagged string stream, for the benches and tests that read one
+ * string. The turn path calls startCompleteStreamPieces() instead. */
 export async function startCompleteStream(
   role: LlmRole,
   messages: LlmMessage[],

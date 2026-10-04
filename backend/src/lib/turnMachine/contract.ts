@@ -64,10 +64,7 @@ export interface PendingAskInfo {
 /** GROUND-01 (state record, "1. Split the reason"): the live diagnosis
  * found `ungrounded_args` produced by three different branches with
  * nothing in the trace to tell them apart - `unknown_tool` (the
- * manifest failed to load) and `context_tool_in_policy` (the
- * answer-from-context tool reaching policy, which should never happen -
- * the model node's own quote check catches it first) now carry their
- * own names; `ungrounded_args` keeps only `argsGrounded()`'s own false.
+ * manifest failed to load) now carries its own name; `ungrounded_args` keeps only `argsGrounded()`'s own false.
  * The refusal line stays one sentence either way (nodes/answer.ts's
  * policyRefusalLine()); only the trace changes.
  *
@@ -90,8 +87,8 @@ export type PolicyDecision =
       // registered ProjectType - answer.ts's own default line ("I don't
       // actually have that in this conversation") covers it, the same
       // closed set of named-then-defaulted reasons `ungrounded_args`/
-      // `unknown_tool`/`context_tool_in_policy` already are.
-      reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "context_tool_in_policy" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type";
+      // `unknown_tool` already are.
+      reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type";
       ask?: PendingAskInfo;
     };
 

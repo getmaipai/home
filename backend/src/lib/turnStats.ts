@@ -9,8 +9,8 @@ export type { TurnStats } from "@/wire";
 const finite = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) ? value : null;
 
 // LAT-00: the shape buildTurnStats() actually needs from a generation -
-// deliberately structural (not turnEngine.ts's own GenerationRecord
-// import) so this file never imports from turnEngine.ts, which already
+// deliberately structural (not the retired turn engine's own GenerationRecord
+// import) so this file never imports from the retired turn engine, which already
 // imports this one.
 export interface GenerationInput {
   reason: string;

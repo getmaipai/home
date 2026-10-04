@@ -1,7 +1,7 @@
 // Real `kind: "skill"` packages (2026-09-05): plain instructions,
 // Claude-`SKILL.md`-compatible, no permissions, no recipe - composed into
 // the chat model's system prompt when relevant to the turn (see
-// turnEngine.ts's buildSystemPrompt()), never run on their own the way a
+// the retired turn engine's buildSystemPrompt()), never run on their own the way a
 // plugin's recipe does. Distinct from lib/plugins.ts's plugin packages
 // (self-contained, permissioned, their own network access via a recipe) -
 // see docs/dev.md's "Naming: skill, plugin, command, connector" entry for
@@ -119,7 +119,7 @@ export function loadSkill(id: string): LoadedSkill | null {
 }
 
 /** Every loadable skill, sorted by id for the same deterministic-order
- * reason turnEngine.ts's loadAllManifests() already documents (a stable
+ * reason the retired turn engine's loadAllManifests() already documents (a stable
  * tie-break when more than one skill scores equally against a turn). */
 export function loadAllSkills(): LoadedSkill[] {
   return listSkillIds()

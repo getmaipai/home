@@ -332,7 +332,7 @@ async function attemptHttpFetch(
         // spec/errors/errors.json, not an unreachable network: the host
         // answered and the resource does not exist. A Tier 0 pattern
         // winner reporting it falls through to the model
-        // (turnEngine.ts's prepareTurn()); every other status stays the
+        // (the retired turn engine's prepareTurn()); every other status stays the
         // upstream failure it is.
         const code = response.status === 404 || response.status === 410 ? "not_found" : "network_unreachable";
         return {
@@ -1522,7 +1522,7 @@ export async function homeCallService(domain: string, service: string, target: u
 // THIRD PARTY's fact to the speaker's own private scope: "remember my
 // sister's allergy is peanuts" contains "my", so it wrote scope person,
 // person actor.id - the sister's allergy, filed as the parent's own
-// secret, and (combined with turnEngine.ts's selfOnly recall) invisible
+// secret, and (combined with the retired turn engine's selfOnly recall) invisible
 // to everyone else including the sister. `my <word>'s` names someone
 // ELSE's thing, not the speaker's own, so it's stripped before the
 // first-person check runs; a bare "i"/"me"/"mine" elsewhere still
@@ -1761,7 +1761,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // - unlike memory.remember's own free-text `source`, there is no
         // fallback shape for "no turn": a live chat artifact always has
         // one. `turn.conversationId` is passed straight from the
-        // caller's own in-flight turn context (turnEngine.ts already
+        // caller's own in-flight turn context (the retired turn engine already
         // has it every place it calls runPlugin() with a turn id),
         // never looked up from conversationTurns: that row is written
         // by logTurn() only once the WHOLE turn finishes composing,
@@ -1775,7 +1775,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // deeper gap this fix alone didn't: `createArtifact()` below
         // used to fail its own foreign-key constraint against
         // conversationTurns, since that row genuinely didn't exist yet
-        // at this point in a real turn - turnEngine.ts's `prepareTurn()`
+        // at this point in a real turn - the retired turn engine's `prepareTurn()`
         // now writes a real, minimal row for this exact turn id before
         // anything else runs (conversationHistory.ts's
         // `insertProvisionalTurn()`), so the FK this insert needs is

@@ -471,7 +471,7 @@ export async function* streamTurnEvents(
   // REASONING-01: a minor's turn (child or teen) never emits a
   // `reasoning` event at all (the coordinator's own call, docs/dev.md's
   // "REASONING-01" section) - a minor sees the answer, not the model's
-  // thinking. The safety/guard pass upstream (turnEngine.ts) is entirely
+  // thinking. The safety/guard pass upstream (the retired turn engine) is entirely
   // unaffected: this drops the already-classified reasoning span at the
   // OUTPUT boundary, after the combined text has gone through the
   // identical pass every turn gets.
@@ -482,7 +482,7 @@ export async function* streamTurnEvents(
   // REASONING-01: splits each chunk of the pipeline's own combined text
   // (a think block, if present, embedded per wellFormed.ts's own
   // contract) into `reasoning`/`delta` wire events - the one and only
-  // place this split happens; `result.tokens` (turnEngine.ts's whole
+  // place this split happens; `result.tokens` (the retired turn engine's whole
   // pipeline) is never touched, and `fullText` keeps accumulating the
   // UNSPLIT original chunks, so `finalize()` and the stored row are
   // unaffected either way (docs/dev.md's own "smallest change" section).
@@ -573,7 +573,7 @@ export async function* streamTurnEvents(
     // collector) already treats a `t`-keyed line as opaque data to
     // serialize, never dispatching on `.type` for one - widening the
     // generator's own declared type would have forced two dozen
-    // pre-existing, unrelated test assertions across turnEngine.test.ts/
+    // pre-existing, unrelated test assertions across chatTurn.test.ts/
     // safety01.test.ts/turnNext.test.ts to narrow a case their own
     // fixtures can never actually produce (neither hand-built
     // `TurnStreamResult` there ever sets `toolEvents`).
@@ -604,7 +604,7 @@ export async function* streamTurnEvents(
       await result.status.wait();
     }
     // `current.value` here is the generator's own RETURN value (step 9),
-    // not a yielded delta: a StreamOutcome (turnEngine.ts). Either the
+    // not a yielded delta: a StreamOutcome (the retired turn engine). Either the
     // most recently flagged, non-refuse SafetyResult gateOutputSafety()
     // saw (a self_harm mention in the model's own words, say; a review,
     // 2026-09-05, found this was previously discarded, so a flag that
@@ -634,7 +634,7 @@ export async function* streamTurnEvents(
     // Headers (and a 200 status) are already committed by the time
     // generation can fail here - an HTTP error status is no longer
     // possible, so the failure has to travel as its own event instead
-    // (turnEngine.ts's "unavailable" code covers this same down-state
+    // (the retired turn engine's "unavailable" code covers this same down-state
     // class for the non-streaming route; ChatPage.tsx maps this event to
     // the identical friendly message).
     //
@@ -877,7 +877,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     // alone is "an independent, less accurate signal") - a review
     // caught the first draft reading actor.role directly, which both
     // excluded teen and could disagree with every other minor-gated
-    // decision on this same turn (host.ts's chat-models gate, turnEngine.ts's
+    // decision on this same turn (host.ts's chat-models gate, the retired turn engine's
     // withholdSensitive/mayDefer, composer.ts's child-only projection).
     dropReasoning,
     modelStatus: modelSelection.status,

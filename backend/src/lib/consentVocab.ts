@@ -1,7 +1,7 @@
 // The consent and negative vocabularies, one definition: the pending
-// ask's yes and no (turnEngine.ts's continuation), and the short-answer
+// ask's yes and no (the retired turn engine's continuation), and the short-answer
 // list the reply boundary (wellFormed.ts) accepts as a whole reply
-// ("Yes.", "Done.", "Okay."). Kept out of turnEngine.ts so a reader with
+// ("Yes.", "Done.", "Okay."). Kept out of the retired turn engine so a reader with
 // no store behind it can use them.
 //
 // CHAT-15: consent is the whole message, never a prefix ("no thanks"

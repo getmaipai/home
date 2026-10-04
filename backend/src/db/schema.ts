@@ -350,7 +350,7 @@ export const conversations = sqliteTable(
     summary: text("summary"),
     summaryThroughTurn: text("summary_through_turn"),
     source: text("source").notNull().default("hub"), // hub|local
-    // Session C step 2: JSON-encoded PendingAsk (turnEngine.ts) or null.
+    // Session C step 2: JSON-encoded PendingAsk (the retired turn engine) or null.
     // Set either by a Tier 2 tool proposal naming a `consequential`
     // package (waiting on the person's yes/no) or by a recipe result's
     // own `ask`/`confirm` field (spec/schemas/result.schema.json - typed
@@ -376,7 +376,7 @@ export const conversations = sqliteTable(
   ],
 );
 
-// Conversation history (4.14, split): one row per completed turnEngine
+// Conversation history (4.14, split): one row per completed the retired turn engine
 // turn, kept per person and per surface. Not a spec 3.1 record type
 // today (chapter 3's record table has no Conversation-turn entry either,
 // distinct from the `conversations` thread record above), the same
@@ -823,7 +823,7 @@ export const scheduledJobs = sqliteTable("scheduled_jobs", {
 // own header for why this lives here rather than as a spec 3.1 record
 // type, the same call scheduledJobs above already made for the identical
 // reason. `trigger` is matched exactly (case-insensitive, trimmed, no
-// wildcard - lib/turnEngine.ts's own matchPattern with no `*`), never
+// wildcard - the retired turn engine's own matchPattern with no `*`), never
 // fuzzy: a command is a deliberate, household-authored phrase, not a
 // guess. Unique per household (enforced at the lib layer, not a DB
 // constraint, since "unique" here means case-insensitive/trimmed

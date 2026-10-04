@@ -24,7 +24,7 @@ const QUESTION_WORD_RE = /^(?:who|what|when|where|which|why|how|is)\b/i;
 
 /** The text before a pattern's one wildcard, or the whole pattern for a
  * fixed phrase (no `*` at all). Patterns never carry more than one `*`
- * (matchPattern's own rule, turnEngine.ts), so the first index is the
+ * (matchPattern's own rule, the retired turn engine), so the first index is the
  * only one that matters. */
 export function fixedPartOf(pattern: string): string {
   const idx = pattern.indexOf("*");

@@ -1,9 +1,8 @@
 // U2c, the `answer` node (turn-machine-state-record-2026-09-22.md's
 // state table): "the model's final text or the package reply, the
 // outcomes' sources, the surface's projection (reply.speech), the
-// plan's budget." Four producers feed it (the commands node's package
-// reply, the model node's own text, the model node's
-// answer_from_context choice, and a second model call's text once tool
+// plan's budget." Three producers feed it (the commands node's package
+// reply, the model node's own text, and a second model call's text once tool
 // outcomes exist - all folded to the same shape here so `output_gate`
 // never has to know which one ran).
 import type { Node, ToolExecutionOutcome, PolicyDecision } from "../contract";
@@ -15,17 +14,14 @@ import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
  * `policyHasParkedAsk` guard catches those first - only these ever
  * reach `policyAllRefused` and this node). GROUND-01 split the old
  * single `ungrounded_args` into three ("1. Split the reason", state
- * record): `unknown_tool` (the manifest failed to load) and
- * `context_tool_in_policy` (the answer-from-context tool reaching this
- * node, which should never happen) now carry their own names, so the
- * trace can tell them apart even though `policyRefusalLine()` below
+ * record): `unknown_tool` (the manifest failed to load) carries its own name, so
+ * the trace can tell it apart even though `policyRefusalLine()` below
  * still prints them all as the one honesty line. */
 export type PolicyRefusedReason = Exclude<Extract<PolicyDecision, { allow: false }>["reason"], "consent_needed" | "confirm_needed">;
 
 export type AnswerInput =
   | { kind: "immediate"; text: string; speech?: string; outcome: ToolExecutionOutcome }
   | { kind: "model_text"; text: string }
-  | { kind: "context_quote"; quote: string }
   | { kind: "from_outcomes"; text: string; outcomes: readonly ToolExecutionOutcome[] }
   // A code review (2026-09-22) caught `policy`'s own "every proposal
   // refused, nothing parked" exit (machine.ts's policyAllRefused) with
@@ -67,7 +63,7 @@ export interface AnswerOutput {
  * a time (the rule-budget lint's word-list check is syntactic, not
  * semantic - a 3+-string array trips it whatever it holds). GROUND-01:
  * "the refusal line stays one sentence; the trace is what changes" -
- * `ungrounded_args`, `unknown_tool` and `context_tool_in_policy` all
+ * `ungrounded_args` and `unknown_tool` both
  * fall to the same honesty line on purpose; the branch and the argument
  * name live in `stats.nodes[]`'s `policy` entry instead.
  *
@@ -111,9 +107,7 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // tool call, so `step` there is a fresh ModelOutput text kind),
       // so both cases need the same merge - a review caught an
       // earlier draft of this comment claiming "from_outcomes" was
-      // near-unreachable, which is wrong: `answer_from_context_check`'s
-      // own forced retry (forceSearchOnly, machine.ts) can still reach
-      // `tool` with rounds already exhausted, landing there directly.
+      // near-unreachable, which is wrong.
       // `state.outcomes` already carries every tool this turn ran, in
       // order, across every round, so flatMap-ing it here is safe
       // either way.
@@ -124,15 +118,6 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // so nothing is appended here.
       return { outcome: { ok: true }, output: { text: input.text, sources } };
     }
-    case "context_quote":
-      // The state record's own honesty rule: a world answer without a
-      // search carries no sources and says so is for the case NOTHING
-      // grounds it; here the quote itself is the grounding (policy's
-      // set check already verified it is a real line of the window),
-      // so the line is handed back as the answer, not paraphrased -
-      // the safest "simplest real implementation" for a case where
-      // inventing new phrasing risks saying something the quote didn't.
-      return { outcome: { ok: true }, output: { text: input.quote, sources: [] } };
     case "from_outcomes": {
       // COMMAND-FAIL-01: this text is machine.ts's own last-resort
       // fallback (`answerInputFrom`), built from `outcomes.at(-1)?.

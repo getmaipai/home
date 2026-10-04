@@ -201,7 +201,7 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
 }
 
 /** Fires `safety.flagged_turn` for one evaluateSafety() result, fire-and-
- * forget - the exact same three-line shape turnEngine.ts's prepareTurn(),
+ * forget - the exact same three-line shape the retired turn engine's prepareTurn(),
  * runTurn()'s output check, and gateOutputSafety() each wrote out by hand
  * (a code review, 2026-09-06, found a fourth copy of it landing in
  * routes/llm.ts the same day). `logPrefix` keeps each caller's own

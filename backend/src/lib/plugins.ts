@@ -88,7 +88,7 @@ export function listPackageIds(): string[] {
 }
 
 // mtime-keyed caches for loadManifestOnly()/loadPackage() (a latency
-// review, 2026-09-06: every one of turnEngine.ts's loadAllManifests()
+// review, 2026-09-06: every one of the retired turn engine's loadAllManifests()
 // calls re-read and re-Zod-validated every bundled package's manifest,
 // twelve packages' worth every single turn, none of it ever changing
 // between household messages). Keyed by file mtime rather than a plain
@@ -124,7 +124,7 @@ export function __resetPackageCachesForTests(): void {
 }
 
 // MANIFEST-REFUSAL-01: the bracketed-tag console.warn convention
-// lib/turnEngine.ts and friends already use for a household-invisible
+// the retired turn engine and friends already use for a household-invisible
 // diagnostic (`[conversation]`, `[background]`) - `[packages]` is a new
 // tag for the same reason, never a rule reading anything a household
 // member said (this only ever logs the loader's own Zod message about
@@ -458,7 +458,7 @@ export function meetsMinRole(actorRole: string, minRole: string): boolean {
  * see recipe-interpreter.ts and packageHost.ts.
  *
  * `turnId`, when this run is happening inside a conversation turn
- * (turnEngine.ts's prepareTurn(), the only real caller that has one),
+ * (the retired turn engine's prepareTurn(), the only real caller that has one),
  * is handed straight to createHost() so anything the recipe remembers
  * is attributed to that turn (step 2's provenance rule) rather than the
  * package id. Omitted for every other caller (a direct
@@ -510,7 +510,7 @@ export function safeFailureMessage(result: Extract<PluginOpResult<PluginResult>,
  * one read both share.
  *
  * `turn`, when this run is happening inside a conversation turn
- * (turnEngine.ts's prepareTurn(), the only real caller that has one), is
+ * (the retired turn engine's prepareTurn(), the only real caller that has one), is
  * handed straight to createHost() so anything the recipe remembers is
  * attributed to that turn (step 2's provenance rule) rather than the
  * package id. Omitted for every other caller (a direct

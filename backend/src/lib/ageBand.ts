@@ -1,12 +1,12 @@
 // Age band derivation (originally session-a-intelligence.md step 1,
-// computed inline in turnEngine.ts for the prompt only). Session C step
+// computed inline in the retired turn engine for the prompt only). Session C step
 // 7 (session-c-brain-and-voice.md) pulls it out here so the safety layer
 // can share the identical computation ("the safety layer reads the
 // ceiling through the band instead of the role proxy" - a real, if
 // unglamorous, "one definition, one place" fix: `evaluateSafety()` was
 // deriving its own `isMinor` boolean from `actor.role` directly, an
 // independent, less accurate signal than the birthdate-based band
-// turnEngine.ts's prompt already used for the exact same person on the
+// the retired turn engine's prompt already used for the exact same person on the
 // exact same turn).
 //
 // Deliberately narrow: just enough to calibrate a reply's phrasing and a
@@ -44,7 +44,7 @@ function ageBandFromRole(role: string): AgeBand {
 // looser one.
 const BAND_STRICTNESS: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
 
-/** The one, shared age-band computation - turnEngine.ts's prompt
+/** The one, shared age-band computation - the retired turn engine's prompt
  * (speakerLine()) and safety.ts's evaluateSafety() both call this for the
  * same actor on the same turn, rather than each deriving their own
  * answer from a different signal.

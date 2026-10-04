@@ -1,10 +1,10 @@
-// The first real slice of the "Persona/style record" gap turnEngine.ts's
+// The first real slice of the "Persona/style record" gap the retired turn engine's
 // own comment has named since before this file existed (3.1 lists the
 // type; nothing implemented it). Jesse, 2026-09-05, after the humanistic-
 // speech work landed: "work on persona as that ties into humanistic
 // speech (can have humanism without a persona)" - then, correcting
 // himself - "humanism requires persona." That reframing is this file's
-// actual thesis: `turnEngine.ts`'s old NATURAL_REGISTER_POLICY wasn't
+// actual thesis: the retired turn engine's old NATURAL_REGISTER_POLICY wasn't
 // "no persona," it was one fixed, unnamed, un-editable persona. This
 // makes that explicit: everything now goes through ONE composition
 // mechanism (`composePersonaPrompt`), and what shipped before becomes
@@ -93,7 +93,7 @@ export interface Persona {
 // Read once at module load, the same "bundled packages are static this
 // pass, no install flow yet" assumption `lib/plugins.ts`'s own
 // PACKAGES_DIR scan already makes (unlike `loadAllManifests()` in
-// turnEngine.ts, which re-scans every turn because a plugin's OWN
+// the retired turn engine, which re-scans every turn because a plugin's OWN
 // recipe can matter mid-session - a companion's voice dials changing
 // requires editing a file on disk regardless of when this ran).
 // Skips (rather than throws on) a package that fails to load or isn't
@@ -238,7 +238,7 @@ export const WRITTEN_POLICY =
 // itself untouched, exactly as today.
 // CORRECTION-02: the written-class twin of the same contract added to
 // INFORMATION_HANDLING_POLICY above. Read buildStablePrefix()'s written
-// branch (turnEngine.ts) before assuming this reaches a real prompt:
+// branch (the retired turn engine) before assuming this reaches a real prompt:
 // composePersonaPrompt(persona, "written") returns "" while
 // WRITTEN_VOICE_PROSE (below) is false (PREFIX-CLASS-01, "The written
 // prompt on tier 1, decided", 2026-09-23), so this whole array,
@@ -405,7 +405,7 @@ function examplesBlock(examples: readonly string[] | undefined): string {
 }
 
 /** `surfaceClass` defaults "spoken" - the old path's own four call
- * sites (turnEngine.ts, personaJudge.ts) pass nothing and get today's
+ * sites (the retired turn engine, personaJudge.ts) pass nothing and get today's
  * exact wording, frozen; only the new path (messages.ts, via
  * buildStablePrefix's own new parameter) passes "written" explicitly.
  * The spoken branch is byte-identical to before PREFIX-CLASS-01.

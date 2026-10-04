@@ -9,7 +9,7 @@
 // `source` value, and no synthetic message.
 //
 // The one real gap this closes: turnMachine/turnNext.ts (unlike the
-// legacy turnEngine.ts's prepareTurn()) writes conversationTurns' own row
+// legacy the retired turn engine's prepareTurn()) writes conversationTurns' own row
 // only at the very end (logResult(), turnNext.ts), never a provisional
 // one up front - so a project that finishes fast enough (every scripted
 // test; a real one-step project on a fast engine) can reach its terminal

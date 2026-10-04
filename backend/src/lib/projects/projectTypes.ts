@@ -81,7 +81,7 @@ export interface ProjectType {
 // ProjectType's `title` in as a sentence's first word - fine for the
 // proper-noun-style titles, but the noun-phrase-style ones (this
 // module's own doc comment above) produced a reply that opened
-// lowercase. Not `sentenceCaseOpener()` (turnEngine.ts): that one is
+// lowercase. Not `sentenceCaseOpener()` (the retired turn engine): that one is
 // deliberately scoped to a MODEL reply's own opener, never "a
 // package's own reply... left as authored" per its own comment - a
 // project's title isn't authored prose at all, it's a data field, so

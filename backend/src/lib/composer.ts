@@ -906,7 +906,7 @@ export function questionOf(outcomes: readonly ToolExecutionOutcome[]): string | 
 /** The one user-role instruction after the tool messages.
  *
  * `surfaceClass` defaults "spoken" - the old path's own one call site
- * (planComposition below, turnEngine.ts) passes nothing and keeps
+ * (planComposition below, the retired turn engine) passes nothing and keeps
  * today's exact "one to three sentences" wording, frozen. The reply
  * floor (owner's rule, 2026-09-23): that line is the spoken form; on
  * the written class it becomes the complete answer from the results,

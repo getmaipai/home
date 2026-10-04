@@ -12,7 +12,7 @@
 // needs: routes/turn.ts's `/stream` route calls it instead, when
 // turn.pipeline.next is on.
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
-import type { Surface, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome, DocumentTurnAttachment } from "@/lib/turnShared";
+import type { Surface, TurnFailure, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome, DocumentTurnAttachment } from "@/lib/turnShared";
 import type { TurnValue } from "@/wire";
 import { attachDocuments } from "./documents";
 import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
@@ -678,7 +678,10 @@ function engineUnavailableLine(state: Pick<TurnState, "spoken" | "surface">): st
   return stackRefusal("chat")?.household ?? "MaiPai's AI isn't running right now.";
 }
 
-export async function runTurnNext(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnStreamResult> {
+/** runTurnNext() always resolves the whole reply: a failure or an "immediate" value, never a stream. */
+export type TurnImmediateResult = TurnFailure | Extract<TurnStreamResult, { kind: "immediate" }>;
+
+export async function runTurnNext(actor: PersonRow, surface: Surface, text: string, opts: RunTurnNextOpts = {}): Promise<TurnImmediateResult> {
   const begun = await beginTurn(actor, surface, text, opts);
   if (!begun.ok) return begun.result;
   const { state, lease } = begun.value;

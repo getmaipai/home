@@ -169,14 +169,14 @@ export function stackRefusal(role: string, now = Date.now()): StackRefusal | nul
 let stackChatIdentity: EngineIdentity | null = null;
 
 /** Set after every Stack chat reply (success or a failure that still
- * carried headers) so turnEngine.ts's [turn] line and TurnStats read the
+ * carried headers) so the retired turn engine's [turn] line and TurnStats read the
  * engine the Stack actually used, not a probe of a process Home never
  * spawned. */
 export function recordStackChatIdentity(identity: EngineIdentity | null): void {
   stackChatIdentity = identity;
 }
 
-/** turnEngine.ts's one call site for "whichever chat identity is live
+/** the retired turn engine's one call site for "whichever chat identity is live
  * right now" - the Stack's, when configured, else llmSupervisor.ts's own
  * probe of the engine it spawned. Neither side needs to know about the
  * other. */

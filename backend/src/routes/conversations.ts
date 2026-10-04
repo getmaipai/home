@@ -35,7 +35,7 @@ import {
 import { recallEpisodes } from "@/lib/episodes";
 import { embedQueryForRecall } from "@/lib/memory";
 import type { AppEnv, PersonRow } from "@/types";
-import type { Surface } from "@/lib/turnEngine";
+import type { Surface } from "@/lib/turnShared";
 
 export const conversationsRoutes = apiRouter();
 

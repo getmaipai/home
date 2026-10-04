@@ -15,7 +15,7 @@ import { safetyNode, applySafety, safetyRoute, inputSafetyAfterFailure, type Saf
 import { carriesCrisisSignal } from "@/lib/safety";
 import { commandsNode, type CommandsOutput } from "./nodes/commands";
 import { contextNode, applyContext, type ContextOutput } from "./nodes/context";
-import { modelNode, ANSWER_FROM_CONTEXT_TOOL_ID, rawUtteranceWebsearchCall, type ModelOutput } from "./nodes/model";
+import { modelNode, rawUtteranceWebsearchCall, type ModelOutput } from "./nodes/model";
 import { policyNode, type PolicyOutput, type PolicyEntry } from "./nodes/policy";
 import { toolNode, type ToolOutput } from "./nodes/tool";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
@@ -67,12 +67,6 @@ interface MachineContext {
   abortSignal: AbortSignal;
   preConfirmed?: ActionProposal;
   roundsUsed: number;
-  // Set once by `answer_from_context_check`'s own ungrounded-quote
-  // branch, read once by the model actor's next invocation, then never
-  // again this turn - guarantees the retry it forces cannot itself
-  // loop back through the same check (model.ts's own forceSearchOnly
-  // never offers answer_from_this_conversation).
-  forceSearchOnly: boolean;
   // QUERY-WRITER-01: set by the `model` state's own onDone action
   // whenever THIS round's tool_calls came from the query-writer
   // generation (nodes/model.ts's `recoveredMissingCall()`), never from
@@ -81,8 +75,7 @@ interface MachineContext {
   // tell "policy refused the query-writer's own answer" apart from an
   // ordinary refusal, then cleared by `queryWriterFallback` itself so
   // the one retry it forces can never loop back through the same
-  // check a second time - the identical shape `forceSearchOnly`
-  // already uses for `answer_from_context_check`'s own retry.
+  // check a second time.
   queryWriterUsed: boolean;
   // The last node's raw output, read by that state's own guarded
   // transitions - one shared slot rather than one typed field per
@@ -122,7 +115,7 @@ export const turnMachine = setup({
         input.turnState.budget.deadlines_ms.model,
         input.turnState,
         input.abortSignal,
-        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds, forceSearchOnly: input.forceSearchOnly },
+        { utterance: input.turnState.utterance, toolsAllowed: input.turnState.budget.model_transitions && input.roundsUsed < input.turnState.budget.rounds },
         modelNode,
       ),
     ),
@@ -152,27 +145,11 @@ export const turnMachine = setup({
     // transition's actions run (XState's own order: guard picks the
     // transition, actions then fire), so `context.step` is still the
     // PREVIOUS state's value here - these guards read `event.output`
-    // (this done event's own payload) directly instead. A guard used
-    // where `context.step` really was already set by an earlier,
-    // already-completed transition (contextQuoteGrounded, in the
-    // `always` state entered after `model`'s onDone action ran) keeps
-    // reading `context.step`, correctly.
+    // (this done event's own payload) directly instead.
     safetyRefused: ({ event }) => safetyRoute((event as unknown as { output: SafetyOutput }).output) === "refused",
     safetyBlocked: ({ event }) => safetyRoute((event as unknown as { output: SafetyOutput }).output) === "blocked",
     commandsMatched: ({ event }) => ((event as unknown as { output: CommandsOutput }).output).matched === true,
     modelIsToolCalls: ({ event }) => ((event as unknown as { output: ModelOutput }).output).kind === "tool_calls",
-    modelIsAnswerFromContext: ({ event }) => ((event as unknown as { output: ModelOutput }).output).kind === "answer_from_context",
-    contextQuoteGrounded: ({ context }) => {
-      const quote = (context.step as { kind: "answer_from_context"; quote: string }).quote;
-      // Case-insensitive, matching policy.ts's own argsGrounded() - the
-      // same "set check, not a judgment" rule for the identical kind of
-      // question ("is this string really in the conversation"), a code
-      // review caught reading these two differently. GROUND-01: the
-      // "utterance" item is excluded on purpose - quoting the question
-      // back is never answer evidence, even though it now sits in the
-      // context list for grounding.
-      return quote.length > 0 && context.turnState.context.some((c) => c.source !== "utterance" && c.text.toLowerCase().includes(quote.toLowerCase()));
-    },
     policyHasParkedAsk: ({ event }) => proposalsFrom((event as unknown as { output: PolicyOutput }).output).parkedAsk !== null,
     policyAllRefused: ({ event }) => {
       const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
@@ -334,7 +311,7 @@ export const turnMachine = setup({
   },
 }).createMachine({
   id: "turn",
-  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, forceSearchOnly: false, queryWriterUsed: false, step: null, modelReasoning: undefined }),
+  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, queryWriterUsed: false, step: null, modelReasoning: undefined }),
   initial: "safety",
   states: {
     safety: {
@@ -399,25 +376,9 @@ export const turnMachine = setup({
           // a real model call or a plain builder row both leave it
           // undefined/false, matching ModelOutput's own optional field).
           { guard: "modelIsToolCalls", actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning, queryWriterUsed: (event.output as ModelOutput & { kind: "tool_calls" }).queryWriterUsed === true })), target: "policy" },
-          { guard: "modelIsAnswerFromContext", actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning })), target: "answer_from_context_check" },
           { actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning })), target: "answer" },
         ],
       },
-    },
-    // The interim rule's own policy check (turn-machine-state-record's
-    // "policy verifies the quote is in the list ... a quote that is not
-    // there is an ungrounded argument and the search runs instead"):
-    // a real state, not folded into `model`, so the trace can show it
-    // as its own decision rather than hiding it inside the model node.
-    answer_from_context_check: {
-      always: [
-        { guard: "contextQuoteGrounded", target: "answer" },
-        // An ungrounded quote means "run the search instead" - back to
-        // `model`, forced to the search tool alone this one time
-        // (forceSearchOnly) so a model that keeps choosing the broken
-        // answer cannot loop here a second time.
-        { actions: assign({ forceSearchOnly: true }), target: "model" },
-      ],
     },
     policy: {
       invoke: {
@@ -436,8 +397,7 @@ export const turnMachine = setup({
       },
     },
     // QUERY-WRITER-01: the ruling's own "fall back to the raw utterance
-    // as today" - a synchronous `always` transition, the identical shape
-    // answer_from_context_check already uses for its own retry, back
+    // as today" - a synchronous `always` transition, back
     // through `policy` (never straight to `tool`) so the raw utterance
     // still clears a real grounding check rather than skipping it - it
     // always does (it IS the utterance's own terms), the same reason
@@ -543,7 +503,6 @@ function answerInputFrom(context: MachineContext): AnswerInput {
   if (step && typeof step === "object" && "kind" in step) {
     const s = step as ModelOutput;
     if (s.kind === "text") return { kind: "model_text", text: s.text };
-    if (s.kind === "answer_from_context") return { kind: "context_quote", quote: s.quote };
     // DEADLINE-01: a generation that never finished at all - kept
     // distinct from "text" with an empty string, which used to reach
     // here and deliver a real, silent empty reply.

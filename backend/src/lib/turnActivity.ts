@@ -1,4 +1,4 @@
-// Shared by turnEngine.ts (holds a lease for every real household turn)
+// Shared by the retired turn engine (holds a lease for every real household turn)
 // and background LLM work that must never contend with one on the shared
 // `chat` engine slot (lib/memoryJudge.ts's per-minute tick) - a latency
 // review, 2026-09-06, found the judge's own extraction/embed/dedupe calls

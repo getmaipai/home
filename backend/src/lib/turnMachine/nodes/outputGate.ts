@@ -17,7 +17,7 @@
 // an action are `answer`'s "immediate" and "from_outcomes" kinds, and
 // both are already built from a real ToolExecutionOutcome (the command
 // that ran, or the tool that did) - there is no path here where the
-// model's own free text ("model_text"/"context_quote") stands in for
+// model's own free text ("model_text") stands in for
 // an action result, so nothing in this node re-parses that text for a
 // claim a regex would have to invent (RULES-AND-LEARNED-COMPONENTS.md's
 // "No hacky rules": understanding language is the model's job, and a
@@ -591,7 +591,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   // node never re-evaluates that text; it assembles its output from the
   // verdicts the gate already made, so logged equals streamed by
   // construction. `done` is unset for every other AnswerInput kind
-  // (immediate/from_outcomes/context_quote/policy_refused/model_failed
+  // (immediate/from_outcomes/policy_refused/model_failed
   // never touch this gate at all) and `heldAsEnvelope` falls through to
   // the ordinary whole-reply path below - the same one a generation
   // whose envelope parse actually succeeded already takes, since

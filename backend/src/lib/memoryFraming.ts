@@ -1,6 +1,6 @@
 // CONTEXT-RECALL-01 (dev.md "The owner's three live turns on the new
 // path", (2)): the volatile context message's own memory framing -
-// moved out of turnEngine.ts (the old path's own home for these three
+// moved out of the retired turn engine (the old path's own home for these three
 // lines) so nodes/messages.ts can wrap a recalled row in the identical
 // wording, never a second, drifting copy. Why the framing exists at
 // all: an unframed memory line reads as part of the question itself
