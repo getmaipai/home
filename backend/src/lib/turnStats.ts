@@ -38,6 +38,8 @@ export interface GenerationInput {
    * wire.ts's TurnGeneration.error for the full contract. `undefined`
    * on a generation that produced a real reply. */
   error?: string | null;
+  /** THIN-1E: the Stack's `offline_reason` for a refused generation. */
+  offlineReason?: string | null;
 }
 
 function projectGeneration(gen: GenerationInput): TurnGeneration {
@@ -66,6 +68,7 @@ function projectGeneration(gen: GenerationInput): TurnGeneration {
     tool_call_raw_args: gen.toolCallRawArgs ?? null,
     envelope_parsed: gen.envelopeParsed ?? false,
     error: gen.error ?? null,
+    ...(gen.offlineReason ? { offline_reason: gen.offlineReason } : {}),
   };
 }
 

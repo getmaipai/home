@@ -59,6 +59,7 @@ import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { Rung } from "@/lib/ruleNames";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
+import { canReadErrorDetail, statsForViewer } from "@/lib/turnErrorDetail";
 import type { ConversationRow, ConversationSummary, ConversationTurnWithMemoryIds, Media, StructuredPart, TurnValue } from "@/wire";
 export type { ConversationSummary, ConversationTurnWithMemoryIds } from "@/wire";
 export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
@@ -1643,6 +1644,8 @@ export function listConversationTurns(
   // rule; computed once here since it depends only on the reading
   // actor, never the row.
   const dropReasoningForActor = speakerAgeBand(actor, new Date()) !== "adult";
+  // THIN-1E: the raw tool and generation errors on a row are an admin's alone.
+  const readsErrorDetail = canReadErrorDetail(actor);
   // artifacts.ts's own visibleArtifactRow() access check, inlined
   // rather than called per row (it would re-fetch the same turn row
   // `r` already is): a child sees an artifact only from their own
@@ -1666,7 +1669,7 @@ export function listConversationTurns(
   const projectByTurn = projectsByTurn(rows.map((r) => r.id));
 
   return { ok: true, value: rows.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, ...row } = r;
     // Named once, read by both fields below (a code review's own
     // finding: two separately-inlined copies of the identical condition
     // is exactly the kind of thing a later rule change updates in one
@@ -1689,7 +1692,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2236,6 +2239,7 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   // that used to prove "an owner may read a child's stored reasoning"
   // is retired with this fix (conversationHistory.test.ts).
   const dropReasoningForActor = speakerAgeBand(actor, new Date()) !== "adult";
+  const readsErrorDetail = canReadErrorDetail(actor);
   // APPROVE-CARD-01: the same read-time derivation listConversationTurns()
   // above uses, adapted for this flat, cross-conversation list - one
   // getPendingAsk() call per distinct conversation actually carrying a
@@ -2248,12 +2252,12 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
     return pendingAskCache.get(conversationId) ?? null;
   };
   return capped.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, ...row } = r;
     const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
     // getmaipai/home#130: no age gate, same call listConversationTurns()
     // above makes - the card is the reply itself. APPROVE-CARD-01's
     // confirm gets the same treatment.
-    return { ...row, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? JSON.parse(r.stats) as TurnStats : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

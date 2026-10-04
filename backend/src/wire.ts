@@ -140,6 +140,8 @@ export interface TurnGeneration {
    * (`request_sent_ms`, `first_delta_ms`), this is only the reason it
    * stopped there. */
   error?: string | null;
+  /** THIN-1E: the Stack's own `offline_reason` when it refused the chat role for this generation. Admin only on the wire. */
+  offline_reason?: string | null;
 }
 
 /** U2's own per-node trace entry, TurnGeneration's structural twin -
