@@ -77,6 +77,11 @@ describe("Home's token-only restyle of the shipped reply markdown (UI-1)", () =>
     expect(css()).toMatch(/\.aui-md\s+li\.task-list-item\s*{[^}]*list-style:\s*none/);
   });
 
+  test("code colours follow the dark theme: the shiki palette is light-dark(), which needs color-scheme", () => {
+    expect(css()).toMatch(/\.dark\s+\.aui-shiki-base\s*{[^}]*color-scheme:\s*dark/);
+    expect(css()).toMatch(/\.light\s+\.aui-shiki-base\s*{[^}]*color-scheme:\s*light/);
+  });
+
   test("the chat page loads the stylesheet", () => {
     const page = readFileSync(join(import.meta.dir, "NextChatPage.tsx"), "utf8");
     expect(page).toContain('import "@/next/pages/chatReplyMarkdown.css";');

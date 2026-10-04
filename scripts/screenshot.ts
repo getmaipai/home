@@ -3561,6 +3561,12 @@ async function captureNextChatRichReview(browser: Browser, sessionValue: string)
           links: [...document.querySelectorAll(".aui-md a")].map((a) => `${a.getAttribute("target")}|${a.getAttribute("rel")}`),
           mermaid: document.querySelectorAll(".aui-md svg").length,
           pageScrollsSideways: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          scheme: (() => {
+            const css = (selector: string, prop: "colorScheme" | "color" | "backgroundColor") => { const el = document.querySelector(selector); return el ? getComputedStyle(el)[prop] : null; };
+            return { htmlClass: document.documentElement.className, htmlColorScheme: css("html", "colorScheme"), shikiColorScheme: css(".aui-shiki-base code", "colorScheme"), tokenColor: css(".aui-shiki-base code span", "color"), preBg: css(".aui-shiki-base pre", "backgroundColor"), pageBg: css("body", "backgroundColor") };
+          })(),
+          emptyLabel: (() => { const el = [...document.querySelectorAll(".aui-code-header-language")].find((n) => !n.textContent); return el ? getComputedStyle(el, "::before").content : null; })(),
+          taskListStyle: (() => { const li = document.querySelector(".aui-md li.task-list-item"); return li ? getComputedStyle(li).listStyleType : null; })(),
           codeBox: (() => {
             const h = document.querySelector(".aui-code-header-root")?.getBoundingClientRect();
             const pre = document.querySelector(".aui-shiki-base pre");
@@ -3573,10 +3579,20 @@ async function captureNextChatRichReview(browser: Browser, sessionValue: string)
         }));
         console.log(`captureNextChatRichReview: ${slug}/${theme} ${JSON.stringify(report)}`);
         await settleAnimations(page);
-        const filename = `next-chat-rich-${evidenceTag}-${viewport.width}-${theme}.png`;
-        await page.screenshot({ path: join(outDir, filename), fullPage: slug === "phone" });
-        dedicatedScreenshots.push({ file: filename, route: "/chat", viewport: viewport.slug, theme });
-        console.log(`Wrote ${join(outDir, filename)}`);
+        // The thread scrolls inside its own viewport, so one shot per end of
+        // the reply: the top (code, math) and the bottom (table, tasks, diagram).
+        for (const part of ["top", "end"] as const) {
+          await page.evaluate((where) => {
+            const md = document.querySelector(".aui-md");
+            if (where === "top") md?.scrollIntoView({ block: "start" });
+            else document.querySelectorAll(".aui-md").forEach((n) => n.scrollIntoView({ block: "end" }));
+          }, part);
+          await page.waitForTimeout(400);
+          const filename = `next-chat-rich-${evidenceTag}-${part}-${viewport.width}-${theme}.png`;
+          await page.screenshot({ path: join(outDir, filename) });
+          dedicatedScreenshots.push({ file: filename, route: "/chat", viewport: viewport.slug, theme });
+          console.log(`Wrote ${join(outDir, filename)}`);
+        }
         await page.close();
       } finally {
         await context.close();

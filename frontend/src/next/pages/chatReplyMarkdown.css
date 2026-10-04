@@ -19,3 +19,15 @@
   margin-inline-end: 0.5rem;
   vertical-align: middle;
 }
+
+/* The kit's highlighter paints with light-dark(), which follows the element's
+   color-scheme. The app themes with a .light / .dark class on <html> and
+   leaves color-scheme at "normal", so dark code resolved to the light palette
+   (near-black text on a dark block). Say the scheme where the colours are used. */
+.light .aui-shiki-base {
+  color-scheme: light;
+}
+
+.dark .aui-shiki-base {
+  color-scheme: dark;
+}
