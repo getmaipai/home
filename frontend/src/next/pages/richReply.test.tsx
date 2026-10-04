@@ -32,7 +32,9 @@ describe("a reply with every rich element (UI-1, A3)", () => {
   test("inline code, inline math and block math render", async () => {
     const { container } = renderReply(RICH_REPLY_MARKDOWN);
     expect(container.querySelector(".aui-md-inline-code")?.textContent).toBe("Array.map");
-    await waitFor(() => expect(container.querySelectorAll(".katex").length).toBe(2));
+    await waitFor(() => expect(container.querySelectorAll(".katex").length).toBe(4));
+    expect(container.querySelector("td .katex")).toBeTruthy();
+    expect(container.querySelector("li .katex")).toBeTruthy();
     expect(container.querySelectorAll(".katex-display").length).toBe(1);
   });
 
@@ -80,6 +82,11 @@ describe("Home's token-only restyle of the shipped reply markdown (UI-1)", () =>
   test("code colours follow the dark theme: the shiki palette is light-dark(), which needs color-scheme", () => {
     expect(css()).toMatch(/\.dark\s+\.aui-shiki-base\s*{[^}]*color-scheme:\s*dark/);
     expect(css()).toMatch(/\.light\s+\.aui-shiki-base\s*{[^}]*color-scheme:\s*light/);
+  });
+
+  test("tables use small uppercase headers and thin row rules, no heavy borders", () => {
+    expect(css()).toMatch(/\.aui-md\s+th\.aui-md-th\s*{[^}]*text-transform:\s*uppercase/);
+    expect(css()).toMatch(/\.aui-md\s+td\.aui-md-td\s*{[^}]*border-inline-width:\s*0/);
   });
 
   test("the chat page loads the stylesheet", () => {

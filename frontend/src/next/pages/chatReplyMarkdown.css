@@ -31,3 +31,20 @@
 .dark .aui-shiki-base {
   color-scheme: dark;
 }
+
+/* Tables: small muted uppercase headers over thin row rules, no side borders
+   or filled header, like Open WebUI and ChatGPT. Selector-only over the kit's
+   own th/td classes; the horizontal scroller around the table is untouched. */
+.aui-md th.aui-md-th {
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+
+.aui-md td.aui-md-td {
+  border-inline-width: 0;
+}
