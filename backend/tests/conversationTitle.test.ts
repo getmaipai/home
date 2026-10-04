@@ -80,6 +80,9 @@ describe("generateConversationTitle() (CHAT-TITLE-01)", () => {
     const sent = JSON.stringify(modelCalls[0]!.messages);
     expect(sent).toContain("tomato plants");
     expect(sent).toContain("Water them evenly");
+    // Asked for a noun-phrase topic, not the message cut off.
+    expect(sent).toContain("noun-phrase topic title");
+    expect(sent).toContain("never copy or truncate the first message");
   });
 
   test("is idempotent: a second run neither calls the model nor changes the title", async () => {
