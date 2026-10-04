@@ -8,6 +8,8 @@
 // underlying call keeps running unobserved until it finishes or the
 // process exits.
 import { runPlugin } from "@/lib/plugins";
+import { surfaceClassOf } from "@/lib/surfaceClass";
+import { searchTurnContext } from "@/lib/search/turnContext";
 import { outcomeOf } from "@/lib/turnContext";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
@@ -139,7 +141,8 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // node asks for them itself; the model never chooses it (the wire
     // events above keep the model's own filtered args).
     const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true } : args;
-    const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId }), signal);
+    // SRCH: the search's one retry pause is cancelable by this node's signal and skipped on a spoken turn.
+    const raced = await withDeadline(searchTurnContext.run({ signal, spoken: surfaceClassOf(state.surface, state.spoken) !== "written" }, () => runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId })), signal);
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", userMessage: "That took too long, sorry." });
       outcomes.push(outcome);

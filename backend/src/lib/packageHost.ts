@@ -60,6 +60,7 @@ import { createArtifact, updateArtifact, getArtifactRow } from "@/lib/artifacts"
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { tryConsume } from "@/lib/rateLimiter";
 import { recordSearchHealth } from "@/lib/searchHealthState";
+import { searchTurnContext, pauseBeforeRetry } from "@/lib/search/turnContext";
 import { classifyServiceOutcome, recordServiceOutcome } from "@/lib/serviceHealth";
 import { assertNotPrivateHost, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
 import * as memory from "@/lib/memory";
@@ -677,7 +678,9 @@ export function formatSearxngResults(data: unknown, count = 5): string {
  * `text` as numbered source text; `page` on the result stays the first
  * page's whole document for the old path. */
 export type SearxngPage = { url: string; title: string; text: string };
-type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadResult; pages?: SearxngPage[]; floor_dropped?: number };
+type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadResult; pages?: SearxngPage[]; floor_dropped?: number;
+  /** SRCH: which path produced the rows, so the outcome can say so: SearXNG's first answer (absent), its one retry on the engines not benched, or the key-free Wikipedia fallback. */
+  via?: "searxng_retry" | "wikipedia" };
 
 /** SEARCH-FALLBACK-01: Wikipedia's own official, documented REST API,
  * search then the page summary - "search" (the Core REST API,
@@ -879,7 +882,8 @@ export function __resetSearchCacheForTests(): void {
 }
 
 export async function searxngSearch(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand } = {}): Promise<SearxngSearchResult> {
-  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args, opts.minorBand);
+  // SRCH: a bypassCache call is the health canary's raw probe; it reports what one request saw, so it never retries.
+  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, { ...opts, retried: true }), args, opts.minorBand);
   const input = args as { query?: unknown; category?: unknown; read_page?: unknown } | undefined;
   const query = input?.query;
   if (typeof query !== "string" || query.length === 0) return searxngSearchUncached(args, opts);
@@ -900,10 +904,15 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
   if (running) return running;
   const searchRows = async (): Promise<SearxngSearchResult> => {
     const result = await searxngSearchUncached(args, { ...opts, safeEngines: requestEngines ?? safeEngines });
-    if (!rotationPool || !requestEngines || requestEngines.length === 0 || result.rows.length >= 3) return result;
+    if (!rotationPool || !requestEngines || requestEngines.length === 0 || result.rows.length >= 3 || result.via) return result;
     const next = rotationEngines(rotationPool);
     if (next.length === 0 || next.join(",") === requestEngines.filter((name) => name !== "wikipedia").join(",")) return result;
-    const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...next, ...wikipedia] });
+    // SRCH: a second pass that fails (or is turned away by the pace) never discards the first pass's rows.
+    const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...next, ...wikipedia] }).catch((err: unknown) => {
+      if (err instanceof HostError) return null;
+      throw err;
+    });
+    if (!second) return result;
     const rows = dedupeRows([...result.rows, ...second.rows]);
     return { text: [result.text, second.text].filter((value) => value !== SEARXNG_NO_RESULTS_TEXT).join("\n"), rows };
   };
@@ -991,7 +1000,7 @@ function appendRows(items: unknown, cap: number, n: number, out: SearxngRow[], b
   return n;
 }
 
-async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; safeEngines?: string[] | null } = {}): Promise<SearxngSearchResult> {
+async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; safeEngines?: string[] | null; retried?: boolean; extraQuery?: string } = {}): Promise<SearxngSearchResult> {
   // SEARCH-FALLBACK-01: `opts` is never part of the recipe's own public
   // `args` schema (a model can never set it) - the one caller that
   // needs to turn the fallback off is `searxngHealth.ts`'s own canary,
@@ -1046,7 +1055,7 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
   // outright over a filter that couldn't be built.
   const safeEngines = opts.safeEngines !== undefined ? opts.safeEngines : opts.safeSearchLevel === "strict" || opts.safeSearchLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general") : null;
   const engines = safeEngines && safeEngines.length > 0 ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
-  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}&safesearch=${safesearchLevel}${engines}`;
+  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}&safesearch=${safesearchLevel}${engines}${opts.extraQuery ?? ""}`;
   if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) {
     throw new HostError("rate_limited", "Web search is rate-limited - try again shortly");
   }
@@ -1124,6 +1133,11 @@ async function searxngSearchUncached(args: unknown, opts: { allowWikipediaFallba
         // the admin indicator, THIN-1E). It never reaches the model or a
         // household member; the reply's note is the model's own words, told
         // only the code's failure kind (turnMachine/nodes/lookupFallback.ts).
+        const retried = opts.retried ? null : await retryOnUnsuspendedEngines(baseUrl, args, opts, isImages);
+        if (retried) {
+          await recordSearchHealth({ kind: "ok" });
+          return retried;
+        }
         throw new HostError("search_unavailable", "Search isn't working right now.");
       }
       // SEARCH-FALLBACK-01: "when SearXNG is down or returns nothing" -
@@ -1221,6 +1235,35 @@ let searchPagesBudgetMs = 6_000;
 
 export function __setSearchPagesBudgetForTests(ms: number | null): void {
   searchPagesBudgetMs = ms ?? 6_000;
+}
+
+/** SRCH: zero rows with a suspended engine is asked once more, after a
+ * person's pause, naming only the instance's enabled engines that are not
+ * benched (the bench map the first answer just updated; `engines=` from its
+ * /config, the same list the rotation reads). With no engine list it varies
+ * `language` instead. Never on a spoken turn, never past the turn's abort
+ * signal, never more than once (the retry runs with `retried`, and does not
+ * itself fall back to Wikipedia: the caller's fallback covers both). Null
+ * when it did not run or found nothing; the caller then fails or falls back
+ * exactly as before. */
+async function retryOnUnsuspendedEngines(baseUrl: string, args: unknown, opts: { safeSearchLevel?: SafeSearchLevel; safeEngines?: string[] | null }, isImages: boolean): Promise<SearxngSearchResult | null> {
+  const turn = searchTurnContext.getStore();
+  if (turn?.spoken) return null;
+  if (!(await pauseBeforeRetry(turn?.signal))) return null;
+  const category = isImages ? "images" : "web";
+  if (!searxngEnginesCache || searxngEnginesCache.baseUrl !== baseUrl) await safesearchEnginesFor(baseUrl, "general");
+  const known = searxngEnginesCache?.baseUrl === baseUrl ? searxngEnginesCache.engines : null;
+  const now = Date.now();
+  const allowed = opts.safeEngines && opts.safeEngines.length > 0 ? new Set(opts.safeEngines) : null;
+  const engines = known?.filter((e) => e.enabled && e.categories.includes(category) && (searxngBenchedUntil.get(e.name) ?? 0) <= now && (!allowed || allowed.has(e.name))).map((e) => e.name) ?? [];
+  if (known && engines.length === 0) return null;
+  try {
+    const found = await searxngSearchUncached(args, { ...opts, allowWikipediaFallback: false, retried: true, safeEngines: known ? engines : opts.safeEngines, extraQuery: known ? "" : "&language=en" });
+    return found.rows.length > 0 ? { ...found, via: "searxng_retry" } : null;
+  } catch (err) {
+    if (err instanceof HostError) return null;
+    throw err;
+  }
 }
 
 /** With `read_page: true`, read the top result pages and attach them.
@@ -1321,7 +1364,8 @@ export function floorSearchResult(result: SearxngSearchResult, _band: MinorBand)
 async function tryWikipediaFallback(query: string): Promise<SearxngSearchResult | null> {
   const enabled = getHouseholdSettingValue("search.wikipedia_fallback") as boolean | undefined;
   if (enabled === false) return null;
-  return wikipediaFallback(query);
+  const found = await wikipediaFallback(query);
+  return found ? { ...found, via: "wikipedia" } : null;
 }
 
 export interface PageReadLink {

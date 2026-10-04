@@ -10,8 +10,13 @@ import { installTestIsolationGuard } from "./isolation";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import type { StackFixture } from "./stackFixture";
+import { __setSearchRetryPauseForTests } from "@/lib/search/turnContext";
 
 let defaultScriptedStack: StackFixture;
+
+// SRCH: a search retries once after a 1 to 3 second pause; no test waits for it.
+// searchResilience.test.ts sets its own pauses.
+__setSearchRetryPauseForTests(() => 0);
 
 // SINGLE-INSTANCE-02 (#196): a hub booted by a test (or by a script a test
 // runs) has its own throwaway data directory and port, and must never
