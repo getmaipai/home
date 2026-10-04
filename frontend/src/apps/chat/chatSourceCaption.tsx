@@ -43,7 +43,7 @@ export function ChatSourceCaption() {
   if (!captioned) return null;
 
   // A code review (2026-09-07) found `pluginId` isn't always one real
-  // package id: attemptTier2Tools() (turnEngine.ts) joins two tools'
+  // package id: attemptTier2Tools() (the retired turn engine) joins two tools'
   // ids with "+" ("currency+weather") when a turn answers via both, and
   // no manifest's own id ever equals that compound string - a plain
   // `find()` silently returned nothing and the whole caption vanished
