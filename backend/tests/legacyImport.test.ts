@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
@@ -172,6 +172,11 @@ describe("runLegacyImport()", () => {
   test("a real (non-dry-run) import refuses without a backup on file", async () => {
     const { ownerRow } = await ownerAndMatch();
     const dbPath = buildLegacyFixture();
+    // Another test file in the same bun process may have left a backup
+    // behind (the suite is sharded into processes by file, so which files
+    // share a process changes from run to run): start from an empty folder.
+    const backups = process.env.MAIPAI_BACKUP_DIR!;
+    for (const f of readdirSync(backups)) rmSync(join(backups, f), { recursive: true, force: true });
     expect(() => runLegacyImport(ownerRow, { dbPath, dryRun: false })).toThrow(/no backup/);
   });
 

@@ -173,7 +173,7 @@ function micLabel(device: MediaDeviceInfo, index: number): string {
 function useAudioInputDevices(): MediaDeviceInfo[] {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   useEffect(() => {
-    if (!navigator.mediaDevices) return;
+    if (typeof navigator.mediaDevices?.enumerateDevices !== "function") return;
     let cancelled = false;
     const refresh = () => {
       navigator.mediaDevices
