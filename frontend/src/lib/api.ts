@@ -116,7 +116,7 @@ export type ProjectView = Project & { posted_artifact: { id: string; version: nu
 // Real backend types, imported from @/wire (not hand-duplicated): a code
 // review (2026-09-04) flagged an earlier version of this file for
 // hand-typing mirrors of these three, which could silently drift from the
-// real shapes since nothing linked them. Importing turnEngine.ts or
+// real shapes since nothing linked them. Importing the retired turn engine or
 // conversationHistory.ts directly instead of @/wire does not work here:
 // those files (and personShape.ts) pull in backend's own "@/..." path
 // aliases, which frontend's tsconfig has no mapping for - @/wire exists

@@ -78,7 +78,7 @@ describe("ChatSourceCaption (Fix B4)", () => {
   });
 
   // A code review (2026-09-07) found a Tier 2 multi-tool turn's own
-  // pluginId ("currency+weather", turnEngine.ts's attemptTier2Tools())
+  // pluginId ("currency+weather", the retired turn engine's attemptTier2Tools())
   // resolved against nothing (no manifest's id is ever a "+"-joined
   // string), silently dropping the whole caption for exactly the
   // multi-tool case Tier 2 exists to produce.

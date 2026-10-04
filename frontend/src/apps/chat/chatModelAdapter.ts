@@ -542,7 +542,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               // safety reply, which never emits a "delta" at all, or a
               // short model reply that streamed as a single final flush):
               // the backend's own reply.speech is authoritative here,
-              // including any package-authored override turnEngine.ts's
+              // including any package-authored override the retired turn engine's
               // finalizeReply() respects - using it instead of recomputing
               // generically keeps that override intact (a code review,
               // 2026-09-05, found the original version always recomputed
