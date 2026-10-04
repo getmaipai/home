@@ -2007,6 +2007,46 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
     }
   });
 
+  // SRCH (2026-10-04, live): after "when is the new avengers movie coming out",
+  // "is robert downey in it" failed its search and the note said "it's very
+  // likely he'll be returning ... I'll keep that in mind and try to find out
+  // more". The model's obedience is a live check; this pins that the
+  // instruction it is sent forbids the guess and the promise, and that a
+  // scripted reply containing both still reaches the person unedited (rule 6:
+  // no word rule edits the model's words, the instruction is the fix).
+  test("SRCH: the answering round after a failed search forbids guessing and promising (the RDJ case)", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    const GUESS = "I couldn't look that up, but it's very likely he'll be returning. I'll keep that in mind and try to find out more if I can!";
+    const answering: ChatCompletionRequest[] = [];
+    try {
+      const first = await withStub({ reply: () => "It is out soon." }, () => runTurnNext(people.owner, "chat", "when is the new avengers movie coming out"));
+      if (!first.ok || first.kind !== "immediate") throw new Error("expected an immediate result");
+      const second = await withStub(
+        {
+          calls: (request) => (answeringRound(request) || request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-1", name: "websearch", args: JSON.stringify({ expression: "robert downey unresponsive engines fixture" }) }]),
+          reply: (request) => {
+            if (!answeringRound(request)) return "searching";
+            answering.push(request);
+            return GUESS;
+          },
+        },
+        () => runTurnNext(people.owner, "chat", "is robert downey in it", { conversationId: first.value.conversation_id }),
+      );
+      expect(second.ok).toBe(true);
+      expect(answering.length).toBeGreaterThan(0);
+      const instruction = answering[0]!.messages.at(-1)?.content?.toString() ?? "";
+      expect(instruction).toContain("Do not guess");
+      expect(instruction).toContain("likely");
+      expect(instruction).toContain("promise");
+      expect(instruction).toContain("find out more");
+      if (!second.ok || second.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(second.value.reply.text).toBe(GUESS);
+    } finally {
+      searxng.stop();
+    }
+  });
+
   test("THIN-1D: the raw error string of a failed tool is in no model request", async () => {
     const plugins = await import("@/lib/plugins");
     const spy = spyOn(plugins, "runPlugin").mockImplementation(async () => ({

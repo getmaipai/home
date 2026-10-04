@@ -48,25 +48,38 @@ function kindsPhrase(kinds: readonly LookupFailureKind[]): string {
   return [...new Set(kinds)].map((k) => KIND_PHRASE[k]).join("; ");
 }
 
+/** SRCH (live, 2026-10-04): the note must not guess about the specific thing
+ * asked ("it's very likely he'll be returning") or promise what the model
+ * cannot do ("I'll try to find out more"). Both rules ride in every failed-
+ * lookup instruction; the wording of the note stays the model's own. */
+const NO_GUESS_CLAUSE =
+  'Do not guess or hedge about the specific thing asked: nothing like "it\'s likely" or "probably", and no answer inferred from general knowledge about a current fact (a date, who is in or returns to something, a number, a price, a score, what is latest). ';
+const NO_PROMISE_CLAUSE =
+  'Do not promise anything later: no "I\'ll find out more", "I\'ll keep that in mind" or "I\'ll check", because you cannot act after this reply.';
+
 /** The clause a round that still has other results appends: only the failure
  * kind, never the failed call's own result (model.ts leaves that pair out). */
 export function lookupMissedClause(kinds: readonly LookupFailureKind[]): string {
   return (
-    ` One lookup for this did not happen (${kindsPhrase(kinds)}); so say plainly, in your own words and in your usual voice, that you could not look that part up, ` +
-    "and leave out any specific current fact you cannot know rather than guessing it."
+    ` One lookup for this did not happen (${kindsPhrase(kinds)}); so say plainly, in your own words and in your usual voice, that you could not look that part up. ` +
+    `${NO_GUESS_CLAUSE}${NO_PROMISE_CLAUSE}`
   );
 }
 
 /** The answering round's instruction when no lookup result survives to
- * ground it: told the failure kind and nothing else about it, answer from
- * what you know, say in your own words that you could not look it up, leave
- * out any specific current fact. Mirrors phrasingInstruction()'s length
- * clause so a spoken turn stays 1 to 3 sentences, note included. */
+ * ground it: told the failure kind and nothing else about it. The note says
+ * in the model's own words that it could not look the thing up and invites
+ * asking again; it may share something general it knows that does not answer
+ * the specific question, and never guesses or promises (above). Mirrors
+ * phrasingInstruction()'s length clause so a spoken turn stays 1 to 3
+ * sentences, note included. */
 export function lookupMissedInstruction(surfaceClass: SurfaceClass, utterance: string, kinds: readonly LookupFailureKind[]): string {
-  const lengthClause = surfaceClass === "written" ? "structured where it helps" : "in one to three sentences, the note included";
+  const lengthClause = surfaceClass === "written" ? "Structure it where it helps." : "Say it in one to three sentences, the note included.";
   return (
-    `The lookup for this did not happen (${kindsPhrase(kinds)}), so there are no results. Answer this question of mine completely from what you know, ${lengthClause}: "${quoteForPrompt(utterance)}". ` +
-    "Say plainly, in your own words and in your usual voice, that you could not look that up, fresh wording each time. " +
-    "Any specific current fact - who holds an office, a date, a number, a price, a score, what is latest - is left out rather than guessed."
+    `The lookup for this did not happen (${kindsPhrase(kinds)}), so there are no results. About this question of mine: "${quoteForPrompt(utterance)}". ` +
+    "Say plainly, in your own words and in your usual voice, that you could not look that up, fresh wording each time, and invite me to ask again. " +
+    `${NO_GUESS_CLAUSE}` +
+    "You may say, from what you know, something general that does not answer the specific question. " +
+    `${NO_PROMISE_CLAUSE} ${lengthClause}`
   );
 }

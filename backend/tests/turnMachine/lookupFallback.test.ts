@@ -4,7 +4,7 @@
 // told, and the answering round's instruction. The end-to-end rows live in
 // turnNext.test.ts.
 import { describe, expect, test } from "bun:test";
-import { lookupMissed, lookupFailureKind, lookupMissedInstruction } from "@/lib/turnMachine/nodes/lookupFallback";
+import { lookupMissed, lookupFailureKind, lookupMissedInstruction, lookupMissedClause } from "@/lib/turnMachine/nodes/lookupFallback";
 import type { ToolExecutionOutcome } from "@/lib/turnMachine/contract";
 import * as lookupFallback from "@/lib/turnMachine/nodes/lookupFallback";
 
@@ -67,5 +67,35 @@ describe("lookupMissedInstruction: the answering round after a missed lookup", (
 
   test("never says a note is added afterwards: the model writes it", () => {
     expect(lookupMissedInstruction("written", "q", ["errored"])).not.toContain("is added after");
+  });
+});
+
+// SRCH (2026-10-04, "is robert downey in it"): the note guessed about the
+// specific thing asked and promised to find out more. The instruction forbids
+// both, in every shape the failed lookup reaches the model (the answering round
+// and the clause a round with other results appends). Whether the live model
+// obeys is a live check; these pin what it is told.
+describe("a failed lookup's note neither guesses nor promises", () => {
+  const texts = [
+    lookupMissedInstruction("written", "is robert downey in it", ["unavailable"]),
+    lookupMissedInstruction("spoken", "is robert downey in it", ["unavailable"]),
+    lookupMissedClause(["unavailable"]),
+  ];
+  test("forbids guessing or hedging about the specific thing asked", () => {
+    for (const text of texts) {
+      expect(text).toContain("Do not guess");
+      expect(text).toContain("likely");
+      expect(text).toContain("from general knowledge");
+    }
+  });
+  test("forbids promising future action", () => {
+    for (const text of texts) {
+      expect(text).toContain("promise");
+      expect(text).toContain("find out more");
+    }
+  });
+  test("still allows general knowledge that does not answer the question, and an invitation to ask again", () => {
+    expect(texts[0]).toContain("does not answer the specific question");
+    expect(texts[0]).toContain("ask again");
   });
 });
