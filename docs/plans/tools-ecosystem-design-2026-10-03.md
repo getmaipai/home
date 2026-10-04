@@ -88,6 +88,11 @@ nothing fits.
   for now and revisit when a maintained server has releases and an owner. This is an owner decision (O1). One carve-out the review supports: `lights-on`, `lights-off` and `lock-doors` are
   replaced by Home Assistant's own MCP server (first party, Apache-2.0, LAN only, limited to the entities Assist
   exposes) for a household that runs Home Assistant.
+- **C4. Learn from community tools even when we do not adopt them (owner, 2026-10-03).** A young or small project is read as
+  reference: where its data comes from, which endpoints work, how it shapes a result for a model, which edge cases it
+  handles that our tool does not. Each bundled tool with a community counterpart gets a learnings review (code read as
+  reference only, never copied, never executed), and the output is improvement items for our tool, each with a reuse
+  check. First review: `docs/plans/tool-learnings-2026-10-03.md` (sports, weather, music, news, YouTube).
 - **C3. A connector is a package kind, not a special case.** Its manifest names the pinned server, checksum, `net:`
   hosts, `data_sources` and a tool-level allow list; its tools enter the same offered-set computation as any package;
   its failures are rule 6 failures.
