@@ -1583,3 +1583,56 @@ describe("the chat asks for the assistant-stream wire", () => {
     }
   });
 });
+
+describe("behaviours the old NDJSON adapter carried, proven on the assistant-stream path", () => {
+  async function collectWith(deps: Partial<Parameters<typeof createChatModelAdapter>[0]>, text: string) {
+    const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, onCrisisResources: () => {}, turnSchedulerRef: { current: null }, ...deps });
+    const messages = [fakeUserMessage(text)];
+    const options = { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions;
+    const yields: ChatModelRunResult[] = [];
+    for await (const r of runAdapter(adapter, options)) yields.push(r);
+    return yields;
+  }
+
+  test("Incognito: the single-shot temporary choice rides the request once, and the reply streams as usual", async () => {
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "Sure.", sequence: 1 }, { type: "done", value: { reply: { text: "Sure." }, safety: SAFETY, turn_id: "t9", conversation_id: "c9" } }]));
+    let armed = true;
+    try {
+      const yields = await collectWith({ consumeTemporary: () => { const was = armed; armed = false; return was ? true : undefined; } }, "hi");
+      expect(lastText(yields)).toBe("Sure.");
+      expect(env.turnBodies[0]).toMatchObject({ temporary: true });
+      expect(armed).toBe(false);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a done event's crisis_resources are offered alongside the reply, not in place of it", async () => {
+    const line = "If you're in crisis, call or text 988.";
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "I'm here with you.", sequence: 1 }, { type: "done", value: { reply: { text: "I'm here with you." }, safety: SAFETY, crisis_resources: line, turn_id: "t8", conversation_id: "c8" } }]));
+    const shown: string[] = [];
+    try {
+      const yields = await collectWith({ onCrisisResources: (text) => shown.push(text) }, "I feel awful");
+      expect(lastText(yields)).toBe("I'm here with you.");
+      expect(shown).toEqual([line]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("released text reaches the screen piece by piece as it arrives: no client-side buffering or re-splitting", async () => {
+    const { stream, release } = staggeredNdjsonStream([{ type: "delta", text: "Half a sen", sequence: 1 }], [{ type: "delta", text: "tence.", sequence: 2 }, { type: "done", value: { reply: { text: "Half a sentence." }, safety: SAFETY, turn_id: "t7", conversation_id: "c7" } }]);
+    const env = stubEnvironment(stream);
+    try {
+      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, onCrisisResources: () => {}, turnSchedulerRef: { current: null }, speakReplies: false });
+      const messages = [fakeUserMessage("hi")];
+      const run = runAdapter(adapter, { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions);
+      const first = await run.next();
+      expect(first.value?.content?.[0]).toMatchObject({ type: "text", text: "Half a sen" });
+      release();
+      for await (const _ of run) void _;
+    } finally {
+      env.restore();
+    }
+  });
+});
