@@ -10,7 +10,7 @@
 // Not part of check.sh, same "small deterministic suite in check.sh, a
 // large model-driven bench on demand" split every other bench in this
 // directory already follows: this one runs the REAL turn engine
-// (runTurn(), lib/persona.ts's NATURALNESS_POLICY included in every
+// (runTurnNext(), lib/persona.ts's NATURALNESS_POLICY included in every
 // prompt) against whatever chat backend the machine currently resolves.
 // Against the in-process stub (spec/llm/ts/stubServer.ts, every dev
 // machine and CI by default) every row reports "ambiguous": the stub
@@ -31,7 +31,7 @@ import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import type { PersonRow } from "@/types";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
@@ -88,7 +88,7 @@ async function main(): Promise<number> {
   let robotic = 0;
   let ambiguous = 0;
   for (const row of corpus) {
-    const result = await runTurn(actor as PersonRow, "chat", row.utterance);
+    const result = await runTurnNext(actor as PersonRow, "chat", row.utterance);
     const replyText = result.ok ? result.value.reply.text : "";
     const isRobotic = toRegExp(row.robotic_re).test(replyText);
     const isNatural = toRegExp(row.natural_re).test(replyText);

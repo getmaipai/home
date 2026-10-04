@@ -1596,7 +1596,7 @@ describe("recall() cosine scoring (step 5: real embeddings)", () => {
   });
 
   // A post-hoc review (2026-09-05) found recall() had no exclusion for
-  // the profile paragraph (step 7): turnEngine.ts's buildSystemPrompt()
+  // the profile paragraph (step 7): the retired turn engine's buildSystemPrompt()
   // already injects it unconditionally via getProfileParagraph(), so
   // without this exclusion its own `pinned: true` would force it past
   // recall()'s own floor/score gates and inject the SAME text a second

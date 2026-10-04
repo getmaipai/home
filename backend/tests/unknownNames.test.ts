@@ -30,8 +30,6 @@ describe("finding 24 first: a grounded first-person recall trips no guard", () =
       roster: ["Sage", "Bramble"],
       personId: "person-t",
       unknownNames: [],
-      subjectPronouns: [],
-      pronounsInPlay: [],
     };
     for (const reply of [
       "You said your class schedule is Monday and Wednesday mornings, with a lab on Thursday.",
@@ -242,22 +240,6 @@ describe("the two guard shapes, both ways", () => {
     expect(guardReply("You mentioned earlier that Nadia runs.", ctx).reason).toBe("false_familiarity");
     // Agreement is not familiarity (a review).
     expect(guardReply("Of course, I'll remind you to call Nadia.", { ...ctx, utterance: "Nadia ran her marathon, remind me to call her" }).reason).not.toBe("false_familiarity");
-  });
-
-  test("pronoun_mismatch: a reply pronoun against the subject's is skipped and the rest stands; the subject's own, one in play, or another referent passes", () => {
-    const ctx = { utterance: "should he be outside in this heat", act: "question" as const, personId: "person-t", subjectPronouns: [{ name: "Juniper", pronouns: "he" }], pronounsInPlay: ["he"] };
-    const skipped = guardReply("She should stay in the shade with plenty of water. Rabbits overheat fast.", ctx);
-    expect(skipped).toMatchObject({ reason: "pronoun_mismatch", replaced: false, reply: "Rabbits overheat fast." });
-    expect(guardReply("He should stay in the shade with plenty of water.", ctx).reason).toBeNull();
-    expect(guardReply("She should stay in the shade.", { ...ctx, pronounsInPlay: ["he", "she"] }).reason).toBeNull();
-    expect(guardReply("She's right, he should stay inside.", { ...ctx, utterance: "my sister says he should stay inside" }).reason).toBeNull();
-    expect(guardReply("Ask Sage, she knows rabbits.", ctx).reason).toBeNull();
-    // A sentence opening with a roster name has another referent (a review).
-    expect(guardReply("Sage can take him in, she knows rabbits.", { ...ctx, roster: ["Sage"] }).reason).toBeNull();
-    // A member named in the utterance beside the subject is a referent
-    // with no stored pronouns (a review).
-    expect(guardReply("She probably didn't love that. Hopefully she got away fast.", { ...ctx, utterance: "Rover chased Pippa around the yard again", subjectPronouns: [{ name: "Rover", pronouns: "he" }], roster: ["Pippa", "Rover"] }).reason).toBeNull();
-    expect(guardReply("She should stay in the shade.", { ...ctx, subjectPronouns: [{ name: "Juniper", pronouns: "they" }] }).reason).toBeNull();
   });
 
   test("a household role put on a name with nothing behind it is an invention (the seltzer target row)", () => {

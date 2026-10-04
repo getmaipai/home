@@ -73,7 +73,7 @@ describe("createCommand", () => {
     expect(result.status).toBe(400);
   });
 
-  // A code review (2026-09-05) found matchCommand() reuses turnEngine's
+  // A code review (2026-09-05) found matchCommand() reuses the retired turn engine's
   // own matchPattern() as-is, which treats a bare "*" as a real
   // wildcard-capture, not a literal character - nothing here stopped a
   // trigger containing one from becoming fuzzier than the documented

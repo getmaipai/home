@@ -5,7 +5,7 @@
 //
 // No sweep of the CURRENT bundled manifests here on purpose, found
 // live building this item: every bundled package's own routing.patterns
-// is also what the OLD path's route()/matchPattern() (turnEngine.ts)
+// is also what the OLD path's route()/matchPattern() (the retired turn engine)
 // reads for its own Tier 0 literal-pattern floor, proven by
 // routingCorpus.test.ts's own real, frozen fixture (spec's
 // routing-corpus.json) expecting "who was Marie Curie" to route to

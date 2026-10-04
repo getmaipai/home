@@ -20,8 +20,8 @@
 // already manages is exactly the kind of one-off infrastructure a bench
 // script has no business doing quietly on the side.
 //
-// Deliberately bypasses lib/turnEngine.ts and lib/llm.ts entirely,
-// calling the LlamaServerClient directly: turnEngine.ts's
+// Deliberately bypasses the retired turn engine and lib/llm.ts entirely,
+// calling the LlamaServerClient directly: the retired turn engine's
 // buildSystemPrompt() always composes the FULL stable prefix (identity,
 // naturalness policy, plugins list, household/speaker/memory sections),
 // which would confound the comparison this spike exists to make - the

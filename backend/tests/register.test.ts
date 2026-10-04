@@ -71,7 +71,7 @@ describe("planFor", () => {
   });
 
   // U4/RESP-01: no surfaceClass pins today's exact numbers, so
-  // turnEngine.ts's four call sites (none of which pass it) keep
+  // the retired turn engine's four call sites (none of which pass it) keep
   // running the frozen path's own act table unchanged.
   test("with no surfaceClass, every act keeps today's numbers", () => {
     expect(planFor(input(base("question"))).max_words).toBe(60);

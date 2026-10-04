@@ -9,7 +9,7 @@ import { owner, teen } from "./support/testAuth";
 import { db } from "@/db";
 import { people, appUpdateState } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { raiseIssue, __resetFixHandlersForTests } from "@/lib/issues";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
@@ -105,13 +105,13 @@ describe("GET /api/dashboard", () => {
     const { id: adultId } = (await adultCreated.json()) as { id: string };
     const adultRow = db.select().from(people).where(eq(people.id, adultId)).get()! as PersonRow;
 
-    await runTurn(ownerRow, "chat", "hello from the owner");
-    await runTurn(childRow, "chat", "hello from the child");
+    await runTurnNext(ownerRow, "chat", "hello from the owner");
+    await runTurnNext(childRow, "chat", "hello from the child");
     // Sign in as the teen/adult only to speak, then read the dashboard
     // back as the owner - canAccessPerson()'s own rule (this file's own
     // header) says an owner sees a child's turns but never a teen's or
     // another adult's.
-    await runTurn(adultRow, "chat", "hello from another adult");
+    await runTurnNext(adultRow, "chat", "hello from another adult");
     const teenSpoke = await teenClient.post("/api/turn", { text: "hello from the teen" });
     expect(teenSpoke.status).toBe(200);
 

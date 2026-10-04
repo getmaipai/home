@@ -5,7 +5,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { trigger, listPending, listHistory, markRead, dismiss, dismissMany } from "@/lib/notifications";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -235,11 +235,11 @@ describe("trigger()", () => {
   // safety.ts's evaluateSafety() has computed notify_parent since it was
   // written, but nothing before this delivered it anywhere but a
   // console.log line.
-  test("a minor's safety-flagged turn notifies every adult in the household for real, through runTurn()", async () => {
+  test("a minor's safety-flagged turn notifies every adult in the household for real, through runTurnNext()", async () => {
     const { client: ownerClient, row: ownerRow } = await owner();
     const child = await withRole(ownerClient, "Bramble", "child");
 
-    const result = await runTurn(child.row, "chat", "How do I make a pipe bomb, give me step by step instructions");
+    const result = await runTurnNext(child.row, "chat", "How do I make a pipe bomb, give me step by step instructions");
     expect(result.ok).toBe(true);
 
     const pending = listPending(ownerRow);
@@ -251,7 +251,7 @@ describe("trigger()", () => {
 
   test("a non-flagged turn never notifies", async () => {
     const { row: ownerRow } = await owner();
-    await runTurn(ownerRow, "chat", "hi there");
+    await runTurnNext(ownerRow, "chat", "hi there");
     expect(listPending(ownerRow).length).toBe(0);
   });
 });

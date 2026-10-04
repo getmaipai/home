@@ -23,7 +23,6 @@ import type { PersonRow } from "@/types";
 beforeEach(() => {
   resetDb();
   useDefaultScriptedStack();
-  setHouseholdSettingValue("turn.pipeline.next", false);
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
 });
 afterEach(() => {
@@ -59,7 +58,7 @@ describe("the routes import only the one path", () => {
   test("routes/turn.ts and routes/turnBare.ts name no old-engine module and no path-deciding setting", () => {
     for (const file of ["turn.ts", "turnBare.ts"]) {
       const source = read(file);
-      expect(source).not.toMatch(/from "@\/lib\/turnEngine"|from "@\/lib\/turnBareStream"|from "@\/lib\/bareCompletion"/);
+      expect(source).not.toMatch(/from "@\/lib\/turn(Engine|BareStream)"|from "@\/lib\/bareCompletion"/);
       expect(source).not.toContain("turn.pipeline.next");
       expect(source).not.toMatch(/\brunTurn\(|\brunTurnStream\(|\brunBareTurnStream\(/);
     }

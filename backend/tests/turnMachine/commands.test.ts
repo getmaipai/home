@@ -12,7 +12,7 @@ import { resetDb } from "../reset-db";
 import { createBenchPeople, type BenchPeople } from "../../scripts/bench/conversationRunner";
 import { commandsNode } from "@/lib/turnMachine/nodes/commands";
 import { classifyTurnSignal } from "@/lib/turnSignal";
-import { loadAllManifests, commandOpeners } from "@/lib/turnEngine";
+import { loadAllManifests, commandOpeners } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import type { TurnState } from "@/lib/turnMachine/contract";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
@@ -149,7 +149,7 @@ describe("commandsNode: a computed wildcard fires only when the package's own re
 // the reply (an MCP error string, a Wikipedia URL, once verbatim) and
 // `String(result.status)` as the error code, discarding the plugin
 // runner's own typed `code`. `runPlugin` is spied (the same pattern
-// turnEngine.test.ts's own `#92`/knowledge-miss tests use) since a
+// chatTurn.test.ts's own `#92`/knowledge-miss tests use) since a
 // household turn matching knowledge's own opener needs a directive
 // classification forced (`signalOverride`) to reach the pattern loop
 // at all under OPENER-01's own gate - the failure handling itself is

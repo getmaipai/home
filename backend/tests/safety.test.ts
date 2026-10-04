@@ -4,7 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { evaluateReply, evaluateSafety, forOutput, carriesCrisisSignal } from "@/lib/safety";
 import { db } from "@/db";
 import { people } from "@/db/schema";
@@ -196,7 +196,7 @@ describe("POST /api/safety/check", () => {
 // and every household/person setting in the real registry are, by
 // construction, never read by spec/safety/ts/classifier.ts's checkSafety()
 // - this proves that at the level a household could actually reach: run
-// a real self-harm turn through runTurn() once per registry key, with
+// a real self-harm turn through runTurnNext() once per registry key, with
 // that ONE key stressed to its most permissive-looking value each time,
 // and confirm the crisis overlay never once goes missing.
 describe("the crisis overlay is not configurable", () => {
@@ -218,7 +218,7 @@ describe("the crisis overlay is not configurable", () => {
       // resetDb() + actor per iteration makes "after stressing X" mean
       // exactly one setting changed, not "X plus everything before it."
       //
-      // getmaipai/home#123: the previous iteration's own runTurn() call
+      // getmaipai/home#123: the previous iteration's own runTurnNext() call
       // (below) can fire a crisis notification that's still in flight
       // when this line runs - the global afterEach in tests/preload.ts
       // only drains BETWEEN tests, never between iterations of a loop
@@ -246,7 +246,7 @@ describe("the crisis overlay is not configurable", () => {
       if (written) expect(written.ok, `writing ${keyDef.key} = ${JSON.stringify(extreme)}`).toBe(true);
       else expect(keyDef.scope, `${keyDef.key} has an unhandled scope - only "device" is a deliberate skip`).toBe("device");
 
-      const result = await runTurn(actor, "chat", "I want to kill myself");
+      const result = await runTurnNext(actor, "chat", "I want to kill myself");
       expect(result.ok, `after stressing ${keyDef.key}`).toBe(true);
       if (!result.ok) continue;
       expect(result.value.safety.action, `after stressing ${keyDef.key}`).toBe("allow_with_resources");
@@ -254,7 +254,7 @@ describe("the crisis overlay is not configurable", () => {
       expect(result.value.crisis_resources, `after stressing ${keyDef.key}`).toContain("988");
     }
     // getmaipai/home#123: 48 registry keys x (resetDb + a real owner()
-    // setup + a real runTurn()) is genuine work, not a hang - passes
+    // setup + a real runTurnNext()) is genuine work, not a hang - passes
     // reliably in isolation but hit bun's 5000ms default exactly once
     // running inside the full gate (real machine contention from
     // everything else in that same run). Raised, not removed - a test

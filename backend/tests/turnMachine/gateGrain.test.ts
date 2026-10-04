@@ -14,7 +14,7 @@ import { __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { StreamGate, gateGrainFor } from "@/lib/turnMachine/nodes/outputGate";
-import { StreamSafetyRefusal } from "@/lib/turnEngine";
+import { StreamSafetyRefusal } from "@/lib/turnShared";
 import { createBenchPeople, type BenchPeople } from "../../scripts/bench/conversationRunner";
 import { useDefaultScriptedStack } from "../stackFixture";
 import type { PersonRow } from "@/types";

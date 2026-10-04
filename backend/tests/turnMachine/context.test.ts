@@ -76,7 +76,7 @@ describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor g
   // leaked into a real household turn. `recall()` already excludes
   // `PROFILE_SOURCE` unconditionally, before scoring, before
   // `forceInclude` ever applies (memory.ts:628, landed 2026-09-05,
-  // `b25a49f1`) - shared by both this path and turnEngine.ts's old path
+  // `b25a49f1`) - shared by both this path and the retired turn engine's old path
   // since both call this same exported `recall()`. This test exercises
   // that exclusion at contextNode's own layer (the profile record still
   // reaches the prompt exactly once, via `getProfileParagraph()`'s

@@ -16,7 +16,7 @@ import { createBenchPeople, type BenchPeople } from "../../scripts/bench/convers
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { BareModeForbidden } from "@/lib/turnShared";
-import { StreamSafetyRefusal, identityLine } from "@/lib/turnEngine";
+import { StreamSafetyRefusal, identityLine } from "@/lib/turnShared";
 import { DEFAULT_PERSONA } from "@/lib/persona";
 import { remember } from "@/lib/memory";
 import { db, sqlite } from "@/db";

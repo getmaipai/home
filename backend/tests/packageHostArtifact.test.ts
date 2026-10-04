@@ -16,7 +16,7 @@
 // uses, which is exactly why the real bug went uncaught until a real
 // runTurn() hit it live. The one test that reproduces the real shape
 // (below) uses `insertProvisionalTurn()` instead - the same function
-// `turnEngine.ts`'s `prepareTurn()` now calls at the very start of a
+// the retired turn engine's `prepareTurn()` now calls at the very start of a
 // real turn, before the safety check, before any tool call - to prove
 // this against production's own real precondition, not a hand-rolled
 // approximation of it.
@@ -122,7 +122,7 @@ describe("packageHost artifact.create/update", () => {
   // conversation's turnId/conversationId ARE always populated here (the
   // caller passes them unconditionally either way), so the check above
   // never catches this case - insertProvisionalTurn() is deliberately
-  // never called for a temporary turn (turnEngine.ts), so there is no
+  // never called for a temporary turn (the retired turn engine), so there is no
   // conversation_turns row for createArtifact()'s own foreign key to
   // attach to. Before this fix that was an uncaught FK violation, not a
   // clean refusal; this proves it's now the identical HostError shape

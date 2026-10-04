@@ -98,7 +98,6 @@ async function runMain(): Promise<void> {
   await startBench();
 
   const { setHouseholdSettingValue } = await import("@/lib/settings");
-  setHouseholdSettingValue("turn.pipeline.next", true);
   setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
 
   console.log("\n## Run header\n");

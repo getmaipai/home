@@ -6,7 +6,8 @@ import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { resolveOrCreateConversation, logTurn, turnSignalOf, insertProvisionalTurn } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { judgeTurn, runJudgeBatch, runConsolidation, judgeQueueStats } from "@/lib/memoryJudge";
-import { runTurn, judgeStatusAtInsert, commandOpeners as commandOpenersFromManifests, loadAllManifests } from "@/lib/turnEngine";
+import { judgeStatusAtInsert, commandOpeners as commandOpenersFromManifests, loadAllManifests } from "@/lib/turnShared";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { remember, recall, supersede, archiveByProvenance, similarByVector, PROFILE_SOURCE } from "@/lib/memory";
 import { listPending } from "@/lib/notifications";
 import { CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
@@ -63,10 +64,10 @@ const SAFE: TurnValue["safety"] = {
 };
 
 /** A model-sourced turn, the real construction path (logTurn(), the
- * exact function turnEngine.ts's own prepareTurn() calls) rather than a
+ * exact function the retired turn engine's own prepareTurn() calls) rather than a
  * hand-rolled row - judgeTurn() only cares about the persisted shape,
  * not how the reply was generated, so there's no need to run a real
- * generation through runTurn() for every test case here. */
+ * generation through runTurnNext() for every test case here. */
 function makeTurn(actor: PersonRow, userText: string, replyText: string, opts: { outcomes?: readonly ToolExecutionOutcome[]; subjects?: readonly SubjectRef[] } = {}) {
   const conv = resolveOrCreateConversation(actor, "chat");
   if (!conv.ok) throw new Error("setup failed");
@@ -144,10 +145,10 @@ describe("judgeTurn() - extraction and provenance", () => {
   // SEC-8 (code review, 2026-09-06): the speaker's own displayName is
   // free text they set on their own profile, interpolated into
   // buildExtractionPrompt()'s system prompt below. A follow-up review
-  // pass found this untouched by SEC-8's own turnEngine.ts fix -
+  // pass found this untouched by SEC-8's own the retired turn engine fix -
   // sanitizeForPrompt() now runs here too, shared from lib/promptSanitize.ts
-  // rather than reimplemented (moved there from turnEngine.ts by a later
-  // review that found importing it from turnEngine.ts closed a real
+  // rather than reimplemented (moved there from the retired turn engine by a later
+  // review that found importing it from the retired turn engine closed a real
   // import cycle through persona.ts -> plugins.ts).
   test("a newline or brace in the speaker's own display name is stripped before it reaches the extraction prompt", async () => {
     const client = new TestClient();
@@ -1036,7 +1037,7 @@ describe("MEM-06: the clause shapes the record", () => {
 describe("ACT-01: the judge's queue is keyed on the stored signal", () => {
   // The real construction path: logTurn() with the signal prepareTurn()
   // computes and the status judgeStatusAtInsert() decides, for any
-  // source, the way turnEngine.ts's logTurnSafely() writes every row.
+  // source, the way the retired turn engine's logTurnSafely() writes every row.
   function makeSignalledTurn(actor: PersonRow, userText: string, replyText: string, source: TurnValue["source"], commandOpeners: ReadonlySet<string> = new Set(["add"])) {
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error("setup failed");
@@ -1852,8 +1853,9 @@ describe("#88: the judge and an edited turn", () => {
       },
     });
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    useDefaultScriptedStack(); // the judge's own scripted stack above is gone; the turn's chat role needs the default one
     try {
-      const result = await runTurn(actor, "chat", "I love anchovies, actually", { conversationId: turn.conversationId ?? undefined, supersedes: turn.id });
+      const result = await runTurnNext(actor, "chat", "I love anchovies, actually", { conversationId: turn.conversationId ?? undefined, supersedes: turn.id });
       expect(result.ok).toBe(true);
     } finally {
       await stub.stop();
@@ -1923,7 +1925,7 @@ describe("#88: the judge and an edited turn", () => {
     setHouseholdSettingValue("engines.stack.url", "");
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
     try {
-      const result = await runTurn(actor, "chat", "I love anchovies, actually", { conversationId: turn.conversationId ?? undefined, supersedes: turn.id });
+      const result = await runTurnNext(actor, "chat", "I love anchovies, actually", { conversationId: turn.conversationId ?? undefined, supersedes: turn.id });
       expect(result.ok).toBe(false);
     } finally {
       delete process.env.MAIPAI_LLAMA_SERVER_URL;

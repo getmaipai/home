@@ -6,18 +6,11 @@
 // persona's own example line said back on a statement is the parrot,
 // read before the action family, and the retry says so.
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { runTurn } from "@/lib/turnEngine";
-import { guardReply, EXAMPLE_PARROT_RETRY_NOTE, type GuardContext } from "@/lib/guards";
-import { db } from "@/db";
-import { people } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
-import type { PersonRow } from "@/types";
+import { guardReply, type GuardContext } from "@/lib/guards";
 
 beforeEach(() => {
   resetDb();
@@ -29,12 +22,6 @@ afterEach(() => {
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
 
-async function owner(): Promise<{ client: TestClient; actor: PersonRow }> {
-  const client = new TestClient();
-  await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-  const actor = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
-  return { client, actor };
-}
 const ctx = (overrides: Partial<GuardContext> = {}): GuardContext => ({ utterance: "", personId: "person-test", roster: ["Sage", "Bramble", "Pippa"], ...overrides });
 
 describe("a child's asserted state", () => {
@@ -78,31 +65,9 @@ describe("a child's asserted state", () => {
 });
 
 
-async function withReplies<T>(reply: (request: ChatCompletionRequest, noted: string | null) => string, fn: (seen: { notes: (string | null)[] }) => Promise<T>): Promise<T> {
-  __resetLlmSupervisorForTests();
-  const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
-  const seen = { notes: [] as (string | null)[] };
-  const stub = startStubLlmServer(0, {
-    scriptedChatReply: (request) => {
-      const note = [...request.messages].reverse().find((m) => m.role === "system" && typeof m.content === "string" && (m.content === EXAMPLE_PARROT_RETRY_NOTE || m.content.startsWith("Nothing was asked")));
-      const noted = note && typeof note.content === "string" ? note.content : null;
-      seen.notes.push(noted);
-      return reply(request, noted);
-    },
-  });
-  process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-  try {
-    return await fn(seen);
-  } finally {
-    await stub.stop();
-    delete process.env.MAIPAI_LLAMA_SERVER_URL;
-    __resetLlmSupervisorForTests();
-  }
-}
 
 describe("the persona's example line said back", () => {
   test("the exact example line on a statement is the parrot, read before the action family; the retry carries the parrot's note and its reply stands; the action family still reads a claim that is not an example", async () => {
-    const { actor } = await owner();
     expect(guardReply("Sounds like a long day, put your feet up.", ctx({ utterance: "Pippa has soccer practice on Tuesdays", act: "inform", personaExamples: ["Sounds like a long day, put your feet up.", "The timer's done."] })).reason).toBe("example_parrot");
     // A three-word example line said back is not the parrot (a short line is a reply a model produces on its own).
     expect(guardReply("Got it, added to the list.", ctx({ utterance: "Pippa has soccer practice on Tuesdays", act: "inform", personaExamples: ["Got it, added to the list."] })).reason).toBe("unsupported_action");
@@ -115,15 +80,5 @@ describe("the persona's example line said back", () => {
     // After a request the action family keeps the first read: a parrot
     // that is also a false completion is the claim (a review).
     expect(guardReply("Got it, added milk and eggs to the shopping list.", ctx({ utterance: "add milk to the list", act: "directive", personaExamples: ["Got it, added milk and eggs to the shopping list."] })).reason).toBe("unsupported_action");
-    // The default persona's own example lines claim nothing now (the
-    // coordinator's call: a voice example that claims an action the
-    // model has not taken is a prompt line teaching a lie), so the
-    // engine half says one of them back on a statement it does not fit.
-    await withReplies((_r, noted) => (noted === EXAMPLE_PARROT_RETRY_NOTE ? "Tuesdays, noted; is that after school?" : "Sounds like a long day, put your feet up."), async (seen) => {
-      const result = await runTurn(actor, "chat", "Pippa has soccer practice on Tuesdays");
-      if (!result.ok) throw new Error(result.error);
-      expect(result.value.reply.text).toBe("Tuesdays, noted; is that after school?");
-      expect(seen.notes).toEqual([null, EXAMPLE_PARROT_RETRY_NOTE]);
-    });
   });
 });

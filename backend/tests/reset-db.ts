@@ -4,7 +4,8 @@ import { dataDir } from "@/lib/paths";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
 import { __resetCommandsCacheForTests } from "@/lib/commands";
 import { __resetTurnActivityForTests } from "@/lib/turnActivity";
-import { __clearPendingSummaryRefreshesForTests, __resetOrdinaryToolSetForTests, __resetOutputNotificationsForTests } from "@/lib/turnEngine";
+import { __resetOutputNotificationsForTests } from "@/lib/turnShared";
+import { __clearPendingSummaryRefreshesForTests } from "@/lib/summaryRefresh";
 import { __resetPackageCachesForTests } from "@/lib/plugins";
 import { __resetServiceHealthForTests } from "@/lib/serviceHealth";
 import { __resetSkillCacheForTests } from "@/lib/skills";
@@ -164,11 +165,11 @@ export function resetDb(): void {
   // lib/turnActivity.ts's own "a turn ran recently" flag (also added in
   // that pass): the memory judge's runJudgeBatch() skips its whole batch
   // while this says a turn is active, and it's real wall-clock state, not
-  // DB-backed - a turnEngine.test.ts/tier2.test.ts run moments before a
+  // DB-backed - a chatTurn.test.ts/tier2.test.ts run moments before a
   // memoryJudge.test.ts one in the same process would otherwise cause a
   // real, order-dependent test failure, not just stale data.
   __resetTurnActivityForTests();
-  // turnEngine.ts's own debounced post-turn summary refresh (issue #45):
+  // the retired turn engine's own debounced post-turn summary refresh (issue #45):
   // a code review found every test file calling runTurn() left one of
   // these timers outstanding at DEFAULT_IDLE_WINDOW_MS (20s) - most
   // finish well before that, so it fires later against whatever the NEXT
@@ -189,7 +190,6 @@ export function resetDb(): void {
   __resetSkillCacheForTests();
   // ROUTE-02: the ordinary tool set is read from routing stats once per
   // installed set (boot); a fresh database is a fresh boot.
-  __resetOrdinaryToolSetForTests();
   __resetOutputNotificationsForTests(); // CHAT-02: once-per-turn notification keys
   db.delete(idSequences).run();
   db.delete(personApiTokens).run();

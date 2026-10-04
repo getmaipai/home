@@ -69,7 +69,6 @@ function storedNodeNames(turnId: string): string[] | undefined {
 
 describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
   test("a corrupt document is refused with one safe line before any attachment is stored", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", false);
     const { client } = await owner();
     __setTikaRunnerForTests(() => { throw new Error("parser internals with private bytes"); });
     const response = await client.post("/api/turn/stream", {
@@ -81,7 +80,6 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
   });
 
   test("an unreadable document is refused with a one-line reason", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", false);
     const { client } = await owner();
     __setTikaRunnerForTests(() => " \n\f ");
     const response = await client.post("/api/turn/stream", {
@@ -93,7 +91,6 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
   });
 
   test("a temporary chat refuses documents cleanly before extraction or durable storage", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", false);
     const { client } = await owner();
     let parserCalls = 0;
     __setTikaRunnerForTests(() => { parserCalls++; return "should not parse"; });
@@ -126,7 +123,6 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
   });
 
   test("the large-body fast path accepts documents serialized before text", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", false);
     const { client } = await owner();
     __setTikaRunnerForTests(() => "document excerpt");
     const result = await withStubReply("Here is the summary.", async () => {
@@ -147,7 +143,6 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
   });
 
   test("storage quota is checked before document extraction starts", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", false);
     const { client } = await owner();
     setHouseholdSettingValue("storage.person.default_cap_bytes", 1);
     let parserCalls = 0;
@@ -172,7 +167,6 @@ describe("POST /api/turn/stream - U6a, the one path-deciding boundary", () => {
   // already does, never asserting an exact delta count (the stub's own
   // chunking, never this route's contract).
   test("with turn.pipeline.next on, the same turn runs the new path - stats.nodes carries all eight nodes, and the event shape is turn_meta/signal/delta.../done, the same shape the off case has", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", true);
     setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
     const { client } = await owner();
     await withStubReply("Hello! How can I help?", async () => {
@@ -199,7 +193,6 @@ describe("POST /api/turn/stream - bare mode runs on the same path as every turn"
   // packages) through the full new-path pipeline instead - a debug
   // feature quietly comparing against the wrong thing, no error at all.
   test("bare: true runs the default path with the bare marker (THIN-7C: bare mode is an option of that path)", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", true);
     setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
     const { client } = await owner();
     await withStubReply("hi", async () => {
@@ -218,7 +211,6 @@ describe("POST /api/turn/stream - bare mode runs on the same path as every turn"
 
 describe("POST /api/turn - U6a's non-stream twin", () => {
   test("with turn.pipeline.next on, the response is the identical TurnValue shape, from the new path", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", true);
     setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
     const { client } = await owner();
     await withStubReply("Hello! How can I help?", async () => {
@@ -235,7 +227,6 @@ describe("POST /api/turn - U6a's non-stream twin", () => {
   // asks for it - proven here at the route, the same boundary this
   // file's own header names.
   test("with turn.pipeline.next on and no body.thinking, the new path sends thinking:false", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", true);
     setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
     const { client } = await owner();
     await withStubReply("Hello! How can I help?", async (seen) => {
@@ -246,7 +237,6 @@ describe("POST /api/turn - U6a's non-stream twin", () => {
   });
 
   test("with turn.pipeline.next on and body.thinking: true, the new path sends thinking:true", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", true);
     setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
     const { client } = await owner();
     await withStubReply("Hello! How can I help?", async (seen) => {
@@ -269,7 +259,6 @@ describe("POST /api/turn - THIN-0D, speaker_evidence reaches the default path", 
   }
 
   test("a robot request with no evidence writes no memory; with the signed-in person's evidence the package runs", async () => {
-    setHouseholdSettingValue("turn.pipeline.next", true);
     const { client, actor } = await owner();
     await withStubReply("Okay.", async () => {
       const anon = await client.post("/api/turn", { surface: "robot", text });

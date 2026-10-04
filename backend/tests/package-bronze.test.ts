@@ -109,7 +109,7 @@ describe("every bundled package clears bronze", () => {
       });
 
       // A real gap found and fixed building `lock-doors` (session-d-
-      // packages-and-store.md step 9): turnEngine.ts's route() now also
+      // packages-and-store.md step 9): the retired turn engine's route() now also
       // refuses to treat a consequential manifest's own routing.patterns
       // as live (the confirm gate can't depend on a manifest bug alone),
       // but a package declaring one here would still be dead weight at

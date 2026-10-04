@@ -18,8 +18,8 @@
 // mechanism did.
 //
 //
-// D7: the routed pass uses the stable ordinary set, matching prepareTurn()
-// and no longer builds a semantic per-utterance tool subset.
+// The old path's routed and forced passes retired with it (THIN-7D); the
+// budget-offered pass below is the one path's own tool offer.
 //
 // Usage: bun run scripts/bench/tool-calling.ts
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
@@ -27,20 +27,13 @@ import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { eq } from "drizzle-orm";
-import { db, sqlite } from "@/db";
-import { people } from "@/db/schema";
-import { newPersonId, randomSuffix } from "@/lib/id";
-import { nextHlc } from "@/lib/hlc";
 import { complete, type LlmMessage, type ToolSpec } from "@/lib/llm";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import { getEngineStatus, __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 import { SPEC_DIR } from "@/lib/specDir";
-import { buildPromptParts, loadAllManifests, ordinaryToolIds } from "@/lib/turnEngine";
 import { CATALOG } from "@/lib/modelCatalog";
-import type { PersonRow } from "@/types";
 
 interface ToolCallCorpusRow {
   utterance: string;
@@ -78,28 +71,6 @@ const TOOLS: ToolSpec[] = ["remember", "recall", "define", "trivia", "math", "co
 // the false-call rate then reads "0/0 (0.0%)", a clean pass on this
 // fix's own exit criterion for having tested nothing at all. Falls back
 // to the real default instead of ever running with NaN.
-// ROUTE-01's own two rows (getmaipai/home#77's exact phrasings): Tier 0
-// patterns catch them in runTurn() since 147cd28, so the routed pass
-// measures them through the model path directly, which is the point.
-const ROUTE01_ROWS: ToolCallCorpusRow[] = [
-  { utterance: "the plumber's number is 555 9876 extension 12, please remember it", expect_calls: ["remember"] },
-  { utterance: "Friday is pizza night, please remember", expect_calls: ["remember"] },
-];
-
-// PHRASE-02: the five "inverse-miss" world-question rows ARCH-MEASURE-01
-// added ad hoc for its own routed pass at `auto` (never committed here -
-// data-scratch/arch-measure/tc_8b_inverse.log has the original run: 19
-// of 50 fitting, 0 of 50 false calls, the baseline this file's own
-// `requiredPass()` below is gated against). Kept as the same five rows
-// rather than a fresh pick, so the two numbers are actually comparable.
-const INVERSE_MISS_ROWS: ToolCallCorpusRow[] = [
-  { utterance: "who is the president of chile", expect_calls: ["websearch"] },
-  { utterance: "did chatgpt 6 luna come out", expect_calls: ["websearch"] },
-  { utterance: "what did Apple announce this week", expect_calls: ["websearch"] },
-  { utterance: "who won the Seattle Mariners game yesterday", expect_calls: ["websearch"] },
-  { utterance: "is the new iPhone out yet", expect_calls: ["websearch"] },
-];
-
 // PHRASE-02, the coordinator's own follow-up (CHAT-RICH-01): measures
 // `write_document`'s own effect once it joins `modelCatalog.ts`'s
 // `tools_offered` - two plain questions it must never fire on, beside
@@ -140,22 +111,6 @@ function budgetOfferedTools(): ToolSpec[] {
     });
 }
 
-const benchPersonId = newPersonId();
-function createBenchPerson(): PersonRow {
-  const nowIso = new Date().toISOString();
-  sqlite
-    .query(
-      "INSERT INTO people (id, display_name, role, avatar_seed, source, local_only, created_at, updated_at, hlc) VALUES (?, ?, 'owner', ?, 'bench', 0, ?, ?, ?)",
-    )
-    .run(benchPersonId, "Bench Household", randomSuffix(12), nowIso, nowIso, nextHlc());
-  const actor = db.select().from(people).where(eq(people.id, benchPersonId)).get();
-  if (!actor) throw new Error("failed to create the bench person row");
-  return actor as PersonRow;
-}
-function cleanup(): void {
-  sqlite.query("DELETE FROM people WHERE id = ?").run(benchPersonId); // this bench's own row, in its own disposable database
-}
-
 // A real gap found live while measuring PHRASE-02's own required pass
 // (2026-09-24): `complete()` has no request timeout of its own
 // (ARCH-MEASURE-01's own "A real gap found and fixed this session" -
@@ -188,13 +143,6 @@ async function completeWithTimeout(...args: Parameters<typeof complete>): Return
 
 const requestedRepeats = Number(process.env.MAIPAI_BENCH_REPEATS ?? 5);
 const REPEATS = Number.isFinite(requestedRepeats) && requestedRepeats > 0 ? requestedRepeats : 5;
-
-// PHRASE-02's own gate wants 50 repeats over the five inverse-miss rows
-// (matching ARCH-MEASURE-01's own baseline run), independent of REPEATS
-// above so a quick REPEATS override elsewhere never silently shrinks
-// the one pass whose number is actually gated.
-const requestedRequiredRepeats = Number(process.env.MAIPAI_BENCH_REQUIRED_REPEATS ?? 10);
-const REQUIRED_REPEATS = Number.isFinite(requestedRequiredRepeats) && requestedRequiredRepeats > 0 ? requestedRequiredRepeats : 10;
 
 async function main(): Promise<{ executed: number; engine: string }> {
   await startBench();
@@ -235,127 +183,8 @@ async function main(): Promise<{ executed: number; engine: string }> {
     console.log("Above Fix E's own 2% bar - needs a better floor or better negatives in the corpus, never a return to the grammar.");
   }
 
-  const routedExecuted = await routedPass();
-  const requiredExecuted = await requiredPass();
   const budgetExecuted = await budgetOfferedPass();
-  return { executed: corpus.length * REPEATS + routedExecuted + requiredExecuted + budgetExecuted, engine };
-}
-
-/** ROUTE-01: the production path's numbers (see the header). */
-async function routedPass(): Promise<number> {
-  const actor = createBenchPerson();
-  const loaded = loadAllManifests();
-  const alwaysOffer = new Set(loaded.filter((l) => l.manifest.routing?.always_offer).map((l) => l.id));
-  // ROUTE-02: the ordinary set from a FIXED usage fixture (an empty
-  // household: always-offer plus the default order), never this
-  // machine's routing stats, so the bench's offered sets do not drift
-  // with whatever the household has been asking.
-  const ordinary = ordinaryToolIds(loaded, { byPlugin: [] });
-  console.log(`Ordinary tool set (fixture: empty household): [${ordinary.join(", ")}]`);
-  const rows = [...corpus, ...ROUTE01_ROWS];
-  console.log(`\nRouted pass: ${rows.length} rows (${corpus.length} corpus + ${ROUTE01_ROWS.length} from #77), ${REPEATS} repeats each, stable ordinary tool set...\n`);
-  let falseCallAttempts = 0;
-  let falseCalls = 0;
-  let lookupCalls = 0;
-  let executed = 0;
-  for (const row of rows) {
-    const isNegative = row.expect_calls.length === 0;
-    const tools = ordinary.map((id) => TOOLS.find((tool) => tool.id === id)).filter((tool): tool is ToolSpec => tool !== undefined);
-    const parts = buildPromptParts(actor, row.utterance, [], loaded);
-    const messages: LlmMessage[] = [
-      { role: "system", content: parts.stablePrefix },
-      { role: "system", content: parts.context },
-      { role: "user", content: row.utterance },
-    ];
-    let rowPass = 0;
-    const outcomes: string[] = [];
-    for (let i = 0; i < REPEATS; i++) {
-      const result = await completeWithTimeout("chat", messages, { tools, tool_choice: "auto" });
-      if (!result.ok) {
-        outcomes.push("no reply");
-        continue;
-      }
-      executed++;
-      const calls = result.value.tool_calls ?? [];
-      const gotIds = calls.map((c) => c.tool).sort();
-      const routedIds = gotIds.filter((id) => !alwaysOffer.has(id));
-      const lookupIds = gotIds.filter((id) => alwaysOffer.has(id));
-      const wantIds = [...row.expect_calls].sort();
-      if (JSON.stringify(routedIds) === JSON.stringify(wantIds)) rowPass++;
-      if (isNegative) {
-        falseCallAttempts++;
-        if (routedIds.length > 0) falseCalls++;
-        if (lookupIds.length > 0) lookupCalls++;
-      }
-      outcomes.push(gotIds.length === 0 ? "[]" : `[${gotIds.join(", ")}]`);
-    }
-    console.log(
-      `${rowPass}/${REPEATS}  "${row.utterance}" -> expected [${row.expect_calls.join(", ")}], offered=[${tools.map((t) => t.id).join(", ")}], got: ${outcomes.join(" | ")}`,
-    );
-  }
-  console.log(`\nRouted pass, false calls on negative rows (outside always-offer): ${falseCalls}/${falseCallAttempts}`);
-  console.log(`Routed pass, lookup calls on negative rows (always-offer, the designed behavior): ${lookupCalls}/${falseCallAttempts}`);
-  return executed;
-}
-
-/** PHRASE-02's own gate, kept for the next attempt (not current
- * behavior - `nodes/model.ts`'s forced branches were reverted to
- * `[websearch]` alone/`[websearch, answer_from_this_conversation]`
- * after this gate failed live; dev.md "PHRASE-02: gated closed on
- * today's own numbers"). Measures the hypothetical: forced
- * (`tool_choice: "required"`) over the budget's full fixed sorted
- * tools block instead of `[websearch]` alone. Every row here is
- * positive (a world question with no search verb, all expecting
- * `["websearch"]`), so "fitting" is a clean single `websearch` call and
- * "false call" is anything else the forced choice picked instead - the
- * new failure mode broadening the forced set can introduce, where the
- * old one-tool shape had no other tool to pick. Compare the two totals
- * this prints against ARCH-MEASURE-01's own 19/50 fitting, 0/50 false
- * (`data-scratch/arch-measure/tc_8b_inverse.log`, `auto` over
- * `[recall, remember, websearch]`); per `docs/BACKLOG.md`'s own gate,
- * worse on either number means the forced retry keeps `[websearch]`
- * alone and only PHRASE-01's continuation stands - which is exactly
- * what happened (dev.md has the numbers). */
-async function requiredPass(): Promise<number> {
-  const tools = budgetOfferedTools();
-  console.log(`\nRequired pass: ${INVERSE_MISS_ROWS.length} inverse-miss rows, ${REQUIRED_REPEATS} repeats each, tool_choice="required" over the full budget set [${tools.map((t) => t.id).join(", ")}]...\n`);
-  let fitting = 0;
-  let attempts = 0;
-  let falseCalls = 0;
-  let executed = 0;
-  for (const row of INVERSE_MISS_ROWS) {
-    let rowFit = 0;
-    const outcomes: string[] = [];
-    for (let i = 0; i < REQUIRED_REPEATS; i++) {
-      const result = await completeWithTimeout("chat", [{ role: "user", content: row.utterance }], { tools, tool_choice: "required" });
-      attempts++;
-      if (!result.ok) {
-        falseCalls++;
-        outcomes.push("no reply");
-        continue;
-      }
-      executed++;
-      const calls = result.value.tool_calls ?? [];
-      const gotIds = calls.map((c) => c.tool).sort();
-      // Sorted on both sides, matching budgetOfferedPass()'s own
-      // comparison below - every INVERSE_MISS_ROWS entry expects exactly
-      // one tool today so this never differs in practice, but a future
-      // multi-tool row would otherwise fail on declared order alone.
-      const wantIds = [...row.expect_calls].sort();
-      if (JSON.stringify(gotIds) === JSON.stringify(wantIds)) {
-        fitting++;
-        rowFit++;
-      } else {
-        falseCalls++;
-      }
-      outcomes.push(gotIds.length === 0 ? "[]" : `[${gotIds.join(", ")}]`);
-    }
-    console.log(`${rowFit}/${REQUIRED_REPEATS}  "${row.utterance}" -> expected [websearch], got: ${outcomes.join(" | ")}`);
-  }
-  console.log(`\nRequired pass, fitting (clean websearch call): ${fitting}/${attempts}`);
-  console.log(`Required pass, false calls (anything else the forced choice picked): ${falseCalls}/${attempts}`);
-  console.log(`Baseline to beat (ARCH-MEASURE-01, tc_8b_inverse.log, auto over [recall, remember, websearch]): 19/50 fitting, 0/50 false.`);
-  return executed;
+  return { executed: corpus.length * REPEATS + budgetExecuted, engine };
 }
 
 /** PHRASE-02's coordinator follow-up (CHAT-RICH-01), kept for the next
@@ -406,7 +235,6 @@ let summary = { executed: 0, engine: "not run" };
 try {
   summary = await main();
 } finally {
-  cleanup();
   __resetLlmSupervisorForTests();
 }
 finishBench(summary);

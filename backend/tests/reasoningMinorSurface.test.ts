@@ -7,7 +7,7 @@
 // never sent on a surface other than "chat" (voice/robot/tv/phone have
 // no Reasoning Element to disclose it in), adult or not. This is the
 // route's own wiring (isMinor/dropReasoning, computed from the real
-// actor and the real surface) - turnEngine.test.ts's own "REASONING-01"
+// actor and the real surface) - chatTurn.test.ts's own "REASONING-01"
 // describe block already proves streamTurnEvents() itself drops a
 // reasoning event once told to; this file proves the route tells it to
 // at the right times, the same "route gate, mirrored by a test one
@@ -20,7 +20,7 @@ import { resetDb } from "./reset-db";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, conversationTurns } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 
@@ -29,7 +29,6 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 // explicitly now that it is no longer the default.
 beforeEach(() => {
   resetDb();
-  setHouseholdSettingValue("turn.pipeline.next", false);
 });
 afterEach(() => {
   __resetLlmSupervisorForTests();
@@ -139,9 +138,31 @@ describe("POST /api/turn/stream - reasoning never reaches a minor", () => {
   });
 });
 
+describe("POST /api/turn - a minor's reasoning is never stored", () => {
+  // Moved from tier2.test.ts (THIN-7D): the stored half of the same gate.
+  test("a child's turn with thinking forced on writes an empty reasoning column, not just a hidden response field", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: childClient } = await childMember(ownerClient);
+    const res = await withStubReply(
+      "Noted.",
+      () => childClient.post("/api/turn", { text: "Friday is pizza night, can you remember that for me", thinking: true }),
+      "the household wants this remembered, so I should call remember",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { turn_id: string; reasoning?: string };
+    expect(body.reasoning).toBeUndefined();
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, body.turn_id)).get();
+    expect(row?.reasoning).toBeNull();
+    // No reasoning in stats either: NodeExecution/GenerationInput carry no raw
+    // reasoning text field (contract.ts), so this is structural, not a scrub.
+    const storedStats = row?.stats ? String(row.stats) : "";
+    expect(storedStats).not.toContain("household wants this remembered");
+  });
+});
+
 describe("POST /api/turn/stream - reasoning never reaches a non-chat surface", () => {
   // "tv"/"phone"/"overlay" 400 with unsupported_surface today
-  // (turnEngine.ts's IMPLEMENTED_SURFACES: only "chat" and "robot" are
+  // (the retired turn engine's IMPLEMENTED_SURFACES: only "chat" and "robot" are
   // live, 4.5) - robot is the one real non-chat surface to prove this
   // gate against; the others get the identical dropReasoning expression
   // the moment they're implemented, nothing surface-specific to retest.

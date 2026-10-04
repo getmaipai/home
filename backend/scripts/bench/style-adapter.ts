@@ -108,7 +108,7 @@ import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { setValue } from "@/lib/settings";
 import { DEFAULT_PERSONA, resolvePersona, type Persona } from "@/lib/persona";
-import { identityLine } from "@/lib/turnEngine";
+import { identityLine } from "@/lib/turnShared";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { createConversation } from "@/lib/conversationHistory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";

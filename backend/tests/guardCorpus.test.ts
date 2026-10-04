@@ -1,6 +1,6 @@
 // Fix C (docs/dev.md's "Chat reliability: the 2026-09-07 incident and the
 // five fixes", getmaipai/home#62): runs spec/llm/guard-corpus.json
-// against the real guardReply() and guardSentence()/gateGuards() paths -
+// against the real guardReply() path (the streaming gateGuards() pass left with the old engine, THIN-7D) -
 // the deterministic, always-in-check.sh half of "every guard false
 // positive seen in the house gets a row before it is fixed." Mirrors
 // routingCorpus.test.ts's own shape (one test() per row, run against the
@@ -10,7 +10,6 @@ import { describe, test, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { guardReply, type GuardContext, type GuardReason } from "@/lib/guards";
-import { gateGuards } from "@/lib/turnEngine";
 import { SPEC_DIR } from "@/lib/specDir";
 
 interface CorpusRow {
@@ -28,23 +27,14 @@ interface CorpusRow {
   /** ACT-01: the turn's primary act. */
   act?: GuardContext["act"];
   previousReply?: string;
-  /** ASK-01: the turn's unknown names, the subjects' pronouns and the
-   * pronoun families in play, for the two new shapes. */
+  /** ASK-01: the turn's unknown names, for the false-familiarity shape. */
   unknownNames?: string[];
-  subjectPronouns?: { name: string; pronouns: string }[];
-  pronounsInPlay?: string[];
   lookupServed?: boolean;
   target?: GuardContext["target"];
   repair?: GuardContext["repair"];
   subjects?: GuardContext["subjects"];
   bannedPhrases?: string[];
   expect: GuardReason | null;
-  /** True only for a row that depends on the whole-reply lookahead
-   * guardReply() has and gateGuards() (the streaming path) genuinely
-   * cannot - see the row's own `note` and GuardContext.replyHasQuestion's
-   * doc comment in guards.ts. Excluded from the streaming describe block
-   * below, not silently passed. */
-  streamingSkip?: boolean;
   note?: string;
 }
 
@@ -55,16 +45,13 @@ const corpus: CorpusRow[] = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "guard
 const RETIRED_EXPECTATIONS: ReadonlySet<string> = new Set([
   "repeat_question", "repeat_sentence", "repeat_reply",
   "placeholder_echo", "assistant_register", "tag_question",
+  // ASK-01 part 5, retired by ruling (THIN-7D): the model is given the pronouns instead.
+  "pronoun_mismatch",
 ]);
 const isRetiredGuard = (row: CorpusRow) => RETIRED_EXPECTATIONS.has(row.expect ?? "");
 
 function ctxFor(row: CorpusRow): Omit<GuardContext, "personId"> {
-  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, subjectPronouns: row.subjectPronouns, pronounsInPlay: row.pronounsInPlay, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects, bannedPhrases: row.bannedPhrases };
-}
-
-async function* sentenceStream(reply: string): AsyncGenerator<string, undefined, void> {
-  for (const s of reply.split(/(?<=[.!?])\s+/).filter(Boolean)) yield `${s} `;
-  return undefined;
+  return { utterance: row.utterance, sources: row.sources ?? [], history: row.history ?? [], personaExamples: row.personaExamples, roster: row.roster, outcomes: row.outcomes, act: row.act, previousReply: row.previousReply, unknownNames: row.unknownNames, lookupServed: row.lookupServed, target: row.target, repair: row.repair, subjects: row.subjects, bannedPhrases: row.bannedPhrases };
 }
 
 describe("guard corpus (guardReply, the non-streaming path)", () => {
@@ -73,33 +60,6 @@ describe("guard corpus (guardReply, the non-streaming path)", () => {
     test(row.id, () => {
       const result = guardReply(row.reply, { ...ctxFor(row), personId: "person-corpus" });
       expect(result.reason).toBe(row.expect);
-    });
-  }
-});
-
-// Fix C's own core rewrite: a CUTTABLE reason drops the sentence and
-// keeps streaming, a non-cuttable reason replaces itself and stops - so
-// the streaming path's OWN pass/fail shape differs from guardReply()'s
-// (a single-sentence corpus row that guardReply() replaces wholesale can
-// come back from gateGuards() as either the honest line alone, cuttable
-// or not; a passing row streams through with the reply's own words
-// intact). What every row still proves here: nothing from `reply` that
-// guardReply() would have caught is ever spoken untouched by the
-// streaming path either, and nothing guardReply() clears is ever
-// replaced by it.
-describe("guard corpus (gateGuards, the streaming path)", () => {
-  for (const row of corpus) {
-    if (row.streamingSkip || isRetiredGuard(row)) continue;
-    test(row.id, async () => {
-      const gated = gateGuards(sentenceStream(row.reply), ctxFor(row), "person-corpus");
-      const delivered: string[] = [];
-      for await (const chunk of gated) delivered.push(chunk);
-      const streamed = delivered.join("").trim();
-      if (row.expect === null) {
-        expect(streamed).toBe(row.reply.trim());
-      } else {
-        expect(streamed).not.toBe(row.reply.trim());
-      }
     });
   }
 });

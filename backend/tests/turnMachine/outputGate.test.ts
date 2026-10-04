@@ -144,7 +144,7 @@ describe("outputGateNode: a reply tagged outcome_error never reaches the person 
 // direct unit tests of StreamGate itself, the same evaluateSafety()/
 // forOutput() floor evaluateReply() above uses on the whole reply,
 // applied one already-complete sentence at a time. The same fixture
-// phrases tests/turnEngine.test.ts's own runTurnStream() output-safety
+// phrases tests/chatTurn.test.ts's own runTurnStream() output-safety
 // suite uses (step 9), so a mid-stream refusal here and there are
 // provably the same real classifier decision, not two different
 // fixtures that happen to both say "refuse".
@@ -241,7 +241,7 @@ describe("StreamGate (STREAM-NEXT-01 (b)): the per-sentence gate a streamed turn
   // whole generation (this test), but repairReply() would have
   // misdiagnosed and stripped a quote legitimately opened in an
   // EARLIER, already-released sentence and correctly closed in the
-  // tail. Fixed to match turnEngine.ts's own gateOutputSafety() exactly
+  // tail. Fixed to match the retired turn engine's own gateOutputSafety() exactly
   // (repairTail(delivered, pending)).
   test("a reply ending in dangling markup is released repaired - the chunker's own tail only, never an earlier, already-complete sentence", () => {
     const { gate, released } = drive();

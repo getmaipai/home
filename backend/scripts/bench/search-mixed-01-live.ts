@@ -79,7 +79,6 @@ async function main(): Promise<void> {
 
   const searxng = startAlwaysFailingSearxng();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
-  setHouseholdSettingValue("turn.pipeline.next", true);
   setHouseholdSettingValue("search.searxng_url", searxng.url);
 
   console.log("\n## Run header\n");

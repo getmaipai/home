@@ -7,7 +7,7 @@
 // memory-eval.ts (step 5) and judge-eval.ts (step 6) already established.
 //
 // Runs the SAME ten scripted user turns through the real turn engine
-// (runTurn(), not a parallel prompt-only check) once per bundled
+// (runTurnNext(), not a parallel prompt-only check) once per bundled
 // companion, switching persona.active_id between runs exactly the way a
 // household member would in Settings. Three string checks per reply:
 // - Address form: a reply never leaks a DIFFERENT companion's own
@@ -44,7 +44,7 @@ import { db, sqlite } from "@/db";
 import { people } from "@/db/schema";
 import { newPersonId, randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { runTurn } from "@/lib/turnEngine";
+import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { setValue } from "@/lib/settings";
 import { PERSONAS } from "@/lib/persona";
 import { getEngineStatus } from "@/lib/llmSupervisor";
@@ -133,7 +133,7 @@ async function main(): Promise<number> {
     let forbiddenPhrasesOk = 0;
     const transcript: JudgedExchange[] = [];
     for (const utterance of EXCHANGES) {
-      const result = await runTurn(actor as PersonRow, "chat", utterance);
+      const result = await runTurnNext(actor as PersonRow, "chat", utterance);
       const replyText = result.ok ? result.value.reply.text : "";
       const lower = replyText.toLowerCase();
       transcript.push({ user: utterance, reply: replyText });

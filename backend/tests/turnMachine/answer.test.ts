@@ -59,11 +59,9 @@ describe("answerNode: 'from_outcomes' tags provenance from the LAST outcome only
   });
 });
 
-test("answerNode: 'model_text' and 'context_quote' never carry the provenance tag - only a real outcome-sourced kind can", async () => {
+test("answerNode: 'model_text' never carries the provenance tag - only a real outcome-sourced kind can", async () => {
   const modelText = await answerNode(STATE, { kind: "model_text", text: "a real model reply" }, SIGNAL);
   expect(modelText.output.provenance).toBeUndefined();
-  const contextQuote = await answerNode(STATE, { kind: "context_quote", quote: "a line from the window" }, SIGNAL);
-  expect(contextQuote.output.provenance).toBeUndefined();
 });
 
 test("answerNode keeps the generic line for non-engine model failures", async () => {

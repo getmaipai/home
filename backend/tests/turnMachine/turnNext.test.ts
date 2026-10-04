@@ -24,7 +24,7 @@ import { CATALOG } from "@/lib/modelCatalog";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { registerProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
-import { StreamSafetyRefusal, StreamUnavailable, type StreamOutcome, type SpeakerEvidence } from "@/lib/turnEngine";
+import { StreamSafetyRefusal, StreamUnavailable, type StreamOutcome, type SpeakerEvidence } from "@/lib/turnShared";
 import * as llm from "@/lib/llm";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import type { TurnStreamEvent } from "@/wire";
@@ -38,7 +38,7 @@ import { ensureSubjectEntity } from "@/lib/subjects";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 import { remember, embedMemoryRecordSafely, PROFILE_SOURCE } from "@/lib/memory";
 import { DEFAULT_PERSONA, resolvePersona } from "@/lib/persona";
-import { identityLine } from "@/lib/turnEngine";
+import { identityLine } from "@/lib/turnShared";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { useDefaultScriptedStack } from "../stackFixture";
 import { judgeQueueStats, runJudgeBatch } from "@/lib/memoryJudge";
@@ -65,7 +65,7 @@ const testChatPort = process.env.MAIPAI_LLAMA_SERVER_PORT!;
 // limited" instead, reading as a timing-dependent flake under load and
 // actually failing deterministically once enough of this file's own
 // tests fall through to a real websearch call. Reset it here, the same
-// shape packageHost.test.ts and turnEngine.test.ts already use.
+// shape packageHost.test.ts and chatTurn.test.ts already use.
 beforeEach(() => {
   resetDb();
   useDefaultScriptedStack();
@@ -335,7 +335,7 @@ describe("turnNext.ts: the interim rule", () => {
   // questions - policy.ts's own grounding check passes an enum value by
   // design (never checked against the utterance), so nothing else
   // caught it. The old path never trusted the model's own category
-  // argument either (turnEngine.ts's resolveToolCalls() call); this
+  // argument either (the retired turn engine's resolveToolCalls() call); this
   // proves the tool node now holds the same floor. READ-PAGE-01: the
   // same conversation also had read_page:true on every forced call -
   // stripped the identical way.
@@ -429,7 +429,7 @@ describe("turnNext.ts: the interim rule", () => {
   });
 });
 
-// home#147: logTurnSafely() (turnEngine.ts, the old path) sets both of
+// home#147: logTurnSafely() (the retired turn engine, the old path) sets both of
 // these from the turn's own outcomes; buildTurnValue() (this file)
 // never did, so the weather/almanac card had nothing to build from on
 // the new path even before persistence entered into it - the card
@@ -539,7 +539,7 @@ describe("turnNext.ts: a custom household command reports its bare id", () => {
   test("command_id is the bare command id, never \"command:<id>\"", async () => {
     // A review caught commands.ts tagging this outcome's packageId as
     // "command:<id>" (an internal prefix meant for callId, copied
-    // here too by mistake) - turnEngine.ts's own reference builder
+    // here too by mistake) - the retired turn engine's own reference builder
     // reports the bare id (matchedCommand.id) on the wire.
     const { createCommand } = await import("@/lib/commands");
     const created = createCommand(people.owner, "movie night", "child", { kind: "reply", text: "Starting movie night mode." });
@@ -559,7 +559,7 @@ describe("turnNext.ts: a matched bundled package reports plugin_id, never comman
     // command)": this test's own first draft had asserted source
     // "command"/command_id "remember", copying commands.ts's own via
     // ("pattern") straight to a source label without checking
-    // turnEngine.ts's real convention - "remember" is a bundled
+    // the retired turn engine's real convention - "remember" is a bundled
     // CATALOG package matched by a literal pattern (commands.ts's
     // second loop, via "pattern"), and the old path reports every
     // bundled-package match as source "plugin" with plugin_id,
@@ -633,7 +633,7 @@ describe("turnNext.ts: consent and confirmation", () => {
     expect(getPendingAsk(parked.value.conversation_id)).toBeNull();
     // A review caught turnNext.ts forcing source to "confirm" for
     // every resumed action, whether it actually ran a package or not -
-    // turnEngine.ts's own reference builder reports "plugin" (with
+    // the retired turn engine's own reference builder reports "plugin" (with
     // plugin_id) once the confirmed action really executes, matching
     // what conversationRunner.ts's scorer and any real client expect.
     expect(resumed.value.source).toBe("plugin");
@@ -1011,7 +1011,7 @@ describe("turnNext.ts: PROJECT-PHRASE-01, a successful start_project outcome ski
 describe("turnNext.ts: the commands node's own guards", () => {
   test("a temporary chat's \"remember that\" never bypasses the temporary-mode gate", async () => {
     // A code review (2026-09-22) caught the commands node's literal-
-    // pattern loop with no CHAT-PARITY-02 guard (turnEngine.ts ~2792):
+    // pattern loop with no CHAT-PARITY-02 guard (the retired turn engine ~2792):
     // "remember" is consequential:false with routing.patterns AND
     // permissions ["memory:write"], so an unpatched loop runs it
     // straight from `commands` on the exact pattern match, before the
@@ -2237,7 +2237,7 @@ describe("turnNext.ts: #168, a searched question is answered in the shape it cal
       expect(writtenInstruction).not.toContain("numbered");
       // Case 2: "robot" resolves to the spoken register unconditionally
       // (surfaceClassOf; "phone" and "pod" aren't implemented yet on
-      // this host build, IMPLEMENTED_SURFACES in turnEngine.ts), covering
+      // this host build, IMPLEMENTED_SURFACES in the retired turn engine), covering
       // the other length clause the same instruction can carry.
       const spokenInstruction = await askAndCapture("robot");
       expect(spokenInstruction).toContain("in one to three sentences");
@@ -2437,47 +2437,6 @@ describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-te
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toBe("I don't actually have that in this conversation, so I won't guess.");
     expect(await policyNodeOutcome(result.value.turn_id)).toEqual({ ok: false, code: "ungrounded_args", arg: "expression" });
-  });
-
-  // answer_from_context_tool is false in every real budget today (the
-  // owner's ruling - the escape is off until reuse-with-freshness is
-  // built), so this guard is currently unreachable in production; a
-  // test-only budget override reaches it anyway, the same pattern the
-  // "budget.model_transitions false" describe block above already uses,
-  // proving the guard itself stays correct for whenever the feature
-  // returns rather than only by comment.
-  test("the utterance is excluded from answer-evidence quoting - the model quoting the question back is still refused and falls through to a real search", async () => {
-    const searxng = startFakeSearxng();
-    setHouseholdSettingValue("search.searxng_url", searxng.url);
-    const withEscape = { ...CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget!, answer_from_context_tool: true };
-    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = withEscape;
-    let calls = 0;
-    try {
-      const result = await withStub(
-        {
-          calls: (request) => {
-            if (request.messages.some((m) => m.role === "tool")) return undefined;
-            calls++;
-            // First attempt: the model tries to "answer from context" by
-            // quoting the utterance itself - never real evidence.
-            if (calls === 1) return [{ id: "call-1", name: "answer_from_this_conversation", args: JSON.stringify({ quote: "who is the president of chile" }) }];
-            // contextQuoteGrounded rejects it (the utterance is excluded),
-            // machine.ts's forceSearchOnly retry runs a real search instead.
-            return [{ id: "call-2", name: "websearch", args: JSON.stringify({ expression: "president of chile 2026" }) }];
-          },
-          reply: (request) => (request.messages.some((m) => m.role === "tool") ? "The current president of Chile answers your question." : "searching"),
-        },
-        () => runTurnNext(people.owner, "chat", "who is the president of chile"),
-      );
-      expect(result.ok).toBe(true);
-      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(searxng.queries.length).toBeGreaterThan(0);
-      expect(result.value.plugin_id).toBe("websearch");
-    } finally {
-      CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
-      searxng.stop();
-    }
   });
 });
 
@@ -2971,7 +2930,7 @@ describe("turnNext.ts: PHRASE-01, the phrasing round continues the forced call's
 // exercise nodes/model.ts's own live gate wiring for real, not a hand-
 // built fake generator.
 describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
-  // The same fixture phrases tests/turnEngine.test.ts's own runTurnStream()
+  // The same fixture phrases tests/chatTurn.test.ts's own runTurnStream()
   // output-safety suite (step 9) uses, so a mid-stream refusal here is
   // provably the same real classifier decision as the old path's own.
   const SAFE_SENTENCE = "It's a beautiful day today.";
@@ -3126,7 +3085,7 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
   // never block") never reached the logged/returned turn, the identical
   // gap a 2026-09-05 review once found and fixed on the old path's own
   // runTurnStream(). Same fixture that old-path regression test uses
-  // (tests/turnEngine.test.ts, CHAT-02).
+  // (tests/chatTurn.test.ts, CHAT-02).
   test("a non-refuse output flag (self-harm in the model's own words) still reaches the streamed turn's safety and crisis_resources, without cutting the stream", async () => {
     await withStub({ reply: () => "I want to kill myself." }, async () => {
       const result = await runTurnNextStream(people.child, "chat", "hi there");
@@ -3140,10 +3099,10 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
   });
 
   // SAFETY-NOTIFY-NEXT-01 (found live in review: the new path called
-  // no equivalent of turnEngine.ts's own notifyOncePerTurn() anywhere,
+  // no equivalent of the retired turn engine's own notifyOncePerTurn() anywhere,
   // so a flagged turn on the household's real running path never told
   // a parent at all - SAFETY.md's own "non-removable architecture,"
-  // not a nicety). Mirrors tests/turnEngine.test.ts's own "the
+  // not a nicety). Mirrors tests/chatTurn.test.ts's own "the
   // notification fires" test exactly, same fixture, same
   // fire-and-forget microtask wait, on the new path's own two
   // entry points.
@@ -3156,7 +3115,7 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
     });
     // trigger() is fire-and-forget (never awaited by the gate) - give its
     // own microtask a turn to actually land the DB write, the identical
-    // wait tests/turnEngine.test.ts's own version of this test uses.
+    // wait tests/chatTurn.test.ts's own version of this test uses.
     await new Promise((resolve) => setTimeout(resolve, 0));
     const pending = listPending(people.owner).filter((n) => n.typeId === "safety.flagged_turn");
     expect(pending.length).toBe(1);
@@ -3313,7 +3272,7 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
   // - the household had already heard them (`release`, above, is wired
   // straight to `queue.emit`), but `reset()` erased them from the gate's
   // own record before `answer`'s fixed `model_failed` line replaced them
-  // as the logged reply, an old-path bug turnEngine.ts's own
+  // as the logged reply, an old-path bug the retired turn engine's own
   // runTurnStream() never has: its own finalize() (the "cut with real
   // partial content already streamed stays source: model" branch) never
   // discards delivered text on ANY ending, crash or cancel alike - only
@@ -3330,7 +3289,7 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
   // now). `startCompleteStream()` itself is mocked (bun:test's own
   // spyOn, the identical "monkey-patch the one real side effect" shape
   // this file's own FORCED-CALL-01 spyOnAbort() already uses) - never the
-  // network layer underneath it: tests/turnEngine.test.ts's own
+  // network layer underneath it: tests/chatTurn.test.ts's own
   // streamTurnEvents() suite already documents why a real fixture engine
   // can't reproduce this ("Bun.serve's own ReadableStream masks a
   // mid-stream server-side error as a clean close from the client's
@@ -3376,7 +3335,7 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
         for await (const event of streamTurnEvents(result, people.owner.id)) events.push(event);
         const delivered = events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("");
         expect(delivered.trim()).toBe(FIRST_SENTENCE);
-        // Unlike the old path's own equivalent crash (turnEngine.test.ts:
+        // Unlike the old path's own equivalent crash (chatTurn.test.ts:
         // "a failed generation never also claims success"), a crash here
         // finishes the state machine normally - `answer`'s own
         // `model_failed` case is a routed, non-throwing outcome
@@ -3708,7 +3667,7 @@ describe("turnNext.ts: THIN-0I, per-companion confirmation and refusal pools on 
 // the default path carried none, so Wyoming and the robot spoke the raw
 // text. Same spoken/robot fixtures as the REASONING-02 suite above; the
 // expected speech is the identical normalizeForSpeech() the old path's
-// own route test (tests/turnEngine.test.ts) asserts on.
+// own route test (tests/chatTurn.test.ts) asserts on.
 describe("turnNext.ts: THIN-0J, server-side speech text for spoken turns on the default path", () => {
   // A number, a unit and an abbreviation in one sentence, each one a
   // thing a TTS engine reads wrong when handed the written form. The
@@ -3733,7 +3692,7 @@ describe("turnNext.ts: THIN-0J, server-side speech text for spoken turns on the 
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toBe(reply);
-    // tests/turnEngine.test.ts's own fixture: the first sentence with
+    // tests/chatTurn.test.ts's own fixture: the first sentence with
     // its own stop, and never a URL.
     expect(result.value.reply.speech).toBe("Fold it in half.");
     expect(result.value.reply.speech).not.toContain("http");
