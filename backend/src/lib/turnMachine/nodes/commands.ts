@@ -39,7 +39,8 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
   // THIN-7E (ASK-01): the answer to a question put on an earlier turn, or a judge's open
   // question answered before it is put, comes before every command, as on the old path
   // (after `safety`, before routing). The deterministic parser reads it; no model runs.
-  const answered = answerWhoTurn({ actor: state.actor, text: input.utterance, conversationId: state.conversationId, turnId: state.turnId, pendingWho: state.pendingWho ?? null, temporary: state.temporary });
+  // Not on a bare, ephemeral, continuation or crisis turn: nothing is learned there and the crisis reply stays the crisis reply.
+  const answered = state.bare || state.ephemeral || state.continuation || state.crisis ? null : answerWhoTurn({ actor: state.actor, text: input.utterance, conversationId: state.conversationId, turnId: state.turnId, pendingWho: state.pendingWho ?? null, temporary: state.temporary });
   if (answered) {
     state.whoAnswer = true;
     state.subjects = answered.subjects;

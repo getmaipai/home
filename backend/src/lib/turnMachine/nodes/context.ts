@@ -144,7 +144,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // never heard before: ...") and one line per registry subject go ahead of the memory
   // block; the question itself is appended to the reply by the model node.
   const recentUserTexts = window.messages.filter((m) => m.role === "user").map((m) => m.content);
-  const resolvedSubjects = subjectsForTurn({ actor: state.actor, text: input.utterance, signal: state.signal, recentUserTexts, conversationId: conversation.id, supersedes: state.supersedes, turnId: state.turnId });
+  const resolvedSubjects = subjectsForTurn({ actor: state.actor, text: input.utterance, signal: state.signal, recentUserTexts, conversationId: conversation.id, supersedes: state.supersedes, turnId: state.turnId, temporary });
   if (resolvedSubjects.section) items.push({ id: "subjects", text: resolvedSubjects.section, source: "subjects", subjects: [], disclosure: "child_ok" });
 
   // Memories, dated and labeled (U5/REPLY-FIND-04's own shape): never

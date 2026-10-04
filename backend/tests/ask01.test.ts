@@ -771,4 +771,23 @@ describe("THIN-7E: the unknown-name question on the one path", () => {
       expect(getPendingAsk(refused.value.conversation_id)).toBeNull();
     });
   });
+  test("a crisis turn gets no appended question and no stored ask (a review)", async () => {
+    const { actor } = await owner();
+    await withChat("I'm here with you.", async () => {
+      const result = await runTurn(actor, "chat", "I want to kill myself. Willow borrowed our tent for the weekend");
+      if (!result.ok) throw new Error(result.error);
+      expect(result.value.reply.text).not.toContain("Who's Willow?");
+      expect(getPendingAsk(result.value.conversation_id)).toBeNull();
+    });
+  });
+
+  test("a temporary chat that names a household member creates no entity row (a review)", async () => {
+    const { actor } = await owner();
+    db.delete(entities).run();
+    await withChat("Sounds good.", async () => {
+      const result = await runTurn(actor, "chat", `${actor.displayName} borrowed our tent for the weekend`, { temporary: true });
+      if (!result.ok) throw new Error(result.error);
+      expect(db.select().from(entities).all()).toHaveLength(0);
+    });
+  });
 });

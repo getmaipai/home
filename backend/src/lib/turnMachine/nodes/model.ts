@@ -792,7 +792,7 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
   // by logResult() only if the delivered text carries it. Never for a bare turn, a
   // continuation or a widget's fixed question (no subjects were resolved for those).
   const ask =
-    state.subjects !== undefined && !isPhrasingRound && state.outcomes.length === 0 && !state.bare && !state.ephemeral && !state.continuation
+    state.subjects !== undefined && !isPhrasingRound && state.outcomes.length === 0 && !state.bare && !state.ephemeral && !state.continuation && !state.crisis
       ? askAppendFor({ actor: state.actor, conversationId: state.conversationId, turnId: state.turnId, replyText: attempt.text, utterance: input.utterance, subjects: state.subjects, unknownAsk: state.unknownAsk ?? null, recentUserTexts: state.context.filter((c) => c.source === "window" && c.id.startsWith("window-user")).map((c) => c.text), temporary: state.temporary })
       : NO_ASK_APPEND;
   state.askCommit = ask.commit;

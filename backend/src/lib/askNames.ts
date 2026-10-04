@@ -34,6 +34,9 @@ import {
   type OpenQuestionRow,
   type PendingAsk,
 } from "@/lib/conversationHistory";
+import { and, eq, isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { entities } from "@/db/schema";
 import { ensurePersonEntity, entityForSpeaker, registryNamesFor, subjectLabel } from "@/lib/subjects";
 import { applyWhoAnswer, candidateByName, framedName, looksLikeWhoAnswer, parseWhoAnswer, replyAsksAbout, replyAsksIdentityOf, resolveNames, unknownNamesLine, whoQuestion, type SubjectRef } from "@/lib/unknownNames";
 import { framedUnknownNames } from "@/lib/turnContext";
@@ -61,8 +64,8 @@ export interface TurnSubjects {
  * registry's names are household refs, the rest unresolved; a turn that names
  * nobody carries the previous turn's subjects (a carried unresolved one lives
  * two turns unless re-mentioned, and never re-asks). */
-export function subjectsForTurn(input: { actor: PersonRow; text: string; signal: TurnSignal; recentUserTexts: readonly string[]; conversationId: string; supersedes?: string; turnId: string }): TurnSubjects {
-  const { actor, text, signal, recentUserTexts, conversationId, supersedes, turnId } = input;
+export function subjectsForTurn(input: { actor: PersonRow; text: string; signal: TurnSignal; recentUserTexts: readonly string[]; conversationId: string; supersedes?: string; turnId: string; temporary?: boolean }): TurnSubjects {
+  const { actor, text, signal, recentUserTexts, conversationId, supersedes, turnId, temporary } = input;
   const household = listActivePeople();
   const rosterNames = household.flatMap((p) => (p.nickname ? [p.displayName, p.nickname] : [p.displayName]));
   const registry = registryNamesFor(actor);
@@ -74,7 +77,11 @@ export function subjectsForTurn(input: { actor: PersonRow; text: string; signal:
       names: knownForHub,
       resolveEntity: (name) => {
         const member = household.find((p) => p.displayName.trim().toLowerCase() === name.toLowerCase() || (p.nickname ?? "").trim().toLowerCase() === name.toLowerCase());
-        if (member) return ensurePersonEntity(member).value?.id ?? null;
+        if (member) {
+          // A temporary chat writes nothing: a member whose entity does not exist yet is not created for it.
+          if (temporary) return db.select().from(entities).where(and(eq(entities.accountPersonId, member.id), isNull(entities.deletedAt))).get()?.id ?? null;
+          return ensurePersonEntity(member).value?.id ?? null;
+        }
         return registry.find((r) => r.name.toLowerCase() === name.toLowerCase())?.id ?? null;
       },
       recent: recentUserTexts.slice(-3),
