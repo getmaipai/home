@@ -1,9 +1,15 @@
-import { describe, expect, test, afterEach } from "bun:test";
+import { describe, expect, test, afterEach, spyOn } from "bun:test";
+import { readFileSync } from "node:fs";
+import { hostname } from "node:os";
 import { Bonjour } from "bonjour-service";
 import { resetDb } from "./reset-db";
 import { __resetHubIdentityForTests, getHubInstanceId, setHubName } from "@/lib/hubIdentity";
 import { listIssues } from "@/lib/issues";
-import { advertiseMdns, stopMdnsAdvertisement, isMdnsAdvertising } from "@/lib/mdns";
+import { advertiseMdns, stopMdnsAdvertisement, isMdnsAdvertising, mdnsHostLabel } from "@/lib/mdns";
+
+// bun test runs with NODE_ENV=test, where advertising is off by default
+// (MDNS-HOST-01); these tests exercise the real responder, so force it on.
+process.env.MAIPAI_MDNS = "on";
 
 afterEach(async () => {
   await stopMdnsAdvertisement();
@@ -122,4 +128,85 @@ describe("advertiseMdns()/stopMdnsAdvertisement()", () => {
       rival.destroy();
     }
   }, 30_000);
+});
+
+// MDNS-HOST-01: publish() without a `host` made bonjour-service announce A/AAAA
+// records for os.hostname(), which macOS's mDNSResponder read as a clash on its
+// own name and answered by renaming the computer ("... (2)", "-2").
+describe("advertised host label (MDNS-HOST-01)", () => {
+  test("mdnsHostLabel() is maipai-<first 8 of the instance id>.local, lowercase", () => {
+    const label = mdnsHostLabel();
+    expect(label).toBe(`maipai-${getHubInstanceId().slice(0, 8).toLowerCase()}.local`);
+    expect(label).toMatch(/^[a-z0-9-]+\.local$/);
+  });
+
+  test("the published service carries the maipai host, never os.hostname(), and its address records are for that label only", async () => {
+    const spy = spyOn(Bonjour.prototype, "publish");
+    try {
+      await advertiseMdns({ port: 48800, tls: false });
+      expect(spy).toHaveBeenCalledTimes(1);
+      const cfg = spy.mock.calls[0]![0] as { host?: string };
+      expect(cfg.host).toBe(mdnsHostLabel());
+      expect(cfg.host).not.toBe(hostname());
+      const svc = spy.mock.results[0]!.value as { host: string; records(): Array<{ type: string; name: string }> };
+      expect(svc.host).toBe(mdnsHostLabel());
+      const names = svc.records().filter((r) => r.type === "A" || r.type === "AAAA" || r.type === "SRV").map((r) => r.name);
+      for (const r of svc.records()) {
+        if (r.type === "A" || r.type === "AAAA") expect(r.name).toBe(mdnsHostLabel());
+      }
+      expect(names.some((n) => n.toLowerCase() === hostname().toLowerCase() || n.toLowerCase() === `${hostname().toLowerCase()}.local`)).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("it logs one line with the host label used", async () => {
+    const spy = spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await advertiseMdns({ port: 48801, tls: false });
+      const lines = spy.mock.calls.map((c) => String(c[0])).filter((l) => l.includes("[mdns]") && l.includes(mdnsHostLabel()));
+      expect(lines).toHaveLength(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("MAIPAI_MDNS=off publishes nothing", async () => {
+    const spy = spyOn(Bonjour.prototype, "publish");
+    process.env.MAIPAI_MDNS = "off";
+    try {
+      await advertiseMdns({ port: 48802, tls: false });
+      expect(spy).not.toHaveBeenCalled();
+      expect(isMdnsAdvertising()).toBe(false);
+    } finally {
+      process.env.MAIPAI_MDNS = "on";
+      spy.mockRestore();
+    }
+  });
+
+  test("with MAIPAI_MDNS unset, NODE_ENV=test and a scratch Home (the one-hub opt-out) both mean off", async () => {
+    const spy = spyOn(Bonjour.prototype, "publish");
+    const saved = { ...process.env };
+    try {
+      delete process.env.MAIPAI_MDNS;
+      process.env.NODE_ENV = "test";
+      await advertiseMdns({ port: 48803, tls: false });
+      process.env.NODE_ENV = "production";
+      process.env.MAIPAI_TEST_ALLOW_MULTIPLE_HUBS = "1";
+      await advertiseMdns({ port: 48804, tls: false });
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      process.env = saved;
+      spy.mockRestore();
+    }
+  });
+});
+
+describe("scratch Home launchers turn mDNS off (MDNS-HOST-01)", () => {
+  for (const file of ["scripts/smoke/chat.ts", "../scripts/screenshot.ts", "scripts/restore-drill.ts"]) {
+    test(`${file} sets MAIPAI_MDNS=off in the spawn env`, () => {
+      const src = readFileSync(new URL(`../${file}`, import.meta.url), "utf8");
+      expect(src).toMatch(/MAIPAI_MDNS:\s*"off"/);
+    });
+  }
 });

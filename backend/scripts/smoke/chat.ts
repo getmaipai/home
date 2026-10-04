@@ -260,6 +260,7 @@ async function main(): Promise<void> {
     env: {
       ...process.env,
       MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", // a throwaway hub opts out of the machine-wide one-hub lock
+      MAIPAI_MDNS: "off", // a scratch Home never advertises on the LAN (MDNS-HOST-01)
       PORT: "0",
       MAIPAI_DATA_DIR: dataDir,
       MAIPAI_BACKUP_DIR: join(dataDir, "backups"),

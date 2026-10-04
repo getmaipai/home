@@ -33,6 +33,26 @@ const ISSUE_KEY = "advertise_failed";
  * apart); this matches it with a little headroom for a slow network. */
 const NAME_CHECK_MS = 1_200;
 
+/** The host label the service record points at (MDNS-HOST-01). Without an
+ * explicit `host`, bonjour-service defaults it to os.hostname() and announces
+ * A/AAAA records for the machine's OWN .local name (dist/lib/service.js line
+ * 32, RecordA/RecordAAAA); macOS's mDNSResponder reads that as a conflict on
+ * its own host name and renames the computer ("-2"). Our own label never
+ * claims the machine's name. */
+export function mdnsHostLabel(): string {
+  return `maipai-${getHubInstanceId().slice(0, 8).toLowerCase()}.local`;
+}
+
+/** Only the one real hub advertises: MAIPAI_MDNS=off turns it off, =on forces
+ * it on, and unset means off under NODE_ENV=test and for a scratch Home (the
+ * one-hub-lock opt-out env every throwaway launcher already sets). */
+function mdnsEnabled(): boolean {
+  const flag = process.env.MAIPAI_MDNS?.trim().toLowerCase();
+  if (flag === "off") return false;
+  if (flag === "on") return true;
+  return process.env.NODE_ENV !== "test" && !process.env.MAIPAI_TEST_ALLOW_MULTIPLE_HUBS;
+}
+
 let bonjour: Bonjour | null = null;
 let service: Service | null = null;
 
@@ -86,6 +106,7 @@ export async function advertiseMdns(opts: AdvertiseOptions): Promise<void> {
   let mine: Bonjour | null = null;
   try {
     await stopMdnsAdvertisement();
+    if (!mdnsEnabled()) return;
     const b = new Bonjour();
     bonjour = b;
     mine = b;
@@ -98,6 +119,7 @@ export async function advertiseMdns(opts: AdvertiseOptions): Promise<void> {
         name,
         type: SERVICE_TYPE,
         port: opts.port,
+        host: mdnsHostLabel(),
         probe: false,
         txt: {
           id: getHubInstanceId(),
@@ -106,6 +128,7 @@ export async function advertiseMdns(opts: AdvertiseOptions): Promise<void> {
           v: "1",
         },
       });
+      console.log(`[mdns] advertising ${name} on host ${mdnsHostLabel()}`);
       resolveIssue(ISSUE_SOURCE, ISSUE_KEY);
       return;
     }

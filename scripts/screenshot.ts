@@ -5392,7 +5392,7 @@ async function main() {
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
       // This matrix never calls speech; all speech requests go to the Stack.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
       stdout: "pipe",
       stderr: "inherit",
     });

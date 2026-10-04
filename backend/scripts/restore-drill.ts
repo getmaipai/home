@@ -90,6 +90,7 @@ async function main(): Promise<void> {
         ...process.env,
         // SINGLE-INSTANCE-02: the drill hub runs beside the real one.
         MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1",
+        MAIPAI_MDNS: "off", // MDNS-HOST-01
         MAIPAI_DATA_DIR: drillDataDir,
         MAIPAI_BACKUP_DIR: drillBackupDir,
         PORT: String(DRILL_PORT),
