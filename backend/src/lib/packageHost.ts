@@ -891,7 +891,7 @@ export async function searxngSearch(args: unknown, opts: { allowWikipediaFallbac
   const rotated = rotationPool ? rotationEngines(rotationPool) : null;
   const wikipedia = rotationPool?.includes("wikipedia") ? ["wikipedia"] : [];
   const requestEngines = rotated && rotated.length > 0 ? [...rotated, ...wikipedia] : rotated;
-  const key = [baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? "page" : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
+  const key = [baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? (wantsSpoken(input as { spoken?: unknown }) ? "page-spoken" : "page") : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
   const now = Date.now();
   const cached = searchCache.get(key);
   if (cached && now - cached.storedAt < SEARCH_CACHE_TTL_MS) return cached.result;
@@ -1193,12 +1193,24 @@ export const SEARCH_PAGES_MAX = 3;
 /** Characters of page text kept per page for the model (three pages stay
  * well inside the tool message's budget). */
 const SEARCH_PAGE_TEXT_CHARS = 2_500;
+/** THIN-4F (rule 13): a spoken turn's first word is due in 3 s, and the
+ * answering round re-reads every character of evidence (about 4 to 5 s for
+ * 1,000 to 1,800 tokens on the laptop engine), so a spoken search reads
+ * fewer pages and keeps less of each. */
+export const SEARCH_PAGES_MAX_SPOKEN = 2;
+export const SEARCH_PAGE_TEXT_CHARS_SPOKEN = 500;
 
 /** A recipe interpolates every argument to a string, so `read_page`
  * arrives from a package as "true" (an unset one stays the literal
  * "{read_page}"); a direct caller may pass the boolean. */
 function wantsPages(input: { read_page?: unknown } | undefined): boolean {
   return input?.read_page === true || input?.read_page === "true";
+}
+
+/** THIN-4F: the tool node marks a spoken turn's search with `spoken`
+ * (the recipe forwards it as a string, an unset one stays "{spoken}"). */
+function wantsSpoken(input: { spoken?: unknown } | undefined): boolean {
+  return input?.spoken === true || input?.spoken === "true";
 }
 
 /** One entry per url (a row with no url is keyed by its title and
@@ -1231,13 +1243,15 @@ export function __setSearchPagesBudgetForTests(ms: number | null): void {
  * SEARCH_PAGES_MAX requests in all (a failed one still counts), and only
  * the ones that finish inside the step's time budget are kept. */
 async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand): Promise<SearxngSearchResult> {
-  const input = args as { category?: unknown; read_page?: unknown } | undefined;
+  const input = args as { category?: unknown; read_page?: unknown; spoken?: unknown } | undefined;
+  const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : SEARCH_PAGES_MAX;
+  const pageChars = wantsSpoken(input) ? SEARCH_PAGE_TEXT_CHARS_SPOKEN : SEARCH_PAGE_TEXT_CHARS;
   const result = minorBand ? floorSearchResult({ ...found, rows: dedupeRows(found.rows) }, minorBand) : { ...found, rows: dedupeRows(found.rows) };
   if (!wantsPages(input) || input?.category === "images" || input?.category === "videos") return result;
   const hosts = new Set<string>();
   const candidates: SearxngRow[] = [];
   for (const row of result.rows) {
-    if (candidates.length >= SEARCH_PAGES_MAX) break;
+    if (candidates.length >= pagesMax) break;
     if (!row.url) continue;
     let host: string;
     try {
@@ -1269,7 +1283,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
         new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), remaining); }),
       ]);
       if (!doc) break;
-      const text = doc.text.trim().slice(0, SEARCH_PAGE_TEXT_CHARS);
+      const text = doc.text.trim().slice(0, pageChars);
       if (!text) continue;
       first ??= doc;
       pages.push({ url: row.url!, title: doc.title || row.title, text });
