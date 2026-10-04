@@ -19,6 +19,10 @@ const nativeStreams = {
   ReadableStream: globalThis.ReadableStream,
   WritableStream: globalThis.WritableStream,
   TransformStream: globalThis.TransformStream,
+  // pipeTo({signal}) in the native streams (assistant-stream's decoder uses
+  // it) rejects happy-dom's AbortSignal, so the pair stays native too.
+  AbortController: globalThis.AbortController,
+  AbortSignal: globalThis.AbortSignal,
 };
 
 GlobalRegistrator.register();
