@@ -7,13 +7,14 @@
 // privacy page in the same commit" rule).
 //
 // Scoped to the APP only. The plan's full projection also names
-// packages (D's store), models (the catalogue), and sidecars (pinned
-// with the app) - none of those have anything real to check against
-// yet: no package catalog is live (getmaipai/catalog is a separate,
-// not-yet-consuming repo), lib/modelCatalog.ts is a static, hand-
-// maintained list with no "latest version" concept of its own, and
-// sidecars are declared as "pinned with the app" (i.e. they follow
-// whatever the app's own release settles on, not tracked separately).
+// packages (the store), models (the catalogue), and sidecars (pinned
+// with the app). The package store itself is built (lib/store.ts:
+// verify, install, rollback, uninstall, channel), but no catalog address
+// is pinned in Home, so there is nothing live to ask for a newer package
+// version (STORE-01). lib/modelCatalog.ts is a static, hand-maintained
+// list with no "latest version" concept of its own, and sidecars are
+// declared as "pinned with the app" (i.e. they follow whatever the
+// app's own release settles on, not tracked separately).
 // Building a projection for data sources that don't exist yet would be
 // exactly the kind of speculative code CLAUDE.md's own "don't design
 // for hypothetical future requirements" warns against - documented as
