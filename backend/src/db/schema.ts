@@ -345,6 +345,13 @@ export const conversations = sqliteTable(
     companionId: text("companion_id"),
     title: text("title"),
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    // CONV-ARCHIVE-01: a shelved chat leaves the default list but keeps its turns. Hub-internal
+    // (not on the spec Conversation record), surfaced on ConversationSummary only.
+    archived: integer("archived", { mode: "boolean" }).notNull().default(false),
+    // CHAT-TITLE-01: who last decided `title`. user = a person renamed it (never overwritten);
+    // model = written after the first exchange; skipped = the output gate refused the model's
+    // title (decided once, not retried). null = still open to a model title.
+    titleSource: text("title_source"),
     settings: text("settings"),
     status: text("status").notNull().default("open"), // open|closed|deleted
     summary: text("summary"),

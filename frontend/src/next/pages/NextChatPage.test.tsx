@@ -342,9 +342,11 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     const otherConversation = { id: "conv-archive456", title: "Other conversation", surface: "chat", created_at: "2026-09-26T00:00:00Z", pinned: false };
     let finishTurnsLoad!: () => void;
     const turnsLoad = new Promise<void>((resolve) => { finishTurnsLoad = resolve; });
-    globalThis.fetch = mock((input: RequestInfo | URL) => {
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
+      // The hub refuses the archive (CONV-ARCHIVE-01 made archive real; this test is about its failure path).
+      if (init?.method === "PATCH" && url.includes("/api/conversations/conv-archive123")) return Promise.resolve(Response.json({ error: "Cannot save" }, { status: 500 }));
       if (url.includes("/api/conversations/conv-archive123/resume")) return Promise.resolve(Response.json(conversation));
       if (url.includes("/api/conversations/conv-archive456/resume")) return Promise.resolve(Response.json(otherConversation));
       if (url.includes("/turns")) {

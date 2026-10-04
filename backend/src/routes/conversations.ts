@@ -24,6 +24,7 @@ import {
   getConversation,
   listConversationTurns,
   updateConversationTitle,
+  updateConversationArchived,
   updateConversationMode,
   updateConversationSettings,
   deleteConversationById,
@@ -76,7 +77,8 @@ conversationsRoutes.get("/", requireAuth, async (c) => {
   // search to whichever target `personId` names (`target = personId ??
   // actor.id`, conversationHistory.ts), so there was never a reason to
   // drop it here.
-  return c.json(listConversations(actor, person, query));
+  const archived = c.req.query("archived");
+  return c.json(listConversations(actor, person, query, { archived: archived === "include" || archived === "only" ? archived : "exclude" }));
 });
 
 conversationsRoutes.get("/incognito", requireAuth, async (c) => {
@@ -365,7 +367,12 @@ conversationsRoutes.get("/:id/turns", requireAuth, async (c) => {
 
 conversationsRoutes.patch("/:id", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { title?: string | null; pinned?: boolean; mode?: Conversation["mode"]; settings?: unknown };
+  const body = (await c.req.json().catch(() => ({}))) as { title?: string | null; pinned?: boolean; archived?: boolean; mode?: Conversation["mode"]; settings?: unknown };
+  if (body.archived !== undefined) {
+    const result = updateConversationArchived(actor, c.req.param("id"), body.archived);
+    if (!result.ok) return fail(c, result);
+    return c.json(result.value);
+  }
   if (body.mode !== undefined) {
     const mode = Conversation.shape.mode.safeParse(body.mode);
     if (!mode.success || mode.data === undefined) return c.json({ error: "invalid conversation mode" }, 400);

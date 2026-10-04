@@ -3,7 +3,6 @@ import { useAui, type RemoteThreadListAdapter } from "@assistant-ui/react";
 import { createAssistantStream } from "assistant-stream";
 import { toast } from "sonner";
 import { createChatHistoryAdapter } from "@/apps/chat/chatHistoryAdapter";
-import { messageText } from "@/apps/chat/chatMessageText";
 import { api } from "@/lib/api";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 
@@ -22,19 +21,23 @@ export interface ChatThreadListOptions {
   query?: string;
   /** When true, list the live session-only Incognito conversations. */
   incognito?: boolean;
-  /** Called synchronously when an unsupported archive action is rejected. */
+  /** Called synchronously when an archive action is rejected by the hub. */
   onArchiveUnavailable?: (remoteId: string) => void;
+  /** CHAT-TITLE-01: how often, and how many times, generateTitle looks for the hub's title (the hub
+   * writes it in the background once the chat has been idle). */
+  titlePollMs?: number;
+  titlePollAttempts?: number;
   /** Supplies persisted settings when the active conversation history loads. */
   onSettingsLoaded?: (conversationId: string, settings: NonNullable<Conversation["settings"]> | undefined) => void;
 }
 
 export function createChatThreadListAdapter(selfName: string, options: ChatThreadListOptions = {}): RemoteThreadListAdapter {
-  const { personId, query, incognito = false, onArchiveUnavailable, onSettingsLoaded } = options;
+  const { personId, query, incognito = false, onArchiveUnavailable, onSettingsLoaded, titlePollMs = 3000, titlePollAttempts = 40 } = options;
   return {
     async list() {
-      const rows = incognito ? await api.incognitoConversationList(personId) : await api.conversationList(personId, query);
+      const rows = incognito ? await api.incognitoConversationList(personId) : await api.conversationList(personId, query, "include");
       return { threads: rows.filter((row) => row.surface === "chat").map((row) => ({
-        status: "regular" as const,
+        status: row.archived ? ("archived" as const) : ("regular" as const),
         remoteId: row.id,
         title: row.title ?? undefined,
         lastMessageAt: new Date(row.last_turn_at ?? row.created_at),
@@ -52,18 +55,24 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       if (!custom || typeof custom.pinned !== "boolean") return;
       await api.setConversationPinned(remoteId, custom.pinned);
     },
-    // The shared record has no archive state. The shipped Elements menu
-    // still offers Archive, so explain the unsupported action before
-    // rejecting it; the runtime rolls back its own optimistic status.
+    // CONV-ARCHIVE-01: archive state lives on the hub (PATCH {archived}). A failure rejects so the
+    // runtime rolls back its optimistic status; the toast says why nothing moved.
     async archive(remoteId) {
-      toast.error("Archiving isn't available yet.");
-      onArchiveUnavailable?.(remoteId);
-      throw new Error("Archiving conversations is not supported.");
+      try {
+        await api.setConversationArchived(remoteId, true);
+      } catch (error) {
+        toast.error("Could not archive this chat. Try again.");
+        onArchiveUnavailable?.(remoteId);
+        throw error;
+      }
     },
     async unarchive(remoteId) {
-      toast.error("Archiving isn't available yet.");
-      onArchiveUnavailable?.(remoteId);
-      throw new Error("Archiving conversations is not supported.");
+      try {
+        await api.setConversationArchived(remoteId, false);
+      } catch (error) {
+        toast.error("Could not restore this chat. Try again.");
+        throw error;
+      }
     },
     async delete(remoteId) { await api.deleteConversation(remoteId); },
     async initialize() {
@@ -85,10 +94,19 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       if (row.surface !== "chat") throw new Error("This conversation is not a chat.");
       return { status: "regular", remoteId: row.id, title: row.title ?? undefined };
     },
-    async generateTitle(remoteId, messages) {
-      const title = messageText(messages.find((message) => message.role === "user")).trim().slice(0, 60) || "New chat";
-      await api.renameConversation(remoteId, title);
-      return createAssistantStream((controller) => { controller.appendText(title); });
+    // CHAT-TITLE-01: the hub writes a model topic title in the background once the chat has been
+    // idle (backend conversationTitle.ts); this only waits for it and hands it to the list. Nothing is
+    // written back and the first message is never used as a stand-in, so a chat the hub did not title
+    // (Incognito, a refused title) stays "New chat" until the next list load.
+    async generateTitle(remoteId) {
+      let title: string | null = null;
+      if (!incognito) {
+        for (let attempt = 0; attempt < titlePollAttempts && !title; attempt++) {
+          if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, titlePollMs));
+          title = (await api.conversation(remoteId).catch(() => null))?.title ?? null;
+        }
+      }
+      return createAssistantStream((controller) => { if (title) controller.appendText(title); });
     },
     unstable_useAdapters: function useChatAdapters() {
       const aui = useAui();

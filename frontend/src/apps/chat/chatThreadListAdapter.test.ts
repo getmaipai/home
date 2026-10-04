@@ -4,6 +4,13 @@ import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { api } from "@/lib/api";
 import type { ThreadMessage } from "@assistant-ui/react";
 
+async function readTextDeltas(stream: ReadableStream<{ type: string; textDelta?: string }>, into: string[]): Promise<void> {
+  const reader = stream.getReader();
+  for (let read = await reader.read(); !read.done; read = await reader.read()) {
+    if (read.value.type === "text-delta") into.push(read.value.textDelta ?? "");
+  }
+}
+
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
 
@@ -20,7 +27,7 @@ describe("saved conversations", () => {
         saved.set(row.id, row);
         return Response.json(row, { status: 201 });
       }
-      if (path === "/api/conversations") return Response.json([...saved.values()]);
+      if (path.startsWith("/api/conversations?") || path === "/api/conversations") return Response.json([...saved.values()]);
       const row = saved.get(id);
       if (!row) return Response.json({ error: "conversation not found" }, { status: 404 });
       if (method === "PATCH") row.title = JSON.parse(String(init?.body)).title;
@@ -39,16 +46,35 @@ describe("saved conversations", () => {
     expect((await createChatThreadListAdapter("Nova").list()).threads.map((row) => row.remoteId)).toEqual([a.remoteId]);
   });
 
-  test("automatic titles are saved before being displayed", async () => {
-    let savedTitle = "";
-    globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      expect(init?.method).toBe("PATCH");
-      savedTitle = JSON.parse(String(init?.body)).title;
-      return Response.json({});
+  test("the automatic title is the model's topic title from the server, never the first message cut off, and is not written back", async () => {
+    const calls: string[] = [];
+    let polls = 0;
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(`${init?.method ?? "GET"} ${String(input)}`);
+      polls++;
+      // The hub writes the title in the background after the first exchange: absent on the first look.
+      return Response.json({ id: "conv-example123", title: polls < 3 ? null : "Garden layout" });
     }) as unknown as typeof fetch;
     const message: ThreadMessage = { id: "msg-1", createdAt: new Date(), role: "user", content: [{ type: "text", text: "Plan a garden" }], attachments: [], metadata: { custom: {} } };
-    await createChatThreadListAdapter("Nova").generateTitle("conv-example123", [message]);
-    expect(savedTitle).toBe("Plan a garden");
+    const stream = await createChatThreadListAdapter("Nova", { titlePollMs: 1 }).generateTitle("conv-example123", [message]);
+    const parts: string[] = [];
+    await readTextDeltas(stream, parts);
+    expect(parts.join("")).toBe("Garden layout");
+    expect(calls.every((call) => call.startsWith("GET "))).toBe(true);
+  });
+
+  test("when the hub never writes a title the stream is empty and nothing is renamed", async () => {
+    const methods: string[] = [];
+    globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      methods.push(init?.method ?? "GET");
+      return Response.json({ id: "conv-example123", title: null });
+    }) as unknown as typeof fetch;
+    const message: ThreadMessage = { id: "msg-1", createdAt: new Date(), role: "user", content: [{ type: "text", text: "Plan a garden" }], attachments: [], metadata: { custom: {} } };
+    const stream = await createChatThreadListAdapter("Nova", { titlePollMs: 1, titlePollAttempts: 3 }).generateTitle("conv-example123", [message]);
+    const parts: string[] = [];
+    await readTextDeltas(stream, parts);
+    expect(parts).toEqual([]);
+    expect(methods).toEqual(["GET", "GET", "GET"]);
   });
 
   test("server failures reject rename and delete instead of pretending to persist", async () => {
@@ -58,18 +84,38 @@ describe("saved conversations", () => {
     await expect(adapter.delete("conv-example123")).rejects.toThrow();
   });
 
-  test("unsupported archive is explained and remains a rejected, non-persistent operation", async () => {
+  test("archive and unarchive persist through the hub, and the list reports archived chats with their status", async () => {
+    const bodies: Array<{ method: string; path: string; body: unknown }> = [];
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (init?.method === "PATCH") {
+        bodies.push({ method: "PATCH", path, body: JSON.parse(String(init.body)) });
+        return Response.json({});
+      }
+      bodies.push({ method: "GET", path, body: undefined });
+      return Response.json([
+        { id: "conv-live", title: "Keep this chat", surface: "chat", created_at: "2026-09-07T00:00:00Z", last_turn_at: null, pinned: false, archived: false },
+        { id: "conv-shelved", title: "Shelved chat", surface: "chat", created_at: "2026-09-06T00:00:00Z", last_turn_at: null, pinned: false, archived: true },
+      ]);
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova");
+    const { threads } = await adapter.list();
+    expect(bodies[0]!.path).toBe("/api/conversations?archived=include");
+    expect(threads.map((t) => [t.remoteId, t.status])).toEqual([["conv-live", "regular"], ["conv-shelved", "archived"]]);
+    await adapter.archive("conv-live");
+    await adapter.unarchive("conv-shelved");
+    expect(bodies.slice(1)).toEqual([
+      { method: "PATCH", path: "/api/conversations/conv-live", body: { archived: true } },
+      { method: "PATCH", path: "/api/conversations/conv-shelved", body: { archived: false } },
+    ]);
+  });
+
+  test("a failed archive rejects so the runtime rolls back, and says so", async () => {
     const errorToast = spyOn(toast, "error");
     try {
-      const rows = [{ id: "conv-archive", title: "Keep this chat", surface: "chat", created_at: "2026-09-07T00:00:00Z", pinned: false }];
-      globalThis.fetch = mock(async (input: RequestInfo | URL) => {
-        expect(String(input)).toBe("/api/conversations");
-        return Response.json(rows);
-      }) as unknown as typeof fetch;
-      const adapter = createChatThreadListAdapter("Nova");
-      await expect(adapter.archive("conv-archive")).rejects.toThrow("Archiving conversations is not supported.");
-      expect(errorToast).toHaveBeenCalledWith("Archiving isn't available yet.");
-      expect((await adapter.list()).threads).toMatchObject([{ remoteId: "conv-archive", title: "Keep this chat", status: "regular" }]);
+      globalThis.fetch = mock(async () => Response.json({ error: "Cannot save" }, { status: 500 })) as unknown as typeof fetch;
+      await expect(createChatThreadListAdapter("Nova").archive("conv-archive")).rejects.toThrow();
+      expect(errorToast).toHaveBeenCalledWith("Could not archive this chat. Try again.");
     } finally {
       errorToast.mockRestore();
     }
@@ -123,7 +169,7 @@ describe("HOME-UI-02e: restored Conversations functions", () => {
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = String(input);
       const method = init?.method ?? "GET";
-      if (path === "/api/conversations" && method === "GET") return Response.json([{ ...saved, surface: "chat", created_at: "2026-09-07T00:00:00Z", last_turn_at: null }]);
+      if (path === "/api/conversations?archived=include" && method === "GET") return Response.json([{ ...saved, surface: "chat", created_at: "2026-09-07T00:00:00Z", last_turn_at: null }]);
       if (path === `/api/conversations/${saved.id}` && method === "PATCH") {
         const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
         expect("title" in body).toBe(false);
