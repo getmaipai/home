@@ -1,5 +1,6 @@
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, ThreadAssistantMessagePart } from "@assistant-ui/react";
-import { api, readTurnStream, ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import { readAssistantTurnStream } from "@/lib/assistantTurnStream";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
@@ -400,6 +401,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // surface's request that only NextChatPage's own admin
             // diagnostic ever means anything.
             bare: bare || undefined,
+            assistantStream: true,
             conversationId,
             supersedes,
             continuation,
@@ -416,7 +418,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             askAnswer: reconnectAttempts === 0 ? deps.consumeAskAnswer?.() : undefined,
             documentAttachments: reconnectAttempts === 0 && documentPayloads.length > 0 ? documentPayloads : undefined,
           });
-          for await (const event of readTurnStream(response)) {
+          for await (const event of readAssistantTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event
           // unconditionally, including every `delta` - the hottest path
           // in this loop, once per streamed chunk. `t` is exclusive to

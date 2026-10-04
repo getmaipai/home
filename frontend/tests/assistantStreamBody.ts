@@ -6,7 +6,7 @@ import { AssistantStream, DataStreamEncoder, createAssistantStreamController, ty
 // writes them (its header comment is the contract). `events` are the same
 // objects the NDJSON wire carries (wire.ts's TurnStreamEvent, plus the
 // spec's `t`-keyed tool lines). The fixture only writes; it decides nothing.
-export function assistantStreamBody(events: Record<string, unknown>[], opts: { chunkBytes?: number; keepOpen?: boolean } = {}): ReadableStream<Uint8Array> {
+export function assistantStreamWriter(): { body: ReadableStream<Uint8Array>; write(events: unknown[]): void; end(): void } {
   const [stream, controller] = createAssistantStreamController();
   let parts = 0;
   let open: { kind: "text" | "reasoning"; index: number } | undefined;
@@ -16,7 +16,11 @@ export function assistantStreamBody(events: Record<string, unknown>[], opts: { c
     if (open) controller.enqueue({ type: "part-finish", path: [open.index] });
     open = undefined;
   };
-  for (const event of events) {
+  let finished = false;
+  const write = (events: unknown[]) => {
+  for (const raw of events) {
+    const event = raw as Record<string, unknown>;
+    if (finished) return;
     if (!("type" in event)) {
       data(event);
       closeOpen();
@@ -52,17 +56,39 @@ export function assistantStreamBody(events: Record<string, unknown>[], opts: { c
       closeOpen();
       controller.enqueue({ type: "message-finish", path: [], finishReason: "stop", usage: { inputTokens: 0, outputTokens: 0 } });
       controller.close();
+      finished = true;
       break;
     }
     if (event.type === "error") {
       closeOpen();
       controller.enqueue({ type: "error", path: [], error: String(event.error), ...(event.code ? { code: event.code } : {}) } as AssistantStreamChunk);
       controller.close();
+      finished = true;
       break;
     }
   }
-  if (!opts.keepOpen && !events.some((event) => event.type === "done" || event.type === "error")) controller.close();
-  return AssistantStream.toByteStream(stream, new DataStreamEncoder());
+  };
+  const end = () => {
+    if (finished) return;
+    finished = true;
+    controller.close();
+  };
+  return { body: AssistantStream.toByteStream(stream, new DataStreamEncoder()), write, end };
+}
+
+/** A whole body at once; a body with neither done nor error just ends. */
+export function assistantStreamBody(events: unknown[]): ReadableStream<Uint8Array> {
+  const writer = assistantStreamWriter();
+  writer.write(events);
+  writer.end();
+  return writer.body;
+}
+
+/** `firstEvents` now, `restEvents` once release() runs, as staggeredNdjsonStream does. */
+export function staggeredAssistantStreamBody(firstEvents: unknown[], restEvents: unknown[]): { stream: ReadableStream<Uint8Array>; release: () => void } {
+  const writer = assistantStreamWriter();
+  writer.write(firstEvents);
+  return { stream: writer.body, release: () => { writer.write(restEvents); writer.end(); } };
 }
 
 export const ASSISTANT_STREAM_HEADERS = { "content-type": "text/plain; charset=utf-8", "x-vercel-ai-data-stream": "v1" } as const;

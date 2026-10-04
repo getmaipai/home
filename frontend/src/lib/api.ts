@@ -483,6 +483,7 @@ async function rawStreamPost(
   timeoutMs: number,
   timeoutMessage = "Timed out waiting for a response",
   externalSignal?: AbortSignal,
+  accept?: string,
 ): Promise<Response> {
   const { signal: timeoutSignal, clear } = withTimeout(timeoutMs);
   const signal =
@@ -493,7 +494,7 @@ async function rawStreamPost(
     const res = await fetch(path, {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: accept ? { "Content-Type": "application/json", Accept: accept } : { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal,
     });
@@ -1098,7 +1099,7 @@ export const api = {
   streamTurn: (
     text: string,
     signal?: AbortSignal,
-    opts: { thinking?: boolean; model?: string; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string; temporary?: boolean; spoken?: boolean; askAnswer?: { turnId: string; approved: boolean }; documentAttachments?: { name: string; mediaType: string; data: string }[] } = {},
+    opts: { thinking?: boolean; model?: string; conversationId?: string; supersedes?: string; ephemeral?: boolean; resumeToken?: string; turnId?: string; resumeFrom?: number; continuation?: { assistantText: string; fromTurnId?: string }; bare?: boolean; packageScope?: string; temporary?: boolean; spoken?: boolean; askAnswer?: { turnId: string; approved: boolean }; documentAttachments?: { name: string; mediaType: string; data: string }[]; assistantStream?: boolean } = {},
   ) =>
     rawStreamPost(
       "/api/turn/stream",
@@ -1123,6 +1124,9 @@ export const api = {
       0,
       undefined,
       signal,
+      // THIN-5E: the web chat reads the assistant-stream wire (lib/
+      // assistantTurnStream.ts); every other caller keeps NDJSON.
+      opts.assistantStream ? "application/x-assistant-stream" : undefined,
     ),
   // ADMIN-COMPARE-01: owner/admin only on the server (a 403 for anyone
   // else, checked before this ever streams); the frontend gate is just

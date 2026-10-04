@@ -1,6 +1,5 @@
 import { DataStreamDecoder, type AssistantStreamChunk } from "assistant-stream";
 import type { TurnStreamEvent } from "@maipai/home-backend/src/wire";
-import type { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 // THIN-5E (rule 9): the web chat's reader for POST /api/turn/stream sent with
 // `Accept: application/x-assistant-stream`. The installed DataStreamDecoder
@@ -11,7 +10,8 @@ import type { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/
 // `{type:"sequence"}` data chunk written just before it), and every other
 // NDJSON event comes back unchanged from its data chunk. A tool-call part's
 // own chunks are not read: its NDJSON line already rides a data chunk.
-export type AssistantTurnEvent = TurnStreamEvent | ToolTurnStreamEvent;
+// Typed as the NDJSON wire union the adapter already narrows on; the spec's `t`-keyed tool lines ride it as before.
+export type AssistantTurnEvent = TurnStreamEvent;
 
 export async function* readAssistantTurnStream(response: Response): AsyncGenerator<AssistantTurnEvent, void, void> {
   const chunks = response.body!.pipeThrough(new DataStreamDecoder({ strict: false })).getReader();

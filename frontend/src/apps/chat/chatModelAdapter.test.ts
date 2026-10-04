@@ -3,7 +3,7 @@ import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, Pending
 import { createChatModelAdapter, stripThinking } from "@/apps/chat/chatModelAdapter";
 import { createLocalImageAttachmentAdapter, clearStagedImageAttachments } from "@/apps/chat/localImageAttachmentAdapter";
 import { FakeAudioContext, fakeWavBody } from "../../../tests/fakeAudioContext";
-import { ndjsonStream, staggeredNdjsonStream } from "../../../tests/ndjsonStream";
+import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
 
 afterEach(() => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = undefined;
@@ -34,15 +34,17 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   const originalFetch = globalThis.fetch;
   const ttsCalls: string[] = [];
   const turnBodies: unknown[] = [];
+  const turnAccepts: (string | null)[] = [];
   let turnCalls = 0;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/api/turn/stream")) {
       turnBodies.push(JSON.parse(String(init?.body ?? "{}")));
+      turnAccepts.push(new Headers(init?.headers).get("accept"));
       if (typeof streamBody === "function") return streamBody();
       const call = turnCalls++;
       const body = call === 0 ? streamBody : additionalStreams[call - 1] ?? streamBody;
-      return Promise.resolve(new Response(body, { status: 200, headers: { "content-type": "application/x-ndjson" } }));
+      return Promise.resolve(new Response(body, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
     }
     if (url.includes("/api/tts")) {
       const body = JSON.parse(String(init?.body ?? "{}")) as { text?: string };
@@ -54,6 +56,7 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   return {
     ttsCalls,
     turnBodies,
+    turnAccepts,
     restore: () => {
       globalThis.fetch = originalFetch;
     },
@@ -1561,5 +1564,22 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
       /* the failure itself is expected and irrelevant here */
     }
     expect(consumed).toBe(true);
+  });
+});
+
+describe("the chat asks for the assistant-stream wire", () => {
+  test("every turn request, first send and reconnect alike, sends Accept: application/x-assistant-stream", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "turn_meta", conversation_id: "c1", turn_id: "t1", resume_token: "r1" }, { type: "delta", text: "Hi", sequence: 1 }]),
+      [ndjsonStream([{ type: "delta", text: " there", sequence: 2 }, { type: "done", value: { turn_id: "t1", reply: { text: "Hi there" }, safety: SAFETY } }])],
+    );
+    try {
+      const { yields, error } = await collect([fakeUserMessage("hello")]);
+      expect(error).toBeUndefined();
+      expect(lastText(yields)).toBe("Hi there");
+      expect(env.turnAccepts).toEqual(["application/x-assistant-stream", "application/x-assistant-stream"]);
+    } finally {
+      env.restore();
+    }
   });
 });
