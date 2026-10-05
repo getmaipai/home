@@ -61,6 +61,7 @@ function lastUserText(messages: ChatModelRunOptions["messages"]): string | undef
 }
 
 export interface ChatModelAdapterDeps {
+  onDraftSent?(): void;
   onConnection?(state: { phase: "online" | "dropped" | "reconnecting" | "resumed"; attempt?: number; resumedTokens?: number }): void;
   onReplyState?(state: "waiting" | "responding" | "ready" | "error" | "idle"): void;
   onSpeechError?(): void;
@@ -186,6 +187,7 @@ export interface ChatModelAdapterDeps {
 export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAdapter {
   return {
     async *run({ messages, abortSignal }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
+      deps.onDraftSent?.();
       const lastMessage = messages[messages.length - 1];
       const imageAttached = lastMessage?.role === "user" && lastMessage.attachments.some((attachment) => attachment.type === "image");
       const documentPayloads = lastMessage?.role === "user" ? (await Promise.all(lastMessage.attachments.filter((attachment) => attachment.type === "file").map((attachment) => stagedDocumentPayload(attachment.id)))).filter((item): item is NonNullable<typeof item> => Boolean(item)) : [];

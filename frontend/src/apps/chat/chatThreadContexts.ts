@@ -127,6 +127,7 @@ export const BareModeContext = createContext<{ on: boolean; toggle: () => void }
 /** Carries the session-wide Incognito state into the kit's bare Welcome
  * slot, which uses it only to show the matching temporary-chat heading. */
 export const TemporaryChatContext = createContext<{ on: boolean }>({ on: false });
+export const DraftConversationContext = createContext<string | undefined>(undefined);
 export type ConnectionState = { phase: ConnectionPhase; attempt?: number; resumedTokens?: number };
 export const ConnectionStateContext = createContext<ConnectionState & { setConnection?(state: ConnectionState): void }>({ phase: "online" });
 export const WakeWordPersonContext = createContext<Roster | null>(null);

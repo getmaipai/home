@@ -60,9 +60,10 @@ import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognito
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { ChatShortcutReference } from "@/next/pages/ChatShortcutReference";
-import { ArtifactOpenContext, AdminContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext, ConnectionStateContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, AdminContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, MODEL_EFFORTS, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
+import { discardDraft } from "@/apps/chat/draftStore";
 
 const HistoryIcon = getIcon("history");
 // CHAT-UI-03 (3): the app rail's own toggle (sidebar.tsx's
@@ -336,7 +337,7 @@ function NextThreadList({
   );
 }
 
-function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, onArtifactReady: (artifactId: string) => void) {
+function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void) {
   const temporaryNextRef = useRef(temporaryNext);
   temporaryNextRef.current = temporaryNext;
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
@@ -397,10 +398,11 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const onArchiveUnavailable = useCallback((remoteId: string) => {
     if (visibleConversationIdRef.current !== undefined || deselectedConversationIdRef.current !== remoteId) return;
     visibleConversationIdRef.current = remoteId;
+    setDraftConversationId(remoteId);
     deselectedConversationIdRef.current = undefined;
     previousThreadIdRef.current = remoteId;
     setSearchParamsRef.current({ conversation: remoteId }, { replace: true });
-  }, []);
+  }, [setDraftConversationId]);
   // PERSIST-CONV-01 / RESP-04: Thinking and the selected model hydrate
   // from the active conversation settings and save when changed. Refs
   // keep the memoized model adapter on their current values.
@@ -599,6 +601,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     const chatModelAdapter = useMemo(
       () =>
         createChatModelAdapter({
+          onDraftSent: () => { if (!temporaryNextRef.current) discardDraft(visibleConversationIdRef.current); },
           getConversationId: async () => {
             const { remoteId } = await aui.threadListItem().initialize();
             await settingsWriteRef.current;
@@ -771,8 +774,10 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
       if (id === undefined) {
         deselectedConversationIdRef.current = visibleConversationIdRef.current;
         visibleConversationIdRef.current = undefined;
+        setDraftConversationId(undefined);
       } else {
         visibleConversationIdRef.current = id;
+        setDraftConversationId(id);
         deselectedConversationIdRef.current = undefined;
       }
       setSearchParams(id ? { conversation: id } : {}, { replace: true });
@@ -1042,6 +1047,7 @@ function ProjectResultReload() {
 }
 
 export function NextChatPage({ person }: { person: Roster }) {
+  const [draftConversationId, setDraftConversationId] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get("conversation") ?? undefined);
   const chatAvailability = useChatAvailability();
   // CHAT-HEADER-01: ChatHeaderBar is a stable, zero-prop reference - the
   // shell header's own slot (ui-v0.5.35) mounts and unmounts it, never
@@ -1338,7 +1344,7 @@ export function NextChatPage({ person }: { person: Roster }) {
     setRailPeeked(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
-  }, temporaryNext, setOpenArtifactId);
+  }, temporaryNext, setOpenArtifactId, setDraftConversationId);
   const thinkingModeValue = useMemo(
     () => ({
       mode: (thinking ? "thinking" : "instant") as "instant" | "thinking",
@@ -1611,6 +1617,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <ModelPickerContext.Provider value={modelPickerValue}>
       <BareModeContext.Provider value={bareModeValue}>
       <TemporaryChatContext.Provider value={temporaryChatValue}>
+      <DraftConversationContext.Provider value={draftConversationId}>
       <PackageScopeContext.Provider value={packageScopeValue}>
       <VoiceSessionProvider value={{ open: voiceOpen, setOpen: setVoiceOpen }}>
       <WakeWordPersonContext.Provider value={person}>
@@ -1910,6 +1917,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </WakeWordPersonContext.Provider>
       </VoiceSessionProvider>
       </PackageScopeContext.Provider>
+      </DraftConversationContext.Provider>
       </TemporaryChatContext.Provider>
       </BareModeContext.Provider>
       </ModelPickerContext.Provider>

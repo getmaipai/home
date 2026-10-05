@@ -21,10 +21,13 @@
 // window of recent levels drawn as bars. Never a second `getUserMedia`
 // call: `sttDictationAdapter.ts` builds the meter over the exact stream
 // its own real capture pipeline already opened.
-import { createContext, useContext, useEffect, useState } from "react";
-import { ComposerPrimitive, useAuiState } from "@assistant-ui/react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
+import { DraftRestore } from "@maipai/ui/src/elements/draft-restore";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
+import { DraftConversationContext, TemporaryChatContext } from "@/apps/chat/chatThreadContexts";
+import { DRAFT_DELAY_MS, discardDraft, readDraft, saveDraft, type ChatDraft } from "@/apps/chat/draftStore";
 
 const DictationLevelMeterContext = createContext<LevelMeter | null>(null);
 
@@ -61,15 +64,34 @@ const POLL_MS = 60;
  * before the server's own "ready"). */
 export function ComposerDictationWaveform() {
   const dictating = useAuiState((s) => s.composer.dictation != null);
+  const text = useAuiState((s) => s.composer.text);
+  const id = useContext(DraftConversationContext);
+  const temporary = useContext(TemporaryChatContext).on;
+  const aui = useAui();
   const meter = useContext(DictationLevelMeterContext);
   const availability = useContext(ChatAvailabilityContext);
   const [colors] = useState(() => ({ bar: readColorToken("--color-primary") || "rgb(160, 198, 255)" }));
+  const hadText = useRef(false);
   // A rolling window of recent levels, oldest first - each render tick
   // shifts one out and pushes the meter's current read in, the classic
   // "recent history" bar look (RECALL each bar is a time-slice, not a
   // frequency bin - a real spectrum needs its own AnalyserNode reads,
   // which is exactly what this already is, one bin at a time).
   const [levels, setLevels] = useState<number[]>(() => Array(BAR_COUNT).fill(0));
+  const [savedDraft, setSavedDraft] = useState<ChatDraft | null>(() => temporary ? null : readDraft(id));
+  useEffect(() => setSavedDraft(temporary ? null : readDraft(id)), [id, temporary]);
+
+  useEffect(() => {
+    if (temporary || !id) return;
+    if (!text) {
+      if (hadText.current) discardDraft(id);
+      return;
+    }
+    hadText.current = true;
+    const timer = setTimeout(() => { saveDraft(id, text); setSavedDraft(null); }, DRAFT_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [id, temporary, text]);
+
   useEffect(() => {
     // Gated on `dictating` too, not just `meter` - a review caught this:
     // the real Input branch below never reads `levels` at all, so
@@ -85,28 +107,26 @@ export function ComposerDictationWaveform() {
     }, POLL_MS);
     return () => clearInterval(timer);
   }, [dictating, meter]);
-  if (!dictating) {
-    // The kit's own default Input, verbatim (elements/thread.aui.tsx's
-    // Composer) - `autoFocus` isn't part of this zero-prop slot's own
-    // shape (`ComponentType`, the same as every other ThreadComponents
-    // override), so a page load's own autofocus is the one behavior this
-    // trades away; every other prop matches exactly.
-    return (
-      <ComposerPrimitive.Input
-        placeholder={availability === "unavailable" ? "MaiPai's AI isn't running right now" : "Send a message..."}
-        disabled={availability === "unavailable"}
-        // Same Tailwind utilities as the kit's own default Input - not
-        // its "aui-composer-input" marker class, which has no real CSS
-        // rule anywhere and only the kit's own thread.aui.tsx carries an
-        // eslint exemption for that non-Tailwind naming convention.
-        className="caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-12 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
-        rows={1}
-        enterKeyHint="send"
-        aria-label="Message input"
-      />
-    );
-  }
-  return (
+
+  const input = !dictating ? (
+    <ComposerPrimitive.Input
+      placeholder={availability === "unavailable" ? "MaiPai's AI isn't running right now" : "Send a message..."}
+      disabled={availability === "unavailable"}
+      // The kit's own default Input, verbatim (elements/thread.aui.tsx's
+      // Composer) - `autoFocus` isn't part of this zero-prop slot's own
+      // shape (`ComponentType`, the same as every other ThreadComponents
+      // override), so a page load's own autofocus is the one behavior this
+      // trades away; every other prop matches exactly.
+      // Same Tailwind utilities as the kit's own default Input - not
+      // its "aui-composer-input" marker class, which has no real CSS
+      // rule anywhere and only the kit's own thread.aui.tsx carries an
+      // eslint exemption for that non-Tailwind naming convention.
+      className="caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-12 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
+      rows={1}
+      enterKeyHint="send"
+      aria-label="Message input"
+    />
+  ) : (
     // w-full, not flex-1: the kit's own composer-shell is flex-col (the
     // attachments row, this input row, the action row stacked
     // vertically), so flex-1's own flex-basis: 0% fights `h-12` for the
@@ -123,5 +143,11 @@ export function ComposerDictationWaveform() {
         ))}
       </div>
     </div>
+  );
+  return (
+    <>
+      {!temporary && savedDraft && !text ? <DraftRestore draft={savedDraft.text} savedAt={savedDraft.savedAt} onRestore={() => { aui.composer.setText(savedDraft.text); setSavedDraft(null); }} onDiscard={() => { discardDraft(id); setSavedDraft(null); }} /> : null}
+      {input}
+    </>
   );
 }
