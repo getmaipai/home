@@ -3180,7 +3180,7 @@ async function captureChatStreamGlitch(browser: Browser, sessionValue: string): 
     await page.getByLabel("Streaming pace").click();
     await page.getByRole("option", { name: "Normal pace" }).click();
     const framesDir = process.env.MAIPAI_CHAT_GLITCH_OUT_DIR || join(ROOT, "data-scratch", "chat-ab", "glitch-capture");
-    const evidenceDir = join(ROOT, "data-scratch", "chat-ab", "glitch-frames");
+    const evidenceDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/glitch-frames";
     mkdirSync(framesDir, { recursive: true });
     mkdirSync(evidenceDir, { recursive: true });
     const overrides: Array<{ name: string; css: string; result?: string }> = [
@@ -3233,7 +3233,8 @@ async function captureChatStreamGlitch(browser: Browser, sessionValue: string): 
     running = false;
     await recordFrames;
     const rectGlitches = samples.map((sample, i) => ({ sample, i })).filter(({ sample }) => sample.rects.some((r, i) => i > 0 && r.x < sample.rects[i - 1]!.x - 0.5));
-    if (frames.length < 200) throw new Error(`Firefox frame capture was too short: ${frames.length} frames`);
+    const minimumFrames = useFirefox ? 200 : 150;
+    if (frames.length < minimumFrames) throw new Error(`${useFirefox ? "Firefox" : useWebkit ? "WebKit" : "Chromium"} frame capture was too short: ${frames.length} frames (minimum ${minimumFrames})`);
     const pixelDiffs: Array<{ frame: number; changedPixels: number; ratio: number }> = [];
     for (let i = 1; i < frames.length; i++) {
       const script = `import sys, struct, zlib\ndef read(p):\n d=open(p,'rb').read(); pos=8; w=h=0; b=bytearray()\n while pos<len(d):\n  n=struct.unpack('>I',d[pos:pos+4])[0]; t=d[pos+4:pos+8]; x=d[pos+8:pos+8+n]; pos+=12+n\n  if t==b'IHDR': w,h,bd,ct,_,_,_=struct.unpack('>IIBBBBB',x)\n  if t==b'IDAT': b.extend(x)\n raw=zlib.decompress(b); bpp=4; stride=w*bpp; out=bytearray(h*stride); prev=bytearray(stride); k=0\n for y in range(h):\n  f=raw[k]; k+=1; row=bytearray(raw[k:k+stride]); k+=stride\n  for x in range(stride):\n   a=row[x-bpp] if x>=bpp else 0; up=prev[x]; ul=prev[x-bpp] if x>=bpp else 0\n   if f==1: row[x]=(row[x]+a)&255\n   elif f==2: row[x]=(row[x]+up)&255\n   elif f==3: row[x]=(row[x]+((a+up)//2))&255\n   elif f==4:\n    q=a+up-ul; pa=abs(q-a); pb=abs(q-up); pc=abs(q-ul); z=a if pa<=pb and pa<=pc else up if pb<=pc else ul; row[x]=(row[x]+z)&255\n  out[y*stride:(y+1)*stride]=row; prev=row\n return w,h,out\na=sys.argv[1:]; w,h,x=read(a[0]); w2,h2,y=read(a[1]); assert (w,h)==(w2,h2); n=sum(1 for q,r in zip(x,y) if q!=r); print(n//4, (n//4)/(w*h))`;
@@ -3266,10 +3267,32 @@ async function captureChatStreamGlitch(browser: Browser, sessionValue: string): 
       (window as any).__chatGlitchSetOverride("");
       return result;
     }, overrides);
-    const trace = { browser: "firefox", frameCount: frames.length, sampleCount: samples.length, measuredFrameIntervalMs: samples.length > 1 ? (samples.at(-1)!.at - samples[0]!.at) / (samples.length - 1) : null, deviceScaleFactor: 2, pixelDiffPairs: glitchPairs, samples, rectGlitches, overrideResults };
+    const browserName = useFirefox ? "firefox" : useWebkit ? "webkit" : "chromium";
+    const trace = { browser: browserName, frameCount: frames.length, sampleCount: samples.length, measuredFrameIntervalMs: samples.length > 1 ? (samples.at(-1)!.at - samples[0]!.at) / (samples.length - 1) : null, deviceScaleFactor: 2, pixelDiffPairs: glitchPairs, samples, rectGlitches, overrideResults };
     writeFileSync(join(evidenceDir, "trace.json"), JSON.stringify(trace, null, 2));
-    console.log(`CHAT_STREAM_GLITCH_TRACE ${JSON.stringify({ browser: "firefox", frames: frames.length, samples: samples.length, meanMs: trace.measuredFrameIntervalMs, first5PixelDiffPairs: glitchPairs, first5RectGlitches: rectGlitches.slice(0, 5), overrideResults })}`);
-    console.log(`Saved Firefox frame samples to ${framesDir} and six review frames to ${evidenceDir}`);
+    console.log(`CHAT_STREAM_GLITCH_TRACE ${JSON.stringify({ browser: browserName, frames: frames.length, samples: samples.length, meanMs: trace.measuredFrameIntervalMs, first5PixelDiffPairs: glitchPairs, first5RectGlitches: rectGlitches.slice(0, 5), overrideResults })}`);
+    console.log(`Saved ${browserName} frame samples to ${framesDir} and six review frames to ${evidenceDir}`);
+    const phase = process.env.CHAT_MARKDOWN_CAPTURE_PHASE === "before" ? "before" : "after";
+    let previousVisibleText = "";
+    let markdownViolation: { frame: number; issue: string; text: string } | null = null;
+    for (const [index, sample] of samples.entries()) {
+      const visibleText = sample.text.replace(/\s+/g, " ").trim();
+      if (visibleText.includes("*")) markdownViolation ??= { frame: index, issue: "visible literal asterisk", text: visibleText };
+      if (previousVisibleText && !visibleText.startsWith(previousVisibleText)) {
+        markdownViolation ??= { frame: index, issue: "earlier visible characters changed", text: `${previousVisibleText} -> ${visibleText}` };
+      }
+      if (visibleText) previousVisibleText = visibleText;
+    }
+    const evidenceFrame = markdownViolation?.frame ?? Math.max(0, samples.findIndex((sample) => sample.text.includes("Bold lead-in")));
+    const markdownFrameIndexes = Array.from({ length: 6 }, (_, offset) => Math.max(0, Math.min(frames.length - 1, evidenceFrame - 2 + offset)));
+    for (const [index, frameIndex] of markdownFrameIndexes.entries()) {
+      const target = join(evidenceDir, `markdown-${phase}-${index + 1}.png`);
+      const copied = spawnSync("cp", [frames[frameIndex]!, target]);
+      if (copied.status !== 0) throw new Error(`could not save markdown evidence frame ${frameIndex}`);
+    }
+    writeFileSync(join(evidenceDir, `markdown-${phase}.json`), JSON.stringify({ browser: browserName, frameCount: frames.length, sampleCount: samples.length, violation: markdownViolation, selectedFrames: markdownFrameIndexes }, null, 2));
+    console.log(`CHAT_MARKDOWN_STREAM_FRAMES ${JSON.stringify({ browser: browserName, phase, frames: frames.length, samples: samples.length, violation: markdownViolation, selectedFrames: markdownFrameIndexes })}`);
+    if (markdownViolation) throw new Error(`CHAT-MARKDOWN-STREAM frame ${markdownViolation.frame}: ${markdownViolation.issue}: ${markdownViolation.text}`);
   } finally { await context.close(); }
 }
 

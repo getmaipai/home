@@ -137,7 +137,8 @@ The end.`;
 
 function essay(): string {
   const paragraph = "The kitchen is the quietest place in the house at six in the morning, and that is exactly why it is worth writing about. Light comes in low across the counter, the kettle ticks as it cools, and for a few minutes nobody needs anything. ";
-  return Array.from({ length: 24 }, (_, i) => `Paragraph ${i + 1}. ${paragraph}`).join("\n\n");
+  const markdownPrefix = "# Principles\n\n1. **Bold lead-in:** explains *italic words* and `inline code`.\n\n```txt\nplain fenced code\n```\n\nSee [1] for details.";
+  return `${markdownPrefix}\n\n${Array.from({ length: 24 }, (_, i) => `Paragraph ${i + 1}. ${paragraph}`).join("\n\n")}`;
 }
 
 const SEARCH = `Short answer: the market opens at 8:00 on Saturdays [1], and the library keeps its usual hours [2]. Parking is free before 10:00 [1][3].`;

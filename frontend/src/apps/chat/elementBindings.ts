@@ -37,7 +37,7 @@ import { ChatCitationLink } from "@/apps/chat/chatCitationLink";
 import { ArtifactCardToolRender, ConfirmToolRender, ProjectToolRender, SourcesNoopRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
 import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
-import { citeMarkers } from "@/apps/chat/chatCitations";
+import { preprocessChatMarkdown } from "@/apps/chat/chatStreamingMarkdown";
 
 export type ToolBinding = {
   /** The tool-call part's `toolName` on the wire (chatModelAdapter.ts). */
@@ -68,7 +68,7 @@ export const TOOL_BINDINGS: readonly ToolBinding[] = [
 // does, whether the model picker is allowed) is a ChatThread prop, never a
 // different component here.
 export const THREAD_SLOTS = {
-  markdown: { components: { a: ChatCitationLink }, preprocess: citeMarkers },
+  markdown: { components: { a: ChatCitationLink }, preprocess: preprocessChatMarkdown },
   Welcome: NextChatWelcome,
   AssistantMoreItems,
   AssistantActionBarExtra: SourcesActionBarTrigger,
