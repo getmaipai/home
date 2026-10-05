@@ -275,7 +275,13 @@ export interface StackCheckRun {
 
 // The failure body every role route returns with an error status.
 export interface FailureBody {
-  error: string;
+  error: string | {
+    code?: number;
+    message?: string;
+    type?: string;
+    n_ctx?: number;
+    n_prompt_tokens?: number;
+  };
   offline_reason?: string;
   roles?: string[];
   model?: string;

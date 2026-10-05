@@ -24,6 +24,7 @@ const ROUTES: Array<[string, string, (body: unknown, form: FormData | null) => {
       if (b.slow) return { status: 200, body: "slow" };
       if (b.stream) return { status: 200, body: "stream", headers: IDENTITY_HEADERS };
       if (b.fail === "400") return { status: 400, body: { error: "the model field must be a role id or an installed model id", roles: ["chat", "embed"] } };
+      if (b.fail === "llama400") return { status: 400, body: { error: { code: 400, message: "request (6013 tokens) exceeds the available context size (4096 tokens), try increasing it", type: "exceed_context_size_error", n_prompt_tokens: 6013, n_ctx: 4096 } } };
       if (b.fail === "409") return { status: 409, body: { error: "model is unverified", model: "qwen3-8b", reason: "unverified", missing: ["checksum"] } };
       if (b.fail === "503") return { status: 503, body: { error: "the engine is offline", role: "chat", state: "offline", offline_reason: "the engine process is not running" } };
       if (b.fail === "504") return { status: 504, body: { error: "the engine took too long", role: "chat" } };
@@ -401,6 +402,12 @@ describe("createStackClient", () => {
       "unknown",
       "the model field must be a role id or an installed model id",
     );
+  });
+
+  test("a llama-server object error keeps its message and full diagnostic body", async () => {
+    const client = createStackClient({ baseUrl });
+    const err = await expectStackError(() => client.chat({ model: "chat", messages: [], fail: "llama400" }), "unknown", "request (6013 tokens) exceeds the available context size (4096 tokens), try increasing it");
+    expect(err.body).toBe(JSON.stringify({ error: { code: 400, message: "request (6013 tokens) exceeds the available context size (4096 tokens), try increasing it", type: "exceed_context_size_error", n_prompt_tokens: 6013, n_ctx: 4096 } }));
   });
 
   test("a 409 maps to unverified", async () => {

@@ -171,7 +171,8 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     }
     const kind = KIND_BY_STATUS[res.status] ?? "unexpected";
     const fb = isFailureBody(body) ? body : undefined;
-    const message = fb?.error ?? (res.statusText || `the Stack answered ${res.status}`);
+    const failureMessage = typeof fb?.error === "string" ? fb.error : fb?.error?.message;
+    const message = failureMessage ?? (res.statusText || `the Stack answered ${res.status}`);
     if (kind === "offline") {
       throw new StackError("offline", message, { status: res.status, offline_reason: fb?.offline_reason, body: text });
     }
@@ -179,7 +180,9 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
   }
 
   function isFailureBody(value: unknown): value is FailureBody {
-    return typeof value === "object" && value !== null && typeof (value as FailureBody).error === "string";
+    if (typeof value !== "object" || value === null) return false;
+    const error = (value as FailureBody).error;
+    return typeof error === "string" || (typeof error === "object" && error !== null && typeof error.message === "string");
   }
 
   function json<T>(res: Response): Promise<T> {

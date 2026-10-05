@@ -10,6 +10,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { createStackClient, type StackClient } from "@/lib/stack/client";
 import { FAILURE_COPY } from "@/lib/failureCopy";
 import { StackError, type StackErrorKind } from "@/lib/stack/errors";
+import { redactCredentials } from "@/lib/memoryContentPolicy";
 import { hostLabel, type EngineIdentity } from "@/lib/engineIdentity";
 import { getChatEngineIdentity } from "@/lib/llmSupervisor";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -233,7 +234,8 @@ export function stackFailureResult(err: unknown, role: string): StackFailureResu
       return { ok: false, status: 503, code: "unavailable", error: role === "chat" ? OFFLINE_COMPANION_LINE : `${role} model unavailable: the Stack is offline` };
     }
     resolveStackOffline(role);
-    return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${err.message}` };
+    const detail = role === "chat" && err.body ? ` (${redactCredentials(err.body.slice(0, 2_000))})` : "";
+    return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${err.message}${detail}` };
   }
   return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${(err as Error).message}` };
 }
