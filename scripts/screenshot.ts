@@ -159,6 +159,7 @@ const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
 const chatListReview = process.argv.includes("--chat-list-review");
+const chatMobileSheetReview = process.argv.includes("--chat-mobile-sheet-review");
 const chatShortcutsReview = process.argv.includes("--chat-shortcuts-review");
 const chatFindHeaderAlignmentReview = process.argv.includes("--chat-find-header-alignment-review");
 const chatFindBubbleHoverWidthReview = process.argv.includes("--chat-find-bubble-hover-width-review");
@@ -1971,6 +1972,61 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
       } finally {
         await context.close();
       }
+    }
+  }
+}
+
+/** CHAT-MOBILE-SHEET-01: capture and measure the phone history drawer at
+ * 390x844 in both themes. The New chat row, Search field, first thread,
+ * and shipped Sheet close button must share a comfortable 16px gutter. */
+async function captureChatMobileSheetReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  await seedTitledConversation("captureChatMobileSheetReview", cookie, "Weekend garden plans");
+  const viewport = VIEWPORTS.find((v) => v.slug === "phone")!;
+  for (const theme of THEMES) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      await page.getByRole("button", { name: "Show threads" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByText("Weekend garden plans", { exact: true }).waitFor();
+      await settleAnimations(page);
+      const measure = async (locator: Locator) => locator.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return { x: box.x, y: box.y, width: box.width, height: box.height, right: box.right, bottom: box.bottom };
+      });
+      const boxes = {
+        dialog: await measure(dialog),
+        newChat: await measure(dialog.locator("[data-slot='aui_thread-list-new']")),
+        search: await measure(dialog.locator("[data-slot='aui_thread-list-search'] input")),
+        firstRow: await measure(dialog.locator("[data-slot='aui_thread-list-item']").first()),
+        close: await measure(dialog.locator("[data-slot='sheet-close']")),
+      };
+      const newChatLeft = boxes.newChat.x - boxes.dialog.x;
+      const newChatTop = boxes.newChat.y - boxes.dialog.y;
+      const searchLeft = boxes.search.x - boxes.dialog.x;
+      const newChatGutter = newChatLeft;
+      const searchGutter = searchLeft;
+      const closeGutter = boxes.dialog.right - boxes.close.right;
+      const firstRowGutter = boxes.firstRow.x - boxes.dialog.x;
+      console.log(`CHAT-MOBILE-SHEET-01 ${theme}: ${JSON.stringify({ ...boxes, newChatLeft, newChatTop, searchLeft, newChatGutter, searchGutter, closeGutter, firstRowGutter })}`);
+      if (newChatLeft < 12 || newChatTop < 12) throw new Error(`New chat inset too small (${newChatLeft}px left, ${newChatTop}px top)`);
+      if (Math.abs(newChatGutter - searchGutter) > 1) throw new Error(`New chat and Search gutters differ (${newChatGutter}px vs ${searchGutter}px)`);
+      if (Math.abs(newChatGutter - closeGutter) > 1) throw new Error(`Close and New chat gutters differ (${closeGutter}px vs ${newChatGutter}px)`);
+      if (Math.abs(newChatGutter - firstRowGutter) > 1) throw new Error(`First row and New chat gutters differ (${firstRowGutter}px vs ${newChatGutter}px)`);
+      await settleAnimations(page);
+      const file = `chat-mobile-sheet-390-${theme}.png`;
+      await page.screenshot({ path: join(outDir, file) });
+      dedicatedScreenshots.push({ file, route: "chat-mobile-sheet", viewport: "phone (390x844)", theme });
+      console.log(`Wrote ${join(outDir, file)}`);
+      await page.close();
+    } finally {
+      await context.close();
     }
   }
 }
@@ -6348,6 +6404,10 @@ async function main() {
       await captureChatListReview(browser, sessionValue);
     }
 
+    if (!a11yOnly && chatMobileSheetReview) {
+      await captureChatMobileSheetReview(browser, sessionValue);
+    }
+
     if (!a11yOnly && chatShortcutsReview) {
       await captureChatShortcutsReview(browser, sessionValue);
     }
@@ -6376,7 +6436,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -6407,7 +6467,7 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview
+    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview
       ? []
       : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
         ? A11Y_ONLY_COMBOS
@@ -6477,7 +6537,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !chatShortcutsReview && !nextDashboardReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !chatShortcutsReview && !nextDashboardReview && !chatMobileSheetReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
