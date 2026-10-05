@@ -1963,8 +1963,7 @@ function turnWindowMessages(t: ConversationTurnRow): LlmMessage[] {
   const replays = replaySearchOutcomes(t);
   if (replays.length) {
     const toolCallMessage = toolCallAssistantMessage(replays);
-    const [nativeCall] = toolCallMessage.tool_calls ?? [];
-    if (nativeCall) messages.push({ role: "assistant", content: "", tool_calls: [nativeCall] });
+    if (toolCallMessage.tool_calls?.length) messages.push(toolCallMessage);
     messages.push(...replays.map((o) => ({ role: "tool" as const, tool_call_id: o.callId, content: JSON.stringify({ sources: sourcesFromRows(o.sources ?? []).map((s, i) => ({ number: i + 1, title: s.title, url: s.url, snippet: s.snippet })) }) })));
   }
   messages.push(
@@ -2166,7 +2165,7 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
   const newest = liveRows.slice(-WINDOW_NEWEST_TURNS_KEPT);
   const older = liveRows.slice(0, Math.max(0, liveRows.length - WINDOW_NEWEST_TURNS_KEPT));
 
-  const costOf = (t: ConversationTurnRow) => turnWindowMessages(t).reduce((sum, m) => sum + estimateTokens(typeof m.content === "string" ? m.content : JSON.stringify(m)), 0);
+  const costOf = (t: ConversationTurnRow) => turnWindowMessages(t).reduce((sum, m) => sum + estimateTokens(JSON.stringify(m)), 0);
   let tokenTotal = newest.reduce((sum, t) => sum + costOf(t), 0);
   const includedOlder: ConversationTurnRow[] = [];
   for (let i = older.length - 1; i >= 0; i--) {
