@@ -56,6 +56,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
 import { startScreenshotStack } from "./screenshotStack";
+import { assistantStreamBody } from "../frontend/tests/assistantStreamBody";
 import { RICH_REPLY_MARKDOWN, RICH_REPLY_PROMPT } from "../frontend/src/next/pages/richReplyFixture";
 import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
@@ -158,6 +159,7 @@ const chatResearchReview = process.argv.includes("--chat-research-review");
 const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
+const chatMissingStatesReview = process.argv.includes("--chat-missing-states-review");
 const chatListReview = process.argv.includes("--chat-list-review");
 const chatMobileSheetReview = process.argv.includes("--chat-mobile-sheet-review");
 const chatShortcutsReview = process.argv.includes("--chat-shortcuts-review");
@@ -287,7 +289,7 @@ const nextChatComposerReview = process.argv.includes("--next-chat-composer-revie
 const nextChatAuditReview = process.argv.includes("--next-chat-audit-review");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatMissingStatesReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
@@ -1369,6 +1371,123 @@ async function captureChatStreaming(browser: Browser, sessionValue: string, view
     dedicatedScreenshots.push({ file: screenshot, route: "chat-streaming", viewport: viewport.slug, theme });
   } finally {
     await context.close();
+  }
+}
+
+/** Closes the two missing 2026-10-04 chat audit states against the real
+ * Next Chat route and assistant-ui action bar. The first stream ends after
+ * a resumable turn_meta and delta; the second response is held until the
+ * reconnecting banner has been captured. */
+async function captureChatMissingStates(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/audit-2026-10-04";
+  mkdirSync(outDir, { recursive: true });
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
+
+  for (const viewport of [desktop, phone]) {
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      const meta = { type: "turn_meta", conversation_id: "audit-reconnect", turn_id: "audit-reconnect-turn", resume_token: "audit-resume-token" };
+      const firstBody = await new Response(assistantStreamBody([meta, { type: "delta", text: "The stream started before the connection paused.", sequence: 1 }])).text();
+      const resumePrefix = await new Response(assistantStreamBody([meta, { type: "delta", text: " then resumed successfully.", sequence: 2 }])).text();
+      const value = {
+        reply: { text: "The stream started before the connection paused, then resumed successfully." },
+        source: "model",
+        safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-10-04T00:00:00.000Z" },
+        conversation_id: "audit-reconnect", turn_id: "audit-reconnect-turn",
+      };
+      const resumeFinish = await new Response(assistantStreamBody([{ type: "done", value }])).text();
+      await page.addInitScript(({ firstBody, resumePrefix, resumeFinish }) => {
+        let count = 0;
+        const state = { resumeRequested: false, releaseResume: () => {}, releaseFinish: () => {} };
+        (window as unknown as { __auditResume: typeof state }).__auditResume = state;
+        const nativeFetch = window.fetch;
+        window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+          const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+          if (!url.includes("/api/turn/stream")) return nativeFetch(input, init);
+          count++;
+          if (count === 1) return new Response(firstBody, { status: 200, headers: { "content-type": "text/plain; charset=utf-8", "x-vercel-ai-data-stream": "v1" } });
+          state.resumeRequested = true;
+          const encoder = new TextEncoder();
+          return new Response(new ReadableStream<Uint8Array>({ start(controller) {
+            state.releaseResume = () => {
+              controller.enqueue(encoder.encode(resumePrefix));
+              state.releaseFinish = () => { controller.enqueue(encoder.encode(resumeFinish)); controller.close(); };
+            };
+          } }), { status: 200, headers: { "content-type": "text/plain; charset=utf-8", "x-vercel-ai-data-stream": "v1" } });
+        }) as typeof fetch;
+      }, { firstBody, resumePrefix, resumeFinish });
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).fill("Continue after a dropped stream");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      await page.waitForFunction(() => (window as unknown as { __auditResume: { resumeRequested: boolean } }).__auditResume.resumeRequested);
+      await page.getByText("Reconnecting", { exact: true }).waitFor();
+      await settleAnimations(page);
+      const reconnectFile = `reconnecting-${viewport.width}x${viewport.height}-dark.png`;
+      await page.screenshot({ path: join(outDir, reconnectFile), fullPage: true });
+      await page.evaluate(() => (window as unknown as { __auditResume: { releaseResume(): void } }).__auditResume.releaseResume());
+      await page.getByText("Picked the stream back up.", { exact: true }).waitFor();
+      await settleAnimations(page);
+      const resumedFile = `resumed-${viewport.width}x${viewport.height}-dark.png`;
+      await page.screenshot({ path: join(outDir, resumedFile), fullPage: true });
+      await page.evaluate(() => (window as unknown as { __auditResume: { releaseFinish(): void } }).__auditResume.releaseFinish());
+      console.log(`Wrote ${join(outDir, reconnectFile)} and ${join(outDir, resumedFile)}`);
+    } finally {
+      await context.close();
+    }
+  }
+
+  // Seed one persisted assistant-ui conversation in the throwaway data
+  // directory; reload it for every state so each action bar is a completed reply.
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const conversation = await seedTitledConversation("captureChatMissingStates", cookie, "A short garden answer");
+  const who = await fetch(`${BASE_URL}/api/auth/me`, { headers: cookie });
+  if (!who.ok) throw new Error(`captureChatMissingStates: reading signed-in person failed: ${who.status}`);
+  const personId = ((await who.json()) as { id: string }).id;
+  const reply = "Start with a sunny spot and a few easy plants.";
+  const seedSource = [
+    'import { sqlite } from "./src/db/index.ts";',
+    'sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, conversation_id, user_text, reply_text, source, safety_action, created_at, hlc) VALUES (?, ?, \'chat\', ?, ?, ?, \'model\', \'allow\', ?, ?)").run(' +
+      ['audit-action-turn', personId, conversation.id, 'How should I start a small garden?', reply].map((value) => JSON.stringify(value)).join(', ') +
+      ', new Date().toISOString(), new Date().toISOString() + ":0:audit-action-turn");',
+    'sqlite.close();',
+  ].join("\n");
+  const inserted = Bun.spawnSync({ cmd: ["bun", "-e", seedSource], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "pipe", stderr: "pipe" });
+  if (inserted.exitCode !== 0) throw new Error(`captureChatMissingStates: persisting assistant action fixture failed: ${inserted.stderr.toString()}`);
+
+  for (const { viewport, theme } of [
+    { viewport: desktop, theme: "dark" as const },
+    { viewport: desktop, theme: "light" as const },
+    { viewport: phone, theme: "dark" as const },
+  ]) {
+    for (const state of ["hover", "focus", "menu"] as const) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
+        const replyText = page.getByText(reply, { exact: true });
+        await replyText.waitFor();
+        const message = page.locator('[data-role="assistant"]').filter({ has: replyText }).last();
+        if (state === "hover") {
+          await message.hover();
+        } else if (state === "focus") {
+          await message.getByRole("button", { name: "Copy", exact: true }).focus();
+        } else {
+          await message.hover();
+          await message.getByRole("button", { name: "More", exact: true }).click();
+          await page.getByRole("menuitem", { name: "Export as Markdown", exact: true }).waitFor();
+        }
+        await settleAnimations(page);
+        const file = `action-bar-${state}-${viewport.width}x${viewport.height}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file), fullPage: true });
+        console.log(`Wrote ${join(outDir, file)}`);
+      } finally {
+        await context.close();
+      }
+    }
   }
 }
 
@@ -6067,6 +6186,11 @@ async function main() {
 
     const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch({ headless: true });
     browser = launchedBrowser;
+    if (chatMissingStatesReview) {
+      await captureChatMissingStates(browser, sessionValue);
+      console.log("completed named review: --chat-missing-states-review");
+      return;
+    }
     if (fitVerdictReview) {
       const phone = VIEWPORTS.find((item) => item.slug === "phone")!;
       const desktop = VIEWPORTS.find((item) => item.slug === "desktop")!;
