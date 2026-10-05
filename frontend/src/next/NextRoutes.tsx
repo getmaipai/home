@@ -29,6 +29,7 @@ import { NextFilesPage } from "@/next/pages/NextFilesPage";
 import { NextPersonProfilePage } from "@/next/pages/NextPersonProfilePage";
 import { NextSignInPage } from "@/next/pages/NextSignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
+import { discardIncognitoThreads } from "@/apps/chat/chatThreadListAdapter";
 import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
@@ -152,7 +153,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
       // The state switches the chat adapter immediately; after temporary
       // sessions are discarded, tell the mounted chat runtime to reload
       // once more so its list cannot retain stale Incognito rows.
-      void api.discardIncognitoConversations().then(() => {
+      void discardIncognitoThreads().then(() => {
         window.dispatchEvent(new Event(INCOGNITO_DISCARDED_EVENT));
       }).catch(() => toast.error("Could not discard Incognito chats. Try again."));
     }

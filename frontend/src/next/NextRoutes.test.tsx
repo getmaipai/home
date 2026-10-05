@@ -5,6 +5,7 @@ import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { NextBackupsPage } from "@/next/pages/NextBackupsPage";
 import { NextRoutes } from "@/next/NextRoutes";
+import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import type { Roster } from "@/lib/api";
@@ -180,6 +181,50 @@ describe("NextRoutes status indicator", () => {
       const statusLink = await view.findByRole("link", { name: /All good/ });
       expect(statusLink.getAttribute("href")).toBe("/status");
     } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("NextRoutes Incognito toggle", () => {
+  test("turning Incognito off clears the adapter's Incognito thread ids", async () => {
+    sessionStorage.setItem("maipai.incognito", "1");
+    localStorage.setItem("maipai.incognito-explanation-seen", "true");
+    const originalFetch = globalThis.fetch;
+    const discardCalls: string[] = [];
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/settings")) return Response.json([
+        { scope: "person:person-abc123", key: "ui.appearance", value: "dark" },
+        { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
+      ]);
+      if (url.includes("/api/health")) return healthResponse();
+      if (url === "/api/conversations" && init?.method === "POST") {
+        return Response.json({ id: "conv-toggle-incognito", title: null, surface: "chat", mode: "temporary", created_at: "2026-10-03T00:00:00Z", pinned: false }, { status: 201 });
+      }
+      if (url === "/api/conversations/incognito/discard") {
+        discardCalls.push(url);
+        return Response.json({ discarded: 1 });
+      }
+      if (url.includes("/api/dashboard")) return Response.json({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] });
+      return Response.json([]);
+    }) as unknown as typeof fetch;
+
+    try {
+      await createChatThreadListAdapter("Nova", { incognito: true }).initialize("local-temp");
+      const view = renderWithQueryClient(
+        <TooltipProvider>
+          <MemoryRouter initialEntries={["/"]}>
+            <Routes><Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} /></Routes>
+          </MemoryRouter>
+        </TooltipProvider>,
+      );
+      fireEvent.click(await view.findByRole("button", { name: "Incognito On" }));
+      await waitFor(() => expect(discardCalls).toEqual(["/api/conversations/incognito/discard"]));
+      await expect(createChatThreadListAdapter("Nova", { incognito: true }).fetch("conv-toggle-incognito")).rejects.toThrow();
+    } finally {
+      sessionStorage.removeItem("maipai.incognito");
+      localStorage.removeItem("maipai.incognito-explanation-seen");
       globalThis.fetch = originalFetch;
     }
   });
