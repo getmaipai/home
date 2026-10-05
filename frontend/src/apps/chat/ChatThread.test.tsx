@@ -136,6 +136,25 @@ describe("ChatThread", () => {
     expect(view.container.querySelector('[data-slot="connection-state"]')).toBeNull();
   });
 
+  test("the connection banner takes space in the layout and does not overlap the thread", () => {
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin connection={{ phase: "reconnecting", attempt: 1 }} /></MemoryRouter>);
+    const banner = view.container.querySelector('[data-slot="connection-state"]');
+    expect(banner).not.toBeNull();
+    const bannerRow = banner!.parentElement!;
+    const thread = view.container.querySelector(".aui-thread-root");
+    expect(bannerRow.className).toContain("flex");
+    expect(bannerRow.className).not.toContain("absolute");
+    expect(bannerRow.nextElementSibling).toBe(thread);
+  });
+
+  test("no banner element or height when online", () => {
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin /></MemoryRouter>);
+    expect(view.container.querySelector('[data-slot="connection-state"]')).toBeNull();
+    const bannerRow = Array.from(view.container.querySelectorAll("div")).find((element) => element.className === "flex justify-center");
+    expect(bannerRow?.children).toHaveLength(0);
+    expect(bannerRow?.getBoundingClientRect().height ?? 0).toBe(0);
+  });
+
   test("the connection banner shows Reconnecting with the attempt number", () => {
     const view = renderWithQueryClient(<MemoryRouter><Harness admin connection={{ phase: "reconnecting", attempt: 2 }} /></MemoryRouter>);
     expect(view.container.textContent).toContain("Reconnecting");

@@ -24,9 +24,9 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true }:
   modelPickerAllowed?: boolean;
 }) {
   return (
-    <div className="relative min-h-0 flex-1">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       {TOOL_BINDINGS.map((binding) => <ElementBinding key={binding.toolName} binding={binding} />)}
-      <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center">
+      <div className="flex justify-center">
         <ChatConnectionBanner />
       </div>
       <Thread

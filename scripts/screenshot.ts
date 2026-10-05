@@ -292,6 +292,7 @@ const nextChatAuditReview = process.argv.includes("--next-chat-audit-review");
 // configured household engine, the chat composer is correctly disabled.
 const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatMissingStatesReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
+const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
 const peopleProfileMediaReview = process.argv.includes("--people-profile-media-review");
@@ -1385,6 +1386,21 @@ async function captureChatMissingStates(browser: Browser, sessionValue: string):
   const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
   const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
 
+  async function assertBannerAbovePrompt(page: Page, state: string) {
+    const bounds = await page.evaluate(() => {
+      const banner = document.querySelector('[data-slot="connection-state"]');
+      const prompt = document.querySelector('[data-slot="aui_user-message-root"]');
+      if (!banner || !prompt) return null;
+      const bannerBox = banner.getBoundingClientRect();
+      const promptBox = prompt.getBoundingClientRect();
+      return { bannerBottom: bannerBox.bottom, promptTop: promptBox.top };
+    });
+    if (!bounds || bounds.bannerBottom > bounds.promptTop) {
+      throw new Error(`${state} connection banner overlaps the first user message at ${page.viewportSize()?.width}x${page.viewportSize()?.height}: ${JSON.stringify(bounds)}`);
+    }
+    console.log(`${state} banner/message bounds ${page.viewportSize()?.width}x${page.viewportSize()?.height}: ${JSON.stringify(bounds)}`);
+  }
+
   for (const viewport of [desktop, phone]) {
     const context = await newContext(browser, viewport, "dark", sessionValue);
     try {
@@ -1426,14 +1442,20 @@ async function captureChatMissingStates(browser: Browser, sessionValue: string):
       await page.waitForFunction(() => (window as unknown as { __auditResume: { resumeRequested: boolean } }).__auditResume.resumeRequested);
       await page.getByText("Reconnecting", { exact: true }).waitFor();
       await settleAnimations(page);
+      await assertBannerAbovePrompt(page, "reconnecting");
       const reconnectFile = `reconnecting-${viewport.width}x${viewport.height}-dark.png`;
       await page.screenshot({ path: join(outDir, reconnectFile), fullPage: true });
       await page.evaluate(() => (window as unknown as { __auditResume: { releaseResume(): void } }).__auditResume.releaseResume());
       await page.getByText("Picked the stream back up.", { exact: true }).waitFor();
       await settleAnimations(page);
+      await assertBannerAbovePrompt(page, "resumed");
       const resumedFile = `resumed-${viewport.width}x${viewport.height}-dark.png`;
       await page.screenshot({ path: join(outDir, resumedFile), fullPage: true });
       await page.evaluate(() => (window as unknown as { __auditResume: { releaseFinish(): void } }).__auditResume.releaseFinish());
+      await page.getByText("The stream started before the connection paused, then resumed successfully.", { exact: true }).waitFor();
+      await context.setOffline(true);
+      await page.getByText("Connection lost. The run kept going on the server.", { exact: true }).waitFor();
+      await assertBannerAbovePrompt(page, "dropped");
       console.log(`Wrote ${join(outDir, reconnectFile)} and ${join(outDir, resumedFile)}`);
     } finally {
       await context.close();
@@ -3253,8 +3275,14 @@ sqlite.close();`;
       await page.waitForFunction(() => {
         const reply = document.querySelectorAll<HTMLElement>('[data-slot="aui_assistant-message-content"]');
         const latest = reply[reply.length - 1];
-        return !!latest && latest.textContent?.includes("Streamed reply word400") === true;
-      }, { timeout: 30000 });
+        return !!latest && latest.textContent?.includes("Streamed reply word1.") === true;
+      }, { timeout: 15000 });
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+      const completedReply = await viewportEl.locator('[data-slot="aui_assistant-message-content"]').last().textContent();
+      const finalWordSentinel = `Streamed reply word${SCREENSHOT_STREAM_WORDS}.`;
+      if (!completedReply?.includes(finalWordSentinel)) {
+        throw new Error(`scripted stream completed without its final text sentinel at ${size.width}x${size.height}: expected ${JSON.stringify(finalWordSentinel)}, received ${JSON.stringify(completedReply?.slice(-160))}`);
+      }
       await page.waitForFunction(() => {
         const viewport = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
         const replies = viewport?.querySelectorAll<HTMLElement>('[data-slot="aui_assistant-message-content"]');
@@ -3273,13 +3301,12 @@ sqlite.close();`;
       const streamTextGap = typeof streamFollow.footerTop === "number" && streamFollow.latestReply ? streamFollow.footerTop - (streamFollow.latestReply as DOMRect).bottom : null;
       if (streamTextGap === null || streamTextGap < 0 || streamTextGap > 40) throw new Error(`stream did not follow newest text within 40px at ${size.width}x${size.height}: ${JSON.stringify({ streamFollow, streamTextGap })}`);
       await page.screenshot({ path: join(outDir, `chat-scroll-${size.width}x${size.height}-stream-follow.png`) });
-      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
 
       await input.fill("D22 streaming while scrolled up");
       await page.getByRole("button", { name: "Send message", exact: true }).click();
       await page.waitForFunction(() => {
         const replies = document.querySelectorAll<HTMLElement>('[data-slot="aui_assistant-message-content"]');
-        return replies[replies.length - 1]?.textContent?.includes("Streamed reply word1") === true;
+        return replies[replies.length - 1]?.textContent?.includes("Streamed reply word1.") === true;
       }, { timeout: 15000 });
       await page.mouse.wheel(0, -5000);
       const beforeDetached = await viewportEl.evaluate((el) => el.scrollTop);
@@ -6094,7 +6121,7 @@ async function main() {
     return undefined;
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
-    if (text.includes("D22 streaming")) return Array.from({ length: 400 }, (_, i) => `Streamed reply word${i + 1}.`).join(" ");
+    if (text.includes("D22 streaming")) return Array.from({ length: SCREENSHOT_STREAM_WORDS }, (_, i) => `Streamed reply word${i + 1}.`).join(" ");
     if (chatPageScreenshotFixture) return SCREENSHOT_CHAT_REPLY;
     if (text.includes(RICH_REPLY_PROMPT)) return RICH_REPLY_MARKDOWN;
     if (text.includes("Friday is pizza night")) return "Friday is pizza night.";
