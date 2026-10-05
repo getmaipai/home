@@ -9,6 +9,7 @@ import {
   composeTurn,
   constraintsLine,
   compositionInstruction,
+  phrasingInstruction,
   toolResultContent,
   needsComposition,
   questionOf,
@@ -166,6 +167,16 @@ describe("a composition that fails", () => {
 });
 
 describe("the constraints and the shape", () => {
+  test("written search phrasing asks for inline numbered citations while spoken phrasing does not", () => {
+    const written = phrasingInstruction("written", "who is president", 3);
+    const spoken = phrasingInstruction("spoken", "who is president", 3);
+    expect(written).toContain("Omit raw URLs.");
+    expect(written).toContain("Cite the numbered sources from this search inline like [1]");
+    expect(written).not.toMatch(/\b(?:words|sentences)\b.{0,30}\b(?:limit|under|at most)\b/i);
+    expect(spoken).not.toContain("[1]");
+    expect(spoken).toContain("omit raw URLs.");
+  });
+
   test("a list shape renders result rows, capped at five with a remainder line", async () => {
     const rows = Array.from({ length: 7 }, (_, i) => ({ title: `Track ${i + 1}` }));
     const result = await composeTurn(input([outcome({ callId: "call-list", packageId: "websearch", status: "succeeded", result: { actions: [], data: { rows } } })], { constraints: [{ kind: "shape", value: "list" }] }), scripted("ignored"));
@@ -223,6 +234,7 @@ describe("the constraints and the shape", () => {
     expect(line).toContain("never repeat what you said before");
     expect(line).toContain("Hint: answer from these results.");
     expect(compositionInstruction({ ageBand: "adult" }, [])).not.toContain("Hint:");
+    expect(compositionInstruction({ ageBand: "adult" }, [], null, "written")).toContain("cite numbered search sources inline like [1]");
   });
 });
 

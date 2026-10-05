@@ -2189,7 +2189,7 @@ describe("turnNext.ts: #156 under THIN-1A, a searched list answer on an adult's 
       expect(instruction).not.toContain("under 140 words");
       expect(instruction).not.toContain("at most 7 of them");
       expect(instruction).toContain("Omit raw URLs");
-      expect(instruction).not.toContain("numbered");
+      expect(instruction).toContain("Cite the numbered sources from this search inline like [1]");
       expect(result.value.reply.text).toBe(completeReply);
       expect(result.value.reply.text).not.toMatch(/from the$/u);
       expect(searxng.queries).toContain("reply truncation seven rows fixture");
@@ -2236,7 +2236,7 @@ describe("turnNext.ts: #168, a searched question is answered in the shape it cal
       // more - #168's own row used to assert the 140-word line here too.
       expect(writtenInstruction).not.toContain("under 140 words");
       expect(writtenInstruction).toContain("Omit raw URLs");
-      expect(writtenInstruction).not.toContain("numbered");
+      expect(writtenInstruction).toContain("Cite the numbered sources from this search inline like [1]");
       // Case 2: "robot" resolves to the spoken register unconditionally
       // (surfaceClassOf; "phone" and "pod" aren't implemented yet on
       // this host build, IMPLEMENTED_SURFACES in the retired turn engine), covering
@@ -2796,6 +2796,8 @@ describe("turnNext.ts: PHRASE-01, the phrasing round continues the forced call's
       const lastMessage = phrasingRequest!.messages[phrasingRequest!.messages.length - 1];
       expect(lastMessage?.role).toBe("user");
       expect(lastMessage?.content).toContain("use the results above as support");
+      expect(lastMessage?.content).toContain("Cite the numbered sources from this search inline like [1]");
+      expect(lastMessage?.content).toContain("Omit raw URLs.");
       expect(lastMessage?.content).not.toContain("from the tool results above");
     } finally {
       searxng.stop();
