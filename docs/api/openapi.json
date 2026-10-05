@@ -14194,7 +14194,7 @@
           "Developer"
         ],
         "summary": "Play one scenario as an assistant-stream turn",
-        "description": "Owner/admin only, and refused for a temporary (Incognito) request: streams the named fixture's events through the real assistant-stream encoder, at the chosen pace. Stores nothing, except the failed-tool scenario's own turn row (no conversation) that the error-detail control reads.",
+        "description": "Owner/admin only, and refused for a temporary (Incognito) request: streams the named fixture's events through the real assistant-stream encoder, at the chosen pace. Stores only fixture rows for admin error-detail scenarios (no conversation).",
         "parameters": [
           {
             "schema": {
