@@ -149,7 +149,8 @@ function stubMultiTurnFetch(): () => void {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/api/conversations") && init?.method === "POST") {
       conversationCount++;
-      return Promise.resolve(Response.json({ id: `conv-temp-${conversationCount}`, status: "open", surface: "chat" }));
+      const body = JSON.parse(init.body as string) as { mode?: string };
+      return Promise.resolve(Response.json({ id: `conv-temp-${conversationCount}`, status: "open", surface: "chat", ...(body.mode === "temporary" ? { mode: "temporary" } : {}) }));
     }
     if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/turn/stream")) {

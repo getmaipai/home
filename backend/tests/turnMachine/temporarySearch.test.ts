@@ -28,6 +28,7 @@ let provider: ReturnType<typeof Bun.serve>;
 let searxngQueries: string[] = [];
 let providerQueries: string[] = [];
 let owner: PersonRow;
+let client: TestClient;
 
 beforeEach(async () => {
   resetDb();
@@ -55,7 +56,8 @@ beforeEach(async () => {
   });
   __setHostedSearchEndpointForTests(`http://127.0.0.1:${provider.port}/res/v1/web/search`);
   setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${searxng.port}`);
-  await new TestClient().post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  client = new TestClient();
+  await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
   owner = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
 });
 
@@ -102,13 +104,14 @@ describe("THIN-INC row 4: a temporary search keeps no query history or cache", (
 
   test("temporary search leaves no person-keyed query history or cache", async () => {
     const temporaryId = conversationFor(owner, "temporary");
+    const durableId = conversationFor(owner, "chat");
     const before = tableCounts();
     await search(owner, temporaryId, "turn-t-1");
     await search(owner, temporaryId, "turn-t-2");
     // Not cached: each lookup went to the engine itself.
     expect(searxngQueries).toEqual([QUERY, QUERY]);
     // Not remembered for later: the same words in a durable chat are a fresh lookup too.
-    await search(owner, conversationFor(owner, "chat"), "turn-d-1");
+    await search(owner, durableId, "turn-d-1");
     expect(searxngQueries).toEqual([QUERY, QUERY, QUERY]);
     // And no table holds a query.
     expect(changedTables(before, tableCounts())).toEqual([]);

@@ -72,7 +72,8 @@ function snapshot(): Record<string, string> {
 
 /** The tables whose content differs between two snapshots. */
 function changed(before: Record<string, string>, after: Record<string, string>): string[] {
-  return Object.keys(after).filter((name) => after[name] !== before[name]).sort();
+  // auth bookkeeping: the token is stamped on use, it is not conversation data
+  return Object.keys(after).filter((name) => name === "person_api_tokens" ? JSON.stringify((JSON.parse(after[name]!) as Record<string, unknown>[]).map(({ last_used_at: _lastUsedAt, ...row }) => row)) !== JSON.stringify((JSON.parse(before[name]!) as Record<string, unknown>[]).map(({ last_used_at: _lastUsedAt, ...row }) => row)) : after[name] !== before[name]).sort();
 }
 
 /** Row count of one table (an ordinary request's footprint). */
