@@ -60,7 +60,7 @@ import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognito
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { ChatShortcutReference } from "@/next/pages/ChatShortcutReference";
-import { ArtifactOpenContext, AdminContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, AdminContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext, ConnectionStateContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, MODEL_EFFORTS, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 
@@ -380,6 +380,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // this instead of `isSpeaking` alone to notice "speaking is over."
   const [speakingEndedAt, setSpeakingEndedAt] = useState(0);
   const [banner, setBanner] = useState<string | null>(null);
+  const [connection, setConnection] = useState<ConnectionState>({ phase: "online" });
   const [searchParams, setSearchParams] = useSearchParams();
   // Archive first switches an active remote thread to the blank thread
   // before calling the adapter. Keep the identity of that just-deselected
@@ -680,6 +681,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           },
           isBareMode: () => bareModeRef.current,
           onCrisisResources: setBanner,
+          onConnection: setConnection,
           // Jesse, live-found 2026-09-27: a synchronous write_document
           // reply's own artifact card used to sit there unopened until
           // clicked - the default now is to open it, the same way a
@@ -808,7 +810,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     },
   });
 
-  return { runtime, banner, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, banner, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1331,7 +1333,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
+  const { runtime, banner, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setRailPeeked(false);
     setOpenArtifactId(null);
@@ -1790,11 +1792,13 @@ export function NextChatPage({ person }: { person: Roster }) {
                 railCollapsed ? "ms-0" : "ms-4",
               )}
             >
-              <ChatThread
-                temporary={temporaryNext}
-                onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
-                modelPickerAllowed={modelPickerAllowed}
-              />
+              <ConnectionStateContext.Provider value={{ ...connection, setConnection }}>
+                <ChatThread
+                  temporary={temporaryNext}
+                  onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
+                  modelPickerAllowed={modelPickerAllowed}
+                />
+              </ConnectionStateContext.Provider>
             </div>
             {isDesktopCanvas ? (
               // Desktop only - the phone/tablet Sheet below covers the

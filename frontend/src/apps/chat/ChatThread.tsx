@@ -1,6 +1,7 @@
 import { useAssistantToolUI } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { MODEL_SELECTOR_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type ToolBinding } from "@/apps/chat/elementBindings";
+import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
 
 // SHARED-THREAD-01: the one thread composition. The chat page and the /dev/ui
 // showcase both render this and nothing else for the thread; which Element
@@ -23,8 +24,11 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true }:
   modelPickerAllowed?: boolean;
 }) {
   return (
-    <>
+    <div className="relative min-h-0 flex-1">
       {TOOL_BINDINGS.map((binding) => <ElementBinding key={binding.toolName} binding={binding} />)}
+      <div className="pointer-events-none absolute inset-x-0 top-3 z-20 flex justify-center">
+        <ChatConnectionBanner />
+      </div>
       <Thread
         temporary={temporary}
         components={{
@@ -33,6 +37,6 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true }:
           ComposerExtra: modelPickerAllowed ? MODEL_SELECTOR_SLOT : undefined,
         }}
       />
-    </>
+    </div>
   );
 }

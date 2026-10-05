@@ -60,6 +60,7 @@ function lastUserText(messages: ChatModelRunOptions["messages"]): string | undef
 }
 
 export interface ChatModelAdapterDeps {
+  onConnection?(state: { phase: "online" | "dropped" | "reconnecting" | "resumed"; attempt?: number; resumedTokens?: number }): void;
   onReplyState?(state: "waiting" | "responding" | "ready" | "error" | "idle"): void;
   onSpeechError?(): void;
   // NewChat reads the active conversation's selected mode. Undefined
@@ -235,6 +236,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       let lastAcknowledgedSequence = 0;
       let reconnectAttempts = 0;
       const MAX_RECONNECT_ATTEMPTS = 3;
+      let awaitingResume = false;
+      let resumedDeltaCount = 0;
+      deps.onConnection?.({ phase: "online" });
       // Lane 11 item 1: true from the moment a `status`/`spoken_cue`
       // event has set the transient activity line (chatTurnActivity.ts)
       // until the next delta clears it - tracked here, not derived from
@@ -391,6 +395,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               if (event.sequence <= lastAcknowledgedSequence) continue;
               lastAcknowledgedSequence = event.sequence;
             }
+            if (awaitingResume) {
+              resumedDeltaCount++;
+              awaitingResume = false;
+              deps.onConnection?.({ phase: "resumed", resumedTokens: resumedDeltaCount });
+            }
             deps.onReplyState?.("responding");
             visible += event.text;
             if (activityShown) {
@@ -450,6 +459,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             yield { metadata: { custom: { activity: event.text } } };
           } else if (event.type === "done") {
             sawTerminalEvent = true;
+            deps.onConnection?.({ phase: "online" });
             // Authoritative, not just the incrementally-built preview: a
             // reasoning-only reply (never saw a real </think>), a stream
             // that ended mid-block, or any other edge case all resolve
@@ -662,6 +672,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               if (event.sequence <= lastAcknowledgedSequence) continue;
               lastAcknowledgedSequence = event.sequence;
             }
+            if (awaitingResume) {
+              awaitingResume = false;
+              deps.onConnection?.({ phase: "resumed", resumedTokens: resumedDeltaCount });
+            }
             deps.onReplyState?.("responding");
             reasoningText += event.text;
             if (activityShown) {
@@ -672,6 +686,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             continue;
           } else {
             sawTerminalEvent = true;
+            deps.onConnection?.({ phase: "online" });
             // SAFETY-01 (#85): a streamed refusal's crisis resources ride
             // on the error event; shown the same way a done value's are.
             if (event.crisis_resources) deps.onCrisisResources(event.crisis_resources);
@@ -687,9 +702,13 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // "done"/"error" event left this loop ending silently. When the
             // server supplied a live resume token, retry the same turn; a
             // legacy or malformed response still gets the old clear error.
+            deps.onConnection?.({ phase: "dropped" });
             throw new ApiError("The connection ended before MaiPai finished replying.", 0, "unavailable");
           }
+          deps.onConnection?.({ phase: "reconnecting", attempt: reconnectAttempts + 1 });
           reconnectAttempts++;
+          awaitingResume = true;
+          resumedDeltaCount = 0;
         }
       } catch (e) {
         if (abortSignal.aborted) {

@@ -10,6 +10,7 @@ import { createContext } from "react";
 // is built for a terminal command and can't be relabeled, per the org's
 // "no hand-built UI" rule).
 import { type ModelOption } from "@maipai/ui/src/elements/model-selector";
+import type { ConnectionPhase } from "@maipai/ui/src/elements/connection-state";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -126,4 +127,6 @@ export const BareModeContext = createContext<{ on: boolean; toggle: () => void }
 /** Carries the session-wide Incognito state into the kit's bare Welcome
  * slot, which uses it only to show the matching temporary-chat heading. */
 export const TemporaryChatContext = createContext<{ on: boolean }>({ on: false });
+export type ConnectionState = { phase: ConnectionPhase; attempt?: number; resumedTokens?: number };
+export const ConnectionStateContext = createContext<ConnectionState & { setConnection?(state: ConnectionState): void }>({ phase: "online" });
 export const WakeWordPersonContext = createContext<Roster | null>(null);

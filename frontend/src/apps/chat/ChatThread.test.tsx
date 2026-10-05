@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { THREAD_SLOTS, TOOL_BINDINGS } from "@/apps/chat/elementBindings";
-import { AdminContext } from "@/apps/chat/chatThreadContexts";
+import { AdminContext, ConnectionStateContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 
@@ -26,12 +26,14 @@ const MESSAGES: ThreadMessageLike[] = [
   },
 ];
 
-function Harness({ admin }: { admin: boolean }) {
-  const runtime = useLocalRuntime(NOOP, { initialMessages: MESSAGES });
+function Harness({ admin, connection = { phase: "online" }, adapter = NOOP }: { admin: boolean; connection?: ConnectionState; adapter?: ChatModelAdapter }) {
+  const runtime = useLocalRuntime(adapter, { initialMessages: MESSAGES });
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <AdminContext.Provider value={admin}>
-        <ChatThread />
+        <ConnectionStateContext.Provider value={connection}>
+          <ChatThread />
+        </ConnectionStateContext.Provider>
       </AdminContext.Provider>
     </AssistantRuntimeProvider>
   );
@@ -66,5 +68,24 @@ describe("ChatThread", () => {
     expect(view.container.textContent?.toLowerCase()).toContain("reasoning");
     // The "sources" binding keeps the fallback tool card out of the message body.
     expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
+  });
+
+  test("the banner shows nothing when online", () => {
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin /></MemoryRouter>);
+    expect(view.container.querySelector('[data-slot="connection-state"]')).toBeNull();
+  });
+
+  test("the connection banner shows Reconnecting with the attempt number", () => {
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin connection={{ phase: "reconnecting", attempt: 2 }} /></MemoryRouter>);
+    expect(view.container.textContent).toContain("Reconnecting");
+    expect(view.container.textContent).toContain("attempt 2");
+  });
+
+  test("Reconnect on a dropped banner reruns the reply", async () => {
+    let runs = 0;
+    const adapter: ChatModelAdapter = { run: async function* () { runs++; yield { content: [{ type: "text", text: "Reconnected." }] }; } };
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin adapter={adapter} connection={{ phase: "dropped" }} /></MemoryRouter>);
+    fireEvent.click(view.getByRole("button", { name: "Reconnect" }));
+    await waitFor(() => expect(runs).toBe(1));
   });
 });

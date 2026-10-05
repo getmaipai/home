@@ -63,7 +63,7 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   };
 }
 
-async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, onCrisisResources: (text: string) => void = () => {}, getModel?: () => string | undefined, onArtifactReady?: (artifactId: string) => void): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
+async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, onCrisisResources: (text: string) => void = () => {}, getModel?: () => string | undefined, onArtifactReady?: (artifactId: string) => void, onConnection?: (state: { phase: "online" | "dropped" | "reconnecting" | "resumed"; attempt?: number; resumedTokens?: number }) => void): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
   const adapter = createChatModelAdapter({
     consumeThinking: () => false,
     consumeSupersedes: () => undefined,
@@ -71,6 +71,7 @@ async function collect(messages: ThreadMessage[], abortSignal = new AbortControl
     turnSchedulerRef: { current: null },
     getModel,
     onArtifactReady,
+    onConnection,
   });
   const options = { messages, runConfig: {}, abortSignal, context: {}, unstable_getMessage: () => messages[messages.length - 1]! } as unknown as ChatModelRunOptions;
   const yields: ChatModelRunResult[] = [];
@@ -1196,6 +1197,30 @@ describe("createChatModelAdapter errors", () => {
     } finally {
       env.restore();
     }
+  });
+
+  test("a dropped stream with a resume token reports reconnecting then resumed then online", async () => {
+    const connection: { phase: string; attempt?: number; resumedTokens?: number }[] = [];
+    const value = { reply: { text: "Hello world." }, source: "model", safety: SAFETY, turn_id: "turn-resume123", conversation_id: "conv-resume123" };
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "turn_meta", conversation_id: "conv-resume123", turn_id: "turn-resume123", resume_token: "resume-token-test" }, { type: "delta", text: "Hello", sequence: 1 }]),
+      [ndjsonStream([{ type: "turn_meta", conversation_id: "conv-resume123", turn_id: "turn-resume123", resume_token: "resume-token-test" }, { type: "delta", text: " world.", sequence: 2 }, { type: "done", value }])],
+    );
+    try {
+      const result = await collect([fakeUserMessage("hi")], undefined, () => {}, undefined, undefined, (state) => connection.push(state));
+      expect(result.error).toBeUndefined();
+      expect(connection).toEqual([{ phase: "online" }, { phase: "reconnecting", attempt: 1 }, { phase: "resumed", resumedTokens: 1 }, { phase: "online" }]);
+    } finally { env.restore(); }
+  });
+
+  test("a stream that cannot resume reports dropped before the error", async () => {
+    const connection: string[] = [];
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "Partial" }]));
+    try {
+      const result = await collect([fakeUserMessage("hi")], undefined, () => {}, undefined, undefined, (state) => connection.push(state.phase));
+      expect(result.error).toBeInstanceOf(Error);
+      expect(connection).toEqual(["online", "dropped"]);
+    } finally { env.restore(); }
   });
 
   test("a request that fails before any stream event surfaces the generic hub-unreachable message", async () => {
