@@ -291,7 +291,6 @@ describe("turnNext.ts: the interim rule", () => {
       if (!first.ok || first.kind !== "immediate") throw new Error("expected an immediate result");
 
       let queryWriterRequest: ChatCompletionRequest | undefined;
-      const secondProxy = startRecordingProxy(process.env.MAIPAI_LLAMA_SERVER_URL!);
       const second = await withStub(
         {
           calls: (request) => (!request.response_format && !request.messages.some((m) => m.role === "tool" && m.tool_call_id === "call-2") ? [{ id: "call-2", name: "websearch", args: JSON.stringify({ expression: "he" }) }] : undefined),
@@ -305,8 +304,6 @@ describe("turnNext.ts: the interim rule", () => {
         },
         () => runTurnNext(people.owner, "chat", "when was he born", { conversationId: first.value.conversation_id }),
       );
-      console.log("CONFIRM DEBUG", secondProxy.requests.map((r) => ({ tools: r.tools, text: r.responseText })));
-      secondProxy.stop();
       if (!second.ok || second.kind !== "immediate") throw new Error("expected an immediate result");
       // The query-writer's own retry ran at all (never a bare "he"
       // reaching policy.ts silently) and resolved the real name, not
@@ -2187,7 +2184,7 @@ describe("turnNext.ts: #156 under THIN-1A, a searched list answer on an adult's 
       );
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(phrasingRequest?.max_tokens).toBeDefined();
+      expect(phrasingRequest?.max_tokens).toBe(1536);
       const instruction = phrasingRequest?.messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
       expect(instruction).not.toContain("under 140 words");
       expect(instruction).not.toContain("at most 7 of them");
