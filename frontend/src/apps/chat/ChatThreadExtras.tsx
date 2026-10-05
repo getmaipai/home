@@ -1,4 +1,4 @@
-import { memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAui, useAuiState } from "@assistant-ui/react";
 import { CommandPalette } from "@maipai/ui/src/elements/command-palette";
 import { ConversationMap } from "@maipai/ui/src/elements/conversation-map";
@@ -104,6 +104,27 @@ export function ChatThreadExtras() {
   useEffect(() => {
     if (searchOpen && hits.length > 0) scrollToMessage(hits[Math.min(activeIndex, hits.length - 1)]!.id);
   }, [activeIndex, hits, searchOpen, scrollToMessage]);
+
+  // Search is fixed over the thread. Reserve its measured height in the
+  // viewport's content and scrollport so scrollIntoView leaves the selected
+  // message below the entire search card (including its match preview).
+  useLayoutEffect(() => {
+    const viewport = rootRef.current?.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
+    const content = viewport?.firstElementChild as HTMLElement | null | undefined;
+    const search = rootRef.current?.querySelector<HTMLElement>('[data-slot="conversation-search"]');
+    if (!viewport || !content || !search) return;
+
+    const inset = Math.max(16, search.getBoundingClientRect().bottom - viewport.getBoundingClientRect().top + 12);
+    const previousPadding = content.style.paddingTop;
+    const previousScrollPadding = viewport.style.scrollPaddingTop;
+    const basePadding = Number.parseFloat(getComputedStyle(content).paddingTop) || 0;
+    content.style.paddingTop = `${basePadding + inset}px`;
+    viewport.style.scrollPaddingTop = `${inset}px`;
+    return () => {
+      content.style.paddingTop = previousPadding;
+      viewport.style.scrollPaddingTop = previousScrollPadding;
+    };
+  }, [activeIndex, hits, rootRef, searchOpen]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {

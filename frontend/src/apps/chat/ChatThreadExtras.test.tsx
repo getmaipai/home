@@ -94,6 +94,37 @@ test("Cmd+F opens in-chat search on a non-empty thread and not on an empty one",
   expect(empty.queryByRole("textbox", { name: "Find in conversation" })).toBeNull();
 });
 
+test("the open search card ends above the first visible message", async () => {
+  const original = HTMLElement.prototype.getBoundingClientRect;
+  HTMLElement.prototype.getBoundingClientRect = function () {
+    if (this.matches('[data-slot="aui_thread-viewport"]')) {
+      return { x: 0, y: 0, top: 0, right: 390, bottom: 844, left: 0, width: 390, height: 844, toJSON: () => ({}) } as DOMRect;
+    }
+    if (this.matches('[data-slot="conversation-search"]')) {
+      return { x: 16, y: 80, top: 80, right: 374, bottom: 120, left: 16, width: 358, height: 40, toJSON: () => ({}) } as DOMRect;
+    }
+    if (this.matches("[data-message-id]") && this.textContent?.includes("geometry target")) {
+      const viewport = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
+      const content = viewport?.firstElementChild as HTMLElement | null;
+      const top = Number.parseFloat(content?.style.paddingTop ?? "") || 16;
+      return { x: 16, y: top, top, right: 374, bottom: top + 40, left: 16, width: 358, height: 40, toJSON: () => ({}) } as DOMRect;
+    }
+    return original.call(this);
+  };
+  try {
+    const view = renderChat({ count: 1, content: "geometry target" });
+    const root = view.container.querySelector('[data-slot="aui_thread-viewport"]')!;
+    act(() => root.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true, cancelable: true })));
+    await view.findByRole("textbox", { name: "Find in conversation" });
+    const search = view.container.querySelector<HTMLElement>('[data-slot="conversation-search"]')!;
+    const message = [...view.container.querySelectorAll<HTMLElement>("[data-message-id]")]
+      .find((element) => element.textContent?.includes("geometry target"))!;
+    expect(search.getBoundingClientRect().bottom).toBeLessThanOrEqual(message.getBoundingClientRect().top);
+  } finally {
+    HTMLElement.prototype.getBoundingClientRect = original;
+  }
+});
+
 test("search steps through matches with Enter and closes on Escape", async () => {
   const oldScrollIntoView = HTMLElement.prototype.scrollIntoView;
   const scrolled: Element[] = [];

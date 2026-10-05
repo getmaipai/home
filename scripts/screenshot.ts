@@ -4014,7 +4014,7 @@ const id = ${JSON.stringify(conversation.id)};
 const person = sqlite.query("SELECT id FROM people WHERE display_name = 'Sage' LIMIT 1").get() as { id: string };
 const insert = sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, user_text, reply_text, source, safety_action, conversation_id, created_at, hlc, routing_tier, routing_score, status, parent_turn_id, branch_chosen) VALUES (?, ?, 'chat', ?, ?, 'model', 'allow', ?, ?, ?, 'chat', 1.0, 'done', ?, 1)");
 let parent: string | null = null;
-for (let i = 1; i <= 20; i++) { const turn = crypto.randomUUID(); const at = new Date(Date.now() + i).toISOString(); const reply = i === 10 ? ${JSON.stringify(longReply)} : 'A concise answer for the chat extras audit, turn ' + i + '.'; insert.run(turn, person.id, 'Question ' + i + ': share one useful detail about the day.', reply, id, at, at + ':0:' + turn, parent); parent = turn; }
+for (let i = 1; i <= 40; i++) { const turn = crypto.randomUUID(); const at = new Date(Date.now() + i).toISOString(); const prompt = i === 39 ? 'Question 39: a representative conversation message with enough text to wrap on a phone screen.' : 'Question ' + i + ': share one useful detail about the day.'; const reply = i === 39 ? ${JSON.stringify(RICH_REPLY_MARKDOWN)} : i === 10 ? ${JSON.stringify(longReply)} : 'A concise answer for the chat extras audit, turn ' + i + '.'; insert.run(turn, person.id, prompt, reply, id, at, at + ':0:' + turn, parent); parent = turn; }
 sqlite.close();`;
     const seeded = Bun.spawnSync({ cmd: ["bun", "-e", seedScript], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
     if (seeded.exitCode !== 0) throw new Error(`captureNextChatAuditReview: seeding chat extras thread failed with exit code ${seeded.exitCode}`);
@@ -4024,7 +4024,7 @@ sqlite.close();`;
       const page = await desktopContext.newPage();
       page.setDefaultTimeout(15000);
       await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
-      await page.getByText("Question 20: share one useful detail about the day.", { exact: true }).waitFor();
+      await page.getByText("Question 40: share one useful detail about the day.", { exact: true }).waitFor();
       await page.waitForFunction(() => document.querySelectorAll('[data-slot="aui_assistant-message-content"]').length >= 20);
       const map = page.getByRole("navigation", { name: "Conversation map" });
       await map.waitFor({ state: "visible" });
@@ -4055,7 +4055,30 @@ sqlite.close();`;
       const page = await phoneContext.newPage();
       page.setDefaultTimeout(15000);
       await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
-      await page.getByText("Question 20: share one useful detail about the day.", { exact: true }).waitFor();
+      await page.getByText("Question 40: share one useful detail about the day.", { exact: true }).waitFor();
+      await page.getByRole("textbox", { name: "Message input" }).focus();
+      await page.keyboard.press("Control+f");
+      const search = page.getByRole("textbox", { name: "Find in conversation" });
+      await search.waitFor({ state: "visible" });
+      await search.fill("screen.");
+      await page.getByText("1/1", { exact: true }).waitFor();
+      await page.waitForTimeout(100);
+      const geometry = await page.evaluate(() => {
+        const viewport = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
+        const searchCard = document.querySelector<HTMLElement>('[data-slot="conversation-search"]');
+        const message = [...(viewport?.querySelectorAll<HTMLElement>('[data-message-id]') ?? [])].find((element) => {
+          const rect = element.getBoundingClientRect();
+          return element.textContent?.includes("Question ") && rect.bottom > (viewport?.getBoundingClientRect().top ?? 0);
+        });
+        if (!viewport || !searchCard || !message) throw new Error("phone search geometry elements were not rendered");
+        return { searchBottom: searchCard.getBoundingClientRect().bottom, messageTop: message.getBoundingClientRect().top, viewportTop: viewport.getBoundingClientRect().top, messageText: message.textContent?.slice(0, 100) };
+      });
+      if (geometry.searchBottom > geometry.messageTop) {
+        throw new Error(`phone in-chat search overlaps its first visible user message: ${JSON.stringify(geometry)}`);
+      }
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, "chat-search-390x844-dark.png") });
+      await search.press("Escape");
       await page.getByRole("textbox", { name: "Message input" }).focus();
       await page.keyboard.press("Control+k");
       await page.locator('[data-slot="command-palette"]').waitFor({ state: "visible" });
