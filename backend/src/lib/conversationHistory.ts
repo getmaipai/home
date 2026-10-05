@@ -1347,10 +1347,16 @@ export function createConversation(
   if (mode === "temporary" && !canHaveTemporaryChat(actor)) {
     return { ok: false, status: 403, error: "temporary chat is not available for minors" };
   }
-  db.update(conversations)
-    .set({ status: "closed", updatedAt: new Date().toISOString(), hlc: nextHlc() })
-    .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.status, "open")))
-    .run();
+  // THIN-INC row 6: a temporary conversation never takes the "currently
+  // open" slot, so it must not close the person's saved chat either: that
+  // edit is a durable write (the saved row's status, time and hlc) made on
+  // behalf of a request that is supposed to leave nothing.
+  if (mode !== "temporary") {
+    db.update(conversations)
+      .set({ status: "closed", updatedAt: new Date().toISOString(), hlc: nextHlc() })
+      .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.status, "open")))
+      .run();
+  }
   // TEMP-CHAT-01: this is the only place a real DB row was ever written
   // for mode: "temporary" (Chat 55, 2026-09-16) - it still leaked a
   // conversations row (title: null, but a row all the same: this

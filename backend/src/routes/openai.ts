@@ -36,6 +36,7 @@ import { requireApiToken } from "@/middleware/auth";
 import { StreamSafetyRefusal, type Surface } from "@/lib/turnShared";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { personWithinTurnBudget } from "@/lib/llm";
+import { canHaveTemporaryChat } from "@/lib/access";
 import { visibleText } from "@/lib/wellFormed";
 import type { ChatMessage, ChatCompletionResponse, ChatCompletionChunk } from "@maipai/spec/llm/ts/types.js";
 import type { AppEnv } from "@/types";
@@ -75,7 +76,7 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
     return c.json(RATE_LIMIT_RESPONSE, 429);
   }
 
-  const body = (await c.req.json().catch(() => ({}))) as { model?: string; messages?: ChatMessage[]; stream?: boolean };
+  const body = (await c.req.json().catch(() => ({}))) as { model?: string; messages?: ChatMessage[]; stream?: boolean; temporary?: boolean };
   const text = lastUserMessageText(body.messages);
   if (!text) {
     return c.json({ error: { message: "messages must include at least one user message with string content", code: "invalid_input" } }, 400);
@@ -89,7 +90,17 @@ openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 
   // clients, so the spoken register, the per-sentence gate for a child
   // and no reasoning apply, whatever the caller. A caller that needs a
   // long written reply uses the chat surface (docs/dev.md, THIN-7B).
-  const turnOpts = { spoken: true, thinking: false } as const;
+  //
+  // THIN-INC row 6: a caller can ask for a temporary (Incognito) turn with
+  // `temporary: true` in the body or an `X-MaiPai-Temporary: true` header.
+  // It is honoured, never ignored (an ignored flag would store a turn the
+  // caller believed was not kept), and refused for a child or teen exactly
+  // as routes/turn.ts refuses it.
+  const temporary = body.temporary === true || c.req.header("x-maipai-temporary")?.toLowerCase() === "true";
+  if (temporary && !canHaveTemporaryChat(actor)) {
+    return c.json({ error: { message: "temporary chat is not available for minors", code: "forbidden" } }, 403);
+  }
+  const turnOpts = { spoken: true, thinking: false, ...(temporary ? { temporary: true } : {}) } as const;
 
   if (body.stream) {
     // COR-7 (code review, 2026-09-06): an external client

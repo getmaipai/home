@@ -27,6 +27,7 @@ import { isStackConfigured } from "@/lib/stackEngine";
 import { synthesizeSpeech } from "@/lib/tts";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { personWithinTurnBudget } from "@/lib/llm";
+import { canHaveTemporaryChat } from "@/lib/access";
 import { visibleText } from "@/lib/wellFormed";
 import type { PersonRow } from "@/types";
 
@@ -189,7 +190,16 @@ async function handleMessage(
       // the robot's first-sentence projection would cut a 1-to-3
       // sentence reply to its first. Thinking is off, a spoken turn has
       // nowhere to show reasoning.
-      const result = await runTurnNext(state.actor, "chat", text, { spoken: true, thinking: false });
+      //
+      // THIN-INC row 6: `data.temporary: true` asks for a temporary
+      // (Incognito) turn, as the same field does on routes/turn.ts. It is
+      // honoured, never ignored, and refused for a child or teen.
+      const temporary = msg.data?.temporary === true;
+      if (temporary && !canHaveTemporaryChat(state.actor)) {
+        send(socket, { type: "not-handled", data: { text: "temporary chat is not available for minors" } });
+        return;
+      }
+      const result = await runTurnNext(state.actor, "chat", text, { spoken: true, thinking: false, ...(temporary ? { temporary: true } : {}) });
       if (!result.ok) {
         send(socket, { type: "not-handled", data: { text: result.error } });
         return;
