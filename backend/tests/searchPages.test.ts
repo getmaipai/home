@@ -406,7 +406,7 @@ describe("what the model is told about the websearch arguments", () => {
     expect(description).toMatch(/you can search the web/i);
     expect(description).toMatch(/current events/i);
     expect(description).toMatch(/anything that may have changed/i);
-    expect(description).toMatch(/release dates/i);
+    expect(description).toMatch(/news/i);
     expect(description).toMatch(/read the top pages/i);
   });
 
