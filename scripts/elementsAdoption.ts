@@ -5,7 +5,7 @@ import { join, relative } from "node:path";
 const ROOT = join(import.meta.dir, "..");
 const OUTPUT_PATH = join(ROOT, "frontend/src/dev/elements-adoption.json");
 type PlanItem = { file: string; name?: string; group?: string; verdict: string; [key: string]: unknown };
-export type AdoptionItem = { file: string; name: string; group: string; verdict: string; implemented: boolean };
+export type AdoptionItem = { file: string; name: string; group: string; verdict: string; implemented: boolean; reading?: string };
 
 async function filesUnder(dir: string): Promise<string[]> {
   const found: string[] = [];
@@ -53,6 +53,7 @@ export async function scanElements(options: { root?: string; tag?: string } = {}
       group: planItem?.group ?? stem.split("-")[0] ?? "other",
       verdict: planItem?.verdict ?? "unassessed",
       implemented: imported.has(file) || imported.has(file.replace(/\.[^.]+$/, "")),
+      ...(typeof planItem?.reading === "string" ? { reading: planItem.reading } : {}),
     };
   });
   const kitTag = options.tag ?? `ui-v${pkg.version ?? "unknown"}`;

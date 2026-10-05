@@ -18,7 +18,7 @@ async function fixture() {
   await writeFile(join(kit, "src/elements/chat-panel.tsx"), "export {};");
   await writeFile(join(kit, "src/elements/chart.tsx"), "export {};");
   await writeFile(join(root, "frontend/src/dev/elements-plan.json"), JSON.stringify({ items: [
-    { file: "chat-panel.tsx", name: "chat-panel", group: "chat", verdict: "wire-now" },
+    { file: "chat-panel.tsx", name: "chat-panel", group: "chat", verdict: "wire-now", reading: "Streamdown inside MarkdownText is the kit part used as it ships." },
     { file: "chart.tsx", name: "chart", group: "chart", verdict: "later" },
   ] }));
   return root;
@@ -38,6 +38,14 @@ describe("elements adoption scanner", () => {
     await writeFile(join(root, "frontend/src/dev/show.tsx"), 'import "@maipai/ui/src/elements/chart";');
     const { output } = await scanElements({ root });
     expect(output.items.every((item) => !item.implemented)).toBe(true);
+  });
+
+  test("the adoption scan carries the recorded shipped-part reading", async () => {
+    const root = await fixture();
+    const { output } = await scanElements({ root });
+    expect(output.items.find((item) => item.file === "chat-panel.tsx")?.reading).toBe(
+      "Streamdown inside MarkdownText is the kit part used as it ships.",
+    );
   });
 
   test("the committed adoption json matches a fresh scan", async () => {

@@ -739,8 +739,8 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     const SOURCE = { id: "src-tide123", kind: "web" as const, title: "Lantern Bay tide chart", url: "https://example.com/tides", site: "example.com", snippet: null, source: "turn-tide123", created_at: "2026-09-22T00:00:00.000Z", hlc: "1788000000000:0:test" };
     const restore = stubTurnFetch(
       ndjsonStream([
-        { type: "delta", text: "High tide is at 4pm." },
-        { type: "done", value: { turn_id: "turn-tide123", reply: { text: "High tide is at 4pm." }, source: "model", safety: SAFETY, sources: [SOURCE] } },
+        { type: "delta", text: "High tide is at 4pm [1]. More [9]; code `[1]`." },
+        { type: "done", value: { turn_id: "turn-tide123", reply: { text: "High tide is at 4pm [1]. More [9]; code `[1]`." }, source: "model", safety: SAFETY, sources: [SOURCE] } },
       ]),
     );
     // happy-dom has no real image decoder - `<img src>` always ends up
@@ -771,16 +771,23 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
         </MemoryRouter>,
       );
       await sendMessage(view, "when's high tide");
-      await view.findByText("High tide is at 4pm.");
+      await waitFor(() => expect(view.container.querySelector(".aui-md")?.textContent).toContain("High tide is at 4pm 1."));
+      const markdown = view.container.querySelector<HTMLElement>(".aui-md")!;
+      expect(markdown.querySelector('a[href="https://example.com/tides"]')).toBeTruthy();
+      expect(markdown.textContent).toContain("More 9; code [1].");
+      expect(markdown.querySelector("code")?.textContent).toBe("[1]");
+      const citation = view.getByRole("link", { name: /^1$/ });
+      expect(citation).toHaveAttribute("href", "https://example.com/tides");
+      // The inline chip resolves through ChatCitationLink's existing source
+      // hook, while the Sources card below keeps its collapsed-by-default
+      // behavior.
+      expect(view.queryByText("Lantern Bay tide chart")).toBeNull();
       // Issue #205: the visible label carries the real count; with the icon's
       // fallback letter beside it, a bare "Sources" read as "NSources".
       const trigger = view.getByRole("button", { name: "1 Source" });
       expect(trigger).toBeVisible();
-      // Collapsed by default - the source's own title isn't in the DOM
-      // yet (a Collapsible unmounts its own content when closed).
-      expect(view.queryByText("Lantern Bay tide chart")).toBeNull();
       fireEvent.click(trigger);
-      const row = view.getByText("Lantern Bay tide chart").closest("a");
+      const row = view.container.querySelector('[data-slot="sources-list"] a[href="https://example.com/tides"]');
       expect(row).not.toBeNull();
       // Opens the source's own page - the privacy promise on
       // source.schema.json's own `url` field: `rel`/`referrerPolicy`

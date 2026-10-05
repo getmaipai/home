@@ -899,10 +899,27 @@
       "realTurnToday": null
     },
     {
+      "file": "markdown-text.css",
+      "name": "markdown-text styles",
+      "group": "markdown",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
+    },
+    {
       "file": "markdown-text.tsx",
       "name": "markdown-text",
       "group": "message",
       "verdict": "wire-now",
+      "reading": "Streamdown inside MarkdownText is the kit part used as it ships.",
       "backendNeeded": null,
       "effort": "QUICK",
       "specTagNeeded": false,

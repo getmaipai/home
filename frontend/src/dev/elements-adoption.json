@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-05T17:03:33.945Z",
-  "kitTag": "ui-v0.5.98",
+  "generatedAt": "2026-10-05T18:48:23.780Z",
+  "kitTag": "ui-v0.5.101",
   "items": [
     {
       "file": "activity-graph.tsx",
@@ -381,6 +381,13 @@
       "implemented": false
     },
     {
+      "file": "markdown-text.css",
+      "name": "markdown-text styles",
+      "group": "markdown",
+      "verdict": "support",
+      "implemented": true
+    },
+    {
       "file": "markdown-text.test.tsx",
       "name": "markdown-text.test",
       "group": "other",
@@ -392,7 +399,8 @@
       "name": "markdown-text",
       "group": "message",
       "verdict": "wire-now",
-      "implemented": true
+      "implemented": true,
+      "reading": "Streamdown inside MarkdownText is the kit part used as it ships."
     },
     {
       "file": "math-block.tsx",

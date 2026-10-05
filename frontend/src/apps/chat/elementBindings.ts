@@ -68,7 +68,11 @@ export const TOOL_BINDINGS: readonly ToolBinding[] = [
 // does, whether the model picker is allowed) is a ChatThread prop, never a
 // different component here.
 export const THREAD_SLOTS = {
-  markdown: { components: { a: ChatCitationLink }, preprocess: preprocessChatMarkdown },
+  markdown: {
+    components: { a: ChatCitationLink },
+    preprocess: preprocessChatMarkdown,
+    remend: { links: false, linkMode: "text-only" },
+  },
   Welcome: NextChatWelcome,
   AssistantMoreItems,
   AssistantActionBarExtra: SourcesActionBarTrigger,
