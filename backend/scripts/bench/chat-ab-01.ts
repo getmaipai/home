@@ -38,6 +38,7 @@
 // every run, so a killed run keeps what it measured) and side-by-side.md.
 import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { loadavg, uptime } from "node:os";
 import { join } from "node:path";
 import dataset from "./datasets/chat-ab-01.json";
 import { refuseIfGateRunning, refuseRealSearxngWithoutClearance, waitForHubQuiet } from "./liveHubQuiet";
@@ -107,6 +108,10 @@ interface RunRecord {
   cachedTokens?: number | null;
   /** Block mode only (BENCH-AB-02): "cold" when the engine served under half of the prompt from its cache, else "warm". */
   cache?: "cold" | "warm" | null;
+  /** Host load and uptime sampled immediately before this generation. */
+  hostLoad?: { one: number; five: number; fifteen: number; uptimeSeconds: number; loaded: boolean };
+  /** Host load and uptime checked when this arm began. */
+  armStart?: { one: number; five: number; fifteen: number; uptimeSeconds: number };
   promptTokens: number | null;
   completionTokens: number | null;
   finishReason: string | null;
@@ -669,11 +674,17 @@ async function main(): Promise<void> {
       console.log(`[chat-ab-01] captured ${captured.system.length} system messages (${captured.system.map((m) => m.content.length).join("+")} chars) and ${captured.tools.length} tools (${JSON.stringify(captured.tools).length} chars)`);
     }
     for (const arm of ARMS) {
+      const armLoads = loadavg();
+      const armStart = { one: armLoads[0]!, five: armLoads[1]!, fifteen: armLoads[2]!, uptimeSeconds: uptime() };
+      console.log(`[chat-ab-01] starting arm ${arm}; uptime ${Math.round(armStart.uptimeSeconds)} s; load ${armStart.one.toFixed(2)} ${armStart.five.toFixed(2)} ${armStart.fifteen.toFixed(2)}`);
       for (const item of dataset.items.filter((i) => wanted(i.id))) {
         const category = item.category as Category;
         for (let rep = 1; rep <= SINGLE_RUNS; rep++) {
           console.log(`[chat-ab-01] block ${arm} ${item.id} run ${rep}`);
           await waitForHubQuiet(undefined, (m) => console.log(m));
+          const loads = loadavg();
+          const hostLoad = { one: loads[0]!, five: loads[1]!, fifteen: loads[2]!, uptimeSeconds: uptime(), loaded: loads[0]! > 8 };
+          console.log(`[chat-ab-01] host load ${hostLoad.one.toFixed(2)} ${hostLoad.five.toFixed(2)} ${hostLoad.fifteen.toFixed(2)}; uptime ${Math.round(hostLoad.uptimeSeconds)} s${hostLoad.loaded ? "; LOADED" : ""}`);
           if (arm === "B") {
             const t = await retry503(async () => {
               const out = await runPipeline(`${item.id}-${rep}`, [item.prompt]);
@@ -713,6 +724,8 @@ async function main(): Promise<void> {
             runs.push({ ...base, arm, item: item.id, category, rep, turn: null, prompt: item.prompt, reply: r.reply, words: words(r.reply), ttftMs: r.ttftMs, totalMs: r.totalMs, cachedTokens: r.cachedTokens, promptTokens: r.promptTokens, completionTokens: r.completionTokens, finishReason: r.finishReason, correct: null, factsRecalled: null, error: r.error });
           }
           const last = runs[runs.length - 1]!;
+          last.hostLoad = hostLoad;
+          last.armStart = armStart;
           last.cache = last.cachedTokens == null || last.promptTokens == null ? null : last.cachedTokens < last.promptTokens / 2 ? "cold" : "warm";
           save(runs, env);
         }
