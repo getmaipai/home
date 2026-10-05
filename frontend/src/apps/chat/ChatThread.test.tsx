@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { THREAD_SLOTS, TOOL_BINDINGS } from "@/apps/chat/elementBindings";
 import { AdminContext, ConnectionStateContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
+import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
+import { EngineStartingLoader } from "@/apps/chat/chatThreadSlots";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 
@@ -39,6 +41,11 @@ function Harness({ admin, connection = { phase: "online" }, adapter = NOOP }: { 
   );
 }
 
+function WelcomeHarness({ availability }: { availability: "ready" | "starting" | "unavailable" }) {
+  const runtime = useLocalRuntime(NOOP, { initialMessages: [] });
+  return <AssistantRuntimeProvider runtime={runtime}><ChatAvailabilityContext.Provider value={availability}><ChatThread /></ChatAvailabilityContext.Provider></AssistantRuntimeProvider>;
+}
+
 const realFetch = globalThis.fetch;
 beforeEach(() => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
@@ -68,6 +75,51 @@ describe("ChatThread", () => {
     expect(view.container.textContent?.toLowerCase()).toContain("reasoning");
     // The "sources" binding keeps the fallback tool card out of the message body.
     expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
+  });
+
+  test("while the engine is loading the empty thread shows the generation loader", () => {
+    const view = renderWithQueryClient(<MemoryRouter><WelcomeHarness availability="starting" /></MemoryRouter>);
+    expect(view.container.querySelector('[data-slot="generation-loader"]')).not.toBeNull();
+    expect(view.container.textContent).toContain("Starting your AI");
+  });
+
+  test("once the engine is ready the loader is gone", () => {
+    const view = renderWithQueryClient(<MemoryRouter><WelcomeHarness availability="ready" /></MemoryRouter>);
+    expect(view.container.querySelector('[data-slot="generation-loader"]')).toBeNull();
+  });
+
+  test("the loader ticks once a second and stops on unmount (no timer leak)", () => {
+    const realSetInterval = globalThis.setInterval;
+    const realClearInterval = globalThis.clearInterval;
+    const cleared: unknown[] = [];
+    let callback: (() => void) | undefined;
+    let delay: number | undefined;
+    globalThis.setInterval = ((fn: TimerHandler, ms?: number) => { callback = fn as () => void; delay = ms; return 42 as unknown as ReturnType<typeof setInterval>; }) as unknown as typeof setInterval;
+    globalThis.clearInterval = ((timer: ReturnType<typeof setInterval>) => { cleared.push(timer); }) as typeof clearInterval;
+    try {
+      const ticks: number[] = [];
+      function TickProbe({ tick }: { tick: number }) { ticks.push(tick); return <span>{tick}</span>; }
+      const view = renderWithQueryClient(<ChatAvailabilityContext.Provider value="starting"><EngineStartingLoader Loader={TickProbe as typeof import("@maipai/ui/src/elements/loading-state").GenerationLoader} /></ChatAvailabilityContext.Provider>);
+      expect(callback).toBeDefined();
+      expect(delay).toBe(1_000);
+      expect(ticks.at(-1)).toBe(0);
+      act(() => callback?.());
+      expect(ticks.at(-1)).toBe(1);
+      view.unmount();
+      expect(cleared).toContain(42 as unknown as ReturnType<typeof setInterval>);
+    } finally {
+      globalThis.setInterval = realSetInterval;
+      globalThis.clearInterval = realClearInterval;
+    }
+  });
+
+  test("a normal in-message wait still uses the thinking indicator", () => {
+    expect(THREAD_SLOTS.Indicator.name).toBe("ChatThinkingIndicator");
+  });
+
+  test("the loader does not appear when the engine is unavailable", () => {
+    const view = renderWithQueryClient(<MemoryRouter><WelcomeHarness availability="unavailable" /></MemoryRouter>);
+    expect(view.container.querySelector('[data-slot="generation-loader"]')).toBeNull();
   });
 
   test("the banner shows nothing when online", () => {

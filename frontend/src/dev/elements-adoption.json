@@ -371,7 +371,7 @@
       "name": "loading-state",
       "group": "errors/states",
       "verdict": "wire-now",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "map-answer.tsx",

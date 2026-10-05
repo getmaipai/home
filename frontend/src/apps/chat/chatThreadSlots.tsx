@@ -18,6 +18,7 @@ import { Source, SourceIcon, SourceTitle } from "@maipai/ui/src/elements/sources
 import { Collapsible, CollapsibleContent } from "@maipai/ui/src/ui/collapsible";
 import { collapsePanel } from "@maipai/ui/src/elements/surfaces";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
+import { GenerationLoader } from "@maipai/ui/src/elements/loading-state";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
 import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorSearch, ModelSelectorList, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
@@ -39,6 +40,7 @@ import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
 // specifically - grid-2x2 (a two-pane split) is the closest already-
@@ -212,12 +214,33 @@ export function ChatThinkingIndicator() {
   );
 }
 
+// Startup belongs in the empty thread's Welcome slot. The timer exists only
+// while the engine is starting, so ready/unavailable states and unmounts
+// clear it immediately.
+export function EngineStartingLoader({ Loader = GenerationLoader }: {
+  Loader?: typeof GenerationLoader;
+} = {}) {
+  const availability = useContext(ChatAvailabilityContext);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (availability !== "starting") {
+      setTick(0);
+      return;
+    }
+    const timer = setInterval(() => setTick((value) => value + 1), 1_000);
+    return () => clearInterval(timer);
+  }, [availability]);
+  if (availability !== "starting") return null;
+  return <Loader label="Starting your AI…" tick={tick} role="status" aria-live="polite" className="py-8" />;
+}
+
 // Incognito is controlled from the global /next header; this welcome
 // slot only reflects the shared state and does not add a second toggle.
 export function NextChatWelcome() {
   const { on } = useContext(TemporaryChatContext);
   return (
     <div className="relative mb-6 flex flex-col px-2">
+      <EngineStartingLoader />
       {on ? (
         <div className="flex flex-col gap-1">
           <p className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-2xl font-medium tracking-tight duration-200">
@@ -559,4 +582,3 @@ export function MessageFooterExtra() {
     </>
   );
 }
-
