@@ -41,6 +41,12 @@ function stateFor(actor: BenchPeople["owner"]): TurnState {
 }
 
 describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor gated", () => {
+  test("the live clock line tells the model its training knowledge may be old", async () => {
+    const { output } = await contextNode(stateFor(people.owner), { utterance: "hi" }, SIGNAL);
+    const clock = output.items.find((item) => item.id === "clock");
+    expect(clock?.text).toContain("The model's training knowledge may be older than today.");
+  });
+
   test("a small-talk utterance with a seeded unrelated memory produces a context with no memory item", async () => {
     const seeded = remember(people.owner, { text: "Friday is pizza night", category: "fact", tier: "durable", scope: "household", source: "test", importance: 0.5 });
     if (!seeded.ok) throw new Error("setup failed");

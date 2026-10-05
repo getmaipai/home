@@ -400,6 +400,12 @@ describe("what the model is told about the websearch arguments", () => {
 
   test("the tool description covers dates and news and says the pages are read", () => {
     const { description } = tool();
+    expect(description).toMatch(/you can search the web/i);
+    expect(description).toMatch(/current events/i);
+    expect(description).toMatch(/anything that may have changed/i);
+    expect(description).toMatch(/you can search the web/i);
+    expect(description).toMatch(/current events/i);
+    expect(description).toMatch(/anything that may have changed/i);
     expect(description).toMatch(/release dates/i);
     expect(description).toMatch(/read the top pages/i);
   });
