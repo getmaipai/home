@@ -35,6 +35,7 @@ import {
   type ConversationOpResult,
 } from "@/lib/conversationHistory";
 import { recallEpisodes } from "@/lib/episodes";
+import { ensureConversationTitleScheduled } from "@/lib/conversationTitle";
 import { embedQueryForRecall } from "@/lib/memory";
 import type { AppEnv, PersonRow } from "@/types";
 import type { Surface } from "@/lib/turnShared";
@@ -354,6 +355,8 @@ conversationsRoutes.get("/:id", requireAuth, async (c) => {
   const actor = c.get("person");
   const result = getConversation(actor, c.req.param("id"));
   if (!result.ok) return fail(c, result);
+  // CHAT-TITLE-01: a stored chat read with no title and nothing on its way gets its title asked for again.
+  if (result.value.title == null && result.value.mode !== "temporary") ensureConversationTitleScheduled(result.value.id);
   return c.json(result.value);
 });
 

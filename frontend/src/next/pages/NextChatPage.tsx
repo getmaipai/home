@@ -34,7 +34,7 @@ import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCo
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
-import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
+import { createChatThreadListAdapter, needsTitleCatchUp } from "@/apps/chat/chatThreadListAdapter";
 import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { PackageScopeContext } from "@/apps/chat/composerAddMenu";
@@ -859,6 +859,28 @@ function ChatDocumentTitle() {
   return null;
 }
 
+/** CHAT-TITLE-01 follow-up: the runtime asks the hub for a title only right after a reply finishes in this
+ * mounted page. Leave while the reply streams, or open a chat that has none yet, and nothing asks again, so the
+ * row and the header keep saying "New Chat". This asks once per opened chat (and again on a return, because
+ * the page remounts) whenever the open chat has messages and no title; the adapter's bounded poll does the
+ * waiting and the runtime applies the result to the list row and the header together. */
+function ChatTitleCatchUp({ incognito }: { incognito: boolean }) {
+  const aui = useAui();
+  const remoteId = useAuiState((s) => s.threadListItem.remoteId);
+  const title = useAuiState((s) => s.threadListItem.title);
+  const status = useAuiState((s) => s.threadListItem.status);
+  const messageCount = useAuiState((s) => s.thread.messages.length);
+  const isRunning = useAuiState((s) => s.thread.isRunning);
+  const asked = useRef<string | undefined>(undefined);
+  const wanted = needsTitleCatchUp({ remoteId, title, status }, messageCount, isRunning, incognito);
+  useEffect(() => {
+    if (!wanted || asked.current === remoteId) return;
+    asked.current = remoteId;
+    void Promise.resolve(aui.threadListItem().generateTitle({ automatic: true })).catch(() => undefined);
+  }, [wanted, remoteId, aui]);
+  return null;
+}
+
 /** CHAT-HEADER-01: the bridge chatHeaderData.tsx's own header comment
  * describes - reads the real runtime state ChatHeaderBar (rendered as
  * Header's own child, outside this provider) can't reach directly, and
@@ -1601,6 +1623,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         <WakeWordController person={person} />
         <ArtifactCacheInvalidator />
         <ChatDocumentTitle />
+        <ChatTitleCatchUp incognito={temporaryNext} />
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
         <ProjectResultReload />
         <LiveVoiceSession

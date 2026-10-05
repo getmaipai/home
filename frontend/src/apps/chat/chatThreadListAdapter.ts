@@ -46,6 +46,31 @@ export async function discardIncognitoThreads(personId?: string): Promise<void> 
   incognitoThreadIds.clear();
 }
 
+/** One bounded poll per conversation, shared by every caller: the runtime's own trigger after a reply and the
+ * catch-up for a chat opened or returned to with no title both ask, and the hub only needs asking once. */
+const titlePolls = new Map<string, Promise<string | null>>();
+
+function pollForTitle(remoteId: string, pollMs: number, attempts: number): Promise<string | null> {
+  const running = titlePolls.get(remoteId);
+  if (running) return running;
+  const poll = (async () => {
+    let title: string | null = null;
+    for (let attempt = 0; attempt < attempts && !title; attempt++) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, pollMs));
+      title = (await api.conversation(remoteId).catch(() => null))?.title ?? null;
+    }
+    return title;
+  })().finally(() => titlePolls.delete(remoteId));
+  titlePolls.set(remoteId, poll);
+  return poll;
+}
+
+/** Whether an open chat should go looking for its title: it is a stored chat with at least one message, no
+ * reply is still streaming, and no title has arrived. Nothing here writes a title; the hub owns that. */
+export function needsTitleCatchUp(item: { remoteId?: string; title?: string; status?: string }, messageCount: number, isRunning: boolean, incognito: boolean): boolean {
+  return !incognito && item.status === "regular" && Boolean(item.remoteId) && !item.title && messageCount > 0 && !isRunning;
+}
+
 export function createChatThreadListAdapter(selfName: string, options: ChatThreadListOptions = {}): RemoteThreadListAdapter {
   const { personId, query, incognito = false, onArchiveUnavailable, onSettingsLoaded, titlePollMs = 3000, titlePollAttempts = 40 } = options;
   return {
@@ -120,13 +145,7 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
     // written back and the first message is never used as a stand-in, so a chat the hub did not title
     // (Incognito, a refused title) stays "New chat" until the next list load.
     async generateTitle(remoteId) {
-      let title: string | null = null;
-      if (!incognito) {
-        for (let attempt = 0; attempt < titlePollAttempts && !title; attempt++) {
-          if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, titlePollMs));
-          title = (await api.conversation(remoteId).catch(() => null))?.title ?? null;
-        }
-      }
+      const title = incognito ? null : await pollForTitle(remoteId, titlePollMs, titlePollAttempts);
       return createAssistantStream((controller) => { if (title) controller.appendText(title); });
     },
     unstable_useAdapters: function useChatAdapters() {

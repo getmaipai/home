@@ -105,6 +105,16 @@ export function scheduleConversationTitle(conversationId: string): void {
   );
 }
 
+/** A chat that is read while it still has no title and no timer is waiting for it (the hub restarted inside
+ * the idle window, which drops the timer with the process, or the first title call found the engine down)
+ * gets the same debounced schedule a finished turn gets. Unlike scheduleConversationTitle this never
+ * restarts a timer already running, so a client polling for the title cannot keep pushing it back.
+ * generateConversationTitle still skips a temporary, renamed or already titled chat. */
+export function ensureConversationTitleScheduled(conversationId: string): void {
+  if (pendingTitles.has(conversationId) || inFlight.has(conversationId)) return;
+  scheduleConversationTitle(conversationId);
+}
+
 /** Test-only: the idle delay before a scheduled title is asked for (null restores the default). */
 export function __setConversationTitleDelayForTests(ms: number | null): void {
   titleDelayMs = ms ?? DEFAULT_IDLE_WINDOW_MS;

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { toast } from "sonner";
-import { createChatThreadListAdapter, discardIncognitoThreads } from "@/apps/chat/chatThreadListAdapter";
+import { createChatThreadListAdapter, discardIncognitoThreads, needsTitleCatchUp } from "@/apps/chat/chatThreadListAdapter";
 import { api } from "@/lib/api";
 import type { ThreadMessage } from "@assistant-ui/react";
 
@@ -335,5 +335,59 @@ describe("THIN-INC row 5: the Incognito thread list", () => {
     window.localStorage.setItem(draftKey("conv-temp-sage"), JSON.stringify({ text: "x", savedAt: "2026-10-03T00:00:00Z" }));
     await expect(discardIncognitoThreads()).rejects.toThrow();
     expect(window.localStorage.getItem(draftKey("conv-temp-sage"))).toBeNull();
+  });
+});
+
+describe("a title that arrives while the person was away (TITLEBUG)", () => {
+  const message: ThreadMessage = { id: "msg-1", createdAt: new Date(), role: "user", content: [{ type: "text", text: "Plan a garden" }], attachments: [], metadata: { custom: {} } };
+
+  test("a poll that gave up before the hub titled the chat is replaced by a fresh adapter's poll after remount", async () => {
+    let title: string | null = null;
+    globalThis.fetch = mock(async () => Response.json({ id: "conv-away1", title })) as unknown as typeof fetch;
+    // The page was left: the first adapter's short poll ended with nothing.
+    const before: string[] = [];
+    await readTextDeltas(await createChatThreadListAdapter("Nova", { titlePollMs: 1, titlePollAttempts: 2 }).generateTitle("conv-away1", [message]), before);
+    expect(before).toEqual([]);
+    // The hub titles the chat while nobody is looking; the remounted page builds a new adapter and asks again.
+    title = "Garden layout";
+    const after: string[] = [];
+    await readTextDeltas(await createChatThreadListAdapter("Nova", { titlePollMs: 1 }).generateTitle("conv-away1", [message]), after);
+    expect(after.join("")).toBe("Garden layout");
+  });
+
+  test("two callers asking for the same chat share one poll", async () => {
+    let gets = 0;
+    globalThis.fetch = mock(async () => {
+      gets++;
+      return Response.json({ id: "conv-away2", title: gets < 3 ? null : "Garden layout" });
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova", { titlePollMs: 1 });
+    const [a, b] = await Promise.all([adapter.generateTitle("conv-away2", [message]), adapter.generateTitle("conv-away2", [message])]);
+    const first: string[] = [];
+    const second: string[] = [];
+    await Promise.all([readTextDeltas(a, first), readTextDeltas(b, second)]);
+    expect(first.join("")).toBe("Garden layout");
+    expect(second.join("")).toBe("Garden layout");
+    expect(gets).toBe(3);
+  });
+
+  test("Incognito never asks the hub for a title", async () => {
+    const fetched = mock(async () => Response.json({ id: "conv-away3", title: "Should not be read" }));
+    globalThis.fetch = fetched as unknown as typeof fetch;
+    const parts: string[] = [];
+    await readTextDeltas(await createChatThreadListAdapter("Nova", { incognito: true, titlePollMs: 1 }).generateTitle("conv-away3", [message]), parts);
+    expect(parts).toEqual([]);
+    expect(fetched).not.toHaveBeenCalled();
+  });
+
+  test("an open chat goes looking for its title only when it is stored, has messages, is idle and has no title", () => {
+    const open = { remoteId: "conv-away4", title: undefined, status: "regular" };
+    expect(needsTitleCatchUp(open, 2, false, false)).toBe(true);
+    expect(needsTitleCatchUp({ ...open, title: "Garden layout" }, 2, false, false)).toBe(false);
+    expect(needsTitleCatchUp(open, 0, false, false)).toBe(false);
+    expect(needsTitleCatchUp(open, 2, true, false)).toBe(false);
+    expect(needsTitleCatchUp(open, 2, false, true)).toBe(false);
+    expect(needsTitleCatchUp({ ...open, remoteId: undefined }, 2, false, false)).toBe(false);
+    expect(needsTitleCatchUp({ ...open, status: "new" }, 2, false, false)).toBe(false);
   });
 });
