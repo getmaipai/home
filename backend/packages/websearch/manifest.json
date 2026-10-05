@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
-  "description": "Search the web and read the top pages for release dates, casts, prices and news, instead of answering from memory.",
+  "description": "You can search the web for current events, office holders, election results, and anything that may have changed, including release dates, casts, prices and news, instead of answering from memory.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

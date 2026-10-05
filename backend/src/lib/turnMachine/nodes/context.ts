@@ -294,7 +294,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // "computed, not recalled" rule (RULES-AND-LEARNED-COMPONENTS.md).
   const locale = (getHouseholdSettingValue("household.locale") as string | undefined) ?? "en-US";
   const now = new Date();
-  items.push({ id: "clock", text: now.toLocaleString(locale, { dateStyle: "full", timeStyle: "short" }), source: "clock", subjects: [], disclosure: "child_ok" });
+  items.push({ id: "clock", text: `${now.toLocaleString(locale, { dateStyle: "full", timeStyle: "short" })}\nThe model's training knowledge may be older than today.`, source: "clock", subjects: [], disclosure: "child_ok" });
 
   // The roster: who this household has, so "he"/"she"/a name resolves
   // against real people without a pronoun-guessing rule. One item per
