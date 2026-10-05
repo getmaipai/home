@@ -507,6 +507,32 @@ html:has([data-slot="next-chat-shell"]) {
   overscroll-behavior-y: none;
 }
 
+/* UI-SHOWCASE: give the full-height showcase thread the same bounded
+ * outlet chain as chat. The showcase keeps its own slot so chat's footer
+ * and overscroll rules do not leak into this developer page. */
+main:has([data-slot="next-chat-showcase-shell"]) {
+  height: calc(100svh - 1rem);
+}
+main:has([data-slot="next-chat-showcase-shell"]) > div {
+  min-height: 0;
+  padding-bottom: 0;
+}
+.container:has([data-slot="next-chat-showcase-shell"]) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.container:has([data-slot="next-chat-showcase-shell"]) > :first-child {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+[data-slot="next-chat-showcase-shell"] {
+  min-height: 0;
+}
+
 /* Jesse's own ChatGPT comparison (23:55): the column and the composer
  * both stopped ~60px short of the window's real bottom edge, a gap
  * below them neither reaches. Root cause: FullLayout.tsx's own chain

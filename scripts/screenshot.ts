@@ -274,6 +274,7 @@ const nextPerformanceReview = process.argv.includes("--next-performance-review")
 const nextStorageReview = process.argv.includes("--next-storage-review");
 const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
+const showcaseScrollReview = process.argv.includes("--showcase-scroll-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
 const nextChatPolishReview = process.argv.includes("--next-chat-polish-review");
@@ -283,7 +284,7 @@ const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || ne
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
@@ -2841,6 +2842,77 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
     await page.close();
   } finally {
     await wideTenContext.close();
+  }
+}
+
+async function captureShowcaseScrollReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  for (const size of [{ width: 1440, height: 900 }, { width: 2000, height: 1293 }]) {
+    const viewport = { slug: `${size.width}`, ...size } as ViewportSpec;
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.setViewportSize(size);
+      const conversation = await seedTitledConversation("captureShowcaseScrollReview", cookie, "Long thread scroll guard");
+      const seedScript = `import { sqlite } from "./src/db/index.ts";
+const id = ${JSON.stringify(conversation.id)};
+const person = sqlite.query("SELECT id FROM people WHERE display_name = 'Sage' LIMIT 1").get() as { id: string };
+const insert = sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, user_text, reply_text, source, safety_action, conversation_id, created_at, hlc, routing_tier, routing_score, status, parent_turn_id, branch_chosen) VALUES (?, ?, 'chat', ?, ?, 'model', 'allow', ?, ?, ?, 'chat', 1.0, 'done', ?, 1)");
+let parent: string | null = null;
+for (let i = 1; i <= 5; i++) { const turn = crypto.randomUUID(); const at = new Date(Date.now() + i).toISOString(); insert.run(turn, person.id, 'Question ' + i + ': please give me a detailed response for the long thread scroll check.', 'Answer ' + i + ': ' + 'A realistic seeded chat reply with enough text to exercise the thread viewport. '.repeat(5), id, at, at + ':0:' + turn, parent); parent = turn; }
+sqlite.close();`;
+      const seedResult = Bun.spawnSync({ cmd: ["bun", "-e", seedScript], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+      if (seedResult.exitCode !== 0) throw new Error(`captureShowcaseScrollReview: seeding production thread failed with exit code ${seedResult.exitCode}`);
+      await page.goto(`${BASE_URL}/dev/ui`);
+      await page.getByRole("heading", { name: "Chat showcase" }).first().waitFor();
+      const scenarioResponse = await fetch(`${BASE_URL}/api/dev/ui-fixtures`, { headers: cookie });
+      if (!scenarioResponse.ok) throw new Error(`showcase fixtures unavailable: ${scenarioResponse.status} ${await scenarioResponse.text()}`);
+      await page.getByRole("button", { name: /Long essay/ }).waitFor({ timeout: 10000 });
+      await page.getByLabel("Streaming pace").click();
+      await page.getByRole("option", { name: "Instant" }).click();
+      await page.getByRole("button", { name: /Long essay/ }).click();
+      await page.locator('[data-slot="aui_thread-viewport"]').waitFor({ state: "attached", timeout: 5000 }).catch(async () => { throw new Error(`showcase viewport did not mount: ${await page.locator("body").innerText()}`); });
+      await page.waitForFunction(() => {
+        const el = document.querySelector('[data-slot="aui_thread-viewport"]');
+        return !!el && (el.textContent?.includes("Paragraph 24.") ?? false);
+      }, { timeout: 36000 });
+      const streaming = await page.evaluate(() => { const el = document.querySelector('[data-slot="aui_thread-viewport"]')!; return { scrollTop: el.scrollTop, clientHeight: el.clientHeight, scrollHeight: el.scrollHeight }; });
+      if (streaming.scrollTop + streaming.clientHeight < streaming.scrollHeight - 40) throw new Error(`showcase stream did not follow newest text @ ${size.width}: ${JSON.stringify(streaming)}`);
+      const before = await page.evaluate(() => {
+        const el = document.querySelector('[data-slot="aui_thread-viewport"]')!;
+        const ancestors: Array<Record<string, unknown>> = [];
+        for (let node: HTMLElement | null = el as HTMLElement; node; node = node.parentElement) {
+          const style = getComputedStyle(node), rect = node.getBoundingClientRect();
+          ancestors.push({ tag: node.tagName.toLowerCase(), slot: node.dataset.slot ?? "", className: String(node.className).slice(0, 80), height: Math.round(rect.height), overflowY: style.overflowY });
+        }
+        return { scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, scrollTop: el.scrollTop, overflowY: getComputedStyle(el).overflowY, ancestors };
+      });
+      console.log(`SHOWCASE_SCROLL_MEASURE ${size.width}: ${JSON.stringify(before)}`);
+      if (before.scrollHeight <= before.clientHeight) throw new Error(`showcase viewport is not scrollable @ ${size.width}: ${JSON.stringify(before)}`);
+      const viewportEl = page.locator('[data-slot="aui_thread-viewport"]');
+      await viewportEl.hover();
+      await page.mouse.wheel(0, -4000);
+      await page.waitForFunction(() => { const el = document.querySelector('[data-slot="aui_thread-viewport"]'); return !!el && el.scrollTop < 40; }, { timeout: 3000 });
+      const afterManual = await viewportEl.evaluate((el) => ({ scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+      if (afterManual.scrollTop >= before.scrollTop || afterManual.scrollHeight <= afterManual.clientHeight) throw new Error(`showcase viewport failed manual scrollability @ ${size.width}: ${JSON.stringify(afterManual)}`);
+      await viewportEl.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+      await page.waitForFunction(() => { const el = document.querySelector('[data-slot="aui_thread-viewport"]'); return !!el && el.scrollTop + el.clientHeight >= el.scrollHeight - 40; });
+      await page.screenshot({ path: join(outDir, `showcase-scroll-${size.width}-latest.png`) });
+      console.log(`SHOWCASE_SCROLL ${size.width}: ${JSON.stringify(before)} manual=${JSON.stringify(afterManual)}`);
+
+      await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
+      await page.locator('[data-slot="aui_thread-viewport"]').waitFor({ state: "attached" });
+      await page.waitForFunction(() => document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent?.includes("Answer 5:") ?? false);
+      const chat = await page.evaluate(() => {
+        const el = document.querySelector('[data-slot="aui_thread-viewport"]')!;
+        return { scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, scrollTop: el.scrollTop, overflowY: getComputedStyle(el).overflowY };
+      });
+      console.log(`CHAT_SCROLL ${size.width}: ${JSON.stringify(chat)}`);
+      await page.screenshot({ path: join(outDir, `chat-scroll-${size.width}-long-thread.png`) });
+    } finally { await context.close(); }
   }
 }
 
@@ -5871,6 +5943,12 @@ async function main() {
       return;
     }
 
+    if (showcaseScrollReview) {
+      await captureShowcaseScrollReview(browser, sessionValue);
+      console.log("completed named review: --showcase-scroll-review");
+      return;
+    }
+
     if (nextSettingsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview) {
       await captureNextSettingsReview(browser, sessionValue);
     }
@@ -6016,7 +6094,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;

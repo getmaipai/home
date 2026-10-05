@@ -114,7 +114,7 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, banner, setScenario, sett
               <AlertDescription>{banner}</AlertDescription>
             </Alert>
           ) : null}
-          <div className="min-h-0 flex-1">
+          <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
             <ChatThread />
           </div>
         </div>
@@ -156,16 +156,17 @@ export function NextUiShowcasePage({ person }: { person: Roster }) {
 
   return (
     <AdminGatedContent title="Chat showcase" person={person} deniedText="The Chat showcase is for owners and admins.">
-      {/* The chat page's own full-height slot (tokens.css keys its rules on this
-          data-slot), so the thread scrolls inside the viewport instead of the page. */}
-      <div data-slot="next-chat-shell" className="flex h-full flex-col overflow-hidden">
+      {/* The showcase-specific full-height slot bounds the thread within this page. */}
+      <div data-slot="next-chat-showcase-shell" className="flex h-full min-h-0 flex-col overflow-hidden">
       <Page title="Chat showcase">
         <AsyncState data={query.isError ? null : query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={query.error?.message}>
           {(scenarios) => (
             <AssistantRuntimeProvider runtime={runtime}>
               <AdminContext.Provider value>
                 <SourcesOpenContext.Provider value={sourcesValue}>
-                  <ShowcaseWorkspace scenarios={scenarios} pace={pace} setPace={setPace} banner={banner} setScenario={(id) => { scenarioRef.current = id; }} settleRef={settleRef} />
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                    <ShowcaseWorkspace scenarios={scenarios} pace={pace} setPace={setPace} banner={banner} setScenario={(id) => { scenarioRef.current = id; }} settleRef={settleRef} />
+                  </div>
                 </SourcesOpenContext.Provider>
               </AdminContext.Provider>
             </AssistantRuntimeProvider>
