@@ -132,6 +132,39 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
   --thread-max-width: 53rem !important;
 }
 
+/* CHAT-COMPOSER-01: ChatThread's shipped wrapper is flex-1, so make its
+ * pane a column that gives the assistant-ui Thread the full available
+ * height. The kit footer already sticks to the bottom when a thread has
+ * messages; a compact inline shell keeps its controls alongside the
+ * input, with a small footer inset. */
+[data-slot="next-chat-pane"] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+[data-slot="next-chat-pane"] .aui-thread-viewport-footer {
+  padding-bottom: 8px !important;
+}
+
+[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] {
+  align-items: center;
+  flex-direction: row;
+  gap: 0;
+  min-height: 56px;
+  padding: 6px 12px;
+}
+
+[data-slot="next-chat-pane"] .aui-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 4px;
+}
+
+[data-slot="next-chat-pane"] .aui-composer-action-wrapper {
+  flex: 0 0 auto;
+}
+
 /* CHAT-QUIET-01: the shipped spec sheet uses the mono token for labels;
  * Home's result-card rows read more naturally in the body face. */
 [data-slot="spec-sheet"] {

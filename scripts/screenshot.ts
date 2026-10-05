@@ -2644,9 +2644,50 @@ async function captureNextProfileSheetReview(browser: Browser, sessionValue: str
   }
 }
 
-/** Captures the chat page at desktop and phone sizes in both themes, with
- * one persisted reply from the screenshot-only scripted Stack so the
- * composer and a real rendered assistant message are both visible. */
+async function readComposerGeometry(page: Page) {
+  return page.evaluate(() => {
+    const composer = document.querySelector<HTMLElement>("[data-slot=\"aui_composer-shell\"]");
+    const footer = document.querySelector<HTMLElement>(".aui-thread-viewport-footer");
+    const rect = (element: HTMLElement | null) => element ? element.getBoundingClientRect() : null;
+    const composerRect = rect(composer);
+    const footerRect = rect(footer);
+    const paneRect = rect(document.querySelector<HTMLElement>("[data-slot=\"next-chat-pane\"]"));
+    const rootRect = rect(document.querySelector<HTMLElement>(".aui-thread-root"));
+    const viewportRect = rect(document.querySelector<HTMLElement>("[data-slot=\"aui_thread-viewport\"]"));
+    const contentRect = rect(document.querySelector<HTMLElement>("[data-slot=\"aui_thread-viewport\"] > .mx-auto"));
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      composer: composerRect && { top: composerRect.top, bottom: composerRect.bottom, height: composerRect.height },
+      footer: footerRect && { top: footerRect.top, bottom: footerRect.bottom, height: footerRect.height },
+      pane: paneRect && { top: paneRect.top, bottom: paneRect.bottom, height: paneRect.height },
+      root: rootRect && { top: rootRect.top, bottom: rootRect.bottom, height: rootRect.height },
+      viewportElement: viewportRect && { top: viewportRect.top, bottom: viewportRect.bottom, height: viewportRect.height },
+      content: contentRect && { top: contentRect.top, bottom: contentRect.bottom, height: contentRect.height },
+      bottomGap: composerRect ? window.innerHeight - composerRect.bottom : null,
+    };
+  });
+}
+
+type ComposerGeometry = Awaited<ReturnType<typeof readComposerGeometry>>;
+
+function assertComposerUnder72px(geometry: ComposerGeometry, testName: string): void {
+  const height = geometry.composer?.height;
+  if (height === null || height === undefined || height >= 72) {
+    throw new Error(`Regression test failed: ${testName}`);
+  }
+}
+
+function assertComposerAtBottom(geometry: ComposerGeometry, testName: string): void {
+  const footerBottomGap = geometry.footer ? geometry.viewport.height - geometry.footer.bottom : null;
+  if (geometry.bottomGap === null || geometry.bottomGap === undefined || geometry.bottomGap >= 24 || footerBottomGap === null || footerBottomGap >= 24) {
+    throw new Error(`Regression test failed: ${testName}`);
+  }
+}
+
+/** Captures the chat page at desktop and phone sizes in both themes, plus
+ * a tall-window run with one and ten rendered messages. Each thread uses
+ * persisted turns from the screenshot-only scripted Stack so both the
+ * composer and real Elements message layouts are exercised. */
 async function captureNextChatReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2709,6 +2750,18 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
         if (await page.getByRole("alert").count()) throw new Error(`captureNextChatReview: error banner on ${slug}/${theme}`);
         if (await page.getByRole("button", { name: "Stop generating", exact: true }).count()) throw new Error(`captureNextChatReview: turn still running on ${slug}/${theme}`);
         await settleAnimations(page);
+        const composerGeometry = await readComposerGeometry(page);
+        console.log(`captureNextChatReview geometry ${slug}/${theme}: ${JSON.stringify(composerGeometry)}`);
+        if (slug === "desktop") {
+          assertComposerUnder72px(composerGeometry, "composer root height under 72px empty at desktop");
+        }
+        if (composerGeometry.bottomGap === null || composerGeometry.bottomGap === undefined || composerGeometry.bottomGap >= 24) {
+          throw new Error("Regression test failed: composer bottom gap under 24px");
+        }
+        assertComposerAtBottom(composerGeometry, "composer stays at the bottom with a one-message thread");
+        if (!await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).isVisible()) {
+          throw new Error("Regression test failed: composer stays at the bottom with a one-message thread");
+        }
         const filename = `next-chat-${viewport.width}-${theme}.png`;
         const path = join(outDir, filename);
         await page.screenshot({ path, fullPage: slug === "phone" });
@@ -2721,6 +2774,73 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
         await context.close();
       }
     }
+  }
+
+  const wideViewport: ViewportSpec = { slug: "wide-review", width: 2000, height: 1293 };
+  const wideOneContext = await newContext(browser, wideViewport, "dark", sessionValue);
+  try {
+    const page = await wideOneContext.newPage();
+    await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
+    await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor();
+    await settleAnimations(page);
+    const geometry = await readComposerGeometry(page);
+    console.log(`captureNextChatReview geometry wide-one-message/dark: ${JSON.stringify(geometry)}`);
+    assertComposerUnder72px(geometry, "composer root height under 72px empty at 2000x1293");
+    assertComposerAtBottom(geometry, "composer stays at the bottom with a one-message thread at 2000x1293");
+    const path = join(outDir, "next-chat-2000x1293-one-message-dark.png");
+    await page.screenshot({ path });
+    console.log(`Wrote ${path}`);
+    await page.close();
+  } finally {
+    await wideOneContext.close();
+  }
+
+  const newChatContext = await newContext(browser, wideViewport, "dark", sessionValue);
+  try {
+    const page = await newChatContext.newPage();
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+    await page.getByText("How can I help you today?").waitFor();
+    await settleAnimations(page);
+    const geometry = await readComposerGeometry(page);
+    console.log(`captureNextChatReview geometry wide-new-chat/dark: ${JSON.stringify(geometry)}`);
+    assertComposerUnder72px(geometry, "new-chat composer root height under 72px at 2000x1293");
+    const path = join(outDir, "next-chat-2000x1293-new-chat-dark.png");
+    await page.screenshot({ path });
+    console.log(`Wrote ${path}`);
+    await page.close();
+  } finally {
+    await newChatContext.close();
+  }
+
+  const wideTenContext = await newContext(browser, wideViewport, "dark", sessionValue);
+  try {
+    const page = await wideTenContext.newPage();
+    await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
+    const composer = page.getByRole("textbox", { name: "Message input" });
+    await composer.waitFor();
+    for (let turn = 2; turn <= 5; turn += 1) {
+      await composer.fill(`Demo question ${turn}.`);
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+      await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).nth(turn - 1).waitFor({ timeout: 15000 });
+    }
+    const tenTurnResponse = await fetch(`${BASE_URL}/api/conversations/${conversation.id}/turns`, { headers: cookie });
+    if (!tenTurnResponse.ok) throw new Error(`captureNextChatReview: reading ten-message turns failed: ${tenTurnResponse.status}`);
+    const tenTurns = await tenTurnResponse.json() as Array<unknown>;
+    if (tenTurns.length !== 5) throw new Error(`captureNextChatReview: expected 5 persisted turns (10 messages), found ${tenTurns.length}`);
+    await settleAnimations(page);
+    const geometry = await readComposerGeometry(page);
+    console.log(`captureNextChatReview geometry wide-ten-message/dark: ${JSON.stringify(geometry)}`);
+    assertComposerUnder72px(geometry, "composer root height under 72px empty with ten messages at 2000x1293");
+    assertComposerAtBottom(geometry, "composer stays at the bottom with a ten-message thread at 2000x1293");
+    const path = join(outDir, "next-chat-2000x1293-ten-messages-dark.png");
+    await page.screenshot({ path });
+    console.log(`Wrote ${path}`);
+    await page.close();
+  } finally {
+    await wideTenContext.close();
   }
 }
 
