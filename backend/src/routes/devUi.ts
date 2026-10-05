@@ -2,8 +2,8 @@
 // (/dev/ui). It plays a named fixture (lib/uiFixtures.ts) through the real
 // assistant-stream sink, the same encoder POST /api/turn/stream uses, at a
 // chosen pace. Additive: nothing here is read by the real turn path. The one
-// thing stored is the failed-tool scenario's own turn row (no conversation),
-// so the admin error-detail control reads a real record.
+// stored failed-tool and generation-failure rows (no conversation), so the
+// admin error-detail controls read real records.
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
@@ -31,7 +31,7 @@ devUiRoutes.openapi(listRoute, (c) => c.json({ fixtures: UI_FIXTURES.map(({ id, 
 const streamRoute = createRoute({
   method: "post", path: "/{fixture_id}/stream", tags: ["Developer"],
   summary: "Play one scenario as an assistant-stream turn",
-  description: "Owner/admin only, and refused for a temporary (Incognito) request: streams the named fixture's events through the real assistant-stream encoder, at the chosen pace. Stores nothing, except the failed-tool scenario's own turn row (no conversation) that the error-detail control reads.",
+  description: "Owner/admin only, and refused for a temporary (Incognito) request: streams the named fixture's events through the real assistant-stream encoder, at the chosen pace. Stores only fixture rows for admin error-detail scenarios (no conversation).",
   middleware: [requireRole("owner", "admin")] as const,
   request: {
     params: idParamSchema("fixture_id"),
@@ -50,12 +50,14 @@ devUiRoutes.openapi(streamRoute, (c) => {
   if (temporary === true) return c.json({ error: "The showcase is not available in a temporary chat" }, 403);
   const fixture = findFixture(c.req.valid("param").fixture_id);
   if (!fixture) return c.json({ error: "Unknown fixture" }, 404);
-  if (fixture.storedOutcomes) {
+  if (fixture.storedOutcomes || fixture.storedStats) {
     const person = c.get("person");
     const turnId = `showcase-${fixture.id}`;
     db.insert(conversationTurns).values({
       id: turnId, personId: person.id, conversationId: null, surface: "chat", userText: "saturday market hours", replyText: "", source: "model", safetyAction: "allow",
-      minorSpeaker: false, createdAt: new Date().toISOString(), hlc: nextHlc(), outcomes: JSON.stringify(fixture.storedOutcomes),
+      minorSpeaker: false, createdAt: new Date().toISOString(), hlc: nextHlc(),
+      outcomes: fixture.storedOutcomes ? JSON.stringify(fixture.storedOutcomes) : null,
+      stats: fixture.storedStats ? JSON.stringify(fixture.storedStats) : null,
     }).onConflictDoUpdate({ target: conversationTurns.id, set: { personId: person.id } }).run();
   }
   const ms = pace === "instant" ? 0 : (fixture.pace ?? DEFAULT_PACE)[pace];

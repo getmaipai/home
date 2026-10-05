@@ -283,9 +283,10 @@ const nextShellFoldReview = process.argv.includes("--next-shell-fold-review");
 const nextChatRichReview = process.argv.includes("--next-chat-rich-review");
 const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview || nextChatRichReview;
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
+const nextChatAuditReview = process.argv.includes("--next-chat-audit-review");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
@@ -505,13 +506,19 @@ async function seedHousehold(): Promise<string> {
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
   if (chatArtifactCapture || chatPageScreenshotFixture) {
-    for (const [key, value] of [["engines.stack.url", STACK_URL], ["engines.stack.use_chat", true], ["engines.stack.use_embeddings", true]] as const) {
+    for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
         body: JSON.stringify({ scope: "household", key, value }),
       });
       if (!response.ok) throw new Error(`seed ${key} failed: ${response.status}`);
+    }
+    const health = await fetch(`${BASE_URL}/api/health`, { headers: { Cookie: `session=${sessionValue}` } });
+    if (!health.ok) throw new Error(`seed screenshot Stack health failed: ${health.status}`);
+    const healthBody = await health.json() as { engines?: { chat?: { availability?: string; reason?: string } } };
+    if (healthBody.engines?.chat?.availability !== "ready") {
+      throw new Error(`seed screenshot Stack is not ready: ${JSON.stringify(healthBody.engines?.chat ?? null)}`);
     }
   }
 
@@ -2863,7 +2870,7 @@ const id = ${JSON.stringify(conversation.id)};
 const person = sqlite.query("SELECT id FROM people WHERE display_name = 'Sage' LIMIT 1").get() as { id: string };
 const insert = sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, user_text, reply_text, source, safety_action, conversation_id, created_at, hlc, routing_tier, routing_score, status, parent_turn_id, branch_chosen) VALUES (?, ?, 'chat', ?, ?, 'model', 'allow', ?, ?, ?, 'chat', 1.0, 'done', ?, 1)");
 let parent: string | null = null;
-for (let i = 1; i <= 5; i++) { const turn = crypto.randomUUID(); const at = new Date(Date.now() + i).toISOString(); insert.run(turn, person.id, 'Question ' + i + ': please give me a detailed response for the long thread scroll check.', 'Answer ' + i + ': ' + 'A realistic seeded chat reply with enough text to exercise the thread viewport. '.repeat(5), id, at, at + ':0:' + turn, parent); parent = turn; }
+for (let i = 1; i <= 20; i++) { const turn = crypto.randomUUID(); const at = new Date(Date.now() + i).toISOString(); insert.run(turn, person.id, 'Question ' + i + ': please give me a detailed response for the long thread scroll check.', 'Answer ' + i + ': ' + 'A realistic seeded chat reply with enough text to exercise the thread viewport. '.repeat(5), id, at, at + ':0:' + turn, parent); parent = turn; }
 sqlite.close();`;
       const seedResult = Bun.spawnSync({ cmd: ["bun", "-e", seedScript], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
       if (seedResult.exitCode !== 0) throw new Error(`captureShowcaseScrollReview: seeding production thread failed with exit code ${seedResult.exitCode}`);
@@ -2910,13 +2917,13 @@ sqlite.close();`;
 
       await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
       await page.locator('[data-slot="aui_thread-viewport"]').waitFor({ state: "attached" });
-      await page.waitForFunction(() => document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent?.includes("Answer 5:") ?? false);
+      await page.waitForFunction(() => document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent?.includes("Answer 20:") ?? false);
       const chat = await page.evaluate(() => {
         const el = document.querySelector('[data-slot="aui_thread-viewport"]')!;
         return { scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, scrollTop: el.scrollTop, overflowY: getComputedStyle(el).overflowY };
       });
       console.log(`CHAT_SCROLL ${size.width}: ${JSON.stringify(chat)}`);
-      await page.screenshot({ path: join(outDir, `chat-scroll-${size.width}-long-thread.png`) });
+      await page.screenshot({ path: join(outDir, `chat-scroll-${size.width}-long-thread-40-messages.png`) });
     } finally { await context.close(); }
   }
 }
@@ -3347,9 +3354,8 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
       if (!(await composer.isEnabled())) throw new Error(`captureNextChatComposerReview: composer disabled on ${slug}`);
       await composer.fill("Show me a short demo reply.");
       await page.getByRole("button", { name: "Send message", exact: true }).click();
-      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
-      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
       await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor({ timeout: 15000 });
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 }).catch(() => {});
       if (slug === "phone") {
         await page.getByRole("button", { name: "Add", exact: true }).click();
         await page.locator('[data-slot="composer-menu"][data-open]').waitFor({ timeout: 5000 });
@@ -3366,13 +3372,115 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
       if (await page.getByRole("button", { name: "Stop generating", exact: true }).count()) throw new Error(`captureNextChatComposerReview: turn still running on ${slug}`);
       await settleAnimations(page);
       const path = join(outDir, `next-chat-composer-${viewport.width}-dark.png`);
-      await page.screenshot({ path, fullPage: slug === "phone" });
+      await page.screenshot({ path });
       console.log(`Wrote ${path}`);
       await page.close();
     } finally {
       await context.close();
     }
   }
+}
+
+/** Capture audit states that use the real /dev/ui scripted event stream or
+ * existing chat controls. This is screenshot-only fixture orchestration. */
+async function captureNextChatAuditReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = process.env.MAIPAI_CHAT_AUDIT_OUT_DIR || join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const desktop = { slug: "desktop", width: 1440, height: 900 } as ViewportSpec;
+  const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
+
+  async function showcase(id: string, name: string, viewport: ViewportSpec = desktop, theme: "light" | "dark" = "dark", after?: (page: Page) => Promise<void>) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(10000);
+      await page.goto(`${BASE_URL}/dev/ui`);
+      await page.getByRole("heading", { name: "Chat showcase" }).first().waitFor();
+      const pace = page.getByLabel("Streaming pace");
+      await pace.click();
+      await page.getByRole("option", { name: "Instant" }).click();
+      const scenarios = await fetch(`${BASE_URL}/api/dev/ui-fixtures`, { headers: cookie });
+      if (!scenarios.ok) throw new Error(`audit fixture list failed: ${scenarios.status}`);
+      const rows = await scenarios.json() as { fixtures: Array<{ id: string; title: string }> };
+      const fixture = rows.fixtures.find((entry) => entry.id === id);
+      if (!fixture) throw new Error(`audit fixture missing: ${id}`);
+      await page.getByRole("button", { name: new RegExp(fixture.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) }).click();
+      await page.locator('[data-slot="aui_thread-viewport"]').waitFor({ state: "attached" });
+      await page.waitForTimeout(350);
+      if (after) await after(page);
+      await settleAnimations(page);
+      const pane = page.getByRole("region", { name: "Chat", exact: true });
+      const box = await pane.boundingBox();
+      if (box) await page.screenshot({ path: join(outDir, `${name}-${viewport.width}x${viewport.height}-${theme}.png`), clip: { x: Math.max(0, box.x - 16), y: Math.max(0, box.y - 56), width: Math.min(viewport.width - Math.max(0, box.x - 16), box.width + 32), height: Math.min(viewport.height - Math.max(0, box.y - 56), box.height + 72) } });
+      else await page.screenshot({ path: join(outDir, `${name}-${viewport.width}x${viewport.height}-${theme}.png`) });
+      await page.close();
+    } finally { await context.close(); }
+  }
+
+  await showcase("failure-engine-down", "failed-reply");
+  await showcase("failure-admin-details", "failed-reply-admin-details", desktop, "dark", async (page) => {
+    await page.getByRole("button", { name: "Error details" }).click();
+    await page.getByRole("dialog").waitFor();
+  });
+  await showcase("failed-tool", "tool-error-admin");
+  await showcase("failure-safety", "guardrail-refusal");
+  await showcase("search", "sources-reply");
+  await showcase("table", "table-reply");
+  await showcase("code", "code-reply");
+
+  // Real chat rail, collapsed to the permanent navigation icon rail.
+  {
+    const context = await newContext(browser, desktop, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      const sidebar = page.locator('[data-slot="sidebar"]');
+      if (await sidebar.getAttribute("data-state") !== "collapsed") {
+        await page.getByRole("button", { name: "Toggle app menu" }).click();
+      }
+      await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "collapsed");
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, "collapsed-rail-1440x900-dark.png") });
+    } finally { await context.close(); }
+  }
+
+  // The mobile thread list is the chat app's own sheet, opened by its real
+  // Show threads control.
+  {
+    const context = await newContext(browser, phone, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      await seedTitledConversation("captureNextChatAuditReview", cookie, "Thread list example");
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("button", { name: "Show threads" }).click();
+      await page.getByRole("dialog").waitFor();
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, "mobile-thread-list-sheet-390x844-dark.png"), fullPage: true });
+    } finally { await context.close(); }
+  }
+
+  // Stack role state is supplied by the fixture Stack. Intercept health to
+  // hold the real availability loader in its starting state for one shot.
+  {
+    const context = await newContext(browser, desktop, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.route("**/api/health", async (route) => {
+        const response = await route.fetch();
+        const body = await response.json() as { engines: { chat: Record<string, unknown> } };
+        body.engines.chat = { ...body.engines.chat, kind: "starting", alive: true, availability: "starting", reason: null };
+        await route.fulfill({ response, json: body });
+      });
+      await page.goto(`${BASE_URL}/chat`);
+      await page.locator('[data-slot="generation-loader"]').waitFor({ timeout: 10000 });
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, "engine-starting-loader-1440x900-dark.png") });
+    } finally { await context.close(); }
+  }
+
+  console.log("completed named review: --next-chat-audit-review");
 }
 
 /** Lane B-15: exercise the actual tap targets named by the cutover
@@ -6176,6 +6284,11 @@ async function main() {
     if (nextChatComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatChildComposerReview) {
       await captureNextChatComposerReview(browser, sessionValue);
       console.log("completed named review: --next-chat-composer-review");
+      return;
+    }
+
+    if (nextChatAuditReview) {
+      await captureNextChatAuditReview(browser, sessionValue);
       return;
     }
 

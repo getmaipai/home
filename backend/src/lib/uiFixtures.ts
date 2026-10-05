@@ -16,6 +16,8 @@ export interface UiFixture {
   events: Event[];
   /** THIN-1E: the stored failure behind this fixture's turn, so the admin's error-detail popover has a real row to read. */
   storedOutcomes?: unknown[];
+  /** THIN-1E: a real generation failure record for the admin details fixture. */
+  storedStats?: unknown;
   /** Milliseconds between events at "normal" and "slow"; "instant" is always 0. */
   pace?: { normal: number; slow: number };
 }
@@ -154,6 +156,12 @@ const SOURCES = [
 
 const CRISIS = "If you are thinking about hurting yourself, you are not alone. In the US you can call or text 988 at any time to reach the Suicide & Crisis Lifeline.";
 
+function failureAdminDetails(): Event[] {
+  const events = failing("failure-admin-details", "", { type: "error", error: failureLine("unreachable", false), code: "engine_unavailable" });
+  events[0] = { type: "turn_meta", conversation_id: "showcase", turn_id: "showcase-failure-admin-details" };
+  return events;
+}
+
 export const UI_FIXTURES: UiFixture[] = [
   { id: "table", title: "Table", description: "A markdown table with four columns and a closing line.", events: turn("table", TABLE) },
   { id: "code", title: "Code blocks", description: "Fenced Python and TypeScript blocks, each with its copy button.", events: turn("code", CODE) },
@@ -189,6 +197,7 @@ export const UI_FIXTURES: UiFixture[] = [
     }),
   },
   { id: "failure-engine-down", title: "Failure: engine down (chat)", description: "The chat engine is not running: the plain line an adult sees, code engine_unavailable.", events: failing("failure-engine-down", "", { type: "error", error: failureLine("unreachable", false), code: "engine_unavailable" }) },
+  { id: "failure-admin-details", title: "Failure: admin generation details", description: "A failed generation with the admin-only raw detail popover.", storedStats: { generations: [{ reason: "chat", error: "The scripted screenshot engine returned a connection timeout.", request_sent_ms: 245, offline_reason: "scripted timeout" }] }, events: failureAdminDetails() },
   { id: "failure-engine-down-spoken", title: "Failure: engine down (spoken or child)", description: "The engine is down on a spoken or non-chat surface: the short grown-ups line, code engine_unavailable.", events: failing("failure-engine-down-spoken", "", { type: "error", error: failureLine("unreachable", true), code: "engine_unavailable" }) },
   { id: "failure-unavailable", title: "Failure: unavailable", description: "A generic unavailable failure after the turn started, code unavailable.", events: failing("failure-unavailable", "", { type: "error", error: failureLine("busy", false), code: "unavailable" }) },
   { id: "failure-generic", title: "Failure: mid-stream error", description: "The engine fails with no catalogue code (the plain generic error event).", events: failing("failure-generic", "", { type: "error", error: failureLine("other", false) }) },
