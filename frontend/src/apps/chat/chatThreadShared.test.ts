@@ -39,6 +39,6 @@ describe("one chat thread composition", () => {
   test("the registry header says how to add an Element and names the adoption scanner", () => {
     const registry = read("./elementBindings.ts");
     expect(registry).toContain("How to add an Element");
-    expect(registry).toContain("scripts/elements-adoption.ts");
+    expect(registry).toContain("scripts/elementsAdoption.ts");
   });
 });

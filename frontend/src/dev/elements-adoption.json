@@ -1,852 +1,1014 @@
 {
- "generated": "stub: file names from ui-v0.5.90 src/elements, replaced by the cloud/elements-audit scanner output",
- "items": [
-  {
-   "file": "activity-graph.tsx",
-   "name": "activity-graph",
-   "group": "activity",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "agent-card.tsx",
-   "name": "agent-card",
-   "group": "agent",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "agent-handoff.tsx",
-   "name": "agent-handoff",
-   "group": "agent",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "agent-plan.tsx",
-   "name": "agent-plan",
-   "group": "agent",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "agent-status.tsx",
-   "name": "agent-status",
-   "group": "agent",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "approval-card.tsx",
-   "name": "approval-card",
-   "group": "approval",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "artifact-card.tsx",
-   "name": "artifact-card",
-   "group": "artifact",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "attachment.aui.tsx",
-   "name": "attachment",
-   "group": "attachment",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "background-inbox.tsx",
-   "name": "background-inbox",
-   "group": "background",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "canvas-split.tsx",
-   "name": "canvas-split",
-   "group": "canvas",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "chart.tsx",
-   "name": "chart",
-   "group": "chart",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "chat-panel.tsx",
-   "name": "chat-panel",
-   "group": "chat",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "checkpoint-history.tsx",
-   "name": "checkpoint-history",
-   "group": "checkpoint",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "code-diff.tsx",
-   "name": "code-diff",
-   "group": "code",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "code-runner.tsx",
-   "name": "code-runner",
-   "group": "code",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "command-palette.tsx",
-   "name": "command-palette",
-   "group": "command",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "comparison-card.tsx",
-   "name": "comparison-card",
-   "group": "comparison",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "composer.tsx",
-   "name": "composer",
-   "group": "composer",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "computer-use.tsx",
-   "name": "computer-use",
-   "group": "computer",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "confidence-marker.tsx",
-   "name": "confidence-marker",
-   "group": "confidence",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "connection-state.tsx",
-   "name": "connection-state",
-   "group": "connection",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "context-breakdown.tsx",
-   "name": "context-breakdown",
-   "group": "context",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "context-display.tsx",
-   "name": "context-display",
-   "group": "context",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "conversation-map.tsx",
-   "name": "conversation-map",
-   "group": "conversation",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "conversation-search.tsx",
-   "name": "conversation-search",
-   "group": "conversation",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "cost-meter.tsx",
-   "name": "cost-meter",
-   "group": "cost",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "data-table.tsx",
-   "name": "data-table",
-   "group": "data",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "day-separator.tsx",
-   "name": "day-separator",
-   "group": "day",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "diagram.tsx",
-   "name": "diagram",
-   "group": "diagram",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "directive-text.tsx",
-   "name": "directive-text",
-   "group": "directive",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "document-reference.tsx",
-   "name": "document-reference",
-   "group": "document",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "draft-restore.tsx",
-   "name": "draft-restore",
-   "group": "draft",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "edit-message.tsx",
-   "name": "edit-message",
-   "group": "edit",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "elicitation-form.tsx",
-   "name": "elicitation-form",
-   "group": "elicitation",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "empty-state.tsx",
-   "name": "empty-state",
-   "group": "empty",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "error-state.tsx",
-   "name": "error-state",
-   "group": "error",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "feedback-dialog.tsx",
-   "name": "feedback-dialog",
-   "group": "feedback",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "file-tree.tsx",
-   "name": "file-tree",
-   "group": "file",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "file.tsx",
-   "name": "file",
-   "group": "file",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "flow-graph.tsx",
-   "name": "flow-graph",
-   "group": "flow",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "follow-up-suggestions.aui.tsx",
-   "name": "follow-up-suggestions",
-   "group": "follow",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "github.tsx",
-   "name": "github",
-   "group": "github",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "globals.css",
-   "name": "globals",
-   "group": "globals",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "guardrail-notice.tsx",
-   "name": "guardrail-notice",
-   "group": "guardrail",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "image-generation.tsx",
-   "name": "image-generation",
-   "group": "image",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "image.tsx",
-   "name": "image",
-   "group": "image",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "inline-citation.tsx",
-   "name": "inline-citation",
-   "group": "inline",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "job-progress.tsx",
-   "name": "job-progress",
-   "group": "job",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "launcher-bubble.tsx",
-   "name": "launcher-bubble",
-   "group": "launcher",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "loading-state.tsx",
-   "name": "loading-state",
-   "group": "loading",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "map-answer.tsx",
-   "name": "map-answer",
-   "group": "map",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "markdown-text.tsx",
-   "name": "markdown-text",
-   "group": "markdown",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "math-block.tsx",
-   "name": "math-block",
-   "group": "math",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "mcp-server-panel.tsx",
-   "name": "mcp-server-panel",
-   "group": "mcp",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "memory-chips.tsx",
-   "name": "memory-chips",
-   "group": "memory",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "mermaid-diagram.tsx",
-   "name": "mermaid-diagram",
-   "group": "mermaid",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "message-actions.tsx",
-   "name": "message-actions",
-   "group": "message",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "message-attachment.tsx",
-   "name": "message-attachment",
-   "group": "message",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "message-branches.tsx",
-   "name": "message-branches",
-   "group": "message",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "message-pair.tsx",
-   "name": "message-pair",
-   "group": "message",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "message-queue.tsx",
-   "name": "message-queue",
-   "group": "message",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "message-timing.tsx",
-   "name": "message-timing",
-   "group": "message",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "mobile-composer.tsx",
-   "name": "mobile-composer",
-   "group": "mobile",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "model-picker.tsx",
-   "name": "model-picker",
-   "group": "model",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "model-selector.tsx",
-   "name": "model-selector",
-   "group": "model",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "number-ticker.tsx",
-   "name": "number-ticker",
-   "group": "number",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "onboarding.tsx",
-   "name": "onboarding",
-   "group": "onboarding",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "permission-grant.tsx",
-   "name": "permission-grant",
-   "group": "permission",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "prompt-library.tsx",
-   "name": "prompt-library",
-   "group": "prompt",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "quota-banner.tsx",
-   "name": "quota-banner",
-   "group": "quota",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "quote-reply.tsx",
-   "name": "quote-reply",
-   "group": "quote",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "range.ts",
-   "name": "range",
-   "group": "range",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "read-aloud.tsx",
-   "name": "read-aloud",
-   "group": "read",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "reasoning-effort.tsx",
-   "name": "reasoning-effort",
-   "group": "reasoning",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "reasoning-panel.tsx",
-   "name": "reasoning-panel",
-   "group": "reasoning",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "reasoning.aui.tsx",
-   "name": "reasoning",
-   "group": "reasoning",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "reasoning.tsx",
-   "name": "reasoning",
-   "group": "reasoning",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "recommendation-card.tsx",
-   "name": "recommendation-card",
-   "group": "recommendation",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "regenerate-menu.tsx",
-   "name": "regenerate-menu",
-   "group": "regenerate",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "research-report.tsx",
-   "name": "research-report",
-   "group": "research",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "retrieval-chunks.tsx",
-   "name": "retrieval-chunks",
-   "group": "retrieval",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "reviewable-diff.tsx",
-   "name": "reviewable-diff",
-   "group": "reviewable",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "schedule-card.tsx",
-   "name": "schedule-card",
-   "group": "schedule",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "score-breakdown.tsx",
-   "name": "score-breakdown",
-   "group": "score",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "scroll-anchor.tsx",
-   "name": "scroll-anchor",
-   "group": "scroll",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "settings-panel.tsx",
-   "name": "settings-panel",
-   "group": "settings",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "shared-conversation.tsx",
-   "name": "shared-conversation",
-   "group": "shared",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "shiki-highlighter.tsx",
-   "name": "shiki-highlighter",
-   "group": "shiki",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "sources.aui.tsx",
-   "name": "sources",
-   "group": "sources",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "sources.tsx",
-   "name": "sources",
-   "group": "sources",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "speaker-identity.tsx",
-   "name": "speaker-identity",
-   "group": "speaker",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "spec-sheet.tsx",
-   "name": "spec-sheet",
-   "group": "spec",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "stopped-run.tsx",
-   "name": "stopped-run",
-   "group": "stopped",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "streaming-text.tsx",
-   "name": "streaming-text",
-   "group": "streaming",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "subagent-list.tsx",
-   "name": "subagent-list",
-   "group": "subagent",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "suggestions.tsx",
-   "name": "suggestions",
-   "group": "suggestions",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "surfaces.tsx",
-   "name": "surfaces",
-   "group": "surfaces",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "task-card.tsx",
-   "name": "task-card",
-   "group": "task",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "task.ts",
-   "name": "task",
-   "group": "task",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "terminal-block.tsx",
-   "name": "terminal-block",
-   "group": "terminal",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "thinking-indicator.tsx",
-   "name": "thinking-indicator",
-   "group": "thinking",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "thread-list.aui.tsx",
-   "name": "thread-list",
-   "group": "thread",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "thread-list.tsx",
-   "name": "thread-list",
-   "group": "thread",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "thread-search.tsx",
-   "name": "thread-search",
-   "group": "thread",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "thread.aui.tsx",
-   "name": "thread",
-   "group": "thread",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "threadlist-sidebar.aui.tsx",
-   "name": "threadlist-sidebar",
-   "group": "threadlist",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "timeline.tsx",
-   "name": "timeline",
-   "group": "timeline",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "todo-list.tsx",
-   "name": "todo-list",
-   "group": "todo",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "tool-call.tsx",
-   "name": "tool-call",
-   "group": "tool",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "tool-error.tsx",
-   "name": "tool-error",
-   "group": "tool",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "tool-fallback.aui.tsx",
-   "name": "tool-fallback",
-   "group": "tool",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "tool-group.aui.tsx",
-   "name": "tool-group",
-   "group": "tool",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "tool-group.tsx",
-   "name": "tool-group",
-   "group": "tool",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "tool-timeline.tsx",
-   "name": "tool-timeline",
-   "group": "tool",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "tooltip-icon-button.tsx",
-   "name": "tooltip-icon-button",
-   "group": "tooltip",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "trace-waterfall.tsx",
-   "name": "trace-waterfall",
-   "group": "trace",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "typing-indicator.tsx",
-   "name": "typing-indicator",
-   "group": "typing",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "voice-conversation.tsx",
-   "name": "voice-conversation",
-   "group": "voice",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "voice.tsx",
-   "name": "voice",
-   "group": "voice",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "web-preview.tsx",
-   "name": "web-preview",
-   "group": "web",
-   "verdict": "unassessed",
-   "implemented": false
-  },
-  {
-   "file": "web-search.tsx",
-   "name": "web-search",
-   "group": "web",
-   "verdict": "unassessed",
-   "implemented": false
-  }
- ]
+  "generatedAt": "2026-10-05T01:54:30.727Z",
+  "kitTag": "ui-v0.5.91",
+  "items": [
+    {
+      "file": "activity-graph.tsx",
+      "name": "activity-graph",
+      "group": "charts/data",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "agent-card.tsx",
+      "name": "agent-card",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "agent-handoff.tsx",
+      "name": "agent-handoff",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "agent-plan.tsx",
+      "name": "agent-plan",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "agent-status.tsx",
+      "name": "agent-status",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "approval-card.tsx",
+      "name": "approval-card",
+      "group": "reasoning/tools",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "artifact-card.tsx",
+      "name": "artifact-card",
+      "group": "canvas/artifacts",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "attachment.aui.tsx",
+      "name": "attachment",
+      "group": "composer",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "background-inbox.tsx",
+      "name": "background-inbox",
+      "group": "agent/workflow",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "canvas-split.tsx",
+      "name": "canvas-split",
+      "group": "canvas/artifacts",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "chart.tsx",
+      "name": "chart",
+      "group": "charts/data",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "chat-panel.tsx",
+      "name": "chat-panel",
+      "group": "message",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "checkpoint-history.tsx",
+      "name": "checkpoint-history",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "code-diff.tsx",
+      "name": "code-diff",
+      "group": "canvas/artifacts",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "code-runner.tsx",
+      "name": "code-runner",
+      "group": "agent/workflow",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "command-palette.tsx",
+      "name": "command-palette",
+      "group": "other",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "comparison-card.tsx",
+      "name": "comparison-card",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "composer.tsx",
+      "name": "composer",
+      "group": "composer",
+      "verdict": "wire-after",
+      "implemented": true
+    },
+    {
+      "file": "computer-use.tsx",
+      "name": "computer-use",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "confidence-marker.tsx",
+      "name": "confidence-marker",
+      "group": "sources/citations",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "connection-state.tsx",
+      "name": "connection-state",
+      "group": "errors/states",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "context-breakdown.tsx",
+      "name": "context-breakdown",
+      "group": "other",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "context-display.tsx",
+      "name": "context-display",
+      "group": "composer",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "conversation-map.tsx",
+      "name": "conversation-map",
+      "group": "thread/list",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "conversation-search.tsx",
+      "name": "conversation-search",
+      "group": "thread/list",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "cost-meter.tsx",
+      "name": "cost-meter",
+      "group": "charts/data",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "data-table.tsx",
+      "name": "data-table",
+      "group": "charts/data",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "day-separator.tsx",
+      "name": "day-separator",
+      "group": "message",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "diagram.tsx",
+      "name": "diagram",
+      "group": "canvas/artifacts",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "directive-text.tsx",
+      "name": "directive-text",
+      "group": "message",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "document-reference.tsx",
+      "name": "document-reference",
+      "group": "sources/citations",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "draft-restore.tsx",
+      "name": "draft-restore",
+      "group": "composer",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "edit-message.tsx",
+      "name": "edit-message",
+      "group": "message",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "elicitation-form.tsx",
+      "name": "elicitation-form",
+      "group": "reasoning/tools",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "empty-state.tsx",
+      "name": "empty-state",
+      "group": "settings/onboarding",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "error-state.tsx",
+      "name": "error-state",
+      "group": "errors/states",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "feedback-dialog.tsx",
+      "name": "feedback-dialog",
+      "group": "message",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "file-tree.tsx",
+      "name": "file-tree",
+      "group": "canvas/artifacts",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "file.tsx",
+      "name": "file",
+      "group": "canvas/artifacts",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "flow-graph.tsx",
+      "name": "flow-graph",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "follow-up-suggestions.aui.tsx",
+      "name": "follow-up-suggestions",
+      "group": "composer",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "github.tsx",
+      "name": "github",
+      "group": "other",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "globals.css",
+      "name": "globals.css",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "guardrail-notice.tsx",
+      "name": "guardrail-notice",
+      "group": "errors/states",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "hooks/use-attachment-src.ts",
+      "name": "hooks/use-attachment-src",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "hooks/use-copy-to-clipboard.ts",
+      "name": "hooks/use-copy-to-clipboard",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "hooks/use-mobile.ts",
+      "name": "hooks/use-mobile",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "image-generation.tsx",
+      "name": "image-generation",
+      "group": "canvas/artifacts",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "image.tsx",
+      "name": "image",
+      "group": "canvas/artifacts",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "inline-citation.tsx",
+      "name": "inline-citation",
+      "group": "sources/citations",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "job-progress.tsx",
+      "name": "job-progress",
+      "group": "agent/workflow",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "launcher-bubble.tsx",
+      "name": "launcher-bubble",
+      "group": "other",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "loading-state.tsx",
+      "name": "loading-state",
+      "group": "errors/states",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "map-answer.tsx",
+      "name": "map-answer",
+      "group": "charts/data",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "markdown-text.test.tsx",
+      "name": "markdown-text.test",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "markdown-text.tsx",
+      "name": "markdown-text",
+      "group": "message",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "math-block.tsx",
+      "name": "math-block",
+      "group": "charts/data",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "mcp-server-panel.tsx",
+      "name": "mcp-server-panel",
+      "group": "settings/onboarding",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "memory-chips.tsx",
+      "name": "memory-chips",
+      "group": "other",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "mermaid-diagram.tsx",
+      "name": "mermaid-diagram",
+      "group": "canvas/artifacts",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "message-actions.tsx",
+      "name": "message-actions",
+      "group": "message",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "message-attachment.tsx",
+      "name": "message-attachment",
+      "group": "composer",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "message-branches.tsx",
+      "name": "message-branches",
+      "group": "message",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "message-pair.tsx",
+      "name": "message-pair",
+      "group": "message",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "message-queue.tsx",
+      "name": "message-queue",
+      "group": "composer",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "message-timing.tsx",
+      "name": "message-timing",
+      "group": "reasoning/tools",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "mobile-composer.tsx",
+      "name": "mobile-composer",
+      "group": "composer",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "model-picker.tsx",
+      "name": "model-picker",
+      "group": "composer",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "model-selector.tsx",
+      "name": "model-selector",
+      "group": "composer",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "number-ticker.tsx",
+      "name": "number-ticker",
+      "group": "other",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "onboarding.tsx",
+      "name": "onboarding",
+      "group": "settings/onboarding",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "permission-grant.tsx",
+      "name": "permission-grant",
+      "group": "settings/onboarding",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "prompt-library.tsx",
+      "name": "prompt-library",
+      "group": "composer",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "quota-banner.tsx",
+      "name": "quota-banner",
+      "group": "errors/states",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "quote-reply.tsx",
+      "name": "quote-reply",
+      "group": "message",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "range.ts",
+      "name": "range",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "read-aloud.tsx",
+      "name": "read-aloud",
+      "group": "voice",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "reasoning-effort.tsx",
+      "name": "reasoning-effort",
+      "group": "composer",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "reasoning-panel.tsx",
+      "name": "reasoning-panel",
+      "group": "reasoning/tools",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "reasoning.aui.tsx",
+      "name": "reasoning",
+      "group": "reasoning/tools",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "reasoning.tsx",
+      "name": "reasoning",
+      "group": "reasoning/tools",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "recommendation-card.tsx",
+      "name": "recommendation-card",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "regenerate-menu.tsx",
+      "name": "regenerate-menu",
+      "group": "message",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "research-report.tsx",
+      "name": "research-report",
+      "group": "canvas/artifacts",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "retrieval-chunks.tsx",
+      "name": "retrieval-chunks",
+      "group": "sources/citations",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "reviewable-diff.tsx",
+      "name": "reviewable-diff",
+      "group": "canvas/artifacts",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "schedule-card.tsx",
+      "name": "schedule-card",
+      "group": "settings/onboarding",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "score-breakdown.tsx",
+      "name": "score-breakdown",
+      "group": "charts/data",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "scroll-anchor.tsx",
+      "name": "scroll-anchor",
+      "group": "message",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "settings-panel.tsx",
+      "name": "settings-panel",
+      "group": "settings/onboarding",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "shared-conversation.tsx",
+      "name": "shared-conversation",
+      "group": "thread/list",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "shiki-highlighter.tsx",
+      "name": "shiki-highlighter",
+      "group": "message",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "sources.aui.tsx",
+      "name": "sources",
+      "group": "sources/citations",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "sources.tsx",
+      "name": "sources",
+      "group": "sources/citations",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "speaker-identity.tsx",
+      "name": "speaker-identity",
+      "group": "voice",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "spec-sheet.tsx",
+      "name": "spec-sheet",
+      "group": "charts/data",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "stopped-run.tsx",
+      "name": "stopped-run",
+      "group": "errors/states",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "streaming-text.tsx",
+      "name": "streaming-text",
+      "group": "message",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "subagent-list.tsx",
+      "name": "subagent-list",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "suggestions.tsx",
+      "name": "suggestions",
+      "group": "composer",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "surfaces.test.tsx",
+      "name": "surfaces.test",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "surfaces.tsx",
+      "name": "surfaces",
+      "group": "other",
+      "verdict": "support",
+      "implemented": true
+    },
+    {
+      "file": "task-card.tsx",
+      "name": "task-card",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "task.ts",
+      "name": "task",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "terminal-block.tsx",
+      "name": "terminal-block",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "thinking-indicator.test.tsx",
+      "name": "thinking-indicator.test",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "thinking-indicator.tsx",
+      "name": "thinking-indicator",
+      "group": "reasoning/tools",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "thread-list.aui.test.tsx",
+      "name": "thread-list.aui.test",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "thread-list.aui.tsx",
+      "name": "thread-list",
+      "group": "thread/list",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "thread-list.tsx",
+      "name": "thread-list",
+      "group": "thread/list",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "thread-search.tsx",
+      "name": "thread-search",
+      "group": "thread/list",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "thread.aui.test.tsx",
+      "name": "thread.aui.test",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "thread.aui.tsx",
+      "name": "thread",
+      "group": "thread/list",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "threadlist-sidebar.aui.tsx",
+      "name": "threadlist-sidebar",
+      "group": "thread/list",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "timeline.tsx",
+      "name": "timeline",
+      "group": "agent/workflow",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "todo-list.tsx",
+      "name": "todo-list",
+      "group": "agent/workflow",
+      "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "tool-call.tsx",
+      "name": "tool-call",
+      "group": "reasoning/tools",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "tool-error.tsx",
+      "name": "tool-error",
+      "group": "errors/states",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "tool-fallback.aui.tsx",
+      "name": "tool-fallback",
+      "group": "reasoning/tools",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "tool-group.aui.tsx",
+      "name": "tool-group",
+      "group": "reasoning/tools",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "tool-group.tsx",
+      "name": "tool-group",
+      "group": "reasoning/tools",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "tool-timeline.tsx",
+      "name": "tool-timeline",
+      "group": "reasoning/tools",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "tooltip-icon-button.tsx",
+      "name": "tooltip-icon-button",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "trace-waterfall.tsx",
+      "name": "trace-waterfall",
+      "group": "agent/workflow",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "typing-indicator.tsx",
+      "name": "typing-indicator",
+      "group": "errors/states",
+      "verdict": "no-fit",
+      "implemented": false
+    },
+    {
+      "file": "ui/avatar.tsx",
+      "name": "ui/avatar",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/badge.tsx",
+      "name": "ui/badge",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/button.tsx",
+      "name": "ui/button",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/collapsible.tsx",
+      "name": "ui/collapsible",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/command.tsx",
+      "name": "ui/command",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/dialog.tsx",
+      "name": "ui/dialog",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/input.tsx",
+      "name": "ui/input",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/popover.tsx",
+      "name": "ui/popover",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/separator.tsx",
+      "name": "ui/separator",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/sheet.tsx",
+      "name": "ui/sheet",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/sidebar.tsx",
+      "name": "ui/sidebar",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/skeleton.tsx",
+      "name": "ui/skeleton",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/textarea.tsx",
+      "name": "ui/textarea",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "ui/tooltip.tsx",
+      "name": "ui/tooltip",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "voice-conversation.test.tsx",
+      "name": "voice-conversation.test",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "voice-conversation.tsx",
+      "name": "voice-conversation",
+      "group": "voice",
+      "verdict": "wire-now",
+      "implemented": true
+    },
+    {
+      "file": "voice.tsx",
+      "name": "voice",
+      "group": "voice",
+      "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "web-preview.tsx",
+      "name": "web-preview",
+      "group": "canvas/artifacts",
+      "verdict": "later",
+      "implemented": false
+    },
+    {
+      "file": "web-search.tsx",
+      "name": "web-search",
+      "group": "reasoning/tools",
+      "verdict": "no-fit",
+      "implemented": false
+    }
+  ]
 }

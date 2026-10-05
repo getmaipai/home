@@ -17,11 +17,10 @@
 //   chatThreadContexts.ts, because the showcase mounts without the chat page's
 //   providers.
 //
-// Elements adoption scanner (scripts/elements-adoption.ts, when cloud/elements-
-// audit lands): an Element counts as used when ChatThread.tsx or this file
-// imports it, directly or through the renderers this file imports
-// (chatToolUis.tsx, chatThreadSlots.tsx). Do not require the import to sit in
-// NextChatPage.tsx: the Elements live in those files now.
+// The Elements adoption scanner (scripts/elementsAdoption.ts) counts direct
+// `@maipai/ui/src/elements/...` imports from Home source; test and dev files
+// are excluded. This registry documents which chat renderers compose each
+// Element, while the scanner reports imports mechanically.
 import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
 import {
   AssistantMoreItems,

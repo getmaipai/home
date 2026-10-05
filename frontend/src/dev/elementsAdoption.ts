@@ -1,15 +1,13 @@
 import raw from "@/dev/elements-adoption.json";
 
-// UI-SHOWCASE: loader for the Elements adoption panel. The file is the
-// cloud/elements-audit scanner's output once that lane lands (items[].file,
-// name, group, verdict, implemented, optionally status); until then it is a
-// stub of the kit's element file names, all unassessed. Tolerant on purpose:
-// a missing field falls back instead of throwing, so the final shape can grow.
-export type Verdict = "wire now" | "wire after" | "later" | "no fit" | "unassessed";
+// UI-SHOWCASE: loader for the Elements adoption panel. `elements:scan`
+// generates the file and computes implemented from Home source imports.
+// Tolerant on purpose: missing fields fall back instead of throwing.
+export type Verdict = "wire now" | "wire after" | "support" | "later" | "no fit" | "unassessed";
 export type Status = "implemented" | "in progress" | "not yet" | "not for us";
 export interface ElementItem { file: string; name: string; group: string; verdict: Verdict; status: Status }
 
-const VERDICTS: Verdict[] = ["wire now", "wire after", "later", "no fit"];
+const VERDICTS: Verdict[] = ["wire now", "wire after", "support", "later", "no fit"];
 const norm = (value: unknown) => String(value ?? "").toLowerCase().replace(/[-_]+/g, " ").trim();
 
 export function normalizeAdoption(input: unknown): ElementItem[] {
