@@ -25,7 +25,7 @@ Ask MaiPai to look something up and you get a real answer, not a guess. Just ask
 - "Who directed Cobra?"
 - "Search the web for tonight's game score"
 
-Weather, word meanings, trivia, and film lookups work right away. Web search takes one more step. An adult sets it up first, in **Settings**, **Integrations**, by adding the address of your own search server. When you search, MaiPai reads a few of the pages it finds, so the answer comes from what they say.
+Weather, word meanings, trivia, and film lookups work right away. Web search takes one more step. An adult sets it up first, in **Settings**, **AI & connections**, **Integrations**, by adding the address of your own search server. When you search, MaiPai reads a few of the pages it finds, so the answer comes from what they say.
 
 See the [Privacy](privacy.md) page for what each one sends, and to whom.
 

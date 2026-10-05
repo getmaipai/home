@@ -28,7 +28,7 @@ When you search, MaiPai sends your search words to your SearXNG. It does not nee
 
 ## Connect MaiPai
 
-1. Open **Settings**, then **Integrations**.
+1. Open **Settings**, then **AI & connections**, then **Integrations**.
 2. Find **SearXNG URL**.
 3. Paste the address, for example `http://192.0.2.10:8888`, and save.
 4. Ask MaiPai a question you know the answer to, like "Search the web for the capital of France."
@@ -56,7 +56,7 @@ If your search server does not answer, or finds nothing, MaiPai can ask Wikipedi
 
 What leaves your house: the words of the search go to Wikipedia, which is run by the Wikimedia Foundation. Wikipedia also sees your home's internet address, like any website you visit.
 
-To turn it off, open **Settings**, then **Integrations**, and turn off **Ask Wikipedia when web search fails or finds nothing**.
+To turn it off, open **Settings**, then **AI & connections**, then **Integrations**, and turn off **Ask Wikipedia when web search fails or finds nothing**.
 
 ## Kids and safe search
 
@@ -78,7 +78,7 @@ Each problem goes away by itself when search works again. MaiPai also runs a tes
 Go down this list in order.
 
 1. **Is the search server running?** Open its address in a browser on the computer that runs MaiPai. You should see the SearXNG page.
-2. **Is the address right?** Check **SearXNG URL** in **Settings**, **Integrations**. It needs `http://`, the right number after the colon, and no login page in front.
+2. **Is the address right?** Check **SearXNG URL** in **Settings**, **AI & connections**, **Integrations**. It needs `http://`, the right number after the colon, and no login page in front.
 3. **Is Home allowed?** Check `pass_ip` in `limiter.toml` and your firewall for the address MaiPai connects from. Restart SearXNG.
 4. **Is JSON on?** Check `formats: [html, json]` in `settings.yml`.
 5. **Is the tailnet up?** If you reach the search server over Tailscale, make sure Tailscale is running on the computer that runs MaiPai.
