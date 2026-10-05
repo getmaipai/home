@@ -1299,6 +1299,23 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(after.messages.slice(0, before.messages.length)).toEqual(before.messages);
   });
 
+  test("a replay that exceeds the older-turn budget is dropped as a whole exchange", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const sources = Array.from({ length: 8 }, (_, i) => ({ id: `src-${i}`, kind: "web" as const, title: `Result ${i}`, url: `https://example.test/${i}`, site: "example.test", snippet: "x".repeat(240), source: "websearch", created_at: "2026-10-05T00:00:00.000Z", hlc: `${i}` }));
+    const search = { callId: "old-web", packageId: "websearch", status: "succeeded" as const, via: "tool_call" as const, args: { expression: "old search" }, sources };
+    logTurn(actor, "chat", "old search question", { reply: { text: "Old search answer." }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-old-search-budget" }, { outcomes: [search] });
+    for (let i = 0; i < 4; i++) {
+      const long = "x".repeat(400);
+      logTurn(actor, "chat", `new turn ${i} ${long}`, { reply: { text: `${long} reply` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-new-${i}` });
+    }
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((m) => m.content.includes("old search question"))).toBe(false);
+    expect(window.messages.some((m) => m.tool_calls?.some((call) => call.id === "old-web"))).toBe(false);
+    expect(window.messages.some((m) => m.role === "tool" && m.tool_call_id === "old-web")).toBe(false);
+  });
+
   // Item 1b (#67): a guard's own honest line, stored as the reply of a
   // replaced model turn, must never come back to the model as its own
   // past words (it recited "nobody's told me" four times about one
