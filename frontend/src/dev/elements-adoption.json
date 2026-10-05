@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-05T11:48:44.204Z",
-  "kitTag": "ui-v0.5.94",
+  "generatedAt": "2026-10-05T13:39:46.448Z",
+  "kitTag": "ui-v0.5.96",
   "items": [
     {
       "file": "activity-graph.tsx",
@@ -766,6 +766,13 @@
       "implemented": true
     },
     {
+      "file": "thread-list.pin.aui.test.tsx",
+      "name": "thread-list.pin.aui.test",
+      "group": "thread/list",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
       "file": "thread-list.tsx",
       "name": "thread-list",
       "group": "thread/list",
@@ -785,6 +792,13 @@
       "group": "thread/list",
       "verdict": "wire-now",
       "implemented": true
+    },
+    {
+      "file": "thread-viewport.test.tsx",
+      "name": "thread-viewport.test",
+      "group": "thread",
+      "verdict": "support",
+      "implemented": false
     },
     {
       "file": "thread.aui.test.tsx",

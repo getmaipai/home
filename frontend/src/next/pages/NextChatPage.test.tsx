@@ -310,12 +310,20 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
 
   function stubSearchRows() {
     const original = globalThis.fetch;
+    const rows = searchRows.map((row) => ({ ...row }));
     const calls: Array<{ url: string; method?: string; body?: string }> = [];
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       calls.push({ url, method: init?.method, body: init?.body as string | undefined });
-      if (url.includes("/api/conversations") && !init?.method) return Promise.resolve(Response.json(searchRows));
-      if (url.includes("/api/conversations/") && init?.method === "PATCH") return Promise.resolve(Response.json({ ok: true }));
+      if (url.includes("/api/conversations/incognito") && !init?.method) return Promise.resolve(Response.json(rows));
+      if (url.includes("/api/conversations") && !init?.method) return Promise.resolve(Response.json(rows));
+      if (url.includes("/api/conversations/") && init?.method === "PATCH") {
+        const id = decodeURIComponent(url.split("/").at(-1)!);
+        const body = JSON.parse(String(init.body)) as { pinned?: boolean };
+        const row = rows.find((candidate) => candidate.id === id);
+        if (row && body.pinned !== undefined) row.pinned = body.pinned;
+        return Promise.resolve(Response.json(row ?? { ok: true }));
+      }
       if (url.includes("/api/conversations/") && init?.method === "DELETE") return Promise.resolve(Response.json({ ok: true }));
       if (url.includes("/api/conversations/")) return Promise.resolve(Response.json(searchRows[0]));
       return Promise.resolve(new Response("{}", { status: 200 }));
@@ -323,7 +331,8 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     return { restore: () => { globalThis.fetch = original; }, calls };
   }
 
-  async function searchPage() {
+  async function searchPage(incognito = false) {
+    if (incognito) writeIncognitoCache(true);
     const fetch = stubSearchRows();
     const view = renderPage(
       <MemoryRouter initialEntries={["/chat"]}>
@@ -353,11 +362,61 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
       const list = view.container.querySelector('[data-slot="aui_thread-list-items"]')!;
       const rows = Array.from(list.querySelectorAll('[data-slot="aui_thread-list-item"]'));
       expect(rows.map((row) => row.querySelector('[data-slot="aui_thread-list-item-title"]')?.textContent?.trim())).toEqual(["Garden pinned", "Garden today", "Garden yesterday", "Garden earlier"]);
-      expect(Array.from(list.querySelectorAll('[data-slot="aui_thread-list-group-label"]')).map((label) => label.textContent)).toEqual(["Today", "Yesterday", "Earlier"]);
+      expect(Array.from(list.querySelectorAll('[data-slot="aui_thread-list-group-label"]')).map((label) => label.textContent)).toEqual(["Pinned", "Today", "Yesterday", "Earlier"]);
       // The kit's matcher retains pin/day metadata and Enter uses its ordered results.
       const search = view.container.querySelector('[data-slot="thread-search"]')!;
       expect(search).toBeVisible();
       expect(view.getByRole("textbox", { name: "Search threads" })).toHaveValue("garden");
+    } finally { view.restore(); }
+  });
+
+  test("a Pin action appears on a chat row", async () => {
+    const view = await searchPage();
+    try {
+      const row = view.getByText("Garden today").closest('[data-slot="aui_thread-list-item"]')!;
+      fireEvent.pointerDown(row.querySelector('[data-slot="aui_thread-list-item-more"]')!, { button: 0, ctrlKey: false, pointerType: "mouse" });
+      expect(await view.findByRole("menuitem", { name: "Pin" })).toBeVisible();
+    } finally { view.restore(); }
+  });
+
+  test("pinning a chat persists through the adapter and moves it to the top", async () => {
+    searchRows[0]!.pinned = false;
+    const view = await searchPage();
+    try {
+      const row = view.getByText("Garden today").closest('[data-slot="aui_thread-list-item"]')!;
+      fireEvent.pointerDown(within(row as HTMLElement).getByRole("button", { name: "More options" }), { button: 0, ctrlKey: false, pointerType: "mouse" });
+      fireEvent.click(await view.findByRole("menuitem", { name: "Pin" }));
+      await waitFor(() => expect(view.calls.some((call) => call.method === "PATCH" && call.url.endsWith("conv-search-today") && call.body === '{"pinned":true}')).toBe(true));
+      await waitFor(() => expect(view.getByText("Pinned", { selector: '[data-slot="aui_thread-list-group-label"]' })).toBeVisible());
+      const rows = Array.from(view.container.querySelectorAll('[data-slot="aui_thread-list-item"]'));
+      expect(rows[0]?.querySelector('[data-slot="aui_thread-list-item-title"]')?.textContent?.trim()).toBe("Garden today");
+      expect(rows[0]?.querySelector('[data-slot="aui_thread-list-item-pinned"]')).not.toBeNull();
+    } finally { view.restore(); searchRows[0]!.pinned = true; }
+  });
+
+  test("unpinning restores its place", async () => {
+    const view = await searchPage();
+    try {
+      const row = view.getByText("Garden pinned").closest('[data-slot="aui_thread-list-item"]')!;
+      fireEvent.pointerDown(row.querySelector('[data-slot="aui_thread-list-item-more"]')!, { button: 0, ctrlKey: false, pointerType: "mouse" });
+      fireEvent.click(await view.findByRole("menuitem", { name: "Unpin" }));
+      await waitFor(() => expect(view.calls.some((call) => call.method === "PATCH" && call.url.endsWith("conv-search-pinned") && call.body === '{"pinned":false}')).toBe(true));
+      await waitFor(() => expect(view.queryByText("Pinned", { selector: '[data-slot="aui_thread-list-group-label"]' })).toBeNull());
+      const labels = Array.from(view.container.querySelectorAll('[data-slot="aui_thread-list-group-label"]')).map((label) => label.textContent);
+      expect(labels[0]).toBe("Today");
+      const rows = Array.from(view.container.querySelectorAll('[data-slot="aui_thread-list-item"]'));
+      expect(rows[0]?.querySelector('[data-slot="aui_thread-list-item-title"]')?.textContent?.trim()).toBe("Garden pinned");
+    } finally { view.restore(); }
+  });
+
+  test("an Incognito list never offers Pin", async () => {
+    const view = await searchPage(true);
+    try {
+      const row = await view.findByText("Garden today").then((title) => title.closest('[data-slot="aui_thread-list-item"]')!);
+      fireEvent.pointerDown(row.querySelector('[data-slot="aui_thread-list-item-more"]')!, { button: 0, ctrlKey: false, pointerType: "mouse" });
+      expect(await view.findByRole("menuitem", { name: "Delete" })).toBeVisible();
+      expect(view.queryByRole("menuitem", { name: "Pin" })).toBeNull();
+      expect(view.queryByRole("menuitem", { name: "Unpin" })).toBeNull();
     } finally { view.restore(); }
   });
 

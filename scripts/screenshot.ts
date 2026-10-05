@@ -3629,6 +3629,8 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
 async function captureNextChatAuditReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = process.env.MAIPAI_CHAT_AUDIT_OUT_DIR || join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
+  const pinShotsDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/pin-shots";
+  mkdirSync(pinShotsDir, { recursive: true });
   const cookie = { Cookie: `session=${sessionValue}` };
   const desktop = { slug: "desktop", width: 1440, height: 900 } as ViewportSpec;
   const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
@@ -3703,6 +3705,43 @@ async function captureNextChatAuditReview(browser: Browser, sessionValue: string
       await settleAnimations(page);
       await page.screenshot({ path: join(outDir, "mobile-thread-list-sheet-390x844-dark.png"), fullPage: true });
     } finally { await context.close(); }
+  }
+
+  // CHAT-PIN-01: capture the shipped Pin group with one real, persisted
+  // pinned conversation at the accepted desktop and phone surfaces.
+  {
+    const title = "Pinned audit chat";
+    const row = await seedTitledConversation("captureNextChatAuditReview pin audit", cookie, title);
+    const pinned = await fetch(`${BASE_URL}/api/conversations/${row.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...cookie },
+      body: JSON.stringify({ pinned: true }),
+    });
+    if (!pinned.ok) throw new Error(`captureNextChatAuditReview: pinning the audit conversation failed: ${pinned.status}`);
+
+    const desktopContext = await newContext(browser, desktop, "light", sessionValue);
+    try {
+      const page = await desktopContext.newPage();
+      await page.goto(`${BASE_URL}/chat`);
+      const rail = page.locator('[data-slot="next-chat-rail"]');
+      await rail.getByText(title, { exact: true }).waitFor();
+      await rail.getByText("Pinned", { exact: true }).waitFor();
+      await settleAnimations(page);
+      await page.screenshot({ path: join(pinShotsDir, "chat-list-1440x900-light.png"), fullPage: true });
+    } finally { await desktopContext.close(); }
+
+    const phoneContext = await newContext(browser, phone, "dark", sessionValue);
+    try {
+      const page = await phoneContext.newPage();
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("button", { name: "Show threads" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.waitFor();
+      await dialog.getByText(title, { exact: true }).waitFor();
+      await dialog.getByText("Pinned", { exact: true }).waitFor();
+      await settleAnimations(page);
+      await page.screenshot({ path: join(pinShotsDir, "chat-list-390x844-dark.png"), fullPage: true });
+    } finally { await phoneContext.close(); }
   }
 
   // Stack role state is supplied by the fixture Stack. Intercept health to

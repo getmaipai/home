@@ -252,16 +252,9 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
  * exact pattern) - slice 1's "no thread list, so no id to resolve"
  * comment no longer applies.
  *
- * No Pin here: the shipped Element's own "more" menu is Rename /
- * Archive / Delete, not Rename / Pin / Delete - the OLD shell's own
- * `assistant-ui/thread-list.aui.tsx` (Home's own product composition,
- * outside the vendored path) added Pin by hand against
- * `updateCustom({pinned})`; the vendored Elements version never grew
- * that action, and forking it to add one would be exactly what "the
- * kit wraps and composes, it does not fork" forbids. Archive itself
- * stays wired to `chatThreadListAdapter.ts`'s own deliberate refusal
- * ("the shared record has no archive state") - that decision predates
- * this slice and isn't this slice's call to revisit.
+ * Pinning uses the kit's opt-in `pinnable` Element prop and the adapter's
+ * existing `custom.pinned` persistence. Incognito passes it as false so
+ * temporary threads never offer Pin.
  *
  * Slice 3 (tools and generative UI): weather's and almanac-date's own
  * structured result renders through the shipped `SpecSheet` Element
@@ -319,9 +312,11 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
 function NextThreadList({
   onNewThread,
   collapseToggle,
+  pinnable,
 }: {
   onNewThread: () => void;
   collapseToggle?: ReactNode;
+  pinnable: boolean;
 }) {
   const [search, setSearch] = useState("");
   const aui = useAui();
@@ -349,7 +344,7 @@ function NextThreadList({
         <ThreadListNew label="New chat" className="min-h-12" onClick={onNewThread} disabled={availability === "unavailable"} />
       </div>
       {hasThreads && <ThreadSearch threads={searchableThreads} query={search} activeId={aui.threadListItem().getState().id ?? ""} onQueryChange={setSearch} onSelect={(id) => void aui.threads.switchToThread(id)} inputOnly aria-label="Search chats" className="-ms-0.5" />}
-      <ThreadListItems searchQuery={hasThreads ? search : ""} />
+      <ThreadListItems searchQuery={hasThreads ? search : ""} pinnable={pinnable} />
     </ThreadListRoot>
   );
 }
@@ -1378,7 +1373,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // exactly this (a code review caught two call sites drifting once one
   // grew props the other didn't). The persistent desktop rail gets its
   // own instance below, since it alone carries the collapse toggle.
-  const threadList = <NextThreadList onNewThread={() => setSheetOpen(false)} />;
+  const threadList = <NextThreadList onNewThread={() => setSheetOpen(false)} pinnable={!temporaryNext} />;
   const closeArtifact = () => setOpenArtifactId(null);
   const closeCompare = () => setCompareTarget(null);
   // The toggle (see the CHAT-UI-02 comment above the state
@@ -1754,6 +1749,7 @@ export function NextChatPage({ person }: { person: Roster }) {
               <NextThreadList
                 onNewThread={() => { setSheetOpen(false); setRailPeeked(false); }}
                 collapseToggle={inlineToggle}
+                pinnable={!temporaryNext}
               />
             </div>
             {railCollapsed && !railPeeked ? collapsedToggle : null}
