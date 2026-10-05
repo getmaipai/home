@@ -75,6 +75,7 @@ const useWebkit = process.argv.includes("--webkit");
 // in the browser Jesse actually uses - headless only (this file's own
 // rule), Playwright's own firefox channel.
 const useFirefox = process.argv.includes("--firefox") || process.env.BROWSER?.toLowerCase() === "firefox";
+const chatIncognitoAudit = process.argv.includes("--chat-incognito-audit");
 
 // backend/ and frontend/ pin the same @maipai/spec tag, so backend's
 // package.json is as good a source as either for the worktree this
@@ -134,7 +135,9 @@ async function runPool<T, R>(items: readonly T[], poolSize: number, worker: (ite
 // path is the one that must never move; every other browser writes under
 // its own gitignored subdirectory instead; `bun run screenshots` (default,
 // no `--webkit`) is unaffected by any of this.
-const SCREENS_DIR = useWebkit ? join(ROOT, "docs", "assets", "screens", "webkit") : join(ROOT, "docs", "assets", "screens");
+const SCREENS_DIR = chatIncognitoAudit
+  ? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/incognito-shots"
+  : useWebkit ? join(ROOT, "docs", "assets", "screens", "webkit") : join(ROOT, "docs", "assets", "screens");
 const HERO_PATH = useWebkit ? join(ROOT, "docs", "assets", "webkit", "hero.png") : join(ROOT, "docs", "assets", "hero.png");
 const dedicatedScreenshots: Array<{ file: string; route: string; viewport: string; theme: string }> = [];
 
@@ -513,7 +516,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (chatArtifactCapture || chatPageScreenshotFixture) {
+  if (chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit) {
     for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -1690,6 +1693,192 @@ async function captureChatTemporaryReview(browser: Browser, sessionValue: string
     const screenshot = "chat-temporary-mode-desktop-light.png";
     await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
     dedicatedScreenshots.push({ file: screenshot, route: "chat-temporary-mode", viewport: viewport.slug, theme: "light" });
+  } finally {
+    await context.close();
+  }
+}
+
+/** THIN-INC INC-4: a real Chromium run through the complete Incognito lifecycle.
+ * Captures are written to the coordinator's scratch audit directory, not the
+ * product screenshot set. Marker checks inspect browser storage and SQLite. */
+async function captureChatIncognitoAudit(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = SCREENS_DIR;
+  mkdirSync(outDir, { recursive: true });
+  const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const people = await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json() as Array<{ id: string; display_name: string; role: string }>;
+  const sage = people.find((person) => person.display_name === "Sage");
+  if (!sage) throw new Error("Incognito audit could not find seeded Sage");
+  const appearance = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: `person:${sage.id}`, key: "ui.appearance", value: "dark" }),
+  });
+  if (!appearance.ok) throw new Error(`Incognito audit could not seed dark appearance: ${appearance.status}`);
+  const context = await newContext(browser, desktop, "dark", sessionValue);
+  const marker = "incognito-marker-b27-20261005";
+  const draftMarker = "incognito-draft-marker-b27-20261005";
+  const results: Array<{ step: number; status: "PASS" | "FAIL"; evidence: string }> = [];
+  const record = (step: number, ok: boolean, evidence: string) => {
+    results.push({ step, status: ok ? "PASS" : "FAIL", evidence });
+    if (!ok) throw new Error(`INC-4 SAFETY DEFECT step ${step}: ${evidence}`);
+  };
+  const shot = async (step: number, viewport: ViewportSpec = desktop) => {
+    const page = viewport.slug === "phone" ? await (await newContext(browser, phone, "dark", sessionValue)).newPage() : context.pages()[0]!;
+    if (viewport.slug === "phone") {
+      await page.addInitScript(() => {
+        localStorage.setItem("vite-ui-theme", "dark");
+        document.documentElement.classList.add("dark");
+      });
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("button", { name: "Incognito Off", exact: true }).click();
+      await page.getByRole("dialog").getByRole("heading", { name: "What Incognito does" }).waitFor();
+      await page.getByRole("button", { name: "Got it", exact: true }).click();
+      await page.getByRole("button", { name: "Incognito On", exact: true }).waitFor();
+      await page.evaluate(() => document.documentElement.classList.add("dark"));
+    } else {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    }
+    await settleAnimations(page);
+    const file = `step-${step}-${viewport.width}-dark.png`;
+    const path = join(outDir, file);
+    await page.screenshot({ path, fullPage: true });
+    dedicatedScreenshots.push({ file, route: "incognito-audit", viewport: viewport.slug, theme: "dark" });
+    console.log(`[incognito-audit] screenshot ${path}`);
+    if (viewport.slug === "phone") await page.context().close();
+  };
+  const page = await context.newPage();
+  page.setDefaultTimeout(15000);
+  try {
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor();
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+    // Seed a durable chat so the Incognito list can prove it excludes real history.
+    await page.getByRole("textbox", { name: "Message input" }).fill("A normal stored chat for the audit.");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByText("This is a normal chat response.", { exact: true }).waitFor();
+    const storedListResponse = await fetch(`${BASE_URL}/api/conversations`, { headers: { Cookie: `session=${sessionValue}` } });
+    const storedBefore = storedListResponse.ok ? await storedListResponse.json() as Array<{ id: string }> : [];
+    if (!storedListResponse.ok || storedBefore.length < 1) throw new Error(`could not seed stored chat: ${storedListResponse.status}`);
+
+    const desktopToggle = page.getByRole("button", { name: "Incognito Off", exact: true }).first();
+    await desktopToggle.click();
+    await page.getByRole("dialog").getByRole("heading", { name: "What Incognito does" }).waitFor();
+    await page.getByRole("button", { name: "Got it", exact: true }).click();
+    await page.getByRole("button", { name: "Incognito On", exact: true }).waitFor();
+    await page.waitForTimeout(300);
+    await shot(1);
+    await shot(1, phone);
+    const listText = await page.locator("body").innerText();
+    if (!/Incognito/i.test(listText)) throw new Error("INC-4 SAFETY DEFECT step 1: Incognito state has no visible indication");
+    record(1, !storedBefore.some((row) => listText.includes(row.id)) && !/Pinned/i.test(listText) && !/Pin chat/i.test(listText), "Incognito on; only temporary list visible, no stored chat IDs, Pin action, or Pinned group");
+
+    await page.getByRole("textbox", { name: "Message input" }).fill(`Please repeat exactly ${marker}`);
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByText("This is a normal chat response.", { exact: true }).waitFor();
+    await page.waitForTimeout(900);
+    const activeTitle = await page.locator("[data-thread-list-item][aria-current='page'], [data-active='true']").first().getAttribute("title").catch(() => null);
+    const temporaryList = await (await fetch(`${BASE_URL}/api/conversations/incognito`, { headers: { Cookie: `session=${sessionValue}` } })).json() as Array<{ id: string; title?: string | null }>;
+    const normalRows = await (await fetch(`${BASE_URL}/api/conversations`, { headers: { Cookie: `session=${sessionValue}` } })).json() as Array<{ id: string }>;
+    await shot(2);
+    record(2, temporaryList.length === 1 && temporaryList[0]?.title == null && !normalRows.some((row) => row.id === temporaryList[0]?.id) && !activeTitle?.includes(marker), `streamed reply shown; temporary-only session listed; title=${JSON.stringify(temporaryList[0]?.title)}; no normal-list row`);
+
+    await page.getByRole("textbox", { name: "Message input" }).fill(draftMarker);
+    await page.getByRole("button", { name: "New thread", exact: true }).click().catch(async () => {
+      await page.getByRole("button", { name: /New chat|New thread/i }).first().click();
+    });
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+    await page.getByRole("button", { name: "Incognito On", exact: true }).click();
+    await page.getByRole("button", { name: "Incognito Off", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Incognito Off", exact: true }).click();
+    await page.getByRole("button", { name: "Incognito On", exact: true }).waitFor();
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+    const restorePrompt = await page.getByText(draftMarker, { exact: false }).count();
+    await shot(3);
+    record(3, restorePrompt === 0, "draft was not restored and no restore prompt is shown after switching away and back");
+
+    // Keyboard shortcuts are registered on the real ChatThread while a live
+    // temporary conversation is active.
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await page.getByRole("textbox", { name: "Message input" }).fill(`searchable ${marker}`);
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByText("This is a normal chat response.", { exact: true }).waitFor();
+    await page.locator('[data-slot="aui_thread-viewport"]').click({ position: { x: 400, y: 160 } });
+    await page.keyboard.press("Control+f");
+    await page.getByRole("textbox", { name: "Find in conversation" }).waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator('[data-slot="aui_thread-viewport"]').click({ position: { x: 400, y: 160 } });
+    await page.keyboard.press("Control+k");
+    await page.getByRole("combobox", { name: "Type a command" }).waitFor();
+    await page.getByRole("option", { name: /Toggle Incognito/i }).waitFor();
+    await page.keyboard.press("Escape");
+    await shot(4);
+    record(4, true, "Cmd+F opens in-chat search and Cmd+K palette opens with Incognito command");
+
+    const storageBeforeToggleOff = await page.evaluate(async () => {
+      const values: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) { const key = localStorage.key(i)!; values.push(`${key}=${localStorage.getItem(key) ?? ""}`); }
+      for (let i = 0; i < sessionStorage.length; i++) { const key = sessionStorage.key(i)!; values.push(`${key}=${sessionStorage.getItem(key) ?? ""}`); }
+      if (indexedDB.databases) for (const dbInfo of await indexedDB.databases()) {
+        if (!dbInfo.name) continue;
+        const db = await new Promise<IDBDatabase>((resolve, reject) => { const request = indexedDB.open(dbInfo.name!); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
+        for (const name of Array.from(db.objectStoreNames)) {
+          const tx = db.transaction(name, "readonly");
+          const rows = await new Promise<unknown[]>((resolve, reject) => { const req = tx.objectStore(name).getAll(); req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error); });
+          values.push(`${dbInfo.name}/${name}=${JSON.stringify(rows)}`);
+        }
+        db.close();
+      }
+      return values;
+    });
+    const storeResponse = await page.evaluate(() => ({ localStorage: Object.keys(localStorage), sessionStorage: Object.keys(sessionStorage), indexedDB: [] as string[] }));
+    console.log(`[incognito-audit] browser storage before toggle off ${JSON.stringify({ ...storeResponse, values: storageBeforeToggleOff })}`);
+    await page.getByRole("button", { name: "Incognito On", exact: true }).click();
+    await page.getByRole("button", { name: "Incognito Off", exact: true }).first().waitFor();
+    await page.waitForTimeout(250);
+    const normalListAfter = await (await fetch(`${BASE_URL}/api/conversations`, { headers: { Cookie: `session=${sessionValue}` } })).json() as Array<{ id: string }>;
+    const incognitoAfter = await (await fetch(`${BASE_URL}/api/conversations/incognito`, { headers: { Cookie: `session=${sessionValue}` } })).json() as Array<{ id: string }>;
+    await shot(5);
+    await shot(5, phone);
+    record(5, incognitoAfter.length === 0 && normalListAfter.some((row) => row.id === storedBefore[0]?.id), "temporary session discarded, stored list returns");
+
+    await page.reload();
+    await page.getByRole("heading", { level: 1 }).first().waitFor();
+    await page.waitForTimeout(250);
+    const afterReload = await (await fetch(`${BASE_URL}/api/conversations/incognito`, { headers: { Cookie: `session=${sessionValue}` } })).json() as Array<{ id: string }>;
+    record(5, afterReload.length === 0, "reload does not restore the temporary session");
+    const leakedStorage = storageBeforeToggleOff.filter((value) => value.includes(marker) || value.includes(draftMarker));
+    record(6, leakedStorage.length === 0, `browser storage key/value scan contains no marker text; ${storageBeforeToggleOff.length} values inspected`);
+    await shot(6);
+    await Bun.write(join(outDir, "storage-audit.json"), JSON.stringify({ keys: storeResponse, inspectedValues: storageBeforeToggleOff.length, markerMatches: leakedStorage }, null, 2) + "\n");
+
+    // SQLite snapshot search over every table and every value.
+    const dbPath = join(DATA_DIR, "hub.db");
+    const dbCheck = Bun.spawnSync({ cmd: ["bun", "-e", `const { Database } = require("bun:sqlite"); const db = new Database(${JSON.stringify(dbPath)}, { readonly: true }); const tables = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all(); const hits=[]; for (const {name} of tables) { const cols=db.query("PRAGMA table_info('"+name.replaceAll("'","''")+"')").all(); if (!cols.length) continue; const sql='SELECT * FROM "'+name.replaceAll('"','""')+'"'; for (const row of db.query(sql).all()) { const value=JSON.stringify(row); if (value.includes(${JSON.stringify(marker)}) || value.includes(${JSON.stringify(draftMarker)})) hits.push({table:name,row:value}); } } console.log(JSON.stringify({tables:tables.length,hits})); db.close();`], cwd: ROOT, stdout: "pipe", stderr: "pipe" });
+    if (dbCheck.exitCode !== 0) throw new Error(`INC-4 database scan failed: ${dbCheck.stderr.toString()}`);
+    const dbEvidence = JSON.parse(dbCheck.stdout.toString()) as { tables: number; hits: unknown[] };
+    await Bun.write(join(outDir, "database-audit.json"), JSON.stringify(dbEvidence, null, 2) + "\n");
+    record(7, dbEvidence.hits.length === 0, `scanned ${dbEvidence.tables} SQLite tables; marker hits=${dbEvidence.hits.length}`);
+    await shot(7);
+
+    // Sessions for the seeded teen/child are secret-free and can use /select.
+    const people = await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json() as Array<{ id: string; display_name: string; role: string }>;
+    for (const profile of [people.find((p) => p.display_name === "Nova")!, people.find((p) => p.display_name === "Marlow")!]) {
+      const select = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: profile.id }) });
+      const cookie = select.headers.get("set-cookie")?.split(";")[0];
+      if (!select.ok || !cookie) throw new Error(`INC-4 SAFETY DEFECT: could not authenticate ${profile.display_name}`);
+      const turn = await fetch(`${BASE_URL}/api/turn/stream`, { method: "POST", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ surface: "chat", text: `child gate ${marker}`, temporary: true }) });
+      const issued = await fetch(`${BASE_URL}/api/settings/api-token`, { method: "POST", headers: { Cookie: cookie } });
+      const token = issued.ok ? (await issued.json() as { token: string }).token : "";
+      if (!token) throw new Error(`INC-4 audit could not issue API token for ${profile.display_name}: ${issued.status}`);
+      const openai = await fetch(`${BASE_URL}/v1/chat/completions`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ model: "maipai", messages: [{ role: "user", content: `child gate ${marker}` }], temporary: true }) });
+      record(8, turn.status === 403 && openai.status === 403, `${profile.role} direct temporary request: /api/turn/stream=${turn.status}, /v1/chat/completions=${openai.status}`);
+    }
+    await shot(8);
+
+    const report = ["# Incognito browser audit", "", "| Step | Result | Evidence |", "|---:|:---:|---|", ...results.map((row) => `| ${row.step} | ${row.status} | ${row.evidence.replaceAll("|", "\\|")} |`), ""].join("\n");
+    await Bun.write(join(outDir, "audit-results.md"), report);
+    console.log(report);
   } finally {
     await context.close();
   }
@@ -6459,6 +6648,7 @@ async function main() {
     return undefined;
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    if (chatIncognitoAudit) return "This is a normal chat response.";
     if (text.includes("D22 streaming")) return Array.from({ length: SCREENSHOT_STREAM_WORDS }, (_, i) => `Streamed reply word${i + 1}.`).join(" ");
     if (chatPageScreenshotFixture) return SCREENSHOT_CHAT_REPLY;
     if (text.includes(RICH_REPLY_PROMPT)) return RICH_REPLY_MARKDOWN;
@@ -6511,7 +6701,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture ? startScreenshotStack(chatModel.url) : undefined;
+  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit ? startScreenshotStack(chatModel.url) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -6528,7 +6718,7 @@ async function main() {
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
       // This matrix never calls speech; all speech requests go to the Stack.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", ...(!chatIncognitoAudit ? { MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1" } : {}), MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
       stdout: "pipe",
       stderr: "inherit",
     });
@@ -6883,6 +7073,11 @@ async function main() {
 
     if (nextChatAuditReview) {
       await captureNextChatAuditReview(browser, sessionValue);
+      return;
+    }
+
+    if (chatIncognitoAudit) {
+      await captureChatIncognitoAudit(browser, sessionValue);
       return;
     }
 
