@@ -52,6 +52,11 @@ describe("parsing", () => {
     expect(parseSummary(out)).toEqual({ pass: 12, fail: 1, tests: 13, files: 3 });
   });
 
+  test("parseSummary uses the final footer after a nested bun summary", () => {
+    const out = "Ran 2 tests across 1 files. [0.1s]\n 76 pass\n 0 fail\nRan 76 tests across 8 files. [4.2s]\n";
+    expect(parseSummary(out).files).toBe(8);
+  });
+
   test("failedTests names each red test", () => {
     expect(failedTests("(pass) a\n(fail) b > c [3ms]\n")).toEqual(["(fail) b > c [3ms]"]);
   });

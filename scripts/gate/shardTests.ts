@@ -91,11 +91,13 @@ export interface Summary {
 /** Reads bun test's closing lines (" 12 pass", " 0 fail", "Ran 12 tests across 3 files."). */
 export function parseSummary(output: string): Summary {
   const num = (re: RegExp) => Number(re.exec(output)?.[1] ?? 0);
+  const footers = [...output.matchAll(/^Ran (\d+) tests? across (\d+) files?\./gm)];
+  const footer = footers.at(-1);
   return {
     pass: num(/^\s*(\d+) pass\b/m),
     fail: num(/^\s*(\d+) fail\b/m),
-    tests: num(/Ran (\d+) tests? across/),
-    files: num(/across (\d+) files?\./),
+    tests: Number(footer?.[1] ?? 0),
+    files: Number(footer?.[2] ?? 0),
   };
 }
 
