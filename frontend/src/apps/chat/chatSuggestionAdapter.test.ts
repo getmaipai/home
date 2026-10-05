@@ -1,6 +1,8 @@
-import { describe, expect, test, mock } from "bun:test";
+import { afterEach, describe, expect, test, mock, spyOn } from "bun:test";
 import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
-import type { PackageManifest } from "@/lib/api";
+import { api, type PackageManifest } from "@/lib/api";
+
+afterEach(() => mock.restore());
 
 function manifest(id: string, examples?: string[]): PackageManifest {
   return {
@@ -22,54 +24,35 @@ function manifest(id: string, examples?: string[]): PackageManifest {
   } as PackageManifest;
 }
 
-function stubPlugins(manifests: PackageManifest[]): () => void {
-  const original = globalThis.fetch;
-  globalThis.fetch = mock((input: RequestInfo | URL) => {
-    const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("/api/plugins")) return Promise.resolve(new Response(JSON.stringify(manifests), { status: 200 }));
-    throw new Error(`unstubbed fetch: ${url}`);
-  }) as unknown as typeof fetch;
-  return () => (globalThis.fetch = original);
+function stubPlugins(manifests: PackageManifest[]) {
+  return spyOn(api, "plugins").mockResolvedValue(manifests as never);
 }
 
 describe("createChatSuggestionAdapter", () => {
   test("takes the first routing example from up to three installed packages", async () => {
-    const restore = stubPlugins([
+    stubPlugins([
       manifest("weather", ["What's the weather tomorrow?", "Will it rain today?"]),
       manifest("calendar", ["What's on my calendar?"]),
       manifest("recipes", ["Suggest a dinner recipe"]),
       manifest("timers", ["Set a 10 minute timer"]),
     ]);
-    try {
-      const suggestions = await createChatSuggestionAdapter().generate({ messages: [], signal: undefined });
-      expect(suggestions).toEqual([
-        { prompt: "What's the weather tomorrow?" },
-        { prompt: "What's on my calendar?" },
-        { prompt: "Suggest a dinner recipe" },
-      ]);
-    } finally {
-      restore();
-    }
+    const suggestions = await createChatSuggestionAdapter().generate({ messages: [], signal: undefined });
+    expect(suggestions).toEqual([
+      { prompt: "What's the weather tomorrow?" },
+      { prompt: "What's on my calendar?" },
+      { prompt: "Suggest a dinner recipe" },
+    ]);
   });
 
   test("skips a package that declares no routing examples", async () => {
-    const restore = stubPlugins([manifest("no-examples"), manifest("weather", ["What's the weather?"])]);
-    try {
-      const suggestions = await createChatSuggestionAdapter().generate({ messages: [], signal: undefined });
-      expect(suggestions).toEqual([{ prompt: "What's the weather?" }]);
-    } finally {
-      restore();
-    }
+    stubPlugins([manifest("no-examples"), manifest("weather", ["What's the weather?"])]);
+    const suggestions = await createChatSuggestionAdapter().generate({ messages: [], signal: undefined });
+    expect(suggestions).toEqual([{ prompt: "What's the weather?" }]);
   });
 
   test("returns no suggestions rather than throwing when the plugins list fails to load", async () => {
-    const original = globalThis.fetch;
-    globalThis.fetch = mock(() => Promise.reject(new Error("network error"))) as unknown as typeof fetch;
-    try {
-      const suggestions = await createChatSuggestionAdapter().generate({ messages: [], signal: undefined });
-      expect(suggestions).toEqual([]);
-    } finally {
-      globalThis.fetch = original;
-    }
+    spyOn(api, "plugins").mockRejectedValue(new Error("network error"));
+    const suggestions = await createChatSuggestionAdapter().generate({ messages: [], signal: undefined });
+    expect(suggestions).toEqual([]);
   });
 });

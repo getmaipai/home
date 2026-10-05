@@ -1,7 +1,10 @@
-import { describe, expect, test, mock } from "bun:test";
+import { afterEach, describe, expect, test, mock } from "bun:test";
 import { chosenBranchHeadId, createChatHistoryAdapter, rowsToBranchableMessages } from "@/apps/chat/chatHistoryAdapter";
 import type { ConversationTurnWithMemoryIds } from "@/lib/api";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
+
+const originalFetch = globalThis.fetch;
+afterEach(() => { globalThis.fetch = originalFetch; });
 
 function makeRow(id: string, replyText: string, memoryIds: string[] = [], supersedes: string | null = null, branch: { parentTurnId?: string | null; branchChosen?: boolean; hlc?: string } = {}): ConversationTurnWithMemoryIds {
   return {

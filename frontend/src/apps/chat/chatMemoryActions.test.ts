@@ -1,7 +1,10 @@
-import { describe, expect, test, mock } from "bun:test";
+import { afterEach, describe, expect, test, mock } from "bun:test";
 import { forgetMessage, rememberMessage } from "@/apps/chat/chatMemoryActions";
 import { useMemoryState } from "@/apps/chat/chatMemoryState";
 import { renderHook } from "@testing-library/react";
+
+const originalFetch = globalThis.fetch;
+afterEach(() => { globalThis.fetch = originalFetch; });
 
 function stubFetch(): { restore: () => void; calls: { url: string; body: unknown }[] } {
   const original = globalThis.fetch;

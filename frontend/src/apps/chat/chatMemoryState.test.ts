@@ -1,6 +1,9 @@
-import { describe, expect, test, mock } from "bun:test";
+import { afterEach, describe, expect, test, mock } from "bun:test";
 import { renderHook, waitFor } from "@testing-library/react";
 import { deriveMemoryStatus, useMemoryState, useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
+
+const originalFetch = globalThis.fetch;
+afterEach(() => { globalThis.fetch = originalFetch; });
 
 describe("deriveMemoryStatus", () => {
   test("real memory ids always win, regardless of source or judge status", () => {

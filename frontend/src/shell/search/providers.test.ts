@@ -1,5 +1,8 @@
-import { describe, test, expect, mock } from "bun:test";
+import { afterEach, describe, test, expect, mock } from "bun:test";
 import { runSearchProviders } from "@/shell/search/providers";
+
+const originalFetch = globalThis.fetch;
+afterEach(() => { globalThis.fetch = originalFetch; });
 
 // One provider is independent and best-effort of every other (`step 6:
 // "a failing provider contributes nothing"`), so each test here stubs
