@@ -57,7 +57,18 @@ wins.
    thinking allowance. Trimming must not break the prompt-cache prefix
    on every turn. The rolling summary and episode recall are defined on
    the same boundary, and persisted and temporary conversations use one
-   window builder.
+   window builder. A conversation never fails because it is long. When
+   history passes the window, old tool results are cleared first, then
+   the oldest exchanges are folded into the rolling summary in blocks
+   at checkpoints, never one turn at a time, and no exchange leaves the
+   window before its fold is stored. The summary is data, passes the
+   person's output floor before it is stored, and never holds crisis,
+   consent or age state. A spoken turn never tells the person a
+   conversation is too long. Only on written chat, and only when the
+   stable prefix, the summary at its cap and the current message cannot
+   fit together, the reply offers a new chat that carries the summary
+   forward. (Owner-approved 2026-10-05; design note
+   DESIGN-context-compaction-2026-10-05.)
 5. **No length cap on adult written chat.** No instruction tells the
    model how many words to write, and `max_tokens` is a ceiling, not a
    target. A child's or teen's chat, any spoken turn (robot, pod, phone,
