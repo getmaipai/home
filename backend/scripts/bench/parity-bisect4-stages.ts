@@ -66,12 +66,7 @@ export const THINKING_ON_MAX_TOKENS = RESIDENT_BUDGET.reply_ceiling_tokens + RES
 // without it would not be testing the shape a real turn actually sends.
 // Built the same way toolSpecFor() does (loadManifestOnly()),
 // filesystem-only, no DB - safe at module scope here too. Does NOT
-// mirror toolSpecFor's ANSWER_FROM_CONTEXT_TOOL_ID special case (that
-// ToolSpec constant is private to model.ts, not exported, and this
-// file makes no production source changes to get at it) - the assert
-// below turns that gap into a loud failure instead of a silent one if
-// this budget's own answer_from_context_tool ever flips true. It DOES
-// mirror toolSpecFor's other virtual-tool special case, start_project
+// mirror toolSpecFor's virtual-tool special case, start_project
 // (PROJECT-START-01): that ToolSpec constant IS exported (lib/projects/
 // tool.ts's own header - a virtual tool the same shape answer_from_
 // this_conversation is, with no backend/packages/start_project manifest
@@ -85,9 +80,6 @@ export const THINKING_ON_MAX_TOKENS = RESIDENT_BUDGET.reply_ceiling_tokens + RES
 // never a silently shorter tool list: "five-tool block present" is the
 // ruling's own literal test condition, not "up to five."
 function productionTools(): ToolSpec[] {
-  if (RESIDENT_BUDGET.answer_from_context_tool) {
-    throw new Error("productionTools() does not build the answer-from-context tool - RESIDENT_BUDGET.answer_from_context_tool is now true, so this bench's tool block no longer matches production's");
-  }
   const tools = RESIDENT_BUDGET.tools_offered
     .slice()
     .sort()

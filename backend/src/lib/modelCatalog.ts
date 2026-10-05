@@ -108,7 +108,6 @@ export const CATALOG: ModelCapabilities[] = [
       // proves a line exists in the conversation, not that it is true,
       // which is what recycled the Chile follow-up's hallucinated name
       // in the skeleton run.
-      answer_from_context_tool: false,
       model_transitions: true,
       context_tokens: 4000,
       // THINK-DEFAULT-01 (dev.md "U6 rerun ruling" (b) 1, spec-v0.1.27):

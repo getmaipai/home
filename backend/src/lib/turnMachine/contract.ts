@@ -99,7 +99,6 @@ export type PolicyDecision =
 export interface TurnBudget {
   rounds: 0 | 1 | 2;
   tools_offered: string[];
-  answer_from_context_tool: boolean;
   model_transitions: boolean;
   context_tokens: number;
   /** THINK-DEFAULT-01 (spec-v0.1.27): the turn's default when the

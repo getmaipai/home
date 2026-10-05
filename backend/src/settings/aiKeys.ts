@@ -59,22 +59,6 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.ai",
     honoured_by: ["home"],
   }),
-  // THIN-7D: RETIRED, nothing reads this key any more (the old engine is
-  // deleted, every turn runs the machine, a stored value is ignored). It stays
-  // declared only because the pinned spec (spec-v0.1.71 settings/keys.json)
-  // still carries it and the registry must match the spec; the spec removal
-  // is the follow-up THIN-7F, after which this entry is deleted.
-  SettingsKey.parse({
-    key: "turn.pipeline.next",
-    scope: "household",
-    selector: "boolean",
-    default: true,
-    label: "Use the new reply engine",
-    help: "On uses the rebuilt engine (the default since U6). Off falls back to the old one.",
-    level: "advanced",
-    lives_in: "household.ai",
-    honoured_by: ["home", "bot"],
-  }),
   // THIN-5C (docs/design/RULES.md rule 10, SAFETY.md): the only admin choice
   // that moves a minor's output gate, and it chooses between two checked
   // modes; nothing turns the gate off. Household scope: it gives no admin

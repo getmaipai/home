@@ -29,7 +29,6 @@ function withStreamDeadlines(budget: Omit<TurnBudget, "deadlines_ms"> & { deadli
 export const NO_RECORD_BUDGET: TurnBudget = {
   rounds: 0,
   tools_offered: [],
-  answer_from_context_tool: false,
   model_transitions: false,
   context_tokens: 2000,
   thinking_budget_tokens: 0,
