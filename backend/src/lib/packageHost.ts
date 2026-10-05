@@ -953,7 +953,7 @@ export function __resetSearchCacheForTests(): void {
   searchInFlight.clear();
 }
 
-type SearchOptions = { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; signal?: AbortSignal; deadlineAt?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number };
+type SearchOptions = { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number };
 
 export async function searxngSearch(args: unknown, opts: SearchOptions = {}): Promise<SearxngSearchResult> {
   const parentSignal = opts.signal;
@@ -1009,7 +1009,7 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
       if (retryNext.length === 0) {
         // Benching during the request emptied the pool: the first request left the
         // Wikipedia fallback for a retry that cannot happen, so try it here.
-        const fallback = opts.allowWikipediaFallback ?? true ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt) : null;
+        const fallback = (opts.allowWikipediaFallback ?? true) && opts.speakerBand === "adult" ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt, opts.speakerBand) : null;
         if (fallback) return fallback;
         throw err;
       }
@@ -1018,7 +1018,7 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
     if (!rotationPool || !requestEngines || requestEngines.length === 0 || result.rows.length >= 3) return result;
     const more = pickSearchEngines(rotationPool, asked);
     if (more.length === 0) {
-      const fallback = result.text === SEARXNG_NO_RESULTS_TEXT && (opts.allowWikipediaFallback ?? true) && next.length > 0 ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt) : null;
+      const fallback = result.text === SEARXNG_NO_RESULTS_TEXT && (opts.allowWikipediaFallback ?? true) && opts.speakerBand === "adult" && next.length > 0 ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt, opts.speakerBand) : null;
       return fallback ?? result;
     }
     const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...more, ...wikipedia] });
@@ -1253,7 +1253,7 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
       // answer a household member's question from, and Wikipedia is
       // one more real chance to before giving up.
       if (text === SEARXNG_NO_RESULTS_TEXT && allowWikipediaFallback) {
-        const fallback = await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt);
+        const fallback = await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt, opts.speakerBand);
         if (fallback) {
           // A review, 2026-09-24, caught the first cut returning here
           // before this call - SearXNG really did just answer "ok"
@@ -1296,7 +1296,7 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
     // mapping), which would have silently masked a real code defect as
     // a clean Wikipedia answer instead of the loud failure a bug needs.
     if (allowWikipediaFallback && err instanceof HostError && (err.code === "network_unreachable" || err.code === "search_unavailable")) {
-      const fallback = await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt);
+      const fallback = await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt, opts.speakerBand);
       if (fallback) return fallback;
     }
     throw err;
@@ -1453,7 +1453,8 @@ export function floorSearchResult(result: SearxngSearchResult, _band: MinorBand)
  * itself already refused to run at all if `search.searxng_url` were
  * unset). `null` on any failure, the identical "the caller falls back
  * to what it already had" contract `wikipediaFallback()` itself uses. */
-async function tryWikipediaFallback(query: string, signal?: AbortSignal, deadlineAt?: number): Promise<SearxngSearchResult | null> {
+async function tryWikipediaFallback(query: string, signal?: AbortSignal, deadlineAt?: number, speakerBand?: "child" | "teen" | "adult"): Promise<SearxngSearchResult | null> {
+  if (speakerBand !== "adult") return null;
   const enabled = getHouseholdSettingValue("search.wikipedia_fallback") as boolean | undefined;
   if (enabled === false) return null;
   return wikipediaFallback(query, signal, deadlineAt);
@@ -2072,7 +2073,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const input = args as { query?: unknown; category?: unknown } | undefined;
           const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role, runtime.signal) : null;
           if (hosted) return hosted;
-          return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, ...(band === "adult" ? {} : { minorBand: band }) });
+          return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }) });
         }
         if (id === "searxng" && method === "page.read") {
           const doc = await searxngPageRead(args, runtime.signal);

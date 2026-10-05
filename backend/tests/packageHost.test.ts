@@ -2168,7 +2168,7 @@ describe("search engine choice: three engines ranked by recent health (THIN-GROU
     process.env.MAIPAI_WIKIPEDIA_BASE_URL = `http://127.0.0.1:${wiki.port}`;
     const fake = fakeSearxng(() => ({ results: [], unresponsive_engines: ["alpha", "bravo", "charlie", "delta"].map((e) => [e, "Suspended: too many requests"]) }));
     try {
-      const result = await searxngSearch({ query: "juniper" });
+      const result = await searxngSearch({ query: "juniper" }, { speakerBand: "adult" });
       expect(fake.asked).toHaveLength(1);
       expect(result.rows[0]!.title).toBe("Juniper (topic)");
     } finally {
@@ -2250,7 +2250,7 @@ describe("SEARCH-BUDGET-01", () => {
     await setupBudgetSearch(`http://127.0.0.1:${hanging.port}`);
     const started = Date.now();
     try {
-      const result = await searxngSearch({ query: "budget fallback listener" });
+      const result = await searxngSearch({ query: "budget fallback listener" }, { speakerBand: "adult" });
       expect(result.rows.length).toBeGreaterThan(0);
       expect(result.rows[0]?.title).toBe("Budget result");
       expect(acceptedRequests).toBeGreaterThan(0);
@@ -2273,7 +2273,7 @@ describe("SEARCH-BUDGET-01", () => {
       return realFetch(input, init);
     });
     await setupBudgetSearch("http://127.0.0.1:1");
-    const result = await searxngSearch({ query: "budget fallback closed port" });
+    const result = await searxngSearch({ query: "budget fallback closed port" }, { speakerBand: "adult" });
     expect(result.rows.length).toBeGreaterThan(0);
     expect(fallbackCalls).toBe(2);
   });
@@ -2301,7 +2301,7 @@ describe("SEARCH-BUDGET-01", () => {
       });
     });
     await setupBudgetSearch("http://192.0.2.1:8080");
-    const result = await searxngSearch({ query: "budget fallback no connect" });
+    const result = await searxngSearch({ query: "budget fallback no connect" }, { speakerBand: "adult" });
     expect(result.rows.length).toBeGreaterThan(0);
     expect(searxngAborted).toBe(true);
     expect(fallbackCalls).toBe(2);
@@ -2319,9 +2319,59 @@ describe("SEARCH-BUDGET-01", () => {
       return Response.json({ results: [{ title: "SearXNG source", url: "https://example.com/result", content: "SearXNG answer" }] });
     });
     await setupBudgetSearch("http://search.test");
-    const result = await searxngSearch({ query: "budget healthy search" });
+    const result = await searxngSearch({ query: "budget healthy search" }, { speakerBand: "adult" });
     expect(result.rows[0]?.title).toBe("SearXNG source");
     expect(fallbackCalls).toBe(0);
+  });
+
+  async function searchAs(role: "child" | "teen" | "adult", setting = true) {
+    const actor = { ...(await owner()), role } as Awaited<ReturnType<typeof owner>>;
+    setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+    setHouseholdSettingValue("search.wikipedia_fallback", setting);
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wikiBase;
+    let fallbackCalls = 0;
+    const realFetch = globalThis.fetch.bind(globalThis);
+    __setPackageFetchForTests(async (input, init) => {
+      const url = new URL(typeof input === "string" || input instanceof URL ? input.toString() : input.url);
+      if (url.origin === wikiBase) {
+        fallbackCalls++;
+        return fakeWikipedia(url);
+      }
+      return realFetch(input, init);
+    });
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    return { host, getFallbackCalls: () => fallbackCalls };
+  }
+
+  test("a child band never calls Wikipedia when SearXNG is down", async () => {
+    const { host, getFallbackCalls } = await searchAs("child");
+    await expect(host.integration.call("searxng", "search", { query: "private child query" })).rejects.toBeInstanceOf(HostError);
+    expect(getFallbackCalls()).toBe(0);
+  });
+
+  test("a teen band never calls Wikipedia when SearXNG is down", async () => {
+    const { host, getFallbackCalls } = await searchAs("teen");
+    await expect(host.integration.call("searxng", "search", { query: "private teen query" })).rejects.toBeInstanceOf(HostError);
+    expect(getFallbackCalls()).toBe(0);
+  });
+
+  test("an unresolved band never calls Wikipedia when SearXNG is down", async () => {
+    const { getFallbackCalls } = await searchAs("adult");
+    await expect(searxngSearch({ query: "unresolved speaker query" })).rejects.toThrow();
+    expect(getFallbackCalls()).toBe(0);
+  });
+
+  test("an adult band with Wikipedia fallback enabled calls it and returns sources", async () => {
+    const { host, getFallbackCalls } = await searchAs("adult");
+    const result = await host.integration.call("searxng", "search", { query: "adult fallback query" }) as { rows: { title: string }[] };
+    expect(result.rows[0]?.title).toBe("Budget result");
+    expect(getFallbackCalls()).toBe(2);
+  });
+
+  test("an adult with Wikipedia fallback disabled never calls it", async () => {
+    const { host, getFallbackCalls } = await searchAs("adult", false);
+    await expect(host.integration.call("searxng", "search", { query: "adult disabled query" })).rejects.toBeInstanceOf(HostError);
+    expect(getFallbackCalls()).toBe(0);
   });
 
   test("spoken search keeps its existing 3s first-word shape, tool deadline, and retry shortening", () => {
