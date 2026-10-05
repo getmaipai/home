@@ -139,6 +139,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
   return {
     reply: { text, speech },
     source,
+    ...(state.failedGenerationReply ? { failed_generation: true as const } : {}),
     safety: outputFlag ?? state.safety,
     conversation_id: state.conversationId,
     turn_id: state.turnId,

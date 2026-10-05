@@ -27,8 +27,9 @@ describe("showcase fixtures through the real client reader", () => {
       expect(events[0]!.type).toBe("turn_meta");
       expect(events.filter((e) => e.type === "done" || e.type === "error")).toHaveLength(1);
       const text = events.filter((e) => e.type === "delta").map((e) => e.text).join("");
-      const done = events.find((e) => e.type === "done") as { value: { reply: { text: string } } } | undefined;
-      if (done) expect(text).toBe(done.value.reply.text);
+      const done = events.find((e) => e.type === "done") as { value: { reply: { text: string }; failed_generation?: true } } | undefined;
+      if (done?.value.failed_generation) expect(text).toBe("");
+      else if (done) expect(text).toBe(done.value.reply.text);
     });
   }
 

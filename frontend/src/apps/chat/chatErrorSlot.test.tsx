@@ -38,6 +38,17 @@ function failingAdapter(error: Error, onRun = () => {}): ChatModelAdapter {
   };
 }
 
+function failedDoneAdapter(): ChatModelAdapter {
+  return {
+    async *run() {
+      yield {
+        content: [{ type: "text", text: "That was too much text for me to read in one go. Try a shorter question." }],
+        metadata: { custom: { failedGeneration: true, turnId: "turn-failed-live" } },
+      };
+    },
+  };
+}
+
 async function sendFailingMessage(view: ReturnType<typeof renderWithQueryClient>) {
   fireEvent.change(view.getByRole("textbox", { name: "Message input" }), { target: { value: "hi" } });
   fireEvent.click(view.getByRole("button", { name: "Send message" }));
@@ -51,6 +62,20 @@ async function sendRefusedMessage(view: ReturnType<typeof renderWithQueryClient>
 }
 
 describe("ChatMessageError", () => {
+  test("a completed failed-generation reply uses the existing admin details control only for admins", async () => {
+    const adminView = renderWithQueryClient(<Harness adapter={failedDoneAdapter()} admin />);
+    fireEvent.change(adminView.getByRole("textbox", { name: "Message input" }), { target: { value: "find all of these" } });
+    fireEvent.click(adminView.getByRole("button", { name: "Send message" }));
+    expect(await adminView.findByRole("button", { name: "Error details" })).toBeTruthy();
+    adminView.unmount();
+
+    const memberView = renderWithQueryClient(<Harness adapter={failedDoneAdapter()} />);
+    fireEvent.change(memberView.getByRole("textbox", { name: "Message input" }), { target: { value: "find all of these" } });
+    fireEvent.click(memberView.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(memberView.container.textContent).toContain("too much text"));
+    expect(memberView.queryByRole("button", { name: "Error details" })).toBeNull();
+  });
+
   test("a failed reply renders the plain line in the kit error panel", async () => {
     const message = "The AI is busy starting up. Try again in a moment.";
     const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError(message, "unavailable"))} />);

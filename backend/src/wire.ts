@@ -251,6 +251,9 @@ export interface TurnValue {
   /** RVW-1: which rung answered (lib/ruleNames.ts's Rung), additive on
    * the wire and on the turn row. */
   rung?: "typed_source" | "search" | "model_knowledge" | "failed" | "none";
+  /** A fixed reply was delivered after generation failed; raw details remain
+   * available only through the admin-gated turn error detail route. */
+  failed_generation?: true;
   /** COMP-01: whether a validated details document is available for this turn. */
   document_available?: boolean;
   /** The generative-UI contract (chat program record, "The chat's wiring

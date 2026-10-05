@@ -22,6 +22,7 @@ import type { LlmMessage } from "@/lib/llm";
 
 // What llama.cpp's server says, passed through the Stack's own error body.
 const ENGINE_400 = "the request (4456 tokens) exceeds the available context size (4096 tokens), try increasing it (exceed_context_size_error)";
+const DIAGNOSIS_400 = '{"error":{"code":400,"message":"request (6013 tokens) exceeds the available context size (4096 tokens), try increasing it","type":"exceed_context_size_error","n_prompt_tokens":6013,"n_ctx":4096}}';
 
 let people: BenchPeople;
 let searxng: ReturnType<typeof Bun.serve>;
@@ -75,6 +76,7 @@ const toolContent = (messages: LlmMessage[]) => String(messages.find((m) => m.ro
 describe("the failure kind", () => {
   test("an engine 400 about the context size classifies as context_too_large, not other", () => {
     expect(classifyGenerationFailure(`chat model unavailable: ${ENGINE_400}`).kind).toBe("context_too_large");
+    expect(classifyGenerationFailure(`chat model unavailable: 400 Bad Request ${DIAGNOSIS_400}`).kind).toBe("context_too_large");
     expect(classifyGenerationFailure("chat model unavailable: request exceeds the available context size").kind).toBe("context_too_large");
   });
 
@@ -133,6 +135,7 @@ describe("the phrasing round after a context overflow", () => {
       const result = await runTurnNext(people.owner, "chat", "when is the new avengers movie coming out");
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.reply.text).toBe(FAILURE_COPY.context_too_large.adult);
+      expect(result.value.failed_generation).toBe(true);
       expect(result.value.reply.text).not.toContain("Something went wrong");
       expect(turn.phrasingCalls()).toBeGreaterThan(2);
       expect(toolContent(turn.seen.at(-1)!.messages)).toContain("could not be read");
@@ -157,6 +160,19 @@ describe("the phrasing round after a context overflow", () => {
       const phrasing = turn.seen.filter((seen) => hasTool(seen.messages));
       expect(toolContent(phrasing[1]!.messages).length).toBeLessThanOrEqual(Math.floor(searchEvidenceMaxChars(4000) * 4096 / 4370));
       expect(toolContent(phrasing[2]!.messages).length).toBeLessThanOrEqual(Math.floor(Math.floor(searchEvidenceMaxChars(4000) * 4096 / 4370) / 2));
+    } finally {
+      turn.spy.mockRestore();
+    }
+  });
+
+  test("the exact diagnosis 400 body reaches done as plain context-size copy with an admin detail marker", async () => {
+    const turn = scriptTurn(() => ({ ok: false, error: `chat model unavailable: 400 Bad Request ${DIAGNOSIS_400}` }));
+    try {
+      const result = await runTurnNext(people.owner, "chat", "when is the new avengers movie coming out");
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toBe(FAILURE_COPY.context_too_large.adult);
+      expect(result.value.failed_generation).toBe(true);
+      expect(JSON.stringify(result.value)).toContain("exceed_context_size_error");
     } finally {
       turn.spy.mockRestore();
     }

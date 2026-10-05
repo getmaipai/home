@@ -173,6 +173,21 @@ describe("the raw text never rides a payload a non-admin gets", () => {
     expect(JSON.stringify(valueForViewer(value, row))).toContain("slot crashed");
   });
 
+  test("a failed done reply exposes only its marker to an adult admin, never its raw 400 body to a child or teen", async () => {
+    const { row } = await owner();
+    const contextError = 'chat model unavailable: 400 {"error":{"code":400,"message":"request (6013 tokens) exceeds the available context size (4096 tokens), try increasing it","type":"exceed_context_size_error","n_prompt_tokens":6013,"n_ctx":4096}}';
+    const value = { failed_generation: true, stats: { ...stats(), generations: [{ ...stats().generations[0]!, error: contextError }] } } as unknown as TurnValue;
+    const adult = { ...row, role: "adult" } as PersonRow;
+    const adminPayload = JSON.stringify(valueForViewer(value, row));
+    expect(adminPayload).toContain("exceed_context_size_error");
+    expect(adminPayload).toContain('"failed_generation":true');
+    for (const member of [adult, { ...adult, role: "child" }, { ...adult, role: "teen" }]) {
+      const payload = JSON.stringify(valueForViewer(value, member));
+      expect(payload).not.toContain("exceed_context_size_error");
+      expect(payload).not.toContain('"failed_generation":true');
+    }
+  });
+
   test("the tool_error line on the stream carries the failure kind, not the tool's error text", async () => {
     const state = { turnId: "t", conversationId: "c", actor: {} } as unknown as TurnState;
     const proposal: ActionProposal = { kind: "read_only", request: { tool: "not-a-real-package", args: {}, callId: "call-1" } };

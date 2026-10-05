@@ -181,6 +181,8 @@ export interface TurnState {
   safety: SafetyResult;
   crisis: boolean;
   engineUnavailable: boolean;
+  /** True only when answer.ts delivered the fixed model-failure line. */
+  failedGenerationReply?: boolean;
   /** The filtered list; the only prompt input. */
   context: ContextItem[];
   /** Set by the `context` node (ContextOutput.temporary). Not in the

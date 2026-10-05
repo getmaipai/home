@@ -41,6 +41,7 @@ import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
+import { TurnErrorDetails } from "@/next/pages/TurnErrorDetails";
 
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
 // specifically - grid-2x2 (a two-pane split) is the closest already-
@@ -574,11 +575,15 @@ export function BareModelBadge() {
 // state and rendering (or not) on its own, so this wrapper is pure
 // composition, no shared logic between them.
 export function MessageFooterExtra() {
+  const isAdmin = useContext(AdminContext);
+  const failedGeneration = useAuiState((s) => s.message.metadata?.custom?.failedGeneration === true);
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId);
   return (
     <>
       <BareModelBadge />
       <SourcesFooterContent />
       <MessageDetailsReveal />
+      {isAdmin && failedGeneration && typeof turnId === "string" ? <TurnErrorDetails turnId={turnId} /> : null}
     </>
   );
 }

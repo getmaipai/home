@@ -158,9 +158,14 @@ const SOURCES = [
 const CRISIS = "If you are thinking about hurting yourself, you are not alone. In the US you can call or text 988 at any time to reach the Suicide & Crisis Lifeline.";
 
 function failureAdminDetails(): Event[] {
-  const events = failing("failure-admin-details", "", { type: "error", error: failureLine("unreachable", false), code: "engine_unavailable" });
-  events[0] = { type: "turn_meta", conversation_id: "showcase", turn_id: "showcase-failure-admin-details" };
-  return events;
+  const id = "showcase-failure-admin-details";
+  return [
+    { type: "turn_meta", conversation_id: "showcase", turn_id: id },
+    { type: "status", stage: "lookup", text: "Looking that up" },
+    { t: "tool_call", call_id: "call-failure-admin-details", package_id: "websearch", args: { q: "saturday market hours" }, label: "Searching the web" },
+    { t: "tool_result", call_id: "call-failure-admin-details", package_id: "websearch", outcome: { text: "3 pages read", sites: [{ host: "example.com", url: "https://example.com/market" }] } },
+    { type: "done", value: { reply: { text: failureLine("unreachable", false) }, source: "plugin", safety: SAFE, conversation_id: "showcase", turn_id: id, failed_generation: true } as TurnValue },
+  ];
 }
 
 export const UI_FIXTURES: UiFixture[] = [
@@ -198,7 +203,8 @@ export const UI_FIXTURES: UiFixture[] = [
     }),
   },
   { id: "failure-engine-down", title: "Failure: engine down (chat)", description: "The chat engine is not running: the plain line an adult sees, code engine_unavailable.", events: failing("failure-engine-down", "", { type: "error", error: failureLine("unreachable", false), code: "engine_unavailable" }) },
-  { id: "failure-admin-details", title: "Failure: admin generation details", description: "A failed generation with the admin-only raw detail popover.", storedStats: { generations: [{ reason: "chat", error: "The scripted screenshot engine returned a connection timeout.", request_sent_ms: 245, offline_reason: "scripted timeout" }] }, events: failureAdminDetails() },
+  { id: "failure-admin-details", title: "Failure: admin generation details", description: "A successful lookup followed by a failed generation: the plain reply for everyone and the admin-only raw detail popover.", storedStats: { generations: [{ reason: "phrasing", error: "The scripted screenshot engine returned a connection timeout.", request_sent_ms: 245, offline_reason: "scripted timeout" }] }, events: failureAdminDetails() },
+  { id: "failure-too-much-text", title: "Failure: too much text for the model", description: "A successful lookup followed by a generation failure: the person gets a short next step and admins can open the raw detail.", storedStats: { generations: [{ reason: "phrasing", error: "exceed_context_size_error: request exceeds the available context size", request_sent_ms: 245 }] }, events: [{ type: "turn_meta", conversation_id: "showcase", turn_id: "showcase-failure-too-much-text" }, { type: "status", stage: "lookup", text: "Looking that up" }, { t: "tool_call", call_id: "call-failure-too-much-text", package_id: "websearch", args: { q: "saturday market hours" }, label: "Searching the web" }, { t: "tool_result", call_id: "call-failure-too-much-text", package_id: "websearch", outcome: { text: "3 pages read", sites: [{ host: "example.com", url: "https://example.com/market" }] } }, { type: "done", value: { reply: { text: failureLine("context_too_large", false) }, source: "plugin", safety: SAFE, conversation_id: "showcase", turn_id: "showcase-failure-too-much-text", failed_generation: true } as TurnValue }] },
   { id: "failure-engine-down-spoken", title: "Failure: engine down (spoken or child)", description: "The engine is down on a spoken or non-chat surface: the short grown-ups line, code engine_unavailable.", events: failing("failure-engine-down-spoken", "", { type: "error", error: failureLine("unreachable", true), code: "engine_unavailable" }) },
   { id: "failure-unavailable", title: "Failure: unavailable", description: "A generic unavailable failure after the turn started, code unavailable.", events: failing("failure-unavailable", "", { type: "error", error: failureLine("busy", false), code: "unavailable" }) },
   { id: "failure-generic", title: "Failure: mid-stream error", description: "The engine fails with no catalogue code (the plain generic error event).", events: failing("failure-generic", "", { type: "error", error: failureLine("other", false) }) },

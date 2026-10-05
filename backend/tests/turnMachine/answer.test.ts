@@ -86,6 +86,12 @@ describe("answerNode: a failed generation is told by its kind (THIN-DL-02)", () 
     const { output } = await answerNode(ADULT, { kind: "model_failed" }, SIGNAL);
     expect(output.text).toBe(failureLine("other", false));
   });
+  test("a context-too-large failure marks the fixed reply for admin details", async () => {
+    const state = { ...ADULT, failedGenerationReply: false } as typeof ADULT & { failedGenerationReply: boolean };
+    const { output } = await answerNode(state, { kind: "model_failed", failure: "context_too_large" }, SIGNAL);
+    expect(output.text).toBe(FAILURE_COPY.context_too_large.adult);
+    expect(state.failedGenerationReply).toBe(true);
+  });
 });
 
 // MANIFEST-REFUSAL-01 (fixes getmaipai/home#166): a manifest that fails

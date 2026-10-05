@@ -214,6 +214,21 @@ describe("document attachment content", () => {
 });
 
 describe("createChatModelAdapter streaming", () => {
+  test("a failed done reply carries the admin-details marker into message metadata", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "done", value: { turn_id: "turn-failed-live", reply: { text: "That was too much text for me to read in one go. Try a shorter question." }, source: "plugin", failed_generation: true, safety: SAFETY } },
+    ]));
+    try {
+      const { yields } = await collect([fakeUserMessage("find all of these")]);
+      const last = yields.at(-1);
+      expect(last?.metadata?.custom?.failedGeneration).toBe(true);
+      expect(last?.metadata?.custom?.turnId).toBe("turn-failed-live");
+      expect(JSON.stringify(last)).not.toContain("exceed_context_size_error");
+    } finally {
+      env.restore();
+    }
+  });
+
   test("sends the selected model on each turn request", async () => {
     const env = stubEnvironment(ndjsonStream([
       { type: "delta", text: "Selected." },

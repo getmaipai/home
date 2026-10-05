@@ -94,5 +94,8 @@ export function statsForViewer<S extends Pick<TurnStats, "generations"> | undefi
 
 /** A turn value for the wire: raw generation errors only for an admin. */
 export function valueForViewer<V extends Pick<TurnValue, "stats">>(value: V, actor: PersonRow): V {
-  return value.stats ? { ...value, stats: statsForViewer(value.stats, actor) } : value;
+  if (canReadErrorDetail(actor)) return value;
+  const { failed_generation: _failedGeneration, ...safeValue } = value as V & Pick<TurnValue, "failed_generation">;
+  const stats = value.stats ? statsForViewer(value.stats, actor) : undefined;
+  return (stats ? { ...safeValue, stats } : safeValue) as V;
 }

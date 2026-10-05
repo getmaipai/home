@@ -139,6 +139,7 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
     // "something broke, not a refusal" case, one level up, imported
     // rather than re-typed so the two copies can't drift.
     case "model_failed":
+      state.failedGenerationReply = true;
       // THIN-DL-02: the line follows the failure kind (generationFailure.ts),
       // never the generic apology.
       return { outcome: { ok: true }, output: { text: failureLine(input.failure ?? "other", state.plan?.age_band !== "adult"), sources: [] } };

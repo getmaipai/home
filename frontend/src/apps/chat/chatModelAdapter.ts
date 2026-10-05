@@ -648,6 +648,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   pluginId: event.value.plugin_id,
                   commandId: event.value.command_id,
                   turnId: event.value.turn_id,
+                  failedGeneration: event.value.failed_generation === true,
                   conversationId,
                   documentAvailable: event.value.document_available === true,
                   // A real TurnValue field now (CHAT-16 landed) - kept
