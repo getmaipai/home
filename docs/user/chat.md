@@ -10,11 +10,9 @@ Chat is where you talk to MaiPai, by typing or by voice.
 1. Tap the message box at the bottom and type your question.
 2. Tap the arrow button, or press Enter, to send it.
 
-MaiPai's answer appears right below your message.
+MaiPai's answer appears below your message. Chat follows the newest text while a reply is coming in. If you scroll up, tap the down arrow to return to the latest message.
 
-## With the new look on
-
-If you turned on **New shell (preview)** in Settings, the chat has a cleaner design. You type in the box at the bottom and press Enter, the same as before. While MaiPai thinks, a small **Reasoning** line appears above the answer. Click it to read how MaiPai got there, or leave it closed. Children do not see this line. Some parts of chat are still being moved to the new look, so if you do not find a button you used before, turn the preview off and it is back.
+If you leave a chat while MaiPai is replying, the chat gets a title when you return. You do not need to wait for the reply to finish.
 
 ## What MaiPai can look up
 
@@ -29,7 +27,21 @@ Weather, word meanings, trivia, and film lookups work right away. Web search tak
 
 See the [Privacy](privacy.md) page for what each one sends, and to whom.
 
-When an answer comes from something MaiPai looked up, you'll see small numbered links under the reply, one per source. Tap a number in the text, or a link in the list, to open that page in a new tab. This way you can always check where an answer came from.
+Some answers include small numbered markers such as **[1]** in the reply. Tap a marker to open the matching source. Choose **Sources** under the reply to see its source list.
+
+## Save a draft
+
+If you type in a saved chat and leave before sending, Chat keeps your draft on this device. Open that chat again and choose **Restore** to put the text back, or **Discard** to remove it. Sending the message clears the draft. Drafts are not saved in Incognito.
+
+## If the AI is starting
+
+If you see **Starting your AI**, wait for it to finish. The chat will be ready when the message box is available.
+
+## If the connection drops
+
+Chat shows a banner when it is reconnecting, when the reply resumes, or when the connection is dropped. If the reply does not resume, choose **Retry** in the banner.
+
+If a reply fails, an error card appears under it. Choose **Retry** to try the reply again. Admins can open **Error details** for more information.
 
 ## Talk instead of type
 
@@ -41,7 +53,7 @@ Open **Chat status**, then tap **Wake word** to turn on the wake-word listener. 
 
 ## Chat options and status
 
-The small message box grows as you type. Open **Chat options** beside it to turn on **Think longer** for your next message.
+The message box grows as you type. Open **Chat options** beside it to turn on **Think longer** for your next message.
 
 Open **Chat status** to see the Brain, Mouth, Ears, and Eyes indicators. Each shows what is ready and what needs attention. Eyes is marked **Coming soon** until vision is available.
 
@@ -88,11 +100,11 @@ Did MaiPai save something you said? A **Memory updated** chip shows up under its
 
 ## Start a new conversation
 
-Tap the **+** button beside Chat to start fresh. A new chat is saved when you send its first message.
+Tap **New chat** beside the chat list to start fresh. A new chat is saved when you send its first message.
 
 ## Your conversation history
 
-Tap the history button beside Chat to see your saved chats. Pick one to read it and keep talking. Reloading the page keeps that chat open.
+Use the chat list beside the conversation to find a chat. Type in **Search chats** to search the list. On a narrow screen, open the chat list from its button. Use the collapse button to hide the list and make more room for the conversation. Reopen it from the same button.
 
 Open **More options** beside a chat to rename or delete it. Deleting asks you to confirm first.
 
@@ -100,12 +112,13 @@ Open **Conversations** from navigation for bulk actions and parental oversight:
 
 - Tap one of your chat titles to reopen it.
 - Tap **Rename** to give it a clearer title.
-- Tap **Delete** to remove one you don't need.
+- Tap **Pin** to keep it in the **Pinned** group. Tap **Unpin** to remove it from that group.
+- Tap **Delete** to remove a chat you don't need.
 - Tap **Select conversations** to choose several at once, or **Clear all** to remove everything.
 
 ![The conversations list with its search box and pinned chats.](../assets/screens/conversations-desktop-light.png)
 
-At the top of that page, type in the search box to find a chat by its title or what you talked about in it. Tap the pin next to a chat to pin it to the top of the list, and tap it again to unpin it.
+
 
 Owners and admins can also view another household member's conversations from this page. This helps with parental oversight.
 
@@ -121,9 +134,9 @@ A model picker sits beside the **Chat** title. It shows the models you can use. 
 
 ![The model picker open beside the Chat title.](../assets/screens/chat-model-picker-desktop-light.png)
 
-## Temporary chat
+## Incognito
 
-Before you send your first message, turn on temporary mode. A banner above the chat says it's on. Those messages aren't saved, and reloading won't bring them back. The chat lasts for that session only, then it's gone.
+Turn on **Incognito** before you send a message. An Incognito chat is temporary and is not saved with your regular conversations. It has no saved title, cannot be pinned, and does not keep drafts. When you turn Incognito off, its chats are cleared.
 
 ![A chat in temporary mode with its banner.](../assets/screens/chat-temporary-mode-desktop-light.png)
 
