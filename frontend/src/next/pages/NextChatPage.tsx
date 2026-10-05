@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
@@ -1081,6 +1081,7 @@ function ProjectResultReload() {
 }
 
 export function NextChatPage({ person }: { person: Roster }) {
+  const navigate = useNavigate();
   const [draftConversationId, setDraftConversationId] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get("conversation") ?? undefined);
   const chatAvailability = useChatAvailability();
   // CHAT-HEADER-01: ChatHeaderBar is a stable, zero-prop reference - the
@@ -1805,6 +1806,8 @@ export function NextChatPage({ person }: { person: Roster }) {
                   temporary={temporaryNext}
                   onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
                   modelPickerAllowed={modelPickerAllowed}
+                  canUseIncognito={canHaveTemporaryChatRole(person.role)}
+                  onOpenSettings={() => navigate("/settings")}
                 />
               </ConnectionStateContext.Provider>
             </div>

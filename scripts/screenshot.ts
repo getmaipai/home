@@ -3743,6 +3743,68 @@ async function captureNextChatAuditReview(browser: Browser, sessionValue: string
   const desktop = { slug: "desktop", width: 1440, height: 900 } as ViewportSpec;
   const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
 
+  // UI-EXTRAS-01: the three shipped chat Elements, on a real persisted
+  // 40-message conversation. The output directory is supplied by the brief's
+  // audit run through MAIPAI_CHAT_AUDIT_OUT_DIR.
+  {
+    const conversation = await seedTitledConversation("captureNextChatAuditReview extras", cookie, "Conversation map and search audit");
+    const longReply = "A searchneedle is hidden in this answer so the in-chat search has a deterministic match to highlight.";
+    const seedScript = `import { sqlite } from "./src/db/index.ts";
+const id = ${JSON.stringify(conversation.id)};
+const person = sqlite.query("SELECT id FROM people WHERE display_name = 'Sage' LIMIT 1").get() as { id: string };
+const insert = sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, user_text, reply_text, source, safety_action, conversation_id, created_at, hlc, routing_tier, routing_score, status, parent_turn_id, branch_chosen) VALUES (?, ?, 'chat', ?, ?, 'model', 'allow', ?, ?, ?, 'chat', 1.0, 'done', ?, 1)");
+let parent: string | null = null;
+for (let i = 1; i <= 20; i++) { const turn = crypto.randomUUID(); const at = new Date(Date.now() + i).toISOString(); const reply = i === 10 ? ${JSON.stringify(longReply)} : 'A concise answer for the chat extras audit, turn ' + i + '.'; insert.run(turn, person.id, 'Question ' + i + ': share one useful detail about the day.', reply, id, at, at + ':0:' + turn, parent); parent = turn; }
+sqlite.close();`;
+    const seeded = Bun.spawnSync({ cmd: ["bun", "-e", seedScript], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+    if (seeded.exitCode !== 0) throw new Error(`captureNextChatAuditReview: seeding chat extras thread failed with exit code ${seeded.exitCode}`);
+
+    const desktopContext = await newContext(browser, desktop, "dark", sessionValue);
+    try {
+      const page = await desktopContext.newPage();
+      page.setDefaultTimeout(15000);
+      await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
+      await page.getByText("Question 20: share one useful detail about the day.", { exact: true }).waitFor();
+      await page.waitForFunction(() => document.querySelectorAll('[data-slot="aui_assistant-message-content"]').length >= 20);
+      const map = page.getByRole("navigation", { name: "Conversation map" });
+      await map.waitFor({ state: "visible" });
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, "chat-map-1440x900-dark.png") });
+
+      await page.getByRole("textbox", { name: "Message input" }).focus();
+      await page.keyboard.press("Control+f");
+      const search = page.getByRole("textbox", { name: "Find in conversation" });
+      await search.waitFor({ state: "visible" });
+      await search.fill("searchneedle");
+      await page.getByText("1/1", { exact: true }).waitFor();
+      await page.locator('[data-slot="conversation-search"] .bg-amber-400\\/35').waitFor({ state: "visible" });
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, "chat-search-1440x900-dark.png") });
+
+      await search.press("Escape");
+      await page.getByRole("textbox", { name: "Message input" }).focus();
+      await page.keyboard.press("Control+k");
+      await page.locator('[data-slot="command-palette"]').waitFor({ state: "visible" });
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, "chat-palette-1440x900-dark.png") });
+      await page.close();
+    } finally { await desktopContext.close(); }
+
+    const phoneContext = await newContext(browser, phone, "dark", sessionValue);
+    try {
+      const page = await phoneContext.newPage();
+      page.setDefaultTimeout(15000);
+      await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
+      await page.getByText("Question 20: share one useful detail about the day.", { exact: true }).waitFor();
+      await page.getByRole("textbox", { name: "Message input" }).focus();
+      await page.keyboard.press("Control+k");
+      await page.locator('[data-slot="command-palette"]').waitFor({ state: "visible" });
+      await settleAnimations(page);
+      await page.screenshot({ path: join(outDir, "chat-palette-390x844-dark.png"), fullPage: true });
+      await page.close();
+    } finally { await phoneContext.close(); }
+  }
+
   async function showcase(id: string, name: string, viewport: ViewportSpec = desktop, theme: "light" | "dark" = "dark", after?: (page: Page) => Promise<void>) {
     const context = await newContext(browser, viewport, theme, sessionValue);
     try {

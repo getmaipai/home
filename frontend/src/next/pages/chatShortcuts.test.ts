@@ -87,7 +87,7 @@ test("Cmd+/ opens the shortcut reference with all five entries", () => {
     ["New chat", "⌘/Ctrl+⇧O"],
     ["Focus composer", "⇧Esc"],
     ["Stop reply", "Esc"],
-    ["Search", "⌘/Ctrl+K"],
+    ["Command palette", "⌘/Ctrl+K"],
     ["Toggle sidebar", "⌘/Ctrl+B"],
   ]);
 });

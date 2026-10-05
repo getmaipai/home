@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-05T13:39:46.448Z",
+  "generatedAt": "2026-10-05T14:44:22.573Z",
   "kitTag": "ui-v0.5.96",
   "items": [
     {
@@ -112,7 +112,7 @@
       "name": "command-palette",
       "group": "other",
       "verdict": "wire-now",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "comparison-card.tsx",
@@ -168,14 +168,14 @@
       "name": "conversation-map",
       "group": "thread/list",
       "verdict": "wire-now",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "conversation-search.tsx",
       "name": "conversation-search",
       "group": "thread/list",
       "verdict": "wire-now",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "cost-meter.tsx",
