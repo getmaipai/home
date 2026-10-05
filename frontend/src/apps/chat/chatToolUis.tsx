@@ -25,7 +25,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 // the dashboard Button belongs to the surrounding page chrome, not this
 // row.
 import { Button } from "@maipai/ui/src/ui/button";
-import { TurnErrorDetails } from "@/next/pages/TurnErrorDetails";
+import { AdminToolError } from "@/apps/chat/chatToolError";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type StructuredPart, type TurnStats, type ProjectView } from "@/lib/api";
 import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext, AdminContext } from "@/apps/chat/chatThreadContexts";
@@ -361,7 +361,7 @@ export function ReloadMainThreadProvider({ children }: { children: ReactNode }) 
 // package id today - the seam is here so the chip starts reading a real
 // label automatically the moment a later pin bump's adapter change
 // starts providing one, with no render-side change needed then.
-export type TimelineCall = { callId: string; packageId: string; label?: string; state: "running" | "ok" | "error"; sites?: { host: string; url: string }[] };
+export type TimelineCall = { callId: string; packageId: string; label?: string; state: "running" | "ok" | "error"; failureKind?: string; sites?: { host: string; url: string }[] };
 export const TIMELINE_VERB: Record<TimelineCall["state"], string> = {
   running: "Running",
   ok: "Ran",
@@ -387,10 +387,11 @@ export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string,
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   if (!result?.length) return null;
   const running = result.some((call) => call.state === "running");
-  // THIN-1E: an admin's quiet way into the raw details of a failed call.
+  // Rule 6: only admins mount the client that reads stored raw details.
   const failed = isAdmin && !!turnId && result.some((call) => call.state === "error");
   return (
-    <div className="flex items-start gap-1">
+    <div className="flex flex-col items-start gap-2">
+      <div className="flex items-start gap-1">
     <ToolTimeline
       steps={result.map((call) => ({ verb: TIMELINE_VERB[call.state], chip: call.label ?? call.packageId, icon: ToolTimelineIcon, sites: call.sites }))}
       visibleSteps={result.length}
@@ -409,7 +410,8 @@ export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string,
       // function `SourcesFooterContent` below already passes to `SourceIcon`.
       faviconUrl={faviconUrl}
     />
-    {failed ? <TurnErrorDetails turnId={turnId} /> : null}
+      </div>
+      {failed ? <AdminToolError turnId={turnId} /> : null}
     </div>
   );
 };

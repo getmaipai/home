@@ -959,7 +959,7 @@ describe("createChatModelAdapter tool timeline (TOOL-EVENTS-01, frontend half)",
     }
   });
 
-  test("a tool_error marks its call failed", async () => {
+  test("a tool_error event keeps its failure kind on the timeline call", async () => {
     const env = stubEnvironment(
       ndjsonStream([
         { t: "tool_call", package_id: "websearch", args: {}, call_id: "call-1" },
@@ -971,9 +971,27 @@ describe("createChatModelAdapter tool timeline (TOOL-EVENTS-01, frontend half)",
       const { yields } = await collect([fakeUserMessage("search")]);
       const last = yields[yields.length - 1];
       expect(last?.content).toEqual([
-        { type: "tool-call", toolCallId: "turn-err1-tools", toolName: "tool_timeline", args: {}, argsText: "", result: [{ callId: "call-1", packageId: "websearch", state: "error" }] },
+        { type: "tool-call", toolCallId: "turn-err1-tools", toolName: "tool_timeline", args: {}, argsText: "", result: [{ callId: "call-1", packageId: "websearch", state: "error", failureKind: "timed out" }] },
         { type: "text", text: "Something went wrong." },
       ]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("tool_error text is never stored on the timeline call", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_call", package_id: "websearch", args: {}, call_id: "call-1" },
+        { t: "tool_error", call_id: "call-1", package_id: "websearch", error: "unavailable" },
+        { type: "done", value: { turn_id: "turn-err2", reply: { text: "I could not look that up." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("search")]);
+      const timeline = yields.at(-1)?.content?.find((part) => part.type === "tool-call");
+      expect(timeline).toMatchObject({ result: [{ failureKind: "unavailable" }] });
+      expect(JSON.stringify(timeline)).not.toContain("raw");
     } finally {
       env.restore();
     }

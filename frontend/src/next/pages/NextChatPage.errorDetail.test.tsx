@@ -73,26 +73,37 @@ async function runTurn(role: Roster["role"], failed = true) {
   return { view, ...stub };
 }
 
-describe("the admin error detail on a failed tool call", () => {
-  test("an admin opens the quiet indicator and reads the tool, kind, raw error, timing and the Stack's reason", async () => {
+describe("the admin tool error card on a failed tool call", () => {
+  test("an admin sees the tool error card with the tool, kind and raw message from the stored row", async () => {
     const { view, restore } = await runTurn("owner");
     try {
-      const open = await view.findByRole("button", { name: "Error details" });
-      fireEvent.click(open);
-      expect(await view.findByText("SearXNG answered 502")).toBeVisible();
-      expect(view.getByText("websearch", { selector: "[data-slot=popover-content] *" })).toBeVisible();
-      expect(view.getByText("unavailable (search_unavailable)")).toBeVisible();
-      expect(view.getByText(/812 ms/)).toBeVisible();
-      expect(view.getByText("The chat engine waited 15 s for memory and gave up.")).toBeVisible();
+      const card = await view.findByText("SearXNG answered 502");
+      expect(card.closest('[data-slot="tool-error"]')).toBeVisible();
+      expect(view.getByText("websearch")).toBeVisible();
+      expect(view.getByText("unavailable")).toBeVisible();
     } finally {
       restore();
     }
   });
 
-  test("the detail is not fetched until the indicator is opened", async () => {
-    const { view, urls, restore } = await runTurn("owner");
+  test("a non-admin sees no tool error card and makes no detail request", async () => {
+    const { view, urls, restore } = await runTurn("adult");
     try {
-      await view.findByRole("button", { name: "Error details" });
+      await view.findByText("I could not look that up.");
+      expect(view.queryByText("SearXNG answered 502")).toBeNull();
+      expect(view.container.querySelector('[data-slot="tool-error"]')).toBeNull();
+      expect(urls.some((u) => u.includes("/api/turn-error-detail/"))).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test("a child-band thread with a failed tool shows only the timeline chip", async () => {
+    const { view, urls, restore } = await runTurn("child");
+    try {
+      await view.findByText("I could not look that up.");
+      expect(view.queryByText("SearXNG answered 502")).toBeNull();
+      expect(view.container.querySelector('[data-slot="tool-error"]')).toBeNull();
       expect(urls.some((u) => u.includes("/api/turn-error-detail/"))).toBe(false);
     } finally {
       restore();
@@ -102,17 +113,28 @@ describe("the admin error detail on a failed tool call", () => {
   test("no indicator on a reply whose tool succeeded", async () => {
     const { view, restore } = await runTurn("owner", false);
     try {
-      expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
+      expect(view.container.querySelector('[data-slot="tool-error"]')).toBeNull();
     } finally {
       restore();
     }
   });
 
-  test("a teen, a child and an adult see no indicator and the page never asks for the detail", async () => {
-    for (const role of ["teen", "child", "adult"] as const) {
+  test("Retry on the tool error card reruns the reply", async () => {
+    const { view, urls, restore } = await runTurn("owner");
+    try {
+      const before = urls.filter((url) => url.includes("/api/turn/stream")).length;
+      fireEvent.click(await view.findByRole("button", { name: "Retry" }));
+      await waitFor(() => expect(urls.filter((url) => url.includes("/api/turn/stream")).length).toBeGreaterThan(before));
+    } finally {
+      restore();
+    }
+  });
+
+  test("a teen sees no tool error card and the page never asks for the detail", async () => {
+    for (const role of ["teen"] as const) {
       const { view, urls, restore } = await runTurn(role);
       try {
-        expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
+        expect(view.container.querySelector('[data-slot="tool-error"]')).toBeNull();
         expect(urls.some((u) => u.includes("/api/turn-error-detail/"))).toBe(false);
       } finally {
         restore();
