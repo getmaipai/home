@@ -2,6 +2,7 @@
 
 import { MessagePrimitive, useAui, useAuiState } from "@assistant-ui/react";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
+import { GuardrailNotice } from "@maipai/ui/src/elements/guardrail-notice";
 import { useContext, useEffect, useRef, useState } from "react";
 import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
@@ -33,8 +34,11 @@ export function ChatMessageError() {
 
   const error = errorValue as unknown as MessageErrorValue;
   if (error instanceof ChatTurnError && error.code === "safety_refused") {
-    // els-guardrail-notice: the guardrail Element owns safety refusal notices.
-    return null;
+    return (
+      <MessagePrimitive.Error>
+        <GuardrailNotice title="I can't help with that" explanation={error.message} policy="safety" alternatives={[]} />
+      </MessagePrimitive.Error>
+    );
   }
 
   const turnId = error instanceof ChatTurnError ? error.turnId : undefined;

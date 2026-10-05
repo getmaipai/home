@@ -1337,13 +1337,14 @@ describe("createChatModelAdapter errors", () => {
   // SAFETY-01 (#85): a streamed refusal's crisis resources ride on the
   // error event, the one terminal event it sends, and are shown the
   // same way a done value's are.
-  test("a safety_refused error carrying crisis_resources shows them", async () => {
+  test("the crisis resources still reach the banner callback on a safety refusal", async () => {
     const line = "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.";
     const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "That response violated our safety policy", code: "safety_refused", crisis_resources: line }]));
     const shown: string[] = [];
     try {
       const { error } = await collect([fakeUserMessage("hi")], new AbortController().signal, (text) => shown.push(text));
-      expect(error).toBeInstanceOf(Error);
+      expect(error).toBeInstanceOf(ChatTurnError);
+      expect((error as ChatTurnError).code).toBe("safety_refused");
       expect(shown).toEqual([line]);
     } finally {
       env.restore();

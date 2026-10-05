@@ -44,6 +44,12 @@ async function sendFailingMessage(view: ReturnType<typeof renderWithQueryClient>
   await waitFor(() => expect(view.getByRole("alert")).toBeTruthy());
 }
 
+async function sendRefusedMessage(view: ReturnType<typeof renderWithQueryClient>) {
+  fireEvent.change(view.getByRole("textbox", { name: "Message input" }), { target: { value: "hi" } });
+  fireEvent.click(view.getByRole("button", { name: "Send message" }));
+  await waitFor(() => expect(view.container.querySelector('[data-slot="guardrail-notice"]')).toBeTruthy());
+}
+
 describe("ChatMessageError", () => {
   test("a failed reply renders the plain line in the kit error panel", async () => {
     const message = "The AI is busy starting up. Try again in a moment.";
@@ -53,6 +59,34 @@ describe("ChatMessageError", () => {
     expect(view.getByRole("alert").textContent).toContain("Couldn't finish that reply");
     expect(view.getByRole("alert").textContent).toContain(message);
     expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+
+  test("a safety refusal renders the guardrail notice with the server's safe copy", async () => {
+    const message = "I can't continue with that reply.";
+    const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError(message, "safety_refused"))} admin />);
+    await sendRefusedMessage(view);
+
+    expect(view.container.textContent).toContain("I can't help with that");
+    expect(view.container.textContent).toContain(message);
+    expect(view.container.textContent).toContain("safety");
+    expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
+  });
+
+  test("a safety refusal does not render the generic error panel", async () => {
+    const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError("Safe refusal copy.", "safety_refused"))} />);
+    await sendRefusedMessage(view);
+
+    expect(view.container.textContent).not.toContain("Couldn't finish that reply");
+  });
+
+  test("a refusal notice shows no alternatives block and no raw category text", async () => {
+    const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError("I can't continue with that reply.", "safety_refused"))} />);
+    await sendRefusedMessage(view);
+
+    expect(view.container.textContent).not.toContain("try instead");
+    expect(view.container.textContent).not.toContain("self_harm");
+    expect(view.container.textContent).not.toContain("safety_refused");
   });
 
   test("Retry reruns the failed reply", async () => {
