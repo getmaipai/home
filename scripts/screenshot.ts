@@ -53,6 +53,7 @@ type StubServerModule = typeof import("../../commons/spec/llm/ts/stubServer");
 import AxeBuilder from "@axe-core/playwright";
 import { rmSync, mkdirSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
 import { startScreenshotStack } from "./screenshotStack";
@@ -73,7 +74,7 @@ const useWebkit = process.argv.includes("--webkit");
 // Live finding 2026-09-22: a reasoning-clipping report needed verifying
 // in the browser Jesse actually uses - headless only (this file's own
 // rule), Playwright's own firefox channel.
-const useFirefox = process.argv.includes("--firefox");
+const useFirefox = process.argv.includes("--firefox") || process.env.BROWSER?.toLowerCase() === "firefox";
 
 // backend/ and frontend/ pin the same @maipai/spec tag, so backend's
 // package.json is as good a source as either for the worktree this
@@ -289,9 +290,10 @@ const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || ne
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 const nextChatAuditReview = process.argv.includes("--next-chat-audit-review");
 const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audit");
+const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatMissingStatesReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -3166,6 +3168,111 @@ sqlite.close();`;
   }
 }
 
+/** Streams the long-essay fixture through the shipped chat Thread and records
+ * each mutation and animation frame of its Markdown text. */
+async function captureChatStreamGlitch(browser: Browser, sessionValue: string): Promise<void> {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, colorScheme: "dark" });
+  await context.addCookies([{ name: "session", value: sessionValue, url: BASE_URL }]);
+  try {
+    const page = await context.newPage();
+    await page.goto(`${BASE_URL}/dev/ui`);
+    await page.getByRole("heading", { name: "Chat showcase" }).first().waitFor();
+    await page.getByLabel("Streaming pace").click();
+    await page.getByRole("option", { name: "Normal pace" }).click();
+    const framesDir = process.env.MAIPAI_CHAT_GLITCH_OUT_DIR || join(ROOT, "data-scratch", "chat-ab", "glitch-capture");
+    const evidenceDir = join(ROOT, "data-scratch", "chat-ab", "glitch-frames");
+    mkdirSync(framesDir, { recursive: true });
+    mkdirSync(evidenceDir, { recursive: true });
+    const overrides: Array<{ name: string; css: string; result?: string }> = [
+      { name: "text-wrap", css: "* { text-wrap: wrap !important; }" },
+      { name: "animation", css: "*, *::before, *::after { animation: none !important; transition: none !important; }" },
+      { name: "content-visibility", css: "* { content-visibility: visible !important; }" },
+      { name: "transform", css: "[data-slot='aui_assistant-message-content'] *, [data-slot='aui_assistant-message-content'] { transform: none !important; }" },
+    ];
+    await page.evaluate((rows) => {
+      (window as any).__chatGlitchOverrides = rows;
+      (window as any).__chatGlitchSetOverride = (name: string) => {
+        document.getElementById("chat-glitch-override")?.remove();
+        const row = (window as any).__chatGlitchOverrides.find((entry: any) => entry.name === name);
+        if (row) { const style = document.createElement("style"); style.id = "chat-glitch-override"; style.textContent = row.css; document.head.append(style); }
+      };
+    }, overrides);
+    const frames: string[] = [];
+    const samples: Array<{ at: number; text: string; style: Record<string, string>; rects: Array<{ char: string; x: number; y: number; width: number; height: number }> }> = [];
+    let running = true;
+    const recordFrames = (async () => {
+      while (running) {
+        const message = page.locator('[data-slot="aui_assistant-message-content"] .aui-md').last();
+        if (await message.count()) {
+          const box = await message.boundingBox();
+          if (box && box.width > 0 && box.height > 0) {
+            const clip = { x: Math.max(0, box.x), y: Math.max(0, box.y), width: Math.min(box.width, 1200), height: Math.min(box.height, 720) };
+            const path = join(framesDir, `stream-${String(frames.length).padStart(4, "0")}.png`);
+            await page.screenshot({ path, clip });
+            frames.push(path);
+          }
+          const item = await page.evaluate(() => {
+            const messages = document.querySelectorAll<HTMLElement>('[data-slot="aui_assistant-message-content"] .aui-md');
+            const el = messages.item(messages.length - 1);
+            const node = el && (() => { const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); return w.nextNode() as Text | null; })();
+            if (!el || !node?.data) return null;
+            const style = getComputedStyle(node.parentElement ?? el);
+            const properties = ["direction", "unicodeBidi", "textAlign", "writingMode", "transform", "opacity", "letterSpacing", "fontFamily", "fontVariationSettings", "fontSynthesis", "textRendering", "textWrap", "whiteSpace"];
+            const range = document.createRange();
+            const rects = Array.from(node.data.slice(0, 3)).map((char, i) => { range.setStart(node, i); range.setEnd(node, i + 1); const r = range.getBoundingClientRect(); return { char, x: r.x, y: r.y, width: r.width, height: r.height }; });
+            return { at: performance.now(), text: el.textContent ?? "", style: Object.fromEntries(properties.map((key) => [key, (style as any)[key] ?? ""])), rects };
+          });
+          if (item) samples.push(item);
+        }
+        await page.waitForTimeout(16);
+      }
+    })();
+    await page.getByRole("button", { name: /Long essay/ }).click();
+    await page.waitForFunction(() => document.querySelector('[data-slot="aui_assistant-message-content"] .aui-md')?.textContent?.includes("Paragraph 24."), { timeout: 60000 });
+    await page.waitForFunction(() => !document.querySelector('[data-slot="aui_assistant-message-content"] [data-status="running"]'), { timeout: 60000 }).catch(() => undefined);
+    running = false;
+    await recordFrames;
+    const rectGlitches = samples.map((sample, i) => ({ sample, i })).filter(({ sample }) => sample.rects.some((r, i) => i > 0 && r.x < sample.rects[i - 1]!.x - 0.5));
+    if (frames.length < 200) throw new Error(`Firefox frame capture was too short: ${frames.length} frames`);
+    const pixelDiffs: Array<{ frame: number; changedPixels: number; ratio: number }> = [];
+    for (let i = 1; i < frames.length; i++) {
+      const script = `import sys, struct, zlib\ndef read(p):\n d=open(p,'rb').read(); pos=8; w=h=0; b=bytearray()\n while pos<len(d):\n  n=struct.unpack('>I',d[pos:pos+4])[0]; t=d[pos+4:pos+8]; x=d[pos+8:pos+8+n]; pos+=12+n\n  if t==b'IHDR': w,h,bd,ct,_,_,_=struct.unpack('>IIBBBBB',x)\n  if t==b'IDAT': b.extend(x)\n raw=zlib.decompress(b); bpp=4; stride=w*bpp; out=bytearray(h*stride); prev=bytearray(stride); k=0\n for y in range(h):\n  f=raw[k]; k+=1; row=bytearray(raw[k:k+stride]); k+=stride\n  for x in range(stride):\n   a=row[x-bpp] if x>=bpp else 0; up=prev[x]; ul=prev[x-bpp] if x>=bpp else 0\n   if f==1: row[x]=(row[x]+a)&255\n   elif f==2: row[x]=(row[x]+up)&255\n   elif f==3: row[x]=(row[x]+((a+up)//2))&255\n   elif f==4:\n    q=a+up-ul; pa=abs(q-a); pb=abs(q-up); pc=abs(q-ul); z=a if pa<=pb and pa<=pc else up if pb<=pc else ul; row[x]=(row[x]+z)&255\n  out[y*stride:(y+1)*stride]=row; prev=row\n return w,h,out\na=sys.argv[1:]; w,h,x=read(a[0]); w2,h2,y=read(a[1]); assert (w,h)==(w2,h2); n=sum(1 for q,r in zip(x,y) if q!=r); print(n//4, (n//4)/(w*h))`;
+      const compared = spawnSync("python3", ["-c", script, frames[i - 1]!, frames[i]!], { encoding: "utf8" });
+      if (compared.status === 0) {
+        const [changedPixels, ratio] = compared.stdout.trim().split(/\s+/).map(Number);
+        pixelDiffs.push({ frame: i, changedPixels: changedPixels ?? 0, ratio: ratio ?? 0 });
+      }
+    }
+    const glitchPairs = pixelDiffs.filter((d) => d.ratio > 0.0005).slice(0, 5).map((d) => ({ ...d, previous: frames[d.frame - 1], current: frames[d.frame], text: samples[d.frame]?.text, rects: samples[d.frame]?.rects }));
+    const firstGlitch = glitchPairs[0]?.frame ?? Math.min(3, frames.length - 1);
+    const selected = Array.from({ length: 6 }, (_, n) => Math.max(0, Math.min(frames.length - 1, firstGlitch - 2 + n)));
+    for (const [i, frameIndex] of selected.entries()) {
+      const dest = join(evidenceDir, `glitch-${i + 1}.png`);
+      const copy = spawnSync("cp", [frames[frameIndex]!, dest]);
+      if (copy.status !== 0) throw new Error(`could not save evidence frame ${frameIndex}`);
+    }
+    // Inject each suspected layout/animation override and record its computed effect for this stream state.
+    const overrideResults = await page.evaluate(async (rows) => {
+      const result = [];
+      for (const row of rows) {
+        (window as any).__chatGlitchSetOverride(row.name);
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const el = document.querySelector<HTMLElement>('[data-slot="aui_assistant-message-content"] .aui-md');
+        const node = el && (() => { const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); return w.nextNode() as Text | null; })();
+        const range = document.createRange();
+        if (node?.data) { range.setStart(node, 0); range.setEnd(node, Math.min(3, node.data.length)); }
+        result.push({ name: row.name, rect: node?.data ? range.getBoundingClientRect().toJSON() : null, computedTextWrap: el ? getComputedStyle(el).textWrap : null });
+      }
+      (window as any).__chatGlitchSetOverride("");
+      return result;
+    }, overrides);
+    const trace = { browser: "firefox", frameCount: frames.length, sampleCount: samples.length, measuredFrameIntervalMs: samples.length > 1 ? (samples.at(-1)!.at - samples[0]!.at) / (samples.length - 1) : null, deviceScaleFactor: 2, pixelDiffPairs: glitchPairs, samples, rectGlitches, overrideResults };
+    writeFileSync(join(evidenceDir, "trace.json"), JSON.stringify(trace, null, 2));
+    console.log(`CHAT_STREAM_GLITCH_TRACE ${JSON.stringify({ browser: "firefox", frames: frames.length, samples: samples.length, meanMs: trace.measuredFrameIntervalMs, first5PixelDiffPairs: glitchPairs, first5RectGlitches: rectGlitches.slice(0, 5), overrideResults })}`);
+    console.log(`Saved Firefox frame samples to ${framesDir} and six review frames to ${evidenceDir}`);
+  } finally { await context.close(); }
+}
+
 /** Real /chat overflow acceptance: 20 persisted turns (40 messages), three
  * long replies, all three requested viewport sizes, manual scroll, stream
  * follow behavior, and the compact composer's measured size and inset. */
@@ -3627,6 +3734,7 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
 /** Capture audit states that use the real /dev/ui scripted event stream or
  * existing chat controls. This is screenshot-only fixture orchestration. */
 async function captureNextChatAuditReview(browser: Browser, sessionValue: string): Promise<void> {
+  if (useFirefox) await captureChatStreamGlitch(browser, sessionValue);
   const outDir = process.env.MAIPAI_CHAT_AUDIT_OUT_DIR || join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
   const pinShotsDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/pin-shots";
@@ -6348,7 +6456,15 @@ async function main() {
       if (!searchSetting.ok) throw new Error(`seed websearch fixture failed: ${searchSetting.status}`);
     }
 
-    const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch({ headless: true });
+    let launchedBrowser: Browser;
+    try {
+      launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch({ headless: true });
+    } catch (error) {
+      if (useFirefox && chatStreamGlitchReview) {
+        throw new Error(`Firefox stream audit could not start; no visual measurements were made. ${error instanceof Error ? error.message : String(error)}`);
+      }
+      throw error;
+    }
     browser = launchedBrowser;
     if (chatMissingStatesReview) {
       await captureChatMissingStates(browser, sessionValue);
@@ -6639,6 +6755,11 @@ async function main() {
 
     if (chatCollapseHoverAudit) {
       await captureChatCollapseHoverAudit(browser, sessionValue);
+      return;
+    }
+
+    if (chatStreamGlitchReview) {
+      await captureChatStreamGlitch(browser, sessionValue);
       return;
     }
 
