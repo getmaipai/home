@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { __setConversationTitleDelayForTests, __clearPendingConversationTitlesForTests } from "@/lib/conversationTitle";
+import { __setConversationTitleDelayForTests, __clearPendingConversationTitlesForTests, __setConversationTitleRetryPolicyForTests } from "@/lib/conversationTitle";
 import { createConversation, logTurn } from "@/lib/conversationHistory";
 import { db } from "@/db";
 import { conversations, conversationTurns, people } from "@/db/schema";
@@ -20,6 +20,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   __setConversationTitleDelayForTests(null);
+  __setConversationTitleRetryPolicyForTests(null);
   __clearPendingConversationTitlesForTests();
   __resetLlmSupervisorForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
@@ -64,7 +65,7 @@ describe("the title survives the client leaving", () => {
       await reader.cancel();
 
       expect(await until(() => db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).all().length === 1)).toBe(true);
-      const conversationId = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).get()!.conversationId;
+      const conversationId = db.select().from(conversationTurns).where(eq(conversationTurns.personId, actor.id)).get()!.conversationId!;
       expect(await until(() => storedTitle(conversationId) !== null)).toBe(true);
       expect(storedTitle(conversationId)).toBe("Tomato Plant Care");
     } finally {
@@ -116,6 +117,119 @@ describe("a chat read with no title gets one asked for", () => {
       expect(db.select().from(conversations).where(eq(conversations.id, temporary.value.id)).all()).toHaveLength(0);
     } finally {
       await stub.stop();
+    }
+  });
+});
+
+/** An engine that is down: every request is a 503, and each one is counted. */
+function deadEngine() {
+  const server = Bun.serve({ port: 0, fetch: () => { hits++; return new Response("down", { status: 503 }); } });
+  let hits = 0;
+  process.env.MAIPAI_LLAMA_SERVER_URL = `http://127.0.0.1:${server.port}`;
+  return { hits: () => hits, stop: () => server.stop(true) };
+}
+
+function untitledChat(actor: typeof people.$inferSelect, mode?: "temporary") {
+  const created = createConversation(actor, { surface: "chat", ...(mode ? { mode } : {}) });
+  if (!created.ok) throw new Error(created.error);
+  const id = created.value.id;
+  logTurn(actor, "chat", "how do I keep my tomato plants from splitting", { reply: { text: "Water them evenly." }, source: "model", safety: SAFE, conversation_id: id, turn_id: `turn-${id}` });
+  return id;
+}
+
+describe("the read-triggered retry is bounded per conversation", () => {
+  test("a down engine gets at most the attempt cap of title calls across many reads, then none until the window passes", async () => {
+    const { client, actor } = await owner();
+    __resetLlmSupervisorForTests();
+    __setConversationTitleRetryPolicyForTests({ maxAttempts: 3, cooldownMs: 0, windowMs: 60_000 });
+    const engine = deadEngine();
+    try {
+      const id = untitledChat(actor);
+      for (let i = 0; i < 12; i++) {
+        await client.get(`/api/conversations/${id}`);
+        await Bun.sleep(80); // longer than the 30ms schedule delay, so each attempt has run before the next read
+      }
+      const attempts = engine.hits();
+      expect(attempts).toBeGreaterThan(0);
+      expect(attempts).toBeLessThanOrEqual(3);
+      expect(storedTitle(id)).toBeNull();
+    } finally {
+      engine.stop();
+    }
+  });
+
+  test("the cooldown spaces attempts: a read right after an attempt does not schedule another", async () => {
+    const { client, actor } = await owner();
+    __resetLlmSupervisorForTests();
+    __setConversationTitleRetryPolicyForTests({ maxAttempts: 3, cooldownMs: 60_000, windowMs: 3_600_000 });
+    const engine = deadEngine();
+    try {
+      const id = untitledChat(actor);
+      for (let i = 0; i < 6; i++) {
+        await client.get(`/api/conversations/${id}`);
+        await Bun.sleep(80);
+      }
+      expect(engine.hits()).toBe(1);
+    } finally {
+      engine.stop();
+    }
+  });
+
+  test("the cap is per conversation: a second untitled chat still gets its own attempts", async () => {
+    const { client, actor } = await owner();
+    __resetLlmSupervisorForTests();
+    __setConversationTitleRetryPolicyForTests({ maxAttempts: 1, cooldownMs: 0, windowMs: 3_600_000 });
+    const engine = deadEngine();
+    try {
+      const a = untitledChat(actor);
+      const b = untitledChat(actor);
+      for (const id of [a, b, a, b]) {
+        await client.get(`/api/conversations/${id}`);
+        await Bun.sleep(80);
+      }
+      expect(engine.hits()).toBe(2);
+    } finally {
+      engine.stop();
+    }
+  });
+
+  test("an engine that comes back is asked again and titles the chat (fails without the read retry)", async () => {
+    const { client, actor } = await owner();
+    __resetLlmSupervisorForTests();
+    __setConversationTitleRetryPolicyForTests({ maxAttempts: 3, cooldownMs: 0, windowMs: 3_600_000 });
+    const engine = deadEngine();
+    const id = untitledChat(actor);
+    await client.get(`/api/conversations/${id}`);
+    await Bun.sleep(150);
+    expect(storedTitle(id)).toBeNull();
+    engine.stop();
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer(0, { scriptedChatReply: () => "Tomato Plant Care" });
+    process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
+    __resetLlmSupervisorForTests();
+    try {
+      await client.get(`/api/conversations/${id}`);
+      expect(await until(() => storedTitle(id) !== null)).toBe(true);
+    } finally {
+      await stub.stop();
+    }
+  });
+
+  test("a temporary chat makes zero title calls however often it is read", async () => {
+    const { client, actor } = await owner();
+    __resetLlmSupervisorForTests();
+    __setConversationTitleRetryPolicyForTests({ maxAttempts: 3, cooldownMs: 0, windowMs: 3_600_000 });
+    const engine = deadEngine();
+    try {
+      const temporary = createConversation(actor, { surface: "chat", mode: "temporary" });
+      if (!temporary.ok) throw new Error(temporary.error);
+      for (let i = 0; i < 5; i++) {
+        await client.get(`/api/conversations/${temporary.value.id}`);
+        await Bun.sleep(60);
+      }
+      expect(engine.hits()).toBe(0);
+    } finally {
+      engine.stop();
     }
   });
 });

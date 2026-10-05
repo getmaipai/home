@@ -105,14 +105,39 @@ export function scheduleConversationTitle(conversationId: string): void {
   );
 }
 
+// Read-triggered retries are bounded per conversation, in memory (a restart resets them, which is fine: a restart
+// is also what drops the timers this exists to recover). Without the bound, a down engine would make every read of
+// an untitled chat schedule another LLM call. The cap applies per rolling window and a cooldown spaces the attempts.
+const DEFAULT_RETRY_POLICY = { maxAttempts: 3, windowMs: 60 * 60 * 1000, cooldownMs: 5 * 60 * 1000 };
+let retryPolicy = { ...DEFAULT_RETRY_POLICY };
+const retryAttempts = new Map<string, number[]>();
+
 /** A chat that is read while it still has no title and no timer is waiting for it (the hub restarted inside
  * the idle window, which drops the timer with the process, or the first title call found the engine down)
  * gets the same debounced schedule a finished turn gets. Unlike scheduleConversationTitle this never
- * restarts a timer already running, so a client polling for the title cannot keep pushing it back.
- * generateConversationTitle still skips a temporary, renamed or already titled chat. */
+ * restarts a timer already running, so a client polling for the title cannot keep pushing it back, and it asks
+ * at most maxAttempts times per conversation per window, no sooner than cooldownMs after the last ask (3 per
+ * hour, 5 minutes apart, kept in memory). generateConversationTitle still skips a temporary, renamed or
+ * already titled chat. */
 export function ensureConversationTitleScheduled(conversationId: string): void {
   if (pendingTitles.has(conversationId) || inFlight.has(conversationId)) return;
+  const now = Date.now();
+  if (retryAttempts.size > 500) {
+    for (const [id, times] of retryAttempts) if (times.every((t) => now - t >= retryPolicy.windowMs)) retryAttempts.delete(id);
+  }
+  const recent = (retryAttempts.get(conversationId) ?? []).filter((t) => now - t < retryPolicy.windowMs);
+  if (recent.length >= retryPolicy.maxAttempts || (recent.length > 0 && now - recent[recent.length - 1]! < retryPolicy.cooldownMs)) {
+    retryAttempts.set(conversationId, recent);
+    return;
+  }
+  retryAttempts.set(conversationId, [...recent, now]);
   scheduleConversationTitle(conversationId);
+}
+
+/** Test-only: the read-triggered retry bound (null restores the default) and a clean slate. */
+export function __setConversationTitleRetryPolicyForTests(policy: Partial<typeof DEFAULT_RETRY_POLICY> | null): void {
+  retryPolicy = { ...DEFAULT_RETRY_POLICY, ...(policy ?? {}) };
+  retryAttempts.clear();
 }
 
 /** Test-only: the idle delay before a scheduled title is asked for (null restores the default). */
@@ -122,6 +147,7 @@ export function __setConversationTitleDelayForTests(ms: number | null): void {
 
 /** Test-only: drops every pending timer, wired into resetDb() beside the summary one. */
 export function __clearPendingConversationTitlesForTests(): void {
+  retryAttempts.clear();
   for (const timer of pendingTitles.values()) clearTimeout(timer);
   pendingTitles.clear();
 }
