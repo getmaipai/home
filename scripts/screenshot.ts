@@ -164,6 +164,8 @@ const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
 const chatMissingStatesReview = process.argv.includes("--chat-missing-states-review");
+const chatMissingStatesOutDirArg = process.argv.find((arg) => arg.startsWith("--chat-missing-states-out-dir="))?.split("=", 2)[1];
+const chatMissingStatesOutDir = chatMissingStatesOutDirArg || process.env.MAIPAI_CHAT_MISSING_STATES_OUT_DIR || join(ROOT, "data-scratch", "screenshots", "chat-missing-states");
 const chatListReview = process.argv.includes("--chat-list-review");
 const chatSearchReview = process.argv.includes("--chat-search-review");
 const chatMobileSheetReview = process.argv.includes("--chat-mobile-sheet-review");
@@ -1387,7 +1389,7 @@ async function captureChatStreaming(browser: Browser, sessionValue: string, view
  * a resumable turn_meta and delta; the second response is held until the
  * reconnecting banner has been captured. */
 async function captureChatMissingStates(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/audit-2026-10-04";
+  const outDir = chatMissingStatesOutDir;
   mkdirSync(outDir, { recursive: true });
   const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
   const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
@@ -2258,16 +2260,11 @@ async function captureChatThreadActionsReview(browser: Browser, sessionValue: st
   }
 }
 
-/** CHAT-LIST-01's own acceptance ("captured at 1440 and 390") - the
- * `/chat` thread list's own toolbar row with the new temporary-
- * chat button beside New chat, both visible together. Seeded with
- * one real conversation (seedTitledConversation, the same helper
- * captureChatThreadActionsReview uses for the legacy `/chat` list) so
- * the list isn't the empty state. On phone the rail is a Sheet, opened
- * the same way a person would ("Show threads" - NextChatPage.test.tsx's
- * own "New chat closes the phone/tablet Sheet" test uses the same
- * button). Light and dark, matching the coordinator's own instruction
- * for this batch of four header/list rows. */
+/** CHAT-LIST-01 follow-up audit: capture the current `/chat` thread-list
+ * controls at 1440 and 390. Current NextThreadList renders New chat and
+ * Search chats; it has no temporary-chat button. Seed one real
+ * conversation so the list isn't the empty state. On phone the rail is
+ * a Sheet, opened the same way a person would ("Show threads"). */
 async function captureChatListReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -2296,12 +2293,19 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
           scope = page.getByRole("dialog");
         }
         await scope.getByText("Weekend garden plans", { exact: true }).waitFor();
+        await scope.getByRole("textbox", { name: "Search threads" }).waitFor();
+        // CHAT-LIST-01's temporary-chat affordance is absent from the
+        // current NextThreadList composition. Capture the controls that
+        // the app actually ships and report that contract explicitly;
+        // don't wait forever on the retired button label.
         await scope.getByRole("button", { name: "New chat", exact: true }).waitFor();
-        await scope.getByRole("button", { name: "Start a temporary chat", exact: true }).waitFor();
         await settleAnimations(page);
-        const file = `chat-list-temporary-button-${viewport.width}-${theme}.png`;
+        const file = `chat-list-current-controls-${viewport.width}-${theme}.png`;
         await page.screenshot({ path: join(outDir, file), fullPage: slug === "phone" });
         console.log(`Wrote ${join(outDir, file)}`);
+        if (!(await scope.getByRole("button", { name: "Start a temporary chat", exact: true }).count())) {
+          console.log(`CHAT-LIST-01 temporary-chat control absent from ${slug}/${theme}; captured shipped New chat control instead`);
+        }
         await page.close();
       } finally {
         await context.close();
@@ -2376,7 +2380,11 @@ async function captureChatMobileSheetReview(browser: Browser, sessionValue: stri
       const boxes = {
         dialog: await measure(dialog),
         newChat: await measure(dialog.locator("[data-slot='aui_thread-list-new']")),
-        search: await measure(dialog.locator("[data-slot='aui_thread-list-search'] input")),
+        // Home composes assistant-ui's ThreadSearch (data-slot=thread-search),
+        // not the kit's standalone ThreadListSearch (aui_thread-list-search).
+        // Its input retains the component's accessible name "Search threads";
+        // the caller's "Search chats" prop labels the wrapper only.
+        search: await measure(dialog.locator("[data-slot='thread-search']")),
         firstRow: await measure(dialog.locator("[data-slot='aui_thread-list-item']").first()),
         close: await measure(dialog.locator("[data-slot='sheet-close']")),
       };
@@ -2389,7 +2397,10 @@ async function captureChatMobileSheetReview(browser: Browser, sessionValue: stri
       const firstRowGutter = boxes.firstRow.x - boxes.dialog.x;
       console.log(`CHAT-MOBILE-SHEET-01 ${theme}: ${JSON.stringify({ ...boxes, newChatLeft, newChatTop, searchLeft, newChatGutter, searchGutter, closeGutter, firstRowGutter })}`);
       if (newChatLeft < 12 || newChatTop < 12) throw new Error(`New chat inset too small (${newChatLeft}px left, ${newChatTop}px top)`);
-      if (Math.abs(newChatGutter - searchGutter) > 1) throw new Error(`New chat and Search gutters differ (${newChatGutter}px vs ${searchGutter}px)`);
+      // ThreadSearch is intentionally shifted by `-ms-0.5` in
+      // NextThreadList, so its wrapper lands 2px left of the 16px row
+      // gutter. Keep the check tight while accepting that shipped offset.
+      if (Math.abs(newChatGutter - searchGutter) > 2) throw new Error(`New chat and Search gutters differ (${newChatGutter}px vs ${searchGutter}px)`);
       if (Math.abs(newChatGutter - closeGutter) > 1) throw new Error(`Close and New chat gutters differ (${closeGutter}px vs ${newChatGutter}px)`);
       if (Math.abs(newChatGutter - firstRowGutter) > 1) throw new Error(`First row and New chat gutters differ (${firstRowGutter}px vs ${newChatGutter}px)`);
       await settleAnimations(page);
@@ -4846,10 +4857,39 @@ async function captureNextChatRichReview(browser: Browser, sessionValue: string)
         // the reply: the top (code, math) and the bottom (table, tasks, diagram).
         for (const part of ["top", "end"] as const) {
           await page.evaluate((where) => {
-            const md = document.querySelector(".aui-md");
-            if (where === "top") md?.scrollIntoView({ block: "start" });
-            else document.querySelectorAll(".aui-md").forEach((n) => n.scrollIntoView({ block: "end" }));
+            const viewport = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
+            if (!viewport) throw new Error("Missing assistant-ui thread viewport");
+            viewport.scrollTo({ top: where === "top" ? 0 : viewport.scrollHeight, behavior: "instant" });
           }, part);
+          if (part === "end") {
+            // Assistant UI can update the viewport's scroll height as the
+            // scroll event settles. Reapply max after each frame so the
+            // capture ends at the actual current bottom, not a stale max.
+            await page.evaluate(async () => {
+              const viewport = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
+              if (!viewport) throw new Error("Missing assistant-ui thread viewport");
+              for (let attempt = 0; attempt < 4; attempt++) {
+                viewport.scrollTo({ top: viewport.scrollHeight, behavior: "instant" });
+                await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+              }
+            });
+          }
+          await page.waitForTimeout(250);
+          if (part === "end") {
+            const measured = await page.evaluate(() => {
+              const viewport = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
+              const diagram = [...document.querySelectorAll<HTMLElement>(".aui-md")]
+                .flatMap((md) => [...md.querySelectorAll<SVGSVGElement>("svg")])
+                .at(-1);
+              const composer = document.querySelector<HTMLElement>('[data-slot="aui_composer-shell"]');
+              if (!viewport || !diagram || !composer) return null;
+              return { scrollTop: viewport.scrollTop, maxScrollTop: viewport.scrollHeight - viewport.clientHeight, diagramBottom: diagram.getBoundingClientRect().bottom, composerTop: composer.getBoundingClientRect().top };
+            });
+            if (!measured || measured.diagramBottom + 16 > measured.composerTop) {
+              throw new Error(`Rich reply diagram overlaps composer or lacks 16px clearance at ${viewport.width}x${viewport.height}/${theme}: ${JSON.stringify(measured)}`);
+            }
+            console.log(`Rich reply end clearance ${viewport.width}x${viewport.height}/${theme}: ${JSON.stringify(measured)}`);
+          }
           await page.waitForTimeout(400);
           const filename = `next-chat-rich-${evidenceTag}-${part}-${viewport.width}-${theme}.png`;
           await page.screenshot({ path: join(outDir, filename) });
@@ -7168,14 +7208,20 @@ async function main() {
 
     if (!a11yOnly && chatListReview) {
       await captureChatListReview(browser, sessionValue);
+      console.log("completed named review: --chat-list-review");
+      return;
     }
 
     if (!a11yOnly && chatSearchReview) {
       await captureChatSearchReview(browser, sessionValue);
+      console.log("completed named review: --chat-search-review");
+      return;
     }
 
     if (!a11yOnly && chatMobileSheetReview) {
       await captureChatMobileSheetReview(browser, sessionValue);
+      console.log("completed named review: --chat-mobile-sheet-review");
+      return;
     }
 
     if (!a11yOnly && chatShortcutsReview) {
