@@ -331,7 +331,7 @@ function NextThreadList({
         {collapseToggle}
         <ThreadListNew label="New chat" className="min-h-12" onClick={onNewThread} disabled={availability === "unavailable"} />
       </div>
-      {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} label="Search chats" />}
+      {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} label="Search chats" className="-ms-0.5" />}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />
     </ThreadListRoot>
   );
@@ -1874,7 +1874,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         </div>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- sheet width and responsive visibility are intentional layout for the mobile thread list; max-w-[calc(100vw-2rem)] has no scale-token equivalent since Sheet has no max-width prop of its own (commons/ui/docs/dashboard-upstream.md) */}
-          <SheetContent id="next-chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-2 lg:hidden">
+          <SheetContent id="next-chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 px-4 pb-4 pt-6 [&_[data-slot='sheet-close']]:right-4 lg:hidden">
             {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
             <SheetHeader className="sr-only">
               <SheetTitle>Conversations</SheetTitle>

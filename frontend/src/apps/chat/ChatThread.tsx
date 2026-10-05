@@ -34,13 +34,6 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true }:
         components={{
           ...THREAD_SLOTS,
           onEditSend,
-          viewport: {
-            turnAnchor: "bottom",
-            autoScroll: true,
-            scrollToBottomOnRunStart: true,
-            scrollToBottomOnInitialize: true,
-            scrollToBottomOnThreadSwitch: true,
-          },
           ComposerExtra: modelPickerAllowed ? MODEL_SELECTOR_SLOT : undefined,
         }}
       />
