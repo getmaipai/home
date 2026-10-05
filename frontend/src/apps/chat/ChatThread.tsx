@@ -72,6 +72,7 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
       <ChatExtrasContext.Provider value={extraContext}>
         <Thread
           temporary={temporary}
+          scrollToBottomOffset={56}
           components={{
             ...THREAD_SLOTS,
             onEditSend,
