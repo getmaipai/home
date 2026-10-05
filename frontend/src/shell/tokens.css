@@ -65,7 +65,7 @@ html.incognito body::before {
 html.incognito body[class*="style-"] {
   position: relative;
   z-index: 0;
-  background: transparent;
+  background: var(--incognito-canvas-color);
   --background: var(--incognito-canvas-color);
   --card: var(--incognito-card);
   --surface-card: var(--incognito-card);
