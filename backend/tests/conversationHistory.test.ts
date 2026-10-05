@@ -5,6 +5,7 @@ import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stac
 import { startStackFixture as makeStackFixture, type StackFixture, offlineResponse } from "./stackFixture";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { useDefaultScriptedStack } from "./stackFixture";
+import { FAILURE_COPY } from "@/lib/failureCopy";
 
 const backgroundFixtures: StackFixture[] = [];
 const conversationStubs: Array<{ stop(): Promise<void> }> = [];
@@ -1289,21 +1290,22 @@ describe("buildConversationWindow() (step 3)", () => {
     if (!conv.ok) throw new Error(conv.error);
     const search = { callId: "web-1", packageId: "websearch", status: "succeeded" as const, via: "tool_call" as const, args: { expression: "Brazil president" }, sources: [{ id: "src-a", kind: "web" as const, title: "Official result", url: "https://example.test/president", site: "example.test", snippet: "Current president information", source: "websearch", created_at: "2026-10-05T00:00:00.000Z", hlc: "1" }] };
     logTurn(actor, "chat", "who is president of brazil", { reply: { text: "The result names the president." }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-history" }, { outcomes: [search] });
+    const latestSearch = { ...search, callId: "web-2", args: { expression: "Brazil election" }, sources: [{ ...search.sources[0]!, id: "src-b", title: "Most recent result", snippet: "Snippet marker must not be replayed" }] };
+    logTurn(actor, "chat", "who is leading", { reply: { text: "The latest result names the candidates." }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-history-latest" }, { outcomes: [latestSearch] });
     const before = buildConversationWindow(conv.value);
-    expect(before.messages.map((m) => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
-    expect(before.messages[1]?.tool_calls?.[0]?.id).toBe("web-1");
-    expect(before.messages[2]?.content).toContain("Official result");
-    expect(before.messages[2]?.content).not.toContain("page body");
+    expect(before.messages.filter((m) => m.tool_calls?.length).map((m) => m.tool_calls?.[0]?.id)).toEqual(["web-2"]);
+    expect(before.messages.some((m) => m.content.includes("Most recent result"))).toBe(true);
+    expect(before.messages.some((m) => m.content.includes("Snippet marker must not be replayed"))).toBe(false);
     logTurn(actor, "chat", "who won", { reply: { text: "I need the race." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-followup" });
     const after = buildConversationWindow(conv.value);
     expect(after.messages.slice(0, before.messages.length)).toEqual(before.messages);
   });
 
-  test("a replay that exceeds the older-turn budget is dropped as a whole exchange", async () => {
+  test("a title-and-URL replay over the window budget is dropped as a whole exchange", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
-    const sources = Array.from({ length: 8 }, (_, i) => ({ id: `src-${i}`, kind: "web" as const, title: `Result ${i}`, url: `https://example.test/${i}`, site: "example.test", snippet: "x".repeat(240), source: "websearch", created_at: "2026-10-05T00:00:00.000Z", hlc: `${i}` }));
+    const sources = Array.from({ length: 7 }, (_, i) => ({ id: `src-${i}`, kind: "web" as const, title: `Result ${i} ${"x".repeat(590)}`, url: `https://example.test/${i}`, site: "example.test", snippet: "x".repeat(240), source: "websearch", created_at: "2026-10-05T00:00:00.000Z", hlc: `${i}` }));
     const search = { callId: "old-web", packageId: "websearch", status: "succeeded" as const, via: "tool_call" as const, args: { expression: "old search" }, sources };
     logTurn(actor, "chat", "old search question", { reply: { text: "Old search answer." }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-old-search-budget" }, { outcomes: [search] });
     for (let i = 0; i < 4; i++) {
@@ -1311,9 +1313,24 @@ describe("buildConversationWindow() (step 3)", () => {
       logTurn(actor, "chat", `new turn ${i} ${long}`, { reply: { text: `${long} reply` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-new-${i}` });
     }
     const window = buildConversationWindow(conv.value);
-    expect(window.messages.some((m) => m.content.includes("old search question"))).toBe(false);
+    expect(window.messages.some((m) => m.content.includes("old search question"))).toBe(true);
     expect(window.messages.some((m) => m.tool_calls?.some((call) => call.id === "old-web"))).toBe(false);
     expect(window.messages.some((m) => m.role === "tool" && m.tool_call_id === "old-web")).toBe(false);
+  });
+
+  test.each([
+    [3214, FAILURE_COPY.other.adult],
+    [4018, FAILURE_COPY.context_too_large.adult],
+  ])("a failed search reply is never replayed for the %i-token stored prompt, while newest text stays", async (storedPromptTokens, failureReply) => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const search = { callId: `failed-search-${storedPromptTokens}`, packageId: "websearch", status: "succeeded" as const, via: "tool_call" as const, args: { expression: "services for seniors" }, sources: [{ id: "src-failed", kind: "web" as const, title: "Senior services", url: "https://example.test/seniors", site: "example.test", snippet: "This snippet must not be replayed", source: "websearch", created_at: "2026-10-05T00:00:00.000Z", hlc: "1" }] };
+    logTurn(actor, "chat", `stored prompt ${storedPromptTokens}`, { reply: { text: failureReply }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-failed-search-${storedPromptTokens}` }, { outcomes: [search] });
+    const window = buildConversationWindow(conv.value);
+    expect(window.messages.some((message) => message.tool_calls?.some((call) => call.id === search.callId))).toBe(false);
+    expect(window.messages.some((message) => message.role === "tool" && message.tool_call_id === search.callId)).toBe(false);
+    expect(window.messages.some((message) => message.content.includes(`stored prompt ${storedPromptTokens}`))).toBe(true);
   });
 
   // Item 1b (#67): a guard's own honest line, stored as the reply of a
@@ -1324,10 +1341,12 @@ describe("buildConversationWindow() (step 3)", () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
-    logTurn(actor, "chat", "have you seen it", { reply: { text: "I don't actually have that - nobody's told me." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-guarded" }, { guardReasons: ["invention"] });
+    const guardedSearch = { callId: "guarded-web", packageId: "websearch", status: "succeeded" as const, via: "tool_call" as const, args: { expression: "film details" }, sources: [{ id: "src-guarded", kind: "web" as const, title: "Film details", url: "https://example.test/film", site: "example.test", snippet: "Film detail snippet", source: "websearch", created_at: "2026-10-05T00:00:00.000Z", hlc: "1" }] };
+    logTurn(actor, "chat", "have you seen it", { reply: { text: "I don't actually have that - nobody's told me." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-guarded" }, { guardReasons: ["invention"], outcomes: [guardedSearch] });
     logTurn(actor, "chat", "what's it about", { reply: { text: "A clownfish looking for his son." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-plain" });
     const window = buildConversationWindow(conv.value);
     const assistantLines = window.messages.filter((m) => m.role === "assistant").map((m) => m.content);
+    expect(window.messages.some((m) => m.tool_calls?.some((call) => call.id === "guarded-web"))).toBe(false);
     expect(assistantLines).toEqual(["A clownfish looking for his son."]);
     expect(window.messages.some((m) => m.role === "system" && m.content === "[No reply was given to this.]")).toBe(true);
     expect(window.messages.some((m) => m.content.includes("nobody's told me"))).toBe(false);
@@ -1372,6 +1391,7 @@ describe("buildConversationWindow() (step 3)", () => {
     const window = buildConversationWindow(conv.value);
     expect(window.messages.length).toBeLessThan(20); // 10 turns * 2 messages each
     expect(window.messages.some((m) => m.content.includes("turn 9"))).toBe(true); // newest, always kept
+    for (let i = 6; i <= 9; i++) expect(window.messages.some((m) => m.content.includes(`turn ${i}`))).toBe(true);
     expect(window.messages.some((m) => m.content.includes("turn 0"))).toBe(false); // oldest, dropped first
   });
 

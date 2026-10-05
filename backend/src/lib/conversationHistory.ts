@@ -58,6 +58,7 @@ import type { TurnStats } from "@/lib/turnStats";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import { sourcesFromRows } from "@/lib/turnContext";
 import { toolCallAssistantMessage } from "@/lib/composer";
+import { FAILURE_COPY } from "@/lib/failureCopy";
 import type { Rung } from "@/lib/ruleNames";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -1949,31 +1950,52 @@ const WINDOW_TOKEN_BUDGET = 1200;
 // with a long-lived conversation's entire history.
 const WINDOW_ROW_FETCH_LIMIT = 200;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
+const FAILURE_LINES = new Set(Object.values(FAILURE_COPY).flatMap((copy) => [copy.adult, copy.minor]));
+
+function hasFailedFinalGeneration(t: ConversationTurnRow): boolean {
+  if (!t.stats) return false;
+  try {
+    const stats = JSON.parse(t.stats) as { generations?: { error?: unknown }[] };
+    const finalGeneration = stats.generations?.at(-1);
+    return typeof finalGeneration?.error === "string" && finalGeneration.error.length > 0;
+  } catch { return false; }
+}
 
 function replaySearchOutcomes(t: ConversationTurnRow): ToolExecutionOutcome[] {
-  if (t.bare || !t.outcomes) return [];
+  if (t.status !== "done" || t.guardReason || hasFailedFinalGeneration(t) || FAILURE_LINES.has(t.replyText.trim()) || t.bare || !t.outcomes) return [];
   try {
     const outcomes = JSON.parse(t.outcomes) as ToolExecutionOutcome[];
-    return outcomes.filter((o) => o.status === "succeeded" && o.packageId === "websearch" && sourcesFromRows(o.sources ?? []).length > 0);
+    const successful = outcomes.filter((o) => o.status === "succeeded" && o.packageId === "websearch" && sourcesFromRows(o.sources ?? []).length > 0);
+    const mostRecent = successful.at(-1);
+    if (!mostRecent) return [];
+    const sources = sourcesFromRows(mostRecent.sources ?? []).map((source) => ({
+      id: source.id, kind: source.kind, title: source.title, url: source.url, site: source.site, snippet: null,
+      source: source.source, created_at: source.created_at, hlc: source.hlc,
+    }));
+    return [{ ...mostRecent, sources }];
   } catch { return []; }
 }
 
-function turnWindowMessages(t: ConversationTurnRow): LlmMessage[] {
-  const messages: LlmMessage[] = [{ role: "user", content: redactCredentials(t.userText) }];
-  const replays = replaySearchOutcomes(t);
-  if (replays.length) {
-    const toolCallMessage = toolCallAssistantMessage(replays);
-    if (toolCallMessage.tool_calls?.length) messages.push(toolCallMessage);
-    messages.push(...replays.map((o) => ({ role: "tool" as const, tool_call_id: o.callId, content: JSON.stringify({ sources: sourcesFromRows(o.sources ?? []).map((s, i) => ({ number: i + 1, title: s.title, url: s.url, snippet: s.snippet })) }) })));
-  }
-  messages.push(
+function turnTextMessages(t: ConversationTurnRow): LlmMessage[] {
+  return [
+    { role: "user", content: redactCredentials(t.userText) },
     (t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")) && t.guardReason
       ? { role: "system", content: guardedTurnNote(t) }
       : t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")
         ? { role: "assistant", content: redactCredentials(t.replyText) }
         : { role: "system", content: nonModelWindowNote(t) },
-  );
-  return messages;
+  ];
+}
+
+function searchReplayMessages(outcomes: readonly ToolExecutionOutcome[]): LlmMessage[] {
+  if (outcomes.length === 0) return [];
+  const assistant = toolCallAssistantMessage(outcomes);
+  const tools = outcomes.map((outcome) => ({
+    role: "tool" as const,
+    tool_call_id: outcome.callId,
+    content: JSON.stringify({ sources: sourcesFromRows(outcome.sources ?? []).map((source, i) => ({ number: i + 1, title: source.title, url: source.url })) }),
+  }));
+  return [...(assistant.tool_calls?.length ? [assistant] : []), ...tools];
 }
 
 function estimateTokens(text: string): number {
@@ -2113,11 +2135,12 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
 /** The follow-up-turn context (step 3: "and tomorrow?" needs the prior
  * exchange in the prompt to mean anything, the retired turn engine sends
  * `[system, user]` and nothing else today). The newest
- * WINDOW_NEWEST_TURNS_KEPT turns are always included verbatim, whatever
- * their size; older turns are added back to front (most-recent-of-the-
- * older first) while the running chars/4 estimate stays under
- * WINDOW_TOKEN_BUDGET, stopping - "oldest dropped first" - the moment one
- * more would exceed it. Whatever's older than what fit is represented by
+ * WINDOW_NEWEST_TURNS_KEPT user/reply pairs are always included, whatever
+ * their size. One most-recent eligible search replay shares the older
+ * turns' WINDOW_TOKEN_BUDGET and is dropped whole if it does not fit;
+ * older turns are added back to front (most-recent-of-the-older first)
+ * while the chars/4 estimate stays under the remaining budget, stopping
+ * ("oldest dropped first") as soon as one more would exceed it. Whatever's older than what fit is represented by
  * the conversation's own rolling `summary` as one line instead, when one
  * exists. */
 export function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null } = {}): ConversationWindow {
@@ -2165,27 +2188,36 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
   const newest = liveRows.slice(-WINDOW_NEWEST_TURNS_KEPT);
   const older = liveRows.slice(0, Math.max(0, liveRows.length - WINDOW_NEWEST_TURNS_KEPT));
 
-  const costOf = (t: ConversationTurnRow) => turnWindowMessages(t).reduce((sum, m) => sum + estimateTokens(JSON.stringify(m)), 0);
-  let tokenTotal = newest.reduce((sum, t) => sum + costOf(t), 0);
-  const includedOlder: ConversationTurnRow[] = [];
-  for (let i = older.length - 1; i >= 0; i--) {
-    const t = older[i]!;
-    const cost = costOf(t);
-    if (tokenTotal + cost > WINDOW_TOKEN_BUDGET) break;
-    tokenTotal += cost;
-    includedOlder.unshift(t);
+  const costOfText = (t: ConversationTurnRow) => turnTextMessages(t).reduce((sum, m) => sum + estimateTokens(JSON.stringify(m)), 0);
+  const newestTextCost = newest.reduce((sum, turn) => sum + costOfText(turn), 0);
+  const replayTurn = [...liveRows].reverse().find((turn) => replaySearchOutcomes(turn).length > 0);
+  const replay = replayTurn ? searchReplayMessages(replaySearchOutcomes(replayTurn)) : [];
+  const replayCost = replay.reduce((sum, message) => sum + estimateTokens(JSON.stringify(message)), 0);
+  let includeReplay = newestTextCost + replayCost <= WINDOW_TOKEN_BUDGET;
+  const fitOlder = (budget: number): ConversationTurnRow[] => {
+    let tokenTotal = 0;
+    const included: ConversationTurnRow[] = [];
+    for (let i = older.length - 1; i >= 0; i--) {
+      const turn = older[i]!;
+      const cost = costOfText(turn);
+      if (tokenTotal + cost > budget) break;
+      tokenTotal += cost;
+      included.unshift(turn);
+    }
+    return included;
+  };
+  let includedOlder = fitOlder(Math.max(0, WINDOW_TOKEN_BUDGET - newestTextCost - (includeReplay ? replayCost : 0)));
+  if (includeReplay && replayTurn && !newest.some((turn) => turn.id === replayTurn.id) && !includedOlder.some((turn) => turn.id === replayTurn.id)) {
+    includeReplay = false;
+    includedOlder = fitOlder(Math.max(0, WINDOW_TOKEN_BUDGET - newestTextCost));
   }
 
   const windowTurns = [...includedOlder, ...newest];
   const messages: LlmMessage[] = [];
   for (const t of windowTurns) {
-    if (replaySearchOutcomes(t).length) {
-      messages.push(...turnWindowMessages(t));
-      continue;
-    }
+    const turnMessages = turnTextMessages(t);
     // CHAT-03, the read side: a row from before the policy (or an import)
     // is redacted on the way into the model's window, never rewritten.
-    messages.push({ role: "user", content: redactCredentials(t.userText) });
     // A `model` turn's own reply enters the window in its own voice
     // (`assistant`); any other source instead gets a `system` note
     // (nonModelWindowNote(), Fix B3) describing what really happened -
@@ -2200,18 +2232,9 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
     // the model, and a line that carries a fact the next turn needs
     // ("I haven't added anything to your list") is quoted as a note, in
     // nobody's voice (a review).
-    messages.push(
-      (t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")) && t.guardReason
-        ? { role: "system", content: guardedTurnNote(t) }
-        : t.source === "model"
-          ? { role: "assistant", content: redactCredentials(t.replyText) }
-          : // A reply the model composed after a successful tool call
-            // (routing tier "tool", turnNext.ts) is its own words: a
-            // bracketed note here was imitated as the next reply.
-            t.source === "plugin" && t.routingTier === "tool"
-            ? { role: "assistant", content: redactCredentials(t.replyText) }
-            : { role: "system", content: nonModelWindowNote(t) },
-    );
+    messages.push(turnMessages[0]!);
+    if (includeReplay && t.id === replayTurn?.id) messages.push(...replay);
+    messages.push(...turnMessages.slice(1));
   }
 
   const hasUncoveredOlder = older.length - includedOlder.length > 0;
