@@ -52,6 +52,7 @@ const SINGLE_RUNS = (() => {
   const at = process.argv.indexOf("--runs");
   return at < 0 ? 2 : Math.max(1, Number(process.argv[at + 1]));
 })();
+const SEARCH_FREE_ITEMS = new Set(["k1-heat-pump", "w1-story", "f4-recipe"]);
 const ONLY = (() => {
   const at = process.argv.indexOf("--only");
   return at < 0 ? null : new Set((process.argv[at + 1] ?? "").split(",").map((s) => s.trim()).filter(Boolean));
@@ -62,24 +63,25 @@ const GROUP = (() => {
   if (!["adult", "child", "spoken"].includes(g)) throw new Error(`--group must be adult, child or spoken (got ${g})`);
   return g as "adult" | "child" | "spoken";
 })();
-// THIN-Q2 / BENCH-AB-02: --arms A2,AP,AT,APT,B picks the adult arms (default
+// THIN-Q2 / BENCH-AB-02: --arms A2,AP,AT,APT,APM,B picks the adult arms (default
 // A,A2,B) and runs them in BLOCKS (arm, then item, then run), so the engine
 // slot's prompt cache is warm for repeats and every row carries the engine's
 // own cached-token count (cold or warm is read from it, never assumed).
 //   AP   A2 plus Home's persona and clock system lines (captured from a real B turn)
 //   AT   A2 plus Home's tools block and tool_choice (captured from a real B turn)
 //   APT  A2 plus both (the request body B sends, minus Home's own extras)
+//   APM  APT with one short description per tool; parameter schemas are unchanged.
 const ARMS = (() => {
   const at = process.argv.indexOf("--arms");
   if (at < 0) return null;
   const list = (process.argv[at + 1] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  for (const a of list) if (!["A", "A2", "AP", "AT", "APT", "B"].includes(a)) throw new Error(`--arms: unknown arm ${a}`);
+  for (const a of list) if (!["A", "A2", "AP", "AT", "APT", "APM", "B"].includes(a)) throw new Error(`--arms: unknown arm ${a}`);
   return list as Arm[];
 })();
 const SEARCH_PACE_MS = 30_000;
 const MAX_TOKENS = 1536;
 
-type Arm = "A" | "A2" | "AP" | "AT" | "APT" | "B" | "C" | "S";
+type Arm = "A" | "A2" | "AP" | "AT" | "APT" | "APM" | "B" | "C" | "S";
 type Category = "knowledge" | "reasoning" | "formatting" | "writing" | "world" | "multiturn";
 
 interface SearchQuery {
@@ -170,7 +172,7 @@ function render(runs: RunRecord[], env: unknown): string {
       if (turn !== null && ![1, 8, 9].includes(turn)) continue;
       const first = forItem.find((r) => r.turn === turn && r.rep === 1) ?? forItem.find((r) => r.turn === turn)!;
       lines.push(turn === null ? `**Prompt:** ${first.prompt}` : `**Turn ${turn} prompt:** ${first.prompt}`, "");
-      for (const arm of ["A", "A2", "AP", "AT", "APT", "B", "C", "S"] as Arm[]) {
+      for (const arm of ["A", "A2", "AP", "AT", "APT", "APM", "B", "C", "S"] as Arm[]) {
         const r = forItem.find((x) => x.arm === arm && x.turn === turn && x.rep === 1);
         if (!r) continue;
         const meta = `${r.words} words, TTFT ${fmt(r.ttftMs)} ms, total ${fmt(r.totalMs)} ms, finish ${r.finishReason ?? "n/a"}` + (r.correct !== null ? `, contains expected answer: ${r.correct}` : "") + (r.factsRecalled ? `, facts recalled: ${r.factsRecalled.filter((f) => f.recalled).length}/${r.factsRecalled.length}` : "") + (r.stream ? `, first word ${fmt(r.stream.firstWordMs)} ms, cue ${fmt(r.stream.spokenCueMs)} ms, searched ${r.stream.searched}` : "") + (r.b ? `, model calls ${r.b.engineRequests}, search fired ${r.b.searchFired}${r.b.searchForced ? " (forced)" : ""}` : "") + (r.error ? `, ERROR: ${r.error}` : "");
@@ -183,7 +185,7 @@ function render(runs: RunRecord[], env: unknown): string {
   lines.push("Medians over every run of the category (single-turn items: 2 runs each; multi-turn: all 9 turns of both scripts). Checkable-correct counts the reasoning items only. Multi-turn recall counts stated facts recalled at turns 8 and 9 (3 facts x 2 scripts = 6 per turn).", "");
   lines.push("| Category | Arm | Runs | Median words | Median TTFT ms | Median total ms | Checkable correct | Recall turn 8 | Recall turn 9 |", "|---|---|---:|---:|---:|---:|---|---|---|");
   for (const category of ["knowledge", "reasoning", "formatting", "writing", "world", "multiturn"] as Category[]) {
-    for (const arm of ["A", "A2", "AP", "AT", "APT", "B", "C", "S"] as Arm[]) {
+    for (const arm of ["A", "A2", "AP", "AT", "APT", "APM", "B", "C", "S"] as Arm[]) {
       const rs = runs.filter((r) => r.category === category && r.arm === arm);
       if (rs.length === 0) continue;
       const ok = rs.filter((r) => r.error === null);
@@ -219,11 +221,12 @@ if (!chatUrl) {
   process.exit(2);
 }
 const realSearxng = process.env.MAIPAI_BENCH_REAL_SEARXNG_URL;
-if (!realSearxng) {
+const selectedSearchFreeItems = GROUP === "adult" && ONLY !== null && ONLY.size > 0 && [...ONLY].every((id) => SEARCH_FREE_ITEMS.has(id));
+if (!realSearxng && !selectedSearchFreeItems) {
   console.error("chat-ab-01 refused: MAIPAI_BENCH_REAL_SEARXNG_URL is not set (arm B uses the real SearXNG, cleared per run).");
   process.exit(2);
 }
-refuseRealSearxngWithoutClearance("chat-ab-01", realSearxng);
+if (realSearxng) refuseRealSearxngWithoutClearance("chat-ab-01", realSearxng);
 
 // Arms A and A2 talk to the engine directly; arm B reaches it through the
 // recording proxy (so the requests of each turn can be read), which only
@@ -320,6 +323,7 @@ const teeServer = Bun.serve({
     tee.lastSearchAt = Date.now();
     let upstream: Response;
     try {
+      if (!realSearxng) throw new Error("search-free bench selection attempted a search");
       upstream = await fetch(new URL(url.pathname + url.search, realSearxng), { method: req.method, headers: { accept: req.headers.get("accept") ?? "application/json" } });
     } catch (err) {
       tee.queries.push({ q, status: 0, rows: 0, engines: [], unresponsive: [(err as Error).message], stoppedByBench: false });
@@ -654,7 +658,7 @@ async function main(): Promise<void> {
       }
       return r;
     };
-    if (ARMS.some((a) => ["AP", "AT", "APT"].includes(a)) && captured.tools.length === 0) {
+    if (ARMS.some((a) => ["AP", "AT", "APT", "APM"].includes(a)) && captured.tools.length === 0) {
       console.log("[chat-ab-01] capture turn (one real B request, to freeze Home's persona, clock and tools block)");
       await retry503(async () => {
         const out = await runPipeline("capture", ["Say hi"]);
@@ -681,10 +685,29 @@ async function main(): Promise<void> {
               runs.push({ ...base, ...t, arm, item: item.id, category, rep, turn: null, prompt: item.prompt, correct: null, factsRecalled: null });
             }
           } else {
-            const withP = arm === "AP" || arm === "APT";
-            const withT = arm === "AT" || arm === "APT";
+            const withP = arm === "AP" || arm === "APT" || arm === "APM";
+            const withT = arm === "AT" || arm === "APT" || arm === "APM";
             const messages = [...(withP ? captured.system : []), { role: "user", content: item.prompt }];
-            const extra = withT ? { tools: captured.tools, ...(captured.toolChoice !== undefined ? { tool_choice: captured.toolChoice } : {}) } : {};
+            const tools = arm === "APM" ? captured.tools.map((tool) => {
+              const copy = structuredClone(tool) as { function: { name: string; description: string; parameters: unknown } };
+              const concise: Record<string, string> = {
+                "almanac-date": "Get today's date and day of the week.",
+                "almanac-time": "Get the current local time.",
+                convert: "Convert a quantity between units.",
+                math: "Calculate a mathematical expression.",
+                remember: "Save a fact the person asks you to remember.",
+                remind: "Create a reminder for the person.",
+                start_project: "Start a project with the requested details.",
+                timer: "Set or check a timer.",
+                weather: "Get current weather or a forecast for a place.",
+                websearch: "Search the web and read relevant pages; follow-up searches can refer to the previous subject.",
+              };
+              const description = concise[copy.function.name];
+              if (!description) throw new Error(`APM has no concise description for ${copy.function.name}`);
+              copy.function.description = description;
+              return copy;
+            }) : captured.tools;
+            const extra = withT ? { tools, ...(captured.toolChoice !== undefined ? { tool_choice: captured.toolChoice } : {}) } : {};
             // A is the bare arm with no sampling fields; every other bare arm sends CHAT_SAMPLING, as B does.
             const r = await retry503(() => bareCompletion(messages, arm === "A" ? {} : { ...CHAT_SAMPLING }, extra));
             runs.push({ ...base, arm, item: item.id, category, rep, turn: null, prompt: item.prompt, reply: r.reply, words: words(r.reply), ttftMs: r.ttftMs, totalMs: r.totalMs, cachedTokens: r.cachedTokens, promptTokens: r.promptTokens, completionTokens: r.completionTokens, finishReason: r.finishReason, correct: null, factsRecalled: null, error: r.error });
