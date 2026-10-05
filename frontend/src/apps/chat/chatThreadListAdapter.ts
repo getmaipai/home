@@ -3,6 +3,7 @@ import { useAui, type RemoteThreadListAdapter } from "@assistant-ui/react";
 import { createAssistantStream } from "assistant-stream";
 import { toast } from "sonner";
 import { createChatHistoryAdapter } from "@/apps/chat/chatHistoryAdapter";
+import { discardDraft } from "@/apps/chat/draftStore";
 import { api } from "@/lib/api";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 
@@ -31,11 +32,26 @@ export interface ChatThreadListOptions {
   onSettingsLoaded?: (conversationId: string, settings: NonNullable<Conversation["settings"]> | undefined) => void;
 }
 
+/** THIN-INC row 5: the live temporary threads this device has seen (listed or created). The adapter is rebuilt
+ * on every Incognito toggle, so the set lives at module level. It is what Incognito may open, and what
+ * turning Incognito off must clear. Ids only: no title, no text. */
+const incognitoThreadIds = new Set<string>();
+
+/** Turning Incognito off: ask the hub to forget the person's temporary sessions and drop any draft stored
+ * under their ids (the composer never writes one for a temporary chat; this is the belt to that brace).
+ * Local forgetting happens first and the ids are kept if the hub call fails, so a retry still clears them. */
+export async function discardIncognitoThreads(personId?: string): Promise<void> {
+  for (const id of incognitoThreadIds) discardDraft(id);
+  await api.discardIncognitoConversations(personId);
+  incognitoThreadIds.clear();
+}
+
 export function createChatThreadListAdapter(selfName: string, options: ChatThreadListOptions = {}): RemoteThreadListAdapter {
   const { personId, query, incognito = false, onArchiveUnavailable, onSettingsLoaded, titlePollMs = 3000, titlePollAttempts = 40 } = options;
   return {
     async list() {
       const rows = incognito ? await api.incognitoConversationList(personId) : await api.conversationList(personId, query, "include");
+      if (incognito) for (const row of rows) incognitoThreadIds.add(row.id);
       return { threads: rows.filter((row) => row.surface === "chat").map((row) => ({
         status: row.archived ? ("archived" as const) : ("regular" as const),
         remoteId: row.id,
@@ -87,9 +103,14 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       // the in-memory session the backend's own createConversation()
       // already builds for `mode: "temporary"`, now actually asked for.
       const row = await api.createConversation(incognito ? "temporary" : undefined);
+      // A stored row for a temporary request is a leak: refuse it, never adopt it as the Incognito thread.
+      if (incognito && row.mode !== "temporary") throw new Error("Incognito could not start a private chat.");
+      if (incognito) incognitoThreadIds.add(row.id);
       return { remoteId: row.id };
     },
     async fetch(remoteId) {
+      // Incognito opens only its own live threads, never a stored chat.
+      if (incognito && !incognitoThreadIds.has(remoteId)) throw new Error("This chat is not part of Incognito.");
       const row = await api.conversation(remoteId);
       if (row.surface !== "chat") throw new Error("This conversation is not a chat.");
       return { status: "regular", remoteId: row.id, title: row.title ?? undefined };

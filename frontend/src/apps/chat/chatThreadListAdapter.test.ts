@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { toast } from "sonner";
-import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
+import { createChatThreadListAdapter, discardIncognitoThreads } from "@/apps/chat/chatThreadListAdapter";
 import { api } from "@/lib/api";
 import type { ThreadMessage } from "@assistant-ui/react";
 
@@ -237,5 +237,103 @@ describe("HOME-UI-02e: restored Conversations functions", () => {
     }) as unknown as typeof fetch;
     await createChatThreadListAdapter("Nova").initialize("local-regular");
     expect(requestedBody).toEqual({ surface: "chat" });
+  });
+});
+
+// THIN-INC row 5 (docs/BACKLOG.md): while Incognito is on the list is exclusive (only the live temporary
+// thread, no stored chat listed or opened) and turning it off discards that thread with no draft left behind.
+describe("THIN-INC row 5: the Incognito thread list", () => {
+  const temporaryRow = (id: string) => ({ id, title: null, surface: "chat", mode: "temporary", created_at: "2026-10-03T00:00:00Z", last_turn_at: null, pinned: false, archived: false });
+  const draftKey = (id: string) => `maipai:chat-draft:${id}`;
+  afterEach(async () => {
+    globalThis.fetch = mock(async () => Response.json({ discarded: 0 })) as unknown as typeof fetch;
+    await discardIncognitoThreads();
+    window.localStorage.clear();
+  });
+
+  test("an Incognito session only ever talks to the temporary routes: list, initialize and fetch never touch the stored list", async () => {
+    const requests: string[] = [];
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      requests.push(`${init?.method ?? "GET"} ${path}`);
+      if (path === "/api/conversations" && init?.method === "POST") return Response.json(temporaryRow("conv-temp-nova"), { status: 201 });
+      if (path === "/api/conversations/incognito") return Response.json([temporaryRow("conv-temp-nova")]);
+      return Response.json(temporaryRow("conv-temp-nova"));
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova", { incognito: true });
+    await adapter.initialize("local-temp");
+    await adapter.list();
+    await adapter.fetch("conv-temp-nova");
+    expect(requests.filter((request) => request.startsWith("GET /api/conversations?"))).toEqual([]);
+    expect(requests).toContain("GET /api/conversations/incognito");
+  });
+
+  test("Incognito never opens a stored chat: fetch of an id the temporary list never held rejects without a request", async () => {
+    const requests: string[] = [];
+    globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+      requests.push(String(input));
+      return Response.json({ id: "conv-stored-iris", title: "Taxes", surface: "chat", mode: "chat", created_at: "2026-09-07T00:00:00Z", pinned: false });
+    }) as unknown as typeof fetch;
+    await expect(createChatThreadListAdapter("Nova", { incognito: true }).fetch("conv-stored-iris")).rejects.toThrow();
+    expect(requests).toEqual([]);
+  });
+
+  test("Incognito still opens its own live thread once the temporary list or initialize has named it", async () => {
+    globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/conversations/incognito") return Response.json([temporaryRow("conv-temp-listed")]);
+      return Response.json(temporaryRow("conv-temp-listed"));
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova", { incognito: true });
+    await adapter.list();
+    expect((await adapter.fetch("conv-temp-listed")).remoteId).toBe("conv-temp-listed");
+  });
+
+  test("if the hub answers an Incognito initialize with a stored row, the adapter refuses it instead of adopting it", async () => {
+    globalThis.fetch = mock(async () => Response.json({ id: "conv-durable-leak", title: null, surface: "chat", mode: "chat", created_at: "2026-10-03T00:00:00Z", pinned: false }, { status: 201 })) as unknown as typeof fetch;
+    await expect(createChatThreadListAdapter("Nova", { incognito: true }).initialize("local-temp")).rejects.toThrow();
+  });
+
+  test("an Incognito thread never writes a draft: initialize, list and fetch leave storage untouched", async () => {
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) === "/api/conversations/incognito") return Response.json([temporaryRow("conv-temp-ember")]);
+      return Response.json(temporaryRow("conv-temp-ember"), { status: init?.method === "POST" ? 201 : 200 });
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova", { incognito: true });
+    await adapter.initialize("local-temp");
+    await adapter.list();
+    await adapter.fetch("conv-temp-ember");
+    expect(window.localStorage.length).toBe(0);
+  });
+
+  test("turning Incognito off discards the hub's temporary sessions and any draft under their ids, and leaves stored chats' drafts alone", async () => {
+    const requests: string[] = [];
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(`${init?.method ?? "GET"} ${String(input)}`);
+      if (String(input) === "/api/conversations/incognito/discard") return Response.json({ discarded: 1 });
+      if (String(input) === "/api/conversations/incognito") return Response.json([temporaryRow("conv-temp-quill")]);
+      return Response.json(temporaryRow("conv-temp-quill"), { status: 201 });
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova", { incognito: true });
+    await adapter.initialize("local-temp");
+    await adapter.list();
+    window.localStorage.setItem(draftKey("conv-temp-quill"), JSON.stringify({ text: "private", savedAt: "2026-10-03T00:00:00Z" }));
+    window.localStorage.setItem(draftKey("conv-stored-oliver"), JSON.stringify({ text: "keep me", savedAt: "2026-10-03T00:00:00Z" }));
+    await discardIncognitoThreads();
+    expect(requests).toContain("POST /api/conversations/incognito/discard");
+    expect(window.localStorage.getItem(draftKey("conv-temp-quill"))).toBeNull();
+    expect(window.localStorage.getItem(draftKey("conv-stored-oliver"))).not.toBeNull();
+    // The discarded thread is no longer this device's to open.
+    await expect(createChatThreadListAdapter("Nova", { incognito: true }).fetch("conv-temp-quill")).rejects.toThrow();
+  });
+
+  test("a failed discard keeps the thread known so the next attempt can still clear it, and the error reaches the caller", async () => {
+    globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/conversations/incognito/discard") return Response.json({ error: "down" }, { status: 500 });
+      return Response.json(temporaryRow("conv-temp-sage"), { status: 201 });
+    }) as unknown as typeof fetch;
+    await createChatThreadListAdapter("Nova", { incognito: true }).initialize("local-temp");
+    window.localStorage.setItem(draftKey("conv-temp-sage"), JSON.stringify({ text: "x", savedAt: "2026-10-03T00:00:00Z" }));
+    await expect(discardIncognitoThreads()).rejects.toThrow();
+    expect(window.localStorage.getItem(draftKey("conv-temp-sage"))).toBeNull();
   });
 });
