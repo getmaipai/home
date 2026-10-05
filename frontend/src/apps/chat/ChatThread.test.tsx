@@ -62,7 +62,16 @@ describe("ChatThread", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ["weather", "almanac-date", "write_document", "confirm", "project", "tool_timeline", "sources"]) expect(ids).toContain(id);
     for (const binding of TOOL_BINDINGS) expect(typeof binding.render).toBe("function");
-    for (const slot of Object.values(THREAD_SLOTS)) expect(typeof slot).toBe("function");
+    for (const [name, slot] of Object.entries(THREAD_SLOTS)) {
+      if (name === "markdown") {
+        const markdown = slot as typeof THREAD_SLOTS.markdown;
+        expect(typeof markdown).toBe("object");
+        expect(typeof markdown.preprocess).toBe("function");
+        expect(typeof markdown.components?.a).toBe("function");
+      } else {
+        expect(typeof slot).toBe("function");
+      }
+    }
   });
 
   test("a message with every bound part type renders its Elements", async () => {

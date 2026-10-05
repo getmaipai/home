@@ -19,7 +19,7 @@ const MARKER_RE = /\[(\d+)\]/g;
 // capturing group hands these back too, always at an odd index, so a
 // marker inside either is left completely alone: the model quoting a
 // literal `items[2]` in a code example must render as code, not a link.
-const CODE_SPAN_RE = /(```[\s\S]*?```|`[^`\n]*`)/g;
+const CODE_SPAN_RE = /(```[\s\S]*?(?:```|$)|`[^`\n]*`)/g;
 
 /** Rewrites a `[N]` inline citation marker into a real markdown link,
  * `[N](#citation-N)`, when N is a 1-based index into `sources` -
@@ -50,6 +50,23 @@ export function markCitations(text: string, sources: Source[] | undefined): stri
             return n >= 1 && n <= sources.length ? `[${n}](#citation-${n})` : whole;
           }),
     )
+    .join("");
+}
+
+/** Rewrites complete citation markers for the Markdown link renderer. Source
+ * availability is checked by that renderer once the message's source part is
+ * available; unresolved markers are restored to plain text there. */
+export function citeMarkers(text: string): string {
+  return text
+    .split(CODE_SPAN_RE)
+    .map((segment, i) => i % 2 === 1
+      ? segment
+      : segment.replace(MARKER_RE, (whole, digits: string, offset: number, source: string) => {
+          const end = offset + whole.length;
+          const next = source[end];
+          // Leave existing inline links and reference definitions alone.
+          return next === "(" || next === ":" ? whole : `[${digits}](#citation-${Number(digits)})`;
+        }))
     .join("");
 }
 

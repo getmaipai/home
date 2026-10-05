@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-05T04:09:35.249Z",
-  "kitTag": "ui-v0.5.92",
+  "generatedAt": "2026-10-05T10:30:21.965Z",
+  "kitTag": "ui-v0.5.93",
   "items": [
     {
       "file": "activity-graph.tsx",
@@ -350,7 +350,7 @@
       "name": "inline-citation",
       "group": "sources/citations",
       "verdict": "wire-after",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "job-progress.tsx",

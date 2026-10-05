@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { markCitations, parseCitationHref } from "@/apps/chat/chatCitations";
+import { citeMarkers, markCitations, parseCitationHref } from "@/apps/chat/chatCitations";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 
 function makeSource(id: string): Source {
@@ -77,5 +77,41 @@ describe("parseCitationHref", () => {
 
   test("undefined href is not a citation", () => {
     expect(parseCitationHref(undefined)).toBeNull();
+  });
+});
+
+describe("THIN-4B citation rendering mapper", () => {
+  test("[2] in a reply maps to source 2", () => {
+    expect(citeMarkers("See [2] for details.")).toBe("See [2](#citation-2) for details.");
+  });
+
+  test("a marker with no matching source can be restored as plain text", () => {
+    const linked = citeMarkers("See [3].");
+    expect(parseCitationHref(linked.match(/\(([^)]+)\)/)?.[1])).toBe(3);
+    expect(markCitations("See [3].", [makeSource("src-1")])).toBe("See [3].");
+  });
+
+  test("stored reply and memory judge input retain literal markers", () => {
+    const storedReply = "A sourced claim [2].";
+    const memoryJudgeInput = storedReply;
+    expect(storedReply).toBe("A sourced claim [2].");
+    expect(memoryJudgeInput).toBe("A sourced claim [2].");
+    expect(citeMarkers(storedReply)).toBe("A sourced claim [2](#citation-2).");
+  });
+
+  test("markers inside inline and fenced code remain code", () => {
+    expect(citeMarkers("`[1]`\n\n```txt\n[2]\n```\n[3]")).toBe("`[1]`\n\n```txt\n[2]\n```\n[3](#citation-3)");
+  });
+
+  test("a marker in an open code fence stays code while streaming", () => {
+    expect(citeMarkers("Example:\n```js\nconst citation = [1]")).toBe("Example:\n```js\nconst citation = [1]");
+  });
+
+  test("a partial marker at a streaming boundary stays plain text", () => {
+    expect(citeMarkers("Text ending in [1")).toBe("Text ending in [1");
+  });
+
+  test("existing Markdown links and reference definitions are not rewritten", () => {
+    expect(citeMarkers("[1](https://example.com)\n\n[2]: https://example.com")).toBe("[1](https://example.com)\n\n[2]: https://example.com");
   });
 });
