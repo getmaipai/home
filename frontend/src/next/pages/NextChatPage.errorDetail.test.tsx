@@ -79,6 +79,8 @@ describe("the admin tool error card on a failed tool call", () => {
     try {
       const card = await view.findByText("SearXNG answered 502");
       expect(card.closest('[data-slot="tool-error"]')).toBeVisible();
+      const details = await view.findByRole("button", { name: "Error details" });
+      expect(details.closest(".aui-assistant-action-bar-root")).toBeTruthy();
       expect(view.getByText("websearch")).toBeVisible();
       expect(view.getByText("unavailable")).toBeVisible();
     } finally {

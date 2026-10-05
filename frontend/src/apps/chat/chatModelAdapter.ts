@@ -266,6 +266,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // Insertion order (Map's own iteration order) is step order -
       // there is no separate sequence field on these events.
       const toolCalls = new Map<string, { packageId: string; state: "running" | "ok" | "error"; failureKind?: string; sites?: { host: string; url: string }[] }>();
+      let failedTool = false;
 
       // One definition (a review caught this built twice, copy-pasted,
       // between buildContent() and the done handler below): `turnId`
@@ -370,6 +371,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // one `e.t` check, not two, decides both `state` and
                 // whether `sites` applies.
                 toolCalls.set(e.call_id, e.t === "tool_result" ? { ...existing, state: e.outcome.error_code ? "error" : "ok", ...(e.outcome.sites ? { sites: e.outcome.sites } : {}) } : { ...existing, state: "error", failureKind: e.error });
+                if (e.t === "tool_error" || (e.t === "tool_result" && Boolean(e.outcome.error_code))) failedTool = true;
               }
             }
             if (activityShown) {
@@ -649,6 +651,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   commandId: event.value.command_id,
                   turnId: event.value.turn_id,
                   failedGeneration: event.value.failed_generation === true,
+                  failedTool,
                   conversationId,
                   documentAvailable: event.value.document_available === true,
                   // A real TurnValue field now (CHAT-16 landed) - kept

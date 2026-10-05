@@ -62,11 +62,15 @@ async function sendRefusedMessage(view: ReturnType<typeof renderWithQueryClient>
 }
 
 describe("ChatMessageError", () => {
-  test("a completed failed-generation reply uses the existing admin details control only for admins", async () => {
+  test("a completed failed-generation reply shows red error details in its action bar only for admins", async () => {
     const adminView = renderWithQueryClient(<Harness adapter={failedDoneAdapter()} admin />);
     fireEvent.change(adminView.getByRole("textbox", { name: "Message input" }), { target: { value: "find all of these" } });
     fireEvent.click(adminView.getByRole("button", { name: "Send message" }));
-    expect(await adminView.findByRole("button", { name: "Error details" })).toBeTruthy();
+    const control = await adminView.findByRole("button", { name: "Error details" });
+    expect(control).toBeTruthy();
+    expect(control.className).toContain("text-destructive");
+    expect(control.closest(".aui-assistant-action-bar-root")).toBeTruthy();
+    expect(control.parentElement?.closest('[data-slot="aui-assistant-message-footer-extra"]')).toBeNull();
     adminView.unmount();
 
     const memberView = renderWithQueryClient(<Harness adapter={failedDoneAdapter()} />);

@@ -1,9 +1,4 @@
-// THIN-1E (rule 6): the admin's quiet error indicator. Composed from the
-// kit's shipped parts as they ship: TooltipIconButton as the trigger,
-// Popover for the details. The ToolTimeline Element has no per-step detail
-// slot (a named gap for the design record), so this sits beside it.
-// The detail is read only once the popover opens, and only an admin ever
-// renders this (the route also 403s anyone else).
+// Admin-only failure details, triggered from the shipped assistant action bar.
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Popover, PopoverContent, PopoverTrigger } from "@maipai/ui/src/ui/popover";
@@ -11,7 +6,7 @@ import { TooltipIconButton } from "@maipai/ui/src/assistant-ui/tooltip-icon-butt
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type TurnErrorDetail } from "@/lib/api";
 
-const InfoIcon = getIcon("info");
+const AlertIcon = getIcon("alert-triangle");
 
 function Row({ label, children }: { label: string; children: string }) {
   return (
@@ -51,8 +46,8 @@ export function TurnErrorDetails({ turnId }: { turnId: string }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <TooltipIconButton tooltip="Error details" side="top" className="text-foreground/45 hover:text-foreground/80">
-          <InfoIcon className="size-3.5" />
+        <TooltipIconButton aria-label="Error details" tooltip="Error details" side="top" className="text-destructive hover:text-destructive">
+          <AlertIcon className="size-3.5" />
         </TooltipIconButton>
       </PopoverTrigger>
       <PopoverContent align="start">

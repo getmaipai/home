@@ -387,7 +387,6 @@ export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string,
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   if (!result?.length) return null;
   const running = result.some((call) => call.state === "running");
-  // Rule 6: only admins mount the client that reads stored raw details.
   const failed = isAdmin && !!turnId && result.some((call) => call.state === "error");
   return (
     <div className="flex flex-col items-start gap-2">

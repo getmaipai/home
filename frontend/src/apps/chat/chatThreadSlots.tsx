@@ -430,6 +430,30 @@ export function SourcesActionBarTrigger() {
   );
 }
 
+/** Failed-turn diagnostics are appended by the shipped action-bar slot, so
+ * they stay in the same row as Copy, feedback and Refresh. */
+export function FailedTurnErrorDetailsAction() {
+  const isAdmin = useContext(AdminContext);
+  const failed = useAuiState((s) =>
+    s.message.metadata?.custom?.failedGeneration === true ||
+    s.message.metadata?.custom?.failedTool === true ||
+    (s.message.status?.type === "incomplete" && s.message.status.reason === "error"),
+  );
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  if (!isAdmin || !failed || !turnId) return null;
+  return <TurnErrorDetails turnId={turnId} />;
+}
+
+/** Compose both controls in the kit's single action-bar append point. */
+export function FailedTurnActionBarExtras() {
+  return (
+    <>
+      <SourcesActionBarTrigger />
+      <FailedTurnErrorDetailsAction />
+    </>
+  );
+}
+
 // SRC-ICON-01: composed straight from the vendored Elements, no hand-
 // built row - `Source` (a real `<a>`, target `_blank`, `rel="noopener
 // noreferrer"` by default) plus an explicit `referrerPolicy="no-referrer"`
@@ -575,15 +599,11 @@ export function BareModelBadge() {
 // state and rendering (or not) on its own, so this wrapper is pure
 // composition, no shared logic between them.
 export function MessageFooterExtra() {
-  const isAdmin = useContext(AdminContext);
-  const failedGeneration = useAuiState((s) => s.message.metadata?.custom?.failedGeneration === true);
-  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId);
   return (
     <>
       <BareModelBadge />
       <SourcesFooterContent />
       <MessageDetailsReveal />
-      {isAdmin && failedGeneration && typeof turnId === "string" ? <TurnErrorDetails turnId={turnId} /> : null}
     </>
   );
 }

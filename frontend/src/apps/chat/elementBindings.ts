@@ -30,7 +30,7 @@ import {
   MessageFooterExtra,
   NextChatWelcome,
   NextReasoningGroup,
-  SourcesActionBarTrigger,
+  FailedTurnActionBarExtras,
 } from "@/apps/chat/chatThreadSlots";
 import { ChatMessageError } from "@/apps/chat/chatErrorSlot";
 import { ChatCitationLink } from "@/apps/chat/chatCitationLink";
@@ -38,7 +38,6 @@ import { ArtifactCardToolRender, ConfirmToolRender, ProjectToolRender, SourcesNo
 import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
 import { preprocessChatMarkdown } from "@/apps/chat/chatStreamingMarkdown";
-
 export type ToolBinding = {
   /** The tool-call part's `toolName` on the wire (chatModelAdapter.ts). */
   toolName: string;
@@ -75,7 +74,9 @@ export const THREAD_SLOTS = {
   },
   Welcome: NextChatWelcome,
   AssistantMoreItems,
-  AssistantActionBarExtra: SourcesActionBarTrigger,
+  // The kit's append slot accepts one Element; compose both product
+  // controls here, with failed-turn diagnostics last in the row.
+  AssistantActionBarExtra: FailedTurnActionBarExtras,
   AssistantMessageFooterExtra: MessageFooterExtra,
   Indicator: ChatThinkingIndicator,
   MessageError: ChatMessageError,
