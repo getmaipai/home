@@ -275,6 +275,7 @@ const nextStorageReview = process.argv.includes("--next-storage-review");
 const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const showcaseScrollReview = process.argv.includes("--showcase-scroll-review");
+const nextChatScrollReview = process.argv.includes("--next-chat-scroll-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
 const nextChatPolishReview = process.argv.includes("--next-chat-polish-review");
@@ -284,7 +285,7 @@ const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || ne
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
@@ -2914,6 +2915,142 @@ sqlite.close();`;
       await page.screenshot({ path: join(outDir, `chat-scroll-${size.width}-long-thread.png`) });
     } finally { await context.close(); }
   }
+}
+
+/** Real /chat overflow acceptance: 20 persisted turns (40 messages), three
+ * long replies, all three requested viewport sizes, manual scroll, stream
+ * follow behavior, and the compact composer's measured size and inset. */
+async function captureNextChatScrollReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const failures: string[] = [];
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const conversation = await seedTitledConversation("captureNextChatScrollReview", cookie, "Long chat scroll check");
+  const longReply = Array.from({ length: 400 }, (_, i) => `Long reply word${i + 1}`).join(" ");
+  const seedScript = `import { sqlite } from "./src/db/index.ts";
+const id = ${JSON.stringify(conversation.id)};
+const person = sqlite.query("SELECT id FROM people WHERE display_name = 'Sage' LIMIT 1").get() as { id: string };
+const insert = sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, user_text, reply_text, source, safety_action, conversation_id, created_at, hlc, routing_tier, routing_score, status, parent_turn_id, branch_chosen) VALUES (?, ?, 'chat', ?, ?, 'model', 'allow', ?, ?, ?, 'chat', 1.0, 'done', ?, 1)");
+let parent: string | null = null;
+for (let i = 1; i <= 20; i++) { const turn = crypto.randomUUID(); const at = new Date(Date.now() + i).toISOString(); const reply = i === 5 || i === 12 || i === 19 ? ${JSON.stringify(longReply)} : 'A concise answer for the persisted scrolling thread, turn ' + i + '.'; insert.run(turn, person.id, 'Question ' + i + ': tell me something useful about the day.', reply, id, at, at + ':0:' + turn, parent); parent = turn; }
+sqlite.close();`;
+  const seeded = Bun.spawnSync({ cmd: ["bun", "-e", seedScript], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+  if (seeded.exitCode !== 0) throw new Error(`captureNextChatScrollReview: seeding persisted thread failed with exit code ${seeded.exitCode}`);
+  const turnsResponse = await fetch(`${BASE_URL}/api/conversations/${conversation.id}/turns`, { headers: cookie });
+  if (!turnsResponse.ok) throw new Error(`captureNextChatScrollReview: reading seeded turns failed: ${turnsResponse.status}`);
+  const turns = await turnsResponse.json() as Array<unknown>;
+  if (turns.length !== 20) throw new Error(`captureNextChatScrollReview: expected 20 persisted turns (40 messages), found ${turns.length}`);
+
+  const sizes = [
+    { width: 1440, height: 900 },
+    { width: 2000, height: 1293 },
+    { width: 390, height: 844 },
+  ] as const;
+  for (const size of sizes) {
+    const viewport = { slug: String(size.width), ...size } as ViewportSpec;
+    const context = await newContext(browser, viewport, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(30000);
+      await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
+      await page.locator('[data-slot="aui_thread-viewport"]').waitFor({ state: "attached" });
+      await page.getByText("Question 20: tell me something useful about the day.", { exact: true }).waitFor();
+      const viewportEl = page.locator('[data-slot="aui_thread-viewport"]');
+      await viewportEl.evaluate((el) => new Promise<void>((resolve) => {
+        let previous = el.scrollTop;
+        let stableFrames = 0;
+        const settle = () => {
+          if (Math.abs(el.scrollTop - previous) < 0.5) stableFrames += 1;
+          else stableFrames = 0;
+          previous = el.scrollTop;
+          if (stableFrames >= 8) resolve();
+          else requestAnimationFrame(settle);
+        };
+        requestAnimationFrame(settle);
+      }));
+      const measure = () => page.evaluate(() => {
+        const thread = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
+        if (!thread) throw new Error("thread viewport missing");
+        const ancestors: Array<Record<string, unknown>> = [];
+        for (let node: HTMLElement | null = thread; node; node = node.parentElement) {
+          const style = getComputedStyle(node);
+          ancestors.push({ tag: node.tagName.toLowerCase(), slot: node.dataset.slot ?? "", id: node.id, scrollHeight: node.scrollHeight, clientHeight: node.clientHeight, overflowY: style.overflowY, scrollTop: node.scrollTop });
+        }
+        const textRect = (text: string) => {
+          const node = [...thread.querySelectorAll<HTMLElement>("*")].find((element) => element.textContent?.trim() === text);
+          const rect = node?.getBoundingClientRect();
+          return rect ? { top: rect.top, bottom: rect.bottom } : null;
+        };
+        return { ancestors, newestQuestion: textRect("Question 20: tell me something useful about the day."), newestReply: textRect("A concise answer for the persisted scrolling thread, turn 20.") };
+      });
+      const initial = await measure();
+      const thread = initial.ancestors[0] as { scrollHeight: number; clientHeight: number; scrollTop: number; overflowY: string };
+      console.log(`CHAT_SCROLL_MEASURE ${size.width}x${size.height}: ${JSON.stringify(initial)}`);
+      const path = join(outDir, `chat-scroll-${size.width}x${size.height}-latest.png`);
+      await page.screenshot({ path });
+      console.log(`Wrote ${path}`);
+      if (thread.scrollHeight <= thread.clientHeight) throw new Error(`real /chat thread does not overflow at ${size.width}x${size.height}`);
+      const initialGeometry = await readComposerGeometry(page);
+      const newestReplyBottom = (initial.newestReply as { bottom: number } | null)?.bottom;
+      const initialTextGap = initialGeometry.footer && newestReplyBottom !== undefined ? initialGeometry.footer.top - newestReplyBottom : null;
+      if (initialTextGap === null || initialTextGap < 0 || initialTextGap > 40) {
+        const failure = `opening thread did not show the newest reply immediately above its pinned footer at ${size.width}x${size.height}: gap=${initialTextGap}`;
+        failures.push(failure);
+        console.error(failure);
+      }
+
+      await viewportEl.hover();
+      await page.mouse.wheel(0, -5000);
+      await page.waitForFunction((previous) => (document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]')?.scrollTop ?? previous) < previous - 100, thread.scrollTop, { timeout: 5000 });
+      const scrolledUp = await viewportEl.evaluate((el) => ({ scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+      if (scrolledUp.scrollTop >= thread.scrollTop) throw new Error(`wheel did not move real /chat thread upward at ${size.width}x${size.height}`);
+      await viewportEl.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+      await page.waitForFunction(() => { const el = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]'); return !!el && el.scrollTop + el.clientHeight >= el.scrollHeight - 40; });
+
+      const composerGeometry = await readComposerGeometry(page);
+      console.log(`CHAT_COMPOSER_SCROLL ${size.width}x${size.height}: ${JSON.stringify(composerGeometry)}`);
+      if (Math.abs((composerGeometry.composer?.height ?? 0) - 62) > 2) throw new Error(`CHAT-COMPOSER-01: composer is not 62px at ${size.width}x${size.height}`);
+      if (Math.abs((composerGeometry.bottomGap ?? NaN) - 16) > 2) throw new Error(`CHAT-COMPOSER-01: composer bottom gap is not 16px at ${size.width}x${size.height}`);
+      const input = page.getByRole("textbox", { name: "Message input" });
+      await input.fill("D22 streaming follow check");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor();
+      await page.waitForFunction(() => {
+        const reply = document.querySelectorAll<HTMLElement>('[data-slot="aui_assistant-message-content"]');
+        const latest = reply[reply.length - 1];
+        return !!latest && latest.textContent?.includes("Streamed reply word400") === true;
+      }, { timeout: 30000 });
+      const streamFollow = await viewportEl.evaluate((el) => {
+        const reply = el.querySelectorAll<HTMLElement>('[data-slot="aui_assistant-message-content"]');
+        const latest = reply[reply.length - 1];
+        const footer = el.querySelector<HTMLElement>(".aui-thread-viewport-footer");
+        return { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight, latestReply: latest?.getBoundingClientRect().toJSON(), footerTop: footer?.getBoundingClientRect().top };
+      });
+      const streamTextGap = typeof streamFollow.footerTop === "number" && streamFollow.latestReply ? streamFollow.footerTop - (streamFollow.latestReply as DOMRect).bottom : null;
+      if (streamTextGap === null || streamTextGap < 0 || streamTextGap > 40) throw new Error(`stream did not follow newest text within 40px at ${size.width}x${size.height}: ${JSON.stringify({ streamFollow, streamTextGap })}`);
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+
+      await input.fill("D22 streaming while scrolled up");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor();
+      await page.waitForFunction(() => (document.querySelector('[data-slot="aui_thread-viewport"]')?.textContent ?? "").includes("Long reply word"));
+      await page.mouse.wheel(0, -5000);
+      const beforeDetached = await viewportEl.evaluate((el) => el.scrollTop);
+      await page.waitForTimeout(80);
+      const duringDetached = await viewportEl.evaluate((el) => ({ scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
+      if (duringDetached.scrollTop > beforeDetached + 40) throw new Error(`stream forced the reader back to newest after manual scroll-up at ${size.width}x${size.height}`);
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+      const finalGeometry = await readComposerGeometry(page);
+      if (Math.abs((finalGeometry.composer?.height ?? 0) - 62) > 2 || Math.abs((finalGeometry.bottomGap ?? NaN) - 16) > 2) throw new Error(`composer moved during stream at ${size.width}x${size.height}: ${JSON.stringify(finalGeometry)}`);
+      console.log(`CHAT_STREAM_SCROLL ${size.width}x${size.height}: follow=${JSON.stringify(streamFollow)} detached=${JSON.stringify(duringDetached)} composer=${JSON.stringify(finalGeometry.composer)} bottomGap=${finalGeometry.bottomGap}`);
+      await page.close();
+    } catch (error) {
+      const failure = `${size.width}x${size.height}: ${error instanceof Error ? error.message : String(error)}`;
+      failures.push(failure);
+      console.error(failure);
+    } finally { await context.close(); }
+  }
+  if (failures.length) throw new Error(`CHAT_SCROLL_ACCEPTANCE_FAILED: ${failures.join(" | ")}`);
 }
 
 /** SHELL-02 slice 3's own stated acceptance ("a real weather turn... the
@@ -5607,8 +5744,9 @@ async function main() {
     }
     return undefined;
   }, scriptedChatReply: (request) => {
-    if (chatPageScreenshotFixture) return SCREENSHOT_CHAT_REPLY;
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    if (text.includes("D22 streaming")) return Array.from({ length: 400 }, (_, i) => `Streamed reply word${i + 1}.`).join(" ");
+    if (chatPageScreenshotFixture) return SCREENSHOT_CHAT_REPLY;
     if (text.includes(RICH_REPLY_PROMPT)) return RICH_REPLY_MARKDOWN;
     if (text.includes("Friday is pizza night")) return "Friday is pizza night.";
     if (text.includes("What is 2 plus 2?")) return "<think>The user is asking a simple arithmetic question. 2 plus 2 equals 4.</think>2 plus 2 is 4.";
@@ -5940,6 +6078,12 @@ async function main() {
     if (nextChatReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview) {
       await captureNextChatReview(browser, sessionValue);
       console.log("completed named review: --next-chat-review");
+      return;
+    }
+
+    if (nextChatScrollReview) {
+      await captureNextChatScrollReview(browser, sessionValue);
+      console.log("completed named review: --next-chat-scroll-review");
       return;
     }
 
