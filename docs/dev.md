@@ -35986,6 +35986,63 @@ The first row of an AT or APT block on the second and third items shows cached 9
 
 Machine caveat: the load average rose to 230 during the first AT and APT blocks (other lanes' gates), stretching total times to 75 to 160 s. Word counts do not depend on speed, so the length table stands; first-text rows taken in those blocks are marked as noisy above.
 
+### THIN-Q3-a: shorter tool descriptions (2026-10-04)
+
+Follow-up measurement of whether shortening the offered tool descriptions recovers adult written reply length. Phase 1 only; the architect threshold was not met, so Phase 2 was not entered.
+
+| | |
+|---|---|
+| Engine build | `local b10797-832fd6f17` (llama.cpp build 10797, commit `832fd6f17`) |
+| Model file | `Qwen3-8B-Q4_K_M.gguf` (Qwen3-8B-Instruct Q4_K_M; context 4096 as measured by the Stack) |
+| Hardware | Apple M4 Pro, 24 GB unified memory, one laptop |
+| Bench | `chat-ab-01.ts --arms A2,APT,APM --runs 3`; k1-heat-pump (explanation), f4-recipe (formatting), w1-story (long-form); Stack chat role only; one request at a time; 27 scored rows |
+| APM | APT request with one short description per tool; parameter schemas unchanged; search-free guard active |
+| Conditions | Per-arm blocks, three runs per item; cache state from engine `cached_tokens`; host load recorded at each row and rows over one-minute load 8 marked loaded. Host load exceeded 8 during the run and at APT/APM starts; all arms continued. |
+
+**Summary (medians over nine rows per arm).**
+
+| Arm | Median words | Median first-text ms | Loaded rows | Tool-call completions |
+|---|---:|---:|---:|---:|
+| A2 | 397.0 | 84.2 | 4/9 | 0 |
+| APT | 276.0 | 96.2 | 6/9 | 0 |
+| APM | 237.0 | 87.6 | 0/9 | 3 |
+
+**Per-run results.** First-text values are milliseconds; “loaded” means one-minute host load exceeded 8. Cache is the engine-reported state.
+
+| Arm | Item | Run | Words | First-text ms | Cache | Load avg 1 / 5 / 15 min | Finish reason |
+|---|---|---:|---:|---:|---|---|---|
+| A2 | k1-heat-pump | 1 | 579 | 158.9 | cold | 4.14 / 5.04 / 5.84 | stop |
+| A2 | k1-heat-pump | 2 | 583 | 80.3 | warm | 3.58 / 4.86 / 5.76 | stop |
+| A2 | k1-heat-pump | 3 | 576 | 102.4 | warm | 4.57 / 5.01 / 5.78 | stop |
+| A2 | f4-recipe | 1 | 327 | 211.9 (loaded) | cold | 8.22 / 5.82 / 6.06 | stop |
+| A2 | f4-recipe | 2 | 360 | 82.9 | warm | 7.54 / 5.78 / 6.04 | stop |
+| A2 | f4-recipe | 3 | 358 | 77.4 (loaded) | warm | 9.03 / 6.20 / 6.18 | stop |
+| A2 | w1-story | 1 | 397 | 228.0 (loaded) | cold | 8.26 / 6.17 / 6.17 | stop |
+| A2 | w1-story | 2 | 420 | 67.1 (loaded) | warm | 9.16 / 6.44 / 6.27 | stop |
+| A2 | w1-story | 3 | 383 | 84.2 | warm | 7.64 / 6.24 / 6.20 | stop |
+| APT | k1-heat-pump | 1 | 272 | 153.0 (loaded) | warm | 8.04 / 6.41 / 6.26 | stop |
+| APT | k1-heat-pump | 2 | 339 | 107.5 | warm | 7.28 / 6.29 / 6.22 | stop |
+| APT | k1-heat-pump | 3 | 256 | 94.2 | warm | 7.55 / 6.38 / 6.25 | stop |
+| APT | f4-recipe | 1 | 276 | 218.9 | warm | 7.09 / 6.32 / 6.23 | stop |
+| APT | f4-recipe | 2 | 259 | 66.7 (loaded) | warm | 8.36 / 6.64 / 6.34 | stop |
+| APT | f4-recipe | 3 | 232 | 70.0 (loaded) | warm | 9.22 / 6.93 / 6.45 | stop |
+| APT | w1-story | 1 | 291 | 225.4 (loaded) | warm | 8.17 / 6.78 / 6.40 | stop |
+| APT | w1-story | 2 | 339 | 75.6 (loaded) | warm | 8.25 / 6.85 / 6.43 | stop |
+| APT | w1-story | 3 | 343 | 96.2 (loaded) | warm | 8.90 / 7.04 / 6.50 | stop |
+| APM | k1-heat-pump | 1 | 0 | n/a | cold | 7.95 / 6.92 / 6.47 | tool_calls |
+| APM | k1-heat-pump | 2 | 0 | n/a | warm | 7.55 / 6.85 / 6.45 | tool_calls |
+| APM | k1-heat-pump | 3 | 0 | n/a | warm | 7.55 / 6.85 / 6.45 | tool_calls |
+| APM | f4-recipe | 1 | 281 | 216.2 | warm | 7.75 / 6.90 / 6.47 | stop |
+| APM | f4-recipe | 2 | 237 | 72.6 | warm | 7.81 / 6.96 / 6.49 | stop |
+| APM | f4-recipe | 3 | 170 | 83.3 | warm | 7.07 / 6.82 / 6.45 | stop |
+| APM | w1-story | 1 | 349 | 239.3 | warm | 6.96 / 6.81 / 6.45 | stop |
+| APM | w1-story | 2 | 351 | 79.5 | warm | 5.86 / 6.58 / 6.37 | stop |
+| APM | w1-story | 3 | 359 | 91.9 | warm | 5.49 / 6.47 / 6.34 | stop |
+
+The three APM k1 completions ended with `finishReason=tool_calls` and no text; this direct-engine bench does not execute tool calls, so these rows have zero words and no first-text time. There were no other request errors. Despite load over 8 during the run, the reported APT and APM word medians are 276 and 237 against A2's 397; the architect threshold was not met, so Phase 2 was not entered.
+
+Conclusion: shortening tool descriptions does not recover reply length; the cost comes from offering the tools at all; remaining allowed levers are a fixed per-person/surface cap (THIN-2F) and keeping the block in the cached prefix (THIN-3C).
+
 ## DEADLINE-02 and THIN-DL-02: no clock on an adult's reply, and failures told by kind (2026-10-03)
 
 The model node had one wall-clock deadline (`deadlines_ms.model`, 20 s) for the whole reply, streaming included. A long adult answer needs more than that by itself, a loaded machine can miss the first token, and the first request after the Stack unloads its engine pays an engine load. RULES.md rule 5 allows no length cap on adult written chat, and a time limit on the whole reply is one. DEADLINE-01's reason for the deadlines stands: a hung engine must not hang a turn, and a child's or a spoken turn must fail fast.
