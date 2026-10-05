@@ -281,6 +281,10 @@ const nextShellFoldReview = process.argv.includes("--next-shell-fold-review");
 const nextChatRichReview = process.argv.includes("--next-chat-rich-review");
 const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview || nextChatRichReview;
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
+// These focused page reviews need the fixture Stack too: without a
+// configured household engine, the chat composer is correctly disabled.
+const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview;
+const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
 const peopleProfileMediaReview = process.argv.includes("--people-profile-media-review");
@@ -498,7 +502,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (chatArtifactCapture) {
+  if (chatArtifactCapture || chatPageScreenshotFixture) {
     for (const [key, value] of [["engines.stack.url", STACK_URL], ["engines.stack.use_chat", true], ["engines.stack.use_embeddings", true]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -2640,25 +2644,17 @@ async function captureNextProfileSheetReview(browser: Browser, sessionValue: str
   }
 }
 
-/** SHELL-02's first slice, its own stated acceptance ("captures 1440
- * dark only for this slice"), extended 2026-09-22 to also capture
- * phone (390): a live finding on the reasoning card's left edge and
- * width against the reply text needed both to judge. A real turn
- * against the real dev engine (not a mocked stream, the same "real
- * household showed real data" standard
- * `captureNextDashboardReview` holds to), with
- * the reasoning Element expanded so the capture actually shows what
- * the slice proves - not just the collapsed trigger every reply
- * always renders regardless of whether reasoning ever wired up to
- * anything. */
+/** Captures the chat page at desktop and phone sizes in both themes, with
+ * one persisted reply from the screenshot-only scripted Stack so the
+ * composer and a real rendered assistant message are both visible. */
 async function captureNextChatReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
 
 
-  // SHELL-02's holistic review uses one persisted conversation with real
-  // turns in the seeded backend. Keep the same conversation across all
-  // four captures so viewport/theme comparisons show identical content.
+  // This page review uses one persisted conversation with a real turn
+  // through the screenshot-only scripted Stack. Keep it across all four
+  // captures so viewport/theme comparisons show identical content.
   const cookie = { Cookie: `session=${sessionValue}` };
   const conversation = await seedTitledConversation("captureNextChatReview", cookie, "A few questions for today");
   const seedContext = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "dark", sessionValue);
@@ -2667,12 +2663,11 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
     page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
     await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
     await page.getByRole("textbox", { name: "Message input" }).waitFor();
-    for (const prompt of ["What's 2 plus 2?", "What herbs work well in a kitchen garden?", "Give me a simple bedtime story."]) {
-      await page.getByRole("textbox", { name: "Message input" }).fill(prompt);
-      await page.getByRole("button", { name: "Send message", exact: true }).click();
-      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
-      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
-    }
+    await page.getByRole("textbox", { name: "Message input" }).fill("Show me a short demo reply.");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor({ timeout: 15000 });
   } finally {
     await seedContext.close();
   }
@@ -2680,42 +2675,46 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   const turnsResponse = await fetch(`${BASE_URL}/api/conversations/${conversation.id}/turns`, { headers: cookie });
   if (!turnsResponse.ok) throw new Error(`captureNextChatReview: reading seeded turns failed: ${turnsResponse.status}`);
   const turns = await turnsResponse.json() as Array<{ reasoning?: string; reply_text?: string; replyText?: string }>;
-  if (turns.length !== 3) throw new Error(`captureNextChatReview: expected 3 persisted turns, found ${turns.length}`);
-  if (!turns.some((turn) => typeof turn.reasoning === "string" && turn.reasoning.length > 0)) {
-    throw new Error("captureNextChatReview: no persisted turn includes reasoning");
+  if (turns.length !== 1) throw new Error(`captureNextChatReview: expected 1 persisted turn, found ${turns.length}`);
+  if ((turns[0]?.reply_text ?? turns[0]?.replyText) !== SCREENSHOT_CHAT_REPLY) {
+    throw new Error("captureNextChatReview: scripted demo reply was not persisted");
   }
-  console.log(`captureNextChatReview: seeded conversation ${conversation.id} has ${turns.length} persisted turns including reasoning`);
+  console.log(`captureNextChatReview: seeded conversation ${conversation.id} has the scripted demo reply`);
 
-  // Keep the repository's current model-selection wiring visible in this
-  // capture's technical evidence. A household without Stack configured
-  // correctly hides the selector; the current page still owns the model
-  // picker slot and must not regress to the retired thinking control.
-  const nextChatSource = readFileSync(join(ROOT, "frontend", "src", "next", "pages", "NextChatPage.tsx"), "utf8");
-  if (!nextChatSource.includes("ComposerExtra: modelPickerAllowed ? ComposerModelSelector : undefined") || nextChatSource.includes("ComposerThinkingControl")) {
-    throw new Error("captureNextChatReview: current ComposerModelSelector wiring was not found or retired ComposerThinkingControl remains in NextChatPage");
+  // The shared ChatThread owns the current model-selector slot; keep this
+  // source check pointed at that binding, where it moved from the page.
+  const chatThreadSource = readFileSync(join(ROOT, "frontend", "src", "apps", "chat", "ChatThread.tsx"), "utf8");
+  const elementBindingsSource = readFileSync(join(ROOT, "frontend", "src", "apps", "chat", "elementBindings.ts"), "utf8");
+  if (!chatThreadSource.includes("ComposerExtra: modelPickerAllowed ? MODEL_SELECTOR_SLOT : undefined") || !elementBindingsSource.includes("export const MODEL_SELECTOR_SLOT = ComposerModelSelector") || chatThreadSource.includes("ComposerThinkingControl")) {
+    throw new Error("captureNextChatReview: shared ComposerModelSelector binding was not found or retired ComposerThinkingControl remains");
   }
-  console.log("captureNextChatReview: composer source check confirms ComposerModelSelector is wired and ComposerThinkingControl is absent");
+  console.log("captureNextChatReview: shared composer source check confirms ComposerModelSelector is wired");
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     for (const theme of THEMES) {
       const context = await newContext(browser, viewport, theme, sessionValue);
       const consoleErrors: string[] = [];
+      const httpErrors: string[] = [];
       try {
         const page = await context.newPage();
         page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
         page.on("pageerror", (error) => consoleErrors.push(error.message));
+        page.on("response", (response) => { if (response.status() >= 400) httpErrors.push(`${response.status()} ${response.url()}`); });
         await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
-        await page.getByRole("textbox", { name: "Message input" }).waitFor();
-        await page.getByText("A few questions for today", { exact: true }).first().waitFor();
-        await page.getByRole("button", { name: "Reasoning" }).first().click();
+        const composer = page.getByRole("textbox", { name: "Message input" });
+        await composer.waitFor();
+        if (!(await composer.isEnabled())) throw new Error(`captureNextChatReview: composer disabled on ${slug}/${theme}`);
+        await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor();
+        if (await page.getByRole("alert").count()) throw new Error(`captureNextChatReview: error banner on ${slug}/${theme}`);
+        if (await page.getByRole("button", { name: "Stop generating", exact: true }).count()) throw new Error(`captureNextChatReview: turn still running on ${slug}/${theme}`);
         await settleAnimations(page);
         const filename = `next-chat-${viewport.width}-${theme}.png`;
         const path = join(outDir, filename);
         await page.screenshot({ path, fullPage: slug === "phone" });
         dedicatedScreenshots.push({ file: filename, route: "/chat", viewport: viewport.slug, theme });
         console.log(`Wrote ${path}`);
-        if (consoleErrors.length) throw new Error(`captureNextChatReview: ${slug}/${theme} console errors: ${consoleErrors.join(" | ")}`);
+        if (consoleErrors.length || httpErrors.length) throw new Error(`captureNextChatReview: ${slug}/${theme} browser errors: ${[...consoleErrors, ...httpErrors].join(" | ")}`);
         console.log(`captureNextChatReview: ${slug}/${theme} had no console errors`);
         await page.close();
       } finally {
@@ -2989,7 +2988,14 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
     try {
       const page = await context.newPage();
       await page.goto(`${BASE_URL}/chat`);
-      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      const composer = page.getByRole("textbox", { name: "Message input" });
+      await composer.waitFor();
+      if (!(await composer.isEnabled())) throw new Error(`captureNextChatComposerReview: composer disabled on ${slug}`);
+      await composer.fill("Show me a short demo reply.");
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+      await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor({ timeout: 15000 });
       if (slug === "phone") {
         await page.getByRole("button", { name: "Add", exact: true }).click();
         await page.locator('[data-slot="composer-menu"][data-open]').waitFor({ timeout: 5000 });
@@ -3002,6 +3008,8 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
         await page.getByRole("button", { name: "Add", exact: true }).waitFor({ state: "visible" });
       }
       if ((await page.locator("body").innerText()).includes("isn't running")) throw new Error(`captureNextChatComposerReview: chat engine error banner on ${slug}`);
+      if (await page.getByRole("alert").count()) throw new Error(`captureNextChatComposerReview: error banner on ${slug}`);
+      if (await page.getByRole("button", { name: "Stop generating", exact: true }).count()) throw new Error(`captureNextChatComposerReview: turn still running on ${slug}`);
       await settleAnimations(page);
       const path = join(outDir, `next-chat-composer-${viewport.width}-dark.png`);
       await page.screenshot({ path, fullPage: slug === "phone" });
@@ -5407,6 +5415,7 @@ async function main() {
     }
     return undefined;
   }, scriptedChatReply: (request) => {
+    if (chatPageScreenshotFixture) return SCREENSHOT_CHAT_REPLY;
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (text.includes(RICH_REPLY_PROMPT)) return RICH_REPLY_MARKDOWN;
     if (text.includes("Friday is pizza night")) return "Friday is pizza night.";
@@ -5458,7 +5467,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = chatArtifactCapture ? startScreenshotStack(chatModel.url) : undefined;
+  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture ? startScreenshotStack(chatModel.url) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -5475,7 +5484,7 @@ async function main() {
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
       // This matrix never calls speech; all speech requests go to the Stack.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1", MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
       stdout: "pipe",
       stderr: "inherit",
     });
@@ -5536,7 +5545,7 @@ async function main() {
       if (!searchSetting.ok) throw new Error(`seed websearch fixture failed: ${searchSetting.status}`);
     }
 
-    const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch();
+    const launchedBrowser = await (useFirefox ? firefox : useWebkit ? webkit : chromium).launch({ headless: true });
     browser = launchedBrowser;
     if (fitVerdictReview) {
       const phone = VIEWPORTS.find((item) => item.slug === "phone")!;

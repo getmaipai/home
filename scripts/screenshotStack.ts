@@ -22,6 +22,21 @@ export function startScreenshotStack(modelUrl: string): ReturnType<typeof Bun.se
           { id: "embed", label: "Embeddings", wire: "embeddings", residency: "resident", endpoints: ["/v1/embeddings"], quality: [], sharesModelWith: null, state: state(), reason: null, model: modelInfo("stub-embed"), check: check() },
         ] });
       }
+      if (request.method === "GET" && url.pathname === "/stack/v1/engines") {
+        return Response.json({ engines: [] });
+      }
+      if (request.method === "GET" && url.pathname === "/stack/v1/hardware/budget") {
+        return Response.json({
+          totalMemoryBytes: 8 * 1024 ** 3,
+          capBytes: 8 * 1024 ** 3,
+          freeMemoryBytes: 6 * 1024 ** 3,
+          availablePercent: 75,
+          pressure: "normal",
+          memoryReadingDegraded: false,
+          loaded: [],
+          queue: [],
+        });
+      }
       if (request.method === "GET" && url.pathname === "/stack/v1/health") return Response.json({ health: [] });
       if (request.method === "POST" && ["/v1/chat/completions", "/v1/embeddings"].includes(url.pathname)) {
         const path = url.pathname;
