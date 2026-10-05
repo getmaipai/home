@@ -33,6 +33,7 @@ import {
   NextReasoningGroup,
   SourcesActionBarTrigger,
 } from "@/apps/chat/chatThreadSlots";
+import { ChatMessageError } from "@/apps/chat/chatErrorSlot";
 import { ArtifactCardToolRender, ConfirmToolRender, ProjectToolRender, SourcesNoopRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
 import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
@@ -71,6 +72,7 @@ export const THREAD_SLOTS = {
   AssistantActionBarExtra: SourcesActionBarTrigger,
   AssistantMessageFooterExtra: MessageFooterExtra,
   Indicator: ChatThinkingIndicator,
+  MessageError: ChatMessageError,
   ComposerAddAttachmentOverride: ComposerAddMenu,
   // VOICE-LIVE-01: the trailing-side append point beside Send/dictate;
   // ComposerVoiceControls gates its own render on stt+tts being ready.

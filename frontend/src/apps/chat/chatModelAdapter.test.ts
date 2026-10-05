@@ -1,6 +1,7 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, PendingAttachment, ThreadMessage } from "@assistant-ui/react";
 import { createChatModelAdapter, stripThinking } from "@/apps/chat/chatModelAdapter";
+import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { createLocalImageAttachmentAdapter, clearStagedImageAttachments } from "@/apps/chat/localImageAttachmentAdapter";
 import { FakeAudioContext, fakeWavBody } from "../../../tests/fakeAudioContext";
 import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
@@ -1148,6 +1149,25 @@ describe("createChatModelAdapter errors", () => {
       const { error } = await collect([fakeUserMessage("hi")]);
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe("MaiPai's AI isn't running right now. Try again in a moment.");
+      expect((error as Error).message).not.toContain("llama-server");
+      expect(error).toMatchObject({ code: "unavailable" });
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a streamed error event becomes a ChatTurnError with its code and the turn id", async () => {
+    const message = "The chat engine is unavailable. Try again soon.";
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "turn_meta", conversation_id: "conv-resume123", turn_id: "turn-resume123", resume_token: "resume-token-test" },
+        { type: "error", error: message, code: "engine_unavailable" },
+      ]),
+    );
+    try {
+      const { error } = await collect([fakeUserMessage("hi")]);
+      expect(error).toBeInstanceOf(ChatTurnError);
+      expect(error).toMatchObject({ message, code: "engine_unavailable", turnId: "turn-resume123" });
     } finally {
       env.restore();
     }
@@ -1223,12 +1243,13 @@ describe("createChatModelAdapter errors", () => {
     } finally { env.restore(); }
   });
 
-  test("a request that fails before any stream event surfaces the generic hub-unreachable message", async () => {
+  test("an unreachable hub becomes a ChatTurnError with code client_unreachable", async () => {
     const env = stubEnvironment(() => Promise.reject(new Error("network error")));
     try {
       const { error } = await collect([fakeUserMessage("hi")]);
-      expect(error).toBeInstanceOf(Error);
+      expect(error).toBeInstanceOf(ChatTurnError);
       expect((error as Error).message).toMatch(/Could not reach the hub/);
+      expect(error).toMatchObject({ code: "client_unreachable", turnId: undefined });
     } finally {
       env.restore();
     }

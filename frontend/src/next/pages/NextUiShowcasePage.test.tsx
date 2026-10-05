@@ -102,4 +102,10 @@ describe("NextUiShowcasePage", () => {
     fireEvent.click(await waitFor(() => view.getByRole("button", { name: /^Failure: engine down \(chat\)\./ })));
     await waitFor(() => expect(view.container.textContent).toContain("I can't reach the AI on this computer"), { timeout: 5000 });
   });
+
+  test("failure-generic renders the kit error panel", async () => {
+    const view = open();
+    fireEvent.click(await waitFor(() => view.getByRole("button", { name: /^Failure: mid-stream error\./ })));
+    await waitFor(() => expect(view.getByRole("alert").textContent).toContain("Couldn't finish that reply"), { timeout: 5000 });
+  });
 });

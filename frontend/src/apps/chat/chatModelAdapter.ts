@@ -11,6 +11,7 @@ import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
 import { CURRENT_LOCAL_VISION_CAPABILITY, IMAGE_VISION_UNAVAILABLE_MESSAGE, type LocalVisionCapability } from "@/apps/chat/visionCapability";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
+import { ChatTurnError } from "@/apps/chat/chatTurnError";
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -747,15 +748,16 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // properly (filed as a follow-up), this at least tells the
         // person what to do instead of surfacing the backend's raw,
         // id-bearing error string.
-        throw new Error(
+        const message =
           e instanceof ApiError && e.code === "unavailable"
             ? "MaiPai's AI isn't running right now. Try again in a moment."
             : e instanceof ApiError && e.code === "temporary_mismatch"
               ? "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
-              : e instanceof ApiError
-                ? e.message
-                : "Could not reach the hub. Try again.",
-        );
+            : e instanceof ApiError
+              ? e.message
+              : "Could not reach the hub. Try again.";
+        const code = e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
+        throw new ChatTurnError(message, code, resumeTurnId);
       }
     },
   };

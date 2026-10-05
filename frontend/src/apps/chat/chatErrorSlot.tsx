@@ -1,0 +1,52 @@
+"use client";
+
+import { MessagePrimitive, useAui, useAuiState } from "@assistant-ui/react";
+import { ErrorState } from "@maipai/ui/src/elements/error-state";
+import { useContext, useEffect, useRef, useState } from "react";
+import { AdminContext } from "@/apps/chat/chatThreadContexts";
+import { ChatTurnError } from "@/apps/chat/chatTurnError";
+import { TurnErrorDetails } from "@/next/pages/TurnErrorDetails";
+
+type MessageErrorValue = {
+  message: string;
+  code?: string;
+  turnId?: string;
+};
+
+export function ChatMessageError() {
+  const status = useAuiState((s) => s.message.status);
+  const isRunning = useAuiState((s) => s.thread.isRunning);
+  const aui = useAui();
+  const isAdmin = useContext(AdminContext);
+  const [retrying, setRetrying] = useState(false);
+  const previousStatus = useRef(status);
+
+  useEffect(() => {
+    if (!isRunning || previousStatus.current !== status) setRetrying(false);
+    previousStatus.current = status;
+  }, [isRunning, status]);
+
+  const errorValue = status?.type === "incomplete" && status.reason === "error" ? status.error : undefined;
+  if (!errorValue || typeof errorValue !== "object" || !("message" in errorValue) || typeof errorValue.message !== "string") {
+    return null;
+  }
+
+  const error = errorValue as unknown as MessageErrorValue;
+  if (error instanceof ChatTurnError && error.code === "safety_refused") {
+    // els-guardrail-notice: the guardrail Element owns safety refusal notices.
+    return null;
+  }
+
+  const turnId = error instanceof ChatTurnError ? error.turnId : undefined;
+  const retry = () => {
+    setRetrying(true);
+    void aui.message().reload();
+  };
+
+  return (
+    <MessagePrimitive.Error>
+      <ErrorState title="Couldn't finish that reply" detail={error.message} retrying={retrying} onRetry={retry} />
+      {isAdmin && turnId ? <TurnErrorDetails turnId={turnId} /> : null}
+    </MessagePrimitive.Error>
+  );
+}
