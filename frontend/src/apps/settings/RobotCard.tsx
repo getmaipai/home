@@ -10,6 +10,8 @@ const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
   listening: "Listening",
   thinking: "Thinking",
   speaking: "Speaking",
+  reconnecting: "Reconnecting",
+  sleeping: "Sleeping",
 };
 
 function whenText(iso: string): string {

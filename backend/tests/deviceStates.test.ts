@@ -52,6 +52,20 @@ describe("PUT /api/devices/me/state", () => {
     expect(db.select().from(deviceStates).where(eq(deviceStates.deviceId, deviceId)).get()?.reportedAt).toBeString();
   });
 
+  for (const activity of ["reconnecting", "sleeping"] as const) {
+    test(`a robot reporting ${activity} is accepted and returned by both device list routes`, async () => {
+      const { client: owner, personId } = await ownerSession();
+      const { client: robot, deviceId } = await deviceSession(personId);
+      const reported = { ...frame, activity };
+      expect((await robot.request("/api/devices/me/state", { method: "PUT", body: reported })).status).toBe(204);
+
+      const ownDevices = (await (await owner.get("/api/devices")).json()) as Array<{ id: string; state: Record<string, unknown> | null }>;
+      const robots = (await (await owner.get("/api/devices/robots")).json()) as Array<{ id: string; state: Record<string, unknown> | null }>;
+      expect(ownDevices.find((device) => device.id === deviceId)?.state).toMatchObject({ activity });
+      expect(robots.find((device) => device.id === deviceId)?.state).toMatchObject({ activity });
+    });
+  }
+
   test("app_version is stored and returned, and reads as null when the robot leaves it out", async () => {
     const { client: owner, personId } = await ownerSession();
     const { client: robot, deviceId } = await deviceSession(personId);

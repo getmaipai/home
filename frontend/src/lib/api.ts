@@ -1,4 +1,5 @@
 import type { StatusAppsWire } from "@maipai/home-backend/src/wire";
+import type { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { StatusNote } from "@maipai/spec/gen/ts/status-note.js";
@@ -200,7 +201,7 @@ export interface DeviceInfo {
 // reachability, hand-typed to match backend/src/routes/devices.ts's
 // DeviceSchema.state.
 export interface RobotDeviceState {
-  activity: "starting" | "idle" | "listening" | "thinking" | "speaking";
+  activity: RobotState["activity"];
   muted: boolean;
   tracking: boolean;
   on_battery?: boolean | null;

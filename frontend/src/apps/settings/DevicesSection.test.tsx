@@ -168,6 +168,33 @@ describe("DevicesSection", () => {
     }
   });
 
+  test("new robot activities render their plain status labels", async () => {
+    const restore = stubFetch(
+      [
+        device({
+          id: "robot-reconnecting",
+          kind: "robot",
+          name: "Riff reconnecting",
+          state: { activity: "reconnecting", muted: false, tracking: true, reachable: true, unreachableSince: null },
+        }),
+        device({
+          id: "robot-sleeping",
+          kind: "robot",
+          name: "Riff sleeping",
+          state: { activity: "sleeping", muted: false, tracking: true, reachable: true, unreachableSince: null },
+        }),
+      ],
+      [],
+    );
+    try {
+      const { findByText } = renderSection();
+      await findByText("Reconnecting");
+      await findByText("Sleeping");
+    } finally {
+      restore();
+    }
+  });
+
   test("a robot that stopped reporting says not responding and since when", async () => {
     const restore = stubFetch(
       [

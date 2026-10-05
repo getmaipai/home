@@ -29,7 +29,7 @@ const DeviceSchema = z.object({
   // exists.
   capabilities: z.array(z.string()),
   state: z.object({
-    activity: z.enum(["starting", "idle", "listening", "thinking", "speaking"]),
+    activity: RobotState.shape.activity,
     muted: z.boolean(),
     tracking: z.boolean(),
     on_battery: z.boolean().nullable(),
