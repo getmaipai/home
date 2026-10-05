@@ -2073,7 +2073,10 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const input = args as { query?: unknown; category?: unknown } | undefined;
           const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role, runtime.signal) : null;
           if (hosted) return hosted;
-          return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }) });
+          // THIN-INC row 4 (rule 12, Incognito): a temporary chat's query is not kept in the in-process
+          // result cache either, so a later lookup of the same words, by anyone, is a fresh one.
+          const temporary = turn?.conversationId !== undefined && isTemporaryConversation(turn.conversationId);
+          return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}) });
         }
         if (id === "searxng" && method === "page.read") {
           const doc = await searxngPageRead(args, runtime.signal);
