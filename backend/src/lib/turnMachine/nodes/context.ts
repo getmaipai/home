@@ -118,7 +118,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // the id, the one place a source-specific detail can travel without
     // widening the contract for every other source. Parsed back out by
     // windowRoleFromId() in messages.ts - the two stay paired on purpose.
-    items.push({ id: `window-${message.role}-${++windowItemSeq}`, text: message.content, source: "window", subjects: [], disclosure: "child_ok" });
+    items.push({ id: `window-${message.role}-${++windowItemSeq}`, text: typeof message.content === "string" ? message.content : JSON.stringify(message.content), ...(message.tool_calls ? { toolCalls: message.tool_calls } : {}), ...(message.tool_call_id ? { toolCallId: message.tool_call_id } : {}), source: "window", subjects: [], disclosure: "child_ok" });
   }
   if (window.summaryLine) {
     items.push({ id: `window-system-summary`, text: window.summaryLine, source: "window", subjects: [], disclosure: "child_ok" });

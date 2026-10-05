@@ -56,6 +56,8 @@ import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { Surface } from "@/lib/turnShared";
 import type { TurnStats } from "@/lib/turnStats";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
+import { sourcesFromRows } from "@/lib/turnContext";
+import { toolCallAssistantMessage } from "@/lib/composer";
 import type { Rung } from "@/lib/ruleNames";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import type { PersonRow } from "@/types";
@@ -1948,6 +1950,33 @@ const WINDOW_TOKEN_BUDGET = 1200;
 const WINDOW_ROW_FETCH_LIMIT = 200;
 const CHARS_PER_TOKEN_ESTIMATE = 4;
 
+function replaySearchOutcomes(t: ConversationTurnRow): ToolExecutionOutcome[] {
+  if (t.bare || !t.outcomes) return [];
+  try {
+    const outcomes = JSON.parse(t.outcomes) as ToolExecutionOutcome[];
+    return outcomes.filter((o) => o.status === "succeeded" && o.packageId === "websearch" && sourcesFromRows(o.sources ?? []).length > 0);
+  } catch { return []; }
+}
+
+function turnWindowMessages(t: ConversationTurnRow): LlmMessage[] {
+  const messages: LlmMessage[] = [{ role: "user", content: redactCredentials(t.userText) }];
+  const replays = replaySearchOutcomes(t);
+  if (replays.length) {
+    const toolCallMessage = toolCallAssistantMessage(replays);
+    const [nativeCall] = toolCallMessage.tool_calls ?? [];
+    if (nativeCall) messages.push({ role: "assistant", content: "", tool_calls: [nativeCall] });
+    messages.push(...replays.map((o) => ({ role: "tool" as const, tool_call_id: o.callId, content: JSON.stringify({ sources: sourcesFromRows(o.sources ?? []).map((s, i) => ({ number: i + 1, title: s.title, url: s.url, snippet: s.snippet })) }) })));
+  }
+  messages.push(
+    (t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")) && t.guardReason
+      ? { role: "system", content: guardedTurnNote(t) }
+      : t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")
+        ? { role: "assistant", content: redactCredentials(t.replyText) }
+        : { role: "system", content: nonModelWindowNote(t) },
+  );
+  return messages;
+}
+
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / CHARS_PER_TOKEN_ESTIMATE);
 }
@@ -2137,11 +2166,12 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
   const newest = liveRows.slice(-WINDOW_NEWEST_TURNS_KEPT);
   const older = liveRows.slice(0, Math.max(0, liveRows.length - WINDOW_NEWEST_TURNS_KEPT));
 
-  let tokenTotal = newest.reduce((sum, t) => sum + estimateTokens(t.userText) + estimateTokens(t.replyText), 0);
+  const costOf = (t: ConversationTurnRow) => turnWindowMessages(t).reduce((sum, m) => sum + estimateTokens(typeof m.content === "string" ? m.content : JSON.stringify(m)), 0);
+  let tokenTotal = newest.reduce((sum, t) => sum + costOf(t), 0);
   const includedOlder: ConversationTurnRow[] = [];
   for (let i = older.length - 1; i >= 0; i--) {
     const t = older[i]!;
-    const cost = estimateTokens(t.userText) + estimateTokens(t.replyText);
+    const cost = costOf(t);
     if (tokenTotal + cost > WINDOW_TOKEN_BUDGET) break;
     tokenTotal += cost;
     includedOlder.unshift(t);
@@ -2150,6 +2180,10 @@ export function buildConversationWindow(conversation: Conversation, opts: { supe
   const windowTurns = [...includedOlder, ...newest];
   const messages: LlmMessage[] = [];
   for (const t of windowTurns) {
+    if (replaySearchOutcomes(t).length) {
+      messages.push(...turnWindowMessages(t));
+      continue;
+    }
     // CHAT-03, the read side: a row from before the policy (or an import)
     // is redacted on the way into the model's window, never rewritten.
     messages.push({ role: "user", content: redactCredentials(t.userText) });

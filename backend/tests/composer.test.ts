@@ -177,6 +177,12 @@ describe("the constraints and the shape", () => {
     expect(spoken).toContain("omit raw URLs.");
   });
 
+  test("written follow-ups without a new search don't request citations for replayed sources", () => {
+    const followup = phrasingInstruction("written", "who won", 0, false, 1);
+    expect(followup).toContain("Earlier search results are context only");
+    expect(followup).not.toContain("Cite the numbered sources");
+  });
+
   test("a list shape renders result rows, capped at five with a remainder line", async () => {
     const rows = Array.from({ length: 7 }, (_, i) => ({ title: `Track ${i + 1}` }));
     const result = await composeTurn(input([outcome({ callId: "call-list", packageId: "websearch", status: "succeeded", result: { actions: [], data: { rows } } })], { constraints: [{ kind: "shape", value: "list" }] }), scripted("ignored"));

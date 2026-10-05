@@ -1283,6 +1283,22 @@ describe("CHAT-03 (#89): a stored summary is redacted on every read", () => {
 });
 
 describe("buildConversationWindow() (step 3)", () => {
+  test("replays a successful search as one native tool exchange, and preserves the prefix when a later turn is added", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const search = { callId: "web-1", packageId: "websearch", status: "succeeded" as const, via: "tool_call" as const, args: { expression: "Brazil president" }, sources: [{ id: "src-a", kind: "web" as const, title: "Official result", url: "https://example.test/president", site: "example.test", snippet: "Current president information", source: "websearch", created_at: "2026-10-05T00:00:00.000Z", hlc: "1" }] };
+    logTurn(actor, "chat", "who is president of brazil", { reply: { text: "The result names the president." }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-history" }, { outcomes: [search] });
+    const before = buildConversationWindow(conv.value);
+    expect(before.messages.map((m) => m.role)).toEqual(["user", "assistant", "tool", "assistant"]);
+    expect(before.messages[1]?.tool_calls?.[0]?.id).toBe("web-1");
+    expect(before.messages[2]?.content).toContain("Official result");
+    expect(before.messages[2]?.content).not.toContain("page body");
+    logTurn(actor, "chat", "who won", { reply: { text: "I need the race." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-followup" });
+    const after = buildConversationWindow(conv.value);
+    expect(after.messages.slice(0, before.messages.length)).toEqual(before.messages);
+  });
+
   // Item 1b (#67): a guard's own honest line, stored as the reply of a
   // replaced model turn, must never come back to the model as its own
   // past words (it recited "nobody's told me" four times about one

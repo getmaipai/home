@@ -659,7 +659,8 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       { count: 0, allEmpty: true },
     );
     const searchResultCount = searchRows.count;
-    const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount, searchResultCount > 0 && searchRows.allEmpty);
+    const replayedSearchCount = state.messages.reduce((count, message) => count + (message.role === "tool" && message.tool_call_id ? 1 : 0), 0);
+    const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount, searchResultCount > 0 && searchRows.allEmpty, replayedSearchCount);
     const missedKinds = state.outcomes.filter(lookupMissed).map(lookupFailureKind);
     const answering =
       phrasedOutcomes.length === 0

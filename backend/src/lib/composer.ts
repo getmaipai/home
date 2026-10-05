@@ -1059,7 +1059,7 @@ export function toolResultMessages(outcomes: readonly ToolExecutionOutcome[], se
 // (#156) were a length target, and max_tokens is a ceiling, not a target.
 // The spoken class keeps both exactly (rule 0: a spoken turn's shape and
 // a child's or teen's limits never loosen here).
-export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: string, searchResultCount = 0, allSnippetsEmpty = false): string {
+export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: string, searchResultCount = 0, allSnippetsEmpty = false, replayedSearchCount = 0): string {
   const lengthClause = surfaceClass === "written" ? "structured where it helps" : "in one to three sentences";
   const quotedUtterance = quoteForPrompt(utterance);
   const lines = [
@@ -1075,6 +1075,8 @@ export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: strin
     if (allSnippetsEmpty) {
       lines.push("The results have no summary text, only titles and links; say only what a title itself states, and don't invent detail.");
     }
+  } else if (replayedSearchCount > 0 && surfaceClass === "written") {
+    lines.push("Earlier search results are context only; don't use [n] citations for them because this reply has no current source list.");
   }
   return lines.join(" ");
 }

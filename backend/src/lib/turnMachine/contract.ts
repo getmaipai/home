@@ -31,6 +31,9 @@ import type { StreamGate } from "./nodes/outputGate";
 export interface ContextItem {
   id: string;
   text: string;
+  /** Native assistant tool-call metadata carried by prior window turns. */
+  toolCalls?: import("@maipai/spec/llm/ts/types.js").ToolCallWire[];
+  toolCallId?: string;
   /** GROUND-01 (state record, "The live grounding refusals..."): the
    * current utterance joins this list too, source "utterance" - a
    * grounding source for a search (policy's own term-overlap check),

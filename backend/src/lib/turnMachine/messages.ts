@@ -186,7 +186,7 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // (buildConversationWindow()'s own job); this machine never rebuilds
   // that ordering, only replays the window's own roles verbatim.
   for (const item of windowItems) {
-    messages.push({ role: windowRoleFromId(item.id), content: item.text });
+    messages.push({ role: windowRoleFromId(item.id), content: item.text, ...(item.toolCalls ? { tool_calls: item.toolCalls } : {}), ...(item.toolCallId ? { tool_call_id: item.toolCallId } : {}) });
   }
   if (promptSurfaceClass === "written") {
     // The written prompt on tier 1, decided (dev.md, the coordinator's
