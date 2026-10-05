@@ -74,6 +74,31 @@ function failedOutput(attempt: { message?: string }): ModelOutput {
   return { kind: "model_failed", failure: classifyGenerationFailure(attempt.message).kind };
 }
 
+function evidenceRetryLimits(baseChars: number, message: string | undefined): number[] {
+  let promptTokens = 0;
+  let contextTokens = 0;
+  const bodyStart = message?.indexOf("{") ?? -1;
+  const bodyEnd = message?.lastIndexOf("}") ?? -1;
+  if (bodyStart >= 0 && bodyEnd >= bodyStart) {
+    try {
+      const body = JSON.parse(message!.slice(bodyStart, bodyEnd + 1)) as { error?: { n_prompt_tokens?: unknown; n_ctx?: unknown } };
+      promptTokens = typeof body.error?.n_prompt_tokens === "number" ? body.error.n_prompt_tokens : 0;
+      contextTokens = typeof body.error?.n_ctx === "number" ? body.error.n_ctx : 0;
+    } catch { /* use the bounded halving fallback when no structured counts are present */ }
+  }
+  const measuredLimit = Number.isFinite(promptTokens) && Number.isFinite(contextTokens) && promptTokens > contextTokens && contextTokens > 0
+    ? Math.floor(baseChars * contextTokens / promptTokens)
+    : Math.floor(baseChars / 2);
+  const limits: number[] = [];
+  let limit = Math.min(baseChars - 1, measuredLimit);
+  while (limit > 0) {
+    if (!limits.includes(limit)) limits.push(limit);
+    limit = Math.floor(limit / 2);
+  }
+  limits.push(0);
+  return limits;
+}
+
 export interface ModelInput {
   utterance: string;
   /** machine.ts's own round counter: `budget.model_transitions &&
@@ -591,7 +616,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   let tool_choice: "auto" | "none" | undefined;
   // THIN-GROUND-01: the phrasing round's messages again with the evidence block
   // cut to half, for the one retry after the engine says the prompt did not fit.
-  let withHalvedEvidence: (() => LlmMessage[]) | null = null;
+  let withEvidenceLimit: ((maxChars: number) => LlmMessage[]) | null = null;
 
   if (isPhrasingRound) {
     // PHRASE-01's own continuation: the forced call's own messages,
@@ -671,7 +696,20 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? answering : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${answering}` };
     const history = state.messages;
     messages = phrasedOutcomes.length === 0 ? [...history, instruction] : [...history, assistantMessage, ...resultMessages, instruction];
-    if (phrasedOutcomes.length > 0) withHalvedEvidence = () => [...history, assistantMessage, ...toolResultMessages(phrasedOutcomes, Math.floor(searchEvidenceMaxChars(state.budget.context_tokens) / 2)), instruction];
+    if (phrasedOutcomes.length > 0 && searchResultCount > 0) {
+      const baseEvidenceChars = searchEvidenceMaxChars(state.budget.context_tokens);
+      withEvidenceLimit = (maxChars) => {
+        const resultMessages = maxChars > 0
+          ? toolResultMessages(phrasedOutcomes, maxChars, surfaceClass === "spoken")
+          : phrasedOutcomes.flatMap((outcome) => outcome.status === "succeeded" && outcome.packageId === "websearch"
+            ? [{ role: "tool" as const, tool_call_id: outcome.callId, content: JSON.stringify({ status: "succeeded", package: "websearch", instruction: "The search results could not be read because they did not fit in the available context. Do not claim to have read them." }) }]
+            : toolResultMessages([outcome]));
+        const retryInstruction = maxChars === 0
+          ? { ...instruction, content: `${instruction.content} The search results could not be read because they did not fit in the available context. Say that in your own words, and do not claim facts from those results.` }
+          : instruction;
+        return [...history, assistantMessage, ...resultMessages, retryInstruction];
+      };
+    }
     // The same tools block the forced/offered round itself sent -
     // reused verbatim (see contract.ts's own `lastTools` doc comment:
     // the Qwen3 template renders the tools block into the prompt's own
@@ -726,14 +764,20 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal);
-  // THIN-GROUND-01: the engine refused the prompt as larger than its context.
-  // One retry with the evidence block halved and the tools block unchanged; a
-  // second refusal falls through to the failure line for that kind.
-  if (!attempt.ok && withHalvedEvidence && !signal.aborted && classifyGenerationFailure(attempt.message).kind === "context_too_large") {
-    console.error(`[model] the engine refused the prompt as too large (${attempt.message ?? attempt.code}); retrying once with the evidence cut to half`);
-    messages = withHalvedEvidence();
-    state.messages = messages;
-    attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, "phrasing", signal);
+  // THIN-GROUND-01: llama-server reports the rendered prompt size in its
+  // 400 body. Use that measurement to choose the first evidence cut, then
+  // keep cutting until the request fits or the prompt carries no search
+  // evidence and explicitly tells the model to say it could not read it.
+  if (!attempt.ok && withEvidenceLimit && !signal.aborted && classifyGenerationFailure(attempt.message).kind === "context_too_large") {
+    const limits = evidenceRetryLimits(searchEvidenceMaxChars(state.budget.context_tokens), attempt.message);
+    for (const maxChars of limits) {
+      if (signal.aborted) break;
+      console.error(`[model] the engine refused the prompt as too large (${attempt.message ?? attempt.code}); retrying with ${maxChars} search-evidence characters`);
+      messages = withEvidenceLimit(maxChars);
+      state.messages = messages;
+      attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, "phrasing", signal);
+      if (attempt.ok || classifyGenerationFailure(attempt.message).kind !== "context_too_large") break;
+    }
   }
   // DEADLINE-01: a generation that never finished (the model node's own
   // deadline, a dead engine) gets a real, fixed model_failed line, never

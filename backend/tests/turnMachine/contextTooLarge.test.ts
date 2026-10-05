@@ -1,7 +1,7 @@
 // THIN-GROUND-01 part 2: the engine answered HTTP 400 because the prompt
 // exceeded its context. That is a failure kind of its own
-// (`context_too_large`), the phrasing round is retried ONCE with the evidence
-// block halved and the tools block unchanged, and only then does the person
+// (`context_too_large`), the phrasing round cuts evidence against the engine's
+// reported window and retries until it fits or no evidence remains, and only then does the person
 // see plain copy. "Something went wrong" never reaches them for this.
 // The stream is scripted at the LLM client boundary, as modelDeadline.test.ts does.
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
@@ -83,6 +83,14 @@ describe("the failure kind", () => {
     expect(classifyGenerationFailure(failed.error).kind).toBe("context_too_large");
   });
 
+  test("llama-server's exact structured 400 body survives the Stack failure mapping", () => {
+    const body = JSON.stringify({ error: { code: 400, message: "request (6013 tokens) exceeds the available context size (4096 tokens), try increasing it", type: "exceed_context_size_error", n_prompt_tokens: 6013, n_ctx: 4096 } });
+    const failed = stackFailureResult(new StackError("unknown", "request (6013 tokens) exceeds the available context size (4096 tokens), try increasing it", { status: 400, body }), "chat");
+    expect(failed.error).toContain(body);
+    expect(classifyGenerationFailure(failed.error).kind).toBe("context_too_large");
+    expect(stackFailureResult(new StackError("unknown", "request failed", { status: 400, body }), "embeddings").error).not.toContain(body);
+  });
+
   test("the table has plain copy for it, an adult's and a minor's, with no codes and never the generic line", () => {
     expect(FAILURE_COPY.context_too_large.adult).toBe("That was too much text for me to read in one go. Try a shorter question.");
     expect(FAILURE_COPY.context_too_large.minor).toBe("That was too much for me to read at once. Try a shorter question.");
@@ -119,14 +127,36 @@ describe("the phrasing round after a context overflow", () => {
     }
   });
 
-  test("a second overflow stops there: plain copy, one retry only, never 'Something went wrong'", async () => {
+  test("retries keep cutting to no evidence before returning the context failure line", async () => {
     const turn = scriptTurn(() => ({ ok: false, error: `chat model unavailable: ${ENGINE_400}` }));
     try {
       const result = await runTurnNext(people.owner, "chat", "when is the new avengers movie coming out");
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.reply.text).toBe(FAILURE_COPY.context_too_large.adult);
       expect(result.value.reply.text).not.toContain("Something went wrong");
-      expect(turn.phrasingCalls()).toBe(2);
+      expect(turn.phrasingCalls()).toBeGreaterThan(2);
+      expect(toolContent(turn.seen.at(-1)!.messages)).toContain("could not be read");
+      expect(String(turn.seen.at(-1)!.messages.at(-1)?.content)).toContain("Say that in your own words");
+    } finally {
+      turn.spy.mockRestore();
+    }
+  });
+
+  test("uses n_prompt_tokens and n_ctx to size multiple evidence cuts", async () => {
+    const bodyError = (prompt: number) => `chat model unavailable: 400 Bad Request {"error":{"code":400,"message":"request (${prompt} tokens) exceeds the available context size (4096 tokens), try increasing it","type":"exceed_context_size_error","n_prompt_tokens":${prompt},"n_ctx":4096}}`;
+    const turn = scriptTurn((call) => call === 1
+      ? { ok: false, error: bodyError(4370) }
+      : call === 2
+        ? { ok: false, error: bodyError(4146) }
+        : { ok: true, text: "Snippet 1 is in the first result." });
+    try {
+      const result = await runTurnNext(people.owner, "chat", "what does the first Avengers result say");
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toBe("Snippet 1 is in the first result.");
+      expect(turn.phrasingCalls()).toBe(3);
+      const phrasing = turn.seen.filter((seen) => hasTool(seen.messages));
+      expect(toolContent(phrasing[1]!.messages).length).toBeLessThanOrEqual(Math.floor(searchEvidenceMaxChars(4000) * 4096 / 4370));
+      expect(toolContent(phrasing[2]!.messages).length).toBeLessThanOrEqual(Math.floor(Math.floor(searchEvidenceMaxChars(4000) * 4096 / 4370) / 2));
     } finally {
       turn.spy.mockRestore();
     }
