@@ -1390,42 +1390,13 @@ export function NextChatPage({ person }: { person: Roster }) {
   // while collapsed; the click always pins the rail fully open
   // (independent of hover) and clears `railPeeked` so a later collapse
   // never mounts already "peeked" from a stale hover.
-  // A real defect Jesse found (Firefox, hard reload): clicking the open
-  // toggle to collapse it left the pointer sitting over the exact spot
-  // where the collapsed toggle instance now mounts - a browser
-  // recomputes what's under a stationary pointer whenever the DOM
-  // changes there, so it fired a "phantom" pointerenter on the new node
-  // with no real mouse movement, which `handleToggleEnter` read as a
-  // hover and immediately re-opened the peek, undoing the collapse's own
-  // visible effect in the same frame (from Jesse's own eyes, the click
-  // did nothing). `suppressHoverPeekRef` closes this: every click (either
-  // direction, collapsing or pinning open - the SAME phantom-enter risk
-  // exists for the inline/collapsed instance swap either way) sets it,
-  // and only a REAL pointer-leave of whichever toggle instance is
-  // currently mounted clears it, so the peek stays suppressed until the
-  // pointer genuinely leaves and a later hover is a real one again. Only
-  // `onPointerEnter` is gated by it - a genuine keyboard Tab onto the
-  // toggle right after that same click (`handleToggleFocus` below) has
-  // no phantom-recomputation risk analogous to a stationary mouse, and
-  // must still open the peek immediately.
-  const suppressHoverPeekRef = useRef(false);
-  // Jesse found the suppression above regressed: a click-triggered DOM
-  // swap fires a pointerleave on the OUTGOING toggle too, not just a
-  // phantom pointerenter on the incoming one - the same stationary
-  // pointer, no real transition, but `handleToggleLeave` cleared the
-  // suppression flag on ANY leave, so that incidental event raced ahead
-  // of the swap's own phantom enter and defeated it. `relatedTarget`
-  // can't tell the two apart here (an environment quirk found writing
-  // this fix's own test: happy-dom never reports an unspecified
-  // `relatedTarget` as falsy the way a real browser does, so a leave
-  // fired with no real destination is indistinguishable, in a test,
-  // from one with a genuine one). Real pointer MOVEMENT is unambiguous
-  // either way: the incidental leave/enter pair a DOM swap fires under
-  // a stationary pointer report the exact same client coordinates the
-  // click itself had (the OS cursor hasn't moved), while any leave that
-  // follows a genuine hand movement reports different ones. Recorded at
-  // click time, compared at leave time.
-  const suppressPointerOriginRef = useRef<{ x: number; y: number } | null>(null);
+  // Swapping the inline and collapsed buttons under a stationary pointer
+  // can synthesize pointerenter on the newly mounted button. Keep hover
+  // peeking suppressed until the pointer actually moves away from the
+  // click point. A same-coordinate leave/enter is the browser's hit-test
+  // recomputation during the DOM swap, not a person leaving the control.
+  const justToggledRailRef = useRef(false);
+  const toggleClickPointRef = useRef<{ x: number; y: number } | null>(null);
   // Jesse's third report of this exact pane-jitter: `transition-[width]`
   // used to sit unconditionally on the rail's own base className, so
   // *any* width change animated - including closing the peek, which
@@ -1518,13 +1489,15 @@ export function NextChatPage({ person }: { person: Roster }) {
     if (railCollapsed) setRailPeeked(true);
   };
   const handleToggleEnter = () => {
-    if (suppressHoverPeekRef.current) return;
+    if (justToggledRailRef.current) return;
     openPeekIfCollapsed();
   };
   const handleToggleLeave = (e: PointerEvent<HTMLButtonElement>) => {
-    const origin = suppressPointerOriginRef.current;
-    if (origin && e.clientX === origin.x && e.clientY === origin.y) return;
-    suppressHoverPeekRef.current = false;
+    const point = toggleClickPointRef.current;
+    if (!point || e.clientX !== point.x || e.clientY !== point.y) {
+      justToggledRailRef.current = false;
+      toggleClickPointRef.current = null;
+    }
   };
   // Only a genuine interaction with the toggle itself - focusing it or
   // clicking it - ever sets the pending-focus flag the effect above
@@ -1540,19 +1513,9 @@ export function NextChatPage({ person }: { person: Roster }) {
     openPeekIfCollapsed();
   };
   const handleToggleClick = (e: MouseEvent<HTMLButtonElement>) => {
-    suppressHoverPeekRef.current = true;
+    justToggledRailRef.current = true;
+    toggleClickPointRef.current = e.detail === 0 ? null : { x: e.clientX, y: e.clientY };
     startRailWidthAnimation();
-    // A review caught this: `e.detail === 0` is a keyboard-synthesized
-    // click (Enter/Space on the focused toggle, per spec) - its own
-    // `clientX`/`clientY` are always (0, 0), unrelated to wherever the
-    // real mouse actually is, so there's no meaningful origin to compare
-    // a later leave against. `null` here means "no origin recorded" -
-    // `handleToggleLeave`'s own `if (origin && ...)` then clears
-    // suppression on the very first leave that follows, the same
-    // unconditional behavior this mechanism had before the coordinate
-    // check existed, correct for a keyboard-driven collapse where a real
-    // mouse position was never part of the interaction to begin with.
-    suppressPointerOriginRef.current = e.detail === 0 ? null : { x: e.clientX, y: e.clientY };
     pendingToggleFocusRef.current = true;
     if (railCollapsed) {
       setRailCollapsed(false);
@@ -1780,7 +1743,9 @@ export function NextChatPage({ person }: { person: Roster }) {
                     : "hidden w-0 lg:block lg:overflow-hidden"
                   : "hidden w-64 shrink-0 border-r border-border pr-2 lg:block",
               )}
-              onPointerLeave={(e) => closeRailPeek(e.relatedTarget)}
+              onPointerLeave={(e) => {
+                closeRailPeek(e.relatedTarget);
+              }}
               onBlur={(e) => closeRailPeek(e.relatedTarget)}
               onTransitionEnd={(e) => {
                 if (e.target === e.currentTarget && e.propertyName === "width") stopRailWidthAnimation();

@@ -2137,12 +2137,12 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // floating one) - the one a real pointer can actually reach is the
       // one outside the rail.
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
-      // A click-triggered "phantom" pointerenter (the browser recomputing
-      // hover when this node mounts under a stationary pointer) is
-      // suppressed until a real leave - a real hover needs one first.
-      // clientX/Y differ from the click's own default (0, 0) - a real
-      // leave, not the swap's own incidental one (NextChatPage.tsx's
-      // own comment on why coordinates, not relatedTarget).
+      // A same-point leave/enter is the browser's swap hit-test, not a
+      // real departure from the control.
+      fireEvent.pointerEnter(collapsedToggle);
+      expect(classes(rail())).toContain("hidden");
+      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 0, clientY: 0 });
+      expect(classes(rail())).toContain("hidden");
       fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
       fireEvent.pointerEnter(collapsedToggle);
       // Never remounted, never a second column instance - the exact same
@@ -2331,14 +2331,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     }
   });
 
-  test("a keyboard-triggered collapse still clears the peek suppression on the next real leave, not stuck on a meaningless (0, 0) origin", async () => {
-    // A review caught this: a keyboard-synthesized click (Enter/Space on
-    // the focused toggle, `detail: 0` per spec) always reports
-    // `clientX`/`clientY` (0, 0), unrelated to wherever the real mouse
-    // actually is. Comparing a later leave's own real, non-zero
-    // coordinates against that meaningless origin would never match,
-    // permanently blocking a legitimate mouse hover from ever opening
-    // the peek again after a keyboard-driven collapse.
+  test("a keyboard-triggered collapse clears hover suppression on the next leave", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -2393,7 +2386,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
     }
   });
 
-  test("clicking to collapse still suppresses the peek even when the outgoing toggle fires its own pointerleave as part of the swap", async () => {
+  test("clicking to collapse still suppresses peek through same-point outgoing leave", async () => {
     // A regression Jesse found again after the first fix below: the
     // outgoing (inline) toggle doesn't just vanish silently when it
     // becomes `hidden` - a real browser also fires a genuine
@@ -2415,7 +2408,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       await view.findByLabelText("Message input");
       const openToggle = view.getByRole("button", { name: "Hide conversations" });
       fireEvent.click(openToggle, { detail: 1 });
-      fireEvent.pointerLeave(openToggle);
+      fireEvent.pointerLeave(openToggle, { clientX: 0, clientY: 0 });
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("hidden");

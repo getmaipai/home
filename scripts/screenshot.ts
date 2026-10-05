@@ -288,6 +288,7 @@ const nextChatRichReview = process.argv.includes("--next-chat-rich-review");
 const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview || nextChatRichReview;
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 const nextChatAuditReview = process.argv.includes("--next-chat-audit-review");
+const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audit");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatMissingStatesReview;
@@ -3726,6 +3727,63 @@ async function captureNextChatAuditReview(browser: Browser, sessionValue: string
   console.log("completed named review: --next-chat-audit-review");
 }
 
+/** Regression for the chat thread-list collapse control. Keep the pointer
+ * over the newly-mounted toggle after clicking, sample after 600ms, then
+ * move away and confirm the collapsed width remains stable. */
+async function captureChatCollapseHoverAudit(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = process.env.MAIPAI_CHAT_AUDIT_OUT_DIR || join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  // 1024px is the rail's own auto-collapse boundary and is still wide
+  // enough to expose its desktop toggle; 820px uses the app's thread
+  // sheet instead and has no persistent-list collapse control.
+  const viewports = [VIEWPORTS.find((v) => v.slug === "desktop")!, { slug: "tablet-rail-boundary", width: 1024, height: 900 }];
+  for (const viewport of viewports) {
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.addInitScript(() => localStorage.setItem("maipai.chat.rail-collapsed", "0"));
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        const rail = page.locator('[data-slot="next-chat-rail"]');
+        const openToggle = page.getByRole("button", { name: "Hide conversations" });
+        await openToggle.waitFor({ state: "visible" });
+        await openToggle.hover();
+        await page.screenshot({ path: join(outDir, `chat-collapse-hover-before-${viewport.width}-${theme}.png`) });
+        await openToggle.click();
+        await page.waitForTimeout(600);
+        const hovered = await rail.evaluate((el) => ({
+          width: el.getBoundingClientRect().width,
+          className: el.className,
+          collapsed: el.classList.contains("w-0") && !el.classList.contains("absolute"),
+          peeked: el.classList.contains("absolute"),
+          toggleExpanded: [...document.querySelectorAll<HTMLButtonElement>('button[aria-controls="next-chat-rail"]')].find((button) => !el.contains(button))?.getAttribute("aria-expanded"),
+        }));
+        await page.screenshot({ path: join(outDir, `chat-collapse-hover-after-click-${viewport.width}-${theme}.png`) });
+        if (!hovered.collapsed || hovered.width > 1 || hovered.peeked || hovered.toggleExpanded !== "false") {
+          throw new Error(`chat collapse hover regression at ${viewport.width}/${theme}: ${JSON.stringify(hovered)}`);
+        }
+        await page.mouse.move(viewport.width - 20, viewport.height - 20);
+        await page.waitForTimeout(100);
+        const afterLeave = await rail.evaluate((el) => ({
+          width: el.getBoundingClientRect().width,
+          className: el.className,
+          collapsed: el.classList.contains("w-0") && !el.classList.contains("absolute"),
+          peeked: el.classList.contains("absolute"),
+          toggleExpanded: [...document.querySelectorAll<HTMLButtonElement>('button[aria-controls="next-chat-rail"]')].find((button) => !el.contains(button))?.getAttribute("aria-expanded"),
+        }));
+        await page.screenshot({ path: join(outDir, `chat-collapse-hover-after-leave-${viewport.width}-${theme}.png`) });
+        if (!afterLeave.collapsed || afterLeave.width > 1 || afterLeave.peeked || afterLeave.toggleExpanded !== "false") {
+          throw new Error(`chat collapse leave regression at ${viewport.width}/${theme}: ${JSON.stringify(afterLeave)}`);
+        }
+        console.log(`chat-collapse-hover ${viewport.width}/${theme}: hovered=${JSON.stringify(hovered)} afterLeave=${JSON.stringify(afterLeave)}`);
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** Lane B-15: exercise the actual tap targets named by the cutover
  * review, including controls hidden inside the chat attachment and row
  * action menus. This is a real-browser check because happy-dom has no
@@ -6537,6 +6595,11 @@ async function main() {
 
     if (nextChatAuditReview) {
       await captureNextChatAuditReview(browser, sessionValue);
+      return;
+    }
+
+    if (chatCollapseHoverAudit) {
+      await captureChatCollapseHoverAudit(browser, sessionValue);
       return;
     }
 
