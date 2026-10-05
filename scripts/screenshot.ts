@@ -161,6 +161,7 @@ const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
 const chatMissingStatesReview = process.argv.includes("--chat-missing-states-review");
 const chatListReview = process.argv.includes("--chat-list-review");
+const chatSearchReview = process.argv.includes("--chat-search-review");
 const chatMobileSheetReview = process.argv.includes("--chat-mobile-sheet-review");
 const chatShortcutsReview = process.argv.includes("--chat-shortcuts-review");
 const chatFindHeaderAlignmentReview = process.argv.includes("--chat-find-header-alignment-review");
@@ -2091,6 +2092,45 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
       } finally {
         await context.close();
       }
+    }
+  }
+}
+
+/** B23 audit capture: real titled conversations with the kit search field
+ * filled and the filtered Home list visible at requested desktop/light and
+ * phone/dark sizes. */
+async function captureChatSearchReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "search-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  await seedTitledConversation("captureChatSearchReview", cookie, "Garden plans for spring");
+  await seedTitledConversation("captureChatSearchReview", cookie, "Garden tools and seeds");
+  await seedTitledConversation("captureChatSearchReview", cookie, "Family shopping list");
+  for (const [slug, theme] of [["desktop", "light"], ["phone", "dark"]] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      let scope: Page | Locator = page;
+      if (slug === "phone") {
+        await page.getByRole("button", { name: "Show threads" }).click();
+        scope = page.getByRole("dialog");
+      }
+      const search = scope.getByRole("textbox", { name: "Search threads" });
+      await search.fill("garden");
+      await scope.getByText("Garden plans for spring", { exact: true }).waitFor();
+      await scope.getByText("Garden tools and seeds", { exact: true }).waitFor();
+      if (await scope.getByText("Family shopping list", { exact: true }).count()) throw new Error("Search audit state still shows a non-matching chat");
+      await settleAnimations(page);
+      const file = `chat-search-${viewport.width}-${theme}.png`;
+      await page.screenshot({ path: join(outDir, file), fullPage: slug === "phone" });
+      console.log(`Wrote ${join(outDir, file)}`);
+      await page.close();
+    } finally {
+      await context.close();
     }
   }
 }
@@ -6529,6 +6569,10 @@ async function main() {
       await captureChatListReview(browser, sessionValue);
     }
 
+    if (!a11yOnly && chatSearchReview) {
+      await captureChatSearchReview(browser, sessionValue);
+    }
+
     if (!a11yOnly && chatMobileSheetReview) {
       await captureChatMobileSheetReview(browser, sessionValue);
     }
@@ -6561,7 +6605,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;

@@ -1817,6 +1817,12 @@
       "realTurnToday": null
     },
     {
+      "file": "thread-search.test.tsx",
+      "name": "thread-search.test",
+      "group": "thread/list",
+      "verdict": "support"
+    },
+    {
       "file": "thread-search.tsx",
       "name": "thread-search",
       "group": "thread/list",

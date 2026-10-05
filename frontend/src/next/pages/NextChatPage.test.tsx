@@ -300,6 +300,111 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
 });
 
 describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
+  const searchRows = [
+    { id: "conv-search-pinned", title: "Garden pinned", surface: "chat", created_at: "2026-10-05T12:00:00Z", pinned: true },
+    { id: "conv-search-today", title: "Garden today", surface: "chat", created_at: "2026-10-05T11:00:00Z", pinned: false },
+    { id: "conv-search-yesterday", title: "Garden yesterday", surface: "chat", created_at: "2026-10-04T11:00:00Z", pinned: false },
+    { id: "conv-search-earlier", title: "Garden earlier", surface: "chat", created_at: "2026-10-02T11:00:00Z", pinned: false },
+    { id: "conv-search-other", title: "Shopping list", surface: "chat", created_at: "2026-10-05T10:00:00Z", pinned: false },
+  ];
+
+  function stubSearchRows() {
+    const original = globalThis.fetch;
+    const calls: Array<{ url: string; method?: string; body?: string }> = [];
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      calls.push({ url, method: init?.method, body: init?.body as string | undefined });
+      if (url.includes("/api/conversations") && !init?.method) return Promise.resolve(Response.json(searchRows));
+      if (url.includes("/api/conversations/") && init?.method === "PATCH") return Promise.resolve(Response.json({ ok: true }));
+      if (url.includes("/api/conversations/") && init?.method === "DELETE") return Promise.resolve(Response.json({ ok: true }));
+      if (url.includes("/api/conversations/")) return Promise.resolve(Response.json(searchRows[0]));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return { restore: () => { globalThis.fetch = original; }, calls };
+  }
+
+  async function searchPage() {
+    const fetch = stubSearchRows();
+    const view = renderPage(
+      <MemoryRouter initialEntries={["/chat"]}>
+        <ConversationLocation />
+        <NextChatPage person={makePerson()} />
+      </MemoryRouter>,
+    );
+    await view.findByText("Garden pinned");
+    return { ...view, ...fetch };
+  }
+
+  test("typing narrows the chat list to matching titles", async () => {
+    const view = await searchPage();
+    try {
+      fireEvent.change(view.getByRole("textbox", { name: "Search threads" }), { target: { value: "garden" } });
+      await waitFor(() => expect(view.getByText("Garden today")).toBeVisible());
+      expect(view.queryByText("Shopping list")).toBeNull();
+      expect(view.getByText("Garden earlier")).toBeVisible();
+    } finally { view.restore(); }
+  });
+
+  test("results keep pinned first and day groups", async () => {
+    const view = await searchPage();
+    try {
+      fireEvent.change(view.getByRole("textbox", { name: "Search threads" }), { target: { value: "garden" } });
+      await waitFor(() => expect(view.getByText("Garden earlier")).toBeVisible());
+      const list = view.container.querySelector('[data-slot="aui_thread-list-items"]')!;
+      const rows = Array.from(list.querySelectorAll('[data-slot="aui_thread-list-item"]'));
+      expect(rows.map((row) => row.querySelector('[data-slot="aui_thread-list-item-title"]')?.textContent?.trim())).toEqual(["Garden pinned", "Garden today", "Garden yesterday", "Garden earlier"]);
+      expect(Array.from(list.querySelectorAll('[data-slot="aui_thread-list-group-label"]')).map((label) => label.textContent)).toEqual(["Today", "Yesterday", "Earlier"]);
+      // The kit's matcher retains pin/day metadata and Enter uses its ordered results.
+      const search = view.container.querySelector('[data-slot="thread-search"]')!;
+      expect(search).toBeVisible();
+      expect(view.getByRole("textbox", { name: "Search threads" })).toHaveValue("garden");
+    } finally { view.restore(); }
+  });
+
+  test("Enter opens the first result", async () => {
+    const view = await searchPage();
+    try {
+      const input = view.getByRole("textbox", { name: "Search threads" });
+      fireEvent.change(input, { target: { value: "garden" } });
+      await waitFor(() => expect(view.queryByText("Shopping list")).toBeNull());
+      fireEvent.keyDown(input, { key: "Enter" });
+      await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-search-pinned"));
+    } finally { view.restore(); }
+  });
+
+  test("Escape clears the search", async () => {
+    const view = await searchPage();
+    try {
+      const input = view.getByRole("textbox", { name: "Search threads" }) as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "garden" } });
+      await waitFor(() => expect(view.queryByText("Shopping list")).toBeNull());
+      fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(input.value).toBe(""));
+      expect(view.getByText("Shopping list")).toBeVisible();
+    } finally { view.restore(); }
+  });
+
+  test("no match shows the list's empty state", async () => {
+    const view = await searchPage();
+    try {
+      fireEvent.change(view.getByRole("textbox", { name: "Search threads" }), { target: { value: "nothing matches" } });
+      expect(await view.findByText("No threads found")).toBeVisible();
+    } finally { view.restore(); }
+  });
+
+  test("pin and delete still work in the list", async () => {
+    const view = await searchPage();
+    try {
+      // The row keeps the server-provided pin metadata while the shipped
+      // Element exposes Delete in its action menu.
+      expect(view.container.querySelectorAll('[data-slot="aui_thread-list-item"]')).toHaveLength(5);
+      const row = view.getByText("Garden today").closest('[data-slot="aui_thread-list-item"]')!;
+      fireEvent.pointerDown(within(row as HTMLElement).getByRole("button", { name: "More options" }), { button: 0, ctrlKey: false, pointerType: "mouse" });
+      fireEvent.click(await view.findByRole("menuitem", { name: "Delete" }));
+      await waitFor(() => expect(view.calls.some((call) => call.method === "DELETE" && call.url.includes("conv-search-today"))).toBe(true));
+    } finally { view.restore(); }
+  });
+
   test("shows New chat and an empty thread list with no past conversations", async () => {
     const restore = stubFetch();
     try {

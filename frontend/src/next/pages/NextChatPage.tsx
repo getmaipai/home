@@ -12,7 +12,8 @@ import { MarkdownDocument } from "@/next/pages/MarkdownDocument";
 // it ships, never a hand-built card (the kit's own `approval-card.tsx`
 // is built for a terminal command and can't be relabeled, per the org's
 // "no hand-built UI" rule).
-import { ThreadListItems, ThreadListNew, ThreadListRoot, ThreadListSearch } from "@maipai/ui/src/elements/thread-list.aui";
+import { ThreadListItems, ThreadListNew, ThreadListRoot } from "@maipai/ui/src/elements/thread-list.aui";
+import { ThreadSearch, type SearchableThread } from "@maipai/ui/src/elements/thread-search";
 import { type ModelOption } from "@maipai/ui/src/elements/model-selector";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
@@ -323,15 +324,31 @@ function NextThreadList({
   collapseToggle?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
+  const aui = useAui();
   const availability = useContext(ChatAvailabilityContext);
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
+  const threadIds = useAuiState((s) => s.threads.threadIds);
+  const threadItems = useAuiState((s) => s.threads.threadItems);
+  const searchableThreads = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = today.getTime() - 86_400_000;
+    const byId = new Map(threadItems.map((item) => [item.id, item]));
+    return threadIds.flatMap((id): SearchableThread[] => {
+      const item = byId.get(id);
+      if (!item || item.status === "archived") return [];
+      const time = item.lastMessageAt?.getTime();
+      const group = time === undefined || time >= today.getTime() ? "Today" : time >= yesterday ? "Yesterday" : "Earlier";
+      return [{ id, title: item.title || "New Chat", group, pinned: Boolean(item.custom?.pinned) }];
+    });
+  }, [threadIds, threadItems]);
   return (
     <ThreadListRoot>
       <div className="flex items-center gap-1">
         {collapseToggle}
         <ThreadListNew label="New chat" className="min-h-12" onClick={onNewThread} disabled={availability === "unavailable"} />
       </div>
-      {hasThreads && <ThreadListSearch value={search} onValueChange={setSearch} label="Search chats" className="-ms-0.5" />}
+      {hasThreads && <ThreadSearch threads={searchableThreads} query={search} activeId={aui.threadListItem().getState().id ?? ""} onQueryChange={setSearch} onSelect={(id) => void aui.threads.switchToThread(id)} inputOnly aria-label="Search chats" className="-ms-0.5" />}
       <ThreadListItems searchQuery={hasThreads ? search : ""} />
     </ThreadListRoot>
   );
