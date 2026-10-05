@@ -110,7 +110,7 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
     },
     unstable_useAdapters: function useChatAdapters() {
       const aui = useAui();
-      return useMemo(() => ({ history: createChatHistoryAdapter(selfName, () => aui.threadListItem().getState().remoteId, onSettingsLoaded) }), [aui, onSettingsLoaded]);
+      return useMemo(() => ({ history: createChatHistoryAdapter(selfName, () => aui.threadListItem().getState().remoteId, onSettingsLoaded) }), [aui]);
     },
   };
 }

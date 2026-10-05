@@ -703,7 +703,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           // enabled and the TTS role is ready.
           speakReplies: () => liveVoiceActiveRef.current || (ttsAvailableRef.current && autoReadRepliesRef.current),
         }),
-      [aui, hydrateConversationSettings, onArtifactReady],
+      [aui],
     );
     // slice 5(e): thumbs and read-aloud both ride the shipped
     // capability/adapter mechanism (`s.thread.capabilities.feedback`/

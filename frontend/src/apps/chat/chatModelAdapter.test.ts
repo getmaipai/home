@@ -424,7 +424,6 @@ describe("createChatModelAdapter streaming", () => {
       // cover. eslint's no-unused-vars only ignores a leading-underscore
       // NAME on function args (argsIgnorePattern), not a for-of binding,
       // hence the inline disable for this one intentionally-discarded value.
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       for await (const value of runAdapter(adapter, options)) {
         void value;
       }
