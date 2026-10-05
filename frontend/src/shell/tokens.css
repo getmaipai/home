@@ -124,6 +124,14 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
   --composer-bg: var(--background) !important;
 }
 
+/* CHAT-LAYOUT-01: the shipped Thread Element's own max-width token is
+ * 44rem (704px). The approved ChatGPT-shaped chat column is about 850px;
+ * widen that one Element through its token, without changing the kit's
+ * message or composer markup. */
+.aui-root.aui-thread-root {
+  --thread-max-width: 53rem !important;
+}
+
 /* CHAT-QUIET-01: the shipped spec sheet uses the mono token for labels;
  * Home's result-card rows read more naturally in the body face. */
 [data-slot="spec-sheet"] {
