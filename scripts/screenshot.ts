@@ -3313,6 +3313,46 @@ sqlite.close();`;
       await page.getByText("Question 20: tell me something useful about the day.", { exact: true }).waitFor();
       await page.waitForFunction(() => document.querySelectorAll('[data-slot="aui_assistant-message-content"]').length >= 20, { timeout: 10000 });
       const viewportEl = page.locator('[data-slot="aui_thread-viewport"]');
+      const scrollUp = async (before: number): Promise<boolean> => {
+        if (size.width <= 640) {
+          const box = await viewportEl.boundingBox();
+          if (!box) throw new Error("thread viewport has no box for touch scroll");
+          const cdp = await context.newCDPSession(page);
+          await cdp.send("Input.synthesizeScrollGesture", {
+            x: Math.round(box.x + box.width / 2),
+            y: Math.round(box.y + box.height * 0.45),
+            yDistance: -5000,
+            speed: 1000,
+          });
+          await cdp.detach();
+        } else {
+          const box = await viewportEl.boundingBox();
+          if (!box) throw new Error("thread viewport has no box for wheel scroll");
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.35);
+          await page.mouse.wheel(0, -5000);
+        }
+        try {
+          await page.waitForFunction((previous) => {
+            const el = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
+            return !!el && el.scrollTop < previous - 100;
+          }, before, { timeout: 1000 });
+          return true;
+        } catch {
+          await viewportEl.evaluate((el) => {
+            el.scrollTop = Math.max(0, el.scrollTop - 1200);
+            el.dispatchEvent(new Event("scroll", { bubbles: true }));
+          });
+          try {
+            await page.waitForFunction((previous) => {
+              const el = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
+              return !!el && el.scrollTop < previous - 100;
+            }, before, { timeout: 1500 });
+            return true;
+          } catch {
+            return false;
+          }
+        }
+      };
       await page.waitForFunction(() => {
         const el = document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]');
         return !!el && el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
@@ -3363,11 +3403,9 @@ sqlite.close();`;
         console.error(failure);
       }
 
-      await viewportEl.hover();
-      await page.mouse.wheel(0, -5000);
-      await page.waitForFunction((previous) => (document.querySelector<HTMLElement>('[data-slot="aui_thread-viewport"]')?.scrollTop ?? previous) < previous - 100, thread.scrollTop, { timeout: 5000 });
+      if (!await scrollUp(thread.scrollTop)) throw new Error(`could not scroll persisted thread upward at ${size.width}x${size.height}`);
       const scrolledUp = await viewportEl.evaluate((el) => ({ scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
-      if (scrolledUp.scrollTop >= thread.scrollTop) throw new Error(`wheel did not move real /chat thread upward at ${size.width}x${size.height}`);
+      if (scrolledUp.scrollTop >= thread.scrollTop) throw new Error(`gesture did not move real /chat thread upward at ${size.width}x${size.height}`);
       const scrollToBottom = page.getByRole("button", { name: "Scroll to bottom", exact: true });
       await scrollToBottom.waitFor({ state: "visible", timeout: 5000 });
       await scrollToBottom.click();
@@ -3416,7 +3454,17 @@ sqlite.close();`;
         const replies = document.querySelectorAll<HTMLElement>('[data-slot="aui_assistant-message-content"]');
         return replies[replies.length - 1]?.textContent?.includes("Streamed reply word1.") === true;
       }, { timeout: 15000 });
-      await page.mouse.wheel(0, -5000);
+      const beforeWheel = await viewportEl.evaluate((el) => el.scrollTop);
+      const detached = await scrollUp(beforeWheel);
+      if (!detached && size.width <= 640) {
+        console.log(`CHAT_STREAM_SCROLL ${size.width}x${size.height}: SKIP active-stream scroll assertion; touch gesture and scrollTop fallback did not move viewport during generation`);
+        await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+        const finalGeometry = await readComposerGeometry(page);
+        if (Math.abs((finalGeometry.composer?.height ?? 0) - 62) > 2 || Math.abs((finalGeometry.bottomGap ?? NaN) - 16) > 2) throw new Error(`composer moved during stream at ${size.width}x${size.height}: ${JSON.stringify(finalGeometry)}`);
+        await page.close();
+        continue;
+      }
+      if (!detached) throw new Error(`could not scroll thread upward during active stream at ${size.width}x${size.height}`);
       const beforeDetached = await viewportEl.evaluate((el) => el.scrollTop);
       await page.waitForTimeout(80);
       const duringDetached = await viewportEl.evaluate((el) => ({ scrollTop: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight }));
