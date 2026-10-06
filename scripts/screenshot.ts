@@ -5493,9 +5493,9 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
 }
 
 /** COMPOSER-01: the composer's layout contract, measured in a real browser.
- * Empty and one line stay 56 to 60 px, text wrapping grows it toward 220 px
+ * Empty and one line stay 48 to 52 px (COMPOSER-SIZE-01), text wrapping grows it toward 210 px
  * and then scrolls inside, the controls stay on the bottom edge, one model
- * selector, Send 32 to 36 px. Throws on a violation, so a regression fails
+ * selector, Send 32 px. Throws on a violation, so a regression fails
  * the capture, and writes PNGs (empty, one line, multiline, long, generating,
  * paused notice) at 1440 and 390, light and dark. */
 async function captureComposerLayoutReview(browser: Browser, sessionValue: string): Promise<void> {
@@ -5555,9 +5555,9 @@ async function captureComposerLayoutReview(browser: Browser, sessionValue: strin
         const emptyH = m.shell!.height;
         results.push(`${tag} empty ${emptyH.toFixed(1)}px send ${m.send!.width.toFixed(0)}x${m.send!.height.toFixed(0)} selectors ${m.selectors}`);
         if (m.selectors !== (withModels ? 1 : 0)) fail(`composer ${tag}: ${m.selectors} model selectors, want ${withModels ? 1 : 0}`);
-        const maxRow = withModels && width < 640 ? 110 : 60.5; // a phone with the model label stacks its controls
-        if (emptyH < 55 || emptyH > maxRow) fail(`composer ${tag}: empty height ${emptyH}px, want 56 to 60`);
-        if (m.send!.width < 31.5 || m.send!.width > 36.5) fail(`composer ${tag}: send is ${m.send!.width}px, want 32 to 36`);
+        const maxRow = withModels && width < 640 ? 110 : 52.5; // a phone with the model label stacks its controls
+        if (emptyH < 47 || emptyH > maxRow) fail(`composer ${tag}: empty height ${emptyH}px, want 48 to 52`);
+        if (m.send!.width < 31.5 || m.send!.width > 32.5) fail(`composer ${tag}: send is ${m.send!.width}px, want 32`);
                 if (m.overflowX) fail(`composer ${tag}: horizontal overflow`);
         await shot("empty");
         // One line.
@@ -5578,7 +5578,7 @@ async function captureComposerLayoutReview(browser: Browser, sessionValue: strin
         await input.fill(longText);
         m = await measure(page);
         results.push(`${tag} long ${m.shell!.height.toFixed(1)}px scrolls ${m.inputScrolls}`);
-        if (m.shell!.height > 240) fail(`composer ${tag}: grew to ${m.shell!.height}px, cap is about 220`);
+        if (m.shell!.height > 212) fail(`composer ${tag}: grew to ${m.shell!.height}px, cap is about 210`);
         if (!m.inputScrolls) fail(`composer ${tag}: long text does not scroll inside`);
         for (const b of m.buttons) if (b && m.shell!.bottom - b.bottom > 12) fail(`composer ${tag}: a control floats ${m.shell!.bottom - b.bottom}px above the bottom edge (long)`);
         await shot("long");
@@ -5590,7 +5590,7 @@ async function captureComposerLayoutReview(browser: Browser, sessionValue: strin
         await page.waitForTimeout(400);
         m = await measure(page);
         results.push(`${tag} generating ${m.shell!.height.toFixed(1)}px stop ${m.send!.width.toFixed(0)}px input ${m.input?.height.toFixed(0)}`);
-        if (m.shell!.height > 60.5) fail(`composer ${tag}: generating height ${m.shell!.height}px`);
+        if (m.shell!.height > 52.5) fail(`composer ${tag}: generating height ${m.shell!.height}px`);
         await shot("generating");
         await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
         await page.waitForTimeout(2000); // let the held reply finish before the page closes
@@ -5615,7 +5615,7 @@ async function captureComposerLayoutReview(browser: Browser, sessionValue: strin
           return { shellH: shell.height, gap: note.top - shell.bottom, noteBottom: note.bottom, footerBottom: footer.bottom, winH: window.innerHeight };
         });
         results.push(`${tag} paused shell ${pm.shellH.toFixed(1)}px gap ${pm.gap.toFixed(1)}px`);
-        if (pm.shellH > 60.5) fail(`composer ${tag}: paused height ${pm.shellH}px`);
+        if (pm.shellH > 52.5) fail(`composer ${tag}: paused height ${pm.shellH}px`);
         if (pm.gap < 0 || pm.noteBottom > pm.winH) fail(`composer ${tag}: paused notice crowds or leaves the screen`);
         await settleAnimations(paused);
         const pausedPath = join(outDir, `composer-paused-${tag}.png`);
