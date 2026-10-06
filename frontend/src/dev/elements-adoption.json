@@ -1,7 +1,31 @@
 {
-  "generatedAt": "2026-10-06T19:48:19.862Z",
-  "kitTag": "ui-v0.5.112",
+  "generatedAt": "2026-10-06T20:53:37.376Z",
+  "kitTag": "ui-v0.5.120",
   "items": [
+    {
+      "file": "__snapshots__/activity-graph.test.tsx.snap",
+      "name": "__snapshots__/activity-graph.test.tsx",
+      "group": "__snapshots__/activity",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "__snapshots__/k03-baseline.test.tsx.snap",
+      "name": "__snapshots__/k03-baseline.test.tsx",
+      "group": "__snapshots__/k03",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "activity-graph.test.tsx",
+      "name": "activity-graph.test",
+      "group": "activity",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
     {
       "file": "activity-graph.tsx",
       "name": "activity-graph",
@@ -42,6 +66,14 @@
       "verdictReason": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements.",
       "implemented": false,
       "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
+    },
+    {
+      "file": "approval-card.test.tsx",
+      "name": "approval-card.test",
+      "group": "approval",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "approval-card.tsx",
@@ -139,6 +171,94 @@
       "group": "agent/workflow",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "implemented": false
+    },
+    {
+      "file": "composer-attachments.aui.tsx",
+      "name": "composer-attachments.aui",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-context.aui.tsx",
+      "name": "composer-context.aui",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-mentions.aui.tsx",
+      "name": "composer-mentions.aui",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-model-picker.aui.tsx",
+      "name": "composer-model-picker.aui",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-runtime.aui.test.tsx",
+      "name": "composer-runtime.aui.test",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-slash-commands.aui.tsx",
+      "name": "composer-slash-commands.aui",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-trigger-popover.aui.test.tsx",
+      "name": "composer-trigger-popover.aui.test",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-trigger-popover.aui.tsx",
+      "name": "composer-trigger-popover.aui",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-trigger.aui.test.tsx",
+      "name": "composer-trigger.aui.test",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-voice.aui.test.tsx",
+      "name": "composer-voice.aui.test",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "composer-voice.aui.tsx",
+      "name": "composer-voice.aui",
+      "group": "composer",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -287,6 +407,14 @@
       "implemented": false
     },
     {
+      "file": "empty-state.test.tsx",
+      "name": "empty-state.test",
+      "group": "empty",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "empty-state.tsx",
       "name": "empty-state",
       "group": "settings/onboarding",
@@ -375,6 +503,22 @@
       "implemented": true
     },
     {
+      "file": "heat-graph.test.tsx",
+      "name": "heat-graph.test",
+      "group": "heat",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "heat-graph.tsx",
+      "name": "heat-graph",
+      "group": "heat",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "hooks/use-attachment-src.ts",
       "name": "hooks/use-attachment-src",
       "group": "other",
@@ -454,6 +598,22 @@
       "verdictReason": "ACTIVITY-01d: stays the inline project card in chat; not used for the activity card above the composer, which needs no looping spinner (verdict C3), Approve, Deny and Open, and the 16 px floor. That card is ChatActivityCard, shipped Alert, Button and Progress (named gap KIT-ACTIVITY-CARD-01).",
       "implemented": true,
       "reading": "ACTIVITY-01d: stays the inline project card in chat; not used for the activity card above the composer, which needs no looping spinner (verdict C3), Approve, Deny and Open, and the 16 px floor. That card is ChatActivityCard, shipped Alert, Button and Progress (named gap KIT-ACTIVITY-CARD-01)."
+    },
+    {
+      "file": "k03-baseline.test.tsx",
+      "name": "k03-baseline.test",
+      "group": "k03",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "k03-props.test.tsx",
+      "name": "k03-props.test",
+      "group": "k03",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "launcher-bubble.tsx",
@@ -613,12 +773,20 @@
       "implemented": true
     },
     {
+      "file": "number-ticker.test.tsx",
+      "name": "number-ticker.test",
+      "group": "number",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "number-ticker.tsx",
       "name": "number-ticker",
       "group": "other",
       "verdict": "later",
       "verdictReason": "Deferred until a Home feature requiring this Element is planned.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "onboarding.tsx",
@@ -626,6 +794,22 @@
       "group": "settings/onboarding",
       "verdict": "later",
       "verdictReason": "Deferred until SETUP-* backlog.",
+      "implemented": false
+    },
+    {
+      "file": "option-list.test.tsx",
+      "name": "option-list.test",
+      "group": "option",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "option-list.tsx",
+      "name": "option-list",
+      "group": "option",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -645,6 +829,22 @@
       "implemented": false
     },
     {
+      "file": "question-flow.test.tsx",
+      "name": "question-flow.test",
+      "group": "question",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "question-flow.tsx",
+      "name": "question-flow",
+      "group": "question",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "quota-banner.tsx",
       "name": "quota-banner",
       "group": "errors/states",
@@ -658,6 +858,22 @@
       "group": "message",
       "verdict": "later",
       "verdictReason": "Deferred until composer quoting in the adapter.",
+      "implemented": false
+    },
+    {
+      "file": "quote.aui.test.tsx",
+      "name": "quote.aui.test",
+      "group": "quote.aui.test",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "quote.aui.tsx",
+      "name": "quote.aui",
+      "group": "quote.aui",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -918,6 +1134,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "thread-composer.css",
+      "name": "thread-composer",
+      "group": "thread",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "thread-list.aui.test.tsx",
@@ -1199,6 +1423,14 @@
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": true
+    },
+    {
+      "file": "vendored-no-remote.test.ts",
+      "name": "vendored-no-remote.test",
+      "group": "vendored",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "voice-conversation.test.tsx",
