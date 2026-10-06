@@ -19,6 +19,8 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { withEngine } from "./turnMachine/modeHarness";
 import { weatherCardQuestion } from "@/homeCardQuestions";
 import type { PersonRow } from "@/types";
+import { newConversationTurnId } from "@/lib/id";
+import { listConversationTurns, logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 
 beforeEach(() => {
   resetDb();
@@ -137,6 +139,28 @@ describe("POST /api/turn/stream with the retired setting off: each case runs the
       expect(JSON.stringify(seen.at(-1)!.messages)).not.toContain("on Saturday");
       expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, edited.turn_id)).get()?.supersedes).toBe(first.turn_id);
     });
+  });
+
+  test("retrying a reopened picture turn carries its stored picture onto the new version", async () => {
+    const { actor } = await owner();
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    expect(conversation.ok).toBe(true);
+    if (!conversation.ok) return;
+    const image = { id: "file-retry-robot01", name: "robot.jpg", width: 4, height: 3, media_type: "image/jpeg" };
+    const firstId = newConversationTurnId();
+    const firstValue = { turn_id: firstId, conversation_id: conversation.value.id, reply: { text: "I see a robot picture was attached." }, source: "model" as const, safety: { flagged: false, categories: [], action: "allow" as const, checked_at: new Date().toISOString() } };
+    logTurn(actor, "chat", "this is my new robot", firstValue as never, { images: [image] });
+    const old = db.select().from(conversationTurns).where(eq(conversationTurns.id, firstId)).get()!;
+    const storedImages = JSON.parse(old.images!) as typeof image[];
+    const retryId = newConversationTurnId();
+    logTurn(actor, "chat", "this is my new robot", { ...firstValue, turn_id: retryId } as never, { supersedes: firstId });
+    const latest = db.select().from(conversationTurns).where(eq(conversationTurns.id, retryId)).get()!;
+    expect(latest.supersedes).toBe(firstId);
+    expect(JSON.parse(latest.images!)).toEqual(storedImages);
+    expect(storedImages.map((part) => part.id)).toEqual([image.id]);
+    const history = listConversationTurns(actor, conversation.value.id);
+    expect(history.ok).toBe(true);
+    if (history.ok) expect(history.value.find((turn) => turn.id === retryId)?.images?.map((part) => part.id)).toEqual([image.id]);
   });
 
   test("continuation: the partial text is replayed and the turn records what it continued", async () => {

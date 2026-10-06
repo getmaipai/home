@@ -412,6 +412,20 @@ function buildTurnRow(
   // lib/memory.ts's remember() already set. This runs once per completed
   // turn, the app's hottest path.
   const supersedes = resolveSupersedes(opts.supersedes, value.conversation_id);
+  // UPLOAD-IMG-03 (#207): a retry/edit of a reopened picture message
+  // reuses stored attachment ids (the client has no File to upload).
+  // Preserve those ids on the superseding row when this request did not
+  // supply new pictures. Resolve only the validated same-conversation row
+  // and require the same person before carrying user content forward.
+  const inheritedImages = !opts.images?.length && supersedes
+    ? db.select({ images: conversationTurns.images, personId: conversationTurns.personId })
+      .from(conversationTurns).where(eq(conversationTurns.id, supersedes)).get()
+    : undefined;
+  const images = opts.images?.length
+    ? opts.images
+    : inheritedImages?.personId === actor.id && inheritedImages.images
+      ? storedImages(inheritedImages.images)
+      : [];
   const branchFrom = resolveSupersedes(opts.branchFrom, value.conversation_id);
   const parentTurnId = branchParentFor(value.conversation_id, supersedes ?? branchFrom);
   // REASONING-04 (safety ruling, 2026-09-22): a prose reply's own think
@@ -439,7 +453,7 @@ function buildTurnRow(
     surface,
     conversationId: value.conversation_id,
     userText,
-    images: opts.images?.length ? JSON.stringify(opts.images) : null,
+    images: images.length ? JSON.stringify(images) : null,
     answerImages: opts.answerImages ? JSON.stringify(opts.answerImages) : null,
     // The reply side too (a package answer that echoes a credential would
     // otherwise land in reply_text and its episode embedding). REASONING-04:
