@@ -552,7 +552,7 @@ export const conversationTurns = sqliteTable(
     // pre-existing row, and every test that inserts a complete row
     // directly (bypassing prepareTurn()/logTurn() entirely), keeps
     // reading as finished history with no migration backfill needed.
-    status: text("status").notNull().default("done"), // "running" | "done"
+    status: text("status").notNull().default("done"), // "running" | "done" | "failed" (CHAT-CALM-ERRORS-01b: the engine went away before a reply; readers that skip "running" skip it too)
     // getmaipai/home#130: the turn's structured part (lib/composer.ts's
     // structuredPartForOutcomes()), persisted as JSON text so the reload
     // path (lib/conversationHistory.ts's list()/listConversationTurns())

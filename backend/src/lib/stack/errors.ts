@@ -15,13 +15,22 @@ export class StackError extends Error {
   status?: number;
   offline_reason?: string;
   body?: string;
+  /** CHAT-CALM-ERRORS-01b: the role's state as the failure body stated it
+   * (the Stack's router: notInstalled, installed, loaded, ready, offline). */
+  state?: string;
+  /** The `x-maipai-engine` and `x-maipai-model` headers of the failed reply, when it carried any. */
+  engine?: string;
+  model?: string;
 
-  constructor(kind: StackErrorKind, message: string, extra?: { status?: number; offline_reason?: string; body?: string }) {
+  constructor(kind: StackErrorKind, message: string, extra?: { status?: number; offline_reason?: string; body?: string; state?: string; engine?: string; model?: string }) {
     super(message);
     this.name = "StackError";
     this.kind = kind;
     this.status = extra?.status;
     this.offline_reason = extra?.offline_reason;
     this.body = extra?.body;
+    this.state = extra?.state;
+    this.engine = extra?.engine;
+    this.model = extra?.model;
   }
 }

@@ -178,10 +178,17 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     const fb = isFailureBody(body) ? body : undefined;
     const failureMessage = typeof fb?.error === "string" ? fb.error : fb?.error?.message;
     const message = failureMessage ?? (res.statusText || `the Stack answered ${res.status}`);
+    // CHAT-CALM-ERRORS-01b: the body's `state` and the reply's identity
+    // headers ride on the error so an admin's details name them.
+    const header = (name: string) => {
+      const value = res.headers.get(name);
+      return value && value !== "none" ? value : undefined;
+    };
+    const facts = { status: res.status, body: text, state: typeof fb?.state === "string" ? fb.state : undefined, engine: header("x-maipai-engine"), model: header("x-maipai-model") };
     if (kind === "offline") {
-      throw new StackError("offline", message, { status: res.status, offline_reason: fb?.offline_reason, body: text });
+      throw new StackError("offline", message, { ...facts, offline_reason: fb?.offline_reason });
     }
-    throw new StackError(kind, message, { status: res.status, body: text });
+    throw new StackError(kind, message, facts);
   }
 
   function isFailureBody(value: unknown): value is FailureBody {

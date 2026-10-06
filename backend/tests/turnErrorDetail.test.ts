@@ -30,7 +30,7 @@ function stats(): TurnStats {
     generations: [{
       reason: "answer", thinking: false, max_tokens: null, prompt_n: null, cache_n: null, prompt_ms: null, predicted_n: null, predicted_ms: null,
       request_sent_ms: 0, first_delta_ms: null, tool_call_raw_args: null, envelope_parsed: false, error: GEN_RAW,
-      offline_reason: "The chat engine waited 15 s for memory and gave up.",
+      offline_reason: "The chat engine waited 15 s for memory and gave up.", http_status: 503, state: "offline", stack_error: "No engine is ready for role 'chat'.", raw_body: "{\"error\":\"No engine is ready for role 'chat'.\"}", engine_id: "local b10797", model_id: "qwen3-8b",
     }],
   };
 }
@@ -61,8 +61,12 @@ describe("GET /api/turn-error-detail/:id", () => {
     expect(body.tools).toHaveLength(1);
     expect(body.tools[0]).toMatchObject({ tool_id: "websearch", kind: "unavailable", error_code: "search_unavailable", duration_ms: 812, at: "2026-10-04T10:00:00.000Z" });
     expect(body.tools[0].error_text).toContain("SearXNG answered 502");
-    expect(body.generations[0]).toMatchObject({ reason: "answer", offline_reason: "The chat engine waited 15 s for memory and gave up." });
-    expect(body.generations[0].error).toContain("slot crashed");
+    expect(body.found).toBe(true);
+    expect(body.generations[0]).toMatchObject({ reason: "answer", offline_reason: "The chat engine waited 15 s for memory and gave up.", http_status: 503, state: "offline", engine_id: "local b10797", model_id: "qwen3-8b" });
+    // CHAT-CALM-ERRORS-01b: the Stack's own error leads; its body rides beside it.
+    expect(body.generations[0].error).toBe("No engine is ready for role 'chat'.");
+    expect(body.generations[0].raw_body).toContain("No engine is ready");
+    expect(body.advice).toMatchObject({ cause: "The computer was too low on memory to run the chat engine.", next_step: "Free some memory, then retry." });
   });
 
   test("secrets and tokens are redacted from the detail", async () => {
@@ -71,12 +75,16 @@ describe("GET /api/turn-error-detail/:id", () => {
     expect(text).not.toContain(SECRET);
   });
 
-  test("a turn with no failure reads as an empty detail, an unknown id is 404", async () => {
+  test("a turn with no failure reads as an empty detail, an unknown id is reported as not saved", async () => {
     const { client, row } = await owner();
     const id = newConversationTurnId();
     db.insert(conversationTurns).values({ id, personId: row.id, surface: "chat", userText: "hi", replyText: "hello", source: "model", safetyAction: "allow", minorSpeaker: false, createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
-    expect(await (await client.get(`/api/turn-error-detail/${id}`)).json()).toEqual({ turn_id: id, tools: [], generations: [] });
-    expect((await client.get(`/api/turn-error-detail/${newConversationTurnId()}`)).status).toBe(404);
+    expect(await (await client.get(`/api/turn-error-detail/${id}`)).json()).toEqual({ turn_id: id, found: true, tools: [], generations: [] });
+    // CHAT-CALM-ERRORS-01b: a missing row is a fact to report, never a 404 the popover reads as "could not be read".
+    const unknown = newConversationTurnId();
+    const missing = await client.get(`/api/turn-error-detail/${unknown}`);
+    expect(missing.status).toBe(200);
+    expect(await missing.json()).toEqual({ turn_id: unknown, found: false, tools: [], generations: [] });
   });
 
   test("a teen, a child and a signed-out caller get no detail", async () => {
@@ -122,6 +130,7 @@ describe("the raw text never rides a payload a non-admin gets", () => {
       expect(wire).not.toContain("SearXNG");
       expect(wire).not.toContain("slot crashed");
       expect(wire).not.toContain("memory and gave up");
+      for (const raw of ["engine_id", "http_status", "raw_body", "stack_error", "local b10797", "No engine is ready"]) expect(wire).not.toContain(raw);
       expect(exported.value).toHaveLength(1);
     }
     insertFailedTurn(row.id, null);
@@ -150,6 +159,10 @@ describe("the raw text never rides a payload a non-admin gets", () => {
       const flat = JSON.stringify(list(person));
       expect(flat).not.toContain("SearXNG");
       expect(flat).not.toContain("slot crashed");
+      for (const raw of ["engine_id", "http_status", "raw_body", "stack_error", "local b10797", "No engine is ready"]) {
+        expect(wire).not.toContain(raw);
+        expect(flat).not.toContain(raw);
+      }
     }
   });
 
@@ -170,6 +183,7 @@ describe("the raw text never rides a payload a non-admin gets", () => {
     const forAdult = JSON.stringify(valueForViewer(value, adult));
     expect(forAdult).not.toContain("slot crashed");
     expect(forAdult).not.toContain("memory and gave up");
+    for (const raw of ["engine_id", "http_status", "raw_body", "stack_error", "local b10797", "No engine is ready"]) expect(forAdult).not.toContain(raw);
     expect(JSON.stringify(valueForViewer(value, row))).toContain("slot crashed");
   });
 

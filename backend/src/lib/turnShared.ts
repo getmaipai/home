@@ -22,7 +22,7 @@ import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
-import type { TurnValue } from "@/wire";
+import type { TurnErrorDetail, TurnValue } from "@/wire";
 
 // 4.5 names six surfaces (chat, overlay, pod, robot, tv, phone), each
 // changing memory sensitivity, discretion and presentation. Only `chat`
@@ -652,9 +652,13 @@ export const BARE_SYSTEM_PROMPT = "You are a helpful assistant.";
 // turn's lease releases as the throw passes through holdLease() (CHAT-18).
 export class StreamUnavailable extends Error {
   readonly code: "unavailable" | "engine_unavailable";
-  constructor(message: string, code: "unavailable" | "engine_unavailable" = "unavailable") {
+  /** CHAT-CALM-ERRORS-01b: the failed turn's admin detail for the error
+   * event; routes/turn.ts sends it through streamEventForViewer(). */
+  readonly detail?: TurnErrorDetail;
+  constructor(message: string, code: "unavailable" | "engine_unavailable" = "unavailable", detail?: TurnErrorDetail) {
     super(message);
     this.code = code;
+    this.detail = detail;
   }
 }
 

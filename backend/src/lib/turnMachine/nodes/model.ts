@@ -4,7 +4,7 @@
 // decides whether a turn needs a search or a tool; no signal field, word
 // rule or list does), streamed so the wire's own `reasoning`/`delta` events
 // come from the same call turnNext.ts forwards to the client.
-import { startCompleteStreamPieces, envelopeToolCall } from "@/lib/llm";
+import { startCompleteStreamPieces, envelopeToolCall, StackStreamError } from "@/lib/llm";
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
@@ -13,8 +13,8 @@ import { isBarePronoun } from "@/lib/text";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnShared";
 import { streamWatchdog, replyIsUncapped } from "../deadline";
-import { stackRefusal } from "@/lib/stackEngine";
-import { classifyGenerationFailure, partialReplyNote, RETRY_BACKOFF_MS, type FailureKind } from "@/lib/generationFailure";
+import type { StackFailureFacts } from "@/lib/stackEngine";
+import { classifyGenerationFailure, partialReplyNote, RETRY_BACKOFF_MS, stackRefusalKind, type FailureKind } from "@/lib/generationFailure";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, searchEvidenceMaxChars } from "@/lib/composer";
 import { planLineForTurnMachine } from "@/lib/register";
@@ -265,6 +265,13 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
   }
 }
 
+/** CHAT-CALM-ERRORS-01b: the failure's kind, fixed on the record when it
+ * happens, so an admin's details later never read whatever the engine is
+ * doing by then. The Stack's own state decides when it gave one. */
+function generationFailureKind(facts: StackFailureFacts | null, message: string | undefined): FailureKind {
+  return facts?.state ? stackRefusalKind(facts.state, facts.offline_reason) : classifyGenerationFailure(message).kind;
+}
+
 async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal, beat: () => void): Promise<GenerationResult> {
   // STREAM-NEXT-01 (b): `state.streamGate` is undefined for every caller
   // but turnNext.ts's own runTurnNextStream(), so this is a no-op
@@ -295,7 +302,15 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     // turn's own time before anyone queries a DB row, and this failure
     // class had no line here at all.
     console.error(`[model] generation "${reason}" failed before streaming started: ${started.code}${boundedError ? ` - ${boundedError}` : ""}`);
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: Date.now() - state.startedAt, firstDeltaMs: null, stats: null, error: boundedError, offlineReason: stackRefusal("chat")?.offline_reason ?? null });
+    // CHAT-CALM-ERRORS-01b: the raw facts of the refusal (status, the
+    // Stack's error, state and body, the answering engine) ride on the
+    // record beside the household line, for an admin's details only.
+    const failedAtMs = Date.now();
+    // Only this call's own facts: a remembered refusal may describe an
+    // earlier failure (an invalid request never reaches the Stack at all).
+    // The kind is read now, while the refusal it may name is current.
+    const facts = started.facts ?? null;
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: failedAtMs - state.startedAt, firstDeltaMs: null, stats: null, error: boundedError, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, boundedError), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
     return { ok: false, code: started.code, message: boundedError, released: false };
   }
 
@@ -345,7 +360,11 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     // the one place that used to throw the message away.
     const message = boundedGenerationError(err instanceof Error ? err.message : String(err));
     console.error(`[model] generation "${reason}" failed mid-stream: ${message ?? "(no message)"}`);
-    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message, offlineReason: stackRefusal("chat")?.offline_reason ?? null });
+    // CHAT-CALM-ERRORS-01b: an engine that died mid-reply carries the
+    // engine and model that were answering (llm.ts's StackStreamError).
+    const failedAtMs = Date.now();
+    const facts = err instanceof StackStreamError ? err.facts : null;
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, message), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
     return { ok: false, code: "generation_failed", message, released: raw.length > 0 || (state.reasoning.emit && nativeReasoning.length > 0) };
   }
 

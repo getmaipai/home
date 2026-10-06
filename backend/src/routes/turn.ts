@@ -14,7 +14,7 @@ import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
 import type { TurnStreamEvent, TurnValue } from "@/wire";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import type { AppEnv, PersonRow } from "@/types";
-import { valueForViewer } from "@/lib/turnErrorDetail";
+import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { turnOwnerId } from "@/lib/conversationHistory";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
@@ -416,7 +416,9 @@ function startResumeSession(session: ResumeSession): void {
         // between two `delta` sequence numbers would never be redelivered
         // on a resume exactly at that boundary.
         const event = rawEvent.type === "delta" || rawEvent.type === "reasoning" ? { ...rawEvent, sequence: ++session.sequence } : rawEvent;
-        appendSessionEvent(session, event.type === "done" ? { ...event, value: valueForViewer(event.value, session.viewer) } : event);
+        // THIN-1E and CHAT-CALM-ERRORS-01b (rule 6): the done value and the
+        // error event's admin detail pass the one viewer filter.
+        appendSessionEvent(session, streamEventForViewer(event, session.viewer));
       }
     } catch (err) {
       // streamTurnEvents() maps generation failures to a terminal event. This
@@ -674,7 +676,7 @@ export async function* streamTurnEvents(
       }
     }
     if (safetyRefusal) yield { type: "error", error: safetyRefusal.message, code: "safety_refused", ...(refused?.crisis_resources ? { crisis_resources: refused.crisis_resources } : {}) };
-    else if (err instanceof StreamUnavailable) yield { type: "error", error: err.message, code: err.code };
+    else if (err instanceof StreamUnavailable) yield { type: "error", error: err.message, code: err.code, ...(err.detail ? { detail: err.detail } : {}) };
     else yield { type: "error", error: (err as Error).message };
     // Still finalize (and so still log) whatever text actually streamed
     // before the failure: a code review (2026-09-04) found this skipped
@@ -692,6 +694,8 @@ export async function* streamTurnEvents(
     // Trimmed at the edges (#99's review): a paragraph break beside a
     // sentence the guards skipped would otherwise open or close the
     // stored reply with a bare blank line the blocking path never has.
+    // CHAT-CALM-ERRORS-01b: an engine_unavailable turn is stored as
+    // `failed` by the turn itself (turnNext.ts), so it is never finalized here.
     if (fullText.trim() && !safetyRefusal && !(err instanceof StreamUnavailable && err.code === "engine_unavailable")) result.finalize(fullText.trim());
   }
 }

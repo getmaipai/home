@@ -273,7 +273,17 @@ function branchWinner(rows: Array<{ id: string; hlc: string }>): string | null {
 // serializes those - would also be "running" right now and must be
 // excluded the same way this turn's own row is, or the branch-winner
 // walk treats an unfinished sibling as a real one.
-const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnRow, conversationId: string) => {
+const insertTurnAndBumpConversation = sqlite.transaction((row: ConversationTurnRow, conversationId: string, status: "done" | "failed") => {
+  // CHAT-CALM-ERRORS-01b: a failed turn (the engine went away before a
+  // reply) is kept for the thread and an admin's details, but it is never
+  // a branch candidate: every sibling query here reads "done" rows only,
+  // so it neither wins the branch nor unseats the chosen one.
+  if (status === "failed") {
+    const storedRow = { ...row, branchChosen: false, status };
+    db.insert(conversationTurns).values(storedRow).onConflictDoUpdate({ target: conversationTurns.id, set: storedRow }).run();
+    db.update(conversations).set({ updatedAt: row.createdAt, hlc: nextHlc() }).where(eq(conversations.id, conversationId)).run();
+    return storedRow;
+  }
   const siblings = db
     .select({ id: conversationTurns.id, hlc: conversationTurns.hlc, branchChosen: conversationTurns.branchChosen })
     .from(conversationTurns)
@@ -360,7 +370,7 @@ export function resolveSupersedes(supersedes: string | null | undefined, convers
   return superseded && superseded.conversationId === conversationId ? supersedes : null;
 }
 
-export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean };
+export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean; status?: "done" | "failed" };
 
 /** The row a completed turn would produce, with no persistence of its
  * own - pulled out of logTurn() (TEMP-CHAT-01) so a temporary
@@ -455,7 +465,10 @@ function buildTurnRow(
     // getmaipai/home#60: the turn this one replaces, when the caller is
     // an edit-and-resend rather than a fresh message - resolveSupersedes()
     // above already checked it's a real, same-conversation turn.
-    supersedes,
+    // CHAT-CALM-ERRORS-01b: a failed edit keeps its place in the branch
+    // (the parent above) but supersedes nothing: readers that treat "a row
+    // supersedes X" as X retired do not check status.
+    supersedes: opts.status === "failed" ? null : supersedes,
     parentTurnId,
     branchChosen: true,
     // Every new turn starts unjudged (step 6's own poison-guard state,
@@ -549,10 +562,13 @@ export function logTurn(
   // COMP-01: keep the wire response additive and honest about whether this
   // turn has a validated details document stored beside its outcomes.
   value.document_available = Boolean(opts.document);
-  const storedRow = insertTurnAndBumpConversation(row, value.conversation_id);
+  const storedRow = insertTurnAndBumpConversation(row, value.conversation_id, opts.status ?? "done");
   value.parent_turn_id = storedRow.parentTurnId;
   value.branch_chosen = storedRow.branchChosen;
   if (branchFrom) value.continued_from_turn_id = branchFrom;
+  // A failed turn is not something the household said and heard: it
+  // records no episode and retires nothing it might have superseded.
+  if (opts.status === "failed") return storedRow;
   recordEpisodes(storedRow);
   // #88: the replaced turn leaves the current branch; the memories the
   // judge extracted from it are retired (archived, never deleted) so the

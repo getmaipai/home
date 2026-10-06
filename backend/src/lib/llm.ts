@@ -21,7 +21,7 @@ import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 import { seedFields } from "@/lib/benchSampling";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
-import { isStackRoleEnabled, getStackClient, recordStackChatIdentity, stackFailureResult, resolveStackOffline, type StackFailureResult } from "@/lib/stackEngine";
+import { isStackRoleEnabled, getStackClient, recordStackChatIdentity, stackFailureResult, stackFailureFacts, resolveStackOffline, type StackFailureResult, type StackFailureFacts } from "@/lib/stackEngine";
 import { identityFromHeaders } from "@/lib/stack/client";
 import type { RoleRequest } from "@/lib/stack/types";
 
@@ -530,7 +530,18 @@ export interface LlmStreamPiece {
 
 export type LlmPiecesStartResult =
   | { ok: true; pieces: AsyncGenerator<LlmStreamPiece, ToolCall[] | undefined, void>; stats: ChatCompletionStreamStats }
-  | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string };
+  | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string; facts?: StackFailureFacts };
+
+/** CHAT-CALM-ERRORS-01b: a Stack chat stream that broke after it opened
+ * (the engine died mid-reply). The message keeps the shape every caller
+ * already reads ("chat model unavailable: ..."); `facts` carries the raw
+ * cause and the engine and model that were answering, for an admin. */
+export class StackStreamError extends Error {
+  constructor(message: string, readonly facts: StackFailureFacts) {
+    super(message);
+    this.name = "StackStreamError";
+  }
+}
 
 /** Real token-by-token streaming (2026-09-04): validates and resolves a
  * backend synchronously, exactly like complete(), so a bad request or a
@@ -613,6 +624,10 @@ async function* stackChatPieces(
       toolCallsByIndex.set(fragment.index, existing);
     }
   }
+  // CHAT-CALM-ERRORS-01b: a stream that closes with neither `[DONE]` nor a
+  // finish reason was cut off (an engine that died mid-reply closes its
+  // socket, and the reader sees a plain end), never a finished reply.
+  if (!stats.stopReason) throw new Error("the chat stream ended before the engine finished the reply");
   return assembleToolCalls();
 }
 
@@ -637,13 +652,24 @@ async function openStackPieces(
     return stackFailureResult(err, role);
   }
   recordStackChatIdentity(identityFromHeaders(headers));
+  const answering = (name: string) => {
+    const value = headers.get(name);
+    return value && value !== "none" ? value : undefined;
+  };
+  const engineId = answering("x-maipai-engine");
+  const modelId = answering("x-maipai-model");
   resolveStackOffline(role);
   async function* pieces(): AsyncGenerator<LlmStreamPiece, ToolCall[] | undefined, void> {
     try {
       const wireToolCalls = yield* stackChatPieces(stream, stats, opts.dropReasoning === true);
       return offering && wireToolCalls && wireToolCalls.length > 0 ? wireToolCalls.map(toolCallFromWire) : undefined;
     } catch (err) {
-      throw new Error(`chat model unavailable: ${(err as Error).message}`);
+      const facts = stackFailureFacts(err);
+      throw new StackStreamError(`chat model unavailable: ${(err as Error).message}`, {
+        ...facts,
+        ...(!facts.engine_id && engineId ? { engine_id: engineId } : {}),
+        ...(!facts.model_id && modelId ? { model_id: modelId } : {}),
+      });
     }
   }
   return { ok: true, pieces: pieces(), stats };

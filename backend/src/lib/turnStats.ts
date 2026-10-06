@@ -3,6 +3,8 @@ import type { EngineIdentity } from "@/lib/engineIdentity";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { TurnTimings } from "@/lib/turnContext";
 import type { TurnStats, TurnGeneration } from "@/wire";
+import type { StackFailureFacts } from "@/lib/stackEngine";
+import type { FailureKind } from "@/lib/failureCopy";
 
 export type { TurnStats } from "@/wire";
 
@@ -40,6 +42,23 @@ export interface GenerationInput {
   error?: string | null;
   /** THIN-1E: the Stack's `offline_reason` for a refused generation. */
   offlineReason?: string | null;
+  /** CHAT-CALM-ERRORS-01b: the raw facts of the failed Stack call (stackEngine.ts), and when it failed. */
+  facts?: StackFailureFacts | null;
+  /** The failure's kind as classified when it happened (failureCopy.ts). */
+  failureKind?: FailureKind;
+  failedMs?: number;
+  failedAt?: string;
+}
+
+function generationFacts(facts: StackFailureFacts): Partial<TurnGeneration> {
+  return {
+    stack_error: facts.stack_error,
+    ...(facts.http_status !== undefined ? { http_status: facts.http_status } : {}),
+    ...(facts.state ? { state: facts.state } : {}),
+    ...(facts.raw_body ? { raw_body: facts.raw_body } : {}),
+    ...(facts.engine_id ? { engine_id: facts.engine_id } : {}),
+    ...(facts.model_id ? { model_id: facts.model_id } : {}),
+  };
 }
 
 function projectGeneration(gen: GenerationInput): TurnGeneration {
@@ -69,6 +88,10 @@ function projectGeneration(gen: GenerationInput): TurnGeneration {
     envelope_parsed: gen.envelopeParsed ?? false,
     error: gen.error ?? null,
     ...(gen.offlineReason ? { offline_reason: gen.offlineReason } : {}),
+    ...(gen.facts ? generationFacts(gen.facts) : {}),
+    ...(gen.failureKind ? { failure_kind: gen.failureKind } : {}),
+    ...(gen.failedMs !== undefined ? { failed_ms: gen.failedMs } : {}),
+    ...(gen.failedAt ? { failed_at: gen.failedAt } : {}),
   };
 }
 

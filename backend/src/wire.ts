@@ -149,6 +149,67 @@ export interface TurnGeneration {
   error?: string | null;
   /** THIN-1E: the Stack's own `offline_reason` when it refused the chat role for this generation. Admin only on the wire. */
   offline_reason?: string | null;
+  /** CHAT-CALM-ERRORS-01b: the raw facts of a failed generation, admin
+   * only on every channel (turnErrorDetail.ts's statsForViewer strips them
+   * with `error` and `offline_reason`): the Stack's own `error`, the HTTP
+   * status and role `state` of its reply, its body (redacted, at most 2,000
+   * characters), the engine and model that were answering, and when the
+   * generation failed (ms after the turn started, and the ISO time). */
+  stack_error?: string;
+  http_status?: number;
+  state?: string;
+  raw_body?: string;
+  engine_id?: string;
+  model_id?: string;
+  /** The failure's kind (backend failureCopy.ts's FailureKind) as classified when it happened; admin only. */
+  failure_kind?: "busy" | "memory" | "stopped" | "slow" | "unreachable" | "context_too_large" | "other";
+  failed_ms?: number;
+  failed_at?: string;
+}
+
+// THIN-1E and CHAT-CALM-ERRORS-01b: the admin-only detail of a failed turn,
+// read from GET /api/turn-error-detail/:id and carried on the stream error
+// event (lib/turnErrorDetail.ts builds it; non-admins never receive it).
+export interface ToolFailureDetail {
+  tool_id: string;
+  call_id: string;
+  kind: "unavailable" | "timed_out" | "found_nothing" | "errored" | "bad_arguments";
+  error_code?: string;
+  error_text?: string;
+  at?: string;
+  duration_ms?: number;
+}
+
+export interface GenerationFailureDetail {
+  reason: string;
+  /** The Stack's own error when it gave one, else the generation's caught message. */
+  error: string;
+  request_sent_ms: number;
+  offline_reason?: string;
+  http_status?: number;
+  state?: string;
+  raw_body?: string;
+  engine_id?: string;
+  model_id?: string;
+  failed_ms?: number;
+  failed_at?: string;
+}
+
+/** CHAT-CALM-ERRORS-01b (design section 10): the plain cause and the one
+ * next step above the raw rows, from failureCopy.ts's closed tables. */
+export interface FailureAdviceDetail {
+  cause: string;
+  next_step: string;
+  repairs: boolean;
+}
+
+export interface TurnErrorDetail {
+  turn_id: string;
+  /** False when no row was stored for this turn: a fact to report, never a reading failure. */
+  found: boolean;
+  advice?: FailureAdviceDetail;
+  tools: ToolFailureDetail[];
+  generations: GenerationFailureDetail[];
 }
 
 /** U2's own per-node trace entry, TurnGeneration's structural twin -
@@ -412,7 +473,11 @@ export type TurnStreamEvent =
   // SAFETY-01 (#85): a streamed safety refusal carries its crisis
   // resources here, since this is the one terminal event it sends
   // (additive; a client reading only `error` sees no change).
-  | { type: "error"; error: string; code?: string; crisis_resources?: string };
+  // CHAT-CALM-ERRORS-01b (rule 9, additive): `detail` is the failed
+  // turn's admin details, sent to an adult owner or admin only
+  // (turnErrorDetail.ts's streamEventForViewer); every other client may
+  // ignore it.
+  | { type: "error"; error: string; code?: string; crisis_resources?: string; detail?: TurnErrorDetail };
 
 export interface ResolvedSetting {
   key: string;

@@ -32,10 +32,9 @@ export function classifyGenerationFailure(message: string | undefined): Classifi
   // A Stack 503 reaches here as the companion line (stackEngine.ts); its
   // stated reason was remembered when it arrived.
   const refusal = text.startsWith(OFFLINE_COMPANION_LINE.toLowerCase()) ? stackRefusal("chat") : null;
-  if (refusal) {
-    const lowMemory = (refusal.offline_reason ?? "").toLowerCase().includes("memory");
-    return { kind: lowMemory ? "memory" : "busy", transient: true };
-  }
+  // CHAT-CALM-ERRORS-01b: the kind the Stack's own state decided; a
+  // stopped engine does not come back on a quiet retry.
+  if (refusal) return { kind: refusal.kind, transient: refusal.kind !== "stopped" };
   // THIN-GROUND-01: the engine's 400 when the prompt does not fit its context
   // (llama.cpp: "exceeds the available context size", exceed_context_size_error).
   // Not transient: the same prompt would be refused again; model.ts retries

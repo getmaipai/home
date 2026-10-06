@@ -1,6 +1,6 @@
 // THIN-DL-02: the one table of failure wording, with no imports so any module
 // may read it. Kinds and the classifier live in generationFailure.ts.
-export type FailureKind = "busy" | "memory" | "slow" | "unreachable" | "context_too_large" | "other";
+export type FailureKind = "busy" | "memory" | "stopped" | "slow" | "unreachable" | "context_too_large" | "other";
 
 interface FailureCopy {
   adult: string;
@@ -16,6 +16,13 @@ export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
   memory: {
     adult: "The AI couldn't start because the computer is low on memory. Close something big if you can, then try again in a moment.",
     minor: "I can't wake up all the way right now. Try again soon.",
+  },
+  // CHAT-CALM-ERRORS-01b: the Stack answered with the role's state
+  // `installed` (its engine stopped), so nothing will start on a retry
+  // until someone starts it again.
+  stopped: {
+    adult: "The AI was stopped, so that reply didn't finish. Send it again once chat is back.",
+    minor: "I had to stop. Try again in a moment.",
   },
   slow: {
     adult: "That took too long, so the AI stopped answering. Send it again.",
@@ -33,6 +40,51 @@ export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
     adult: "Something went wrong while I was writing that. Send it again, and if it keeps happening, check Repairs.",
     minor: "Something went wrong. Try asking again.",
   },
+};
+
+/** CHAT-CALM-ERRORS-01b (design section 8): the kind of a Stack refusal,
+ * chosen from the role state its 503 body states (the Stack's router:
+ * notInstalled, installed, loaded, ready, offline), never from the
+ * absence of a word. `offline` still reads its reason for "memory" until
+ * the Stack exposes a structured memory state (backlog note on
+ * CHAT-CALM-ERRORS-01b). A body with no state (an older Stack) keeps the
+ * pre-state reading; a state outside the list is `other`. */
+export function stackRefusalKind(state: string | undefined, offline_reason: string | undefined): FailureKind {
+  const lowMemory = offline_reason !== undefined && offline_reason.toLowerCase().includes("memory");
+  if (state === undefined) return lowMemory ? "memory" : "busy";
+  if (state === "installed") return "stopped";
+  if (state === "loaded") return "busy";
+  if (state === "offline") return lowMemory ? "memory" : "other";
+  return "other";
+}
+
+/** CHAT-CALM-ERRORS-01b (design section 10): what an admin's details
+ * popover says above the raw facts, one closed mapping per kind: the cause
+ * in plain words, one next step, and whether that step is in Repairs. */
+export interface FailureAdvice {
+  cause: string;
+  next_step: string;
+  repairs: boolean;
+}
+
+export const FAILURE_ADVICE: Record<FailureKind, FailureAdvice> = {
+  busy: { cause: "The chat engine was still starting or busy, so the reply never started.", next_step: "Wait a moment, then retry.", repairs: false },
+  memory: { cause: "The computer was too low on memory to run the chat engine.", next_step: "Free some memory, then retry.", repairs: false },
+  stopped: { cause: "The chat engine was stopped, so the reply never started.", next_step: "Start the chat engine in Repairs.", repairs: true },
+  slow: { cause: "The chat engine stopped answering before the reply finished.", next_step: "Retry. If it keeps happening, check Repairs.", repairs: true },
+  unreachable: { cause: "Home could not reach the chat engine.", next_step: "Check that the MaiPai Stack is running in Repairs.", repairs: true },
+  context_too_large: { cause: "The request was too large for the chat engine's context window.", next_step: "Retry with less text, or start a new chat.", repairs: false },
+  other: { cause: "The reply failed, and the engine did not say why.", next_step: "Retry. If it keeps happening, check Repairs.", repairs: true },
+};
+
+/** The same mapping for a failed tool call, keyed by lookupFallback.ts's
+ * failure kinds (kept as plain strings here so this file stays import-free). */
+export const TOOL_FAILURE_ADVICE: Record<"unavailable" | "timed_out" | "found_nothing" | "errored" | "bad_arguments", { verb: string; next_step: string; repairs: boolean }> = {
+  unavailable: { verb: "could not reach its service", next_step: "Retry once the service is back. If it stays down, check Repairs.", repairs: true },
+  timed_out: { verb: "timed out", next_step: "Retry; the service was slow to answer.", repairs: false },
+  found_nothing: { verb: "found nothing", next_step: "Try asking a different way.", repairs: false },
+  errored: { verb: "failed", next_step: "Retry. If it keeps happening, check Repairs.", repairs: true },
+  bad_arguments: { verb: "got a request it could not use", next_step: "Retry; the model may word the request differently.", repairs: false },
 };
 
 export function failureLine(kind: FailureKind, minor: boolean): string {

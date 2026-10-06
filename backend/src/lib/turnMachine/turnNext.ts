@@ -13,7 +13,8 @@
 import { turnTotalWaitMs } from "./deadline";
 import { createActor, waitFor, type ActorRefFrom } from "xstate";
 import type { Surface, TurnFailure, SpeakerEvidence, PresentPerson, TurnStreamResult, StreamOutcome, DocumentTurnAttachment } from "@/lib/turnShared";
-import type { TurnValue } from "@/wire";
+import type { TurnErrorDetail, TurnValue } from "@/wire";
+import { turnErrorDetailFrom } from "@/lib/turnErrorDetail";
 import { attachDocuments } from "./documents";
 import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
@@ -25,6 +26,7 @@ import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { FAILURE_COPY } from "@/lib/failureCopy";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { planFor } from "@/lib/register";
@@ -219,6 +221,39 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   scheduleConversationTitle(value.conversation_id);
 }
 
+/** CHAT-CALM-ERRORS-01b (design section 9): a turn that reached the model
+ * and lost the engine is stored as `failed` - the line the person was
+ * shown as its reply, and the generation records with the raw facts in
+ * its stats - so an admin's details read a real row instead of a 404.
+ * It is never history: every reader that skips a "running" row reads
+ * "done" rows only, so it never reaches the model's window, a branch,
+ * the memory judge, a summary or a title. A temporary or ephemeral turn
+ * stores nothing (C7); its details travel on the stream's error event. */
+function logFailedTurn(state: TurnState, actor: PersonRow, surface: Surface, text: string, value: TurnValue): void {
+  if (state.ephemeral || state.temporary) return;
+  // `supersedes` and `branchFrom` place the row in its branch; logTurn()
+  // stores no `supersedes` for a failed row, so it retires nothing.
+  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, crisisSignal: carriesCrisisSignal(state.safety), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
+  try {
+    logTurn(actor, surface, text, value, { ...opts, judgeStatus: "skipped", status: "failed" });
+  } catch (err) {
+    // The person's error line goes out whatever the store did.
+    console.error("[turn] could not store the failed turn:", err);
+  }
+}
+
+/** The value a failed turn is stored and reported with: the person's line as its reply. */
+function failedTurnValue(state: TurnState, startedAt: number): TurnValue {
+  return buildTurnValue(state, startedAt, "model", engineUnavailableLine(state));
+}
+
+/** The admin detail the stream's error event carries (C1: stripped for
+ * everyone else by streamEventForViewer); `found` says whether a row was stored. */
+function failureDetailFor(state: TurnState, value: TurnValue): TurnErrorDetail {
+  const detail = turnErrorDetailFrom(state.turnId, state.outcomes, value.stats?.generations ?? []);
+  return state.ephemeral || state.temporary ? { ...detail, found: false } : detail;
+}
+
 /** Whether the utterance is a plain "yes" to a stored confirm/lookup ask
  * (consentVocab.ts's own deterministic word, never a model's reading -
  * RULES-AND-LEARNED-COMPONENTS.md's "a yes is a yes by rule").
@@ -303,7 +338,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // answer is no and a refusal is on record.
   if ((await roleHealth("chat", { live: true })).availability === "unavailable") {
     nudgeChatEngineRecovery();
-    return { ok: false, result: { ok: false, status: 503, code: "engine_unavailable", error: engineUnavailableLine({ spoken: opts.spoken === true, surface }) } };
+    return { ok: false, result: { ok: false, status: 503, code: "engine_unavailable", error: engineUnavailableLine({ spoken: opts.spoken === true, surface, actor }) } };
   }
 
   const resolved = resolveOrCreateConversation(actor, surface, opts.conversationId, { temporary: opts.temporary });
@@ -677,9 +712,13 @@ class EngineUnavailableTurnError extends Error {
  * carries the identical line (roleHealth.ts). A spoken turn and every
  * non-chat surface keep their fixed line exactly (rule 0: nothing here
  * changes how a spoken turn is shaped). */
-function engineUnavailableLine(state: Pick<TurnState, "spoken" | "surface">): string {
+function engineUnavailableLine(state: Pick<TurnState, "spoken" | "surface" | "actor">): string {
   if (state.spoken || state.surface !== "chat") return "I can't think right now. I've told the grown-ups.";
-  return stackRefusal("chat")?.household ?? "MaiPai's AI isn't running right now.";
+  const refusal = stackRefusal("chat");
+  if (!refusal) return "MaiPai's AI isn't running right now.";
+  // CHAT-CALM-ERRORS-01b (design section 8): a child gets the band's short
+  // line for the same kind; a teen and an adult the household line.
+  return speakerAgeBand(state.actor, new Date()) === "child" ? FAILURE_COPY[refusal.kind].minor : refusal.household;
 }
 
 /** runTurnNext() always resolves the whole reply: a failure or an "immediate" value, never a stream. */
@@ -694,6 +733,7 @@ export async function runTurnNext(actor: PersonRow, surface: Surface, text: stri
     value = await finishTurn(begun.value);
   } catch (err) {
     lease.release();
+    if (err instanceof EngineUnavailableTurnError) logFailedTurn(state, actor, surface, text, failedTurnValue(state, begun.value.startedAt));
     // Only the machine's own timeout/abort becomes a 503 "unavailable" -
     // anything else finishTurn() might throw (a real bug in buildTurnValue,
     // the trace bookkeeping) propagates uncaught, exactly as it did
@@ -812,6 +852,7 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
 
   let finishedValue: TurnValue | undefined;
   let finalizedValue: TurnValue | undefined;
+  let failedValue: TurnValue | undefined;
   let backgroundError: Error | undefined;
 
   const machineDone: Promise<void> = finishTurn(begun.value)
@@ -824,6 +865,13 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     })
     .catch((err) => {
       backgroundError = err instanceof Error ? err : new Error(String(err));
+      // CHAT-CALM-ERRORS-01b: the engine went away mid-turn; the turn is
+      // stored as failed unless a refusal already finalized it.
+      if (err instanceof EngineUnavailableTurnError && !finalizedValue) {
+        failedValue = failedTurnValue(state, startedAt);
+        finalizedValue = failedValue;
+        logFailedTurn(state, actor, surface, text, failedValue);
+      }
     })
     .finally(() => {
       begun.value.lease.release(); // THIN-0C: after the turn is logged (or failed), never before
@@ -837,7 +885,10 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     const result = gate.result();
     if (result.refused) throw new StreamSafetyRefusal(result.refused);
     await machineDone;
-    if (state.engineUnavailable) throw new StreamUnavailable(engineUnavailableLine(state), "engine_unavailable");
+    if (state.engineUnavailable) {
+      const value = failedValue ?? failedTurnValue(state, startedAt);
+      throw new StreamUnavailable(engineUnavailableLine(state), "engine_unavailable", failureDetailFor(state, value));
+    }
     if (backgroundError) throw new StreamUnavailable(backgroundError.message);
     return result.lastFlagged;
   }

@@ -8,7 +8,7 @@
 // (never inventing a cause the Stack itself didn't state).
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { createStackClient, type StackClient } from "@/lib/stack/client";
-import { FAILURE_COPY } from "@/lib/failureCopy";
+import { FAILURE_COPY, stackRefusalKind, type FailureKind } from "@/lib/failureCopy";
 import { StackError, type StackErrorKind } from "@/lib/stack/errors";
 import { redactCredentials } from "@/lib/memoryContentPolicy";
 import { hostLabel, type EngineIdentity } from "@/lib/engineIdentity";
@@ -101,6 +101,7 @@ export function __resetStackEngineForTests(): void {
   cachedUrl = null;
   stackChatIdentity = null;
   refusals.clear();
+  downSince.clear();
 }
 
 // THIN-1C (docs/design/RULES.md rule 6; fixes part of getmaipai/home#203):
@@ -126,30 +127,86 @@ export interface StackRefusal {
   /** The Stack's own words, as its 503 body stated them (Repairs shows
    * these); undefined when the body carried no offline_reason. */
   offline_reason: string | undefined;
+  /** CHAT-CALM-ERRORS-01b: the role state the body stated, and the kind
+   * Home reads from it (failureCopy.ts's stackRefusalKind). */
+  state: string | undefined;
+  kind: FailureKind;
   /** The same reason in the household's wording - the one line the
    * chat reply and the health row both carry. */
   household: string;
+  /** The raw facts of the refusal, for an admin's details only. */
+  facts: StackFailureFacts;
   at: number;
 }
 
 const refusals = new Map<string, StackRefusal>();
 
 /** The household's wording for a refusal, decided from the Stack's own
- * stated reason - never a cause the Stack did not give. One fixed line
- * per case, the same closed code-to-text mapping nodes/answer.ts's own
- * refusal lines use: the memory refusal #203 reports gets its own line
- * (the computer is low on memory), anything else the plain "couldn't
- * start"; both say to try again in a moment, since the Stack admits the
- * engine again the moment the machine has room. The check reads the
+ * stated state and reason - never a cause the Stack did not give. One
+ * fixed line per kind (failureCopy.ts): a stopped engine says so, the
+ * memory refusal #203 reports says the computer is low on memory, an
+ * engine still loading says to give it a moment. The check reads the
  * engine's own diagnostic, never a household member's words (the same
  * footing nodes/model.ts's "could not reach" check already stands on). */
-export function householdStackRefusalLine(offline_reason: string | undefined): string {
-  const lowMemory = offline_reason !== undefined && offline_reason.toLowerCase().includes("memory");
-  return lowMemory ? FAILURE_COPY.memory.adult : FAILURE_COPY.busy.adult;
+export function householdStackRefusalLine(offline_reason: string | undefined, state?: string): string {
+  return FAILURE_COPY[stackRefusalKind(state, offline_reason)].adult;
 }
 
-function rememberStackRefusal(role: string, offline_reason: string | undefined): void {
-  refusals.set(role, { offline_reason, household: householdStackRefusalLine(offline_reason), at: Date.now() });
+/** CHAT-CALM-ERRORS-01b (design section 10): the raw facts of a failed
+ * Stack call, kept beside the household line for an admin. Never shown to
+ * anyone else (turnErrorDetail.ts strips them) and never in a message the
+ * model reads. */
+export interface StackFailureFacts {
+  /** The Stack's own `error` (or the client's message when nothing answered). */
+  stack_error: string;
+  http_status?: number;
+  state?: string;
+  offline_reason?: string;
+  /** The response text, credentials redacted, at most RAW_BODY_MAX characters, as-is when it is not JSON. */
+  raw_body?: string;
+  engine_id?: string;
+  model_id?: string;
+}
+
+export const RAW_BODY_MAX = 2_000;
+
+/** A body or message trimmed and redacted for an admin's eyes (C8). */
+export function boundedRawBody(text: string): string {
+  return redactCredentials(text).slice(0, RAW_BODY_MAX);
+}
+
+export function stackFailureFacts(err: unknown): StackFailureFacts {
+  if (err instanceof StackError) {
+    return {
+      stack_error: boundedRawBody(err.message),
+      ...(err.status !== undefined ? { http_status: err.status } : {}),
+      ...(err.state ? { state: err.state } : {}),
+      ...(err.offline_reason ? { offline_reason: boundedRawBody(err.offline_reason) } : {}),
+      ...(err.body ? { raw_body: boundedRawBody(err.body) } : {}),
+      ...(err.engine ? { engine_id: err.engine } : {}),
+      ...(err.model ? { model_id: err.model } : {}),
+    };
+  }
+  return { stack_error: boundedRawBody(err instanceof Error ? err.message : String(err)) };
+}
+
+/** A refusal names no engine (the Stack's 503 sends "none" for both
+ * identity headers), so a chat failure names the engine and model that
+ * last answered chat, when one has (recordStackChatIdentity()). */
+function withLastChatIdentity(facts: StackFailureFacts): StackFailureFacts {
+  const last = stackChatIdentity;
+  if (!last) return facts;
+  return {
+    ...facts,
+    ...(!facts.engine_id && last.build ? { engine_id: `${last.host} ${last.build}` } : {}),
+    ...(!facts.model_id && last.model ? { model_id: last.model } : {}),
+  };
+}
+
+function rememberStackRefusal(role: string, err: StackError): void {
+  const kind = stackRefusalKind(err.state, err.offline_reason);
+  const facts = role === "chat" ? withLastChatIdentity(stackFailureFacts(err)) : stackFailureFacts(err);
+  refusals.set(role, { offline_reason: err.offline_reason, state: err.state, kind, household: FAILURE_COPY[kind].adult, facts, at: Date.now() });
 }
 
 /** The Stack's most recent refusal of this role, if it is younger than
@@ -198,6 +255,8 @@ export interface StackFailureResult {
   status: 503;
   code: "unavailable";
   error: string;
+  /** CHAT-CALM-ERRORS-01b: the raw facts beside the person's line, for the generation record. */
+  facts?: StackFailureFacts;
 }
 
 /** A code review caught this only covering "offline" (a scripted 503):
@@ -218,26 +277,27 @@ const REPAIRS_WORTHY: ReadonlySet<StackErrorKind> = new Set(["offline", "unreach
  * model didn't answer" - Home never invents a different cause than the
  * one the Stack gave. */
 export function stackFailureResult(err: unknown, role: string): StackFailureResult {
+  const facts = role === "chat" ? withLastChatIdentity(stackFailureFacts(err)) : stackFailureFacts(err);
   if (err instanceof StackError) {
     if (REPAIRS_WORTHY.has(err.kind)) {
       // THIN-1C: a 503 is the Stack itself saying no, with its reason;
       // remembered so the health row and the chat reply can carry it.
       // "unreachable" is not remembered: nothing answered, and
       // roleHealth() already reads that case live from the socket.
-      if (err.kind === "offline") rememberStackRefusal(role, err.offline_reason);
-      reportStackOffline(err.offline_reason, role, err.message);
+      if (err.kind === "offline") rememberStackRefusal(role, err);
+      reportStackOffline(err.offline_reason, role, err.message, err.kind === "offline" ? err.state : undefined);
       // The companion line is chat's own voice, spoken back to whoever
       // just tried to talk to it - embed/tts/stt fail silently to a
       // person (memory, speech, an internal call), so they keep the
       // plain "unavailable" wording every other failure kind already
       // gets; the real reason still goes to Repairs either way.
-      return { ok: false, status: 503, code: "unavailable", error: role === "chat" ? OFFLINE_COMPANION_LINE : `${role} model unavailable: the Stack is offline` };
+      return { ok: false, status: 503, code: "unavailable", error: role === "chat" ? OFFLINE_COMPANION_LINE : `${role} model unavailable: the Stack is offline`, facts };
     }
     resolveStackOffline(role);
-    const detail = role === "chat" && err.body ? ` (${redactCredentials(err.body.slice(0, 2_000))})` : "";
-    return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${err.message}${detail}` };
+    const detail = role === "chat" && err.body ? ` (${boundedRawBody(err.body)})` : "";
+    return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${err.message}${detail}`, facts };
   }
-  return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${(err as Error).message}` };
+  return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${(err as Error).message}`, facts };
 }
 
 /** The same mapping for a caller (stt.ts) whose own contract throws
@@ -246,8 +306,8 @@ export function stackFailureResult(err: unknown, role: string): StackFailureResu
  * catch/handling is untouched. */
 export function reportStackFailure(err: unknown, role: string): void {
   if (err instanceof StackError && REPAIRS_WORTHY.has(err.kind)) {
-    if (err.kind === "offline") rememberStackRefusal(role, err.offline_reason);
-    reportStackOffline(err.offline_reason, role, err.message);
+    if (err.kind === "offline") rememberStackRefusal(role, err);
+    reportStackOffline(err.offline_reason, role, err.message, err.kind === "offline" ? err.state : undefined);
     return;
   }
   resolveStackOffline(role);
@@ -256,12 +316,25 @@ export function reportStackFailure(err: unknown, role: string): void {
 /** `fallback` covers "unreachable" (the socket refused - StackError
  * carries no offline_reason of its own for that kind, since nothing
  * ever answered to give one) so the Repairs entry still says something
- * real rather than the generic "did not say why". */
-export function reportStackOffline(offline_reason: string | undefined, role: string, fallback?: string): void {
+ * real rather than the generic "did not say why".
+ *
+ * CHAT-CALM-ERRORS-01b (design section 6): a role the Stack reports as
+ * stopped (`installed`) or still loading (`loaded`) is recoverable, so the
+ * entry is a warning; it becomes an error once the role has stayed down
+ * past STACK_RECOVERY_WINDOW_MS, and at once for any other state or for
+ * a Stack that did not answer at all. */
+export const STACK_RECOVERY_WINDOW_MS = 2 * 60_000;
+const RECOVERABLE_STATES: ReadonlySet<string> = new Set(["installed", "loaded"]);
+const downSince = new Map<string, number>();
+
+export function reportStackOffline(offline_reason: string | undefined, role: string, fallback?: string, state?: string, now = Date.now()): void {
+  const since = downSince.get(role) ?? now;
+  downSince.set(role, since);
+  const recoverable = state !== undefined && RECOVERABLE_STATES.has(state) && now - since < STACK_RECOVERY_WINDOW_MS;
   void raiseIssue({
     source: ISSUE_SOURCE,
     key: `offline.${role}`,
-    severity: "error",
+    severity: recoverable ? "warning" : "error",
     title: "MaiPai Stack is offline",
     detail: offline_reason ?? fallback ?? "the Stack did not say why",
   });
@@ -274,5 +347,6 @@ export function reportStackOffline(offline_reason: string | undefined, role: str
  * or clears another's. */
 export function resolveStackOffline(role: string): void {
   refusals.delete(role);
+  downSince.delete(role);
   resolveIssue(ISSUE_SOURCE, `offline.${role}`);
 }

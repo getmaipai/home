@@ -141,7 +141,7 @@ describe("turnNext.ts: a plain question, no tools", () => {
 });
 
 describe("turnNext.ts: the interim rule", () => {
-  test("search succeeds, then a dead model returns a typed status and writes no turn", async () => {
+  test("search succeeds, then a dead model returns a typed status and stores the failed turn", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     const original = llm.startCompleteStreamPieces.bind(llm);
@@ -162,14 +162,16 @@ describe("turnNext.ts: the interim rule", () => {
       );
       expect(searxng.queries.length).toBeGreaterThan(0);
       expect(result).toEqual({ ok: false, status: 503, code: "engine_unavailable", error: "MaiPai's AI isn't running right now." });
-      expect(db.select().from(conversationTurns).all()).toHaveLength(before);
+      // CHAT-CALM-ERRORS-01b: kept as a failed row, never a "done" one.
+      expect(db.select().from(conversationTurns).all()).toHaveLength(before + 1);
+      expect(db.select().from(conversationTurns).all().filter((row) => row.status === "done")).toHaveLength(before);
     } finally {
       failure.mockRestore();
       searxng.stop();
     }
   });
 
-  test("the live streaming turn emits engine_unavailable and stores no assistant turn", async () => {
+  test("the live streaming engine refusal emits engine_unavailable and stores a failed turn", async () => {
     const searxng = startFakeSearxng();
     setHouseholdSettingValue("search.searxng_url", searxng.url);
     const original = llm.startCompleteStreamPieces.bind(llm);
@@ -201,7 +203,8 @@ describe("turnNext.ts: the interim rule", () => {
       expect(thrown).toBeInstanceOf(StreamUnavailable);
       expect(thrown).toMatchObject({ code: "engine_unavailable", message: "MaiPai's AI isn't running right now." });
       expect(searxng.queries.length).toBeGreaterThan(0);
-      expect(db.select().from(conversationTurns).all()).toHaveLength(before);
+      expect(db.select().from(conversationTurns).all()).toHaveLength(before + 1);
+      expect(db.select().from(conversationTurns).all().filter((row) => row.status === "done")).toHaveLength(before);
     } finally {
       failure.mockRestore();
       searxng.stop();

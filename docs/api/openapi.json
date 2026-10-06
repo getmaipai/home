@@ -5243,7 +5243,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The stored detail, credentials redacted; empty lists when nothing failed.",
+            "description": "The stored detail, credentials redacted; empty lists when nothing failed; `found: false` when no row was stored for the turn.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5251,6 +5251,28 @@
                   "properties": {
                     "turn_id": {
                       "type": "string"
+                    },
+                    "found": {
+                      "type": "boolean"
+                    },
+                    "advice": {
+                      "type": "object",
+                      "properties": {
+                        "cause": {
+                          "type": "string"
+                        },
+                        "next_step": {
+                          "type": "string"
+                        },
+                        "repairs": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "cause",
+                        "next_step",
+                        "repairs"
+                      ]
                     },
                     "tools": {
                       "type": "array",
@@ -5309,6 +5331,27 @@
                           },
                           "offline_reason": {
                             "type": "string"
+                          },
+                          "http_status": {
+                            "type": "number"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "raw_body": {
+                            "type": "string"
+                          },
+                          "engine_id": {
+                            "type": "string"
+                          },
+                          "model_id": {
+                            "type": "string"
+                          },
+                          "failed_ms": {
+                            "type": "number"
+                          },
+                          "failed_at": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -5321,6 +5364,7 @@
                   },
                   "required": [
                     "turn_id",
+                    "found",
                     "tools",
                     "generations"
                   ]
@@ -5330,16 +5374,6 @@
           },
           "403": {
             "description": "Not owner/admin",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such turn",
             "content": {
               "application/json": {
                 "schema": {
