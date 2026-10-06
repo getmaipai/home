@@ -54,6 +54,13 @@ describe("elements adoption scanner", () => {
     expect(output.items.filter((item) => ["chat-panel.tsx", "chart.tsx"].includes(item.file)).every((item) => !item.implemented)).toBe(true);
   });
 
+  test("kit test files are not adoption inventory entries", async () => {
+    const root = await fixture();
+    await writeFile(join(root, "frontend/node_modules/@maipai/ui/src/elements/chat-panel.test.tsx"), "export {}; ");
+    const { output } = await scanElements({ root });
+    expect(output.items.some((item) => item.file === "chat-panel.test.tsx")).toBe(false);
+  });
+
   test("the adoption scan carries the recorded shipped-part reading", async () => {
     const root = await fixture();
     const { output } = await scanElements({ root });

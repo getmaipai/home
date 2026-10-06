@@ -15,7 +15,7 @@ function tsxUnder(src: string, dir: string): string[] {
     .filter((rel) => rel.endsWith(".tsx") && !rel.endsWith(".test.tsx"));
 }
 
-const CHAT_IMPORT = /from\s*["'](?:@assistant-ui\/|@maipai\/ui\/src\/elements\/)/;
+const CHAT_IMPORT = /from\s*["'](?:@assistant-ui\/|@maipai\/ui\/src\/elements\/(?:thread-list(?:\.aui)?|thread-search|markdown-text|model-selector|canvas-split|hooks\/use-copy-to-clipboard)(?:["'/]|$))/;
 
 /** The chat screen's own source, relative to `frontend/src`: everything
  * under `apps/chat/`, plus every `next/` file that draws with assistant-ui

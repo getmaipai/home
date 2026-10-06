@@ -82,7 +82,10 @@ export async function scanElements(options: { root?: string; tag?: string } = {}
   const packageRoot = join(await realpath(pkgPath), "..");
   const pkg = JSON.parse(await readFile(pkgPath, "utf8")) as { version?: string };
   const elementsDir = join(packageRoot, "src/elements");
-  const kitFiles = (await filesUnder(elementsDir)).map((path) => relative(elementsDir, path).replaceAll("\\", "/")).sort();
+  const kitFiles = (await filesUnder(elementsDir))
+    .filter((path) => !/\.test\.[^.]+$/.test(path))
+    .map((path) => relative(elementsDir, path).replaceAll("\\", "/"))
+    .sort();
   const plan = JSON.parse(await readFile(join(root, "frontend/src/dev/elements-plan.json"), "utf8")) as { items: PlanItem[] };
   const planByFile = new Map(plan.items.map((item) => [item.file, item]));
   const sourceDir = join(root, "frontend/src");
@@ -113,7 +116,7 @@ export async function scanElements(options: { root?: string; tag?: string } = {}
     };
   });
   const kitTag = options.tag ?? `ui-v${pkg.version ?? "unknown"}`;
-  const planOnly = [...planByFile.keys()].filter((file) => !kitFiles.includes(file)).sort();
+  const planOnly = [...planByFile.keys()].filter((file) => !/\.test\.[^.]+$/.test(file) && !kitFiles.includes(file)).sort();
   return { output: { generatedAt: new Date().toISOString(), kitTag, items }, planOnly };
 }
 
