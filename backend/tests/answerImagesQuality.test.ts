@@ -3,7 +3,9 @@ import sharp, { type Sharp } from "sharp";
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { filterAnswerImages, hashes, nearestDistance } from "@/lib/answerImages/quality";
+import { filterAnswerImages } from "@/lib/answerImages/quality";
+import { fingerprint, hashDistance } from "@/lib/imageSimilarity";
+import { addShapes } from "./answerImagesFixture";
 
 const dir = await mkdtemp(join(tmpdir(), "answer-images-"));
 const fixtures = new Map<string, Uint8Array>();
@@ -15,6 +17,9 @@ const photo = (seed: number, width: number, height: number) => {
     data[i + 1] = (y * 9 + x * 2 + seed * 71) % 256;
     data[i + 2] = ((x ^ y) + seed * 23) % 256;
   }
+  // IMGSIM-01: the photo whose copies must merge carries the corners a real
+  // photo has (a repeating pattern gives a feature matcher nothing to align).
+  if (seed === 2) addShapes(data, width, height, seed);
   return { data, width, height, channels: 3 as const };
 };
 const fromPhoto = (p: ReturnType<typeof photo>) => sharp(p.data, { raw: { width: p.width, height: p.height, channels: p.channels } });
@@ -178,16 +183,16 @@ describe("IMGQ-01: near-duplicates by pHash and dHash", () => {
 
   test("different shots are more than 10 bits apart and all survive", async () => {
     const shots = await Promise.all([2, 8, 11, 17].map(async (seed) => new Uint8Array(await smoothPhoto(seed).jpeg().toBuffer())));
-    const hs = await Promise.all(shots.map(hashes));
-    for (let i = 0; i < hs.length; i++) for (let j = i + 1; j < hs.length; j++) expect(nearestDistance(hs[i]!, hs[j]!)).toBeGreaterThan(10);
+    const hs = await Promise.all(shots.map(fingerprint));
+    for (let i = 0; i < hs.length; i++) for (let j = i + 1; j < hs.length; j++) expect(hashDistance(hs[i]!, hs[j]!)).toBeGreaterThan(10);
     const out = await filterAnswerImages(shots.map((b, i) => jpeg(`s${i}`, b)));
     expect(out.images).toHaveLength(4);
   });
 
   test("each hash is 64 bits, not the old 256-bit blockhash", async () => {
-    const h = await hashes(fixtures.get("photo.jpg")!);
-    expect(h.full.d).toMatch(/^[01]{64}$/);
-    expect(h.full.p).toMatch(/^[01]{64}$/);
+    const h = await fingerprint(fixtures.get("photo.jpg")!);
+    expect(h.hashes.full.d).toMatch(/^[01]{64}$/);
+    expect(h.hashes.full.p).toMatch(/^[01]{64}$/);
   });
 });
 

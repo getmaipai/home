@@ -1,6 +1,7 @@
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 import { tryConsume, __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { filterAnswerImages, type ValidatedAnswerImage } from "./quality";
+import { filterAnswerImages, type QualityResult, type ValidatedAnswerImage } from "./quality";
+import { warmGeometry } from "@/lib/imageSimilarity";
 
 export const ANSWER_IMAGE_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -24,10 +25,17 @@ function quiet(host: string, until: number, now: number): void {
 }
 
 export type AnswerImageSource = { id: string; url: string; leadImage?: boolean };
-export type AnswerImageFetchResult = { images: ValidatedAnswerImage[]; originals: Record<string, string>; dropped_by_fetch: Record<string, number>; dropped_by_quality: Record<string, number> };
+export type AnswerImageFetchResult = { images: ValidatedAnswerImage[]; originals: Record<string, string>; dropped_by_fetch: Record<string, number>; dropped_by_quality: Record<string, number>; duplicate_check?: QualityResult["duplicates"] };
 /** `deadlineAt` (ms, the same clock as `now`): the caller's own end for the
  * set when it comes before the set's 2.5 s (the turn's picture budget minus
  * the time validation and caching need). */
+/** How long the duplicate check may run past the fetch deadline: a chat
+ * turn passes its own deadline and keeps a full second after it for
+ * validating and caching, so 700 ms; a caller without one keeps the set's
+ * own tight 150 ms. The judged sample (IMGQ-05, 2026-10-06) left 19 close
+ * Mona Lisa pairs unverified at 150 ms and showed three copies. */
+const VERIFY_AFTER_DEADLINE_MS = 150;
+const VERIFY_AFTER_CALLER_DEADLINE_MS = 700;
 type Options = { fetch?: typeof fetch; dnsLookup?: DnsLookup; now?: () => number; deadlineAt?: number };
 
 async function validateUrl(url: URL, dns?: DnsLookup): Promise<void> {
@@ -137,6 +145,9 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
 }
 
 export async function fetchAnswerImages(sources: AnswerImageSource[], options: Options = {}): Promise<AnswerImageFetchResult> {
+  // The duplicate check's feature matcher loads while the pictures download
+  // (a cold load is about 200 ms; it must not land after the deadline).
+  warmGeometry();
   const dropped_by_fetch: Record<string, number> = {};
   const countDrop = (why: string) => { dropped_by_fetch[why] = (dropped_by_fetch[why] ?? 0) + 1; };
   const now = options.now ?? Date.now;
@@ -160,11 +171,17 @@ export async function fetchAnswerImages(sources: AnswerImageSource[], options: O
   await Promise.all(Array.from({ length: Math.min(4, input.length) }, worker));
   if (stoppedAtDeadline) countDrop("deadline");
   const good = results.filter((r): r is NonNullable<typeof r> => r !== null);
-  const checked = await filterAnswerImages(good.map(item => ({ id: item.id, bytes: item.bytes, contentType: item.contentType, leadImage: input.find(s => s.id === item.id)?.leadImage, sourceHost: item.host })));
+  // The duplicate check's close-pair comparisons stop VERIFY_AFTER_DEADLINE_MS
+  // after the fetch deadline (the turn keeps a second for validating and
+  // caching); pairs left over are kept as different pictures.
+  // Set before validation starts, on the real clock, so validation's own
+  // time counts against it (the fetch may run on an injected clock).
+  const verifyUntil = Date.now() + Math.max(0, deadline + (options.deadlineAt !== undefined ? VERIFY_AFTER_CALLER_DEADLINE_MS : VERIFY_AFTER_DEADLINE_MS) - now());
+  const checked = await filterAnswerImages(good.map(item => ({ id: item.id, bytes: item.bytes, contentType: item.contentType, leadImage: input.find(s => s.id === item.id)?.leadImage, sourceHost: item.host })), { verifyUntil });
   const originals: Record<string, string> = {};
   for (const image of checked.images) {
     const source = input.find(item => item.id === image.id);
     if (source) originals[image.id] = source.url;
   }
-  return { images: checked.images, originals, dropped_by_fetch, dropped_by_quality: checked.dropped_by_quality };
+  return { images: checked.images, originals, dropped_by_fetch, dropped_by_quality: checked.dropped_by_quality, ...(checked.duplicates ? { duplicate_check: checked.duplicates } : {}) };
 }

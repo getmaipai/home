@@ -14,6 +14,7 @@ import type { PersonRow } from "@/types";
 import type { AnswerImageItem, AnswerImageSet } from "@/wire";
 import { fetchAnswerImages, type AnswerImageSource } from "./fetch";
 import { putAnswerImage } from "./cache";
+import { warmGeometry } from "@/lib/imageSimilarity";
 import { judgeRelevance, subjectNames, type RelevanceDrop } from "./relevance";
 import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates, wikimediaFetchJson, wikipediaExtract, type FetchJson } from "./wikimedia";
 
@@ -53,6 +54,9 @@ export type AnswerImageTrace = {
   search_held_back?: number;
   dropped_by_fetch?: Record<string, number>;
   dropped_by_quality?: Record<string, number>;
+  /** IMGSIM-01's counts for the duplicate check (pairs, same pixels,
+   * verified, merged, left unverified by the deadline, failed). */
+  duplicate_check?: Record<string, number>;
   shown?: number;
 };
 
@@ -111,6 +115,8 @@ export async function selectAnswerImages(input: { subject: string; actor: Person
   // leaves the house as a picture query.
   if (input.roster.length > 0 && speakerNamedAny(subject, input.roster)) return skip("household_name");
   if (trips(subject, input.band)) return skip("floor_subject");
+  // The duplicate check's feature matcher loads while Wikidata answers.
+  warmGeometry();
   const deps = { ...testDeps };
   const fetchJson = deps.fetchJson ?? wikimediaFetchJson;
   const imageSearch = deps.imageSearch ?? ((query: string, actor: PersonRow, band: AgeBand) => answerImageSearch(query, actor, band));
@@ -193,6 +199,7 @@ export async function selectAnswerImages(input: { subject: string; actor: Person
     const fetched = await fetchAnswerImages(sources, { ...deps.fetchOptions, ...(input.deadlineAt !== undefined ? { deadlineAt: input.deadlineAt } : {}) });
     trace.dropped_by_fetch = fetched.dropped_by_fetch;
     trace.dropped_by_quality = fetched.dropped_by_quality as Record<string, number>;
+    if (fetched.duplicate_check && fetched.duplicate_check.pairs > 0) trace.duplicate_check = fetched.duplicate_check;
     // The filter keeps the best of each near-duplicate group; the row keeps
     // the sources' own priority order (lead, Commons, search rank).
     let validated = [...fetched.images].sort((a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)));

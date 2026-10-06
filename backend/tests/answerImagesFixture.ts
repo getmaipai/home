@@ -6,6 +6,22 @@ import sharp from "sharp";
 import type { AnswerImageDeps } from "@/lib/answerImages/select";
 import type { SearxngImageRow } from "@/lib/packageHost";
 
+/** Draws seed-placed rectangles over an RGB buffer: the unique corners a
+ * real photo has. A repeating pattern alone gives a feature matcher nothing
+ * to align (IMGSIM-01), and its scaled-down look is the same for every seed. */
+export function addShapes(data: Buffer, width: number, height: number, seed: number): void {
+  let state = (seed * 2654435761 + 1) >>> 0;
+  const rnd = () => { state = (Math.imul(state, 1103515245) + 12345) >>> 0; return state / 4294967296; };
+  for (let k = 0; k < 40; k++) {
+    const w = Math.max(2, Math.round(width * (0.03 + rnd() * 0.12))), h = Math.max(2, Math.round(height * (0.03 + rnd() * 0.12)));
+    const x0 = Math.floor(rnd() * (width - w)), y0 = Math.floor(rnd() * (height - h));
+    const c = [Math.floor(rnd() * 256), Math.floor(rnd() * 256), Math.floor(rnd() * 256)];
+    // Shift the texture under the shape rather than painting it flat, so the
+    // picture keeps its fine detail (and its sharpness) and gains corners.
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) { const i = (y * width + x) * 3; data[i] = (data[i]! + c[0]!) & 255; data[i + 1] = (data[i + 1]! + c[1]!) & 255; data[i + 2] = (data[i + 2]! + c[2]!) & 255; }
+  }
+}
+
 /** A synthetic photo: busy enough to pass the quality filter, and distinct
  * per seed (the ANSWER-IMG-00 fixture recipe). */
 export async function syntheticPhoto(seed: number, width = 720, height = 540): Promise<Uint8Array> {
@@ -16,6 +32,7 @@ export async function syntheticPhoto(seed: number, width = 720, height = 540): P
     data[i + 1] = (y * 9 + x * 2 + seed * 71) % 256;
     data[i + 2] = ((x ^ (y * seed)) + seed * 23) % 256;
   }
+  addShapes(data, width, height, seed);
   return new Uint8Array(await sharp(data, { raw: { width, height, channels: 3 } }).jpeg({ quality: 88 }).toBuffer());
 }
 
