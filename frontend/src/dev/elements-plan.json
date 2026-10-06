@@ -3152,6 +3152,40 @@
       "replacesHandBuilt": [],
       "realTurnToday": null,
       "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists."
+    },
+    {
+      "file": "number-ticker.test.tsx",
+      "name": "number-ticker",
+      "group": "tests/support",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Kit test for the upstream NumberTicker Element; tests are supporting kit files, not separate Home adoption targets. Master plan #101 assigns number-ticker to ELT-T1-01."
+    },
+    {
+      "file": "thread-list.projects.aui.test.tsx",
+      "name": "thread-list.projects.aui.test",
+      "group": "tests/support",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Kit test for the upstream thread-list projects variant; test files are supporting kit files, not separate Home adoption targets. Master plan #135 assigns the runtime thread-list to Tier 0 (live)."
     }
   ]
 }
