@@ -52,3 +52,7 @@ From the repo root (the `home/` folder with `package.json`):
 - The gate needs sibling checkouts of `getmaipai/.github` and `getmaipai/commons` (pinned tags fetched); a "missing" error means one is absent.
 
 Load [docs/PINNING.md](docs/PINNING.md) (draft: `home-PINNING.md`) before bumping a pin, resolving a lockfile conflict, changing a bundled manifest, or first running the gate on a machine.
+
+## UI rules at commit time (PRECOMMIT-RULES-01)
+
+`cd frontend && bun run lint:ui-rules` runs the Elements/UI rule lints alone (className overrides, CSS restyles, wrappers, hand-built chat, ledger) in about a second and names the file, Element and fix. `scripts/ui-rules-precommit.sh` runs it on staged `frontend/src` or ledger changes, after a guard that refuses a growing baseline or a lost ledger reason; install it once per clone with `bash scripts/install-hooks.sh` (shared by every worktree; the maipai plugin runs the same script before `git commit`). Skip only with `MAIPAI_SKIP_UI_RULES=1`; `check.sh` ignores it and always runs the full lint.

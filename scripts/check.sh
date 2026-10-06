@@ -453,6 +453,9 @@ if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
   BACKEND_PID=$!
   ( trap tests_kill EXIT
     tests_start frontend frontend . "${MAIPAI_GATE_FRONTEND_SHARDS:-3}"
+    stage "frontend: ui rules (same script as the pre-commit hook; MAIPAI_SKIP_UI_RULES is ignored here)"
+    (cd frontend && env -u MAIPAI_SKIP_UI_RULES bun run lint:ui-rules >/dev/null)
+
     stage "frontend: typecheck"
     (cd frontend && bunx tsc --noEmit)
 

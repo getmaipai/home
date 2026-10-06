@@ -11,12 +11,13 @@ import {
   cssOverrideBaselineOf,
   cssOverrideFindings,
   type CssOverrideBaseline,
-  type CssOverrideTokens,
   forbiddenFamily,
   overrideBaselineOf,
   wrapperFindings,
+  cssKeys,
+  overrideKeys,
+  wrapperKeys,
   type OverrideBaseline,
-  type OverrideTokens,
   type WrapperBaseline,
 } from "./kitElementLints";
 
@@ -53,13 +54,6 @@ function baselineAtBase<T>(name: string): T | null {
     return null;
   }
 }
-
-// The merge-base copy may still be the pre-ELEMENTS-DECISIONS-01 shape (a bare
-// array), so every reader accepts both.
-const listOf = (v: unknown, field: string): string[] => (Array.isArray(v) ? (v as string[]) : ((v as Record<string, string[]>)?.[field] ?? []));
-const overrideKeys = (b: OverrideBaseline | OverrideTokens) =>
-  Object.entries(b).flatMap(([file, byElement]) => Object.entries(byElement).flatMap(([element, entry]) => listOf(entry, "tokens").map((t) => `${file}: <${element}> ${t}`)));
-const wrapperKeys = (b: WrapperBaseline) => Object.entries(b).flatMap(([file, byName]) => Object.keys(byName).map((name) => `${file}: ${name}`));
 
 describe("className overrides on kit Elements (ELEMENTS-LINT-02)", () => {
   const baseline = readBaseline<OverrideBaseline>(OVERRIDE_BASELINE);
@@ -138,8 +132,7 @@ describe("className overrides on kit Elements (ELEMENTS-LINT-02)", () => {
 
 describe("Home CSS restyling kit parts (ELEMENTS-LINT-02, CSS leg)", () => {
   const baseline = readBaseline<CssOverrideBaseline>(CSS_BASELINE);
-  const keys = (b: CssOverrideBaseline | CssOverrideTokens) =>
-    Object.entries(b).flatMap(([file, bySelector]) => Object.entries(bySelector).flatMap(([selector, entry]) => listOf(entry, "properties").map((p) => `${file}: ${selector} { ${p} }`)));
+  const keys = cssKeys;
 
   test("no Home stylesheet sets shape, size, layout, spacing, border, shadow, background or display on a kit part unless it is in the shrinking baseline", () => {
     const findings = cssOverrideFindings(SRC);

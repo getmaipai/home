@@ -606,3 +606,15 @@ export function decisionProblem(entry: unknown, ledger: Map<string, LedgerStatus
   if (status === "removed") return `names ${ed}, which the ledger marks removed (delete the entry or reopen the row)`;
   return undefined;
 }
+
+// ------------------------------------------------- PRECOMMIT-RULES-01
+// One definition of "an entry in a baseline", shared by the tests and the
+// pre-commit guard (uiRulesGuard.ts).
+
+/** A baseline field that older copies stored as a bare array. */
+export const listOf = (v: unknown, field: string): string[] => (Array.isArray(v) ? (v as string[]) : ((v as Record<string, string[]>)?.[field] ?? []));
+export const overrideKeys = (b: OverrideBaseline | OverrideTokens) =>
+  Object.entries(b).flatMap(([file, byElement]) => Object.entries(byElement).flatMap(([element, entry]) => listOf(entry, "tokens").map((t) => `${file}: <${element}> ${t}`)));
+export const wrapperKeys = (b: WrapperBaseline) => Object.entries(b).flatMap(([file, byName]) => Object.keys(byName).map((name) => `${file}: ${name}`));
+export const cssKeys = (b: CssOverrideBaseline | CssOverrideTokens) =>
+  Object.entries(b).flatMap(([file, bySelector]) => Object.entries(bySelector).flatMap(([selector, entry]) => listOf(entry, "properties").map((p) => `${file}: ${selector} { ${p} }`)));

@@ -11,7 +11,8 @@
     "prebuild": "bun scripts/copy-ort.mjs",
     "build": "tsc --noEmit && vite build",
     "test": "bun test",
-    "lint": "tsc --noEmit && eslint ."
+    "lint": "tsc --noEmit && eslint .",
+    "lint:ui-rules": "bun test src/dev/kitElementLints.test.ts src/dev/handBuiltChat.test.ts"
   },
   "dependencies": {
     "@assistant-ui/core": "0.3.20",
