@@ -47,6 +47,20 @@ function toRow(row: PersonStorageRow): PersonUsageRow {
   };
 }
 
+// STORE-DELETE-01 (household-storage-2026-09-23.md, "When a person is
+// deleted"): files a deleted person had shared stay, and the household
+// owns them. A parent's page shows them under one row, "shared by people
+// no longer here"; they count toward the household total, not a person.
+function inheritedRow(inherited: { files: number; bytes: number }): PersonUsageRow {
+  return {
+    person: "Shared by people no longer here",
+    role: "household",
+    used: formatBytes(inherited.bytes),
+    cap: "Household total",
+    "top kind": `${inherited.files} ${inherited.files === 1 ? "file" : "files"}`,
+  };
+}
+
 /** /next/storage (STORE-PAGE-01, docs/BACKLOG.md): each person's usage
  * against their cap, the household total against its cap, the largest
  * kinds per person, and the cap controls for an admin - composed
@@ -106,7 +120,10 @@ export function NextStoragePage({ person }: { person: Roster }) {
               </CardContent>
             </Card>
           ) : null}
-          <NextDataTable data={data.people.map(toRow)} emptyMessage="No files yet." />
+          <NextDataTable
+            data={[...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])]}
+            emptyMessage="No files yet."
+          />
           {isAdmin ? <NextSettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} /> : null}
         </div>
       )}

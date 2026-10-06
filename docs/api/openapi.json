@@ -2612,6 +2612,14 @@
                         "approvals": {
                           "type": "number"
                         },
+                        "attachments": {
+                          "type": "number",
+                          "description": "Files nobody else could see, deleted with the person."
+                        },
+                        "filesKeptForHousehold": {
+                          "type": "number",
+                          "description": "Files the person had shared, kept for the household."
+                        },
                         "biometricPrints": {
                           "type": "number"
                         }
@@ -2630,6 +2638,8 @@
                         "relationships",
                         "grants",
                         "approvals",
+                        "attachments",
+                        "filesKeptForHousehold",
                         "biometricPrints"
                       ]
                     }
@@ -2769,6 +2779,177 @@
           },
           "403": {
             "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/people/{id}/deletion-preview": {
+      "get": {
+        "tags": [
+          "People"
+        ],
+        "summary": "What deleting this person would do to their files, and whether you may export them first",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The files that would be deleted, the shared files the household would keep, and the export link when you may use it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "files": {
+                      "type": "object",
+                      "properties": {
+                        "purged": {
+                          "type": "object",
+                          "properties": {
+                            "files": {
+                              "type": "number"
+                            },
+                            "bytes": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "files",
+                            "bytes"
+                          ]
+                        },
+                        "keptForHousehold": {
+                          "type": "object",
+                          "properties": {
+                            "files": {
+                              "type": "number"
+                            },
+                            "bytes": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "files",
+                            "bytes"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "purged",
+                        "keptForHousehold"
+                      ]
+                    },
+                    "export": {
+                      "type": "object",
+                      "properties": {
+                        "allowed": {
+                          "type": "boolean"
+                        },
+                        "url": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "allowed",
+                        "url"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "files",
+                    "export"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You cannot manage this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/people/{id}/files/export": {
+      "get": {
+        "tags": [
+          "People"
+        ],
+        "summary": "Download every file a person owns, as a gzip tar with their records",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "files/ holds the bytes, files.json the File records.",
+            "content": {
+              "application/gzip": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such person, or not yours to export",
             "content": {
               "application/json": {
                 "schema": {
@@ -24903,11 +25084,27 @@
                         },
                         "capBytes": {
                           "type": "number"
+                        },
+                        "inherited": {
+                          "type": "object",
+                          "properties": {
+                            "files": {
+                              "type": "number"
+                            },
+                            "bytes": {
+                              "type": "number"
+                            }
+                          },
+                          "required": [
+                            "files",
+                            "bytes"
+                          ]
                         }
                       },
                       "required": [
                         "usageBytes",
-                        "capBytes"
+                        "capBytes",
+                        "inherited"
                       ]
                     }
                   },
@@ -25392,12 +25589,21 @@
                       },
                       "shared": {
                         "type": "boolean"
+                      },
+                      "household": {
+                        "type": "boolean"
+                      },
+                      "former_owner_name": {
+                        "type": "string",
+                        "nullable": true
                       }
                     },
                     "required": [
                       "file",
                       "owner_person_id",
-                      "shared"
+                      "shared",
+                      "household",
+                      "former_owner_name"
                     ]
                   }
                 }

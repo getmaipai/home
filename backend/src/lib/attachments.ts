@@ -297,11 +297,42 @@ export function deleteAttachmentsForTurns(turnIds: string[]): number {
   return rows.length;
 }
 
-/** Delete all attachment data belonging to a person after authorization. */
+/** Remove one File record for good: its share pointers first (shares.file_id
+ * is a real foreign key), then the record. Returns the record's storage
+ * path when no other record names it, for the caller to unlink once its
+ * transaction has committed (removeFileBlobs below): bytes unlinked inside
+ * a transaction that later rolls back would leave a record with no bytes,
+ * a broken file in someone's Library, while a blob that outlives its
+ * record is only a harmless orphan the reconcile job reports. The path
+ * check is a guard: storagePathFor() builds a path from owner and file id,
+ * so today no two records share one. */
+export function purgeFileRecord(row: typeof attachments.$inferSelect): string | null {
+  db.delete(shares).where(eq(shares.fileId, row.id)).run();
+  db.delete(attachments).where(eq(attachments.id, row.id)).run();
+  const stillReferenced = db.select({ id: attachments.id }).from(attachments).where(eq(attachments.storagePath, row.storagePath)).get();
+  return stillReferenced ? null : row.storagePath;
+}
+
+/** Unlink the bytes purgeFileRecord() released. Best effort: a file that
+ * will not delete stays as an orphan for the reconcile job, never an
+ * error after the records are already gone. */
+export function removeFileBlobs(storagePaths: readonly string[]): void {
+  for (const storagePath of storagePaths) removeFile(storagePath);
+}
+
+/** host.data.forget(person): every file the person owns, shared or not,
+ * goes with their memories (file.schema.json: a "conversation" file is
+ * "deleted immediately by host.data.forget(person)"). Person deletion is a
+ * different rule with a household outcome for shared files; that one is
+ * lib/storage/personFiles.ts's releaseFilesOfDeletedPerson(). */
 export function deleteAttachmentsForPerson(personId: string): number {
   const rows = db.select().from(attachments).where(eq(attachments.ownerPersonId, personId)).all();
-  for (const row of rows) removeFile(row.storagePath);
-  sqlite.query("DELETE FROM attachments WHERE owner_person_id = ?").run(personId);
+  const blobs: string[] = [];
+  for (const row of rows) {
+    const blob = purgeFileRecord(row);
+    if (blob) blobs.push(blob);
+  }
+  removeFileBlobs(blobs);
   return rows.length;
 }
 
@@ -340,6 +371,13 @@ export function temporaryChatImagesForTurn(actor: PersonRow, conversationId: str
 }
 export function removeTemporaryChatImages(conversationId: string): void {
   for (const [id, image] of temporaryChatImages) if (image.conversationId === conversationId) temporaryChatImages.delete(id);
+}
+
+/** Person deletion (lib/storage/personFiles.ts): a temporary chat's
+ * pictures are process memory only, but they are still the person's and
+ * go with them rather than waiting out the two-hour expiry. */
+export function removeTemporaryChatImagesForPerson(personId: string): void {
+  for (const [id, image] of temporaryChatImages) if (image.ownerPersonId === personId) temporaryChatImages.delete(id);
 }
 
 export function pruneTemporaryChatImages(liveConversationIds: ReadonlySet<string>): void {

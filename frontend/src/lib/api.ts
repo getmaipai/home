@@ -341,10 +341,20 @@ export interface StoreInstall {
 // a share pointer makes visible to them - `owner_person_id` is always
 // the real owner, never the viewer, so the Library page can show "with
 // Sage" on anything that isn't the viewer's own.
+// GET /api/people/{id}/deletion-preview (routes/people.ts).
+export interface PersonDeletionPreview {
+  files: { purged: { files: number; bytes: number }; keptForHousehold: { files: number; bytes: number } };
+  export: { allowed: boolean; url: string | null };
+}
+
 export interface VisibleFile {
   file: FileRecord;
   owner_person_id: string;
   shared: boolean;
+  /** STORE-DELETE-01: shared by someone no longer in the household, so
+   * the household's now; `former_owner_name` is who shared it. */
+  household: boolean;
+  former_owner_name: string | null;
 }
 
 // FACE-02: GET/POST /api/biometric-prints's response shape
@@ -844,6 +854,10 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(edit),
     }),
+  // STORE-DELETE-01: read by the delete confirmation, so the export is
+  // offered before a person's files are purged (decision 5).
+  personDeletionPreview: (id: string) =>
+    request<PersonDeletionPreview>(`/api/people/${encodeURIComponent(id)}/deletion-preview`),
   deletePerson: (id: string) =>
     request<{ erased: Record<string, number> }>(`/api/people/${encodeURIComponent(id)}`, { method: "DELETE" }),
   deletePeople: (ids: string[]) =>

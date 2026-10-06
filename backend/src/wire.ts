@@ -1050,7 +1050,9 @@ export interface PersonStorageRow {
  * second filter here or on the frontend). */
 export interface StorageUsageOverview {
   people: PersonStorageRow[];
-  household: { usageBytes: number; capBytes: number } | null;
+  /** `inherited` (STORE-DELETE-01): files shared by people no longer
+   * here, now the household's; already part of `usageBytes`. */
+  household: { usageBytes: number; capBytes: number; inherited: { files: number; bytes: number } } | null;
 }
 
 export interface Performance {

@@ -15,7 +15,8 @@ import { effectivePermissions } from "@/lib/permissions";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import { setValue, getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
-import { isOwnerOrAdmin } from "@/lib/access";
+import { isOwnerOrAdmin, canAccessPerson } from "@/lib/access";
+import { exportPersonFiles, personFilesFate } from "@/lib/storage/personFiles";
 
 export const peopleRoutes = apiRouter();
 
@@ -472,6 +473,8 @@ const deleteRoute = createRoute({
               relationships: z.number(),
               grants: z.number(),
               approvals: z.number(),
+              attachments: z.number().openapi({ description: "Files nobody else could see, deleted with the person." }),
+              filesKeptForHousehold: z.number().openapi({ description: "Files the person had shared, kept for the household." }),
               biometricPrints: z.number(),
             }),
           }),
@@ -495,6 +498,76 @@ peopleRoutes.openapi(deleteRoute, (c) => {
   // destroys a person's history, and a family deserves to see the size
   // of it.
   return c.json({ erased: result.value }, 200);
+});
+
+// STORE-DELETE-01, decision 5 of household-storage-2026-09-23.md: "an
+// export is offered before a removed person's files are purged". The
+// confirmation reads this first: how many files go with the person, how
+// many stay for the household because they are shared, and whether the
+// person asking may download them. Downloading follows the same rule as
+// every other person-data export (memory.ts's assertCanForgetOrExport):
+// yourself, or a parent for a child. An adult's private files are never
+// handed to the admin removing them; the confirmation says so instead.
+const FileFateSchema = z.object({ files: z.number(), bytes: z.number() });
+const deletionPreviewRoute = createRoute({
+  method: "get",
+  path: "/{id}/deletion-preview",
+  tags: ["People"],
+  summary: "What deleting this person would do to their files, and whether you may export them first",
+  middleware: [requireRoleOrGrant(["owner", "admin"], "people.manage")] as const,
+  request: { params: idParamSchema("id") },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            files: z.object({ purged: FileFateSchema, keptForHousehold: FileFateSchema }),
+            export: z.object({ allowed: z.boolean(), url: z.string().nullable() }),
+          }),
+        },
+      },
+      description: "The files that would be deleted, the shared files the household would keep, and the export link when you may use it.",
+    },
+    ...errorResponses({ 401: "Not signed in", 403: "You cannot manage this person", 404: "No such person" }),
+  },
+});
+peopleRoutes.openapi(deletionPreviewRoute, (c) => {
+  const actor = c.get("person");
+  const id = c.req.valid("param").id;
+  const target = db.select().from(people).where(and(eq(people.id, id), isNull(people.deletedAt))).get();
+  if (!target) return c.json({ error: "no such person" }, 404);
+  if (!canManage(actor, target)) return c.json({ error: `${actor.role} cannot manage a ${target.role} profile` }, 403);
+  const allowed = canAccessPerson(actor, id);
+  return c.json({ files: personFilesFate(id), export: { allowed, url: allowed ? `/api/people/${id}/files/export` : null } }, 200);
+});
+
+const filesExportRoute = createRoute({
+  method: "get",
+  path: "/{id}/files/export",
+  tags: ["People"],
+  summary: "Download every file a person owns, as a gzip tar with their records",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id") },
+  responses: {
+    200: { content: { "application/gzip": { schema: z.string() } }, description: "files/ holds the bytes, files.json the File records." },
+    ...errorResponses({ 401: "Not signed in", 404: "No such person, or not yours to export" }),
+  },
+});
+peopleRoutes.openapi(filesExportRoute, (c) => {
+  const actor = c.get("person");
+  const id = c.req.valid("param").id;
+  const target = db.select({ id: people.id }).from(people).where(and(eq(people.id, id), isNull(people.deletedAt))).get();
+  // One answer for "no such person" and "not yours": a 403 would confirm
+  // the id exists, the same posture getAttachment() takes.
+  if (!target || !canAccessPerson(actor, id)) return c.json({ error: "no such person" }, 404);
+  return new Response(exportPersonFiles(id), {
+    headers: {
+      "content-type": "application/gzip",
+      "content-disposition": `attachment; filename="maipai-files-${id}.tar.gz"`,
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
+    },
+  });
 });
 
 // Step 7: BACKLOG.md's "memorialise (read-only profile, PIN cleared,

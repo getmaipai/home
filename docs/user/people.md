@@ -20,6 +20,16 @@ Account management lives in Settings, not on the People page itself.
 
 Only an owner or admin can add, edit, or remove people.
 
+### What happens to their files
+
+When you remove someone, their pictures and other files go too, unless they shared them:
+
+- A file nobody else could see is deleted with them.
+- A file they shared with someone stays. The household keeps it, and it counts toward the household's storage, not anyone's own. It is listed as "Household, shared by" their name.
+- Before you remove a child, you can tap **Download** to save their files first. A teen's or adult's own files are private, so ask them to save anything they want to keep before you remove them.
+
+If you memorialize someone instead, every file they had stays exactly as it was.
+
 ![The Users page, listing household members and the form to add someone](../assets/screens/settings-users-desktop-light.png)
 
 ## What each role can do

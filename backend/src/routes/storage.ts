@@ -197,7 +197,7 @@ const PersonStorageRowSchema = z.object({
 });
 const StorageUsageOverviewSchema = z.object({
   people: z.array(PersonStorageRowSchema),
-  household: z.object({ usageBytes: z.number(), capBytes: z.number() }).nullable(),
+  household: z.object({ usageBytes: z.number(), capBytes: z.number(), inherited: z.object({ files: z.number(), bytes: z.number() }) }).nullable(),
 });
 
 const usageRoute = createRoute({

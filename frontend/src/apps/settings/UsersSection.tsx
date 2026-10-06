@@ -10,7 +10,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
 import { useSelectMode } from "@/kit/hooks/useSelectMode";
-import { api, ApiError, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
+import { api, ApiError, type PersonDeletionPreview, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
 import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles, requiresSecret } from "@/apps/people/roles";
 
 interface UsersSectionProps {
@@ -55,6 +55,16 @@ export function UsersSection({ person }: UsersSectionProps) {
 
   const [confirmingDelete, setConfirmingDelete] = useState<"batch" | string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // STORE-DELETE-01 (decision 5): the export is offered before a person's
+  // files are purged, so the single-person confirmation reads what would
+  // happen to their files first.
+  const confirmingPersonId = confirmingDelete && confirmingDelete !== "batch" ? confirmingDelete : null;
+  const previewQuery = useQuery<PersonDeletionPreview>({
+    queryKey: ["person-deletion-preview", confirmingPersonId],
+    queryFn: () => api.personDeletionPreview(confirmingPersonId!),
+    enabled: confirmingPersonId !== null,
+  });
 
   const actorRole = person.role as Role;
   // Always true here: UsersPage.tsx's AdminGatedContent already restricts
@@ -198,7 +208,8 @@ export function UsersSection({ person }: UsersSectionProps) {
               </p>
               <p className="text-base text-[var(--muted-foreground)]">
                 Everything MaiPai remembers about them, every conversation they had, their settings and any voice
-                they recorded will be deleted. This cannot be undone.
+                they recorded will be deleted. So will any files only they could see; files they shared stay with
+                the household. To save someone&apos;s files first, remove them one at a time. This cannot be undone.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="destructive" onClick={handleDeleteSelected} disabled={busy}>
@@ -269,6 +280,7 @@ export function UsersSection({ person }: UsersSectionProps) {
                       Everything MaiPai remembers about {p.display_name}, every conversation they had, their
                       settings and any voice they recorded will be deleted. This cannot be undone.
                     </p>
+                    <DeletionFilesNote name={p.display_name} preview={previewQuery.data} failed={previewQuery.isError} />
                   </div>
                 );
               }
@@ -312,7 +324,13 @@ export function UsersSection({ person }: UsersSectionProps) {
               if (confirmingDelete === p.id) {
                 return (
                   <div className="flex gap-2">
-                    <Button variant="destructive" onClick={() => handleDeleteOne(p.id)} disabled={busy}>
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleDeleteOne(p.id)}
+                      // The export is offered before the files go, so the
+                      // delete waits for the preview that offers it.
+                      disabled={busy || previewQuery.isPending}
+                    >
                       {busy ? "Removing…" : "Yes, remove"}
                     </Button>
                     <Button variant="ghost" onClick={() => setConfirmingDelete(null)}>
@@ -395,3 +413,44 @@ export function UsersSection({ person }: UsersSectionProps) {
     </>
   );
 }
+
+/** What happens to a person's files when they are removed, and the export
+ * offered first (STORE-DELETE-01). Only shown once the preview loads; the
+ * download link appears only for someone allowed to export them (yourself,
+ * or a parent for a child), never an adult's private files to an admin. */
+function DeletionFilesNote({ name, preview, failed }: { name: string; preview: PersonDeletionPreview | undefined; failed: boolean }) {
+  if (failed) {
+    return (
+      <p className="text-base text-[var(--destructive)]">
+        Could not check {name}&apos;s files. Their files will be deleted with them unless someone else can see them.
+      </p>
+    );
+  }
+  if (!preview) return null;
+  const { purged, keptForHousehold } = preview.files;
+  if (purged.files === 0 && keptForHousehold.files === 0) return null;
+  const files = (n: number) => `${n} ${n === 1 ? "file" : "files"}`;
+  return (
+    <div className="flex flex-col gap-2">
+      {purged.files > 0 ? (
+        <p className="text-base text-[var(--muted-foreground)]">
+          {files(purged.files)} only {name} could see will be deleted too.{" "}
+          {preview.export.url ? "Download them first if you want to keep them." : `Only ${name} can download their own files, so ask them to save anything they want to keep before you remove them.`}
+        </p>
+      ) : null}
+      {keptForHousehold.files > 0 ? (
+        <p className="text-base text-[var(--muted-foreground)]">
+          {files(keptForHousehold.files)} other people can still see will stay, kept by the household.
+        </p>
+      ) : null}
+      {purged.files > 0 && preview.export.url ? (
+        <Button asChild variant="secondary" className="self-start">
+          <a href={preview.export.url} download>
+            Download {name}&apos;s files
+          </a>
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+

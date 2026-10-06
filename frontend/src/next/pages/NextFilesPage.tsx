@@ -47,11 +47,14 @@ export function NextFilesPage({ person }: { person: Roster }) {
   const rows = filesQuery.data ?? [];
   const people = peopleQuery.data ?? [];
   const nameFor = (id: string) => id === person.id ? "You" : people.find((entry) => entry.id === id)?.display_name ?? id;
+  // STORE-DELETE-01: a file whose owner left while it was shared is listed
+  // under the household, with who shared it.
+  const ownerLabel = (row: VisibleFile) => row.household ? `Household, shared by ${row.former_owner_name ?? "someone no longer here"}` : nameFor(row.owner_person_id);
   const filtered = rows.filter((row) => {
     if (source === "mine" && row.shared) return false;
     if (source === "shared" && !row.shared) return false;
     if (kind !== "all" && row.file.kind !== kind) return false;
-    const text = `${row.file.media_type} ${row.file.id} ${nameFor(row.owner_person_id)} ${kindLabel(row.file.kind)}`.toLocaleLowerCase();
+    const text = `${row.file.media_type} ${row.file.id} ${ownerLabel(row)} ${kindLabel(row.file.kind)}`.toLocaleLowerCase();
     return text.includes(search.trim().toLocaleLowerCase());
   });
   const selected = rows.find((row) => row.file.id === selectedId) ?? null;
@@ -61,7 +64,7 @@ export function NextFilesPage({ person }: { person: Roster }) {
   const tableRows: FileRow[] = filtered.map((row) => {
     const visible = {
       file: row.file.media_type,
-      owner: nameFor(row.owner_person_id),
+      owner: ownerLabel(row),
       kind: kindLabel(row.file.kind),
       size: formatBytes(row.file.size),
     };
@@ -119,11 +122,11 @@ export function NextFilesPage({ person }: { person: Roster }) {
               <CardContent className="flex flex-col gap-3 p-4">
                 <label htmlFor="library-file" className="text-sm font-medium">Select a file</label>
                 <select id="library-file" value={selectedId ?? "none"} onChange={(event) => setSelectedId(event.target.value === "none" ? null : event.target.value)} className="h-12 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="none">Choose a file</option>{filtered.map((row) => <option key={row.file.id} value={row.file.id}>{row.file.media_type} — {nameFor(row.owner_person_id)}</option>)}
+                  <option value="none">Choose a file</option>{filtered.map((row) => <option key={row.file.id} value={row.file.id}>{row.file.media_type}, {ownerLabel(row)}</option>)}
                 </select>
                 {selected ? <>
                   <dl className="grid gap-2 text-sm sm:grid-cols-2">
-                    <div><dt className="text-muted-foreground">Owner</dt><dd>{nameFor(selected.owner_person_id)}</dd></div>
+                    <div><dt className="text-muted-foreground">Owner</dt><dd>{ownerLabel(selected)}</dd></div>
                     <div><dt className="text-muted-foreground">Kind</dt><dd>{kindLabel(selected.file.kind)}</dd></div>
                     <div><dt className="text-muted-foreground">Size</dt><dd>{formatBytes(selected.file.size)}</dd></div>
                     <div><dt className="text-muted-foreground">Retention</dt><dd>{selected.file.retention === "kept" ? "Kept until deleted" : "Follows the conversation"}</dd></div>

@@ -11,9 +11,9 @@
 // once, against its owner, and never against a recipient by construction:
 // there is no join through a share pointer here that could double it.
 import { relative } from "node:path";
-import { eq, sql } from "drizzle-orm";
+import { eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments } from "@/db/schema";
+import { attachments, people as peopleTable } from "@/db/schema";
 import { attachmentsDir, dataDir } from "@/lib/paths";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -70,6 +70,22 @@ export function householdUsageBytes(): number {
   return (row?.total as number | undefined) ?? 0;
 }
 
+/** STORE-DELETE-01: files whose owner was deleted while the file was
+ * shared belong to the household (lib/storage/personFiles.ts explains why
+ * that is read from the owner's tombstone rather than written into the
+ * record). They are already inside householdUsageBytes() above; this is
+ * the design record's one household row for them, "shared by people no
+ * longer here". */
+export function householdInheritedUsage(): { files: number; bytes: number } {
+  const row = db
+    .select({ files: sql<number>`count(*)`, bytes: sql<number>`coalesce(sum(${attachments.size}), 0)` })
+    .from(attachments)
+    .innerJoin(peopleTable, eq(attachments.ownerPersonId, peopleTable.id))
+    .where(isNotNull(peopleTable.deletedAt))
+    .get();
+  return { files: Number(row?.files ?? 0), bytes: Number(row?.bytes ?? 0) };
+}
+
 /** One person's bytes broken down by kind (STORE-PAGE-01: "the largest
  * kinds per person"), largest first. Grouped in JS via the same
  * kindForMediaType() classification toRecord() uses for the File shape's
@@ -111,7 +127,7 @@ export function storageUsageOverview(actor: PersonRow): StorageUsageOverview {
   }));
   return {
     people,
-    household: admin ? { usageBytes: householdUsageBytes(), capBytes: householdCapBytes() } : null,
+    household: admin ? { usageBytes: householdUsageBytes(), capBytes: householdCapBytes(), inherited: householdInheritedUsage() } : null,
   };
 }
 

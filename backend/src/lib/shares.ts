@@ -19,7 +19,7 @@
 // adult alike. When PEOPLE-EXPAND-01 lands a known person without
 // household membership, `isValidShareTarget` below is the one place
 // that needs a membership check added, not a second parallel rule.
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people, shares } from "@/db/schema";
 import { Share as ShareSchema, type Share } from "@maipai/spec/gen/ts/share.js";
@@ -201,8 +201,15 @@ export function deleteShare(actor: PersonRow, shareId: string): ShareOpResult<{ 
  * included" as reachable from the very fact that this row exists
  * treated lucia as reachable simply because her own row named
  * "household," so the household-wide grant she made survived her own
- * revoked access indefinitely. */
-export function pruneUnreachableShares(fileId: string, ownerPersonId: string): string[] {
+ * revoked access indefinitely.
+ *
+ * `departingPersonId` (STORE-DELETE-01): a person being deleted is still
+ * an active row until deletePerson() writes their tombstone, after the
+ * erasure. They are left out of "household" here so a re-share they made
+ * from a household pointer dies with them, exactly as it will on any
+ * later prune once the tombstone exists. A departing OWNER stays the
+ * seed: their own shares are what keep a file alive for the household. */
+export function pruneUnreachableShares(fileId: string, ownerPersonId: string, departingPersonId?: string): string[] {
   const removed: string[] = [];
   for (;;) {
     const rows = db.select().from(shares).where(eq(shares.fileId, fileId)).all();
@@ -215,6 +222,7 @@ export function pruneUnreachableShares(fileId: string, ownerPersonId: string): s
         if (!reachable.has(row.fromPersonId)) continue; // this row's own granter isn't justified (yet) - its grant doesn't count.
         if (row.to === "household") {
           for (const person of listActivePeople()) {
+            if (person.id === departingPersonId) continue;
             if (!reachable.has(person.id)) {
               reachable.add(person.id);
               changed = true;
@@ -245,6 +253,12 @@ export interface VisibleFile {
   /** False for a file actor owns; true for one a share (direct or
    * household) makes visible to them. */
   shared: boolean;
+  /** STORE-DELETE-01: the owner was deleted while this file was shared,
+   * so it is the household's now (lib/storage/personFiles.ts).
+   * `formerOwnerName` is the owner's tombstoned display name, the
+   * provenance a family reads ("shared by Bramble"). */
+  household: boolean;
+  formerOwnerName: string | null;
 }
 
 /** The Library's own list: everything actor owns, plus everything
@@ -256,7 +270,7 @@ export function listFilesVisibleToActor(actor: PersonRow): VisibleFile[] {
   const owned = db.select().from(attachments).where(eq(attachments.ownerPersonId, actor.id)).all();
   const allShares = db.select().from(shares).where(eq(shares.to, actor.id)).all().concat(db.select().from(shares).where(eq(shares.to, "household")).all());
 
-  const result: VisibleFile[] = owned.map((row) => ({ file: toRecord(row), ownerPersonId: row.ownerPersonId, shared: false }));
+  const result: VisibleFile[] = owned.map((row) => ({ file: toRecord(row), ownerPersonId: row.ownerPersonId, shared: false, household: false, formerOwnerName: null }));
   const ownedIds = new Set(owned.map((row) => row.id));
   const sharedFileIds = [...new Set(allShares.map((share) => share.fileId).filter((id) => !ownedIds.has(id)))];
   // One batched lookup, not one query per shared file id (code review,
@@ -264,10 +278,22 @@ export function listFilesVisibleToActor(actor: PersonRow): VisibleFile[] {
   // cost this list an extra round trip per distinct file every time
   // anyone opens their Library.
   const sharedFiles = sharedFileIds.length > 0 ? db.select().from(attachments).where(inArray(attachments.id, sharedFileIds)).all() : [];
+  const ownerIds = [...new Set(sharedFiles.map((file) => file.ownerPersonId))];
+  const departed = new Map(
+    ownerIds.length > 0
+      ? db
+          .select({ id: people.id, displayName: people.displayName })
+          .from(people)
+          .where(and(inArray(people.id, ownerIds), isNotNull(people.deletedAt)))
+          .all()
+          .map((row) => [row.id, row.displayName] as const)
+      : [],
+  );
   for (const file of sharedFiles) {
     // An orphaned pointer (the file itself was deleted) simply has no
     // matching row here - nothing to list, no special case needed.
-    result.push({ file: toRecord(file), ownerPersonId: file.ownerPersonId, shared: true });
+    const formerOwnerName = departed.get(file.ownerPersonId) ?? null;
+    result.push({ file: toRecord(file), ownerPersonId: file.ownerPersonId, shared: true, household: formerOwnerName !== null, formerOwnerName });
   }
   return result;
 }

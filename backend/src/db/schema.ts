@@ -604,6 +604,9 @@ export const conversationTurns = sqliteTable(
 // The bytes live at storage_path below dataDir; the turn and conversation
 // references make retention able to remove the file before its owning turn
 // is deleted, while owner_person_id keeps the erasure boundary explicit.
+// STORE-DELETE-01: the conversation and turn are nullable. A file its
+// owner shared outlives them when they are deleted (lib/storage/
+// personFiles.ts), and the conversation it arrived in is erased with them.
 export const attachments = sqliteTable(
   "attachments",
   {
@@ -611,12 +614,8 @@ export const attachments = sqliteTable(
     ownerPersonId: text("owner_person_id")
       .notNull()
       .references(() => people.id),
-    conversationId: text("conversation_id")
-      .notNull()
-      .references(() => conversations.id),
-    turnId: text("turn_id")
-      .notNull()
-      .references(() => conversationTurns.id),
+    conversationId: text("conversation_id").references(() => conversations.id),
+    turnId: text("turn_id").references(() => conversationTurns.id),
     mediaType: text("media_type").notNull(),
     size: integer("size").notNull(),
     sha256: text("sha256").notNull(),

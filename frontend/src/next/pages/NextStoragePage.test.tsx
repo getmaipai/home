@@ -48,7 +48,7 @@ function makeOverview(overrides: Partial<StorageUsageOverview> = {}): StorageUsa
     people: [
       { personId: "person-abc123", displayName: "Nova", role: "owner", usageBytes: 1024, capBytes: 20 * 1024 ** 3, byKind: [{ kind: "image", bytes: 1024 }] },
     ],
-    household: { usageBytes: 1024, capBytes: 20 * 1024 ** 3 },
+    household: { usageBytes: 1024, capBytes: 20 * 1024 ** 3, inherited: { files: 0, bytes: 0 } },
     ...overrides,
   };
 }
@@ -104,6 +104,24 @@ describe("NextStoragePage", () => {
       // the household.storage group, not a hand-built form.
       await waitFor(() => expect(document.body.textContent).toContain("Household storage cap (bytes)"));
       expectHomeTablesWithoutDemoOrActions(1);
+    } finally {
+      restore();
+    }
+  });
+
+  test("files left by a deleted person are listed under the household, not under a person", async () => {
+    const restore = mockFetch(
+      makeOverview({ household: { usageBytes: 4096, capBytes: 20 * 1024 ** 3, inherited: { files: 1, bytes: 3072 } } }),
+    );
+    try {
+      renderWithQueryClient(
+        <MemoryRouter>
+          <NextStoragePage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(document.body.textContent).toContain("Shared by people no longer here"));
+      expect(document.body.textContent).toContain("1 file");
+      expect(document.body.textContent).toContain("3 KB");
     } finally {
       restore();
     }

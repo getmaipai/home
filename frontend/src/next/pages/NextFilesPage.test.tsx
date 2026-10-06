@@ -11,7 +11,7 @@ function makePerson(): Roster {
 }
 
 function file(id: string, owner: string, shared = false, kind: "image" | "document" = "image"): VisibleFile {
-  return { owner_person_id: owner, shared, file: { id, owner_person_id: owner, origin: "made", kind, media_type: kind === "image" ? "image/png" : "application/pdf", size: 2048, sha256: "a".repeat(64), storage_path: `people/${owner}/files/${id}`, retention: "kept", provenance: {}, created_at: "2026-09-04T00:00:00.000Z", hlc: "1788000000000:0:test" } as VisibleFile["file"] as VisibleFile["file"] };
+  return { owner_person_id: owner, shared, household: false, former_owner_name: null, file: { id, owner_person_id: owner, origin: "made", kind, media_type: kind === "image" ? "image/png" : "application/pdf", size: 2048, sha256: "a".repeat(64), storage_path: `people/${owner}/files/${id}`, retention: "kept", provenance: {}, created_at: "2026-09-04T00:00:00.000Z", hlc: "1788000000000:0:test" } as VisibleFile["file"] as VisibleFile["file"] };
 }
 
 function mockFetch(files: VisibleFile[]) {
@@ -48,6 +48,16 @@ describe("NextFilesPage", () => {
       fireEvent.change(document.querySelector("#library-search")!, { target: { value: "Sage" } });
       await waitFor(() => expect(document.body.textContent).not.toContain("image/png"));
       expect(document.body.textContent).toContain("application/pdf");
+    } finally { restore(); }
+  });
+
+  test("a file shared by someone no longer here is listed under the household, with who shared it", async () => {
+    const left = { ...file("file-left123", "person-gone123", true), household: true, former_owner_name: "Bramble" };
+    const { restore } = mockFetch([left]);
+    try {
+      renderWithQueryClient(<NextFilesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Household, shared by Bramble"));
+      expect(document.body.textContent).not.toContain("person-gone123");
     } finally { restore(); }
   });
 

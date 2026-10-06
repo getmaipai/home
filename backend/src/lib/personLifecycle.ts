@@ -48,7 +48,8 @@ import { TOMBSTONE_TEXT } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
 import { invalidateScopeCache } from "@/lib/settings";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
-import { deleteAttachmentsForPerson } from "@/lib/attachments";
+import { releaseFilesOfDeletedPerson } from "@/lib/storage/personFiles";
+import { removeFileBlobs } from "@/lib/attachments";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
 import { roleRequiresCredential, requiresCredential } from "@/lib/personAuthMethods";
@@ -251,7 +252,12 @@ export interface ErasureCounts {
   relationships: number;
   grants: number;
   approvals: number;
+  /** STORE-DELETE-01: files nobody else could see, purged (record and
+   * blob). */
   attachments: number;
+  /** STORE-DELETE-01: files with a live share, kept and now the
+   * household's (lib/storage/personFiles.ts). */
+  filesKeptForHousehold: number;
   /** FACE-01: prints tombstoned (embedding scrubbed), not hard-deleted -
    * see erasePersonData()'s own comment on why. */
   biometricPrints: number;
@@ -263,13 +269,19 @@ export interface ErasureCounts {
  * test walks the schema to prove none is missed: a table added later
  * that keeps person data, and is not handled here, is exactly how a
  * delete quietly stops being a delete. */
-export function erasePersonData(personId: string): ErasureCounts {
+export function erasePersonData(personId: string, blobsAfterCommit: string[]): ErasureCounts {
+  // STORE-DELETE-01, the one files step: files nobody else can see are
+  // purged, record and blob; a file with a live share stays and passes
+  // to the household (lib/storage/personFiles.ts has the rule). It runs
+  // before the turns and conversations below are erased, since a kept
+  // file still names the turn it arrived in until this step clears it.
+  const files = releaseFilesOfDeletedPerson(personId);
+  blobsAfterCommit.push(...files.blobsToRemove);
   // Files first for cloned voices, while the rows still say which files
   // they are; the rows go immediately after. A file that will not delete
   // (locked, permissions) leaves a harmless orphan in a directory that
   // is not backed up, exactly the trade lib/clonedVoices.ts already made
   // and for the same reason: never a person who cannot be removed.
-  const attachments = deleteAttachmentsForPerson(personId);
   const voices = db.select().from(clonedVoices).where(eq(clonedVoices.creatorId, personId)).all();
   for (const voice of voices) {
     try {
@@ -438,7 +450,8 @@ export function erasePersonData(personId: string): ErasureCounts {
     relationships: relationshipRows,
     grants: grantRows,
     approvals: approvalRows,
-    attachments,
+    attachments: files.purged,
+    filesKeptForHousehold: files.keptForHousehold,
     biometricPrints: biometricPrintRows,
   };
 }
@@ -463,7 +476,7 @@ export function erasePersonData(personId: string): ErasureCounts {
 // tolerant of a leftover orphan, before this fix (that function's own
 // header explains why), and stay exactly that tolerant now, just with
 // the SQL side genuinely atomic underneath.
-export const deletePerson = sqlite.transaction((actor: PersonRow, personId: string): PersonOpResult<ErasureCounts> => {
+const commitDeletePerson = sqlite.transaction((actor: PersonRow, personId: string, blobsAfterCommit: string[]): PersonOpResult<ErasureCounts> => {
   const target = livingPerson(personId);
   if (!target) return { ok: false, status: 404, error: "no such person" };
 
@@ -479,7 +492,7 @@ export const deletePerson = sqlite.transaction((actor: PersonRow, personId: stri
   const lastOwnerError = lastOwnerGuardError(personId, target.role === "owner");
   if (lastOwnerError) return lastOwnerError;
 
-  const counts = erasePersonData(personId);
+  const counts = erasePersonData(personId, blobsAfterCommit);
 
   // The tombstone. Nickname and birthdate go with the rest of their
   // data; the display name stays, because a tombstone that cannot say
@@ -492,6 +505,16 @@ export const deletePerson = sqlite.transaction((actor: PersonRow, personId: stri
 
   return { ok: true, value: counts };
 });
+
+/** STORE-DELETE-01: the purged files' bytes are unlinked only once the
+ * transaction above has committed, so a rollback never leaves a record
+ * whose bytes are already gone (attachments.ts's purgeFileRecord). */
+export function deletePerson(actor: PersonRow, personId: string): PersonOpResult<ErasureCounts> {
+  const blobsAfterCommit: string[] = [];
+  const result = commitDeletePerson(actor, personId, blobsAfterCommit);
+  if (result.ok) removeFileBlobs(blobsAfterCommit);
+  return result;
+}
 
 
 export interface BatchDeleteOutcome {

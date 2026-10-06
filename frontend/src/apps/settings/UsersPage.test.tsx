@@ -69,7 +69,9 @@ const ROSTER: PersonRosterEntry[] = [
   member("person-clover", "Clover", "teen"),
 ];
 
-function stubApi(over: { batchOutcomes?: Array<{ id: string; deleted: boolean; reason?: string }> } = {}) {
+const NO_FILES_PREVIEW = { files: { purged: { files: 0, bytes: 0 }, keptForHousehold: { files: 0, bytes: 0 } }, export: { allowed: true, url: null } };
+
+function stubApi(over: { batchOutcomes?: Array<{ id: string; deleted: boolean; reason?: string }>; preview?: unknown } = {}) {
   const calls: Array<{ method: string; url: string; body?: string }> = [];
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
@@ -81,6 +83,10 @@ function stubApi(over: { batchOutcomes?: Array<{ id: string; deleted: boolean; r
         over.batchOutcomes ??
         (JSON.parse((init?.body as string) ?? "{}").ids as string[]).map((id) => ({ id, deleted: true }));
       return Promise.resolve(new Response(JSON.stringify({ outcomes }), { status: 200 }));
+    }
+    if (url.includes("/deletion-preview")) {
+      if (over.preview instanceof Promise) return over.preview as Promise<Response>;
+      return Promise.resolve(new Response(JSON.stringify(over.preview ?? NO_FILES_PREVIEW), { status: 200 }));
     }
     if (method === "DELETE") {
       return Promise.resolve(new Response(JSON.stringify({ erased: {} }), { status: 200 }));
@@ -142,6 +148,57 @@ describe("removing a person", () => {
     }
   });
 
+  // STORE-DELETE-01, decision 5: an export is offered before a removed
+  // person's files are purged.
+  test("a parent removing a child is offered their files to download first", async () => {
+    const { calls, restore } = stubApi({
+      preview: {
+        files: { purged: { files: 2, bytes: 4096 }, keptForHousehold: { files: 1, bytes: 2048 } },
+        export: { allowed: true, url: "/api/people/person-bramble/files/export" },
+      },
+    });
+    try {
+      const { findByRole, findByText } = renderUsersPage(actor("owner"));
+      fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
+
+      expect(await findByText(/2 files only Bramble could see will be deleted too/)).toBeInTheDocument();
+      expect(await findByText(/1 file other people can still see will stay, kept by the household/)).toBeInTheDocument();
+      const download = await findByRole("link", { name: "Download Bramble's files" });
+      expect(download.getAttribute("href")).toBe("/api/people/person-bramble/files/export");
+      expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test("the delete waits while the file preview is still loading", async () => {
+    const { calls, restore } = stubApi({ preview: new Promise(() => {}) });
+    try {
+      const { findByRole, getByRole } = renderUsersPage(actor("owner"));
+      fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
+      expect(getByRole("button", { name: "Yes, remove" })).toBeDisabled();
+      fireEvent.click(getByRole("button", { name: "Yes, remove" }));
+      expect(calls.some((c) => c.method === "DELETE")).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test("a teen's private files are never offered to the parent removing them", async () => {
+    const { restore } = stubApi({
+      preview: { files: { purged: { files: 3, bytes: 4096 }, keptForHousehold: { files: 0, bytes: 0 } }, export: { allowed: false, url: null } },
+    });
+    try {
+      const { findByRole, findByText, queryByRole } = renderUsersPage(actor("owner"));
+      fireEvent.click(await findByRole("button", { name: "Remove Clover" }));
+
+      expect(await findByText(/Only Clover can download their own files/)).toBeInTheDocument();
+      expect(queryByRole("link", { name: /Download/ })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
   test("backing out removes nobody", async () => {
     const { calls, restore } = stubApi();
     try {
@@ -160,6 +217,9 @@ describe("removing a person", () => {
     try {
       const { findByRole, getByRole } = renderUsersPage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
+      // STORE-DELETE-01: the delete waits for the preview that offers the
+      // export, then goes through.
+      await waitFor(() => expect(getByRole("button", { name: "Yes, remove" })).not.toBeDisabled());
       fireEvent.click(getByRole("button", { name: "Yes, remove" }));
 
       await waitFor(() =>

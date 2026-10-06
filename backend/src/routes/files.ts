@@ -16,7 +16,15 @@ export const filesRoutes = apiRouter();
 // share-shaped, not nested under /api/files/shares/{id}.
 export const sharesRoutes = apiRouter();
 
-const VisibleFileSchema = z.object({ file: FileSchema, owner_person_id: z.string(), shared: z.boolean() });
+const VisibleFileSchema = z.object({
+  file: FileSchema,
+  owner_person_id: z.string(),
+  shared: z.boolean(),
+  // STORE-DELETE-01: the owner was deleted while the file was shared, so
+  // it is the household's; former_owner_name is who shared it.
+  household: z.boolean(),
+  former_owner_name: z.string().nullable(),
+});
 
 const listRoute = createRoute({
   method: "get",
@@ -39,7 +47,7 @@ filesRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
   const { owner } = c.req.valid("query");
   const visible = owner ? listPersonFilesVisibleToActor(actor, owner) : listFilesVisibleToActor(actor);
-  const rows = visible.map((row) => ({ file: row.file, owner_person_id: row.ownerPersonId, shared: row.shared }));
+  const rows = visible.map((row) => ({ file: row.file, owner_person_id: row.ownerPersonId, shared: row.shared, household: row.household, former_owner_name: row.formerOwnerName }));
   return c.json(rows, 200);
 });
 
