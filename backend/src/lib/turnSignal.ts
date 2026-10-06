@@ -438,7 +438,7 @@ function protocolSignal(input: SignalInput, protocol: ProtocolAnswer): TurnSigna
     target: act === "inform" ? "other" : "hub",
     repair: protocol.answer === "negative" ? "retraction" : "none",
     refers_to_prior: null,
-    clauses: [{ range: { start: 0, end: text.length }, act, stance: "asserted", subject: act === "inform" ? { kind: "household" } : { kind: "world" }, emotion: emotion.emotion, emotion_intensity: emotion.intensity, confidence: 1 }],
+    clauses: [{ range: { start: 0, end: text.length }, act, stance: "asserted", subject: act === "inform" ? { kind: "household" } : { kind: "world" }, emotion: clauseEmotionLabel(emotion.emotion), emotion_intensity: emotion.intensity, confidence: 1 }],
     act_confidence: 1,
     emotion_confidence: emotion.confidence,
     source: "protocol",
@@ -446,6 +446,18 @@ function protocolSignal(input: SignalInput, protocol: ProtocolAnswer): TurnSigna
     age_band: input.ageBand,
     age_band_basis: input.ageBandBasis ?? "identified_profile",
   };
+}
+
+// v0.1.77 admits EMO-MAP-01 labels on the turn signal while the nested
+// clause record retains its original seven-label vocabulary. Keep the
+// richer expressed label on the turn and project each clause to that
+// stable shared subset for the existing clause record contract.
+function clauseEmotionLabel(emotion: string): "neutral" | "happiness" | "surprise" | "sadness" | "anger" | "disgust" | "fear" {
+  if (emotion === "happy" || emotion === "excited" || emotion === "proud" || emotion === "playful") return "happiness";
+  if (emotion === "surprised") return "surprise";
+  if (emotion === "sad" || emotion === "gentle" || emotion === "tired") return "sadness";
+  if (emotion === "anger" || emotion === "disgust" || emotion === "fear") return emotion;
+  return "neutral";
 }
 
 /** The producer. Protocol state first, then the rules over every clause
@@ -473,7 +485,7 @@ export function classifyTurnSignal(input: SignalInput): TurnSignal {
       act,
       stance: stance.stance,
       subject,
-      emotion: emotion.emotion,
+      emotion: clauseEmotionLabel(emotion.emotion),
       emotion_intensity: emotion.intensity,
       confidence: Math.min(confidence, stance.confidence),
     };

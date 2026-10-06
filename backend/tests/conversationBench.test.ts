@@ -383,6 +383,7 @@ describe("lane 12 item 3: the fixture's new expectation kinds (conversationScore
       explanation_style: "full",
       trusted_adult_move: "none",
       content_disclosure: "full",
+      react_move: null,
     };
   }
 

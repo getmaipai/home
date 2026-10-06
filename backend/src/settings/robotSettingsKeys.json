@@ -1,0 +1,511 @@
+[
+  {
+    "key": "household.quiet_hours.from",
+    "scope": "household",
+    "selector": "time",
+    "default": "21:00",
+    "label": "Quiet hours start",
+    "help": "Quiet hours begin at 9:00 pm by default. Safety alarms always override quiet hours.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "household.quiet_hours.to",
+    "scope": "household",
+    "selector": "time",
+    "default": "07:00",
+    "label": "Quiet hours end",
+    "help": "Quiet hours end at 7:00 am by default.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "person.quiet_hours.from",
+    "scope": "person",
+    "selector": "time",
+    "default": null,
+    "label": "Personal quiet hours start",
+    "help": "Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "person.quiet_hours.to",
+    "scope": "person",
+    "selector": "time",
+    "default": null,
+    "label": "Personal quiet hours end",
+    "help": "Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "person.robot.follow_up",
+    "scope": "person",
+    "selector": "boolean",
+    "default": true,
+    "label": "Robot may listen for a follow-up",
+    "help": "Adults and teens are on by default. Children are off unless a parent enables this.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "person.robot.greet_by_name",
+    "scope": "person",
+    "selector": "boolean",
+    "default": true,
+    "label": "Robot may greet by name",
+    "help": "Adults are on by default; children are off until a parent enables this. Teens control their own setting.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "person.robot.may_address",
+    "scope": "person",
+    "selector": "boolean",
+    "default": true,
+    "label": "Robot may address this person",
+    "help": "Adults are on by default. Children are off until a parent enables this; teens control their own setting.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "person.robot.playful_clips",
+    "scope": "person",
+    "selector": "boolean",
+    "default": true,
+    "label": "Allow playful robot clips",
+    "help": "Adults are on by default; children are off until a parent enables this. Teens control their own setting.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "person.robot.topics",
+    "scope": "person",
+    "selector": "select",
+    "range": {
+      "options": [
+        "off",
+        "nudges",
+        "chit_chat",
+        "both"
+      ]
+    },
+    "default": "nudges",
+    "label": "Robot conversation topics",
+    "help": "Controls optional nudges and chit-chat. Adults get nudges on and chit-chat off by default; children get both off. Teens control their own setting.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "person.vision.gestures",
+    "scope": "person",
+    "selector": "boolean",
+    "default": true,
+    "label": "Allow robot gesture sensing",
+    "help": "On by default; a parent can change a child setting and teens control their own setting.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "person.vision.watch",
+    "scope": "person",
+    "selector": "select",
+    "range": {
+      "options": [
+        "off",
+        "presence",
+        "identify"
+      ]
+    },
+    "default": "presence",
+    "label": "Robot vision watch level",
+    "help": "Identity is used only for enrolled people. Children stay at presence until a parent chooses; teens control their own setting. The stricter person and robot levels apply.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "robot.barge_in.open_mic",
+    "scope": "device",
+    "selector": "boolean",
+    "default": false,
+    "label": "Full open-mic interruption",
+    "help": "Robot-only device setting delivered by Home as settings_changed. Off until arrival-day echo-cancellation measurements pass.",
+    "level": "advanced",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.camera.watch_level",
+    "scope": "device",
+    "selector": "select",
+    "range": {
+      "options": [
+        "off",
+        "presence",
+        "identify"
+      ]
+    },
+    "default": "identify",
+    "label": "Robot camera watch level",
+    "help": "Robot-only device setting delivered by Home as settings_changed. The stricter of this and each person\u2019s watch level applies.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.follow_up.seconds",
+    "scope": "device",
+    "selector": "number",
+    "range": {
+      "min": 0,
+      "max": 20
+    },
+    "default": 8,
+    "label": "Robot follow-up window",
+    "help": "Robot-only device setting delivered by Home as settings_changed. 0 disables the window; child access still requires the person switch.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.gestures.enabled",
+    "scope": "device",
+    "selector": "boolean",
+    "default": false,
+    "label": "Robot gesture sensing",
+    "help": "Robot-only device setting delivered by Home as settings_changed. Packages may explicitly arm gestures while this is off.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.greetings.mode",
+    "scope": "household",
+    "selector": "select",
+    "range": {
+      "options": [
+        "off",
+        "gesture",
+        "spoken"
+      ]
+    },
+    "default": "gesture",
+    "label": "Robot greeting style",
+    "help": "Use a gesture by default; spoken greeting remains subject to person and age-band rules.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "robot.idle.level",
+    "scope": "device",
+    "selector": "select",
+    "range": {
+      "options": [
+        "still",
+        "calm",
+        "lively"
+      ]
+    },
+    "default": "calm",
+    "label": "Robot idle movement",
+    "help": "Robot-only device setting delivered by Home as settings_changed.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.initiative.accept_phrases",
+    "scope": "household",
+    "selector": "select",
+    "range": {
+      "options": [
+        "default"
+      ]
+    },
+    "default": "default",
+    "label": "Offer acceptance phrases",
+    "help": "Uses the closed default set: \u201cgo ahead\u201d or \u201cyes please\u201d to accept, and \u201cnot now\u201d or \u201cno thanks\u201d to decline. No gesture accepts an offer.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "robot.initiative.allowed_here",
+    "scope": "device",
+    "selector": "boolean",
+    "default": false,
+    "label": "Allow offers in this room",
+    "help": "Robot-only device setting delivered by Home as settings_changed. Off until an admin allows offers in this room.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ]
+  },
+  {
+    "key": "robot.initiative.enabled",
+    "scope": "household",
+    "selector": "boolean",
+    "default": true,
+    "label": "Robot initiative",
+    "help": "When on, the robot may make approved offers. On by default for gestures only; spoken offers remain controlled by tiers_spoken.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "robot.initiative.max_offers_per_hour",
+    "scope": "household",
+    "selector": "number",
+    "range": {
+      "min": 0,
+      "max": 20
+    },
+    "default": 3,
+    "label": "Maximum offers per hour",
+    "help": "At most three offers per hour by default; tier 3 is limited to one.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "robot.initiative.tiers_spoken",
+    "scope": "household",
+    "selector": "select",
+    "range": {
+      "options": [
+        "tier_1",
+        "tier_1_2",
+        "all"
+      ]
+    },
+    "default": "tier_1",
+    "label": "Spoken offer tiers",
+    "help": "Tier 1 may speak; tiers 2 and 3 ask first by default.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "robot.live_view.enabled",
+    "scope": "household",
+    "selector": "boolean",
+    "default": false,
+    "label": "Allow robot live view",
+    "help": "Off until an admin enables it. Only admins and adults explicitly named in robot.live_view.who may view.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "robot.live_view.who",
+    "scope": "household",
+    "selector": "person",
+    "default": [],
+    "label": "Adults allowed to view the robot camera",
+    "help": "Admins can view. This list may name adults only; children and teens are never admitted.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "robot.offlan.tailnet",
+    "scope": "household",
+    "selector": "boolean",
+    "default": false,
+    "label": "Allow robot access over the tailnet",
+    "help": "Off by default. Turn on only after the owner manually joins the device to the household tailnet; Home holds no tailnet key.",
+    "level": "advanced",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "safety.alarm.child_line",
+    "scope": "household",
+    "selector": "text",
+    "default": "Smoke alarm. Please go to your grown-up.",
+    "label": "Child safety alarm line",
+    "help": "Spoken after a mapped safety alarm for a child.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "safety.alarm.repeat_seconds",
+    "scope": "household",
+    "selector": "number",
+    "range": {
+      "min": 10,
+      "max": 60
+    },
+    "default": 20,
+    "label": "Safety alarm repeat interval",
+    "help": "Repeat between 10 and 60 seconds; 20 seconds by default.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "safety.alarm.sensors",
+    "scope": "household",
+    "selector": "entity",
+    "default": [],
+    "label": "Safety alarm sensors",
+    "help": "Home Assistant sensors whose alarm events the robot announces. No sensors are selected by default.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "household.integrations",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "safety.alarm.voice",
+    "scope": "household",
+    "selector": "select",
+    "range": {
+      "options": [
+        "default"
+      ]
+    },
+    "default": "default",
+    "label": "Safety alarm voice",
+    "help": "The fixed alarm voice; the deterministic alarm path does not use a model.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "safety.alarm.volume",
+    "scope": "household",
+    "selector": "number",
+    "range": {
+      "min": 70,
+      "max": 100
+    },
+    "default": 70,
+    "label": "Safety alarm volume",
+    "help": "Alarm volume has a hard floor of 70; Home enforces the floor.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  },
+  {
+    "key": "vision.on_request.enabled",
+    "scope": "household",
+    "selector": "boolean",
+    "default": true,
+    "label": "Allow vision when requested",
+    "help": "Allows a requested camera turn. Frames are never kept for a child.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.settings",
+    "honoured_by": [
+      "home"
+    ]
+  }
+]

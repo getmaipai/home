@@ -196,6 +196,7 @@ export function planFor(input: PlanInput): ReplyPlan {
     explanation_style,
     trusted_adult_move: input.deferred ? "offer_to_ask" : "none",
     content_disclosure: input.disclosureWithheld ? "some_withheld" : "full",
+    react_move: null,
   };
 }
 

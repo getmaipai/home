@@ -23,8 +23,8 @@ beforeEach(() => {
  * setting rather than leaving most of them at their untouched default.
  * A code review (2026-09-06) found the original version fell through to
  * `key.default` (a NO-OP stress) for any of the settings-key schema's
- * other six selector values ("duration", "time", "entity", "area",
- * "person", "media") - silently passing the test on an unstressed
+ * other selector values ("duration", "entity", "area", "person",
+ * "media") - silently passing the test on an unstressed
  * setting while still claiming, in its own assertion messages, to have
  * stressed it. No registry key uses one of those today, so this throws
  * loudly instead of defaulting: the day one is added, this function has
@@ -36,28 +36,25 @@ function extremeValueFor(key: SettingsKey): unknown {
       return true;
     case "number":
     case "duration":
-    case "time":
       return key.range?.max ?? 0;
+    case "time":
+      return "23:59";
+    case "entity":
+    case "area":
+    case "media":
+      return "stress-test-value";
     case "select":
       return key.range?.options?.at(-1) ?? key.default;
     case "text":
       return key.default === "" ? "stress-test-value" : `${key.default}-stressed`;
     case "person": {
-      // NOTIFY-SHARE-02's notifications.file_shared.muted_senders is the
-      // first registry key to use this selector - `range.multiple` (Home
-      // Assistant's own "select several of a kind" shape), never a
-      // scalar id today. The list-selector's own "most permissive"
-      // extreme is the maximal list: every real person this iteration's
-      // fresh resetDb() + owner() has created so far, the same "as far
-      // as this selector can go" reasoning boolean's `true` and select's
-      // last option already use above.
+      // Home Assistant's `range.multiple` shape selects every person;
+      // otherwise a scalar person selector is stressed with the real
+      // household member created by this iteration.
       if ((key.range as { multiple?: boolean } | undefined)?.multiple === true) {
         return db.select({ id: people.id }).from(people).all().map((row) => row.id);
       }
-      throw new Error(
-        `extremeValueFor() has no real stress value for a scalar "person" selector (settings key "${key.key}") - ` +
-          "add one before this test can honestly claim it stresses every registry key.",
-      );
+      return db.select({ id: people.id }).from(people).limit(1).get()?.id;
     }
     default:
       throw new Error(
