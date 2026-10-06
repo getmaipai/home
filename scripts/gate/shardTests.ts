@@ -101,6 +101,13 @@ export function parseSummary(output: string): Summary {
   };
 }
 
+/** A shard's whole log: what its tests printed to stdout, then bun's own
+ * stderr report, which ends with the summary parseSummary() reads. */
+export function readShardLog(logPath: string): string {
+  const read = (path: string) => (existsSync(path) ? readFileSync(path, "utf8") : "");
+  return `${read(`${logPath}.out`)}\n${read(logPath)}`;
+}
+
 /** The `(fail) ...` lines of a bun test log: the test names that went red. */
 export function failedTests(output: string): string[] {
   return output.split("\n").filter((l) => l.startsWith("(fail)"));
@@ -195,7 +202,11 @@ export async function run(opts: RunOptions): Promise<number> {
     const proc = Bun.spawn(["bun", ...args], {
       cwd: dir,
       env: { ...process.env, TMPDIR: tmp },
-      stdout: Bun.file(logPath),
+      // Two sinks on one path each write from offset 0 and overwrite each
+      // other (a test that prints to stdout clobbered bun's own summary on
+      // stderr, so a green shard read as "ran 1 of 9 files"): stdout gets
+      // its own file and readShardLog() joins them, the summary last.
+      stdout: Bun.file(`${logPath}.out`),
       stderr: Bun.file(logPath),
     });
     const shard: Live = { index, proc, logPath, junit, files: shardFiles, done: Promise.resolve(0) };
@@ -224,7 +235,7 @@ export async function run(opts: RunOptions): Promise<number> {
   const failure = firstFail as { shard: Live; code: number } | null;
   if (failure) {
     code = failure.code;
-    const out = existsSync(failure.shard.logPath) ? readFileSync(failure.shard.logPath, "utf8") : "";
+    const out = readShardLog(failure.shard.logPath);
     const lines = out.split("\n");
     console.log(`== shard ${failure.shard.index + 1}/${plan.length} FAILED (exit ${code}); the other shards were stopped. Its last 120 lines:`);
     console.log(lines.slice(-120).join("\n"));
@@ -237,7 +248,7 @@ export async function run(opts: RunOptions): Promise<number> {
   } else {
     const total: Summary = { pass: 0, fail: 0, tests: 0, files: 0 };
     for (const s of live) {
-      const sm = parseSummary(readFileSync(s.logPath, "utf8"));
+      const sm = parseSummary(readShardLog(s.logPath));
       total.pass += sm.pass;
       total.fail += sm.fail;
       total.tests += sm.tests;

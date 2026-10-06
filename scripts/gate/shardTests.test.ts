@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { balance, chooseShardCount, discoverTests, failedTests, junitFileSeconds, parseSummary, run } from "./shardTests";
+import { balance, chooseShardCount, discoverTests, failedTests, junitFileSeconds, parseSummary, readShardLog, run } from "./shardTests";
 
 describe("balance", () => {
   test("every file lands in exactly one shard", () => {
@@ -27,6 +27,20 @@ describe("order inside a shard", () => {
   test("a file with no recorded time runs first so a new red test fails fast", () => {
     const [shard] = balance(["old.test.ts", "new.test.ts"], { "old.test.ts": 9 }, 1);
     expect(shard?.[0]).toBe("new.test.ts");
+  });
+});
+
+describe("readShardLog", () => {
+  test("a test's own stdout never hides bun's summary: stdout first, then the stderr report", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-shard-log-"));
+    try {
+      const log = join(dir, "s0.log");
+      writeFileSync(`${log}.out`, "Ran 1 test across 1 file. [9.00ms]\n");
+      writeFileSync(log, " 82 pass\n 0 fail\nRan 82 tests across 9 files. [2.41s]\n");
+      expect(parseSummary(readShardLog(log))).toEqual({ pass: 82, fail: 0, tests: 82, files: 9 });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
