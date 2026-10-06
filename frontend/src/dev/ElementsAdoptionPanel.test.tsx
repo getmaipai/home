@@ -29,7 +29,7 @@ describe("ElementsAdoptionPanel", () => {
     { file: "math-block.tsx", name: "math-block", group: "math", verdict: "wire now", implemented: true },
     { file: "chart.tsx", name: "chart", group: "chart", verdict: "later" },
   ]);
-  test("the headline counts only wire-now and wire-after Elements", () => {
+  test("the headline reports the whole inventory count", () => {
     const view = render(<ElementsAdoptionPanel items={normalizeAdoption([
       { file: "a.tsx", verdict: "wire-now", implemented: true },
       { file: "b.tsx", verdict: "wire-after", implemented: false },
@@ -37,14 +37,14 @@ describe("ElementsAdoptionPanel", () => {
       { file: "d.tsx", verdict: "later", implemented: true },
       { file: "e.tsx", verdict: "no-fit", implemented: false },
     ])} scenarioIds={new Set()} onPlay={() => {}} />);
-    expect(view.container.querySelector("[data-slot=elements-adoption-total]")!.textContent).toBe("1 / 2 in use in chat");
+    expect(view.container.querySelector("[data-slot=elements-adoption-total]")!.textContent).toBe("Elements implemented: 3 / 5");
     expect(view.getByText("Not planned for chat: 1 no fit, 1 later, 1 supporting parts.")).toBeTruthy();
   });
 
   test("an Element imported by chat source counts as in use", () => {
     const onPlay = mock(() => {});
     const view = render(<ElementsAdoptionPanel items={items} scenarioIds={new Set(["math"])} onPlay={onPlay} />);
-    expect(view.container.querySelector("[data-slot=elements-adoption-total]")!.textContent).toBe("1 / 1 in use in chat");
+    expect(view.container.querySelector("[data-slot=elements-adoption-total]")!.textContent).toBe("Elements implemented: 1 / 2");
     expect(view.getByText("wire now: 1")).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Show every Element" }));
     fireEvent.click(view.getByRole("button", { name: /^wire now/ }));

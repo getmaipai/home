@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T18:52:10.610Z",
+  "generatedAt": "2026-10-06T19:32:10.797Z",
   "kitTag": "ui-v0.5.110",
   "items": [
     {
@@ -7,6 +7,7 @@
       "name": "activity-graph",
       "group": "charts/data",
       "verdict": "later",
+      "verdictReason": "Deferred until admin usage endpoint.",
       "implemented": false
     },
     {
@@ -14,6 +15,7 @@
       "name": "agent-card",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -21,6 +23,7 @@
       "name": "agent-handoff",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -28,6 +31,7 @@
       "name": "agent-plan",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -35,6 +39,7 @@
       "name": "agent-status",
       "group": "agent/workflow",
       "verdict": "wire-after",
+      "verdictReason": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements.",
       "implemented": false,
       "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
     },
@@ -43,6 +48,7 @@
       "name": "approval-card",
       "group": "reasoning/tools",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": false
     },
     {
@@ -50,6 +56,7 @@
       "name": "artifact-card",
       "group": "canvas/artifacts",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -57,7 +64,8 @@
       "name": "attachment",
       "group": "composer",
       "verdict": "wire-now",
-      "implemented": false,
+      "verdictReason": "UPLOAD-IMG-02: in use through the shipped thread.aui.tsx, which renders ComposerAttachments (tiles, remove, running and error states, preview dialog) inside the composer and UserMessageAttachments (image thumbnails above the bubble, preview dialog on click); Home feeds it through its attachment adapter and the history adapter, never imports it directly, so the scan reads it as not implemented.",
+      "implemented": true,
       "reading": "UPLOAD-IMG-02: in use through the shipped thread.aui.tsx, which renders ComposerAttachments (tiles, remove, running and error states, preview dialog) inside the composer and UserMessageAttachments (image thumbnails above the bubble, preview dialog on click); Home feeds it through its attachment adapter and the history adapter, never imports it directly, so the scan reads it as not implemented."
     },
     {
@@ -65,6 +73,7 @@
       "name": "background-inbox",
       "group": "agent/workflow",
       "verdict": "wire-after",
+      "verdictReason": "NEEDS-YOU-01 uses background-inbox when its additive route and source records are ready.",
       "implemented": false,
       "reading": "NEEDS-YOU-01 uses background-inbox when its additive route and source records are ready."
     },
@@ -73,6 +82,7 @@
       "name": "canvas-split",
       "group": "canvas/artifacts",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -80,6 +90,7 @@
       "name": "chart",
       "group": "charts/data",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until StructuredPart kind \"chart\" in backend/src/wire.ts and lib/composer.ts structuredPartForOutcomes.",
       "implemented": false
     },
     {
@@ -87,6 +98,7 @@
       "name": "chat-panel",
       "group": "message",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -94,6 +106,7 @@
       "name": "checkpoint-history",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -101,6 +114,7 @@
       "name": "code-diff",
       "group": "canvas/artifacts",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -108,6 +122,7 @@
       "name": "code-runner",
       "group": "agent/workflow",
       "verdict": "later",
+      "verdictReason": "Deferred until sandbox runtime.",
       "implemented": false
     },
     {
@@ -115,6 +130,7 @@
       "name": "command-palette",
       "group": "other",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -122,6 +138,7 @@
       "name": "comparison-card",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -129,6 +146,7 @@
       "name": "composer",
       "group": "composer",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until none for slash (nodes/commands.ts exists); mention list via roster.",
       "implemented": true
     },
     {
@@ -136,6 +154,7 @@
       "name": "computer-use",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -143,6 +162,7 @@
       "name": "confidence-marker",
       "group": "sources/citations",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -150,6 +170,7 @@
       "name": "connection-state",
       "group": "errors/states",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -157,6 +178,7 @@
       "name": "context-breakdown",
       "group": "other",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until TurnStats split by part (THIN-3E, STACK-CTX-01).",
       "implemented": false
     },
     {
@@ -164,6 +186,7 @@
       "name": "context-display",
       "group": "composer",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -171,6 +194,7 @@
       "name": "conversation-map",
       "group": "thread/list",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -178,6 +202,7 @@
       "name": "conversation-search",
       "group": "thread/list",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -185,6 +210,7 @@
       "name": "cost-meter",
       "group": "charts/data",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -192,6 +218,7 @@
       "name": "data-table",
       "group": "charts/data",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until none for markdown; StructuredPart kind \"table\" only if a package returns rows.",
       "implemented": false
     },
     {
@@ -199,6 +226,7 @@
       "name": "day-separator.test",
       "group": "day",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -206,6 +234,7 @@
       "name": "day-separator",
       "group": "message",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -213,6 +242,7 @@
       "name": "diagram",
       "group": "canvas/artifacts",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until the named feature or data producer is available.",
       "implemented": false
     },
     {
@@ -220,6 +250,7 @@
       "name": "directive-text",
       "group": "message",
       "verdict": "later",
+      "verdictReason": "Deferred until a Home feature requiring this Element is planned.",
       "implemented": false
     },
     {
@@ -227,6 +258,7 @@
       "name": "document-reference",
       "group": "sources/citations",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until retrieval anchors from the document tool (ATTACH-PREVIEW-01).",
       "implemented": false
     },
     {
@@ -234,20 +266,24 @@
       "name": "draft-restore",
       "group": "composer",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
       "file": "edit-message.tsx",
       "name": "edit-message",
       "group": "message",
-      "verdict": "wire-now",
-      "implemented": false
+      "verdict": "no-fit",
+      "verdictReason": "No-fit as a standalone demo; the kit Thread renders its runtime EditComposer, whose behavior fits Home without the demo warning line.",
+      "implemented": true,
+      "reading": "No-fit as a standalone demo; the kit Thread renders its runtime EditComposer, whose behavior fits Home without the demo warning line."
     },
     {
       "file": "elicitation-form.tsx",
       "name": "elicitation-form",
       "group": "reasoning/tools",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until tool elicitation event (docs/plans/tools-ecosystem-design T-series).",
       "implemented": false
     },
     {
@@ -255,6 +291,7 @@
       "name": "empty-state",
       "group": "settings/onboarding",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": false
     },
     {
@@ -262,6 +299,7 @@
       "name": "error-state-test",
       "group": "errors/states",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -269,6 +307,7 @@
       "name": "error-state",
       "group": "errors/states",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -276,6 +315,7 @@
       "name": "feedback-dialog",
       "group": "message",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": false
     },
     {
@@ -283,6 +323,7 @@
       "name": "file-tree",
       "group": "canvas/artifacts",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -290,13 +331,15 @@
       "name": "file",
       "group": "canvas/artifacts",
       "verdict": "wire-now",
-      "implemented": false
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": true
     },
     {
       "file": "flow-graph.tsx",
       "name": "flow-graph",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -304,13 +347,15 @@
       "name": "follow-up-suggestions",
       "group": "composer",
       "verdict": "wire-after",
-      "implemented": false
+      "verdictReason": "Deferred until backend follow-up generator (adult only, passes the gate; gap matrix A15).",
+      "implemented": true
     },
     {
       "file": "github.tsx",
       "name": "github",
       "group": "other",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -318,6 +363,7 @@
       "name": "globals.css",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -325,6 +371,7 @@
       "name": "guardrail-notice",
       "group": "errors/states",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -332,20 +379,23 @@
       "name": "hooks/use-attachment-src",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
     },
     {
       "file": "hooks/use-copy-to-clipboard.ts",
       "name": "hooks/use-copy-to-clipboard",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
     },
     {
       "file": "hooks/use-mobile.ts",
       "name": "hooks/use-mobile",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -353,6 +403,7 @@
       "name": "href",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -360,6 +411,7 @@
       "name": "image-gallery.test",
       "group": "image",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -367,6 +419,7 @@
       "name": "image-gallery",
       "group": "image",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until Q16 ANSWER-IMG-04 adopts the kit Element for answer image parts.",
       "implemented": true
     },
     {
@@ -374,6 +427,7 @@
       "name": "image-generation",
       "group": "canvas/artifacts",
       "verdict": "later",
+      "verdictReason": "Deferred until IMAGE-01.",
       "implemented": false
     },
     {
@@ -381,13 +435,15 @@
       "name": "image",
       "group": "canvas/artifacts",
       "verdict": "wire-now",
-      "implemented": false
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": true
     },
     {
       "file": "inline-citation.tsx",
       "name": "inline-citation",
       "group": "sources/citations",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until THIN-4B [n] to source mapping (chatCitations.ts).",
       "implemented": true
     },
     {
@@ -395,6 +451,7 @@
       "name": "job-progress",
       "group": "agent/workflow",
       "verdict": "wire-now",
+      "verdictReason": "ACTIVITY-01d: stays the inline project card in chat; not used for the activity card above the composer, which needs no looping spinner (verdict C3), Approve, Deny and Open, and the 16 px floor. That card is ChatActivityCard, shipped Alert, Button and Progress (named gap KIT-ACTIVITY-CARD-01).",
       "implemented": true,
       "reading": "ACTIVITY-01d: stays the inline project card in chat; not used for the activity card above the composer, which needs no looping spinner (verdict C3), Approve, Deny and Open, and the 16 px floor. That card is ChatActivityCard, shipped Alert, Button and Progress (named gap KIT-ACTIVITY-CARD-01)."
     },
@@ -403,6 +460,7 @@
       "name": "launcher-bubble",
       "group": "other",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -410,6 +468,7 @@
       "name": "loading-state",
       "group": "errors/states",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -417,6 +476,7 @@
       "name": "map-answer",
       "group": "charts/data",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until places-style result must carry lat/lon (additive on weather and a future places tool).",
       "implemented": false
     },
     {
@@ -424,6 +484,7 @@
       "name": "markdown-text styles",
       "group": "markdown",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": true
     },
     {
@@ -431,6 +492,7 @@
       "name": "markdown-text.test",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -438,6 +500,7 @@
       "name": "markdown-text",
       "group": "message",
       "verdict": "wire-now",
+      "verdictReason": "Streamdown inside MarkdownText is the kit part used as it ships.",
       "implemented": true,
       "reading": "Streamdown inside MarkdownText is the kit part used as it ships."
     },
@@ -446,6 +509,7 @@
       "name": "math-block",
       "group": "charts/data",
       "verdict": "later",
+      "verdictReason": "Deferred until tutor package.",
       "implemented": false
     },
     {
@@ -453,35 +517,41 @@
       "name": "mcp-server-panel",
       "group": "settings/onboarding",
       "verdict": "later",
+      "verdictReason": "Deferred until MCP client (tools design H1-H4).",
       "implemented": false
     },
     {
       "file": "memory-chips.tsx",
       "name": "memory-chips",
       "group": "other",
-      "verdict": "wire-now",
+      "verdict": "wire-after",
+      "verdictReason": "The dashboard card is separate; chat chips need the additive memory_saved event, and memory remains injected context, never a tool under RULES.md rule 1.",
       "implemented": false,
-      "reading": "LEARNED-01 is the one dashboard Memory card; it also closes the existing chat chip wiring."
+      "reading": "The dashboard card is separate; chat chips need the additive memory_saved event, and memory remains injected context, never a tool under RULES.md rule 1."
     },
     {
       "file": "mermaid-diagram.tsx",
       "name": "mermaid-diagram",
       "group": "canvas/artifacts",
       "verdict": "wire-now",
-      "implemented": false
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": true
     },
     {
       "file": "message-actions.tsx",
       "name": "message-actions",
       "group": "message",
-      "verdict": "wire-now",
-      "implemented": false
+      "verdict": "no-fit",
+      "verdictReason": "No-fit as a standalone demo; the kit Thread renders its runtime AssistantActionBar.",
+      "implemented": true,
+      "reading": "No-fit as a standalone demo; the kit Thread renders its runtime AssistantActionBar."
     },
     {
       "file": "message-attachment.tsx",
       "name": "message-attachment",
       "group": "composer",
       "verdict": "wire-now",
+      "verdictReason": "UPLOAD-IMG-02: not wired. It is a name-and-size metadata card (a 48 px swatch beside the file name), not the thumbnail ChatGPT shows above the bubble, and thread.aui.tsx has no slot for it; the sent-picture thumbnails come from attachment.aui.tsx UserMessageAttachments instead.",
       "implemented": false,
       "reading": "UPLOAD-IMG-02: not wired. It is a name-and-size metadata card (a 48 px swatch beside the file name), not the thumbnail ChatGPT shows above the bubble, and thread.aui.tsx has no slot for it; the sent-picture thumbnails come from attachment.aui.tsx UserMessageAttachments instead."
     },
@@ -489,14 +559,17 @@
       "file": "message-branches.tsx",
       "name": "message-branches",
       "group": "message",
-      "verdict": "wire-now",
-      "implemented": false
+      "verdict": "no-fit",
+      "verdictReason": "No-fit as a standalone demo; the kit Thread renders its runtime BranchPicker.",
+      "implemented": true,
+      "reading": "No-fit as a standalone demo; the kit Thread renders its runtime BranchPicker."
     },
     {
       "file": "message-pair.tsx",
       "name": "message-pair",
       "group": "message",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -504,6 +577,7 @@
       "name": "message-queue",
       "group": "composer",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until client queue logic in chatModelAdapter (no backend change).",
       "implemented": true
     },
     {
@@ -511,6 +585,7 @@
       "name": "message-timing",
       "group": "reasoning/tools",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -518,6 +593,7 @@
       "name": "mobile-composer",
       "group": "composer",
       "verdict": "later",
+      "verdictReason": "Deferred until a Home feature requiring this Element is planned.",
       "implemented": false
     },
     {
@@ -525,6 +601,7 @@
       "name": "model-picker",
       "group": "composer",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -532,6 +609,7 @@
       "name": "model-selector",
       "group": "composer",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -539,6 +617,7 @@
       "name": "number-ticker",
       "group": "other",
       "verdict": "later",
+      "verdictReason": "Deferred until a Home feature requiring this Element is planned.",
       "implemented": false
     },
     {
@@ -546,6 +625,7 @@
       "name": "onboarding",
       "group": "settings/onboarding",
       "verdict": "later",
+      "verdictReason": "Deferred until SETUP-* backlog.",
       "implemented": false
     },
     {
@@ -553,6 +633,7 @@
       "name": "permission-grant",
       "group": "settings/onboarding",
       "verdict": "later",
+      "verdictReason": "Deferred until tools T4.",
       "implemented": false
     },
     {
@@ -560,6 +641,7 @@
       "name": "prompt-library",
       "group": "composer",
       "verdict": "later",
+      "verdictReason": "Deferred until saved-prompts store.",
       "implemented": false
     },
     {
@@ -567,6 +649,7 @@
       "name": "quota-banner",
       "group": "errors/states",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until none beyond existing storage overview.",
       "implemented": false
     },
     {
@@ -574,6 +657,7 @@
       "name": "quote-reply",
       "group": "message",
       "verdict": "later",
+      "verdictReason": "Deferred until composer quoting in the adapter.",
       "implemented": false
     },
     {
@@ -581,6 +665,7 @@
       "name": "range",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -588,6 +673,7 @@
       "name": "read-aloud",
       "group": "voice",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until per-word timing from the voice engine (VOICE-LIVE-*).",
       "implemented": false
     },
     {
@@ -595,6 +681,7 @@
       "name": "reasoning-effort",
       "group": "composer",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -602,6 +689,7 @@
       "name": "reasoning-panel",
       "group": "reasoning/tools",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -609,6 +697,7 @@
       "name": "reasoning",
       "group": "reasoning/tools",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -616,13 +705,15 @@
       "name": "reasoning",
       "group": "reasoning/tools",
       "verdict": "wire-now",
-      "implemented": false
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": true
     },
     {
       "file": "recommendation-card.tsx",
       "name": "recommendation-card",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -630,6 +721,7 @@
       "name": "regenerate-menu",
       "group": "message",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": false
     },
     {
@@ -637,6 +729,7 @@
       "name": "research-report",
       "group": "canvas/artifacts",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -644,6 +737,7 @@
       "name": "retrieval-chunks",
       "group": "sources/citations",
       "verdict": "later",
+      "verdictReason": "Deferred until document library search.",
       "implemented": false
     },
     {
@@ -651,6 +745,7 @@
       "name": "reviewable-diff",
       "group": "canvas/artifacts",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -658,6 +753,7 @@
       "name": "schedule-card",
       "group": "settings/onboarding",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until remind/timer return {id, label, when_text, fire_at} as structured data (additive).",
       "implemented": false
     },
     {
@@ -665,20 +761,24 @@
       "name": "score-breakdown",
       "group": "charts/data",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
       "file": "scroll-anchor.tsx",
       "name": "scroll-anchor",
       "group": "message",
-      "verdict": "wire-now",
-      "implemented": false
+      "verdict": "no-fit",
+      "verdictReason": "No-fit as a standalone timer demo; the kit Thread already renders ThreadScrollToBottom as its runtime scroll anchor.",
+      "implemented": true,
+      "reading": "No-fit as a standalone timer demo; the kit Thread already renders ThreadScrollToBottom as its runtime scroll anchor."
     },
     {
       "file": "settings-panel.tsx",
       "name": "settings-panel",
       "group": "settings/onboarding",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -686,6 +786,7 @@
       "name": "shared-conversation",
       "group": "thread/list",
       "verdict": "later",
+      "verdictReason": "Deferred until SHARE-CONV-01.",
       "implemented": false
     },
     {
@@ -693,13 +794,15 @@
       "name": "shiki-highlighter",
       "group": "message",
       "verdict": "wire-now",
-      "implemented": false
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": true
     },
     {
       "file": "sources.aui.tsx",
       "name": "sources",
       "group": "sources/citations",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -707,6 +810,7 @@
       "name": "sources",
       "group": "sources/citations",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": false
     },
     {
@@ -714,6 +818,7 @@
       "name": "speaker-identity",
       "group": "voice",
       "verdict": "wire-after",
+      "verdictReason": "CHAR-01 uses SpeakerIdentity as the shipped assistant reply speaker mark.",
       "implemented": false,
       "reading": "CHAR-01 uses SpeakerIdentity as the shipped assistant reply speaker mark."
     },
@@ -722,6 +827,7 @@
       "name": "spec-sheet",
       "group": "charts/data",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -729,6 +835,7 @@
       "name": "stopped-run",
       "group": "errors/states",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": false
     },
     {
@@ -736,6 +843,7 @@
       "name": "streaming-text",
       "group": "message",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -743,6 +851,7 @@
       "name": "subagent-list",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -750,6 +859,7 @@
       "name": "suggestions",
       "group": "composer",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -757,6 +867,7 @@
       "name": "surfaces.test",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -764,6 +875,7 @@
       "name": "surfaces",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": true
     },
     {
@@ -771,6 +883,7 @@
       "name": "task-card",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -778,6 +891,7 @@
       "name": "task",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -785,6 +899,7 @@
       "name": "terminal-block",
       "group": "agent/workflow",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -792,6 +907,7 @@
       "name": "thinking-indicator.test",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -799,6 +915,7 @@
       "name": "thinking-indicator",
       "group": "reasoning/tools",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -806,6 +923,7 @@
       "name": "thread-list.aui.test",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -813,6 +931,7 @@
       "name": "thread-list",
       "group": "thread/list",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -820,6 +939,7 @@
       "name": "thread-list.pin.aui.test",
       "group": "thread/list",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -827,6 +947,7 @@
       "name": "thread-list",
       "group": "thread/list",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -834,6 +955,7 @@
       "name": "thread-search.test",
       "group": "thread/list",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -841,6 +963,7 @@
       "name": "thread-search",
       "group": "thread/list",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -848,6 +971,7 @@
       "name": "thread-viewport.test",
       "group": "thread",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -855,6 +979,7 @@
       "name": "thread.aui.test",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -862,6 +987,7 @@
       "name": "thread",
       "group": "thread/list",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -869,6 +995,7 @@
       "name": "threadlist-sidebar",
       "group": "thread/list",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -876,6 +1003,7 @@
       "name": "timeline",
       "group": "agent/workflow",
       "verdict": "wire-after",
+      "verdictReason": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline.",
       "implemented": false,
       "reading": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline."
     },
@@ -884,6 +1012,7 @@
       "name": "todo-list",
       "group": "agent/workflow",
       "verdict": "wire-after",
+      "verdictReason": "Deferred until list-view and list-add return items[] beside the text (additive).",
       "implemented": false
     },
     {
@@ -891,6 +1020,7 @@
       "name": "tool-call",
       "group": "reasoning/tools",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": false
     },
     {
@@ -898,6 +1028,7 @@
       "name": "tool-error",
       "group": "errors/states",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": false
     },
     {
@@ -905,20 +1036,23 @@
       "name": "tool-fallback",
       "group": "reasoning/tools",
       "verdict": "wire-now",
-      "implemented": false
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": true
     },
     {
       "file": "tool-group.aui.tsx",
       "name": "tool-group",
       "group": "reasoning/tools",
       "verdict": "wire-now",
-      "implemented": false
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": true
     },
     {
       "file": "tool-group.tsx",
       "name": "tool-group",
       "group": "reasoning/tools",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -926,6 +1060,7 @@
       "name": "tool-timeline",
       "group": "reasoning/tools",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -933,6 +1068,7 @@
       "name": "tooltip-icon-button",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": true
     },
     {
@@ -940,6 +1076,7 @@
       "name": "trace-waterfall",
       "group": "agent/workflow",
       "verdict": "later",
+      "verdictReason": "Deferred until TurnStats.nodes.",
       "implemented": false
     },
     {
@@ -947,6 +1084,7 @@
       "name": "typing-indicator",
       "group": "errors/states",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -954,13 +1092,15 @@
       "name": "ui/avatar",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
     },
     {
       "file": "ui/badge.tsx",
       "name": "ui/badge",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -968,20 +1108,23 @@
       "name": "ui/button",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
     },
     {
       "file": "ui/collapsible.tsx",
       "name": "ui/collapsible",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
     },
     {
       "file": "ui/command.tsx",
       "name": "ui/command",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -989,13 +1132,15 @@
       "name": "ui/dialog",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
     },
     {
       "file": "ui/input.tsx",
       "name": "ui/input",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -1003,6 +1148,7 @@
       "name": "ui/popover",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -1010,6 +1156,7 @@
       "name": "ui/separator",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -1017,6 +1164,7 @@
       "name": "ui/sheet",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -1024,6 +1172,7 @@
       "name": "ui/sidebar",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -1031,27 +1180,31 @@
       "name": "ui/skeleton",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
     },
     {
       "file": "ui/textarea.tsx",
       "name": "ui/textarea",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
     },
     {
       "file": "ui/tooltip.tsx",
       "name": "ui/tooltip",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
     },
     {
       "file": "voice-conversation.test.tsx",
       "name": "voice-conversation.test",
       "group": "other",
       "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {
@@ -1059,6 +1212,7 @@
       "name": "voice-conversation",
       "group": "voice",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
     },
     {
@@ -1066,6 +1220,7 @@
       "name": "voice",
       "group": "voice",
       "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": false
     },
     {
@@ -1073,6 +1228,7 @@
       "name": "web-preview",
       "group": "canvas/artifacts",
       "verdict": "later",
+      "verdictReason": "Deferred until sandboxed HTML artifact kind.",
       "implemented": false
     },
     {
@@ -1080,6 +1236,7 @@
       "name": "web-search",
       "group": "reasoning/tools",
       "verdict": "no-fit",
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     }
   ]

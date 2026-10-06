@@ -14,7 +14,8 @@
       "showcaseScenario": "NEW: activity-graph",
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until admin usage endpoint."
     },
     {
       "file": "agent-card.tsx",
@@ -30,7 +31,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "agent-handoff.tsx",
@@ -46,7 +48,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "agent-plan.tsx",
@@ -62,7 +65,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "agent-status.tsx",
@@ -79,7 +83,8 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
+      "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements.",
+      "verdictReason": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
     },
     {
       "file": "approval-card.tsx",
@@ -101,7 +106,8 @@
       "replacesHandBuilt": [
         "frontend/src/next/pages/NextChatPage.tsx:421-480"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "artifact-card.tsx",
@@ -121,7 +127,8 @@
       "showcaseScenario": "NEW: artifact-card",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "attachment.aui.tsx",
@@ -138,7 +145,8 @@
       "batch": 2,
       "replacesHandBuilt": [],
       "realTurnToday": true,
-      "reading": "UPLOAD-IMG-02: in use through the shipped thread.aui.tsx, which renders ComposerAttachments (tiles, remove, running and error states, preview dialog) inside the composer and UserMessageAttachments (image thumbnails above the bubble, preview dialog on click); Home feeds it through its attachment adapter and the history adapter, never imports it directly, so the scan reads it as not implemented."
+      "reading": "UPLOAD-IMG-02: in use through the shipped thread.aui.tsx, which renders ComposerAttachments (tiles, remove, running and error states, preview dialog) inside the composer and UserMessageAttachments (image thumbnails above the bubble, preview dialog on click); Home feeds it through its attachment adapter and the history adapter, never imports it directly, so the scan reads it as not implemented.",
+      "verdictReason": "UPLOAD-IMG-02: in use through the shipped thread.aui.tsx, which renders ComposerAttachments (tiles, remove, running and error states, preview dialog) inside the composer and UserMessageAttachments (image thumbnails above the bubble, preview dialog on click); Home feeds it through its attachment adapter and the history adapter, never imports it directly, so the scan reads it as not implemented."
     },
     {
       "file": "background-inbox.tsx",
@@ -155,7 +163,8 @@
       "batch": 6,
       "replacesHandBuilt": [],
       "realTurnToday": false,
-      "reading": "NEEDS-YOU-01 uses background-inbox when its additive route and source records are ready."
+      "reading": "NEEDS-YOU-01 uses background-inbox when its additive route and source records are ready.",
+      "verdictReason": "NEEDS-YOU-01 uses background-inbox when its additive route and source records are ready."
     },
     {
       "file": "canvas-split.tsx",
@@ -170,10 +179,9 @@
       "size": "S",
       "showcaseScenario": "NEW: canvas-open",
       "batch": 2,
-      "replacesHandBuilt": [
-        "frontend/src/next/pages/NextChatPage.tsx:1150-1371"
-      ],
-      "realTurnToday": true
+      "replacesHandBuilt": [],
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "chart.tsx",
@@ -189,7 +197,8 @@
       "showcaseScenario": "NEW: chart (area, line, bars)",
       "batch": 6,
       "replacesHandBuilt": [],
-      "realTurnToday": false
+      "realTurnToday": false,
+      "verdictReason": "Deferred until StructuredPart kind \"chart\" in backend/src/wire.ts and lib/composer.ts structuredPartForOutcomes."
     },
     {
       "file": "chat-panel.tsx",
@@ -205,7 +214,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "checkpoint-history.tsx",
@@ -221,7 +231,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "code-diff.tsx",
@@ -237,7 +248,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "code-runner.tsx",
@@ -253,7 +265,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until sandbox runtime."
     },
     {
       "file": "command-palette.tsx",
@@ -269,7 +282,8 @@
       "showcaseScenario": "NEW: command-palette",
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "comparison-card.tsx",
@@ -285,7 +299,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "composer.tsx",
@@ -303,7 +318,8 @@
       "replacesHandBuilt": [
         "frontend/src/apps/chat/composerAddMenu.tsx:87-222"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until none for slash (nodes/commands.ts exists); mention list via roster."
     },
     {
       "file": "computer-use.tsx",
@@ -319,7 +335,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "confidence-marker.tsx",
@@ -335,7 +352,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "connection-state.tsx",
@@ -351,7 +369,8 @@
       "showcaseScenario": "NEW: connection-dropped (drop, reconnect, resumed)",
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "context-breakdown.tsx",
@@ -367,7 +386,8 @@
       "showcaseScenario": "NEW: context-breakdown",
       "batch": 6,
       "replacesHandBuilt": [],
-      "realTurnToday": false
+      "realTurnToday": false,
+      "verdictReason": "Deferred until TurnStats split by part (THIN-3E, STACK-CTX-01)."
     },
     {
       "file": "context-display.tsx",
@@ -383,7 +403,8 @@
       "showcaseScenario": "NEW: context-footer",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "conversation-map.tsx",
@@ -399,7 +420,8 @@
       "showcaseScenario": "NEW: conversation-map (long thread)",
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "conversation-search.tsx",
@@ -415,7 +437,8 @@
       "showcaseScenario": "NEW: find-in-chat",
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "cost-meter.tsx",
@@ -431,7 +454,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "data-table.tsx",
@@ -450,7 +474,8 @@
       "showcaseScenario": "table",
       "batch": 5,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until none for markdown; StructuredPart kind \"table\" only if a package returns rows."
     },
     {
       "file": "day-separator.test.tsx",
@@ -466,7 +491,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "day-separator.tsx",
@@ -484,7 +510,8 @@
       "replacesHandBuilt": [
         "frontend/src/apps/chat/chatDayDivider.tsx:35-93"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "diagram.tsx",
@@ -500,7 +527,8 @@
       "showcaseScenario": "NEW: mermaid (flow, sequence)",
       "batch": 5,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until the named feature or data producer is available."
     },
     {
       "file": "directive-text.tsx",
@@ -516,7 +544,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until a Home feature requiring this Element is planned."
     },
     {
       "file": "document-reference.tsx",
@@ -532,7 +561,8 @@
       "showcaseScenario": "NEW: document-reference",
       "batch": 5,
       "replacesHandBuilt": [],
-      "realTurnToday": false
+      "realTurnToday": false,
+      "verdictReason": "Deferred until retrieval anchors from the document tool (ATTACH-PREVIEW-01)."
     },
     {
       "file": "draft-restore.tsx",
@@ -548,13 +578,14 @@
       "showcaseScenario": "NEW: draft-restore",
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "edit-message.tsx",
       "name": "edit-message",
       "group": "message",
-      "verdict": "wire-now",
+      "verdict": "no-fit",
       "backendNeeded": null,
       "effort": "QUICK",
       "specTagNeeded": false,
@@ -564,7 +595,9 @@
       "showcaseScenario": "NEW: edit-branch",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "No-fit as a standalone demo; the kit Thread renders its runtime EditComposer, whose behavior fits Home without the demo warning line.",
+      "reading": "No-fit as a standalone demo; the kit Thread renders its runtime EditComposer, whose behavior fits Home without the demo warning line."
     },
     {
       "file": "elicitation-form.tsx",
@@ -580,7 +613,8 @@
       "showcaseScenario": null,
       "batch": 6,
       "replacesHandBuilt": [],
-      "realTurnToday": false
+      "realTurnToday": false,
+      "verdictReason": "Deferred until tool elicitation event (docs/plans/tools-ecosystem-design T-series)."
     },
     {
       "file": "empty-state.tsx",
@@ -598,7 +632,8 @@
       "replacesHandBuilt": [
         "frontend/src/next/pages/NextChatPage.tsx:780-816"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "error-state.tsx",
@@ -614,7 +649,8 @@
       "showcaseScenario": "failure-engine-down, failure-unavailable, failure-generic",
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "error-state.test.tsx",
@@ -630,7 +666,8 @@
       "showcaseScenario": null,
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "feedback-dialog.tsx",
@@ -648,7 +685,8 @@
       "replacesHandBuilt": [
         "frontend/src/apps/chat/chatActionBar.tsx:33-114"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "file-tree.tsx",
@@ -664,7 +702,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "file.tsx",
@@ -680,7 +719,8 @@
       "showcaseScenario": "NEW: file-card",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "flow-graph.tsx",
@@ -696,7 +736,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "follow-up-suggestions.aui.tsx",
@@ -712,7 +753,8 @@
       "showcaseScenario": "NEW: follow-ups",
       "batch": 5,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until backend follow-up generator (adult only, passes the gate; gap matrix A15)."
     },
     {
       "file": "github.tsx",
@@ -728,7 +770,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "globals.css",
@@ -744,7 +787,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "hooks/use-attachment-src.ts",
@@ -760,7 +804,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "hooks/use-copy-to-clipboard.ts",
@@ -776,7 +821,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "hooks/use-mobile.ts",
@@ -792,7 +838,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "href.ts",
@@ -808,7 +855,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "image-gallery.test.tsx",
@@ -824,7 +872,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "image-gallery.tsx",
@@ -840,7 +889,8 @@
       "showcaseScenario": "Q16: answer images",
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until Q16 ANSWER-IMG-04 adopts the kit Element for answer image parts."
     },
     {
       "file": "image-generation.tsx",
@@ -856,7 +906,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until IMAGE-01."
     },
     {
       "file": "image.tsx",
@@ -872,7 +923,8 @@
       "showcaseScenario": "links, NEW: image-result",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "inline-citation.tsx",
@@ -893,7 +945,8 @@
       "replacesHandBuilt": [
         "frontend/src/next/pages/NextChatPage.tsx:986-1040"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until THIN-4B [n] to source mapping (chatCitations.ts)."
     },
     {
       "file": "job-progress.tsx",
@@ -913,7 +966,8 @@
       "batch": 2,
       "replacesHandBuilt": [],
       "realTurnToday": true,
-      "reading": "ACTIVITY-01d: stays the inline project card in chat; not used for the activity card above the composer, which needs no looping spinner (verdict C3), Approve, Deny and Open, and the 16 px floor. That card is ChatActivityCard, shipped Alert, Button and Progress (named gap KIT-ACTIVITY-CARD-01)."
+      "reading": "ACTIVITY-01d: stays the inline project card in chat; not used for the activity card above the composer, which needs no looping spinner (verdict C3), Approve, Deny and Open, and the 16 px floor. That card is ChatActivityCard, shipped Alert, Button and Progress (named gap KIT-ACTIVITY-CARD-01).",
+      "verdictReason": "ACTIVITY-01d: stays the inline project card in chat; not used for the activity card above the composer, which needs no looping spinner (verdict C3), Approve, Deny and Open, and the 16 px floor. That card is ChatActivityCard, shipped Alert, Button and Progress (named gap KIT-ACTIVITY-CARD-01)."
     },
     {
       "file": "launcher-bubble.tsx",
@@ -929,7 +983,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "loading-state.tsx",
@@ -945,7 +1000,8 @@
       "showcaseScenario": "reasoning",
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "map-answer.tsx",
@@ -964,7 +1020,8 @@
       "showcaseScenario": null,
       "batch": 6,
       "replacesHandBuilt": [],
-      "realTurnToday": false
+      "realTurnToday": false,
+      "verdictReason": "Deferred until places-style result must carry lat/lon (additive on weather and a future places tool)."
     },
     {
       "file": "markdown-text.test.tsx",
@@ -980,7 +1037,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "markdown-text.css",
@@ -996,7 +1054,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "markdown-text.tsx",
@@ -1013,7 +1072,8 @@
       "showcaseScenario": "table, code, math, lists, headings, NEW: mermaid",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Streamdown inside MarkdownText is the kit part used as it ships."
     },
     {
       "file": "math-block.tsx",
@@ -1029,7 +1089,8 @@
       "showcaseScenario": "NEW: math-steps",
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until tutor package."
     },
     {
       "file": "mcp-server-panel.tsx",
@@ -1045,29 +1106,26 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until MCP client (tools design H1-H4)."
     },
     {
       "file": "memory-chips.tsx",
       "name": "memory-chips",
       "group": "other",
-      "verdict": "wire-now",
-      "backendNeeded": null,
+      "verdict": "wire-after",
+      "backendNeeded": "additive memory_saved event field; memory remains injected context, never a tool (RULES.md rule 1)",
       "effort": "QUICK",
       "specTagNeeded": false,
       "newDependency": false,
-      "bindings": [
-        "remember",
-        "recall"
-      ],
+      "bindings": [],
       "size": "S",
       "showcaseScenario": "NEW: memory-chips (added, updated, existing)",
       "batch": 3,
-      "replacesHandBuilt": [
-        "frontend/src/apps/chat/chatActionBar.tsx:183-265"
-      ],
+      "replacesHandBuilt": [],
       "realTurnToday": true,
-      "reading": "LEARNED-01 is the one dashboard Memory card; it also closes the existing chat chip wiring."
+      "reading": "The dashboard card is separate; chat chips need the additive memory_saved event, and memory remains injected context, never a tool under RULES.md rule 1.",
+      "verdictReason": "The dashboard card is separate; chat chips need the additive memory_saved event, and memory remains injected context, never a tool under RULES.md rule 1."
     },
     {
       "file": "mermaid-diagram.tsx",
@@ -1083,13 +1141,14 @@
       "showcaseScenario": "NEW: mermaid",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "message-actions.tsx",
       "name": "message-actions",
       "group": "message",
-      "verdict": "wire-now",
+      "verdict": "no-fit",
       "backendNeeded": null,
       "effort": "QUICK",
       "specTagNeeded": false,
@@ -1102,7 +1161,9 @@
         "frontend/src/apps/chat/chatActionBar.tsx:116-265",
         "frontend/src/next/pages/NextChatPage.tsx:284-372"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "No-fit as a standalone demo; the kit Thread renders its runtime AssistantActionBar.",
+      "reading": "No-fit as a standalone demo; the kit Thread renders its runtime AssistantActionBar."
     },
     {
       "file": "message-attachment.tsx",
@@ -1119,13 +1180,14 @@
       "batch": 3,
       "replacesHandBuilt": [],
       "realTurnToday": true,
-      "reading": "UPLOAD-IMG-02: not wired. It is a name-and-size metadata card (a 48 px swatch beside the file name), not the thumbnail ChatGPT shows above the bubble, and thread.aui.tsx has no slot for it; the sent-picture thumbnails come from attachment.aui.tsx UserMessageAttachments instead."
+      "reading": "UPLOAD-IMG-02: not wired. It is a name-and-size metadata card (a 48 px swatch beside the file name), not the thumbnail ChatGPT shows above the bubble, and thread.aui.tsx has no slot for it; the sent-picture thumbnails come from attachment.aui.tsx UserMessageAttachments instead.",
+      "verdictReason": "UPLOAD-IMG-02: not wired. It is a name-and-size metadata card (a 48 px swatch beside the file name), not the thumbnail ChatGPT shows above the bubble, and thread.aui.tsx has no slot for it; the sent-picture thumbnails come from attachment.aui.tsx UserMessageAttachments instead."
     },
     {
       "file": "message-branches.tsx",
       "name": "message-branches",
       "group": "message",
-      "verdict": "wire-now",
+      "verdict": "no-fit",
       "backendNeeded": null,
       "effort": "QUICK",
       "specTagNeeded": false,
@@ -1135,7 +1197,9 @@
       "showcaseScenario": "NEW: edit-branch",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "No-fit as a standalone demo; the kit Thread renders its runtime BranchPicker.",
+      "reading": "No-fit as a standalone demo; the kit Thread renders its runtime BranchPicker."
     },
     {
       "file": "message-pair.tsx",
@@ -1151,7 +1215,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "message-queue.tsx",
@@ -1167,7 +1232,8 @@
       "showcaseScenario": "NEW: message-queue",
       "batch": 5,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until client queue logic in chatModelAdapter (no backend change)."
     },
     {
       "file": "message-timing.tsx",
@@ -1186,7 +1252,8 @@
         "frontend/src/apps/chat/chatTurnStats.tsx:24-61",
         "frontend/src/next/pages/NextChatPage.tsx:1041-1100"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "mobile-composer.tsx",
@@ -1202,7 +1269,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until a Home feature requiring this Element is planned."
     },
     {
       "file": "model-picker.tsx",
@@ -1218,7 +1286,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "model-selector.tsx",
@@ -1234,7 +1303,8 @@
       "showcaseScenario": "NEW: model-chip",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "number-ticker.tsx",
@@ -1250,7 +1320,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until a Home feature requiring this Element is planned."
     },
     {
       "file": "onboarding.tsx",
@@ -1266,7 +1337,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until SETUP-* backlog."
     },
     {
       "file": "permission-grant.tsx",
@@ -1282,7 +1354,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until tools T4."
     },
     {
       "file": "prompt-library.tsx",
@@ -1298,7 +1371,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until saved-prompts store."
     },
     {
       "file": "quota-banner.tsx",
@@ -1314,7 +1388,8 @@
       "showcaseScenario": "NEW: quota-storage",
       "batch": 5,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until none beyond existing storage overview."
     },
     {
       "file": "quote-reply.tsx",
@@ -1330,7 +1405,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until composer quoting in the adapter."
     },
     {
       "file": "range.ts",
@@ -1346,7 +1422,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "read-aloud.tsx",
@@ -1364,7 +1441,8 @@
       "replacesHandBuilt": [
         "frontend/src/apps/chat/chatActionBar.tsx:116-181"
       ],
-      "realTurnToday": false
+      "realTurnToday": false,
+      "verdictReason": "Deferred until per-word timing from the voice engine (VOICE-LIVE-*)."
     },
     {
       "file": "reasoning-effort.tsx",
@@ -1380,7 +1458,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "reasoning-panel.tsx",
@@ -1396,7 +1475,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "reasoning.aui.tsx",
@@ -1412,7 +1492,8 @@
       "showcaseScenario": "reasoning, child",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "reasoning.tsx",
@@ -1428,7 +1509,8 @@
       "showcaseScenario": "reasoning",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "recommendation-card.tsx",
@@ -1444,7 +1526,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "regenerate-menu.tsx",
@@ -1460,7 +1543,8 @@
       "showcaseScenario": "NEW: regenerate-with",
       "batch": 3,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "research-report.tsx",
@@ -1476,7 +1560,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "retrieval-chunks.tsx",
@@ -1492,7 +1577,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until document library search."
     },
     {
       "file": "reviewable-diff.tsx",
@@ -1508,7 +1594,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "schedule-card.tsx",
@@ -1527,7 +1614,8 @@
       "showcaseScenario": null,
       "batch": 6,
       "replacesHandBuilt": [],
-      "realTurnToday": false
+      "realTurnToday": false,
+      "verdictReason": "Deferred until remind/timer return {id, label, when_text, fire_at} as structured data (additive)."
     },
     {
       "file": "score-breakdown.tsx",
@@ -1543,13 +1631,14 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "scroll-anchor.tsx",
       "name": "scroll-anchor",
       "group": "message",
-      "verdict": "wire-now",
+      "verdict": "no-fit",
       "backendNeeded": null,
       "effort": "QUICK",
       "specTagNeeded": false,
@@ -1559,7 +1648,9 @@
       "showcaseScenario": "essay",
       "batch": 3,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "No-fit as a standalone timer demo; the kit Thread already renders ThreadScrollToBottom as its runtime scroll anchor.",
+      "reading": "No-fit as a standalone timer demo; the kit Thread already renders ThreadScrollToBottom as its runtime scroll anchor."
     },
     {
       "file": "settings-panel.tsx",
@@ -1575,7 +1666,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "shared-conversation.tsx",
@@ -1591,7 +1683,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until SHARE-CONV-01."
     },
     {
       "file": "shiki-highlighter.tsx",
@@ -1607,7 +1700,8 @@
       "showcaseScenario": "code",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "sources.aui.tsx",
@@ -1627,7 +1721,8 @@
       "showcaseScenario": "search",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "sources.tsx",
@@ -1646,7 +1741,8 @@
         "frontend/src/next/pages/NextChatPage.tsx:929-1040",
         "frontend/src/apps/chat/chatSourceCaption.tsx:19-67"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "speaker-identity.tsx",
@@ -1663,7 +1759,8 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": true,
-      "reading": "CHAR-01 uses SpeakerIdentity as the shipped assistant reply speaker mark."
+      "reading": "CHAR-01 uses SpeakerIdentity as the shipped assistant reply speaker mark.",
+      "verdictReason": "CHAR-01 uses SpeakerIdentity as the shipped assistant reply speaker mark."
     },
     {
       "file": "spec-sheet.tsx",
@@ -1692,7 +1789,8 @@
       "showcaseScenario": "NEW: spec-sheet (weather)",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "stopped-run.tsx",
@@ -1710,7 +1808,8 @@
       "replacesHandBuilt": [
         "frontend/src/apps/chat/chatContinue.ts"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "streaming-text.tsx",
@@ -1726,7 +1825,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "subagent-list.tsx",
@@ -1742,7 +1842,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "suggestions.tsx",
@@ -1758,7 +1859,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "surfaces.test.tsx",
@@ -1774,7 +1876,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "surfaces.tsx",
@@ -1790,7 +1893,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "task-card.tsx",
@@ -1806,7 +1910,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "task.ts",
@@ -1822,7 +1927,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "terminal-block.tsx",
@@ -1838,7 +1944,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "thinking-indicator.test.tsx",
@@ -1854,7 +1961,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "thinking-indicator.tsx",
@@ -1870,7 +1978,8 @@
       "showcaseScenario": "reasoning, search",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "thread-list.aui.test.tsx",
@@ -1886,7 +1995,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "thread-list.aui.tsx",
@@ -1902,7 +2012,8 @@
       "showcaseScenario": "NEW: thread-list (titles, pinned, archived)",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "thread-list.pin.aui.test.tsx",
@@ -1918,7 +2029,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "thread-list.tsx",
@@ -1934,13 +2046,15 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "thread-search.test.tsx",
       "name": "thread-search.test",
       "group": "thread/list",
-      "verdict": "support"
+      "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "thread-search.tsx",
@@ -1958,7 +2072,8 @@
       "replacesHandBuilt": [
         "frontend/src/next/pages/NextChatPage.tsx:1372-1875"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "thread.aui.test.tsx",
@@ -1974,7 +2089,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "thread-viewport.test.tsx",
@@ -1990,7 +2106,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "thread.aui.tsx",
@@ -2006,7 +2123,8 @@
       "showcaseScenario": "all existing scenarios",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "threadlist-sidebar.aui.tsx",
@@ -2022,7 +2140,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "timeline.tsx",
@@ -2039,7 +2158,8 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "reading": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline."
+      "reading": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline.",
+      "verdictReason": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline."
     },
     {
       "file": "todo-list.tsx",
@@ -2058,7 +2178,8 @@
       "showcaseScenario": null,
       "batch": 6,
       "replacesHandBuilt": [],
-      "realTurnToday": false
+      "realTurnToday": false,
+      "verdictReason": "Deferred until list-view and list-add return items[] beside the text (additive)."
     },
     {
       "file": "tool-call.tsx",
@@ -2074,7 +2195,8 @@
       "showcaseScenario": "search, failed-tool",
       "batch": 3,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "tool-error.tsx",
@@ -2090,7 +2212,8 @@
       "showcaseScenario": "failed-tool",
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "tool-fallback.aui.tsx",
@@ -2106,7 +2229,8 @@
       "showcaseScenario": "search",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "tool-group.aui.tsx",
@@ -2122,7 +2246,8 @@
       "showcaseScenario": "search",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "tool-group.tsx",
@@ -2138,7 +2263,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "tool-timeline.tsx",
@@ -2156,7 +2282,8 @@
       "showcaseScenario": "search",
       "batch": 1,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "tooltip-icon-button.tsx",
@@ -2172,7 +2299,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "trace-waterfall.tsx",
@@ -2188,7 +2316,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until TurnStats.nodes."
     },
     {
       "file": "typing-indicator.tsx",
@@ -2204,7 +2333,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "ui/avatar.tsx",
@@ -2220,7 +2350,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/badge.tsx",
@@ -2236,7 +2367,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/button.tsx",
@@ -2252,7 +2384,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/collapsible.tsx",
@@ -2268,7 +2401,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/command.tsx",
@@ -2284,7 +2418,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/dialog.tsx",
@@ -2300,7 +2435,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/input.tsx",
@@ -2316,7 +2452,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/popover.tsx",
@@ -2332,7 +2469,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/separator.tsx",
@@ -2348,7 +2486,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/sheet.tsx",
@@ -2364,7 +2503,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/sidebar.tsx",
@@ -2380,7 +2520,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/skeleton.tsx",
@@ -2396,7 +2537,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/textarea.tsx",
@@ -2412,7 +2554,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "ui/tooltip.tsx",
@@ -2428,7 +2571,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "voice-conversation.test.tsx",
@@ -2444,7 +2588,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "voice-conversation.tsx",
@@ -2460,7 +2605,8 @@
       "showcaseScenario": "spoken",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "voice.tsx",
@@ -2476,7 +2622,8 @@
       "showcaseScenario": "spoken",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
       "file": "web-preview.tsx",
@@ -2492,7 +2639,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Deferred until sandboxed HTML artifact kind."
     },
     {
       "file": "web-search.tsx",
@@ -2508,7 +2656,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision."
     },
     {
       "file": "guardrail-notice.tsx",
@@ -2524,7 +2673,8 @@
       "showcaseScenario": "failure-safety, crisis",
       "batch": 4,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     }
   ]
 }

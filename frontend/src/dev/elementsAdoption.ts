@@ -1,11 +1,12 @@
 import raw from "@/dev/elements-adoption.json";
 
 // UI-SHOWCASE: loader for the Elements adoption panel. `elements:scan`
-// generates the file and computes implemented from Home source imports.
+// generates the file and computes implemented from Home imports, including the
+// Elements composed by the kit Thread Home renders.
 // Tolerant on purpose: missing fields fall back instead of throwing.
 export type Verdict = "wire now" | "wire after" | "support" | "later" | "no fit" | "unassessed";
 export type Status = "implemented" | "in progress" | "not yet" | "not for us";
-export interface ElementItem { file: string; name: string; group: string; verdict: Verdict; status: Status }
+export interface ElementItem { file: string; name: string; group: string; verdict: Verdict; verdictReason: string; status: Status }
 
 const VERDICTS: Verdict[] = ["wire now", "wire after", "support", "later", "no fit"];
 const norm = (value: unknown) => String(value ?? "").toLowerCase().replace(/[-_]+/g, " ").trim();
@@ -25,7 +26,7 @@ export function normalizeAdoption(input: unknown): ElementItem[] {
       : verdict === "no fit" || statusText === "not for us" ? "not for us"
       : "not yet";
     const name = String(e.name ?? file.replace(/\..*$/, ""));
-    return [{ file, name, group: String(e.group ?? name.split("-")[0] ?? "other"), verdict, status }];
+    return [{ file, name, group: String(e.group ?? name.split("-")[0] ?? "other"), verdict, verdictReason: String(e.verdictReason ?? "No verdict reason recorded."), status }];
   });
 }
 
