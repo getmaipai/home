@@ -232,6 +232,9 @@ describe("NextRoutes Incognito toggle", () => {
     localStorage.setItem("maipai.incognito-explanation-seen", "true");
     const originalFetch = globalThis.fetch;
     const discardCalls: string[] = [];
+    // INCOGNITO-ANIM-01: switching Incognito never animates the page.
+    const startViewTransition = mock(() => ({ ready: Promise.resolve(), finished: Promise.resolve() }));
+    (document as unknown as { startViewTransition: unknown }).startViewTransition = startViewTransition;
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/settings")) return Response.json([
@@ -263,9 +266,11 @@ describe("NextRoutes Incognito toggle", () => {
       const incognitoRow = await view.findByRole("menuitem", { name: /Incognito/ });
       expect(incognitoRow.textContent).toContain("On");
       fireEvent.click(incognitoRow);
+      expect(startViewTransition).not.toHaveBeenCalled();
       await waitFor(() => expect(discardCalls).toEqual(["/api/conversations/incognito/discard"]));
       await expect(createChatThreadListAdapter("Nova", { incognito: true }).fetch("conv-toggle-incognito")).rejects.toThrow();
     } finally {
+      delete (document as unknown as { startViewTransition?: unknown }).startViewTransition;
       sessionStorage.removeItem("maipai.incognito");
       localStorage.removeItem("maipai.incognito-explanation-seen");
       globalThis.fetch = originalFetch;

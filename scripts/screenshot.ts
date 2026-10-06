@@ -2567,6 +2567,38 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
     await page.getByRole("textbox", { name: "Message input" }).waitFor();
   };
 
+  // INCOGNITO-ANIM-01: switching Incognito on has no transition. Frames at
+  // 60 and 400 ms after the click, and whether any view-transition animation
+  // ran (label from INCOGNITO_ANIM_LABEL: "before" on the old build).
+  {
+    const label = process.env.INCOGNITO_ANIM_LABEL ?? "after";
+    const context = await newContext(browser, desktop, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.addInitScript(() => localStorage.setItem("maipai.incognito-explanation-seen", "true"));
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      await page.locator('[data-slot="rail-profile-trigger"]').click();
+      const item = page.getByRole("menuitem", { name: /Incognito/ });
+      await page.evaluate(() => {
+        const w = window as unknown as { __vt: boolean };
+        w.__vt = false;
+        const tick = () => { if (document.getAnimations().some((a) => String((a.effect as KeyframeEffect | null)?.pseudoElement ?? "").includes("view-transition"))) w.__vt = true; requestAnimationFrame(tick); };
+        requestAnimationFrame(tick);
+      });
+      await item.click();
+      await page.waitForTimeout(60);
+      await page.screenshot({ path: join(outDir, `incognito-${label}-60ms-1440-dark.png`) });
+      await page.waitForTimeout(340);
+      await page.screenshot({ path: join(outDir, `incognito-${label}-400ms-1440-dark.png`) });
+      await page.waitForTimeout(900);
+      log(`incognito ${label}`, { viewTransitionRan: await page.evaluate(() => (window as unknown as { __vt: boolean }).__vt), incognitoClass: await page.evaluate(() => document.documentElement.classList.contains("incognito")) });
+    } finally {
+      await context.close();
+    }
+  }
+
   // Empty: before any conversation exists for this person.
   for (const theme of THEMES) {
     const context = await newContext(browser, desktop, theme, sessionValue);
@@ -2721,6 +2753,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await context.close();
     }
   }
+
 
   // Loading: hold the conversation list so the skeleton rows show.
   {
