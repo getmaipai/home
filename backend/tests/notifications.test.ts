@@ -1,10 +1,10 @@
-import { describe, expect, test, beforeEach, mock } from "bun:test";
+import { describe, expect, test, beforeEach, mock, setSystemTime } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { trigger, listPending, listHistory, markRead, dismiss, dismissMany } from "@/lib/notifications";
+import { trigger, listPending, listHistory, markRead, dismiss, dismissMany, deliverHeldNotifications } from "@/lib/notifications";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { db } from "@/db";
 import { people } from "@/db/schema";
@@ -15,6 +15,33 @@ beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetRateLimiterForTests();
+});
+
+test("quiet hours hold time-sensitive alerts through an overnight window and release them at its end", async () => {
+  setSystemTime(new Date(2026, 9, 6, 2, 0));
+  try {
+    const { row } = await owner();
+    await trigger("model.download_ready", { modelName: "Quiet Model" });
+    expect(listPending(row)).toHaveLength(0);
+    setSystemTime(new Date(2026, 9, 6, 7, 0));
+    await deliverHeldNotifications();
+    expect(listPending(row).map((item) => item.text)).toContain("Quiet Model finished downloading and is ready to use.");
+  } finally { mock.restore(); }
+});
+
+test("immediate alerts bypass quiet hours and a personal override takes precedence", async () => {
+  setSystemTime(new Date(2026, 9, 6, 22, 30));
+  try {
+    const { client, row } = await owner();
+    await client.request("/api/settings", { method: "PUT", body: { scope: "household", key: "household.quiet_hours.from", value: "22:00" } });
+    await client.request("/api/settings", { method: "PUT", body: { scope: "household", key: "household.quiet_hours.to", value: "07:00" } });
+    await setPersonSetting(client, row.id, "person.quiet_hours.from", "23:00");
+    await setPersonSetting(client, row.id, "person.quiet_hours.to", "06:00");
+    await trigger("model.download_ready", { modelName: "Personal Override" });
+    expect(listPending(row)).toHaveLength(1);
+    await trigger("safety.flagged_turn", { childName: "Nova", categories: "self_harm" });
+    expect(listPending(row)).toHaveLength(2);
+  } finally { mock.restore(); }
 });
 
 async function owner(): Promise<{ client: TestClient; row: PersonRow }> {
@@ -52,10 +79,10 @@ describe("trigger()", () => {
     await trigger("no.such.type", {});
   });
 
-  test("a household audience type delivers to every non-minor, not to minors", async () => {
+  test("an adults audience type delivers to every adult, including an owner without a birthdate", async () => {
     const { client: ownerClient, row: ownerRow } = await owner();
     const { row: teen } = await withRole(ownerClient, "Bramble", "teen");
-    await trigger("model.download_ready", { modelName: "Test Model" });
+    await trigger("safety.flagged_turn", { childName: "Test", categories: "safety" });
 
     expect(listPending(ownerRow).length).toBe(1);
     expect(listPending(teen).length).toBe(0);
@@ -63,9 +90,11 @@ describe("trigger()", () => {
 
   test("renders the template with the given vars", async () => {
     const { row } = await owner();
+    setSystemTime(new Date(2026, 9, 6, 12, 0));
     await trigger("model.download_ready", { modelName: "Qwen3 8B" });
     const [delivery] = listPending(row);
     expect(delivery!.text).toBe("Qwen3 8B finished downloading and is ready to use.");
+    mock.restore();
   });
 
   // getmaipai/home#64: chatMemoryChip.tsx correlates a memory.updated

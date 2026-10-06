@@ -38,7 +38,7 @@ import { runBackupAndMirror } from "@/lib/backup";
 import { checkLeafExpiry } from "@/lib/householdCa";
 import { checkSearxngHealth } from "@/lib/searxngHealth";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
-import { trigger } from "@/lib/notifications";
+import { trigger, deliverHeldNotifications } from "@/lib/notifications";
 import { checkDiskFull } from "@/lib/storage";
 import { reconcileFileStore } from "@/lib/storage/usage";
 import { checkForUpdates } from "@/lib/updates";
@@ -234,6 +234,7 @@ export function cancelJob(actor: PersonRow, id: string): SchedulerOpResult<true>
 type CoreJobHandler = (row: JobRow) => void | Promise<void>;
 
 const CORE_JOBS: Record<string, CoreJobHandler> = {
+  "notifications.deliver_held": async () => { await deliverHeldNotifications(); },
   "memory.maintenance": () => {
     runMaintenance();
   },

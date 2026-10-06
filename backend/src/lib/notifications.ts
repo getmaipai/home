@@ -13,9 +13,7 @@
 // configurable type that always fires regardless of preference, and a
 // thirty-day-center-shaped read/dismiss history (routes/notifications.ts).
 //
-// What's deferred, named rather than half-built: quiet hours (no
-// schedule concept exists yet for any settings key, not just this one -
-// scheduler.ts's own header names the identical gap), the `passive`
+// What's deferred, named rather than half-built: the `passive`
 // digest batching (every level delivers immediately today; a `passive`
 // type is stored and readable the same as the others, just not yet
 // batched into a scheduled digest), browser push / Go / TV overlay /
@@ -27,11 +25,11 @@
 // core's are declared, and get its own settings-key toggle through its
 // manifest's `config[]` (already-spec'd, docs/SETTINGS.md), not by
 // editing this file.
-import { eq, and, isNull, inArray, desc } from "drizzle-orm";
+import { eq, and, isNull, inArray, desc, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { notificationDeliveries, people } from "@/db/schema";
+import { notificationDeliveries, notificationHolds, people } from "@/db/schema";
 import { newNotificationId } from "@/lib/id";
-import { getSettingValueForPerson } from "@/lib/settings";
+import { getSettingValueForPerson, getHouseholdSettingValue } from "@/lib/settings";
 import { sendTelegramMessage } from "@/lib/telegramChannel";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listActivePeople } from "@/lib/access";
@@ -174,6 +172,47 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
   const text = renderTemplate(type.template, vars);
 
   for (const recipient of recipients) {
+    const now = new Date();
+    if (type.level === "immediate") {
+      await deliver(type, recipient, text, opts, now);
+      continue;
+    }
+    const quiet = quietHours(recipient, now);
+    if (quiet.active) {
+      db.insert(notificationHolds).values({ id: newNotificationId(), typeId: type.id, recipientId: recipient.id, text, options: JSON.stringify(opts), deliverAfter: quiet.endAt.toISOString() }).run();
+      continue;
+    }
+    await deliver(type, recipient, text, opts, now);
+  }
+}
+
+const QUIET_FROM = "quiet_hours.from";
+const QUIET_TO = "quiet_hours.to";
+function validTime(value: unknown): number | undefined {
+  if (typeof value !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(value)) return undefined;
+  const [hour, minute] = value.split(":").map(Number);
+  return hour! * 60 + minute!;
+}
+
+function quietHours(recipient: PersonRow, now: Date): { active: boolean; endAt: Date } {
+  const householdFrom = validTime(getHouseholdSettingValue(`household.${QUIET_FROM}`)) ?? 21 * 60;
+  const householdTo = validTime(getHouseholdSettingValue(`household.${QUIET_TO}`)) ?? 7 * 60;
+  const personFromValue = getSettingValueForPerson(recipient.id, `person.${QUIET_FROM}`);
+  const personToValue = getSettingValueForPerson(recipient.id, `person.${QUIET_TO}`);
+  const personFrom = validTime(personFromValue);
+  const personTo = validTime(personToValue);
+  const ownHours = ["adult", "teen"].includes(speakerAgeBand(recipient, now));
+  const from = ownHours ? personFrom ?? householdFrom : householdFrom;
+  const to = ownHours ? personTo ?? householdTo : householdTo;
+  const current = now.getHours() * 60 + now.getMinutes();
+  const active = from === to ? true : from < to ? current >= from && current < to : current >= from || current < to;
+  const endAt = new Date(now);
+  endAt.setHours(Math.floor(to / 60), to % 60, 0, 0);
+  if (current >= to) endAt.setDate(endAt.getDate() + 1);
+  return { active, endAt };
+}
+
+async function deliver(type: NotificationType, recipient: PersonRow, text: string, opts: TriggerOptions, now: Date): Promise<void> {
     const channels = resolveChannelsFor(type, recipient);
     if (channels.includes("telegram")) {
       // resolveChannelsFor() only ever includes "telegram" once it has
@@ -191,13 +230,28 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
         recipientId: recipient.id,
         text,
         channels: JSON.stringify(channels),
-        createdAt: new Date().toISOString(),
+        createdAt: now.toISOString(),
         subjectPersonId: opts.subjectPersonId ?? null,
         subjectTurnId: opts.subjectTurnId ?? null,
         memoryIds: opts.memoryIds ? JSON.stringify(opts.memoryIds) : null,
       })
       .run();
+}
+
+/** Deliver durable notifications once their recipient's quiet hours have ended. */
+export async function deliverHeldNotifications(now = new Date()): Promise<number> {
+  const held = db.select().from(notificationHolds).where(lte(notificationHolds.deliverAfter, now.toISOString())).all();
+  for (const row of held) {
+    const type = getNotificationType(row.typeId);
+    const recipient = db.select().from(people).where(and(eq(people.id, row.recipientId), isNull(people.deletedAt))).get() as PersonRow | undefined;
+    if (!recipient || !type) { db.delete(notificationHolds).where(eq(notificationHolds.id, row.id)).run(); continue; }
+    const quiet = quietHours(recipient, now);
+    if (type.level === "immediate" || !quiet.active) {
+      await deliver(type, recipient, row.text, JSON.parse(row.options) as TriggerOptions, now);
+      db.delete(notificationHolds).where(eq(notificationHolds.id, row.id)).run();
+    } else db.update(notificationHolds).set({ deliverAfter: quiet.endAt.toISOString() }).where(eq(notificationHolds.id, row.id)).run();
   }
+  return held.length;
 }
 
 /** Fires `safety.flagged_turn` for one evaluateSafety() result, fire-and-

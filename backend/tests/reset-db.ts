@@ -26,6 +26,7 @@ import {
   memoryConsolidationCursor,
   idSequences,
   settingsValues,
+  notificationHolds,
   scheduledJobs,
   conversationTurns,
   shares,
@@ -157,6 +158,7 @@ export function resetDb(): void {
   db.delete(pendingEmbeddings).run();
   db.delete(pendingMemoryWork).run();
   db.delete(memoryRecords).run();
+  db.delete(notificationHolds).run();
   db.delete(settingsValues).run();
   // lib/settings.ts's own resolveStoredValue() cache (added in a latency
   // pass, 2026-09-06): the same "cleared here too" fix idSequences got

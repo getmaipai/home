@@ -17,7 +17,7 @@ import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
  * that file's own behavior selector by selector - boolean/select/
  * number/text/secret, the same draft/commit/reset logic, the same
  * write-only secret flow, the same "not supported yet" fallback for a
- * selector with no real registry key today (duration/time/entity/area/
+ * selector with no real registry key today (duration/entity/area/
  * media, and a scalar `person` with no `range.multiple`) - reusing its
  * two pure exported helpers (`titleCaseOption`, `localeDisplayName`)
  * rather than redefining them. NOTIFY-SHARE-02 adds the one real
@@ -181,6 +181,8 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
         aria-label={def.label}
       />
     );
+  } else if (def.selector === "time") {
+    control = <div className="flex items-center gap-2"><Input type="time" className="min-h-12 w-40" value={String(resolved.value ?? "")} disabled={disabled} onChange={(e) => void onChange(e.target.value)} aria-label={def.key} />{resolved.value == null && <><span className="text-sm text-muted-foreground">Inheriting household hours</span><Button type="button" variant="link" size="sm" onClick={onReset} disabled={disabled} className="h-auto min-h-12 w-fit p-0">Use household hours</Button></>}</div>;
   } else if (def.selector === "text") {
     control = (
       <Input

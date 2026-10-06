@@ -19,6 +19,10 @@
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
+  SettingsKey.parse({ key: "household.quiet_hours.from", scope: "household", selector: "time", default: "21:00", label: "Quiet hours start", help: "Quiet hours begin at 9:00 pm by default. Safety alarms always override quiet hours.", level: "basic", lives_in: "robot.settings", honoured_by: ["home"] }),
+  SettingsKey.parse({ key: "household.quiet_hours.to", scope: "household", selector: "time", default: "07:00", label: "Quiet hours end", help: "Quiet hours end at 7:00 am by default.", level: "basic", lives_in: "robot.settings", honoured_by: ["home"] }),
+  SettingsKey.parse({ key: "person.quiet_hours.from", scope: "person", selector: "time", default: null, label: "Personal quiet hours start", help: "Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own.", level: "basic", lives_in: "robot.settings", honoured_by: ["home"] }),
+  SettingsKey.parse({ key: "person.quiet_hours.to", scope: "person", selector: "time", default: null, label: "Personal quiet hours end", help: "Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own.", level: "basic", lives_in: "robot.settings", honoured_by: ["home"] }),
   SettingsKey.parse({
     key: "notifications.browser.enabled",
     scope: "person",

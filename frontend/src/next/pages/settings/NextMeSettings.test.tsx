@@ -23,6 +23,7 @@ function setup(role: Roster["role"], initialUrl = "/settings", telegramChatId = 
     ...Array.from({ length: 9 }, (_, i) => makeKey(`allowance.${i}.daily_minutes`, "person.allowance", "number")),
     makeKey("notifications.telegram.chat_id", "person.notifications"),
     makeKey("notifications.browser.enabled", "person.notifications", "boolean"),
+    { ...makeKey("person.quiet_hours.from", "robot.settings", "time"), default: null }, { ...makeKey("person.quiet_hours.to", "robot.settings", "time"), default: null },
     ...["approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available", "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated", "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available"].map((name) => makeKey(`notifications.${name}.telegram`, "person.notifications", "boolean")),
     makeKey("personality.style", "person.persona"), makeKey("search.safe_search", "person.search", "boolean"), makeKey("tts.voice_id", "person.voice", "select"),
     makeKey("storage.cap", "person.storage", "number"), makeKey("storage.cap_warning", "person.storage", "number"),
@@ -152,5 +153,13 @@ describe("NextMeSettings", () => {
       await waitFor(() => expect(document.body.textContent).toContain("ui.show_turn_stats"));
       expect(document.body.textContent).not.toContain("Enrollment sounds");
     } finally { restore(); }
+  });
+
+  test("personal notification section exposes quiet-hours inheritance controls", async () => {
+    const view = setup("adult", "/settings?section=notifications");
+    try {
+      await waitFor(() => expect(view.container.querySelector('input[aria-label="person.quiet_hours.from"]')).not.toBeNull());
+      expect(view.container.querySelectorAll('input[aria-label^="person.quiet_hours."]')).toHaveLength(2);
+    } finally { view.restore(); }
   });
 });

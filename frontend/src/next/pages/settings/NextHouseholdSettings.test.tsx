@@ -14,7 +14,7 @@ function run(initialUrl = "/settings?tab=household") {
   const registry: SettingsKey[] = [
     ["household.name", "household.system"], ["household.location", "household.system"], ["household.locale", "household.system"],
     ["ai.temperature", "household.ai"], ["integration.example", "household.integrations"], ["notifications.telegram.bot_token", "household.notifications"],
-    ["reference.library_dir", "household.reference"], ["storage.household.cap_bytes", "household.storage"],
+    ["reference.library_dir", "household.reference"], ["household.quiet_hours.from", "robot.settings"], ["household.quiet_hours.to", "robot.settings"], ["storage.household.cap_bytes", "household.storage"],
   ].map(([key, lives_in]) => ({ key, scope: "household", selector: "text", label: key, level: "basic", secret: false, lives_in, honoured_by: ["home"] } as SettingsKey));
   const values: ResolvedSetting[] = registry.map((item) => ({ key: item.key, value: "sample", source: "default", label: item.label, help: item.help, level: item.level, secret: item.secret }));
   const before = globalThis.fetch;
@@ -62,5 +62,14 @@ describe("NextHouseholdSettings", () => {
     const view = run();
     try { await waitFor(() => expect(document.querySelector('[data-slot="native-select"]')).not.toBeNull()); }
     finally { view.restore(); }
+  });
+
+  test("household Integrations section renders quiet-hours controls from robot.settings", async () => {
+    const view = run();
+    try {
+      fireEvent.click(await view.findByRole("tab", { name: "Integrations" }));
+      await waitFor(() => expect(view.container.querySelector('input[aria-label="household.quiet_hours.from"]')).not.toBeNull());
+      expect(view.container.querySelector('input[aria-label="household.quiet_hours.to"]')).not.toBeNull();
+    } finally { view.restore(); }
   });
 });

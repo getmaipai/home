@@ -53,7 +53,7 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
 function NotificationSettings({ person }: { person: Roster }) {
   const [chatId, setChatId] = useState<string | null>(null);
   useEffect(() => { let active = true; api.settingsValues(`person:${person.id}`).then((values) => { if (active) setChatId(String(values.find((value) => value.key === "notifications.telegram.chat_id")?.value ?? "").trim() || null); }).catch(() => setChatId(null)); return () => { active = false; }; }, [person.id]);
-  return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.notifications"]} includeKeys={["notifications.browser.enabled", "notifications.file_shared.muted_senders"]} /><TelegramAdvanced person={person} configured={Boolean(chatId)} /></>;
+  return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.notifications", "robot.settings"]} includeKeys={["person.quiet_hours.from", "person.quiet_hours.to", "notifications.browser.enabled", "notifications.file_shared.muted_senders"]} /><TelegramAdvanced person={person} configured={Boolean(chatId)} /></>;
 }
 
 function TelegramAdvanced({ person, configured }: { person: Roster; configured: boolean }) {

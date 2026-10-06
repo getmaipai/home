@@ -898,6 +898,15 @@ export const notificationDeliveries = sqliteTable("notification_deliveries", {
   memoryIds: text("memory_ids"),
 });
 
+export const notificationHolds = sqliteTable("notification_holds", {
+  id: text("id").primaryKey(),
+  typeId: text("type_id").notNull(),
+  recipientId: text("recipient_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  options: text("options").notNull(),
+  deliverAfter: text("deliver_after").notNull(),
+});
+
 // Session F (platform and trust), step 1. Mirrors
 // spec/schemas/issue.schema.json: the Health/Repairs surface's backing
 // store. Upserted on `(source, key)` by lib/issues.ts's raiseIssue() -

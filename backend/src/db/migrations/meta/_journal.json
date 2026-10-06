@@ -582,6 +582,13 @@
       "when": 1791262617800,
       "tag": "0082_marvelous_felicia_hardy",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "6",
+      "when": 1791268403188,
+      "tag": "0083_fine_harpoon",
+      "breakpoints": true
     }
   ]
 }
