@@ -2,6 +2,7 @@ import { tmpdir } from "node:os";
 import { db } from "@/db";
 import { dataDir } from "@/lib/paths";
 import { __resetSettingsCacheForTests } from "@/lib/settings";
+import { quietHoursAwayFromNow } from "./support/quietHours";
 import { __resetDeviceCommandsForTests } from "@/lib/deviceCommands";
 import { __resetCommandsCacheForTests } from "@/lib/commands";
 import { __resetTurnActivityForTests } from "@/lib/turnActivity";
@@ -176,6 +177,8 @@ export function resetDb(): void {
   // since every test file in one `bun test` run shares the same imported
   // settings.ts module instance.
   __resetSettingsCacheForTests();
+  // GATE-FIX-03: no test meets the real clock's quiet hours by accident.
+  quietHoursAwayFromNow();
   // lib/turnActivity.ts's own "a turn ran recently" flag (also added in
   // that pass): the memory judge's runJudgeBatch() skips its whole batch
   // while this says a turn is active, and it's real wall-clock state, not

@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, mock, setSystemTime } from "bun:test";
+import { afterEach, describe, expect, test, beforeEach, mock, setSystemTime } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -19,10 +19,20 @@ beforeEach(() => {
   __resetRateLimiterForTests();
 });
 
+// GATE-FIX-03: mock.restore() does not give the real clock back, so a test
+// here that froze the time left it frozen for every later file in the same
+// run (issues.test.ts's timers then never fired).
+afterEach(() => {
+  setSystemTime();
+});
+
 test("quiet hours hold time-sensitive alerts through an overnight window and release them at its end", async () => {
   setSystemTime(new Date(2026, 9, 6, 2, 0));
   try {
     const { row } = await owner();
+    // The household default (resetDb() moves quiet hours off the real clock).
+    setHouseholdSettingValue("household.quiet_hours.from", "21:00");
+    setHouseholdSettingValue("household.quiet_hours.to", "07:00");
     await trigger("model.download_ready", { modelName: "Quiet Model" });
     expect(listPending(row)).toHaveLength(0);
     setSystemTime(new Date(2026, 9, 6, 7, 0));

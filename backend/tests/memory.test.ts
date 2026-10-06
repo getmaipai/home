@@ -2056,10 +2056,12 @@ describe("validAt() (CHAT-08, chunk a: a record's own validity as of a moment)",
     const r = row({ validTo: "2025-05-01" });
     // "valid through May 1" means May 1 still counts; out of range only
     // from May 2 onward.
-    expect(validAt(r, new Date("2025-04-30T00:00:00Z"))).toBe(true);
-    expect(validAt(r, new Date("2025-05-01T00:00:00Z"))).toBe(true);
-    expect(validAt(r, new Date("2025-05-01T23:59:59Z"))).toBe(true);
-    expect(validAt(r, new Date("2025-05-02T00:00:00Z"))).toBe(false);
+    // Local times, as validAt() reads a bare date in the local day
+    // (GATE-FIX-03: the UTC literals failed in any non-UTC time zone).
+    expect(validAt(r, new Date(2025, 3, 30, 0, 0, 0))).toBe(true);
+    expect(validAt(r, new Date(2025, 4, 1, 0, 0, 0))).toBe(true);
+    expect(validAt(r, new Date(2025, 4, 1, 23, 59, 59))).toBe(true);
+    expect(validAt(r, new Date(2025, 4, 2, 0, 0, 0))).toBe(false);
   });
 
   test("a malformed bound never hides a fact: treated as open", () => {
