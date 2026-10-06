@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AssistantRuntimeProvider, useAui, useLocalRuntime } from "@assistant-ui/react";
-import { Alert, AlertDescription } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Page } from "@maipai/ui/src/primitives/Page";
@@ -30,11 +29,10 @@ const PACES: ShowcasePace[] = ["instant", "normal", "slow"];
 const PACE_LABELS: Record<string, string> = { instant: "Instant", normal: "Normal pace", slow: "Slow pace" };
 type Settle = "ready" | "error" | "idle" | "waiting" | "responding";
 
-function ShowcaseWorkspace({ scenarios, pace, setPace, banner, setScenario, settleRef }: {
+function ShowcaseWorkspace({ scenarios, pace, setPace, setScenario, settleRef }: {
   scenarios: ShowcaseScenario[];
   pace: ShowcasePace;
   setPace: (pace: ShowcasePace) => void;
-  banner: string | null;
   setScenario: (id: string) => void;
   settleRef: React.MutableRefObject<((state: Settle) => void) | null>;
 }) {
@@ -110,11 +108,6 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, banner, setScenario, sett
           <div className="flex items-center gap-2 border-b border-border px-2 py-1 sm:hidden">
             <Button variant="ghost" onClick={() => setCurrent(null)}>Scenarios</Button>
           </div>
-          {banner ? (
-            <Alert className="mx-4 mt-2 mb-2">
-              <AlertDescription>{banner}</AlertDescription>
-            </Alert>
-          ) : null}
           <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
             <ChatThread />
           </div>
@@ -132,7 +125,6 @@ export function NextUiShowcasePage({ person }: { person: Roster }) {
   const [pace, setPace] = useState<ShowcasePace>("normal");
   const paceRef = useRef(pace);
   useEffect(() => { paceRef.current = pace; }, [pace]);
-  const [banner, setBanner] = useState<string | null>(null);
   const [openSources, setOpenSources] = useState<ReadonlySet<string>>(new Set());
   const settleRef = useRef<((state: Settle) => void) | null>(null);
   const scenarioRef = useRef<string>("table");
@@ -153,11 +145,9 @@ export function NextUiShowcasePage({ person }: { person: Roster }) {
 
   const adapter = useMemo(() => createChatModelAdapter({
     consumeSupersedes: () => undefined,
-    onCrisisResources: setBanner,
     turnSchedulerRef: { current: null },
     speakReplies: false,
     onReplyState: (state) => {
-      if (state === "waiting") setBanner(null);
       settleRef.current?.(state);
     },
     openStream: (_text, signal) => openShowcaseStream(scenarioRef.current, paceRef.current, signal),
@@ -177,7 +167,7 @@ export function NextUiShowcasePage({ person }: { person: Roster }) {
               <AdminContext.Provider value>
                 <SourcesOpenContext.Provider value={sourcesValue}>
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <ShowcaseWorkspace scenarios={scenarios} pace={pace} setPace={setPace} banner={banner} setScenario={(id) => chooseScenario(scenarios.find((entry) => entry.id === id), id)} settleRef={settleRef} />
+                    <ShowcaseWorkspace scenarios={scenarios} pace={pace} setPace={setPace} setScenario={(id) => chooseScenario(scenarios.find((entry) => entry.id === id), id)} settleRef={settleRef} />
                   </div>
                 </SourcesOpenContext.Provider>
               </AdminContext.Provider>

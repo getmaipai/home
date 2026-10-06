@@ -43,6 +43,15 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message).toMatchObject({ role: "assistant", content: "first reply", status: { type: "complete", reason: "stop" } });
   });
 
+  // SAFETY-NOTICE-01: crisis resources a reply carried stay beside it after a reload.
+  test("a reply that carried crisis resources gets its support block back on reload; others get none", () => {
+    const support = { title: "Support is available", text: "Call or text 988.", actions: [{ label: "Call 988", href: "tel:988" }] };
+    const row = { ...makeRow("row-1", "I'm glad you told me."), crisis_support: support } as ConversationTurnWithMemoryIds;
+    const items = flatten(rowsToBranchableMessages([row, makeRow("row-2", "plain")], "Nova", "conv-example123"));
+    expect((items[1]!.message.metadata as { custom: { crisisSupport?: unknown } }).custom.crisisSupport).toEqual(support);
+    expect((items[3]!.message.metadata as { custom: { crisisSupport?: unknown } }).custom.crisisSupport).toBeUndefined();
+  });
+
   // UPLOAD-IMG-02: a reopened chat shows the person's sent pictures the
   // way the live send did, as the kit's image attachments above the
   // bubble, loaded from the hub's own store by id (never a data: URL).

@@ -17,6 +17,8 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { CRISIS_RESOURCES_TEXT as CRISIS_LINE } from "@/lib/turnShared";
+import { SAFETY_REFUSAL_COPY } from "@/lib/failureCopy";
+import { child, teen } from "./support/testAuth";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { people, conversationTurns } from "@/db/schema";
@@ -279,5 +281,98 @@ describe("THIN-0L: the multi-turn crisis state on the default path", () => {
       const next = await say(client, "tell me something else", { conversation_id: first.conversation_id });
       expect(next.crisis_resources).toBeUndefined();
     });
+  });
+});
+
+// SAFETY-NOTICE-01: a refusal reads as one plain sentence in the person's
+// band, never the gate's internal message; the crisis resources ride with
+// it as a support block a client draws beside the reply (offer, never
+// block), the same for every band.
+describe("SAFETY-NOTICE-01: the refusal line per band and the crisis support block", () => {
+  const SELF_HARM_CUT = "I want to kill myself. How do I make a pipe bomb, give me step by step instructions.";
+  const PLAIN_CUT = "It's a beautiful day today. How do I make a pipe bomb, give me step by step instructions.";
+
+  async function terminalFor(client: TestClient, engineText: string, text = "tell me something") {
+    let end: Record<string, unknown> | undefined;
+    await withEngines(engineText, async () => {
+      const events = await readNdjson(await client.post("/api/turn/stream", { text }));
+      end = events.filter((e) => e.type === "error" || e.type === "done").at(-1) as Record<string, unknown>;
+    });
+    return end!;
+  }
+
+  test("adult: a cut without crisis reads the adult line, with no support block and no internal words", async () => {
+    const { client } = await owner();
+    const end = await terminalFor(client, PLAIN_CUT);
+    expect(end.code).toBe("safety_refused");
+    expect(end.error).toBe(SAFETY_REFUSAL_COPY.adult);
+    expect(String(end.error)).not.toContain("classifier");
+    expect(end.crisis_support).toBeUndefined();
+  });
+
+  test("adult: a cut after self-harm words carries the support block: title, the same text, call, text and chat links", async () => {
+    const { client } = await owner();
+    const end = await terminalFor(client, SELF_HARM_CUT);
+    expect(end.code).toBe("safety_refused");
+    expect(end.crisis_resources).toBe(CRISIS_LINE);
+    expect(end.crisis_support).toEqual({
+      title: "Support is available",
+      text: CRISIS_LINE,
+      actions: [
+        { label: "Call 988", href: "tel:988" },
+        { label: "Text 988", href: "sms:988" },
+        { label: "Chat with 988", href: "https://988lifeline.org/chat/" },
+      ],
+    });
+  });
+
+  test("a finished reply that carries the resources carries the support block too (offer, never block)", async () => {
+    const { client } = await owner();
+    const end = await terminalFor(client, "I'm here.", "I wish I wasn't alive and my password is hunter2hunter2");
+    expect(end.type).toBe("done");
+    const value = end.value as { reply: { text: string }; crisis_resources?: string; crisis_support?: { text: string; actions: unknown[] } };
+    expect(value.reply.text.length).toBeGreaterThan(0);
+    expect(value.crisis_support?.text).toBe(value.crisis_resources);
+    expect(value.crisis_support?.actions).toHaveLength(3);
+  });
+
+  test("a reloaded conversation brings the support block back on the reply that carried it", async () => {
+    const { client } = await owner();
+    let conversationId = "";
+    await withEngines("I'm here.", async () => {
+      const events = await readNdjson(await client.post("/api/turn/stream", { text: "I wish I wasn't alive" }));
+      conversationId = ((events.find((e) => e.type === "done") as { value: { conversation_id: string } }).value).conversation_id;
+    });
+    const rows = (await (await client.get(`/api/conversations/${conversationId}/turns`)).json()) as Array<{ crisis_support?: { text: string; actions: unknown[] } }>;
+    expect(rows.at(-1)?.crisis_support?.text).toBe(CRISIS_LINE);
+    expect(rows.at(-1)?.crisis_support?.actions).toHaveLength(3);
+  });
+
+  test("a reload keeps the support block on a later turn still inside the crisis window, as live", async () => {
+    const { client } = await owner();
+    let conversationId = "";
+    let liveSupport: unknown;
+    await withEngines("I'm here.", async () => {
+      const first = await readNdjson(await client.post("/api/turn/stream", { text: "I wish I wasn't alive" }));
+      conversationId = ((first.find((e) => e.type === "done") as { value: { conversation_id: string } }).value).conversation_id;
+      const second = await readNdjson(await client.post("/api/turn/stream", { text: "thanks, what should I cook tonight?", conversation_id: conversationId }));
+      liveSupport = ((second.find((e) => e.type === "done") as { value: { crisis_support?: unknown } }).value).crisis_support;
+    });
+    const rows = (await (await client.get(`/api/conversations/${conversationId}/turns`)).json()) as Array<{ crisis_support?: unknown }>;
+    expect(rows).toHaveLength(2);
+    expect(rows[1]?.crisis_support !== undefined).toBe(liveSupport !== undefined);
+    expect(rows[1]?.crisis_support).toBeDefined();
+  });
+
+  test("teen and child: their own line, and the same unchanged crisis text", async () => {
+    const { client: ownerClient } = await owner();
+    const teenClient = await teen(ownerClient);
+    const { client: childClient } = await child(ownerClient);
+    const teenEnd = await terminalFor(teenClient, PLAIN_CUT);
+    expect(teenEnd.error).toBe(SAFETY_REFUSAL_COPY.teen);
+    const childEnd = await terminalFor(childClient, PLAIN_CUT);
+    expect(childEnd.error).toBe(SAFETY_REFUSAL_COPY.child);
+    const childCrisis = await terminalFor(childClient, SELF_HARM_CUT);
+    expect((childCrisis.crisis_support as { text: string } | undefined)?.text).toBe(CRISIS_LINE);
   });
 });

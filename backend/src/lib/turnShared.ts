@@ -87,8 +87,12 @@ export function judgeStatusAtInsert(value: Pick<TurnValue, "source">, signal: Tu
 export type SpeakerEvidence = { person: string | null; basis: "signed_in" | "voice" | "face" | "voice_and_face" | "claimed" | "unknown"; level: "confirmed" | "tentative" | "unknown" };
 export type PresentPerson = SpeakerEvidence;
 
-export const CRISIS_RESOURCES_TEXT =
-  "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.";
+// SAFETY-NOTICE-01: the text lives in failureCopy.ts (no imports), so the
+// turn history can rebuild a reply's support block without importing this.
+export { CRISIS_RESOURCES_TEXT } from "@/lib/failureCopy";
+import { CRISIS_RESOURCES_TEXT } from "@/lib/failureCopy";
+
+export { CRISIS_SUPPORT_TITLE, CRISIS_SUPPORT_ACTIONS, crisisSupportFor } from "@/lib/failureCopy";
 
 /** The one derivation of `crisis_resources` from a SafetyResult, shared
  * by prepareTurn()'s own input-side use below and step 9's two
@@ -680,7 +684,8 @@ export class StreamUnavailable extends Error {
  * in the crisis state for. While the state holds, every reply carries
  * the crisis overlay, no lookup and no package dispatches, and a "stop"
  * gets one short acknowledgment and then the overlay alone. */
-export const CRISIS_STATE_TURNS = 10;
+export { CRISIS_STATE_TURNS } from "@/lib/failureCopy";
+import { CRISIS_STATE_TURNS } from "@/lib/failureCopy";
 /** The conversation is in the crisis state when one of its last
  * CRISIS_STATE_TURNS turns carried the self-harm category on its input
  * or its output (the row's crisis_signal, kept whatever the reply's

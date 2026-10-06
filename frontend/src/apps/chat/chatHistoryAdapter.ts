@@ -244,6 +244,9 @@ export function rowsToBranchableMessages(
         custom: {
           turnId: row.id,
           conversationId,
+          // SAFETY-NOTICE-01: a reply that carried crisis resources keeps
+          // them beside it after a reload (the hub rebuilds the block).
+          ...(row.crisis_support ? { crisisSupport: row.crisis_support } : {}),
           memoryIds: row.memory_ids,
           judgeStatus: row.judgeStatus,
           source: row.source,

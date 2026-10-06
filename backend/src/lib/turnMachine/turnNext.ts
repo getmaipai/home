@@ -16,7 +16,7 @@ import type { Surface, TurnFailure, SpeakerEvidence, PresentPerson, TurnStreamRe
 import type { TurnErrorDetail, TurnValue } from "@/wire";
 import { turnErrorDetailFrom } from "@/lib/turnErrorDetail";
 import { attachDocuments } from "./documents";
-import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
+import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, crisisSupportFor, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
@@ -151,6 +151,8 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     turn_id: state.turnId,
     ...(state.images?.length ? { images: state.images } : {}),
     crisis_resources: crisisResources,
+    // SAFETY-NOTICE-01: the same resources as a client draws them.
+    ...(crisisResources ? { crisis_support: crisisSupportFor(crisisResources) } : {}),
     // "One trace, not a second log" (section 11): every node this turn
     // ran or skipped, beside the generations buildTurnStats() already
     // projects above.

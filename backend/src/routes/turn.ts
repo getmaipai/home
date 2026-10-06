@@ -6,12 +6,13 @@ import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
-import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
+import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue } from "@/lib/replyVariation";
 import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { safetyRefusalLine } from "@/lib/failureCopy";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
 import { MAX_CHAT_IMAGES, type TurnStreamEvent, type TurnValue } from "@/wire";
@@ -418,7 +419,7 @@ function streamResponse(session: ResumeSession, resumeFrom: number | null, wire:
 function startResumeSession(session: ResumeSession): void {
   void (async () => {
     try {
-      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus)) {
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()))) {
         // One shared counter for `delta` and `reasoning` alike (REASONING-01):
         // a resuming client's own replay filter (shouldDeliver()) needs a
         // real per-event sequence for both, or a `reasoning` event sitting
@@ -491,6 +492,9 @@ export async function* streamTurnEvents(
   // identical pass every turn gets.
   dropReasoning = false,
   modelStatus?: ModelSelectionStatus,
+  // SAFETY-NOTICE-01: whose words a safety refusal's line is in. The
+  // strictest band when a caller does not say.
+  speakerBand: "adult" | "teen" | "child" = "child",
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   // REASONING-01: splits each chunk of the pipeline's own combined text
@@ -697,7 +701,10 @@ export async function* streamTurnEvents(
         console.error("[turn/stream] finalize failed on a refusal:", finalizeErr);
       }
     }
-    if (safetyRefusal) yield { type: "error", error: safetyRefusal.message, code: "safety_refused", ...(refused?.crisis_resources ? { crisis_resources: refused.crisis_resources } : {}) };
+    // SAFETY-NOTICE-01: the person reads one plain sentence in their band's
+    // words (failureCopy.ts), never the gate's internal message, and the
+    // crisis resources ride with it as a support block a client can draw.
+    if (safetyRefusal) yield { type: "error", error: safetyRefusalLine(speakerBand), code: "safety_refused", ...(refused?.crisis_resources ? { crisis_resources: refused.crisis_resources, crisis_support: crisisSupportFor(refused.crisis_resources) } : {}) };
     else if (err instanceof StreamUnavailable) yield { type: "error", error: err.message, code: err.code, ...(err.detail ? { detail: err.detail } : {}) };
     else yield { type: "error", error: (err as Error).message };
     // Still finalize (and so still log) whatever text actually streamed

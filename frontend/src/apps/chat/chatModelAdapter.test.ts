@@ -72,11 +72,10 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   };
 }
 
-async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, onCrisisResources: (text: string) => void = () => {}, getModel?: () => string | undefined, onArtifactReady?: (artifactId: string) => void, onConnection?: (state: { phase: "online" | "dropped" | "reconnecting" | "resumed"; attempt?: number; resumedTokens?: number }) => void): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
+async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, _legacyBanner?: unknown, getModel?: () => string | undefined, onArtifactReady?: (artifactId: string) => void, onConnection?: (state: { phase: "online" | "dropped" | "reconnecting" | "resumed"; attempt?: number; resumedTokens?: number }) => void): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
   const adapter = createChatModelAdapter({
     consumeThinking: () => false,
     consumeSupersedes: () => undefined,
-    onCrisisResources,
     turnSchedulerRef: { current: null },
     getModel,
     onArtifactReady,
@@ -109,7 +108,6 @@ describe("regenerate model override", () => {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
         consumeSupersedes: () => undefined,
-        onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
         getModel: () => ageBand === "adult" ? "composer-model" : undefined,
         getAgeBand: () => ageBand,
@@ -353,7 +351,6 @@ describe("createChatModelAdapter streaming", () => {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
         consumeSupersedes: () => undefined,
-        onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
       });
       const abortSignal = new AbortController().signal;
@@ -521,7 +518,6 @@ describe("createChatModelAdapter streaming", () => {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
         consumeSupersedes: () => undefined,
-        onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
         onSpeakingChange: (speaking) => speakingEvents.push(speaking),
       });
@@ -608,7 +604,6 @@ describe("createChatModelAdapter reasoning (SHELL-02)", () => {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
         consumeSupersedes: () => undefined,
-        onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
         speakReplies: false,
       });
@@ -645,7 +640,6 @@ describe("createChatModelAdapter reasoning (SHELL-02)", () => {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
         consumeSupersedes: () => undefined,
-        onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
         consumeSpoken: () => {
           const value = spoken || undefined;
@@ -677,7 +671,6 @@ describe("createChatModelAdapter reasoning (SHELL-02)", () => {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
         consumeSupersedes: () => undefined,
-        onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
         speakReplies: () => liveOpen,
       });
@@ -810,7 +803,6 @@ describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
         consumeSupersedes: () => undefined,
-        onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
         consumeAskAnswer: () => {
           const value = askAnswer;
@@ -1469,15 +1461,16 @@ describe("createChatModelAdapter errors", () => {
   // SAFETY-01 (#85): a streamed refusal's crisis resources ride on the
   // error event, the one terminal event it sends, and are shown the
   // same way a done value's are.
-  test("the crisis resources still reach the banner callback on a safety refusal", async () => {
+  test("the crisis resources reach the reply's error with the safety refusal (SAFETY-NOTICE-01)", async () => {
     const line = "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.";
-    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "That response violated our safety policy", code: "safety_refused", crisis_resources: line }]));
-    const shown: string[] = [];
+    const support = { title: "Support is available", text: line, actions: [{ label: "Call 988", href: "tel:988" }] };
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "I stopped that reply partway, so try asking it a different way.", code: "safety_refused", crisis_resources: line, crisis_support: support }]));
     try {
-      const { error } = await collect([fakeUserMessage("hi")], new AbortController().signal, (text) => shown.push(text));
+      const { error } = await collect([fakeUserMessage("hi")], new AbortController().signal);
       expect(error).toBeInstanceOf(ChatTurnError);
       expect((error as ChatTurnError).code).toBe("safety_refused");
-      expect(shown).toEqual([line]);
+      expect((error as ChatTurnError).message).toBe("I stopped that reply partway, so try asking it a different way.");
+      expect((error as ChatTurnError).crisisSupport).toEqual(support);
     } finally {
       env.restore();
     }
@@ -1535,7 +1528,6 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
       const adapter = createChatModelAdapter({
         consumeThinking: () => false,
         consumeSupersedes: () => "turn-original123",
-        onCrisisResources: () => {},
         turnSchedulerRef: { current: null },
       });
       const options = {
@@ -1563,7 +1555,6 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
       consumeThinking: () => false,
       consumeSupersedes: () => undefined,
       consumeContinuation: () => ({ assistantText: "The answer stopped here.", fromTurnId: "turn-stopped" }),
-      onCrisisResources: () => {},
       turnSchedulerRef: { current: null },
     });
     try {
@@ -1629,7 +1620,6 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
     const adapter = createChatModelAdapter({
       consumeThinking: () => false,
       consumeSupersedes: () => undefined,
-      onCrisisResources: () => {},
       onResearchDocument: (turnId) => opened.push(turnId),
       turnSchedulerRef: { current: null },
     });
@@ -1664,7 +1654,6 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
         return "turn-original123";
       },
       getConversationId: () => Promise.reject(new Error("conversation resolution failed")),
-      onCrisisResources: () => {},
       turnSchedulerRef: { current: null },
     });
     const options = {
@@ -1705,7 +1694,7 @@ describe("the chat asks for the assistant-stream wire", () => {
 
 describe("behaviours the old NDJSON adapter carried, proven on the assistant-stream path", () => {
   async function collectWith(deps: Partial<Parameters<typeof createChatModelAdapter>[0]>, text: string) {
-    const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, onCrisisResources: () => {}, turnSchedulerRef: { current: null }, ...deps });
+    const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, turnSchedulerRef: { current: null }, ...deps });
     const messages = [fakeUserMessage(text)];
     const options = { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions;
     const yields: ChatModelRunResult[] = [];
@@ -1726,14 +1715,15 @@ describe("behaviours the old NDJSON adapter carried, proven on the assistant-str
     }
   });
 
-  test("a done event's crisis_resources are offered alongside the reply, not in place of it", async () => {
+  test("a done event's crisis support rides on the reply's metadata, alongside the reply, not in place of it", async () => {
     const line = "If you're in crisis, call or text 988.";
-    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "I'm here with you.", sequence: 1 }, { type: "done", value: { reply: { text: "I'm here with you." }, safety: SAFETY, crisis_resources: line, turn_id: "t8", conversation_id: "c8" } }]));
-    const shown: string[] = [];
+    const support = { title: "Support is available", text: line, actions: [{ label: "Text 988", href: "sms:988" }] };
+    const env = stubEnvironment(ndjsonStream([{ type: "delta", text: "I'm here with you.", sequence: 1 }, { type: "done", value: { reply: { text: "I'm here with you." }, safety: SAFETY, crisis_resources: line, crisis_support: support, turn_id: "t8", conversation_id: "c8" } }]));
     try {
-      const yields = await collectWith({ onCrisisResources: (text) => shown.push(text) }, "I feel awful");
+      const yields = await collectWith({}, "I feel awful");
       expect(lastText(yields)).toBe("I'm here with you.");
-      expect(shown).toEqual([line]);
+      const custom = yields.map((y) => y.metadata?.custom as { crisisSupport?: unknown } | undefined).filter(Boolean).at(-1);
+      expect(custom?.crisisSupport).toEqual(support);
     } finally {
       env.restore();
     }
@@ -1743,7 +1733,7 @@ describe("behaviours the old NDJSON adapter carried, proven on the assistant-str
     const { stream, release } = staggeredNdjsonStream([{ type: "delta", text: "Half a sen", sequence: 1 }], [{ type: "delta", text: "tence.", sequence: 2 }, { type: "done", value: { reply: { text: "Half a sentence." }, safety: SAFETY, turn_id: "t7", conversation_id: "c7" } }]);
     const env = stubEnvironment(stream);
     try {
-      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, onCrisisResources: () => {}, turnSchedulerRef: { current: null }, speakReplies: false });
+      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, turnSchedulerRef: { current: null }, speakReplies: false });
       const messages = [fakeUserMessage("hi")];
       const run = runAdapter(adapter, { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions);
       const first = await run.next();

@@ -152,3 +152,45 @@ const PROMPT_LIMIT_COPY: Record<"carry_offer" | "too_big", FailureCopy> = {
 export function promptLimitLine(kind: "carry_offer" | "too_big", minor: boolean): string {
   return minor ? PROMPT_LIMIT_COPY[kind].minor : PROMPT_LIMIT_COPY[kind].adult;
 }
+
+/** SAFETY-NOTICE-01: the one sentence a person sees when the output gate
+ * stops a reply partway for safety (the `safety_refused` error). Plain,
+ * no jargon, and it says what to do instead. Per band: a teen reads the
+ * adult line, a child a shorter, kind one. The crisis resources, when the
+ * reply carried them, are shown instead of this line (crisis_support). */
+export const SAFETY_REFUSAL_COPY: Record<"adult" | "teen" | "child", string> = {
+  adult: "I stopped that reply partway, so try asking it a different way.",
+  teen: "I stopped that reply partway, so try asking it a different way.",
+  child: "I can't talk about that one, so let's pick something else.",
+};
+
+export function safetyRefusalLine(band: "adult" | "teen" | "child"): string {
+  return SAFETY_REFUSAL_COPY[band];
+}
+
+/** 4.3, "offer, never block": the crisis resources line, the same for every
+ * band. Moved here from turnShared.ts (which re-exports it) by
+ * SAFETY-NOTICE-01. */
+/** How many finished turns a conversation stays in the crisis state after a
+ * self-harm signal (turnShared.ts's conversationInCrisis() re-exports it;
+ * the turn history reads it to rebuild which replies carried the resources). */
+export const CRISIS_STATE_TURNS = 10;
+
+export const CRISIS_RESOURCES_TEXT =
+  "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.";
+
+/** SAFETY-NOTICE-01: crisis resources as a client draws them beside a
+ * reply: a supportive title, the text the hub sent (turnShared.ts's
+ * CRISIS_RESOURCES_TEXT, unchanged for every band), and the ways to reach
+ * the line as links the person can follow. Shape: wire.ts's CrisisSupport. */
+export const CRISIS_SUPPORT_TITLE = "Support is available";
+export const CRISIS_SUPPORT_ACTIONS: ReadonlyArray<{ label: string; href: string }> = [
+  { label: "Call 988", href: "tel:988" },
+  { label: "Text 988", href: "sms:988" },
+  { label: "Chat with 988", href: "https://988lifeline.org/chat/" },
+];
+
+/** The support block for a turn whose `crisis_resources` is set. */
+export function crisisSupportFor(crisisResources: string | undefined): { title: string; text: string; actions: Array<{ label: string; href: string }> } | undefined {
+  return crisisResources ? { title: CRISIS_SUPPORT_TITLE, text: crisisResources, actions: CRISIS_SUPPORT_ACTIONS.map((action) => ({ ...action })) } : undefined;
+}

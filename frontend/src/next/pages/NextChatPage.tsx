@@ -329,7 +329,6 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // regardless of the previous value, so LiveVoiceSession can depend on
   // this instead of `isSpeaking` alone to notice "speaking is over."
   const [speakingEndedAt, setSpeakingEndedAt] = useState(0);
-  const [banner, setBanner] = useState<string | null>(null);
   const [connection, setConnection] = useState<ConnectionState>({ phase: "online" });
   const [searchParams, setSearchParams] = useSearchParams();
   // Archive first switches an active remote thread to the blank thread
@@ -628,7 +627,6 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
             return value;
           },
           isBareMode: () => bareModeRef.current,
-          onCrisisResources: setBanner,
           onConnection: setConnection,
           // Jesse, live-found 2026-09-27: a synchronous write_document
           // reply's own artifact card used to sit there unopened until
@@ -770,7 +768,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     },
   });
 
-  return { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1187,7 +1185,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
+  const { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1356,11 +1354,9 @@ export function NextChatPage({ person }: { person: Roster }) {
               answer, the one quiet line under the composer says so
               (ChatComposerNotice), and an owner's or admin's line carries the
               Repairs link this banner used to. */}
-          {banner ? (
-            <Alert className="mx-auto mt-3 mb-1 w-full max-w-200">
-              <AlertDescription>{banner}</AlertDescription>
-            </Alert>
-          ) : null}
+          {/* SAFETY-NOTICE-01: crisis resources are no page banner either;
+              they sit beside the reply that carried them (the message footer
+              and the error slot draw the kit GuardrailNotice). */}
               <ConnectionStateContext.Provider value={{ ...connection, setConnection }}>
                 <ChatThread
                   temporary={temporaryNext}

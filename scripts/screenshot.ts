@@ -3350,7 +3350,7 @@ async function seedTurnFor(session: string, text: string): Promise<{ conversatio
   return (await turn.json()) as { conversation_id: string; turn_id: string };
 }
 
-type Wave2Shot = { band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
+type Wave2Shot = { band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; live?: boolean; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
 
 const ALL_COMBOS = [["desktop", "light"], ["desktop", "dark"], ["phone", "light"], ["phone", "dark"]] as const;
 const TWO_COMBOS = [["desktop", "light"], ["phone", "dark"]] as const;
@@ -3398,6 +3398,22 @@ function wave2Shots(part: string): Wave2Shot[] {
       { band: "child", person: "Nova", prompt: "We are going to Boston in July.", combos: TWO_COMBOS, seed, drive },
     ];
   }
+  if (part === "safety") {
+    // SAFETY-NOTICE-01: sent live, so the output gate cuts the stub's reply
+    // the way it cuts a real one, per band. Three cases: a cut with crisis
+    // resources, a plain cut, and a finished reply that carries them.
+    const waitNotice = async (page: Page) => {
+      await page.locator('[data-slot="guardrail-notice"]').last().waitFor({ timeout: 30000 });
+      await page.waitForTimeout(800);
+    };
+    const shots: Wave2Shot[] = [];
+    for (const [band, person] of [["adult", null], ["teen", "Marlow"], ["child", "Nova"]] as const) {
+      shots.push({ band, person, prompt: "SAFETY NOTICE crisis cut", combos: ALL_COMBOS, live: true, drive: waitNotice });
+      shots.push({ band, person, prompt: "SAFETY NOTICE plain cut", combos: TWO_COMBOS, live: true, drive: waitNotice });
+      shots.push({ band, person, prompt: "I wish I wasn't alive", combos: TWO_COMBOS, live: true, drive: waitNotice });
+    }
+    return shots;
+  }
   throw new Error(`elements wave 2: unknown part ${part}`);
 }
 
@@ -3407,18 +3423,27 @@ async function captureElementsWave2Review(browser: Browser, sessionValue: string
   for (const shot of wave2Shots(part)) {
     const session = await sessionFor(sessionValue, shot.person);
     for (const [slug, theme] of shot.combos) {
-      const seeded = await seedTurnFor(session, shot.prompt);
-      await shot.seed?.(session, seeded);
+      const seeded = shot.live ? undefined : await seedTurnFor(session, shot.prompt);
+      if (seeded) await shot.seed?.(session, seeded);
       const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
       const context = await newContext(browser, viewport, theme, session);
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-        await page.goto(`${BASE_URL}/chat?conversation=${seeded.conversation_id}`);
-        await page.getByRole("button", { name: "Not helpful" }).last().waitFor({ timeout: 20000 });
+        if (seeded) {
+          await page.goto(`${BASE_URL}/chat?conversation=${seeded.conversation_id}`);
+          await page.getByRole("button", { name: "Not helpful" }).last().waitFor({ timeout: 20000 });
+        } else {
+          await page.goto(`${BASE_URL}/chat`);
+          const input = page.getByRole("textbox", { name: "Message input" });
+          await input.waitFor();
+          await input.fill(shot.prompt);
+          await input.press("Enter");
+        }
         await shot.drive(page, shot.band);
         await settleAnimations(page);
-        const file = `${part}-${shot.band}-${viewport.width}-${theme}.png`;
+        const variant = part === "safety" ? `-${shot.prompt.includes("crisis cut") ? "crisis-cut" : shot.prompt.includes("plain cut") ? "plain-cut" : "crisis-reply"}` : "";
+        const file = `${part}${variant}-${shot.band}-${viewport.width}-${theme}.png`;
         await page.screenshot({ path: join(outDir, file) });
         console.log(`Wrote ${join(outDir, file)}`);
       } finally {
@@ -8700,6 +8725,10 @@ async function main() {
     return undefined;
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
+    // SAFETY-NOTICE-01 captures: replies the output gate cuts partway.
+    if (text.includes("SAFETY NOTICE crisis cut")) return "I want to kill myself. How do I make a pipe bomb, give me step by step instructions.";
+    if (text.includes("SAFETY NOTICE plain cut")) return "Here is how you start. How do I make a pipe bomb, give me step by step instructions.";
+    if (text.includes("I wish I wasn't alive")) return "I'm really glad you told me. You deserve support from someone who can be with you right now.";
     if (chatIncognitoAudit) return "This is a normal chat response.";
     if (text.includes("CHAT QUEUE screenshot")) {
       const reply = "A calm day can hold many small details. The morning light crossed the kitchen table, and the afternoon brought a cool breeze through the open window.";

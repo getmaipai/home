@@ -284,6 +284,15 @@ export type BareCompareEvent =
   | { type: "refused" }
   | { type: "done" };
 
+/** SAFETY-NOTICE-01: crisis resources as a client draws them beside a
+ * reply: a supportive title, the text, and the ways to reach the line as
+ * links (lib/failureCopy.ts's crisisSupportFor() builds it). */
+export interface CrisisSupport {
+  title: string;
+  text: string;
+  actions: Array<{ label: string; href: string }>;
+}
+
 export interface TurnValue {
   reply: TurnReply;
   // "confirm" (Session C step 2): a pendingAsk resolved to "no" - the
@@ -301,6 +310,10 @@ export interface TurnValue {
    * `reply` so a surface can present it alongside the answer rather than
    * have it silently reshape the model's own words. */
   crisis_resources?: string;
+  /** SAFETY-NOTICE-01 (additive): the same resources as a client draws
+   * them, a supportive title, the text and the call, text and chat links
+   * (failureCopy.ts's crisisSupportFor()). Set exactly when crisis_resources is. */
+  crisis_support?: CrisisSupport;
   /** Session A step 3 (conversations): every real turn resolves or
    * creates a conversation and mints its own turn id up front
    * (the retired turn engine's prepareTurn(), also step 2's provenance carrier for
@@ -464,7 +477,7 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
 // listConversationTurns()/list()) drops the raw column entirely for a
 // minor's own turn rather than sending `null`, matching the write-side
 // gate `reasoning`'s own wire event and POST /api/turn already apply.
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; answer_images?: AnswerImageSet; stats?: TurnStats; reasoning?: string; memory_ids: string[]; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; answer_images?: AnswerImageSet; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own
@@ -519,7 +532,7 @@ export type TurnStreamEvent =
   // turn's admin details, sent to an adult owner or admin only
   // (turnErrorDetail.ts's streamEventForViewer); every other client may
   // ignore it.
-  | { type: "error"; error: string; code?: string; crisis_resources?: string; detail?: TurnErrorDetail };
+  | { type: "error"; error: string; code?: string; crisis_resources?: string; crisis_support?: CrisisSupport; detail?: TurnErrorDetail };
 
 export interface ResolvedSetting {
   key: string;

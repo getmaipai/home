@@ -1019,17 +1019,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextUiShowcasePage.tsx": {
-    "Alert": {
-      "tokens": [
-        "mb-2",
-        "mt-2",
-        "mx-4"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "next/pages/NextUpdatesPage.tsx": {
     "CardHeader": {
       "tokens": [

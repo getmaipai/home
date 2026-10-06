@@ -146,16 +146,48 @@ describe("ChatMessageError", () => {
     expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
-  test("a safety refusal renders the guardrail notice with the server's safe copy", async () => {
-    const message = "I can't continue with that reply.";
-    const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError(message, "safety_refused"))} admin />);
-    await sendRefusedMessage(view);
+  // SAFETY-NOTICE-01: one message. Without crisis resources the notice is
+  // the hub's one sentence in the person's band, as the title alone; no
+  // "I can't help with that" above it and no "safety" tag, for any band.
+  for (const [band, line] of [
+    ["adult", "I stopped that reply partway, so try asking it a different way."],
+    ["teen", "I stopped that reply partway, so try asking it a different way."],
+    ["child", "I can't talk about that one, so let's pick something else."],
+  ] as const) {
+    test(`${band}: a safety refusal is one plain sentence from the hub, with no title above it and no policy tag`, async () => {
+      const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError(line, "safety_refused"))} admin={band === "adult"} />);
+      await sendRefusedMessage(view);
+      const notice = view.container.querySelector('[data-slot="guardrail-notice"]')!;
+      expect(notice.textContent).toBe(line);
+      expect(view.container.textContent).not.toContain("I can't help with that");
+      expect(notice.querySelector(".font-mono")).toBeNull();
+      expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
+      expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
+    });
+  }
 
-    expect(view.container.textContent).toContain("I can't help with that");
-    expect(view.container.textContent).toContain(message);
-    expect(view.container.textContent).toContain("safety");
-    expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
-    expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
+  test("a safety refusal that carried crisis resources is one support notice: calm title, the hub's text, call, text and chat links", async () => {
+    const support = {
+      title: "Support is available",
+      text: "If you're in crisis, the 988 Suicide & Crisis Lifeline is free and available 24/7: call or text 988.",
+      actions: [
+        { label: "Call 988", href: "tel:988" },
+        { label: "Text 988", href: "sms:988" },
+        { label: "Chat with 988", href: "https://988lifeline.org/chat/" },
+      ],
+    };
+    const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError("I stopped that reply partway, so try asking it a different way.", "safety_refused", undefined, support))} />);
+    await sendRefusedMessage(view);
+    const notice = view.container.querySelector('[data-slot="guardrail-notice"]')!;
+    expect(notice.getAttribute("data-tone")).toBe("support");
+    expect(notice.textContent).toContain("Support is available");
+    expect(notice.textContent).toContain(support.text);
+    // One message: the refusal line is not drawn beside the support block.
+    expect(view.container.textContent).not.toContain("I stopped that reply partway");
+    expect(view.container.textContent).not.toContain("I can't help with that");
+    expect(view.getByRole("link", { name: "Call 988" }).getAttribute("href")).toBe("tel:988");
+    expect(view.getByRole("link", { name: "Text 988" }).getAttribute("href")).toBe("sms:988");
+    expect(view.getByRole("link", { name: "Chat with 988" }).getAttribute("href")).toBe("https://988lifeline.org/chat/");
   });
 
   test("a safety refusal does not render the generic error panel", async () => {

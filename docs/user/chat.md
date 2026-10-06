@@ -86,6 +86,10 @@ A rating only labels the reply for the household. It does not change the answer 
 
 When MaiPai saves something from a reply, the saved fact shows as a small chip under that reply. Tap the **x** on a chip to forget it. To save a reply yourself, open **More** under it and tap **Remember this**. Children do not see chips or Remember this, and Incognito never remembers anything.
 
+## When MaiPai stops a reply
+
+If MaiPai stops a reply partway because it wasn't safe to finish, one short sentence under the reply says so and what to try instead. If the conversation sounds like someone might be in crisis, MaiPai shows **Support is available** beside the reply instead, with links to call, text or chat with the 988 Suicide & Crisis Lifeline. Nothing is hidden or blocked, and everyone in the household sees the same help.
+
 ## Open the details pane
 
 Some replies come from a lookup, like the weather or a word meaning. Under that reply is a **Details** handle. Tap it and the full answer opens beside the chat, with the sources listed. On a phone the pane slides up from the bottom instead.

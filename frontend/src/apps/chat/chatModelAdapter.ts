@@ -12,7 +12,7 @@ import { stagedDocumentPayload, clearStagedImageAttachment } from "@/apps/chat/l
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
 import { textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
-import type { AnswerImageSet } from "@maipai/home-backend/src/wire";
+import type { AnswerImageSet, CrisisSupport } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
@@ -128,9 +128,6 @@ export interface ChatModelAdapterDeps {
   // typed message inherits after the call ends.
   consumeSpoken?(): boolean | undefined;
   getConversationId?(): Promise<string>;
-  // 4.3: "offer, never block" - a crisis-resources banner rides alongside
-  // the reply, not as part of the message content assistant-ui renders.
-  onCrisisResources(resources: string): void;
   // The live reply's own sentence-by-sentence speech (2026-09-04): a
   // separate player from the per-message "Listen" replay (chatListen.ts),
   // since a fresh reply speaks as it arrives while an earlier message's
@@ -242,6 +239,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       let sawTerminalEvent = false;
       let resumeToken: string | undefined;
       let resumeTurnId: string | undefined;
+      let crisisSupport: CrisisSupport | undefined;
       let lastAcknowledgedSequence = 0;
       let reconnectAttempts = 0;
       const MAX_RECONNECT_ATTEMPTS = 3;
@@ -526,10 +524,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               );
             }
             scheduler.finish();
-            // 4.3: "offer, never block" - shown alongside the reply, never
-            // in place of it, and never suppressing anything else in the
-            // thread.
-            if (event.value.crisis_resources) deps.onCrisisResources(event.value.crisis_resources);
             if (event.value.document_available === true) deps.onResearchDocument?.(event.value.turn_id);
             // THIN-3G: the offer of a new chat that carries the summary.
             if (event.value.carry_offer === true) offerCarry(event.value.conversation_id);
@@ -687,6 +681,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               metadata: {
                 custom: {
                   source: event.value.source,
+                  // 4.3, "offer, never block" (SAFETY-NOTICE-01): the crisis
+                  // resources ride on the reply's own metadata and are drawn
+                  // beside it by the message footer, never in place of it.
+                  ...(event.value.crisis_support ? { crisisSupport: event.value.crisis_support } : {}),
                   pluginId: event.value.plugin_id,
                   commandId: event.value.command_id,
                   turnId: event.value.turn_id,
@@ -741,9 +739,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           } else {
             sawTerminalEvent = true;
             deps.onConnection?.({ phase: "online" });
-            // SAFETY-01 (#85): a streamed refusal's crisis resources ride
-            // on the error event; shown the same way a done value's are.
-            if (event.crisis_resources) deps.onCrisisResources(event.crisis_resources);
+            // SAFETY-01 (#85), SAFETY-NOTICE-01: a streamed refusal's crisis
+            // resources ride on the error event and reach the reply's error
+            // slot with it (chatErrorSlot.tsx draws one support notice).
+            if (event.crisis_support) crisisSupport = event.crisis_support;
             // CHAT-CALM-ERRORS-01c: the admin-only detail the hub sent with
             // this error (it never reaches anyone else's stream) is kept in
             // the message metadata, so the details control reads it before a
@@ -815,7 +814,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               ? e.message
               : "Could not reach the hub. Try again.";
         const code = e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
-        throw new ChatTurnError(message, code, resumeTurnId);
+        throw new ChatTurnError(message, code, resumeTurnId, code === "safety_refused" ? crisisSupport : undefined);
       }
     },
   };

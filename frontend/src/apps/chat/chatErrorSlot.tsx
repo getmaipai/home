@@ -43,10 +43,20 @@ export function ChatMessageError() {
   }
 
   const error = errorValue as unknown as MessageErrorValue;
+  // SAFETY-NOTICE-01: one message, never a title and a body saying the
+  // same thing. With crisis resources the notice is the support block the
+  // hub sent (a calm title, its text, call, text and chat links); without
+  // them it is the hub's one plain sentence in the person's band. No
+  // policy tag for anyone.
   if (error instanceof ChatTurnError && error.code === "safety_refused") {
+    const support = error.crisisSupport;
     return (
       <MessagePrimitive.Error>
-        <GuardrailNotice title="I can't help with that" explanation={error.message} policy="safety" alternatives={[]} />
+        {support ? (
+          <GuardrailNotice tone="support" title={support.title} explanation={support.text} actions={support.actions} alternatives={[]} />
+        ) : (
+          <GuardrailNotice title={error.message} alternatives={[]} />
+        )}
       </MessagePrimitive.Error>
     );
   }

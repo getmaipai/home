@@ -31,6 +31,7 @@
 // best-effort upgrade on top of it, not a precondition. See
 // summarizeBeforeDelete()'s own comment for exactly what that means
 // when no real model is running yet.
+import { CRISIS_RESOURCES_TEXT, CRISIS_STATE_TURNS, crisisSupportFor } from "@/lib/failureCopy";
 import { eq, and, or, not, lt, gt, gte, isNull, isNotNull, inArray, asc, desc, sql } from "drizzle-orm";
 import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { withoutBankLines, bankLineNote, bankLinesOf, splitIntoSentences } from "@/lib/guards";
@@ -1733,6 +1734,34 @@ function memoryIdsByTurn(turnIds: readonly string[]): Map<string, string[]> {
   return byTurn;
 }
 
+/** SAFETY-NOTICE-01: the turns whose reply carried the crisis resources, so
+ * a reload draws the support block beside the same replies the live stream
+ * did. The live rule (nodes/safety.ts): a turn carries them when its own
+ * input or output has the signal, or when any of the conversation's
+ * CRISIS_STATE_TURNS (10) finished turns before it did. */
+function crisisCarryingTurnIds(conversationIds: readonly (string | null)[]): Set<string> {
+  const ids = [...new Set(conversationIds.filter((id): id is string => Boolean(id)))];
+  const carrying = new Set<string>();
+  if (ids.length === 0) return carrying;
+  const all = db
+    .select({ id: conversationTurns.id, conversationId: conversationTurns.conversationId, crisisSignal: conversationTurns.crisisSignal, status: conversationTurns.status })
+    .from(conversationTurns)
+    .where(inArray(conversationTurns.conversationId, ids))
+    .orderBy(asc(conversationTurns.createdAt))
+    .all();
+  const recent = new Map<string, boolean[]>();
+  for (const t of all) {
+    const window = recent.get(t.conversationId!) ?? [];
+    if (t.crisisSignal || window.some(Boolean)) carrying.add(t.id);
+    if (t.status === "done") {
+      window.push(t.crisisSignal);
+      if (window.length > CRISIS_STATE_TURNS) window.shift();
+    }
+    recent.set(t.conversationId!, window);
+  }
+  return carrying;
+}
+
 /** REASONING-02/03/04, the one place "should this row's reasoning reach
  * this reader" is decided - a review caught the same five lines
  * duplicated between listConversationTurns() and list() below, exactly
@@ -1810,6 +1839,7 @@ export function listConversationTurns(
   }
 
   const byTurn = memoryIdsByTurn(rows.map((r) => r.id));
+  const crisisTurns = crisisCarryingTurnIds(rows.map((r) => r.conversationId));
   // See effectiveReasoningFor()'s own doc comment above for the full
   // rule; computed once here since it depends only on the reading
   // actor, never the row.
@@ -1862,7 +1892,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2785,6 +2815,7 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const capped = rows.slice(0, LIST_CAP);
   const byTurn = memoryIdsByTurn(capped.map((r) => r.id));
+  const crisisTurns = crisisCarryingTurnIds(capped.map((r) => r.conversationId));
   // effectiveReasoningFor()'s own doc comment above has the full rule -
   // this is the `list()` the state record names directly: the test
   // that used to prove "an owner may read a child's stored reasoning"
@@ -2808,7 +2839,7 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
     // getmaipai/home#130: no age gate, same call listConversationTurns()
     // above makes - the card is the reply itself. APPROVE-CARD-01's
     // confirm gets the same treatment.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

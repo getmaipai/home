@@ -8,6 +8,8 @@ import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
 import { memoryChipsAllowed, useReplyMemoryChips } from "@/apps/chat/chatMemoryChips";
 import { ChatActorContext, rememberMessage } from "@/apps/chat/chatMemoryActions";
 import { useContext, useEffect, useState, type PropsWithChildren } from "react";
+import { GuardrailNotice } from "@maipai/ui/src/elements/guardrail-notice";
+import type { CrisisSupport } from "@maipai/home-backend/src/wire";
 import { ActionBarMorePrimitive, ComposerPrimitive, useAui, useAuiState, type ThreadAssistantMessagePart, type ThreadMessage } from "@assistant-ui/react";
 import { type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
 // APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
@@ -753,12 +755,16 @@ export function MessageFooterExtra() {
   const feedbackForm = useReplyFeedbackForm();
   // ELEMENTS-ADOPT-02: the kit memory-chips as it ships, fed by a hook.
   const memoryChips = useReplyMemoryChips();
+  // SAFETY-NOTICE-01: crisis resources a finished reply carried, beside it
+  // ("offer, never block"), as the kit GuardrailNotice in its support tone.
+  const crisisSupport = useAuiState((s) => s.message.metadata?.custom?.crisisSupport as CrisisSupport | undefined);
   return (
     <>
       <BareModelBadge />
       <SourcesFooterContent />
       <MessageDetailsReveal />
       {memoryChips ? <MemoryChips {...memoryChips} /> : null}
+      {crisisSupport ? <GuardrailNotice tone="support" title={crisisSupport.title} explanation={crisisSupport.text} actions={crisisSupport.actions} alternatives={[]} /> : null}
       {feedbackForm ? <FeedbackDialog {...feedbackForm} /> : null}
     </>
   );
