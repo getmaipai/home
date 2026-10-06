@@ -6,6 +6,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { createStackClient } from "@/lib/stack/client";
 import { startStackEventBridge, type StackEventEnvelope } from "@/lib/stack/events";
 import { listPending } from "@/lib/notifications";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -15,6 +16,10 @@ const BASE = "http://127.0.0.1:8770";
 
 beforeEach(() => {
   resetDb();
+  const quietStart = (new Date().getHours() + 2) % 24;
+  const quietEnd = (quietStart + 1) % 24;
+  setHouseholdSettingValue("household.quiet_hours.from", `${String(quietStart).padStart(2, "0")}:00`);
+  setHouseholdSettingValue("household.quiet_hours.to", `${String(quietEnd).padStart(2, "0")}:00`);
   __resetThrottleForTests();
   __resetRateLimiterForTests();
 });

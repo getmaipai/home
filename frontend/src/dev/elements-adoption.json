@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-05T18:48:23.780Z",
+  "generatedAt": "2026-10-06T06:36:49.091Z",
   "kitTag": "ui-v0.5.101",
   "items": [
     {
@@ -422,7 +422,7 @@
       "file": "memory-chips.tsx",
       "name": "memory-chips",
       "group": "other",
-      "verdict": "wire-after",
+      "verdict": "wire-now",
       "implemented": false,
       "reading": "LEARNED-01 is the one dashboard Memory card; it also closes the existing chat chip wiring."
     },

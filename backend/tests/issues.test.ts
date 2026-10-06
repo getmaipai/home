@@ -18,15 +18,21 @@ import { notificationDeliveries } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
 import { createMaintenance, cancelMaintenance } from "@/lib/statusBoard";
+import { setHouseholdSettingValue } from "@/lib/settings";
 let activeTestWindowId: string | undefined;
 
 beforeEach(() => {
   resetDb();
+  const start = (new Date().getHours() + 2) % 24;
+  const end = (start + 1) % 24;
+  setHouseholdSettingValue("household.quiet_hours.from", `${String(start).padStart(2, "0")}:00`);
+  setHouseholdSettingValue("household.quiet_hours.to", `${String(end).padStart(2, "0")}:00`);
   __resetFixHandlersForTests();
   __resetReminderTimersForTests();
   __setReminderTimingForTests(200);
   activeTestWindowId = undefined;
 });
+
 
 async function startMaintenance(components: string[], durationMs = 200): Promise<void> {
   const now = Date.now();

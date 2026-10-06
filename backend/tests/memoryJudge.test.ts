@@ -54,6 +54,14 @@ async function owner(): Promise<{ client: TestClient; actor: PersonRow }> {
   return { client, actor };
 }
 
+async function withNotificationsOutsideQuietHours<T>(work: () => Promise<T>): Promise<T> {
+  const start = (new Date().getHours() + 2) % 24;
+  const end = (start + 1) % 24;
+  setHouseholdSettingValue("household.quiet_hours.from", `${String(start).padStart(2, "0")}:00`);
+  setHouseholdSettingValue("household.quiet_hours.to", `${String(end).padStart(2, "0")}:00`);
+  return work();
+}
+
 const SAFE: TurnValue["safety"] = {
   flagged: false,
   categories: [],
@@ -296,18 +304,20 @@ describe("judgeTurn() - extraction and provenance", () => {
   });
 
   test("the notification: a successful write triggers exactly one memory.updated for the speaker", async () => {
-    const { actor } = await owner();
-    const turn = makeTurn(actor, "I hate anchovies", "Noted.");
+    await withNotificationsOutsideQuietHours(async () => {
+      const { actor } = await owner();
+      const turn = makeTurn(actor, "I hate anchovies", "Noted.");
 
-    await withScriptedJudge(
-      () => ({ facts: [{ text: "Marlow dislikes anchovies", category: "preference", scope: "person", importance: 0.7 }] }),
-      () => judgeTurn(turn),
-    );
+      await withScriptedJudge(
+        () => ({ facts: [{ text: "Marlow dislikes anchovies", category: "preference", scope: "person", importance: 0.7 }] }),
+        () => judgeTurn(turn),
+      );
 
-    const pending = listPending(actor);
-    expect(pending.length).toBe(1);
-    expect(pending[0]!.typeId).toBe("memory.updated");
-    expect(pending[0]!.text).toContain("anchovies");
+      const pending = listPending(actor);
+      expect(pending.length).toBe(1);
+      expect(pending[0]!.typeId).toBe("memory.updated");
+      expect(pending[0]!.text).toContain("anchovies");
+    });
   });
 
   // getmaipai/home#64: chatMemoryChip.tsx correlates a delivery back to
@@ -315,60 +325,64 @@ describe("judgeTurn() - extraction and provenance", () => {
   // records the judge wrote - both need to actually be on the delivery,
   // not just the rendered summary text.
   test("the notification carries the real turn id and the memory record's own id", async () => {
-    const { actor } = await owner();
-    const turn = makeTurn(actor, "I hate anchovies", "Noted.");
+    await withNotificationsOutsideQuietHours(async () => {
+      const { actor } = await owner();
+      const turn = makeTurn(actor, "I hate anchovies", "Noted.");
 
-    await withScriptedJudge(
-      () => ({ facts: [{ text: "Marlow dislikes anchovies", category: "preference", scope: "person", importance: 0.7 }] }),
-      () => judgeTurn(turn),
-    );
+      await withScriptedJudge(
+        () => ({ facts: [{ text: "Marlow dislikes anchovies", category: "preference", scope: "person", importance: 0.7 }] }),
+        () => judgeTurn(turn),
+      );
 
-    const pending = listPending(actor);
-    const written = db.select().from(memoryRecords).get()!;
-    expect(pending[0]!.subjectTurnId).toBe(turn.id);
-    expect(pending[0]!.memoryIds).toEqual([written.id]);
+      const pending = listPending(actor);
+      const written = db.select().from(memoryRecords).get()!;
+      expect(pending[0]!.subjectTurnId).toBe(turn.id);
+      expect(pending[0]!.memoryIds).toEqual([written.id]);
+    });
   });
 
   test("a SUPERSEDE decision's notification carries the NEW record's id, not the retired one", async () => {
-    const { actor } = await owner();
-    const existing = remember(actor, {
-      text: "Marlow lives in New York",
-      category: "fact",
-      tier: "durable",
-      scope: "person",
-      person: actor.id,
-      source: "test",
-      importance: 0.6,
+    await withNotificationsOutsideQuietHours(async () => {
+      const { actor } = await owner();
+      const existing = remember(actor, {
+        text: "Marlow lives in New York",
+        category: "fact",
+        tier: "durable",
+        scope: "person",
+        person: actor.id,
+        source: "test",
+        importance: 0.6,
+      });
+      if (!existing.ok) throw new Error("setup failed");
+      // A real vector, not the fire-and-forget one remember() itself kicks
+      // off (hasn't resolved by the time similarByVector() below runs) -
+      // the same direct-injection setup the SUPERSEDE test above uses.
+      const { sqlite } = await import("@/db");
+      sqlite
+        .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
+        .run(existing.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+
+      const turn = makeTurn(actor, "actually I moved to Boston", "Updated.");
+
+      await withScriptedJudge(
+        (schemaName) => {
+          if (schemaName === "memory_extraction") {
+            return { facts: [{ text: "Marlow lives in Boston", category: "fact", scope: "person", importance: 0.6 }] };
+          }
+          if (schemaName === "memory_dedupe") {
+            return { action: "SUPERSEDE", id: existing.value.id, merged_text: "Marlow lives in Boston", contradiction: true };
+          }
+          return undefined;
+        },
+        () => judgeTurn(turn),
+      );
+
+      const newRow = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).get()!;
+      const pending = listPending(actor);
+      expect(pending[0]!.subjectTurnId).toBe(turn.id);
+      expect(pending[0]!.memoryIds).toEqual([newRow.id]);
+      expect(pending[0]!.memoryIds).not.toEqual([existing.value.id]); // the retired row's own id, never the notification's
     });
-    if (!existing.ok) throw new Error("setup failed");
-    // A real vector, not the fire-and-forget one remember() itself kicks
-    // off (hasn't resolved by the time similarByVector() below runs) -
-    // the same direct-injection setup the SUPERSEDE test above uses.
-    const { sqlite } = await import("@/db");
-    sqlite
-      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
-      .run(existing.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
-
-    const turn = makeTurn(actor, "actually I moved to Boston", "Updated.");
-
-    await withScriptedJudge(
-      (schemaName) => {
-        if (schemaName === "memory_extraction") {
-          return { facts: [{ text: "Marlow lives in Boston", category: "fact", scope: "person", importance: 0.6 }] };
-        }
-        if (schemaName === "memory_dedupe") {
-          return { action: "SUPERSEDE", id: existing.value.id, merged_text: "Marlow lives in Boston", contradiction: true };
-        }
-        return undefined;
-      },
-      () => judgeTurn(turn),
-    );
-
-    const newRow = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).get()!;
-    const pending = listPending(actor);
-    expect(pending[0]!.subjectTurnId).toBe(turn.id);
-    expect(pending[0]!.memoryIds).toEqual([newRow.id]);
-    expect(pending[0]!.memoryIds).not.toEqual([existing.value.id]); // the retired row's own id, never the notification's
   });
 });
 
@@ -592,34 +606,36 @@ describe("judgeTurn() - dedupe by supersede", () => {
 
 describe("judgeTurn() - the poison guard", () => {
   test("three failed extraction attempts mark the turn judge_failed; fewer than three leave it retryable", async () => {
-    const { actor } = await owner();
-    const turn = makeTurn(actor, "hello", "hi there");
+    await withNotificationsOutsideQuietHours(async () => {
+      const { actor } = await owner();
+      const turn = makeTurn(actor, "hello", "hi there");
 
-    __resetLlmSupervisorForTests();
-    __setStackClientForTests(null);
-    process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1"; // never reachable
+      __resetLlmSupervisorForTests();
+      __setStackClientForTests(null);
+      process.env.MAIPAI_LLAMA_SERVER_URL = "http://127.0.0.1:1"; // never reachable
 
-    const first = await judgeTurn(turn);
-    expect(first.ok).toBe(false);
-    let row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
-    expect(row.judgeAttempts).toBe(1);
-    expect(row.judgeStatus).toBeNull();
+      const first = await judgeTurn(turn);
+      expect(first.ok).toBe(false);
+      let row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+      expect(row.judgeAttempts).toBe(1);
+      expect(row.judgeStatus).toBeNull();
 
-    await judgeTurn(row);
-    row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
-    expect(row.judgeAttempts).toBe(2);
-    expect(row.judgeStatus).toBeNull();
+      await judgeTurn(row);
+      row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+      expect(row.judgeAttempts).toBe(2);
+      expect(row.judgeStatus).toBeNull();
 
-    await judgeTurn(row);
-    row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
-    expect(row.judgeAttempts).toBe(3);
-    expect(row.judgeStatus).toBe("failed");
+      await judgeTurn(row);
+      row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+      expect(row.judgeAttempts).toBe(3);
+      expect(row.judgeStatus).toBe("failed");
 
-    expect(db.select().from(memoryRecords).all().length).toBe(0);
-    // The 1:1 backend counterpart to chatMemoryChip.tsx's own pre-existing
-    // "failed" chip state, fired exactly once at the real transition.
-    const pending = listPending(actor);
-    expect(pending.filter((n) => n.typeId === "memory.judge_failed")).toHaveLength(1);
+      expect(db.select().from(memoryRecords).all().length).toBe(0);
+      // The 1:1 backend counterpart to chatMemoryChip.tsx's own pre-existing
+      // "failed" chip state, fired exactly once at the real transition.
+      const pending = listPending(actor);
+      expect(pending.filter((n) => n.typeId === "memory.judge_failed")).toHaveLength(1);
+    });
   });
 
   // A review finding: markAttempt()'s returned "did this fail" boolean

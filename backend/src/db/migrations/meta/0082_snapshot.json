@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "88f0bc16-9c5f-412f-8bf3-9973ad1f274e",
-  "prevId": "332e0e54-92f5-479b-b362-1cfd543d2b57",
+  "id": "332e0e54-92f5-479b-b362-1cfd543d2b57",
+  "prevId": "9f5e7cb3-27b8-4bc0-9926-ca32e6024903",
   "tables": {
     "app_update_state": {
       "name": "app_update_state",
@@ -3307,72 +3307,6 @@
             "id"
           ],
           "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "notification_holds": {
-      "name": "notification_holds",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "type_id": {
-          "name": "type_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "recipient_id": {
-          "name": "recipient_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "text": {
-          "name": "text",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "options": {
-          "name": "options",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "deliver_after": {
-          "name": "deliver_after",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "notification_holds_recipient_id_people_id_fk": {
-          "name": "notification_holds_recipient_id_people_id_fk",
-          "tableFrom": "notification_holds",
-          "tableTo": "people",
-          "columnsFrom": [
-            "recipient_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
           "onUpdate": "no action"
         }
       },

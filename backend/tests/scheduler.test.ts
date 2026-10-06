@@ -16,6 +16,10 @@ import { startStackFixture, IDENTITY_HEADERS, type StackFixture, restoreDefaultS
 
 beforeEach(() => {
   resetDb();
+  const quietStart = (new Date().getHours() + 2) % 24;
+  const quietEnd = (quietStart + 1) % 24;
+  setHouseholdSettingValue("household.quiet_hours.from", `${String(quietStart).padStart(2, "0")}:00`);
+  setHouseholdSettingValue("household.quiet_hours.to", `${String(quietEnd).padStart(2, "0")}:00`);
   __resetThrottleForTests();
 });
 

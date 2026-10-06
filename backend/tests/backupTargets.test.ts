@@ -9,6 +9,7 @@ import { runBackupAndMirror, getBackupHealth } from "@/lib/backup";
 import { setSmbTarget, getSmbTarget, removeSmbTarget } from "@/lib/backupTargets";
 import { listIssues } from "@/lib/issues";
 import { listPending } from "@/lib/notifications";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { backupDir } from "@/lib/paths";
 import { sqlite } from "@/db";
 import type { PersonRow } from "@/types";
@@ -20,6 +21,10 @@ function resetBackupDir(): void {
 
 beforeEach(() => {
   resetDb();
+  const quietStart = (new Date().getHours() + 2) % 24;
+  const quietEnd = (quietStart + 1) % 24;
+  setHouseholdSettingValue("household.quiet_hours.from", `${String(quietStart).padStart(2, "0")}:00`);
+  setHouseholdSettingValue("household.quiet_hours.to", `${String(quietEnd).padStart(2, "0")}:00`);
   __resetThrottleForTests();
   resetBackupDir();
   removeSmbTarget();

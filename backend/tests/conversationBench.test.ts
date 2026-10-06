@@ -71,6 +71,10 @@ async function withStubBench<T>(
   opts: { reply?: (request: ChatCompletionRequest) => string; calls?: (request: ChatCompletionRequest) => { id: string; name: string; args: string }[] | undefined },
   fn: (deps: RunDeps) => Promise<T>,
 ): Promise<T> {
+  const quietStart = (new Date().getHours() + 2) % 24;
+  const quietEnd = (quietStart + 1) % 24;
+  setHouseholdSettingValue("household.quiet_hours.from", `${String(quietStart).padStart(2, "0")}:00`);
+  setHouseholdSettingValue("household.quiet_hours.to", `${String(quietEnd).padStart(2, "0")}:00`);
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const stub = startStubLlmServer(0, {
     scriptedChatReply: opts.reply,
