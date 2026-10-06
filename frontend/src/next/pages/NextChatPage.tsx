@@ -908,7 +908,6 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
 }) {
   const aui = useAui();
   const title = useAuiState((s) => s.threadListItem.title) ?? "";
-  const replyRunning = useAuiState((s) => s.thread.isRunning);
   useEffect(() => {
     const reloadThreads = () => void aui.threads.reload();
     window.addEventListener(INCOGNITO_DISCARDED_EVENT, reloadThreads);
@@ -916,8 +915,6 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
   }, [aui]);
   useSetChatHeaderData({
     title,
-    replyRunning,
-    onStopReply: () => aui.thread.cancelRun(),
     ttsAvailable,
     autoReadReplies,
     onAutoReadRepliesChange: setAutoReadReplies,

@@ -39,6 +39,7 @@ import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
+import { ChatActivityCard } from "@/apps/chat/ChatActivityCard";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
@@ -99,7 +100,7 @@ export function ChatComposerNotice() {
  * Removing a queued message places its text back into the kit composer,
  * where the person can edit and resend it. Queue state lives in the
  * assistant-ui runtime and is never written by this slot. */
-export function ChatMessageQueue() {
+function ChatQueueRow() {
   const aui = useAui();
   const queue = useAuiState((s) => s.composer.queue);
   if (queue.length === 0) return null;
@@ -114,6 +115,17 @@ export function ChatMessageQueue() {
         aui.composer.setText(item.prompt);
       }}
     />
+  );
+}
+
+/** The ComposerQueue footer slot holds both calm rows above the field: the
+ * activity card (ChatActivityCard) and the queued messages. */
+export function ChatMessageQueue() {
+  return (
+    <>
+      <ChatActivityCard />
+      <ChatQueueRow />
+    </>
   );
 }
 

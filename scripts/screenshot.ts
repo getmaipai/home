@@ -165,6 +165,10 @@ const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
 const chatMissingStatesReview = process.argv.includes("--chat-missing-states-review");
+// ACTIVITY-01d/e (owner, 2026-10-06): no header button; the one calm card
+// above the composer for waiting, running and just-finished work, plus the
+// reply's own in-message working state. Desktop and phone, light and dark.
+const activityCardReview = process.argv.includes("--activity-card-review");
 const chatMissingStatesOutDirArg = process.argv.find((arg) => arg.startsWith("--chat-missing-states-out-dir="))?.split("=", 2)[1];
 const chatMissingStatesOutDir = chatMissingStatesOutDirArg || process.env.MAIPAI_CHAT_MISSING_STATES_OUT_DIR || join(ROOT, "data-scratch", "screenshots", "chat-missing-states");
 const chatListReview = process.argv.includes("--chat-list-review");
@@ -307,7 +311,7 @@ const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audi
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const chatShellReview = process.argv.includes("--chat-shell-review");
@@ -4693,6 +4697,134 @@ async function captureNextChatQueueReview(browser: Browser, sessionValue: string
   }
 }
 
+/** ACTIVITY-01d/e: the calm activity card above the composer, through the
+ * real routes. Jobs, an ask and an approval are seeded straight into the demo
+ * database (the producers need engines a capture does not run); everything
+ * shown is read back through GET /api/jobs. Also proves the header carries no
+ * Running now button and that the composer's Stop ends a streaming reply. */
+async function captureActivityCardReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = process.env.MAIPAI_ACTIVITY_CARD_OUT_DIR || join(ROOT, "data-scratch", "screenshots", "activity-card");
+  mkdirSync(outDir, { recursive: true });
+  const viewports = [{ slug: "desktop", width: 1440, height: 900 } as ViewportSpec, VIEWPORTS.find((v) => v.slug === "phone")!];
+  const shot = async (page: Page, name: string, viewport: ViewportSpec, theme: string) => {
+    await settleAnimations(page);
+    const path = join(outDir, `activity-${name}-${viewport.width}-${theme}.png`);
+    await page.screenshot({ path });
+    console.log(`Wrote ${path}`);
+  };
+  const askConversation = await seedTitledConversation("captureActivityCardReview", { Cookie: `session=${sessionValue}` }, "Locking up for the night");
+  const seed = (scenario: "none" | "waiting" | "running" | "done" | "child") => {
+    const script = `import { sqlite } from "./src/db/index.ts";
+const scenario = ${JSON.stringify(scenario)};
+const owner = sqlite.query("SELECT id FROM people WHERE role = 'owner' LIMIT 1").get() as { id: string };
+const nova = sqlite.query("SELECT id FROM people WHERE display_name = 'Nova' AND role = 'child' LIMIT 1").get() as { id: string };
+const now = Date.now();
+const at = (s: number) => new Date(now - s * 1000).toISOString();
+sqlite.query("DELETE FROM jobs WHERE id LIKE 'shot-%'").run();
+sqlite.query("DELETE FROM approvals WHERE id LIKE 'shot-%'").run();
+sqlite.query("UPDATE conversations SET pending_ask = NULL").run();
+const job = sqlite.query("INSERT INTO jobs (id, kind, started_by, for_person, title, state, progress, waiting_reason, result_ref, conversation_id, error_kind, raw, provenance, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, '{}', ?, ?)");
+if (scenario === "running") job.run("shot-fox", "image", owner.id, owner.id, "Making a picture of a red fox", "running", JSON.stringify({ fraction: 0.6, eta_seconds: 40 }), null, at(30), at(2));
+if (scenario === "done") job.run("shot-done", "search", owner.id, owner.id, "Looked up train times to the coast", "done", null, ${JSON.stringify(askConversation.id)}, at(240), at(60));
+if (scenario === "waiting" || scenario === "child") sqlite.query("INSERT INTO approvals (id, kind, person_id, details, status, decided_by_person_id, decided_at, created_at) VALUES ('shot-ask', 'install_package', ?, ?, 'pending', NULL, NULL, ?)").run(nova.id, JSON.stringify({ packageName: "Chess" }), at(60));
+if (scenario === "waiting") {
+  const askTurn = "shot-confirm-turn";
+  sqlite.query("DELETE FROM conversation_turns WHERE id = ?").run(askTurn);
+  sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, user_text, reply_text, source, safety_action, conversation_id, created_at, hlc, routing_tier, routing_score, status, parent_turn_id, branch_chosen, confirm) VALUES (?, ?, 'chat', 'Lock the doors for the night', 'I can lock the front and back doors now. Want me to go ahead?', 'confirm', 'allow', ?, ?, ?, 'chat', 1.0, 'done', NULL, 1, ?)").run(askTurn, owner.id, ${JSON.stringify(askConversation.id)}, at(90), at(90) + ":0:" + askTurn, JSON.stringify({ package_id: "lock-doors", open: true }));
+  sqlite.query("UPDATE conversations SET pending_ask = ? WHERE id = ?").run(JSON.stringify({ kind: "confirm", prompt: "Lock the doors?", packageId: "lock-doors", args: {}, turnId: askTurn }), ${JSON.stringify(askConversation.id)});
+}
+sqlite.close();`;
+    const result = Bun.spawnSync({ cmd: ["bun", "-e", script], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+    if (result.exitCode !== 0) throw new Error(`captureActivityCardReview: seeding ${scenario} failed with exit code ${result.exitCode}`);
+  };
+  const openChat = async (page: Page) => {
+    page.setDefaultTimeout(15000);
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+    await page.waitForResponse((response) => response.url().endsWith("/api/jobs")).catch(() => undefined);
+    if (await page.getByRole("button", { name: /^Running now/ }).count()) throw new Error("captureActivityCardReview: a Running now button is still in the header");
+    if (await page.getByRole("alert").filter({ hasNot: page.locator('[data-slot="chat-activity-card"]') }).count()) throw new Error("captureActivityCardReview: an error banner");
+  };
+  const card = (page: Page) => page.locator('[data-slot="chat-activity-card"]');
+
+  // 1. Nothing relevant: no card at all.
+  seed("none");
+  for (const viewport of viewports) for (const theme of THEMES) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      await openChat(page);
+      if (await card(page).count()) throw new Error(`captureActivityCardReview: a card shows with nothing to say on ${viewport.slug}/${theme}`);
+      await shot(page, "idle", viewport, theme);
+    } finally { await context.close(); }
+  }
+
+  // 3. Waiting (a chat asking, plus an approval for a child's request),
+  // then running, then just finished.
+  const states: Array<{ scenario: "waiting" | "running" | "done"; name: string; ready: (page: Page) => Promise<void> }> = [
+    { scenario: "waiting", name: "waiting", ready: async (page) => { await card(page).waitFor(); await card(page).getByText("Needs you").waitFor(); } },
+    { scenario: "running", name: "running", ready: async (page) => { await card(page).getByText("Making a picture of a red fox").waitFor(); } },
+    { scenario: "done", name: "done", ready: async (page) => { await card(page).getByText("Looked up train times to the coast").waitFor(); await card(page).getByRole("button", { name: "Dismiss" }).waitFor(); } },
+  ];
+  for (const state of states) {
+    seed(state.scenario);
+    for (const viewport of viewports) for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await openChat(page);
+        await state.ready(page);
+        await shot(page, state.name, viewport, theme);
+      } finally { await context.close(); }
+    }
+  }
+
+  // 4. Nova, a child: her own ask reads "Asked a parent", no buttons.
+  seed("child");
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const people = await (await fetch(`${BASE_URL}/api/people`, { headers: cookie })).json() as Array<{ id: string; display_name: string; role: string }>;
+  const child = people.find((p) => p.display_name === "Nova" && p.role === "child");
+  if (!child) throw new Error("captureActivityCardReview: the seeded child Nova is required");
+  const childSignIn = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
+  const childSession = childSignIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("captureActivityCardReview: Nova's sign-in carried no session cookie");
+  for (const viewport of viewports) for (const theme of THEMES) {
+    const context = await newContext(browser, viewport, theme, childSession);
+    try {
+      const page = await context.newPage();
+      await openChat(page);
+      await card(page).getByText("Asked a parent").waitFor();
+      if (await card(page).getByRole("button").count()) throw new Error("captureActivityCardReview: a child was offered buttons on her own ask");
+      await shot(page, "child", viewport, theme);
+    } finally { await context.close(); }
+  }
+  seed("none");
+
+  // 5. A reply streaming (last, so the fixture engine can settle after Stop): the working dot in the message, Stop in the
+  // composer, no card; the composer's Stop ends it.
+  let lastStopAt = 0;
+  for (const viewport of viewports) for (const theme of THEMES) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      await openChat(page);
+      await sendChatMessage(page, "ACTIVITY CARD screenshot: tell me a little about the day");
+      const stop = page.getByRole("button", { name: "Stop generating", exact: true });
+      await stop.waitFor();
+      if (await card(page).count()) throw new Error(`captureActivityCardReview: a card shows during a plain reply on ${viewport.slug}/${theme}`);
+      await shot(page, "streaming", viewport, theme);
+      lastStopAt = Date.now();
+      await stop.click();
+      await stop.waitFor({ state: "detached", timeout: 5000 });
+    } finally { await context.close(); }
+  }
+
+  // A stopped reply's scripted engine call still resolves 20 s after it
+  // began; shutting the fixture Stack down before then resets that call.
+  const settle = lastStopAt + 21_000 - Date.now();
+  if (settle > 0) await new Promise((resolve) => setTimeout(resolve, settle));
+}
+
 /** The matched origin/main view: identical reply/viewport/theme, with both
  * follow-up prompts still in the ordinary composer because main has no queue.
  * This runs the same fixture and PNG geometry as the after capture. */
@@ -7484,6 +7616,8 @@ async function main() {
       const reply = "A calm day can hold many small details. The morning light crossed the kitchen table, and the afternoon brought a cool breeze through the open window.";
       return new Promise((resolve) => setTimeout(() => resolve(reply), 6000));
     }
+    // ACTIVITY-01d/e: a reply that stays running long enough to capture.
+    if (text.includes("ACTIVITY CARD screenshot")) return new Promise((resolve) => setTimeout(() => resolve("A calm day, told in a few short lines."), 20000));
     if (text.includes("D22 streaming")) return Array.from({ length: SCREENSHOT_STREAM_WORDS }, (_, i) => `Streamed reply word${i + 1}.`).join(" ");
     if (chatPageScreenshotFixture) return SCREENSHOT_CHAT_REPLY;
     if (text.includes(RICH_REPLY_PROMPT)) return RICH_REPLY_MARKDOWN;
@@ -7927,6 +8061,12 @@ async function main() {
     if (nextChatQueueEmptyReview) {
       await captureNextChatQueueEmptyReview(browser, sessionValue);
       console.log("completed named review: --next-chat-queue-empty-review");
+      return;
+    }
+
+    if (activityCardReview) {
+      await captureActivityCardReview(browser, sessionValue);
+      console.log("completed named review: --activity-card-review");
       return;
     }
 

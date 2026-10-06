@@ -14,7 +14,7 @@ export interface RunningNowViewer {
   admin: boolean;
 }
 
-export type RunningNowActionKey = "stop_reply" | "stop" | "approve" | "deny" | "open";
+export type RunningNowActionKey = "stop" | "approve" | "deny" | "open";
 
 export interface RunningNowRow {
   id: string;
@@ -26,6 +26,10 @@ export interface RunningNowRow {
   actions: RunningNowActionKey[];
   details?: string;
   href?: string;
+  /** The chat this row belongs to, when it has one. */
+  conversationId?: string;
+  /** Epoch ms the row finished (done rows only). */
+  finishedAt?: number;
   /** Whether this row is the viewer's own (only those are announced). */
   own: boolean;
 }
@@ -115,6 +119,10 @@ function rowFor(job: HomeJobView, viewer: RunningNowViewer, now: number): Runnin
   // A row about another adult carries only its kind and duration (the
   // service's privacy projection); there is nothing plain to show.
   if (!state || !STATUS[state] || !job.title) return null;
+  // The hub's own housekeeping (a memory sweep, an embedding retry) is
+  // nobody's work and its titles are engine names; only a model download
+  // is system-started work a person wants to see.
+  if (job.startedBy === "system" && !job.forPerson && job.kind !== "model_download") return null;
   const status = STATUS[state]!;
   const own = job.forPerson === viewer.id;
   const actions: RunningNowActionKey[] = [];
@@ -150,32 +158,19 @@ function rowFor(job: HomeJobView, viewer: RunningNowViewer, now: number): Runnin
     actions,
     ...(details ? { details } : {}),
     ...(href ? { href } : {}),
+    ...(job.conversationId ? { conversationId: job.conversationId } : {}),
     own,
   };
 }
 
-export function runningNowView({ jobs, viewer, reply, now }: {
+export function runningNowView({ jobs, viewer, now }: {
   jobs: readonly HomeJobView[];
   viewer: RunningNowViewer;
-  /** Set while a chat reply streams on this page. */
-  reply: { startedAt: number } | null;
   now: number;
 }): RunningNowView {
   const running: RunningNowRow[] = [];
   const waiting: RunningNowRow[] = [];
   const done: Array<RunningNowRow & { at: number }> = [];
-  if (reply) {
-    const child = viewer.band === "child";
-    running.push({
-      id: "reply",
-      title: child ? "Writing your answer" : "Writing a reply",
-      status: child ? "Working on it" : "Working",
-      tone: "running",
-      ...(child ? {} : { detail: elapsedWords((now - reply.startedAt) / 1000) }),
-      actions: ["stop_reply"],
-      own: true,
-    });
-  }
   for (const job of jobs) {
     const row = rowFor(job, viewer, now);
     if (!row) continue;
@@ -189,7 +184,7 @@ export function runningNowView({ jobs, viewer, reply, now }: {
   return {
     running,
     waiting,
-    done: done.slice(0, DONE_LIMIT).map(({ at: _at, ...row }) => row),
+    done: done.slice(0, DONE_LIMIT).map(({ at, ...row }) => ({ ...row, finishedAt: at })),
     count: running.length + waiting.length,
     recentDone: done.filter((row) => now - row.at <= RECENT_MS).length,
   };
@@ -204,6 +199,6 @@ export function runningNowAnnouncement(previous: RunningNowView | null, next: Ru
     if (!row.own || !before.has(row.id)) continue;
     return `${row.title}: ${row.status}.`;
   }
-  const started = next.running.find((row) => row.own && row.id !== "reply" && !before.has(row.id));
+  const started = next.running.find((row) => row.own && !before.has(row.id));
   return started ? `${started.title}: ${started.status}.` : undefined;
 }
