@@ -29,6 +29,10 @@ describe("ElementsAdoptionPanel", () => {
     { file: "math-block.tsx", name: "math-block", group: "math", verdict: "wire now", implemented: true },
     { file: "chart.tsx", name: "chart", group: "chart", verdict: "later" },
   ]);
+  test("the exceptions ledger counts show beside the headline", () => {
+    const view = render(<ElementsAdoptionPanel items={items} scenarioIds={new Set()} onPlay={() => {}} />);
+    expect(view.container.querySelector("[data-slot=elements-decisions-counts]")!.textContent).toMatch(/Exceptions ledger.*\d+ active, \d+ being removed, \d+ removed/);
+  });
   test("the headline reports the whole inventory count", () => {
     const view = render(<ElementsAdoptionPanel items={normalizeAdoption([
       { file: "a.tsx", verdict: "wire-now", implemented: true },

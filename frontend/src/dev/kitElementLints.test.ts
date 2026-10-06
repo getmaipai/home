@@ -4,13 +4,19 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   classNameOverrideFindings,
+  decisionProblem,
+  ledgerCounts,
+  ledgerRows,
+  NO_REASON_ED,
   cssOverrideBaselineOf,
   cssOverrideFindings,
   type CssOverrideBaseline,
+  type CssOverrideTokens,
   forbiddenFamily,
   overrideBaselineOf,
   wrapperFindings,
   type OverrideBaseline,
+  type OverrideTokens,
   type WrapperBaseline,
 } from "./kitElementLints";
 
@@ -21,6 +27,8 @@ import {
 // file itself never grows past origin/main's (the merge-base), so "just add the name" is no way
 // past the gate.
 const SRC = fileURLToPath(new URL("..", import.meta.url));
+const LEDGER_PATH = fileURLToPath(new URL("../../../docs/design/ELEMENTS-DECISIONS.md", import.meta.url));
+const COUNTS_FILE = "elements-decisions-counts.json";
 const OVERRIDE_BASELINE = "kit-classname-override-baseline.json";
 const WRAPPER_BASELINE = "kit-wrapper-baseline.json";
 const CSS_BASELINE = "kit-css-override-baseline.json";
@@ -46,8 +54,11 @@ function baselineAtBase<T>(name: string): T | null {
   }
 }
 
-const overrideKeys = (b: OverrideBaseline) =>
-  Object.entries(b).flatMap(([file, byElement]) => Object.entries(byElement).flatMap(([element, tokens]) => tokens.map((t) => `${file}: <${element}> ${t}`)));
+// The merge-base copy may still be the pre-ELEMENTS-DECISIONS-01 shape (a bare
+// array), so every reader accepts both.
+const listOf = (v: unknown, field: string): string[] => (Array.isArray(v) ? (v as string[]) : ((v as Record<string, string[]>)?.[field] ?? []));
+const overrideKeys = (b: OverrideBaseline | OverrideTokens) =>
+  Object.entries(b).flatMap(([file, byElement]) => Object.entries(byElement).flatMap(([element, entry]) => listOf(entry, "tokens").map((t) => `${file}: <${element}> ${t}`)));
 const wrapperKeys = (b: WrapperBaseline) => Object.entries(b).flatMap(([file, byName]) => Object.keys(byName).map((name) => `${file}: ${name}`));
 
 describe("className overrides on kit Elements (ELEMENTS-LINT-02)", () => {
@@ -56,7 +67,7 @@ describe("className overrides on kit Elements (ELEMENTS-LINT-02)", () => {
   test("no kit Element gets a shape, border, surface, spacing, size or layout class unless it is in the shrinking baseline", () => {
     const findings = classNameOverrideFindings(SRC);
     const added = findings.flatMap((f) => {
-      const known = baseline[f.file]?.[f.element] ?? [];
+      const known = baseline[f.file]?.[f.element]?.tokens ?? [];
       const fresh = f.tokens.filter((t) => !known.includes(t));
       return fresh.length ? [`${f.file}:${f.line} <${f.element}> className="${fresh.join(" ")}" (${[...new Set(fresh.map((t) => forbiddenFamily(t)))].join(", ")})`] : [];
     });
@@ -127,13 +138,13 @@ describe("className overrides on kit Elements (ELEMENTS-LINT-02)", () => {
 
 describe("Home CSS restyling kit parts (ELEMENTS-LINT-02, CSS leg)", () => {
   const baseline = readBaseline<CssOverrideBaseline>(CSS_BASELINE);
-  const keys = (b: CssOverrideBaseline) =>
-    Object.entries(b).flatMap(([file, bySelector]) => Object.entries(bySelector).flatMap(([selector, props]) => props.map((p) => `${file}: ${selector} { ${p} }`)));
+  const keys = (b: CssOverrideBaseline | CssOverrideTokens) =>
+    Object.entries(b).flatMap(([file, bySelector]) => Object.entries(bySelector).flatMap(([selector, entry]) => listOf(entry, "properties").map((p) => `${file}: ${selector} { ${p} }`)));
 
   test("no Home stylesheet sets shape, size, layout, spacing, border, shadow, background or display on a kit part unless it is in the shrinking baseline", () => {
     const findings = cssOverrideFindings(SRC);
     const added = findings.flatMap((f) => {
-      const known = baseline[f.file]?.[f.selector] ?? [];
+      const known = baseline[f.file]?.[f.selector]?.properties ?? [];
       const fresh = f.properties.filter((p) => !known.includes(p));
       return fresh.length ? [`${f.file}:${f.line} ${f.selector} { ${fresh.join("; ")} } (kit part ${f.part})`] : [];
     });
@@ -203,7 +214,7 @@ describe("Home wrappers around kit Elements (ELEMENTS-LINT-03)", () => {
   });
 
   test("every allowlist entry carries a reason", () => {
-    const missing = Object.entries(baseline).flatMap(([file, byName]) => Object.entries(byName).filter(([, reason]) => !reason.trim()).map(([name]) => `${file}: ${name}`));
+    const missing = Object.entries(baseline).flatMap(([file, byName]) => Object.entries(byName).filter(([, entry]) => !entry.reason?.trim()).map(([name]) => `${file}: ${name}`));
     expect(missing).toEqual([]);
   });
 
@@ -245,5 +256,65 @@ describe("Home wrappers around kit Elements (ELEMENTS-LINT-03)", () => {
       ["InnerPane", "returns <CanvasSplit> as its root"],
       ["SeededPanel", "named like a wrapper in a file that imports a kit Element"],
     ]);
+  });
+});
+
+describe("Elements decisions ledger (ELEMENTS-DECISIONS-01)", () => {
+  const ledger = ledgerRows(readFileSync(LEDGER_PATH, "utf8"));
+  const entries = (): [string, unknown][] => [
+    ...Object.entries(readBaseline<OverrideBaseline>(OVERRIDE_BASELINE)).flatMap(([f, d]) => Object.entries(d).map(([k, e]) => [`${OVERRIDE_BASELINE} ${f}: <${k}>`, e] as [string, unknown])),
+    ...Object.entries(readBaseline<CssOverrideBaseline>(CSS_BASELINE)).flatMap(([f, d]) => Object.entries(d).map(([k, e]) => [`${CSS_BASELINE} ${f}: ${k}`, e] as [string, unknown])),
+    ...Object.entries(readBaseline<WrapperBaseline>(WRAPPER_BASELINE)).flatMap(([f, d]) => Object.entries(d).map(([k, e]) => [`${WRAPPER_BASELINE} ${f}: ${k}`, e] as [string, unknown])),
+  ];
+
+  test("the ledger has rows, each with a valid status", () => {
+    expect(ledger.size).toBeGreaterThan(30);
+  });
+
+  test("every baseline entry carries a reason and an ED id that is a ledger row or NO-REASON-REMOVE", () => {
+    const bad = entries().flatMap(([where, entry]) => {
+      const problem = decisionProblem(entry, ledger);
+      return problem ? [`${where} ${problem}`] : [];
+    });
+    expect(bad, "add the entry's decision to docs/design/ELEMENTS-DECISIONS.md and cite its ED id").toEqual([]);
+  });
+
+  test("a ledger row marked removed has no baseline entry", () => {
+    const removed = new Set([...ledger].filter(([, status]) => status === "removed").map(([id]) => id));
+    const stillThere = entries().filter(([, e]) => removed.has((e as { ed?: string }).ed ?? "")).map(([where]) => where);
+    expect(stillThere).toEqual([]);
+  });
+
+  test("the panel's counts file equals the ledger", () => {
+    const counts = readBaseline<{ active: number; beingRemoved: number; removed: number }>(COUNTS_FILE);
+    expect(counts).toEqual(ledgerCounts(ledger));
+  });
+
+  test("seeded violations are refused: no reason, no id, unknown id, removed row, bad NO-REASON-REMOVE", () => {
+    const rows = ledgerRows([
+      "| ED-001 | a | b | c | d | e | active exception |",
+      "| ED-002 | a | b | c | d | e | being removed |",
+      "| ED-003 | a | b | c | d | e | removed |",
+    ].join("\n"));
+    expect(decisionProblem({ ed: "ED-001", reason: "kit lacks a variant" }, rows)).toBeUndefined();
+    expect(decisionProblem({ ed: "ED-002", reason: "NO REASON: to be removed" }, rows)).toBeUndefined();
+    expect(decisionProblem({ ed: NO_REASON_ED, reason: "NO REASON: to be removed" }, rows)).toBeUndefined();
+    expect(decisionProblem({ ed: "ED-001", reason: "" }, rows)).toBe("has no reason");
+    expect(decisionProblem({ ed: "ED-001", reason: "   " }, rows)).toBe("has no reason");
+    expect(decisionProblem({ reason: "x" }, rows)).toBe("has no ED id");
+    expect(decisionProblem({ ed: "", reason: "x" }, rows)).toBe("has no ED id");
+    expect(decisionProblem("a bare string", rows)).toBe("has no reason");
+    expect(decisionProblem({ ed: "ED-999", reason: "x" }, rows)).toContain("not a row");
+    expect(decisionProblem({ ed: "ED-003", reason: "x" }, rows)).toContain("marks removed");
+    expect(decisionProblem({ ed: NO_REASON_ED, reason: "because" }, rows)).toContain("NO REASON");
+  });
+
+  test("the ledger parser counts statuses and rejects a bad status or a repeated id", () => {
+    const rows = ledgerRows("| ED-001 | a | b | c | d | e | active exception |\n| ED-002 | a | b | c | d | e | removed |\n| not a row | x |");
+    expect(ledgerCounts(rows)).toEqual({ active: 1, beingRemoved: 0, removed: 1 });
+    expect(() => ledgerRows("| ED-001 | a | b | c | d | e | maybe |")).toThrow("status must be one of");
+    expect(() => ledgerRows("| ED-001 | a | b | active exception")).toThrow("must end");
+    expect(() => ledgerRows("| ED-001 | a | b | |")).toThrow("status must be one of");
+    expect(() => ledgerRows("| ED-001 | a | active exception |\n| ED-001 | a | removed |")).toThrow("twice");
   });
 });

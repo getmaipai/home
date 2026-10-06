@@ -3,6 +3,7 @@ import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
 import { Progress } from "@maipai/ui/src/ui/progress";
+import decisions from "@/dev/elements-decisions-counts.json";
 import { ELEMENTS, SCENARIO_FOR_ELEMENT, type ElementItem, type Status, type Verdict } from "@/dev/elementsAdoption";
 
 // UI-SHOWCASE: "N / M in use in chat" for planned chat Elements, composed from
@@ -35,6 +36,9 @@ export function ElementsAdoptionPanel({ items = ELEMENTS, scenarioIds, onPlay }:
         </div>
       </div>
       <p>Not planned for chat: {items.filter((item) => item.verdict === "no fit").length} no fit, {items.filter((item) => item.verdict === "later").length} later, {items.filter((item) => item.verdict === "support").length} supporting parts.</p>
+      <p data-slot="elements-decisions-counts">
+        Exceptions ledger (docs/design/ELEMENTS-DECISIONS.md): {decisions.active} active, {decisions.beingRemoved} being removed, {decisions.removed} removed.
+      </p>
       <Progress value={percent} aria-label={`${done} of ${items.length} Elements implemented`} />
       <Collapsible>
         <CollapsibleTrigger asChild><Button variant="ghost" size="sm">Show every Element</Button></CollapsibleTrigger>

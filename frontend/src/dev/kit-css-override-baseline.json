@@ -1,372 +1,704 @@
 {
   "next/pages/nextChatTouchTargets.css": {
-    "[data-slot=\"next-chat-pane\"] .aui-composer-dictate": [
-      "position"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-send": [
-      "position"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-dictate::before": [
-      "inset",
-      "position"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-send::before": [
-      "inset",
-      "position"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-assistant-action-bar-root button": [
-      "position"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-user-action-bar-root button": [
-      "position"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-branch-picker-root button": [
-      "position"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-assistant-action-bar-root button::before": [
-      "left",
-      "min-height",
-      "min-width",
-      "position",
-      "top"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-user-action-bar-root button::before": [
-      "left",
-      "min-height",
-      "min-width",
-      "position",
-      "top"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-branch-picker-root button::before": [
-      "left",
-      "min-height",
-      "min-width",
-      "position",
-      "top"
-    ]
+    "[data-slot=\"next-chat-pane\"] .aui-composer-dictate": {
+      "properties": [
+        "position"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-send": {
+      "properties": [
+        "position"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-dictate::before": {
+      "properties": [
+        "inset",
+        "position"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-send::before": {
+      "properties": [
+        "inset",
+        "position"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-assistant-action-bar-root button": {
+      "properties": [
+        "position"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-user-action-bar-root button": {
+      "properties": [
+        "position"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-branch-picker-root button": {
+      "properties": [
+        "position"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-assistant-action-bar-root button::before": {
+      "properties": [
+        "left",
+        "min-height",
+        "min-width",
+        "position",
+        "top"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-user-action-bar-root button::before": {
+      "properties": [
+        "left",
+        "min-height",
+        "min-width",
+        "position",
+        "top"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-branch-picker-root button::before": {
+      "properties": [
+        "left",
+        "min-height",
+        "min-width",
+        "position",
+        "top"
+      ],
+      "ed": "ED-030",
+      "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
+    }
   },
   "shell/tokens.css": {
-    "html.incognito body[class*=\"style-\"] [data-slot=\"sidebar-inner\"]": [
-      "background-color"
-    ],
-    "[data-slot=\"sidebar-inner\"] a[data-slot=\"sidebar-menu-button\"][data-active]": [
-      "background-color"
-    ],
-    "html.incognito body[class*=\"style-\"] [data-slot=\"sidebar-inner\"] a[data-slot=\"sidebar-menu-button\"][data-active]": [
-      "background-color"
-    ],
-    "html.incognito body[class*=\"style-\"] [data-slot=\"sidebar-inset\"]": [
-      "background"
-    ],
-    "html.incognito body[class*=\"style-\"] .aui-root.aui-thread-root": [
-      "background"
-    ],
-    "html.incognito body[class*=\"style-\"] .aui-thread-viewport-footer": [
-      "background"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-thread-viewport-footer": [
-      "background-color",
-      "padding-bottom"
-    ],
-    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"]": [
-      "align-items",
-      "background",
-      "border-color",
-      "border-radius",
-      "column-gap",
-      "display",
-      "grid-template-areas",
-      "grid-template-columns",
-      "min-height",
-      "padding",
-      "row-gap"
-    ],
-    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"]:focus-within": [
-      "border-color"
-    ],
-    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"][data-multiline]": [
-      "grid-template-areas"
-    ],
-    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"]:has([data-slot=\"model-selector-trigger\"])": [
-      "grid-template-areas"
-    ],
-    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"] > :not(.aui-composer-attachments):not(.aui-composer-action-wrapper)": [
-      "grid-area",
-      "min-width"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper": [
-      "display"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper > :first-child": [
-      "align-items",
-      "gap",
-      "grid-area",
-      "height"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper > :last-child": [
-      "align-items",
-      "gap",
-      "grid-area",
-      "height",
-      "min-width"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper button:where(:not([data-slot=\"composer-menu-item\"]):not([data-slot=\"model-selector-trigger\"]))": [
-      "border-radius",
-      "flex",
-      "height",
-      "position",
-      "width"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper button[aria-label=\"Send message\"]": [
-      "height",
-      "margin-inline-start",
-      "width"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper button[aria-label=\"Stop generating\"]": [
-      "height",
-      "margin-inline-start",
-      "width"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper svg": [
-      "height",
-      "width"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper [data-slot=\"model-selector-trigger\"]": [
-      "border-radius",
-      "gap",
-      "height",
-      "padding"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper [data-slot=\"model-selector-trigger\"] svg": [
-      "height",
-      "width"
-    ],
-    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"] textarea:placeholder-shown": [
-      "max-height"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-composer-attachments": [
-      "grid-area",
-      "padding"
-    ],
-    "[data-slot=\"rail-workspace\"]:has([data-slot=\"next-chat-shell\"])": [
-      "background",
-      "height"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-root.aui-thread-root": [
-      "background-color"
-    ],
-    "[data-slot=\"rail-page-header\"]": [
-      "background"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-new\"]": [
-      "background",
-      "border",
-      "border-radius",
-      "box-shadow",
-      "display",
-      "gap",
-      "height",
-      "justify-content",
-      "min-height",
-      "padding",
-      "position",
-      "width"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-new\"]:hover": [
-      "background-color"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-new\"]::before": [
-      "inset",
-      "position"
-    ],
-    "[data-slot=\"chat-column-header\"] [data-slot=\"thread-search\"] > div": [
-      "background-color",
-      "border",
-      "border-radius",
-      "box-shadow",
-      "height",
-      "padding-inline"
-    ],
-    "[data-slot=\"chat-column-header\"] [data-slot=\"thread-search\"] svg": [
-      "height",
-      "width"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-items\"]": [
-      "gap"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-group-label\"]": [
-      "padding"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-items\"] > [data-slot=\"aui_thread-list-group-label\"]:first-child": [
-      "padding-top"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"]": [
-      "border-radius",
-      "height",
-      "min-height"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item-trigger\"]": [
-      "height",
-      "min-height",
-      "padding-inline"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"]:hover": [
-      "background-color"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"][data-active=\"true\"]": [
-      "background-color"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"]:not(:hover):not(:has(:focus-visible)):not(:has([data-state=\"open\"])) [data-slot=\"aui_thread-list-item-trigger\"]": [
-      "padding-inline-end"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item-more\"]": [
-      "border-radius"
-    ],
-    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-skeleton-wrapper\"]": [
-      "height",
-      "padding-inline"
-    ],
-    "[data-slot=\"next-chat-pane\"] .aui-user-message-content": [
-      "background",
-      "border-radius",
-      "max-width",
-      "padding"
-    ],
-    "html.incognito [data-slot=\"input\"]": [
-      "border-color"
-    ],
-    ".sidebar-box [data-slot=\"sidebar-header\"]": [
-      "border-bottom-width"
-    ],
-    "[data-mobile=\"true\"][data-sidebar=\"sidebar\"] [data-slot=\"sidebar-header\"]": [
-      "border-bottom-width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"expanded\"] .sidebar-box [data-slot=\"sidebar-footer\"]": [
-      "padding-inline"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-group\"]": [
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-group-content\"]": [
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu\"]": [
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-content\"] [data-slot=\"sidebar-group\"]": [
-      "margin-inline",
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-group\"]": [
-      "margin-inline",
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] > .hide-menu": [
-      "align-self",
-      "flex",
-      "min-width",
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-button\"]": [
-      "height",
-      "justify-content",
-      "margin-inline",
-      "min-height",
-      "min-width",
-      "padding",
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-item\"]": [
-      "display",
-      "justify-content"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-item\"] > [data-slot=\"sidebar-menu-button\"]": [
-      "margin-inline"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-button\"] > span": [
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-menu-button\"] > div.relative.flex.items-center": [
-      "justify-content"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-menu-button\"] .hide-menu": [
-      "display",
-      "height",
-      "position",
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-header\"]": [
-      "min-height",
-      "position"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-header\"] > button[aria-label=\"Toggle app menu\"]": [
-      "height",
-      "left",
-      "min-height",
-      "min-width",
-      "padding",
-      "position",
-      "top",
-      "width"
-    ],
-    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-header\"] > a:has(img[alt=\"logo\"])": [
-      "display"
-    ],
-    "header [data-slot=\"sidebar-trigger\"]": [
-      "height",
-      "min-height",
-      "min-width",
-      "padding",
-      "width"
-    ],
-    "[data-mobile=\"true\"][data-slot=\"sidebar\"] [data-slot=\"sidebar-header\"] > button[aria-label=\"Toggle app menu\"]": [
-      "display"
-    ],
-    ".sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-menu-button\"] > div.relative.flex.items-center.gap-3": [
-      "gap"
-    ],
-    ".dark [data-slot=\"badge\"][data-variant=\"destructive\"]": [
-      "background-color"
-    ],
-    ".dark [data-slot=\"button\"][data-variant=\"destructive\"]": [
-      "background-color"
-    ],
-    ":root:not(.light) [data-slot=\"badge\"][data-variant=\"destructive\"]": [
-      "background-color"
-    ],
-    ":root:not(.light) [data-slot=\"button\"][data-variant=\"destructive\"]": [
-      "background-color"
-    ],
-    "[data-slot=\"rail-workspace\"]:has([data-slot=\"next-chat-showcase-shell\"])": [
-      "height"
-    ],
-    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-shell\"])": [
-      "display",
-      "flex-direction",
-      "min-height"
-    ],
-    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-showcase-shell\"])": [
-      "display",
-      "flex-direction",
-      "min-height"
-    ],
-    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-shell\"]) > .container": [
-      "display",
-      "flex",
-      "flex-direction",
-      "margin",
-      "max-width",
-      "min-height",
-      "padding"
-    ],
-    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-showcase-shell\"]) > .container": [
-      "display",
-      "flex",
-      "flex-direction",
-      "margin",
-      "max-width",
-      "min-height",
-      "padding"
-    ]
+    "html.incognito body[class*=\"style-\"] [data-slot=\"sidebar-inner\"]": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-032",
+      "reason": "NO REASON: to be removed (cleanup item 4, chat surfaces)."
+    },
+    "[data-slot=\"sidebar-inner\"] a[data-slot=\"sidebar-menu-button\"][data-active]": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "html.incognito body[class*=\"style-\"] [data-slot=\"sidebar-inner\"] a[data-slot=\"sidebar-menu-button\"][data-active]": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-032",
+      "reason": "NO REASON: to be removed (cleanup item 4, chat surfaces)."
+    },
+    "html.incognito body[class*=\"style-\"] [data-slot=\"sidebar-inset\"]": {
+      "properties": [
+        "background"
+      ],
+      "ed": "ED-032",
+      "reason": "NO REASON: to be removed (cleanup item 4, chat surfaces)."
+    },
+    "html.incognito body[class*=\"style-\"] .aui-root.aui-thread-root": {
+      "properties": [
+        "background"
+      ],
+      "ed": "ED-032",
+      "reason": "NO REASON: to be removed (cleanup item 4, chat surfaces)."
+    },
+    "html.incognito body[class*=\"style-\"] .aui-thread-viewport-footer": {
+      "properties": [
+        "background"
+      ],
+      "ed": "ED-032",
+      "reason": "NO REASON: to be removed (cleanup item 4, chat surfaces)."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-thread-viewport-footer": {
+      "properties": [
+        "background-color",
+        "padding-bottom"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"]": {
+      "properties": [
+        "align-items",
+        "background",
+        "border-color",
+        "border-radius",
+        "column-gap",
+        "display",
+        "grid-template-areas",
+        "grid-template-columns",
+        "min-height",
+        "padding",
+        "row-gap"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"]:focus-within": {
+      "properties": [
+        "border-color"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"][data-multiline]": {
+      "properties": [
+        "grid-template-areas"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"]:has([data-slot=\"model-selector-trigger\"])": {
+      "properties": [
+        "grid-template-areas"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"] > :not(.aui-composer-attachments):not(.aui-composer-action-wrapper)": {
+      "properties": [
+        "grid-area",
+        "min-width"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper": {
+      "properties": [
+        "display"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper > :first-child": {
+      "properties": [
+        "align-items",
+        "gap",
+        "grid-area",
+        "height"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper > :last-child": {
+      "properties": [
+        "align-items",
+        "gap",
+        "grid-area",
+        "height",
+        "min-width"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper button:where(:not([data-slot=\"composer-menu-item\"]):not([data-slot=\"model-selector-trigger\"]))": {
+      "properties": [
+        "border-radius",
+        "flex",
+        "height",
+        "position",
+        "width"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper button[aria-label=\"Send message\"]": {
+      "properties": [
+        "height",
+        "margin-inline-start",
+        "width"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper button[aria-label=\"Stop generating\"]": {
+      "properties": [
+        "height",
+        "margin-inline-start",
+        "width"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper svg": {
+      "properties": [
+        "height",
+        "width"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper [data-slot=\"model-selector-trigger\"]": {
+      "properties": [
+        "border-radius",
+        "gap",
+        "height",
+        "padding"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper [data-slot=\"model-selector-trigger\"] svg": {
+      "properties": [
+        "height",
+        "width"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"] textarea:placeholder-shown": {
+      "properties": [
+        "max-height"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-composer-attachments": {
+      "properties": [
+        "grid-area",
+        "padding"
+      ],
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "[data-slot=\"rail-workspace\"]:has([data-slot=\"next-chat-shell\"])": {
+      "properties": [
+        "background",
+        "height"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-root.aui-thread-root": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-032",
+      "reason": "NO REASON: to be removed (cleanup item 4, chat surfaces)."
+    },
+    "[data-slot=\"rail-page-header\"]": {
+      "properties": [
+        "background"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-new\"]": {
+      "properties": [
+        "background",
+        "border",
+        "border-radius",
+        "box-shadow",
+        "display",
+        "gap",
+        "height",
+        "justify-content",
+        "min-height",
+        "padding",
+        "position",
+        "width"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-new\"]:hover": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-new\"]::before": {
+      "properties": [
+        "inset",
+        "position"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-header\"] [data-slot=\"thread-search\"] > div": {
+      "properties": [
+        "background-color",
+        "border",
+        "border-radius",
+        "box-shadow",
+        "height",
+        "padding-inline"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-header\"] [data-slot=\"thread-search\"] svg": {
+      "properties": [
+        "height",
+        "width"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-items\"]": {
+      "properties": [
+        "gap"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-group-label\"]": {
+      "properties": [
+        "padding"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-items\"] > [data-slot=\"aui_thread-list-group-label\"]:first-child": {
+      "properties": [
+        "padding-top"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"]": {
+      "properties": [
+        "border-radius",
+        "height",
+        "min-height"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item-trigger\"]": {
+      "properties": [
+        "height",
+        "min-height",
+        "padding-inline"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"]:hover": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"][data-active=\"true\"]": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"]:not(:hover):not(:has(:focus-visible)):not(:has([data-state=\"open\"])) [data-slot=\"aui_thread-list-item-trigger\"]": {
+      "properties": [
+        "padding-inline-end"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item-more\"]": {
+      "properties": [
+        "border-radius"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-skeleton-wrapper\"]": {
+      "properties": [
+        "height",
+        "padding-inline"
+      ],
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "[data-slot=\"next-chat-pane\"] .aui-user-message-content": {
+      "properties": [
+        "background",
+        "border-radius",
+        "max-width",
+        "padding"
+      ],
+      "ed": "ED-032",
+      "reason": "NO REASON: to be removed (cleanup item 4, chat surfaces)."
+    },
+    "html.incognito [data-slot=\"input\"]": {
+      "properties": [
+        "border-color"
+      ],
+      "ed": "ED-032",
+      "reason": "NO REASON: to be removed (cleanup item 4, chat surfaces)."
+    },
+    ".sidebar-box [data-slot=\"sidebar-header\"]": {
+      "properties": [
+        "border-bottom-width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-mobile=\"true\"][data-sidebar=\"sidebar\"] [data-slot=\"sidebar-header\"]": {
+      "properties": [
+        "border-bottom-width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"expanded\"] .sidebar-box [data-slot=\"sidebar-footer\"]": {
+      "properties": [
+        "padding-inline"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-group\"]": {
+      "properties": [
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-group-content\"]": {
+      "properties": [
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu\"]": {
+      "properties": [
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-content\"] [data-slot=\"sidebar-group\"]": {
+      "properties": [
+        "margin-inline",
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-group\"]": {
+      "properties": [
+        "margin-inline",
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] > .hide-menu": {
+      "properties": [
+        "align-self",
+        "flex",
+        "min-width",
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-button\"]": {
+      "properties": [
+        "height",
+        "justify-content",
+        "margin-inline",
+        "min-height",
+        "min-width",
+        "padding",
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-item\"]": {
+      "properties": [
+        "display",
+        "justify-content"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-item\"] > [data-slot=\"sidebar-menu-button\"]": {
+      "properties": [
+        "margin-inline"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-button\"] > span": {
+      "properties": [
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-menu-button\"] > div.relative.flex.items-center": {
+      "properties": [
+        "justify-content"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-menu-button\"] .hide-menu": {
+      "properties": [
+        "display",
+        "height",
+        "position",
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-header\"]": {
+      "properties": [
+        "min-height",
+        "position"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-header\"] > button[aria-label=\"Toggle app menu\"]": {
+      "properties": [
+        "height",
+        "left",
+        "min-height",
+        "min-width",
+        "padding",
+        "position",
+        "top",
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-header\"] > a:has(img[alt=\"logo\"])": {
+      "properties": [
+        "display"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "header [data-slot=\"sidebar-trigger\"]": {
+      "properties": [
+        "height",
+        "min-height",
+        "min-width",
+        "padding",
+        "width"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-mobile=\"true\"][data-slot=\"sidebar\"] [data-slot=\"sidebar-header\"] > button[aria-label=\"Toggle app menu\"]": {
+      "properties": [
+        "display"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    ".sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-menu-button\"] > div.relative.flex.items-center.gap-3": {
+      "properties": [
+        "gap"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    ".dark [data-slot=\"badge\"][data-variant=\"destructive\"]": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-040",
+      "reason": "NO REASON: to be removed (cleanup item 10, destructive dark tokens)."
+    },
+    ".dark [data-slot=\"button\"][data-variant=\"destructive\"]": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-040",
+      "reason": "NO REASON: to be removed (cleanup item 10, destructive dark tokens)."
+    },
+    ":root:not(.light) [data-slot=\"badge\"][data-variant=\"destructive\"]": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-040",
+      "reason": "NO REASON: to be removed (cleanup item 10, destructive dark tokens)."
+    },
+    ":root:not(.light) [data-slot=\"button\"][data-variant=\"destructive\"]": {
+      "properties": [
+        "background-color"
+      ],
+      "ed": "ED-040",
+      "reason": "NO REASON: to be removed (cleanup item 10, destructive dark tokens)."
+    },
+    "[data-slot=\"rail-workspace\"]:has([data-slot=\"next-chat-showcase-shell\"])": {
+      "properties": [
+        "height"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-shell\"])": {
+      "properties": [
+        "display",
+        "flex-direction",
+        "min-height"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-showcase-shell\"])": {
+      "properties": [
+        "display",
+        "flex-direction",
+        "min-height"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-shell\"]) > .container": {
+      "properties": [
+        "display",
+        "flex",
+        "flex-direction",
+        "margin",
+        "max-width",
+        "min-height",
+        "padding"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    },
+    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-showcase-shell\"]) > .container": {
+      "properties": [
+        "display",
+        "flex",
+        "flex-direction",
+        "margin",
+        "max-width",
+        "min-height",
+        "padding"
+      ],
+      "ed": "ED-033",
+      "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
+    }
   }
 }

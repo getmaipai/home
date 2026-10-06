@@ -1,172 +1,400 @@
 {
   "apps/chat/ChatActivityCard.tsx": {
-    "ChatActivityCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit: hand-built activity card in the hand-built chat baseline."
+    "ChatActivityCard": {
+      "ed": "ED-022",
+      "reason": "Hand-built activity card where task-card and background-inbox ship; ELT-T1-11."
+    }
   },
   "apps/chat/ChatThread.tsx": {
-    "ChatThread": "draws its own <div> box around <Thread>. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ChatThread": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    }
   },
   "apps/chat/ChatThreadExtras.tsx": {
-    "ChatThreadExtras": "draws its own <div> box around <ConversationSearch>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set E (command-palette): hand-drawn modal overlay; the kit ships ui/dialog."
+    "ChatThreadExtras": {
+      "ed": "ED-023",
+      "reason": "Hand-drawn palette overlay; kit ships ui/dialog; ELT-PALETTE-01."
+    }
   },
   "apps/chat/ComposerWakeWordControl.tsx": {
-    "ComposerWakeWordControl": "returns <TooltipIconButton> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ComposerWakeWordControl": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    }
   },
   "apps/chat/chatAnswerImages.tsx": {
-    "AnswerImagesDataRender": "draws its own <div> box around <ImageGallery>. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "AnswerImagesDataRender": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    }
   },
   "apps/chat/chatCitationLink.tsx": {
-    "ChatCitationLink": "returns <Citation> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ChatCitationLink": {
+      "ed": "ED-002",
+      "reason": "Rule 9 named gap: the [n] citation mapper."
+    }
   },
   "apps/chat/chatConnectionBanner.tsx": {
-    "ChatConnectionBanner": "returns <ConnectionState> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ChatConnectionBanner": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    }
   },
   "apps/chat/chatDateDivider.tsx": {
-    "ChatDateDivider": "returns <DayDivider> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ChatDateDivider": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    }
   },
   "apps/chat/chatHeaderBar.tsx": {
-    "ChatHeaderRename": "returns <Input> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ChatHeaderRename": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    }
   },
   "apps/chat/chatThreadSlots.tsx": {
-    "ChatQueueRow": "returns <MessageQueue> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "ComposerModelSelector": "returns <ModelSelectorRoot> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "ChatThinkingIndicator": "returns <ThinkingIndicator> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "NextReasoningGroup": "returns <ReasoningRoot> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "SourcesActionBarTrigger": "returns <Tooltip> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C D4: sources drawn by hand around Element parts; move to native source parts.",
-    "SourcesFooterContent": "draws its own <div> box around <Source>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C D4: sources drawn by hand around Element parts; move to native source parts.",
-    "MessageDetailsContextBar": "returns <ContextDisplay.Bar> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "MessageDetailsReveal": "draws its own <div> box around <MessageTiming>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C: details row wrapper in the hand-built baseline.",
-    "BareModelBadge": "returns <Badge> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C: admin badge wrapper."
+    "ChatQueueRow": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    },
+    "ComposerModelSelector": {
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    },
+    "ChatThinkingIndicator": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    },
+    "NextReasoningGroup": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    },
+    "SourcesActionBarTrigger": {
+      "ed": "ED-024",
+      "reason": "Sources drawn by hand around Element parts, synthetic sources tool part; ELT-T1-23."
+    },
+    "SourcesFooterContent": {
+      "ed": "ED-024",
+      "reason": "Sources drawn by hand around Element parts, synthetic sources tool part; ELT-T1-23."
+    },
+    "MessageDetailsContextBar": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    },
+    "MessageDetailsReveal": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    },
+    "BareModelBadge": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    }
   },
   "apps/chat/chatToolUis.tsx": {
-    "SpecSheetToolRender": "returns <SpecSheet> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "ProducedArtifactCard": "draws its own <div> box around <ArtifactCard>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D (artifact-card): hand-built More menu beside the Element; needs a kit actions slot.",
-    "ProjectToolRender": "returns <JobProgress> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "ToolTimelineToolRender": "returns <ToolTimeline> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "SpecSheetToolRender": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    },
+    "ProducedArtifactCard": {
+      "ed": "ED-025",
+      "reason": "Kit artifact-card lacked an actions slot (added in ui-v0.5.116); ADOPT-02."
+    },
+    "ProjectToolRender": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    },
+    "ToolTimelineToolRender": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    }
   },
   "apps/chat/composerAddMenu.tsx": {
-    "ComposerAddMenuItem": "returns <ComposerMenuItem> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ComposerAddMenuItem": {
+      "ed": "ED-029",
+      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
+    }
   },
   "apps/chat/composerVoiceControls.tsx": {
-    "WaveformButton": "returns <TooltipIconButton> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "WaveformButton": {
+      "ed": "ED-034",
+      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
+    }
   },
   "apps/chat/liveVoiceSession.tsx": {
-    "LiveVoiceSession": "draws its own <div> box around <TooltipIconButton>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set B (voice-conversation): gear overlay drawn around the Element."
+    "LiveVoiceSession": {
+      "ed": "ED-027",
+      "reason": "Kit voice-conversation lacked an extra slot (added in ui-v0.5.116); ELT-T1-12."
+    }
   },
   "apps/people/FaceEnrollmentCard.tsx": {
-    "FaceEnrollmentCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "FaceEnrollmentCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "apps/people/FaceEnrollmentPage.tsx": {
-    "StatusCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "StatusCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "apps/people/PersonProfilePage.tsx": {
-    "ProfileHeaderCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "EditProfileDialog": "returns <Dialog> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ProfileHeaderCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "EditProfileDialog": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "apps/people/ProfileForm.tsx": {
-    "ProfileForm": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ProfileForm": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "apps/settings/ModelsSection.tsx": {
-    "ChatModelCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set B (model-picker): hand-built role cards (HOME-FIT-02).",
-    "FitVerdictBadge": "returns <Badge> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "CheckModelCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set B (model-picker): hand-built role cards (HOME-FIT-02).",
-    "DetailsFitPanel": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D: fit verdict panel; recommendation-card ships (HOME-FIT-03).",
-    "FitPanel": "draws its own <div> box around <SpecSheet>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D: SpecSheet plus hand-built text where recommendation-card ships (HOME-FIT-03).",
-    "CompareCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D: hand-built compare view where comparison-card ships (HOME-FIT-04).",
-    "ComputerMemoryCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "PlannedRoleCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set B (model-picker): hand-built role cards (HOME-FIT-02)."
+    "ChatModelCard": {
+      "ed": "ED-021",
+      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
+    },
+    "FitVerdictBadge": {
+      "ed": "ED-037",
+      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
+    },
+    "CheckModelCard": {
+      "ed": "ED-021",
+      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
+    },
+    "DetailsFitPanel": {
+      "ed": "ED-020",
+      "reason": "Hand text where recommendation-card ships; replaced in ELT-T1-10."
+    },
+    "FitPanel": {
+      "ed": "ED-020",
+      "reason": "Hand text where recommendation-card ships; replaced in ELT-T1-10."
+    },
+    "CompareCard": {
+      "ed": "ED-019",
+      "reason": "HOME-FIT-04 row names comparison-card; hand-built CompareCard until ELT-T1-10."
+    },
+    "ComputerMemoryCard": {
+      "ed": "ED-037",
+      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
+    },
+    "PlannedRoleCard": {
+      "ed": "ED-021",
+      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
+    }
   },
   "apps/settings/RobotCard.tsx": {
-    "RobotCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "RobotCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "dev/ElementsAdoptionPanel.tsx": {
-    "ElementsAdoptionPanel": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ElementsAdoptionPanel": {
+      "ed": "ED-039",
+      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
+    }
   },
   "next/components/NextDataTable.tsx": {
-    "NextDataTable": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D: hand-built data table; use the dashboard template's data table as shipped."
+    "NextDataTable": {
+      "ed": "ED-018",
+      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built NextDataTable until K02 and ELT-T1-13a to 13d."
+    }
   },
   "next/pages/ChatColumn.tsx": {
-    "ChatColumnToggle": "returns <Tooltip> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "ChatHistoryPanel": "returns <ThreadListRoot> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ChatColumnToggle": {
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    },
+    "ChatHistoryPanel": {
+      "ed": "ED-031",
+      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
+    }
   },
   "next/pages/ChatShortcutReference.tsx": {
-    "ChatShortcutReference": "returns <Dialog> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ChatShortcutReference": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/NextChatPage.tsx": {
-    "ArtifactCanvasPanel": "returns <CanvasSplit> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D (canvas-split): fold into the page with a kit CanvasSplit pane variant.",
-    "BareCompareCanvasPanel": "returns <CanvasSplit> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D (canvas-split): fold into the page with a kit CanvasSplit pane variant."
+    "ArtifactCanvasPanel": {
+      "ed": "ED-028",
+      "reason": "Kit CanvasSplit lacked a pane variant (variant=pane in ui-v0.5.116); ELT-T1-18."
+    },
+    "BareCompareCanvasPanel": {
+      "ed": "ED-028",
+      "reason": "Kit CanvasSplit lacked a pane variant (variant=pane in ui-v0.5.116); ELT-T1-18."
+    }
   },
   "next/pages/NextFamilyPage.tsx": {
-    "FamilyCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "PersonCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "NextFamilyPage": "returns <Tabs> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "FamilyCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "PersonCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "NextFamilyPage": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/NextPersonProfilePage.tsx": {
-    "ProfileHeaderCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "EditProfileDialog": "returns <Dialog> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ProfileHeaderCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "EditProfileDialog": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/NextPrivacyPage.tsx": {
-    "ConnectionGroup": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ConnectionGroup": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/TurnErrorDetails.tsx": {
-    "TurnErrorDetails": "returns <Popover> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C D8: hand-built admin detail popover; tool-error ships."
+    "TurnErrorDetails": {
+      "ed": "ED-026",
+      "reason": "Hand-built admin detail popover; tool-error ships with optional counts from ui-v0.5.116; ADOPT-02."
+    }
   },
   "next/pages/dashboard/RecentActivityTable.tsx": {
-    "RecentActivityTable": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "RecentActivityTable": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/dashboard/StatCard.tsx": {
-    "StatCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "StatCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/performance/DiskHardwareCard.tsx": {
-    "DiskHardwareCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "DiskHardwareCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/performance/EnginesHealthCard.tsx": {
-    "EnginesHealthCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "EnginesHealthCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/performance/LabelsCard.tsx": {
-    "LabelsCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "LabelsCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/performance/LayersCard.tsx": {
-    "LayersCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "LayersCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/performance/QueuesCard.tsx": {
-    "QueuesCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "QueuesCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/performance/RoutesCard.tsx": {
-    "RoutesCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "RoutesCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/performance/TurnsByEngineTable.tsx": {
-    "TurnsByEngineTable": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "TurnsByEngineTable": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/performance/TurnsChart.tsx": {
-    "TurnsChart": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "TurnsChart": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/settings/NextHouseholdSettings.tsx": {
-    "LinkCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "LinkCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/settings/NextMeSettings.tsx": {
-    "DeviceAppearanceControl": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "TelegramAdvanced": "returns <Collapsible> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "LinkCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "DeviceAppearanceControl": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "TelegramAdvanced": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "LinkCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/settings/PersonMultiSelect.tsx": {
-    "PersonMultiSelect": "returns <Combobox> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "PersonMultiSelect": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/status/StatusApps.tsx": {
-    "AppRow": "returns <Collapsible> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "AppRow": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/status/StatusBoard.tsx": {
-    "NoteAlert": "returns <Alert> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "StatusMaintenanceCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "NoteAlert": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "StatusMaintenanceCard": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/status/StatusComponents.tsx": {
-    "StatusComponents": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "OverallBanner": "returns <Alert> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "StatusComponents": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "OverallBanner": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "next/pages/status/StatusIncident.tsx": {
-    "StatusIncident": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "RecentProblems": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "StatusIncident": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "RecentProblems": {
+      "ed": "ED-038",
+      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    }
   },
   "shell/ThemeToggle.tsx": {
-    "ThemeToggle": "returns <Button> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "ThemeToggle": {
+      "ed": "ED-039",
+      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
+    }
   }
 }

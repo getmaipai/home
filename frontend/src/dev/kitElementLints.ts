@@ -232,8 +232,13 @@ function classStrings(expr: ts.Node, consts: Map<string, ts.Expression>, seen = 
 }
 
 export type OverrideFinding = { file: string; element: string; line: number; tokens: string[] };
-/** file -> Element -> forbidden class tokens. */
-export type OverrideBaseline = Record<string, Record<string, string[]>>;
+/** file -> Element -> forbidden class tokens (what a scan finds). */
+export type OverrideTokens = Record<string, Record<string, string[]>>;
+/** ELEMENTS-DECISIONS-01: every baseline entry names the ledger row (`ed`)
+ * and the reason it stays. */
+export type DecisionRef = { ed: string; reason: string };
+/** file -> Element -> its tokens plus the decision that explains them. */
+export type OverrideBaseline = Record<string, Record<string, DecisionRef & { tokens: string[] }>>;
 
 function overridesIn(rel: string, source: string): OverrideFinding[] {
   const file = parse(rel, source);
@@ -275,8 +280,8 @@ export function classNameOverrideFindings(src: string, overrides?: Record<string
 
 /** The findings folded into the baseline's shape (no line numbers, so an
  * unrelated edit above an Element never moves the baseline). */
-export function overrideBaselineOf(findings: OverrideFinding[]): OverrideBaseline {
-  const out: OverrideBaseline = {};
+export function overrideBaselineOf(findings: OverrideFinding[]): OverrideTokens {
+  const out: OverrideTokens = {};
   for (const f of findings) {
     const byElement = (out[f.file] ??= {});
     const tokens = new Set([...(byElement[f.element] ?? []), ...f.tokens]);
@@ -291,8 +296,8 @@ export function overrideBaselineOf(findings: OverrideFinding[]): OverrideBaselin
 export const WRAPPER_NAME = /(?:Panel|Card|Wrapper)$/;
 
 export type WrapperFinding = { file: string; component: string; line: number; why: string };
-/** file -> component -> the reason it is allowed to stay (shrink-only). */
-export type WrapperBaseline = Record<string, Record<string, string>>;
+/** file -> component -> the decision and reason it is allowed to stay (shrink-only). */
+export type WrapperBaseline = Record<string, Record<string, DecisionRef>>;
 
 /** The JSX roots a component can return: an arrow's expression body, or
  * each `return` in its own body (not in nested functions), with parens,
@@ -521,8 +526,10 @@ export function frontendCssFiles(src: string): string[] {
 }
 
 export type CssOverrideFinding = { file: string; selector: string; part: string; line: number; properties: string[] };
-/** file -> selector -> forbidden properties. */
-export type CssOverrideBaseline = Record<string, Record<string, string[]>>;
+/** file -> selector -> forbidden properties (what a scan finds). */
+export type CssOverrideTokens = Record<string, Record<string, string[]>>;
+/** file -> selector -> its properties plus the decision that explains them. */
+export type CssOverrideBaseline = Record<string, Record<string, DecisionRef & { properties: string[] }>>;
 
 /** Every Home CSS rule that sets a forbidden property on a kit part.
  * `overrides` maps a relative path to stylesheet text, for tests;
@@ -538,11 +545,64 @@ export function cssOverrideFindings(src: string, overrides?: Record<string, stri
 }
 
 /** The findings folded into the baseline's shape (no line numbers). */
-export function cssOverrideBaselineOf(findings: CssOverrideFinding[]): CssOverrideBaseline {
-  const out: CssOverrideBaseline = {};
+export function cssOverrideBaselineOf(findings: CssOverrideFinding[]): CssOverrideTokens {
+  const out: CssOverrideTokens = {};
   for (const f of findings) {
     const bySelector = (out[f.file] ??= {});
     bySelector[f.selector] = [...new Set([...(bySelector[f.selector] ?? []), ...f.properties])].sort();
   }
   return out;
+}
+
+// ------------------------------------------------- ELEMENTS-DECISIONS-01
+
+/** The explicit `ed` value for an entry that has no ledger row and no valid
+ * reason yet; it only ever shrinks (a new entry is refused by the growth checks). */
+export const NO_REASON_ED = "NO-REASON-REMOVE";
+export const LEDGER_STATUSES = ["active exception", "being removed", "removed"] as const;
+export type LedgerStatus = (typeof LEDGER_STATUSES)[number];
+
+/** The rows of docs/design/ELEMENTS-DECISIONS.md: id -> status. A row is a
+ * table line whose first cell is `ED-nnn`; its status is its last cell. */
+export function ledgerRows(markdown: string): Map<string, LedgerStatus> {
+  const rows = new Map<string, LedgerStatus>();
+  for (const line of markdown.split("\n")) {
+    const text = line.trim();
+    if (!text.startsWith("|")) continue;
+    if (!text.endsWith("|")) {
+      if (/^\|\s*ED-\d{3}\s*\|/.test(text)) throw new Error(`ledger row must end with "|": ${text.slice(0, 40)}`);
+      continue;
+    }
+    const cells = text.slice(1, -1).split("|").map((c) => c.trim());
+    const id = cells[0];
+    if (!id || !/^ED-\d{3}$/.test(id)) continue;
+    const status = cells[cells.length - 1] as LedgerStatus;
+    if (!LEDGER_STATUSES.includes(status)) throw new Error(`${id}: status must be one of ${LEDGER_STATUSES.join(", ")}, got "${status}"`);
+    if (rows.has(id)) throw new Error(`${id} appears twice in the ledger`);
+    rows.set(id, status);
+  }
+  return rows;
+}
+
+/** The ledger's three counts, for the dev/ui panel. */
+export function ledgerCounts(rows: Map<string, LedgerStatus>): { active: number; beingRemoved: number; removed: number } {
+  const all = [...rows.values()];
+  return {
+    active: all.filter((s) => s === "active exception").length,
+    beingRemoved: all.filter((s) => s === "being removed").length,
+    removed: all.filter((s) => s === "removed").length,
+  };
+}
+
+/** Why a baseline entry is not allowed, or undefined. `entry` is the raw
+ * JSON value so a missing or empty field is caught, not typed away. */
+export function decisionProblem(entry: unknown, ledger: Map<string, LedgerStatus>): string | undefined {
+  const { ed, reason } = (entry ?? {}) as Partial<DecisionRef>;
+  if (typeof reason !== "string" || !reason.trim()) return "has no reason";
+  if (typeof ed !== "string" || !ed.trim()) return "has no ED id";
+  if (ed === NO_REASON_ED) return /^NO REASON/.test(reason) ? undefined : `${NO_REASON_ED} needs a reason starting "NO REASON"`;
+  const status = ledger.get(ed);
+  if (!status) return `names ${ed}, which is not a row in docs/design/ELEMENTS-DECISIONS.md`;
+  if (status === "removed") return `names ${ed}, which the ledger marks removed (delete the entry or reopen the row)`;
+  return undefined;
 }
