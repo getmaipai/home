@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T22:31:28.128Z",
+  "generatedAt": "2026-10-06T22:52:30.883Z",
   "kitTag": "ui-v0.5.131",
   "items": [
     {
@@ -65,7 +65,7 @@
       "group": "reasoning/tools",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "artifact-card.tsx",
