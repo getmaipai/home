@@ -1,0 +1,8 @@
+{
+  "sha256": [
+    "b1e0c3b880541b69a6987e5191cc56923d649ccbd612af53c8cc5bda5b9e0959",
+    "94fff8c0f438a327814c45d80eccc9330db76f35ba5391fe90bed44e40d3ccc8"
+  ],
+  "dhash": ["0000000000000000000000000000000000000000000000000000000000000000"],
+  "stock_hosts": ["shutterstock.com", "gettyimages.com", "istockphoto.com", "adobestock.com", "alamy.com"]
+}
