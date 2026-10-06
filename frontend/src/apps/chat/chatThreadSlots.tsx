@@ -32,7 +32,10 @@ import { Button as ElementsButton } from "@maipai/ui/src/elements/ui/button";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, type TurnErrorDetail, type TurnStats } from "@/lib/api";
+import { api, type StatusAppsResponse, type TurnErrorDetail, type TurnStats } from "@/lib/api";
+import { StatusIndicator } from "@maipai/ui/src/ui/status";
+import { useStatusApps } from "@/shell/useStatusApps";
+import { appStatusToSidebar } from "@/shell/statusApps";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
@@ -73,6 +76,14 @@ export function ComposerExtraControls() {
   );
 }
 
+/** The notice's dot colour from the same state the rail's Chat icon reads
+ * (the status board's Chat app, via appStatusToSidebar). A notice only shows
+ * while chat cannot answer, so no reading yet is amber. */
+function chatNoticeLevel(apps: StatusAppsResponse | undefined): "amber" | "red" {
+  const chat = Array.isArray(apps) ? apps.find((app) => app.name.toLocaleLowerCase() === "chat") : undefined;
+  return (chat ? appStatusToSidebar(chat.state) : null) ?? "amber";
+}
+
 /** CHAT-CALM-ERRORS-01d (design sections 2 and 7): the kit Thread's
  * ComposerNotice slot, the one place chat says it cannot answer right now.
  * The kit draws the muted one-line frame; this fills it with the band's line
@@ -81,11 +92,20 @@ export function ComposerExtraControls() {
  * ready. */
 export function ChatComposerNotice() {
   const notice = useContext(ChatComposerNoticeContext);
+  const apps = useStatusApps().data;
   if (!notice) return null;
+  const level = chatNoticeLevel(apps);
   return (
     // The kit frame is one truncated line; on a phone the Repairs link goes
     // first so it is never the part that is cut off.
-    <span data-chat-notice role="status" aria-live="polite" title={notice.text} className="inline-flex max-w-full items-baseline gap-1">
+    // CHAT-NOTICE-LED-01 (owner, 2026-10-06): ChatGPT's quiet status line, a small
+    // LED dot then one sentence in the normal foreground. The dot is the
+    // kit's StatusIndicator (degraded or offline, no ping), the same dot as the
+    // header status pill, on the kit's attention and destructive tokens,
+    // chosen by the status-board state the rail's Chat icon reads; every notice, for
+    // every age band, goes through this one presentation.
+    <span data-chat-notice data-level={level} role="status" aria-live="polite" title={notice.text} className="text-foreground inline-flex max-w-full items-center gap-2">
+      <StatusIndicator data-slot="chat-notice-dot" status={level === "red" ? "offline" : "degraded"} ping={false} />
       <span className="min-w-0 truncate">{notice.text}</span>
       {/* Deliberate touch-target-floor exception (docs/UI.md): a text link
           inside the notice's one sentence (WCAG 2.5.8's inline exception).

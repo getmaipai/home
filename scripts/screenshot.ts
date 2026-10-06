@@ -2778,6 +2778,46 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
     }
   }
 
+  // CHAT-NOTICE-LED-01: the calm composer notice, a status dot then one sentence.
+  for (const [slug, viewport] of [["1440", desktop], ["390", phone]] as const) {
+    for (const theme of THEMES) {
+      for (const level of ["amber", "red"] as const) {
+        const context = await newContext(browser, viewport, theme, sessionValue);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          await page.route("**/api/health", async (route) => {
+            const response = await route.fetch();
+            const body = await response.json();
+            body.engines = { ...(body.engines ?? {}), chat: { kind: "stopped", pid: null, alive: false, availability: "unavailable", reason: "stopped", notice: {
+              adult: "Chat is paused. You can type now and send when it's back.",
+              teen: "Chat is paused right now. You can type and send when it's back.",
+              child: "I'm taking a break. Ask a grown-up, or try again soon.",
+              repairs_link: "Open Repairs",
+            } } };
+            await route.fulfill({ response, json: body });
+          });
+          await page.route("**/api/status/apps", (route) => route.fulfill({ json: [
+            { id: "chat", name: "Chat", state: level === "red" ? "down" : "degraded", reason: level === "red" ? "Chat is down." : "Chat is paused.", paused: level === "amber", history: [], uptimePercent: 100 },
+          ] }));
+          await page.goto(`${BASE_URL}/chat`);
+          await page.getByRole("textbox", { name: "Message input" }).waitFor();
+          const notice = page.locator("[data-chat-notice]");
+          await notice.waitFor();
+          await page.waitForFunction((want) => document.querySelector("[data-chat-notice]")?.getAttribute("data-level") === want, level);
+          const facts = await page.evaluate(() => {
+            const el = document.querySelector<HTMLElement>("[data-chat-notice]")!;
+            const dot = el.querySelector<HTMLElement>('[data-slot="chat-notice-dot"] > span')!;
+            return { dot: getComputedStyle(dot).backgroundColor, dotSize: Math.round(dot.getBoundingClientRect().width), text: getComputedStyle(el).color, size: getComputedStyle(el).fontSize, box: getComputedStyle(el).backgroundColor, border: getComputedStyle(el).borderTopWidth };
+          });
+          log(`notice ${slug}/${theme}/${level}`, facts);
+          await shoot(page, `notice-${level}-${slug}-${theme}`);
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
 
   // Loading: hold the conversation list so the skeleton rows show.
   {

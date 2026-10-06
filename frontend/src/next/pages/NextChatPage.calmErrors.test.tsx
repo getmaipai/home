@@ -41,7 +41,7 @@ function makePerson(role: Roster["role"]): Roster {
   return { id: "person-abc123", display_name: "Nova", nickname: null, role, age_band, avatar_seed: "person-abc123", source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true };
 }
 
-type Scenario = { health: () => unknown; stream?: () => unknown[]; onStream?: () => void };
+type Scenario = { health: () => unknown; apps?: () => unknown; stream?: () => unknown[]; onStream?: () => void };
 
 function stub(scenario: Scenario): { restore: () => void; turns: () => number } {
   const original = globalThis.fetch;
@@ -49,6 +49,7 @@ function stub(scenario: Scenario): { restore: () => void; turns: () => number } 
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.endsWith("/api/status/apps")) return Promise.resolve(Response.json(scenario.apps?.() ?? []));
     if (url.endsWith("/api/health")) return Promise.resolve(Response.json(scenario.health()));
     if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-calm123", status: "open", surface: "chat" }));
     if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
@@ -87,10 +88,27 @@ describe("(a) one cause, one visual", () => {
     try {
       const view = openChat("owner");
       await waitFor(() => expect(notice(view.container)?.textContent).toContain(PAUSED.adult));
+      // CHAT-NOTICE-LED-01: a status dot (the kit's degraded dot, no ping) then the sentence.
+      const dot = notice(view.container)?.querySelector('[data-slot="chat-notice-dot"]');
+      expect(dot?.innerHTML).toContain("tint-attention-fg");
+      expect(dot?.innerHTML).not.toContain("animate-ping");
       expect(inlineFailure(view.container)).toBeNull();
       expect(view.queryByText("MaiPai's AI isn't running right now")).toBeNull();
       expect(view.container.querySelector('[data-slot="alert"]')).toBeNull();
       expect(paintsRed(view.container)).toBeNull();
+    } finally {
+      stubbed.restore();
+    }
+  });
+
+  test("Chat down on the status board: the notice dot is the kit's offline (red) dot, still no ping", async () => {
+    const stubbed = stub({ health: () => DOWN, apps: () => [{ id: "chat", name: "Chat", state: "down", reason: null, paused: false }] });
+    try {
+      const view = openChat("owner");
+      await waitFor(() => expect(notice(view.container)?.getAttribute("data-level")).toBe("red"));
+      const dot = notice(view.container)?.querySelector('[data-slot="chat-notice-dot"]');
+      expect(dot?.innerHTML).toContain("bg-destructive");
+      expect(dot?.innerHTML).not.toContain("animate-ping");
     } finally {
       stubbed.restore();
     }
