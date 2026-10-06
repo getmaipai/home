@@ -329,7 +329,9 @@ const elementsReview = process.argv.includes("--elements-review");
 const chatProjectsReview = process.argv.includes("--chat-projects-review");
 // SKILLS-PAGE-01: the Skills section of Chat settings, an adult and a teen, 1440 and 390, both themes.
 const chatSkillsReview = process.argv.includes("--chat-skills-review");
-const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview;
+// ENGINE-DOWN-UI-01: a reply with its action row while chat is ready and while it is paused.
+const engineDownReview = process.argv.includes("--engine-down-review");
+const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -3209,6 +3211,112 @@ async function captureElementsReview(browser: Browser, sessionValue: string): Pr
         }
       } finally {
         await context.close();
+      }
+    }
+  }
+  console.log(`Wrote captures to ${outDir}`);
+}
+
+/** ENGINE-DOWN-UI-01: one conversation with two replies, opened with chat ready
+ * and with chat paused (the health row says stopped), at 1440 and 390 in both
+ * themes. Each shot is checked in the page for the contract: Refresh, Edit,
+ * Retry, Send and the starter chips are disabled while paused; Copy, Read
+ * aloud, the thumbs, More and typing stay enabled. */
+async function captureEngineDownReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "engine-down-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const conversation = await seedTitledConversation("captureEngineDownReview", cookie, "Homework helper notes");
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const seedContext = await newContext(browser, desktop, "dark", sessionValue);
+  try {
+    const page = await seedContext.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await openStoredConversation(page, conversation.id, "Homework helper notes");
+    await sendChatMessage(page, "Say something short about gardens.");
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    await sendChatMessage(page, "Thanks. Can you say that again in one short sentence?");
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    await page.waitForTimeout(500);
+  } finally {
+    await seedContext.close();
+  }
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      for (const state of ["ready", "paused"] as const) {
+        const context = await newContext(browser, viewport, theme, sessionValue);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          // The fixture Stack has no speech engine; the voice row says ready so Read aloud (which follows the voice service, never chat) shows in both states.
+          await page.route("**/api/health", async (route) => {
+            const response = await route.fetch();
+            const body = await response.json();
+            body.engines = { ...(body.engines ?? {}), voice: { kind: "url", pid: null, alive: true, availability: "ready" } };
+            if (state === "paused") {
+              body.engines.chat = { kind: "stopped", pid: null, alive: false, availability: "unavailable", reason: "stopped", notice: {
+                adult: "Chat is paused. Your message stays here; press Send once it's back.",
+                teen: "Chat is paused right now. Your message stays here; press Send once it's back.",
+                child: "I'm taking a break. Ask a grown-up, or try again soon.",
+                repairs_link: "Open Repairs",
+              } };
+            }
+            await route.fulfill({ response, json: body });
+          });
+          if (state === "paused") {
+            await page.route("**/api/status/apps", (route) => route.fulfill({ json: [
+              { id: "chat", name: "Chat", state: "degraded", reason: "Chat is paused.", paused: true, history: [], uptimePercent: 100 },
+            ] }));
+          }
+          await openStoredConversation(page, conversation.id, "Homework helper notes");
+          await page.locator(".aui-assistant-action-bar-root").first().waitFor();
+          if (state === "paused") await page.locator("[data-chat-notice]").waitFor();
+          await page.getByRole("textbox", { name: "Message input" }).fill("A draft that stays here");
+          await settleAnimations(page);
+          const facts = await page.evaluate(() => {
+            const row = document.querySelector(".aui-assistant-action-bar-root");
+            const state = (root: ParentNode | null, label: string) => {
+              const button = Array.from(root?.querySelectorAll("button") ?? []).find((b) => (b.textContent ?? "").trim().startsWith(label));
+              return button ? (button as HTMLButtonElement).disabled : "missing";
+            };
+            const send = document.querySelector('[aria-label="Send message"]') as HTMLButtonElement | null;
+            const input = document.querySelector('[aria-label="Message input"]') as HTMLTextAreaElement | null;
+            return {
+              Copy: state(row, "Copy"), "Read aloud": state(row, "Read aloud"), Helpful: state(row, "Helpful"), More: state(row, "More"), Refresh: state(row, "Refresh"),
+              Send: send ? send.disabled : "missing", typing: input ? !input.disabled : "missing",
+            };
+          });
+          console.log(`engine-down ${viewport.width}/${theme}/${state}`, JSON.stringify(facts));
+          const wantDown = state === "paused";
+          if (facts["Read aloud"] !== false || facts.Refresh !== wantDown || facts.Send !== wantDown || facts.Copy !== false || facts.More !== false || facts.typing !== true) {
+            throw new Error(`captureEngineDownReview: wrong control states on ${slug}/${theme}/${state}: ${JSON.stringify(facts)}`);
+          }
+          await page.screenshot({ path: join(outDir, `reply-${state}-${viewport.width}-${theme}.png`) });
+          // The user's own row (Retry, Edit, Copy) shows on hover.
+          await page.locator('[data-role="user"]').first().hover();
+          await page.waitForTimeout(250);
+          const editState = await page.evaluate(() => {
+            const edit = Array.from(document.querySelectorAll("button")).find((b) => (b.textContent ?? "").trim().startsWith("Edit")) as HTMLButtonElement | undefined;
+            const retry = Array.from(document.querySelectorAll("button")).find((b) => (b.textContent ?? "").trim().startsWith("Retry")) as HTMLButtonElement | undefined;
+            return edit ? { disabled: edit.disabled, opacity: getComputedStyle(edit).opacity, retryDisabled: retry ? retry.disabled : "missing", retryOpacity: retry ? getComputedStyle(retry).opacity : "missing" } : "missing";
+          });
+          console.log(`engine-down ${viewport.width}/${theme}/${state} user Edit/Retry ${JSON.stringify(editState)}`);
+          if (editState === "missing" || editState.disabled !== wantDown || editState.retryDisabled !== wantDown || (wantDown && (editState.opacity !== "0.5" || editState.retryOpacity !== "0.5"))) throw new Error(`captureEngineDownReview: user Edit/Retry ${JSON.stringify(editState)} on ${slug}/${theme}/${state}`);
+          await page.screenshot({ path: join(outDir, `user-row-${state}-${viewport.width}-${theme}.png`) });
+          if (state === "paused") {
+            await page.goto(`${BASE_URL}/chat`);
+            await page.getByRole("textbox", { name: "Message input" }).waitFor();
+            await page.locator("[data-chat-notice]").waitFor();
+            await settleAnimations(page);
+            const chips = await page.locator('[data-slot="empty-state-suggestion"]').evaluateAll((els) => els.map((el) => (el as HTMLButtonElement).disabled));
+            console.log(`engine-down ${viewport.width}/${theme}/${state} starter chips disabled`, JSON.stringify(chips));
+            if (chips.length !== 4 || chips.some((disabled) => !disabled)) throw new Error(`captureEngineDownReview: starter chips are not all disabled: ${JSON.stringify(chips)}`);
+            await page.screenshot({ path: join(outDir, `new-chat-${state}-${viewport.width}-${theme}.png`) });
+          }
+        } finally {
+          await context.close();
+        }
       }
     }
   }
@@ -9130,6 +9238,12 @@ async function main() {
         await captureChatStreaming(browser, sessionValue, viewport, combo.theme);
         await captureChatEngineNotReady(browser, sessionValue, viewport, combo.theme);
       }
+    }
+
+    if (engineDownReview) {
+      await captureEngineDownReview(browser, sessionValue);
+      console.log("completed named review: --engine-down-review");
+      return;
     }
 
     if (elementsReview) {

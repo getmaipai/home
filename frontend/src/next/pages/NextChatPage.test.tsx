@@ -2755,6 +2755,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       const method = init?.method ?? "GET";
+      if (url.endsWith("/api/health")) return Promise.resolve(Response.json({ engines: { voice: { kind: "url", pid: null, alive: true, availability: "ready" } } }));
       if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [
         { id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } },
         { id: "tts", state: { state: "ready" } },
@@ -2854,6 +2855,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       const method = init?.method ?? "GET";
+      if (url.endsWith("/api/health")) return Promise.resolve(Response.json({ engines: { voice: { kind: "url", pid: null, alive: true, availability: "ready" } } }));
       if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "tts", state: { state: "ready" } }], engines: [], budget: null }));
       if (url.endsWith("/api/conversations") && method === "POST") {
         calls.push("create");
@@ -4066,6 +4068,7 @@ describe("NextChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
     let ttsCount = 0;
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/api/health")) return Promise.resolve(Response.json({ engines: { voice: { kind: "url", pid: null, alive: true, availability: ttsReady ? "ready" : "unavailable" } } }));
       if (url.includes("/api/engines")) {
         const roles = ttsReady ? [{ id: "tts", state: { state: "ready" } }] : [];
         return Promise.resolve(Response.json({ configured: ttsReady, roles, engines: [], budget: null }));

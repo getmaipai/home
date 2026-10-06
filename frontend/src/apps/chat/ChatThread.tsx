@@ -4,7 +4,7 @@ import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { DATA_BINDINGS, MODEL_TRAILING_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
 import { ChatThreadExtras } from "@/apps/chat/ChatThreadExtras";
-import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
+import { ChatAvailabilityContext, engineDownReason } from "@/apps/chat/useChatAvailability";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 
 export type ChatExtrasContextValue = {
@@ -60,7 +60,9 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
   const toggleSidebar = useCallback(() => chatColumn?.toggle(), [chatColumn]);
   // CHAT-CALM-ERRORS-01d (design section 7): while the engine is down or
   // starting, the person can keep typing but Send waits for `ready`.
-  const engineHeld = useContext(ChatAvailabilityContext) !== "ready";
+  // ENGINE-DOWN-UI-01: the same state also holds every other engine-dependent
+  // control, through the kit Thread's one `engineDown` prop.
+  const engineDown = engineDownReason(useContext(ChatAvailabilityContext));
   // getmaipai/home#206: while a saved chat is still opening (a slow hub
   // answering for its details), the composer belongs to a blank placeholder
   // thread; a message sent there vanished when the saved chat replaced it.
@@ -81,7 +83,7 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
     return () => clearTimeout(timer);
   }, [openingKey]);
   const opening = openingKey !== undefined && !openingTimedOut;
-  const sendHeld = engineHeld || opening;
+  const sendHeld = opening;
   // Text typed while the placeholder stands in for the chat (even past the
   // cap) moves into the opened chat's composer, so nothing typed is lost in
   // the switch. Only what changed during the open moves: a draft that was
@@ -129,6 +131,7 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
             ...THREAD_SLOTS,
             onEditSend,
             sendHeld,
+            engineDown,
             // CHAT-ACTION-ROW-01: copy, listen, rate, refresh and more sit under every reply, as in ChatGPT, not only the last.
             assistantActionBarAutohide: "never",
             ThreadViewportExtra: ChatThreadExtras,

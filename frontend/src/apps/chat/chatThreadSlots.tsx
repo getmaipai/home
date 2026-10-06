@@ -55,7 +55,7 @@ import { ChatActivityCard } from "@/apps/chat/ChatActivityCard";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
-import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
+import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/next/pages/TurnErrorDetails";
 
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
@@ -68,15 +68,16 @@ const QueueSendIcon = getIcon("arrow-up");
 
 export function ComposerExtraControls() {
   const person = useContext(WakeWordPersonContext);
+  const engineDown = useEngineDownReason();
   const isRunning = useAuiState((s) => s.thread.isRunning && s.thread.voice === undefined && s.thread.capabilities.queue);
   const writtenTurnBusy = useAuiState((s) => s.thread.isRunning || s.composer.queue.length > 0);
   return (
     <>
-      <ComposerVoiceControls disabled={writtenTurnBusy} />
+      <ComposerVoiceControls disabled={writtenTurnBusy} engineDown={engineDown} />
       {person ? <ComposerWakeWordControl person={person} /> : null}
       {isRunning ? (
         <ComposerPrimitive.Send asChild>
-          <ElementsButton type="button" size="icon" className="size-7 rounded-full" aria-label="Queue message" title="Queue message">
+          <ElementsButton type="button" size="icon" className="size-7 rounded-full" aria-label="Queue message" title="Queue message" disabled={engineDown !== undefined}>
             <QueueSendIcon className="size-4" />
           </ElementsButton>
         </ComposerPrimitive.Send>
@@ -203,6 +204,7 @@ export function ComposerTrailingWithModelSelector() {
  * is convenience, not the real gate. */
 export function CompareWithBareModelMenuItem() {
   const isAdmin = useContext(AdminContext);
+  const engineDown = useEngineDownReason();
   const openCompare = useContext(CompareOpenContext);
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   const conversationId = useAuiState((s) => s.message.metadata?.custom?.conversationId as string | undefined);
@@ -212,7 +214,7 @@ export function CompareWithBareModelMenuItem() {
     <ActionBarMorePrimitive.Item
       // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
       className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none disabled:pointer-events-none disabled:opacity-50"
-      disabled={!turnId || !conversationId}
+      disabled={!turnId || !conversationId || engineDown !== undefined}
       onSelect={(e) => {
         e.preventDefault();
         if (!turnId || !conversationId) return;
@@ -220,7 +222,7 @@ export function CompareWithBareModelMenuItem() {
       }}
     >
       <CompareIcon className="size-4" />
-      {!turnId || !conversationId ? "Compare (available once saved)" : "Compare with the bare model"}
+      {!turnId || !conversationId ? "Compare (available once saved)" : engineDown !== undefined ? `Compare with the bare model. ${engineDown}` : "Compare with the bare model"}
     </ActionBarMorePrimitive.Item>
   );
 }
@@ -388,6 +390,7 @@ export function EngineStartingLoader({ Loader = GenerationLoader }: {
 export function NextChatWelcome() {
   const { on } = useContext(TemporaryChatContext);
   const aui = useAui();
+  const engineDown = useEngineDownReason();
   return (
     <>
       <EngineStartingLoader />
@@ -399,7 +402,10 @@ export function NextChatWelcome() {
             <EmptyStateSuggestion
               key={suggestion.title}
               index={index}
+              disabled={engineDown !== undefined}
+              aria-label={engineDown === undefined ? undefined : `${suggestion.title} ${suggestion.label}. ${engineDown}`}
               onClick={() => {
+                if (engineDown !== undefined) return;
                 aui.composer().setText(suggestion.prompt);
                 aui.composer().send();
               }}
@@ -613,6 +619,7 @@ export function FailedTurnActionBarExtras() {
   const { models, value } = useContext(ModelPickerContext);
   const aui = useAui();
   const eligible = useContext(ModelChoiceAllowedContext);
+  const engineDown = useEngineDownReason();
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -621,6 +628,7 @@ export function FailedTurnActionBarExtras() {
           options={models.map((model) => ({ id: model.id, label: model.name, detail: model.description ?? model.id }))}
           open={open}
           currentId={value}
+          disabled={engineDown}
           onOpenChange={setOpen}
           onPick={(model) => {
             setOpen(false);

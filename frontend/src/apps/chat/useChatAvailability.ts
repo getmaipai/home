@@ -1,4 +1,4 @@
-import { createContext } from "react";
+import { createContext, useContext } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, isOwnerOrAdminRole, type HealthStatus, type Roster } from "@/lib/api";
 import { chatAvailability } from "@/apps/chat/chatAvailability";
@@ -13,6 +13,26 @@ function useHealthQuery() {
     retry: false,
     refetchInterval: (current) => chatAvailability(current.state.data?.engines?.chat) === "unavailable" ? 5_000 : 15_000,
   });
+}
+
+/** ENGINE-DOWN-UI-01: the one reason string every engine-dependent control
+ * shows while chat cannot answer (undefined while ready). ChatThread hands it
+ * to the kit Thread's `engineDown`; Home's own slots read it here, so the
+ * controls never disagree about whether chat is up. */
+export function engineDownReason(availability: "ready" | "starting" | "unavailable"): string | undefined {
+  return availability === "ready" ? undefined : availability === "starting" ? "Chat is starting" : "Chat is paused";
+}
+
+export function useEngineDownReason(): string | undefined {
+  return engineDownReason(useContext(ChatAvailabilityContext));
+}
+
+/** Read aloud depends on the voice service (the Stack's speech role, in the
+ * health row as `engines.voice`), never on chat, and is open to every person,
+ * not only owners and admins. False until the health row has answered. */
+export function useVoiceAvailable(): boolean {
+  const voice = useHealthQuery().data?.engines?.voice;
+  return voice !== undefined && chatAvailability(voice) === "ready";
 }
 
 export function useChatAvailability() {

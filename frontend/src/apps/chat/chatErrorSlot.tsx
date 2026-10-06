@@ -6,7 +6,7 @@ import { GuardrailNotice } from "@maipai/ui/src/elements/guardrail-notice";
 import { useContext, useEffect, useRef, useState } from "react";
 import { QueryClientContext } from "@tanstack/react-query";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
-import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
+import { ChatAvailabilityContext, engineDownReason } from "@/apps/chat/useChatAvailability";
 
 type MessageErrorValue = {
   message: string;
@@ -66,7 +66,7 @@ export function ChatMessageError() {
   // the message column so one sentence stays on one line on a desktop.
   return (
     <MessagePrimitive.Error>
-      <ErrorState title={error.message} detail="" retrying={retrying} onRetry={retry} className="max-w-none px-0 py-1" />
+      <ErrorState title={error.message} detail="" retrying={retrying} onRetry={retry} retryDisabled={engineDownReason(availability)} className="max-w-none px-0 py-1" />
     </MessagePrimitive.Error>
   );
 }

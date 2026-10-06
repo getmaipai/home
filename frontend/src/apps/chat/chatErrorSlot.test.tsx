@@ -3,6 +3,9 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { AdminContext } from "@/apps/chat/chatThreadContexts";
+import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
+import { act } from "@testing-library/react";
+import { useState } from "react";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { MemoryRouter } from "react-router-dom";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -169,6 +172,25 @@ describe("ChatMessageError", () => {
     expect(view.container.textContent).not.toContain("try instead");
     expect(view.container.textContent).not.toContain("self_harm");
     expect(view.container.textContent).not.toContain("safety_refused");
+  });
+
+  // ENGINE-DOWN-UI-01: a failed reply's Retry needs the engine like any other control.
+  test("Retry is disabled, with the reason in its name, while chat is paused, and enabled again when it is back", async () => {
+    let setAvailability!: (value: "ready" | "unavailable") => void;
+    function AvailabilityHarness() {
+      const [availability, set] = useState<"ready" | "unavailable">("ready");
+      setAvailability = set;
+      return <ChatAvailabilityContext.Provider value={availability}><Harness adapter={failingAdapter(new ChatTurnError("Try again.", "unavailable"))} /></ChatAvailabilityContext.Provider>;
+    }
+    const view = renderWithQueryClient(<AvailabilityHarness />);
+    await sendFailingMessage(view);
+    const retry = () => view.getByRole("alert").querySelector("button") as HTMLButtonElement;
+    expect(retry().disabled).toBe(false);
+    act(() => setAvailability("unavailable"));
+    await waitFor(() => expect(retry().disabled).toBe(true));
+    expect(retry().textContent).toContain("Chat is paused");
+    act(() => setAvailability("ready"));
+    await waitFor(() => expect(retry().disabled).toBe(false));
   });
 
   test("Retry reruns the failed reply", async () => {

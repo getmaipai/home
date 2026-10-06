@@ -32,15 +32,16 @@ const AudioWaveformIcon = getIcon("audio-waveform");
 // affordance. The kit's `elements/tooltip-icon-button` has no touch-target
 // floor of its own, so the 48px hit area (docs/UI.md) is the
 // `before:-inset-3` pseudo-element passed through className.
-function WaveformButton({ onClick }: { onClick: () => void }) {
+function WaveformButton({ onClick, engineDown }: { onClick: () => void; engineDown?: string | undefined }) {
   return (
     <TooltipIconButton
-      tooltip="Start a voice conversation"
+      tooltip={engineDown === undefined ? "Start a voice conversation" : `Start a voice conversation. ${engineDown}`}
+      disabled={engineDown !== undefined}
       type="button"
       variant="default"
       size="icon"
       className="relative size-7 rounded-full before:absolute before:-inset-3 before:content-['']"
-      aria-label="Start a voice conversation"
+      aria-label={engineDown === undefined ? "Start a voice conversation" : `Start a voice conversation. ${engineDown}`}
       onClick={onClick}
     >
       <AudioWaveformIcon className="size-4" />
@@ -52,7 +53,7 @@ function WaveformButton({ onClick }: { onClick: () => void }) {
  * own acceptance: "voice and glance have no controls" without them) -
  * absent, not disabled, the same posture Create image and the composer
  * Attach's other role-gated rows already take. */
-export function ComposerVoiceControls({ disabled = false }: { disabled?: boolean }) {
+export function ComposerVoiceControls({ disabled = false, engineDown }: { disabled?: boolean; engineDown?: string | undefined }) {
   const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
   const overview = enginesQuery.data;
   // VOICE-LIVE-02: `null` here (no VoiceSessionProvider in this tree)
@@ -63,5 +64,5 @@ export function ComposerVoiceControls({ disabled = false }: { disabled?: boolean
   // ready.
   const session = useVoiceSession();
   if (disabled || !readyRole(overview, "stt") || !readyRole(overview, "tts")) return null;
-  return <WaveformButton onClick={() => session?.setOpen(true)} />;
+  return <WaveformButton onClick={() => session?.setOpen(true)} engineDown={engineDown} />;
 }

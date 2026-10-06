@@ -45,7 +45,7 @@ import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
-import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice } from "@/apps/chat/useChatAvailability";
+import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice, useVoiceAvailable } from "@/apps/chat/useChatAvailability";
 import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { photoUploadsEnabledForBand } from "@/apps/chat/photoUploadAccess";
@@ -59,7 +59,6 @@ import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 import { CHAT_COLUMN_ID, ChatColumnToggle, ChatHistoryPanel, useChatColumn } from "@/next/pages/ChatColumn";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
-import { readyRole } from "@/apps/chat/engineRoles";
 import { ChatShortcutReference } from "@/next/pages/ChatShortcutReference";
 import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
@@ -304,7 +303,9 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     if (!enginesQuery.data?.configured) return [];
     return (chatRole?.models ?? []).map((model) => ({ ...model, efforts: modelThinks(chatCapabilities, model.id) ? MODEL_EFFORTS : undefined }));
   }, [chatRole?.models, enginesQuery.data?.configured, chatCapabilities]);
-  const ttsAvailable = readyRole(enginesQuery.data, "tts");
+  // ENGINE-DOWN-UI-01: the voice service's own health row (any person), not the
+  // admin-only engines overview and never the chat engine.
+  const ttsAvailable = useVoiceAvailable();
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
   const spokenNextRef = useRef(false);
