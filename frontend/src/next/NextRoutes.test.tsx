@@ -347,18 +347,28 @@ describe("NextRoutes sign-in redirect", () => {
 
 describe("NextRoutes signed-out redirect", () => {
   test("a signed-out visit to a deep path lands on /sign-in once, never /people/sign-in/sign-in", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/auth/profiles")) return Promise.resolve(Response.json([makePerson()]));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
     function Path() {
       return <div data-testid="path">{useLocation().pathname}</div>;
     }
-    const view = renderWithQueryClient(
-      <MemoryRouter initialEntries={["/people"]}>
-        <Path />
-        <Routes>
-          <Route path="/*" element={<NextRoutes person={null} onSignedIn={() => {}} />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    await waitFor(() => expect(view.getByTestId("path").textContent).toBe("/sign-in"));
+    try {
+      const view = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/people"]}>
+          <Path />
+          <Routes>
+            <Route path="/*" element={<NextRoutes person={null} onSignedIn={() => {}} />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(view.getByTestId("path").textContent).toBe("/sign-in"));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 
