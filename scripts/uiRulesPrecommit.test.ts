@@ -30,6 +30,10 @@ beforeAll(() => {
   for (const f of readdirSync(join(REPO, "frontend/src/dev")).filter((f) => f.endsWith(".test.ts") && /^(kitElementLints|handBuiltChat)/.test(f))) cpSync(join(REPO, "frontend/src/dev", f), join(dir, "frontend/src/dev", f));
   for (const b of ["kit-classname-override-baseline", "kit-css-override-baseline", "kit-wrapper-baseline"]) writeFileSync(join(dir, `frontend/src/dev/${b}.json`), "{}");
   writeFileSync(join(dir, "frontend/src/dev/hand-built-chat-baseline.json"), "{}");
+  // GATE-FIX-04: ELEMENTS-LINT-03 reads the chat's element registry for
+  // rule 9(b)'s registered-render exception (RULES-EDIT-01); the scratch
+  // repo needs one, empty, or the lint fails on a missing file.
+  writeFileSync(join(dir, "frontend/src/apps/chat/elementBindings.ts"), "export const TOOL_BINDINGS = [];\nexport const DATA_BINDINGS = [];\n");
   cpSync(join(REPO, "docs/design/ELEMENTS-DECISIONS.md"), join(dir, "docs/design/ELEMENTS-DECISIONS.md"));
   cpSync(join(REPO, "frontend/package.json"), join(dir, "frontend/package.json"));
   cpSync(join(REPO, "frontend/bunfig.toml"), join(dir, "frontend/bunfig.toml"));
