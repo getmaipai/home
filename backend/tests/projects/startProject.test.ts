@@ -310,6 +310,24 @@ describe("policyNode: start_project classified by its own named type, not a fixe
     expect(decision.ask?.prompt).toContain("bedtime story");
   });
 
+  // Live 2026-10-06: "who is the president of brazil" came back as "Bedtime
+  // storybook can take a few minutes to put together. Want me to create it?"
+  // from a call carrying { title, author } for a type whose own schema
+  // requires `topic`. Yes would only have failed with invalid_params, so the
+  // household is never asked to approve a call that cannot run; the call
+  // goes on to fail in the tool, where the retry round can still fix it.
+  test("a call whose params fail the type's own schema parks no confirm ask", async () => {
+    const state = turnState({ utterance: "who is the president of brazil" });
+    const { output } = await policyNode(state, { calls: [toolCall("bedtime-story", { title: "A Life Story", author: "MaiPai" })] }, new AbortController().signal);
+    expect(output.entries[0]!.decision).toEqual({ allow: true });
+  });
+
+  test("a call that cannot run never starts a project: the tool fails it as invalid_params", () => {
+    const outcome = runStartProjectTool({ actor: person("Sage"), args: { type: "bedtime-story", params: { title: "A Life Story", author: "MaiPai" } }, callId: "c1", conversationId: "conv-1", turnId: "turn-1", temporary: false });
+    expect(outcome.status).toBe("failed");
+    expect(outcome.errorCode).toBe("invalid_params");
+  });
+
   test("the identical pre-confirmed call is allowed to run", async () => {
     const state = turnState();
     const call = toolCall("bedtime-story", { topic: "dragons" });

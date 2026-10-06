@@ -119,7 +119,10 @@ export function projectTypeForArgs(args: unknown): ProjectType | undefined {
 // reason to know ajv exists.
 const compiledParamsValidators = new Map<string, ReturnType<typeof ajv.compile>>();
 
-function validateParams(projectType: ProjectType, params: Record<string, unknown>): string | null {
+/** The type's own schema check, shared by policy.ts (before it ever asks
+ * for a yes) and runStartProjectTool() below (before it starts anything):
+ * null when `params` pass, the validator's message when they do not. */
+export function validateProjectParams(projectType: ProjectType, params: Record<string, unknown>): string | null {
   let validate = compiledParamsValidators.get(projectType.id);
   if (!validate) {
     validate = ajv.compile(projectType.paramsSchema as object);
@@ -127,6 +130,11 @@ function validateParams(projectType: ProjectType, params: Record<string, unknown
   }
   if (validate(params)) return null;
   return ajv.errorsText(validate.errors, { separator: "; " });
+}
+
+/** The call's own `params` object, `{}` when it sent none or sent a non-object. */
+export function projectParamsOf(args: StartProjectArgs): Record<string, unknown> {
+  return args.params && typeof args.params === "object" ? (args.params as Record<string, unknown>) : {};
 }
 
 /** "About N minutes/seconds" - the only number the starting turn's own
@@ -178,8 +186,8 @@ export function runStartProjectTool(input: RunStartProjectInput): ToolExecutionO
       userMessage: `there's no project type "${type}"`,
     });
   }
-  const params = input.args.params && typeof input.args.params === "object" ? (input.args.params as Record<string, unknown>) : {};
-  const paramsError = validateParams(projectType, params);
+  const params = projectParamsOf(input.args);
+  const paramsError = validateProjectParams(projectType, params);
   if (paramsError) {
     return outcomeOf({
       callId: input.callId,

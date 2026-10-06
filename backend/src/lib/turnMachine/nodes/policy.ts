@@ -11,7 +11,7 @@
 import { loadManifestOnly, meetsMinRole } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { tokenize, isBarePronoun } from "@/lib/text";
-import { START_PROJECT_TOOL_ID, projectTypeForArgs } from "@/lib/projects/tool";
+import { START_PROJECT_TOOL_ID, projectParamsOf, projectTypeForArgs, validateProjectParams, type StartProjectArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
 import { speakerIsAnonymous, touchesMemory } from "../speaker";
@@ -244,13 +244,21 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         entries.push({ proposal, decision: { allow: false, reason: "min_role" } });
         continue;
       }
+      // Live 2026-10-06: a runaway generation sent { title, author } for a
+      // type whose schema requires `topic`, and the household was asked
+      // "Want me to create it?" for a call that a yes could only fail. A
+      // call whose params fail the type's own schema is never parked as a
+      // confirm: it is let through to run, where runStartProjectTool()'s
+      // identical check fails it as invalid_params before anything starts,
+      // so the T5 retry round still gives the model one chance to fix it.
+      const paramsValid = validateProjectParams(projectType, projectParamsOf(args as StartProjectArgs)) === null;
       // No temporary_mode refusal here (unlike an ordinary
       // memory:write-permissioned package below): the design record's
       // own ruling is that a project started from an incognito or
       // temporary thread is ALLOWED ("its artifact is the point and is
       // durably wanted"), never blocked the way saving a fact is.
       const isPreConfirmed = input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
-      if (!isPreConfirmed && projectType.consequential) {
+      if (!isPreConfirmed && projectType.consequential && paramsValid) {
         noteRefusal("confirm_needed");
         // Jesse found live (2026-09-27): "Start Bedtime storybook?" reads
         // as a bare yes/no with no reason given - `consequential` is
@@ -258,12 +266,9 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         // ProjectType doc comment), so the ask should say that plainly,
         // the actual reason a project asks at all (an instant project
         // type would never reach this branch). No precise number here on
-        // purpose: `buildPlan()`'s own contract (projectTypes.ts) is
-        // "called only after paramsSchema has already validated
-        // [params] - free to assume they're well-shaped," and nothing
-        // has validated this call's params yet at classification time -
-        // tool.ts's own real, ceiling-backed `durationLabel()` names the
-        // honest number instead, once the project actually starts.
+        // purpose: the params passed the schema check above, but the plan
+        // is only built when the project starts, and tool.ts's own real,
+        // ceiling-backed `durationLabel()` names the honest number then.
         entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `${sentenceInitial(projectType.title)} can take a few minutes to put together. Want me to create it?` } } });
         continue;
       }

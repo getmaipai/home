@@ -265,3 +265,44 @@ describe("T5 / THIN-2G: one retry round after every call in a round failed", () 
   });
 });
 
+
+describe("a project call that cannot run is never offered for a yes (live 2026-10-06)", () => {
+  test("a news question whose round carries an ungrounded call and a storybook call with the wrong params parks no ask and offers no storybook", async () => {
+    registerProjectType({
+      id: "test-storybook",
+      title: "Test storybook",
+      description: "A consequential project used only in tests.",
+      minRole: "child",
+      consequential: true,
+      paramsSchema: { type: "object", required: ["topic"], properties: { topic: { type: "string", minLength: 1 } } },
+      buildPlan: () => ({ steps: [], ceilings: { maxWallSeconds: 30, maxGeneratorJobs: 1 } }),
+    });
+    try {
+      await withStub(
+        {
+          // The live round's shape: an unrelated lookup, then a storybook with { title, author } where the type needs `topic`.
+          calls: (request) => (request.tool_choice === "none" || request.messages.some((m) => m.role === "tool") || isRetryRound(request) ? undefined : [
+            { id: "call-a", name: "websearch", args: JSON.stringify({ expression: "latest news on a stranger" }) },
+            { id: "call-b", name: START_PROJECT_TOOL_ID, args: JSON.stringify({ type: "test-storybook", params: { title: "A Stranger's Life", author: "MaiPai" } }) },
+          ]),
+          reply: replies,
+        },
+        async () => {
+          const result = await runTurnNext(people.owner, "chat", "who is the president of brazil");
+          expect(result.ok).toBe(true);
+          if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+          expect(result.value.reply.text).not.toContain("Want me to create it");
+          const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get()!;
+          expect(row.confirm).toBeNull();
+          const outcomes = JSON.parse((row.outcomes as unknown as string) ?? "[]") as { packageId: string; status: string; errorCode?: string }[];
+          const project = outcomes.filter((o) => o.packageId === START_PROJECT_TOOL_ID);
+          expect(project.length).toBeGreaterThan(0);
+          expect(project.some((o) => o.status === "pending")).toBe(false);
+          expect(project.every((o) => o.status === "failed" && o.errorCode === "invalid_params")).toBe(true);
+        },
+      );
+    } finally {
+      __resetProjectTypesForTests();
+    }
+  });
+});
