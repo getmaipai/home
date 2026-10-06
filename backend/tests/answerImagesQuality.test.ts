@@ -1,9 +1,9 @@
 import { describe, expect, test, beforeAll } from "bun:test";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { filterAnswerImages } from "@/lib/answerImages/quality";
+import { filterAnswerImages, hashes, nearestDistance } from "@/lib/answerImages/quality";
 
 const dir = await mkdtemp(join(tmpdir(), "answer-images-"));
 const fixtures = new Map<string, Uint8Array>();
@@ -131,5 +131,90 @@ describe("answer image quality", () => {
     const metadata = await sharp(out.images[0]!.full).metadata();
     expect(metadata.exif).toBeUndefined();
     expect(metadata.xmp).toBeUndefined();
+  });
+});
+
+// IMGQ-01 (design: data-scratch/research/image-quality-design.md section 4):
+// two real 64-bit hashes (DCT pHash and dHash) over the full frame, centre
+// crops and the mirror, threshold 10. The old "pHash" was a 256-bit
+// blockhash judged against a 64-bit threshold.
+// A photo-like synthetic: six seed-dependent waves (the low frequencies a
+// perceptual hash reads) under a fine texture. The sawtooth `photo` above is
+// the same grey ramp for every seed once scaled down, so crops of it do not
+// behave like crops of a real photo.
+const smoothPhoto = (seed: number, width = 720, height = 540) => {
+  let state = (seed * 0x9e3779b9) >>> 0;
+  const rnd = () => { state = (state + 0x6d2b79f5) >>> 0; let t = state; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const waves = Array.from({ length: 6 }, () => ({ a: rnd() * 2 * Math.PI, f: 0.6 + rnd() * 2.2, p: rnd() * 2 * Math.PI, c: [rnd(), rnd(), rnd()] }));
+  const data = Buffer.alloc(width * height * 3);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    const i = (y * width + x) * 3;
+    for (let ch = 0; ch < 3; ch++) {
+      let v = 0;
+      for (const w of waves) v += w.c[ch]! * Math.sin(2 * Math.PI * w.f * ((x / width) * Math.cos(w.a) + (y / height) * Math.sin(w.a)) + w.p);
+      data[i + ch] = Math.max(0, Math.min(255, Math.round(128 + 40 * v + ((x * 7 + y * 3 + ch * 11) % 17) - 8)));
+    }
+  }
+  return sharp(data, { raw: { width, height, channels: 3 } });
+};
+
+describe("IMGQ-01: near-duplicates by pHash and dHash", () => {
+  const variant = async (fn: (s: Sharp) => Sharp) => new Uint8Array(await fn(smoothPhoto(2)).jpeg({ quality: 85 }).toBuffer());
+  const jpeg = (id: string, bytes: Uint8Array) => ({ id, bytes, contentType: "image/jpeg" });
+
+  test("a 75 percent centre crop, a 6 percent border, a mirror and a watermarked copy each collapse into the original", async () => {
+    const original = new Uint8Array(await smoothPhoto(2).jpeg({ quality: 88 }).toBuffer());
+    const copies = {
+      crop75: await variant((s) => s.extract({ left: 90, top: 68, width: 540, height: 405 })),
+      border: await variant((s) => s.extend({ top: 32, bottom: 32, left: 43, right: 43, background: "#ffffff" })),
+      mirror: await variant((s) => s.flop()),
+      watermark: await variant((s) => s.composite([{ input: Buffer.from('<svg width="720" height="540"><text x="120" y="300" font-size="72" fill="white" fill-opacity="0.5" transform="rotate(-20 360 270)">SAMPLE</text></svg>') }])),
+    };
+    for (const [name, bytes] of Object.entries(copies)) {
+      const out = await filterAnswerImages([jpeg("original", original), jpeg(name, bytes)]);
+      expect({ name, kept: out.images.length, duplicate: out.dropped_by_quality.duplicate }).toEqual({ name, kept: 1, duplicate: 1 });
+    }
+  });
+
+  test("different shots are more than 10 bits apart and all survive", async () => {
+    const shots = await Promise.all([2, 8, 11, 17].map(async (seed) => new Uint8Array(await smoothPhoto(seed).jpeg().toBuffer())));
+    const hs = await Promise.all(shots.map(hashes));
+    for (let i = 0; i < hs.length; i++) for (let j = i + 1; j < hs.length; j++) expect(nearestDistance(hs[i]!, hs[j]!)).toBeGreaterThan(10);
+    const out = await filterAnswerImages(shots.map((b, i) => jpeg(`s${i}`, b)));
+    expect(out.images).toHaveLength(4);
+  });
+
+  test("each hash is 64 bits, not the old 256-bit blockhash", async () => {
+    const h = await hashes(fixtures.get("photo.jpg")!);
+    expect(h.full.d).toMatch(/^[01]{64}$/);
+    expect(h.full.p).toMatch(/^[01]{64}$/);
+  });
+});
+
+// IMGQ-02 (design section 6): the placeholder floor.
+describe("IMGQ-02: placeholders, low-byte frames and screen captures", () => {
+  test("a 600x400 two-colour 'image not found' card is dropped as flat (entropy under 3 bits)", async () => {
+    const card = await sharp({ create: { width: 600, height: 400, channels: 3, background: "#dddddd" } }).composite([{ input: Buffer.from('<svg width="600" height="400"><rect x="200" y="150" width="200" height="100" fill="#999999"/></svg>') }]).png().toBuffer();
+    const out = await filterAnswerImages([{ id: "card", bytes: new Uint8Array(card), contentType: "image/png" }]);
+    expect(out.dropped_by_quality).toEqual({ flat_or_text: 1 });
+  });
+
+  test("a 2 MP WebP under 0.015 bytes per pixel is dropped; a real photo WebP passes", async () => {
+    const blur = await sharp({ create: { width: 1600, height: 1250, channels: 3, background: "#7a8a9a" } }).webp({ quality: 5 }).toBuffer();
+    expect(blur.byteLength / (1600 * 1250)).toBeLessThan(0.015);
+    const photoWebp = await fromPhoto(photo(4, 720, 540)).webp({ quality: 80 }).toBuffer();
+    const out = await filterAnswerImages([{ id: "blur", bytes: new Uint8Array(blur), contentType: "image/webp" }, { id: "photo", bytes: new Uint8Array(photoWebp), contentType: "image/webp" }]);
+    expect(out.images.map((i) => i.id)).toEqual(["photo"]);
+    expect(Object.values(out.dropped_by_quality).reduce((a, b) => a + (b ?? 0), 0)).toBe(1);
+  });
+
+  test("a PNG at a screen size with a camera's EXIF is a photo, not a screen capture", async () => {
+    const big = fromPhoto(photo(6, 1920, 1080));
+    const bare = await big.clone().png().toBuffer();
+    const camera = await big.clone().withExif({ IFD0: { Make: "Example Camera" } }).png().toBuffer();
+    expect((await sharp(camera).metadata()).exif).toBeDefined();
+    const out = await filterAnswerImages([{ id: "bare", bytes: new Uint8Array(bare), contentType: "image/png" }, { id: "camera", bytes: new Uint8Array(camera), contentType: "image/png" }]);
+    expect(out.dropped_by_quality.screenshot).toBe(1);
+    expect(out.images.map((i) => i.id)).toEqual(["camera"]);
   });
 });
