@@ -15,6 +15,7 @@ import { textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
 import type { AnswerImageSet } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
+import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -787,7 +788,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // id-bearing error string.
         const message =
           e instanceof ApiError && e.code === "unavailable"
-            ? "MaiPai's AI isn't running right now. Try again in a moment."
+            ? failureLine("unreachable", false)
             : e instanceof ApiError && e.code === "temporary_mismatch"
               ? "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
             : e instanceof ApiError

@@ -3,6 +3,7 @@ import { takeCarry } from "@/apps/chat/chatCarry";
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, PendingAttachment, ThreadMessage } from "@assistant-ui/react";
 import { createChatModelAdapter, stripThinking } from "@/apps/chat/chatModelAdapter";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
+import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
 import { createLocalImageAttachmentAdapter, clearStagedImageAttachments } from "@/apps/chat/localImageAttachmentAdapter";
 import { FakeAudioContext, fakeWavBody } from "../../../tests/fakeAudioContext";
 import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
@@ -1225,7 +1226,7 @@ describe("createChatModelAdapter errors", () => {
     try {
       const { error } = await collect([fakeUserMessage("hi")]);
       expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toBe("MaiPai's AI isn't running right now. Try again in a moment.");
+      expect((error as Error).message).toBe(failureLine("unreachable", false));
       expect((error as Error).message).not.toContain("llama-server");
       expect(error).toMatchObject({ code: "unavailable" });
     } finally {
@@ -1234,7 +1235,7 @@ describe("createChatModelAdapter errors", () => {
   });
 
   test("a streamed error event becomes a ChatTurnError with its code and the turn id", async () => {
-    const message = "The chat engine is unavailable. Try again soon.";
+    const message = failureLine("unreachable", false);
     const env = stubEnvironment(
       ndjsonStream([
         { type: "turn_meta", conversation_id: "conv-resume123", turn_id: "turn-resume123", resume_token: "resume-token-test" },
@@ -1258,7 +1259,7 @@ describe("createChatModelAdapter errors", () => {
     try {
       const { error } = await collect([fakeUserMessage("hi")]);
       expect(error).toBeInstanceOf(Error);
-      expect((error as Error).message).toBe("MaiPai's AI isn't running right now. Try again in a moment.");
+      expect((error as Error).message).toBe(failureLine("unreachable", false));
     } finally {
       env.restore();
     }

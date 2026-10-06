@@ -33,7 +33,10 @@ export function ChatMessageError() {
   // An engine failure: read health now rather than on the next poll, so the
   // composer line takes over this cause straight away.
   useEffect(() => {
-    if (engineDown) void queryClient?.invalidateQueries({ queryKey: ["health"] });
+    if (engineDown) {
+      void queryClient?.invalidateQueries({ queryKey: ["health"] });
+      void queryClient?.invalidateQueries({ queryKey: ["status-apps"] });
+    }
   }, [engineDown, queryClient]);
   if (!errorValue || typeof errorValue !== "object" || !("message" in errorValue) || typeof errorValue.message !== "string") {
     return null;

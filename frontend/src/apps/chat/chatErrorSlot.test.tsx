@@ -101,6 +101,16 @@ async function sendRefusedMessage(view: ReturnType<typeof renderWithQueryClient>
 }
 
 describe("ChatMessageError", () => {
+  test("engine failure refreshes the pill status immediately with composer health", async () => {
+    const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError("down", "engine_unavailable"))} />);
+    const queryClient = view.queryClient;
+    const invalidate = mock(queryClient.invalidateQueries.bind(queryClient));
+    queryClient.invalidateQueries = invalidate;
+    await sendFailingMessage(view);
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ["health"] }));
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["status-apps"] });
+  });
+
   test("a completed failed-generation reply shows a muted error-details control in its action bar only for admins", async () => {
     const adminView = renderWithQueryClient(<Harness adapter={failedDoneAdapter()} admin />);
     fireEvent.change(adminView.getByRole("textbox", { name: "Message input" }), { target: { value: "find all of these" } });
