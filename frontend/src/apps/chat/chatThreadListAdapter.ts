@@ -9,6 +9,9 @@ import { api } from "@/lib/api";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 
 export interface ChatThreadListOptions {
+  /** getmaipai/home#206: told when a saved chat could not be opened, so the
+   * page stops holding Send for a chat that will never open. */
+  onOpenFailed?: (remoteId: string) => void;
   /** The household member whose own conversations to list - omit for
    * the caller's own. Restoring ConversationsPage's own admin oversight
    * (HOME-UI-02e): the server enforces who may view whom
@@ -73,7 +76,7 @@ export function needsTitleCatchUp(item: { remoteId?: string; title?: string; sta
 }
 
 export function createChatThreadListAdapter(selfName: string, options: ChatThreadListOptions = {}): RemoteThreadListAdapter {
-  const { personId, query, incognito = false, onArchiveUnavailable, onSettingsLoaded, titlePollMs = 3000, titlePollAttempts = 40 } = options;
+  const { personId, query, incognito = false, onArchiveUnavailable, onSettingsLoaded, onOpenFailed, titlePollMs = 3000, titlePollAttempts = 40 } = options;
   return {
     async list() {
       const rows = incognito ? await api.incognitoConversationList(personId) : await api.conversationList(personId, query, "include");
@@ -142,11 +145,16 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
     },
     async fetch(remoteId) {
       openedChat(remoteId);
-      // Incognito opens only its own live threads, never a stored chat.
-      if (incognito && !incognitoThreadIds.has(remoteId)) throw new Error("This chat is not part of Incognito.");
-      const row = await api.conversation(remoteId);
-      if (row.surface !== "chat") throw new Error("This conversation is not a chat.");
-      return { status: "regular", remoteId: row.id, title: row.title ?? undefined };
+      try {
+        // Incognito opens only its own live threads, never a stored chat.
+        if (incognito && !incognitoThreadIds.has(remoteId)) throw new Error("This chat is not part of Incognito.");
+        const row = await api.conversation(remoteId);
+        if (row.surface !== "chat") throw new Error("This conversation is not a chat.");
+        return { status: "regular", remoteId: row.id, title: row.title ?? undefined };
+      } catch (error) {
+        onOpenFailed?.(remoteId);
+        throw error;
+      }
     },
     // CHAT-TITLE-01: the hub writes a model topic title in the background once the chat has been
     // idle (backend conversationTitle.ts); this only waits for it and hands it to the list. Nothing is

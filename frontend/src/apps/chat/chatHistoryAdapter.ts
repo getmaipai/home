@@ -263,13 +263,12 @@ export function createChatHistoryAdapter(
   return {
     async load() {
       const id = getConversationId();
-      const [rows, conversation] = id
-        ? await Promise.all([
-            api.conversationTurns(id),
-            onSettingsLoaded ? api.conversation(id) : Promise.resolve(undefined),
-          ])
-        : [[] as ConversationTurnWithMemoryIds[], undefined] as const;
-      if (id && conversation && onSettingsLoaded) onSettingsLoaded(id, conversation.settings);
+      // getmaipai/home#206: the chat's settings arrive on their own and never
+      // hold the load. The runtime replaces the thread with whatever load
+      // returns, so a load held by a slow details request finished after the
+      // person's first message and wiped it (and its reply) off the screen.
+      if (id && onSettingsLoaded) void api.conversation(id).then((conversation) => onSettingsLoaded(id, conversation.settings), () => {});
+      const rows = id ? await api.conversationTurns(id) : ([] as ConversationTurnWithMemoryIds[]);
       const feedback = id
         ? await Promise.all(rows.map(async (row) => [row.id, await api.conversationFeedback(row.id).catch(() => null)] as const))
         : [];

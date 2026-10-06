@@ -563,7 +563,11 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // The remote-thread runtime reloads its list when this adapter changes.
   // Incognito is an exclusive data source: its sessions never merge with
   // durable conversation rows.
-  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name, { incognito: temporaryNext, onArchiveUnavailable, onSettingsLoaded: onConversationSettingsLoaded }), [person.display_name, temporaryNext, onArchiveUnavailable, onConversationSettingsLoaded]);
+  // getmaipai/home#206: a saved chat that could not be opened releases the
+  // Send hold ChatThread keeps while that chat is opening.
+  const [unopenableConversationId, setUnopenableConversationId] = useState<string | undefined>(undefined);
+  const forgetUnopenableConversation = useCallback(() => setUnopenableConversationId(undefined), []);
+  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name, { incognito: temporaryNext, onArchiveUnavailable, onSettingsLoaded: onConversationSettingsLoaded, onOpenFailed: setUnopenableConversationId }), [person.display_name, temporaryNext, onArchiveUnavailable, onConversationSettingsLoaded]);
   // SHELL-02 slice 6: the same real adapters ChatPage.tsx's composer
   // already uses - images plus, new here, text/Markdown files through
   // the shipped `SimpleTextAttachmentAdapter` (client-side only, no
@@ -842,7 +846,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     },
   });
 
-  return { runtime, banner, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1391,12 +1395,20 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, banner, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
+  const { runtime, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setRailPeeked(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
   }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId);
+  const [pageSearchParams] = useSearchParams();
+  const requestedConversationId = pageSearchParams.get("conversation") ?? undefined;
+  const openingConversationId = requestedConversationId !== unopenableConversationId ? requestedConversationId : undefined;
+  // A failed open only counts for that visit: going anywhere else forgets
+  // it, so the same chat reached again later is held while it opens.
+  useEffect(() => {
+    if (unopenableConversationId !== undefined && requestedConversationId !== unopenableConversationId) forgetUnopenableConversation();
+  }, [requestedConversationId, unopenableConversationId, forgetUnopenableConversation]);
   const thinkingModeValue = useMemo(
     () => ({
       mode: (thinking ? "thinking" : "instant") as "instant" | "thinking",
@@ -1821,6 +1833,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   modelPickerAllowed={modelPickerAllowed}
                   canUseIncognito={canHaveTemporaryChatRole(person.role)}
                   onOpenSettings={() => navigate("/settings")}
+                  openingConversationId={openingConversationId}
                 />
               </ConnectionStateContext.Provider>
             </div>
