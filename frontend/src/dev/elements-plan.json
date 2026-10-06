@@ -2676,6 +2676,57 @@
       "replacesHandBuilt": [],
       "realTurnToday": true,
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
+    },
+    {
+      "file": "approval-card.test.tsx",
+      "name": "approval-card.test",
+      "group": "approval",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
+    },
+    {
+      "file": "empty-state.test.tsx",
+      "name": "empty-state.test",
+      "group": "empty",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
+    },
+    {
+      "file": "thread-composer.css",
+      "name": "thread-composer",
+      "group": "thread",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     }
   ]
 }

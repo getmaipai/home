@@ -199,7 +199,7 @@ async function sendMessage(view: ReturnType<typeof render>, text: string): Promi
 }
 
 describe("NextChatPage (SHELL-02's first slice)", () => {
-  test("ordinary new chat shows the quiet home line under the greeting", async () => {
+  test("ordinary new chat shows the greeting and generic starter chips, with no where-it-runs or can-make-mistakes line", async () => {
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -208,13 +208,15 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
         </MemoryRouter>,
       );
       expect(await view.findByText("How can I help you today?")).toBeVisible();
-      expect(await view.findByText("Runs on your own hub. Your chats stay at home.")).toBeVisible();
+      expect(view.queryByText("Runs on your own hub. Your chats stay at home.")).toBeNull();
+      expect(view.queryByText(/can make mistakes/i)).toBeNull();
+      expect(await view.findByRole("button", { name: "Explain how rainbows form" })).toBeVisible();
     } finally {
       restore();
     }
   });
 
-  test("temporary new chat keeps its own welcome lines without the quiet home line", async () => {
+  test("temporary new chat keeps its own welcome lines", async () => {
     const restore = stubFetch();
     writeIncognitoCache(true);
     localStorage.setItem("maipai.incognito-explanation-seen", "true");
@@ -226,6 +228,8 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
       );
       expect(await view.findByText("Temporary chat")).toBeVisible();
       expect(await view.findByText("This chat won't be saved to your history.")).toBeVisible();
+      // The starter chips are one fixed generic list, the same in Incognito.
+      expect(await view.findByRole("button", { name: "Explain how rainbows form" })).toBeVisible();
       expect(view.queryByText("Runs on your own hub. Your chats stay at home.")).toBeNull();
     } finally {
       restore();
