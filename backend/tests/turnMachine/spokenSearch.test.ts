@@ -13,6 +13,7 @@ import { createBenchPeople, startRecordingProxy, type BenchPeople } from "../../
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
+import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { __setPageReaderForTests, __resetSearchCacheForTests, SEARCH_PAGES_MAX, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN } from "@/lib/packageHost";
 import { SPOKEN_EVIDENCE_TOKENS_MAX, SPOKEN_SOURCES_MAX, SPOKEN_SOURCE_TEXT_CHARS } from "@/lib/composer";
 
@@ -25,12 +26,14 @@ beforeEach(() => {
   __resetLlmSupervisorForTests();
   __resetRateLimiterForTests();
   __resetSearchCacheForTests();
+  __setChatWindowContextForTests(4096);
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
 });
 
 afterEach(() => {
   __setPageReaderForTests(null);
+  __setChatWindowContextForTests(undefined);
   __resetLlmSupervisorForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
@@ -114,5 +117,16 @@ describe("a written adult turn with a search is unchanged (THIN-4F)", () => {
     expect(pageLengths).toHaveLength(SEARCH_PAGES_MAX);
     for (const length of pageLengths) expect(length).toBeGreaterThan(SPOKEN_SOURCE_TEXT_CHARS * 2);
     expect(toolContent.length).toBeGreaterThan(SPOKEN_EVIDENCE_TOKENS_MAX * 4);
+  });
+
+  test("the unreported context fallback keeps written evidence smaller but readable", async () => {
+    __setChatWindowContextForTests(undefined);
+    const { toolContent, fetched } = await searchTurn({ spoken: false });
+    expect(fetched.length).toBe(SEARCH_PAGES_MAX);
+    const payload = JSON.parse(toolContent) as { sources: { page_text?: string }[] };
+    const pageTexts = payload.sources.map((source) => source.page_text).filter((pageText): pageText is string => Boolean(pageText));
+    expect(pageTexts).toHaveLength(SEARCH_PAGES_MAX);
+    expect(pageTexts.every((pageText) => pageText.length > 0)).toBe(true);
+    for (const pageText of pageTexts) expect(pageText.length).toBeLessThan(SEARCH_PAGE_TEXT_CHARS_SPOKEN * 2);
   });
 });

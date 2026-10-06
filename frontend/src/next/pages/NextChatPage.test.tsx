@@ -300,6 +300,14 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
 });
 
 describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
+  beforeEach(() => {
+    jest.setSystemTime(new Date("2026-10-05T14:00:00Z"));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   const searchRows = [
     { id: "conv-search-pinned", title: "Garden pinned", surface: "chat", created_at: "2026-10-05T12:00:00Z", pinned: true },
     { id: "conv-search-today", title: "Garden today", surface: "chat", created_at: "2026-10-05T11:00:00Z", pinned: false },

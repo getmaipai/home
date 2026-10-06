@@ -16,6 +16,7 @@ import { collectHealth } from "@/lib/healthSnapshot";
 import { listIssues } from "@/lib/issues";
 import { __blockPortForTests, __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { __resetSearchCacheForTests, __resetSearchRotationForTests, __resetSearxngEnginesCacheForTests } from "@/lib/packageHost";
 import { createBenchPeople, startRecordingProxy, startFakeSearxng, type BenchPeople, type FakeSearxng } from "../../scripts/bench/conversationRunner";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
@@ -73,6 +74,9 @@ beforeEach(() => {
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
   __resetRateLimiterForTests();
+  __resetSearchCacheForTests();
+  __resetSearchRotationForTests();
+  __resetSearxngEnginesCacheForTests();
   people = createBenchPeople();
   // A real, measured budget lives on the 8B catalog entry (U2a); tests
   // select it by id so `resolveTurnBudget()` reads the same record

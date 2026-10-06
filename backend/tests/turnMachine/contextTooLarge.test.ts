@@ -10,6 +10,7 @@ import { useDefaultScriptedStack } from "../stackFixture";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetStackEngineForTests, stackFailureResult } from "@/lib/stackEngine";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { __resetSearchCacheForTests, __resetSearchRotationForTests, __resetSearxngEnginesCacheForTests, __setPageReaderForTests } from "@/lib/packageHost";
 import { createBenchPeople, type BenchPeople } from "../../scripts/bench/conversationRunner";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -36,6 +37,7 @@ beforeEach(() => {
   __resetSearchCacheForTests();
   __resetSearchRotationForTests();
   __resetSearxngEnginesCacheForTests();
+  __setChatWindowContextForTests(4000);
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
   searxng = Bun.serve({ port: 0, fetch: (request) => {
@@ -49,6 +51,7 @@ beforeEach(() => {
 
 afterEach(() => {
   __setPageReaderForTests(null);
+  __setChatWindowContextForTests(undefined);
   searxng.stop(true);
   __resetStackEngineForTests();
 });

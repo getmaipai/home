@@ -78,7 +78,14 @@ export function startDefaultScriptedStack(): StackFixture {
       body: req.method === "GET" ? undefined : await req.arrayBuffer(),
       ...(legacyUpstream ? { signal: req.signal } : {}),
     };
-    const response = await fetch(`${legacyUpstream ?? engine.url}${path}`, request);
+    let response: Response;
+    try {
+      response = await fetch(`${legacyUpstream ?? engine.url}${path}`, request);
+    } catch {
+      // A test may stop its per-test upstream while a proxied request is
+      // still winding down. Model the Stack's ordinary upstream failure.
+      return Response.json({ error: "engine unavailable" }, { status: 502 });
+    }
     const headers = new Headers(response.headers);
     headers.set("x-maipai-engine", "local scripted-test");
     headers.set("x-maipai-model", "scripted-stub");
