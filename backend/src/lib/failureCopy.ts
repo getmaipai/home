@@ -7,14 +7,16 @@ interface FailureCopy {
   minor: string;
 }
 
-/** One table, one place. A minor's wording is short and kind. */
+/** One table, one place. A minor's wording is short and kind. An adult's
+ * line stays short too (CHAT-CALM-ERRORS-01d): it is the whole inline
+ * failure line under a reply, three lines at most on a phone. */
 export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
   busy: {
-    adult: "The AI is still starting up or busy with something else. Give it a moment, then send that again.",
+    adult: "The AI is still starting up or busy. Give it a moment, then send that again.",
     minor: "I'm still waking up. Try again in a moment.",
   },
   memory: {
-    adult: "The AI couldn't start because the computer is low on memory. Close something big if you can, then try again in a moment.",
+    adult: "The computer is low on memory. Close an app, then try again in a moment.",
     minor: "I can't wake up all the way right now. Try again soon.",
   },
   // CHAT-CALM-ERRORS-01b: the Stack answered with the role's state
@@ -29,7 +31,7 @@ export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
     minor: "That took me too long. Try asking again.",
   },
   unreachable: {
-    adult: "I can't reach the AI on this computer. Check that MaiPai's AI is running, then send that again.",
+    adult: "I can't reach the AI on this computer. Check it's running, then try again.",
     minor: "I can't get to my thinking part right now. Please tell a grown-up.",
   },
   context_too_large: {
@@ -37,10 +39,43 @@ export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
     minor: "That was too much for me at once. Please ask me again.",
   },
   other: {
-    adult: "Something went wrong while I was writing that. Send it again, and if it keeps happening, check Repairs.",
+    adult: "Something went wrong while writing that. Send it again, or check Repairs.",
     minor: "Something went wrong. Try asking again.",
   },
 };
+
+/** CHAT-CALM-ERRORS-01d (design section 7): the one quiet line under the
+ * composer while chat cannot answer, per band. The health row carries it
+ * (healthSnapshot.ts), so the web client, the robot and Go read the same
+ * words. `repairs_link` is the words of the one link an owner or admin gets,
+ * only while the engine is down; nobody else gets a link. */
+export interface ComposerNotice {
+  adult: string;
+  teen: string;
+  child: string;
+  repairs_link: string | null;
+}
+
+const COMPOSER_NOTICE: Record<"paused" | "starting", ComposerNotice> = {
+  paused: {
+    adult: "Chat is paused. You can type now and send when it's back.",
+    teen: "Chat is paused right now. You can type and send when it's back.",
+    child: "I'm taking a break. Ask a grown-up, or try again soon.",
+    repairs_link: "Open Repairs",
+  },
+  starting: {
+    adult: "Starting up. You can send in a moment.",
+    teen: "Starting up. You can send in a moment.",
+    child: "I'm waking up. Send that in a moment.",
+    repairs_link: null,
+  },
+};
+
+export function composerNotice(availability: "ready" | "starting" | "unavailable"): ComposerNotice | null {
+  if (availability === "unavailable") return COMPOSER_NOTICE.paused;
+  if (availability === "starting") return COMPOSER_NOTICE.starting;
+  return null;
+}
 
 /** CHAT-CALM-ERRORS-01b (design section 8): the kind of a Stack refusal,
  * chosen from the role state its 503 body states (the Stack's router:

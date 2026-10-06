@@ -3,7 +3,8 @@ export type AppState = "operational" | "degraded" | "down" | "waiting_for_intern
 export type NeedState = "operational" | "degraded" | "down" | "waiting" | "unknown";
 import { serviceState } from "@/lib/serviceHealth";
 import { serviceComponent } from "@/lib/serviceComponent";
-import { roleHealth } from "@/lib/roleHealth";
+import { roleHealth, STACK_REFUSAL_KEY } from "@/lib/roleHealth";
+import { stackOfflineSeverity } from "@/lib/stackEngine";
 export type StatusApp = { id: string; name: string; needs: AppNeed[] };
 export type StatusEventLike = { component: string; state: string; at: string };
 
@@ -175,15 +176,32 @@ export function appResponse(app: StatusApp, events: StatusEventLike[], showNeeds
 
 export async function appResponseWithLiveRoleHealth(app: StatusApp, events: StatusEventLike[], showNeeds: boolean, now = new Date()) {
   const response = appResponse(app, events, showNeeds, now);
+  const paused = new Set<string>();
   const needs = await Promise.all(currentNeedStates(app, events).map(async (need) => {
     const role = need.kind === "engine" ? ({ chat: "chat", understanding: "embed", memory: "background", voice: "voice" } as Record<string, "chat" | "embed" | "background" | "voice">)[need.id] : undefined;
     if (!role) return need;
     const health = await roleHealth(role);
+    // CHAT-CALM-ERRORS-01d (design section 6): an engine the Stack refused
+    // but can still bring back on its own (stopped or loading, inside the
+    // recovery window) is paused, not down: amber, never red. The window
+    // and the states are the ones Repairs uses (stackOfflineSeverity).
+    // Only while the outage on record is the remembered refusal itself: a
+    // live role list that says the role failed is down, whatever was
+    // remembered before.
+    if (health.availability === "unavailable" && health.reason === "stack_refused" && stackOfflineSeverity(STACK_REFUSAL_KEY[role]) === "warning") {
+      paused.add(need.id);
+      return { ...need, state: "degraded" as const };
+    }
     return { ...need, state: health.availability === "unavailable" ? "down" as const : health.availability === "starting" ? "degraded" as const : "operational" as const };
   }) ?? []);
   const state = deriveAppState(needs);
   const visibleNeeds = needs.map((need) => ({ ...need, state: state === "waiting_for_internet" && need.kind !== "internet" ? "waiting" as const : need.state }));
-  return { ...response, state, reason: appReason(app, state, needs), ...(showNeeds ? { needs: visibleNeeds } : {}) };
+  const pausedRequired = state === "degraded" && needs.some((need) => need.required && paused.has(need.id));
+  // `paused`: a required engine is stopped (inside the recovery window) or
+  // starting, so the app will be back on its own; an optional part that is
+  // down is not a pause. The header pill reads this, never the reason text.
+  const pausedApp = state === "degraded" && needs.some((need) => need.required && need.kind === "engine" && need.state === "degraded");
+  return { ...response, state, paused: pausedApp, reason: pausedRequired ? `${app.name} is paused.` : appReason(app, state, needs), ...(showNeeds ? { needs: visibleNeeds } : {}) };
 }
 
 export function appReason(app: StatusApp, state: AppState, needs: Array<AppNeed & { state: NeedState }>): string | null {

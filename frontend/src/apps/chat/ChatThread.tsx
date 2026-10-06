@@ -1,9 +1,10 @@
-import { createContext, useCallback, useMemo, useRef, type RefObject } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, type RefObject } from "react";
 import { useAssistantDataUI, useAssistantToolUI } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
 import { DATA_BINDINGS, MODEL_SELECTOR_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
 import { ChatThreadExtras } from "@/apps/chat/ChatThreadExtras";
+import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 
 export type ChatExtrasContextValue = {
   rootRef: RefObject<HTMLDivElement | null>;
@@ -58,6 +59,9 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
   const toggleSidebar = useCallback(() => {
     document.querySelector<HTMLButtonElement>('[aria-label="Show conversations"], [aria-label="Hide conversations"], [aria-label="Show threads"], [aria-label="Hide threads"]')?.click();
   }, []);
+  // CHAT-CALM-ERRORS-01d (design section 7): while the engine is down or
+  // starting, the person can keep typing but Send waits for `ready`.
+  const sendHeld = useContext(ChatAvailabilityContext) !== "ready";
   const extraContext = useMemo(() => ({ rootRef, canUseIncognito, focusChatSearch, toggleSidebar, openSettings: onOpenSettings }), [canUseIncognito, focusChatSearch, onOpenSettings, toggleSidebar]);
   return (
     <div
@@ -82,6 +86,7 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
           components={{
             ...THREAD_SLOTS,
             onEditSend,
+            sendHeld,
             ThreadViewportExtra: ChatThreadExtras,
             viewport: {
               turnAnchor: "bottom",

@@ -249,12 +249,14 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
     }
   });
 
+  // CHAT-CALM-ERRORS-01d: the full-width banner is gone; the composer line
+  // carries the notice and an owner's Repairs link (ported from the banner).
   test("shows the availability notice and Repairs link when health reports the chat as blocked", async () => {
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.endsWith("/api/health")) {
-        return Promise.resolve(Response.json({ engines: { chat: { kind: "blocked", pid: 1, alive: true } } }));
+        return Promise.resolve(Response.json({ engines: { chat: { kind: "blocked", pid: 1, alive: true, notice: { adult: "Chat is paused. You can type now and send when it's back.", teen: "Chat is paused right now. You can type and send when it's back.", child: "I'm taking a break. Ask a grown-up, or try again soon.", repairs_link: "Open Repairs" } } } }));
       }
       if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
       return Promise.resolve(Response.json({}));
@@ -265,9 +267,8 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
-      expect(await findByText("MaiPai's AI isn't running right now")).toBeVisible();
-      expect(await findByText("You can't send messages until it's back.")).toBeVisible();
-      expect(await findByRole("link", { name: "Open Repairs to see what's wrong." })).toHaveAttribute("href", "/repairs");
+      expect(await findByText(/Chat is paused\. You can type now and send when it's back\./)).toBeVisible();
+      expect(await findByRole("link", { name: "Open Repairs" })).toHaveAttribute("href", "/repairs");
     } finally {
       globalThis.fetch = original;
     }

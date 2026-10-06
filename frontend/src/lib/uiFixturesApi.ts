@@ -1,7 +1,14 @@
 // UI-SHOWCASE: the two calls behind the admin Chat showcase (/dev/ui). Kept
 // beside, not inside, lib/api.ts: nothing else on the web calls them.
 export type ShowcasePace = "instant" | "normal" | "slow";
-export interface ShowcaseScenario { id: string; title: string; description: string }
+export interface ShowcaseScenario {
+  id: string;
+  title: string;
+  description: string;
+  /** CHAT-CALM-ERRORS-01d: the chat health this scenario plays under, and the composer line it carries. */
+  availability?: "ready" | "starting" | "unavailable";
+  notice?: { adult: string; teen: string; child: string; repairs_link: string | null } | null;
+}
 
 export async function listShowcaseScenarios(): Promise<ShowcaseScenario[]> {
   const res = await fetch("/api/dev/ui-fixtures", { credentials: "include" });

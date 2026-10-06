@@ -1,6 +1,7 @@
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { listSidecars } from "@/lib/sidecars";
 import { roleHealth, roleHealthEntry, localRoleHealthEntry } from "@/lib/roleHealth";
+import { composerNotice } from "@/lib/failureCopy";
 
 // This is the single live health snapshot used by both /api/health and
 // status history. Keep its payload aligned with frontend chatAvailability
@@ -13,6 +14,9 @@ export async function collectHealth() {
   ]);
   const chat = roleHealthEntry("chat", locals[0]!, states[0]!);
   if (chat.context_per_slot == null) chat.context_message = "I could not read how much the AI can hold, so I am using a safe small window";
+  // CHAT-CALM-ERRORS-01d: the one composer line while chat cannot answer.
+  const notice = composerNotice(chat.availability ?? "ready");
+  if (notice) chat.notice = notice;
   const embed = roleHealthEntry("embed", locals[1]!, states[1]!);
   const background = roleHealthEntry("background", locals[2]!, states[2]!);
   const voice = roleHealthEntry("voice", locals[3]!, states[3]!);

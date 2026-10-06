@@ -35,13 +35,17 @@ If you type in a saved chat and leave before sending, Chat keeps your draft on t
 
 ## If the AI is starting
 
-If you see **Starting your AI**, wait for it to finish. The chat will be ready when the message box is available.
+If you see **Starting your AI**, wait for it to finish. You can type while it starts. The send button works again once it's ready.
 
 ## If the connection drops
 
 Chat shows a banner when it is reconnecting, when the reply resumes, or when the connection is dropped. If the reply does not resume, choose **Retry** in the banner.
 
-If a reply fails, an error card appears under it. Choose **Retry** to try the reply again. Admins can open **Error details** for more information.
+If a reply fails, one short line appears under it. Choose **Retry** to try the reply again. Admins can open **Error details** for more information.
+
+## If chat is paused
+
+Sometimes MaiPai's AI stops for a while, for example while the computer restarts it. A short line under the message box says chat is paused, and the top bar shows **Chat paused**. You can keep typing. The send button waits until chat is back, and your message stays in the box. If you look after the household, the line has an **Open Repairs** link that shows what stopped.
 
 ## Talk instead of type
 

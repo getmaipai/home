@@ -24,6 +24,7 @@
 import type { DataMessagePartComponent, ToolCallMessagePartComponent } from "@assistant-ui/react";
 import {
   AssistantMoreItems,
+  ChatComposerNotice,
   ChatMessageQueue,
   ChatThinkingIndicator,
   ComposerExtraControls,
@@ -99,6 +100,9 @@ export const THREAD_SLOTS = {
   MessageError: ChatMessageError,
   ComposerAddAttachmentOverride: ComposerAddMenu,
   ComposerQueue: ChatMessageQueue,
+  // CHAT-CALM-ERRORS-01d: the one quiet line under the composer while chat
+  // cannot answer; renders nothing while chat is ready.
+  ComposerNotice: ChatComposerNotice,
   // VOICE-LIVE-01: the trailing-side append point beside Send/dictate;
   // ComposerVoiceControls gates its own render on stt+tts being ready.
   ComposerExtraEnd: ComposerExtraControls,

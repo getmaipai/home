@@ -31,13 +31,25 @@ export function sidebarItemStatus(apps: readonly StatusApp[], item: { name: stri
   return app ? appStatusMenuBadge(app) : undefined;
 }
 
-export function statusAppsSummary(apps: readonly { name: string; state: StatusAppState; reason: string | null }[]) {
+export function statusAppsSummary(apps: readonly { id?: string; name: string; state: StatusAppState; reason: string | null; paused?: boolean }[]) {
   const affected = apps.filter((app) => app.state !== "operational");
   if (!affected.length) return { level: "online" as const, text: "All good", problems: [], message: "Everything is running." };
   const level = affected.some((app) => app.state === "down") ? "offline" as const : "degraded" as const;
   const messages = affected.map((app) => app.reason).filter((reason): reason is string => Boolean(reason));
   const names = affected.map((app) => app.name);
-  return { level, text: level === "offline" ? "Something is down" : "Degraded", problems: names, message: messages.join(" ") || `${names.join(", ")} need attention.` };
+  return { level, text: pillText(affected, level), problems: names, message: messages.join(" ") || `${names.join(", ")} need attention.` };
+}
+
+// CHAT-CALM-ERRORS-01d (design section 6): when chat is the one part
+// affected, the pill names it: "Chat paused" (amber) while its engine is
+// stopped or starting and will be back on its own (the hub's `paused`
+// flag), "Chat is down" (red) once the Stack gave up. Anything else (an
+// optional part down, more than one part) keeps the general wording.
+function pillText(affected: readonly { id?: string; state: StatusAppState; paused?: boolean }[], level: "offline" | "degraded"): string {
+  const only = affected.length === 1 ? affected[0] : undefined;
+  if (only?.id === "chat" && only.state === "degraded" && only.paused) return "Chat paused";
+  if (only?.id === "chat" && only.state === "down") return "Chat is down";
+  return level === "offline" ? "Something is down" : "Degraded";
 }
 
 function problemPriority(state: StatusAppNeed["state"]): number {

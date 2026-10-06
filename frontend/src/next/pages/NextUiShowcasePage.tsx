@@ -12,7 +12,8 @@ import { ElementsAdoptionPanel } from "@/dev/ElementsAdoptionPanel";
 import { AdminGatedContent } from "@/apps/settings/AdminGatedContent";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { ChatThread } from "@/apps/chat/ChatThread";
-import { AdminContext, SourcesOpenContext } from "@/apps/chat/chatThreadContexts";
+import { AdminContext, ChatComposerNoticeContext, SourcesOpenContext } from "@/apps/chat/chatThreadContexts";
+import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { listShowcaseScenarios, openShowcaseStream, type ShowcasePace, type ShowcaseScenario } from "@/lib/uiFixturesApi";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { Roster } from "@/lib/api";
@@ -135,6 +136,15 @@ export function NextUiShowcasePage({ person }: { person: Roster }) {
   const [openSources, setOpenSources] = useState<ReadonlySet<string>>(new Set());
   const settleRef = useRef<((state: Settle) => void) | null>(null);
   const scenarioRef = useRef<string>("table");
+  // CHAT-CALM-ERRORS-01d: the chat health the chosen scenario plays under,
+  // so the composer line and the held Send show as on the chat page. The
+  // showcase is admin-only, so the line carries the Repairs link.
+  const [health, setHealth] = useState<{ availability: "ready" | "starting" | "unavailable"; notice: { text: string; repairsLink: string | null } | null }>({ availability: "ready", notice: null });
+  const chooseScenario = useCallback((scenario: ShowcaseScenario | undefined, id: string) => {
+    scenarioRef.current = id;
+    const notice = scenario?.notice;
+    setHealth({ availability: scenario?.availability ?? "ready", notice: notice ? { text: notice.adult, repairsLink: notice.repairs_link } : null });
+  }, []);
   const sourcesValue = useMemo(() => ({
     isOpen: (turnId: string) => openSources.has(turnId),
     toggle: (turnId: string) => setOpenSources((prev) => { const next = new Set(prev); if (next.has(turnId)) next.delete(turnId); else next.add(turnId); return next; }),
@@ -162,13 +172,17 @@ export function NextUiShowcasePage({ person }: { person: Roster }) {
         <AsyncState data={query.isError ? null : query.data} error={query.isError} isFetching={query.isFetching} onRetry={() => void query.refetch()} errorMessage={query.error?.message}>
           {(scenarios) => (
             <AssistantRuntimeProvider runtime={runtime}>
+              <ChatAvailabilityContext.Provider value={health.availability}>
+              <ChatComposerNoticeContext.Provider value={health.notice}>
               <AdminContext.Provider value>
                 <SourcesOpenContext.Provider value={sourcesValue}>
                   <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                    <ShowcaseWorkspace scenarios={scenarios} pace={pace} setPace={setPace} banner={banner} setScenario={(id) => { scenarioRef.current = id; }} settleRef={settleRef} />
+                    <ShowcaseWorkspace scenarios={scenarios} pace={pace} setPace={setPace} banner={banner} setScenario={(id) => chooseScenario(scenarios.find((entry) => entry.id === id), id)} settleRef={settleRef} />
                   </div>
                 </SourcesOpenContext.Provider>
               </AdminContext.Provider>
+              </ChatComposerNoticeContext.Provider>
+              </ChatAvailabilityContext.Provider>
             </AssistantRuntimeProvider>
           )}
         </AsyncState>

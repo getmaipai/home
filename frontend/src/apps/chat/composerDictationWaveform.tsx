@@ -69,7 +69,7 @@ export function ComposerDictationWaveform() {
   const temporary = useContext(TemporaryChatContext).on;
   const aui = useAui();
   const meter = useContext(DictationLevelMeterContext);
-  const availability = useContext(ChatAvailabilityContext);
+  const held = useContext(ChatAvailabilityContext) !== "ready";
   const [colors] = useState(() => ({ bar: readColorToken("--color-primary") || "rgb(160, 198, 255)" }));
   const hadText = useRef(false);
   // A rolling window of recent levels, oldest first - each render tick
@@ -110,8 +110,14 @@ export function ComposerDictationWaveform() {
 
   const input = !dictating ? (
     <ComposerPrimitive.Input
-      placeholder={availability === "unavailable" ? "MaiPai's AI isn't running right now" : "Send a message..."}
-      disabled={availability === "unavailable"}
+      // CHAT-CALM-ERRORS-01d (design section 7): the field stays usable
+      // while chat is paused or starting so a thought is not lost; the kit
+      // holds Send (Thread `sendHeld`, ChatThread.tsx) and Enter sends
+      // nothing here. Why it waits is the composer line's job, so the
+      // placeholder stays the plain one.
+      placeholder="Send a message..."
+      submitMode={held ? "none" : undefined}
+      onKeyDown={held ? (event) => { if (event.key === "Enter" && !event.shiftKey) event.preventDefault(); } : undefined}
       // The kit's own default Input, verbatim (elements/thread.aui.tsx's
       // Composer) - `autoFocus` isn't part of this zero-prop slot's own
       // shape (`ComponentType`, the same as every other ThreadComponents

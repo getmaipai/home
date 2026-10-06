@@ -8,7 +8,15 @@ import type { StatusBoard } from "@/lib/api";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { statusAppsSummary } from "@/shell/statusApps";
 
-export function StatusIndicator() {
+// Reduced motion: the healthy dot's ping is decoration, so it stops too.
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+/** `child`: while something is paused or down a child sees no pill
+ * (CHAT-CALM-ERRORS-01d, design section 6): they cannot fix it, and in chat
+ * their composer line is the one signal they get. */
+export function StatusIndicator({ child = false }: { child?: boolean } = {}) {
   const board = useQuery<StatusBoard>({ queryKey: STATUS_BOARD_QUERY_KEY, queryFn: () => api.statusBoard(), refetchInterval: 30_000 });
   const underMaintenance = activeMaintenanceParts(Array.isArray(board.data?.maintenance) ? board.data.maintenance : undefined);
   const appsQuery = useStatusApps();
@@ -17,6 +25,10 @@ export function StatusIndicator() {
     ? { ...appsSummary, level: "maintenance" as const, text: "Maintenance" }
     : appsSummary;
   const title = appsSummary.level === "online" ? summary.text : appsSummary.message;
+  // No ping on a failure state (design section 4): a paused or down part is
+  // shown, never animated.
+  const ping = (summary.level === "online" || summary.level === "maintenance") && !prefersReducedMotion();
+  if (child && (summary.level === "degraded" || summary.level === "offline")) return null;
 
   return (
     <Link
@@ -26,7 +38,7 @@ export function StatusIndicator() {
       className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Status status={summary.level} className="gap-1.5 px-2 py-1">
-        <StatusDot status={summary.level} className="overflow-hidden" />
+        <StatusDot status={summary.level} ping={ping} className="overflow-hidden" />
         <span className="hidden sm:inline">{summary.text}</span>
       </Status>
     </Link>

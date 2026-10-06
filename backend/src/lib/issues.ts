@@ -59,6 +59,11 @@ export interface RaiseIssueInput {
   fix?: IssueFix | null;
   learnMore?: string | null;
   remindAfterMs?: number;
+  /** CHAT-CALM-ERRORS-01d: also notify when an open, un-dismissed warning
+   * becomes an error. Opt-in: only a source that keeps an escalated issue an
+   * error until it resolves (stackEngine.ts) sets it, so no flapping source
+   * can notify on every swing. */
+  notifyOnEscalation?: boolean;
 }
 
 const reminderTimers = hotReloadState<Map<string, ReturnType<typeof setTimeout>>>("issueReminderTimers", () => new Map());
@@ -146,14 +151,19 @@ function findRow(source: string, key: string): IssueRow | undefined {
  * see spec/schemas/issue.schema.json's dismissed_at field comment.
  *
  * Fires the `repairs.new` notification only on the transition into an
- * open, un-dismissed `error` (a brand new row, or one that had been
- * genuinely resolved before) - never on a repeated raise of an
+ * open, un-dismissed `error` (a brand new row, one that had been
+ * genuinely resolved before, or, when the caller sets notifyOnEscalation,
+ * an open un-dismissed warning escalating to an error) - never on a repeated raise of an
  * already-open error, and never while a person has dismissed it: both
  * would turn a routine health check into a notification spam source. */
 export async function raiseIssue(input: RaiseIssueInput): Promise<Issue> {
   const existing = findRow(input.source, input.key);
   const wasGenuinelyResolved = existing !== undefined && existing.resolvedAt !== null;
-  const isNewOpenError = input.severity === "error" && (!existing || wasGenuinelyResolved);
+  // CHAT-CALM-ERRORS-01d: for a source that asks, an open warning that
+  // escalates to an error (a stopped engine still down past the Stack's
+  // recovery window) is news too, so it notifies once, like a new error.
+  const escalated = input.notifyOnEscalation === true && existing !== undefined && existing.severity !== "error" && !existing.dismissedAt;
+  const isNewOpenError = input.severity === "error" && (!existing || wasGenuinelyResolved || escalated);
   const hlc = nextHlc();
   const fixJson = input.fix ? JSON.stringify(input.fix) : null;
   const learnMore = input.learnMore ?? null;

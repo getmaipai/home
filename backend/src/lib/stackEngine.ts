@@ -101,7 +101,7 @@ export function __resetStackEngineForTests(): void {
   cachedUrl = null;
   stackChatIdentity = null;
   refusals.clear();
-  downSince.clear();
+  for (const role of [...downSince.keys()]) forgetDown(role);
 }
 
 // THIN-1C (docs/design/RULES.md rule 6; fixes part of getmaipai/home#203):
@@ -325,19 +325,55 @@ export function reportStackFailure(err: unknown, role: string): void {
  * a Stack that did not answer at all. */
 export const STACK_RECOVERY_WINDOW_MS = 2 * 60_000;
 const RECOVERABLE_STATES: ReadonlySet<string> = new Set(["installed", "loaded"]);
-const downSince = new Map<string, number>();
+type DownRecord = { since: number; state: string | undefined; detail: string; escalated: boolean; timer?: ReturnType<typeof setTimeout> };
+const downSince = new Map<string, DownRecord>();
+
+function offlineSeverity(down: DownRecord, now: number): "warning" | "error" {
+  if (down.escalated) return "error";
+  return down.state !== undefined && RECOVERABLE_STATES.has(down.state) && now - down.since < STACK_RECOVERY_WINDOW_MS ? "warning" : "error";
+}
+
+// CHAT-CALM-ERRORS-01d: once an outage is an error it stays one until the
+// role answers again (resolveStackOffline), so a flapping state never turns
+// it back into a warning and never notifies twice for one outage.
+function raiseOffline(role: string, down: DownRecord, now: number): void {
+  const severity = offlineSeverity(down, now);
+  if (severity === "error") down.escalated = true;
+  void raiseIssue({ source: ISSUE_SOURCE, key: `offline.${role}`, severity, title: "MaiPai Stack is offline", detail: down.detail, notifyOnEscalation: true });
+}
 
 export function reportStackOffline(offline_reason: string | undefined, role: string, fallback?: string, state?: string, now = Date.now()): void {
-  const since = downSince.get(role) ?? now;
-  downSince.set(role, since);
-  const recoverable = state !== undefined && RECOVERABLE_STATES.has(state) && now - since < STACK_RECOVERY_WINDOW_MS;
-  void raiseIssue({
-    source: ISSUE_SOURCE,
-    key: `offline.${role}`,
-    severity: recoverable ? "warning" : "error",
-    title: "MaiPai Stack is offline",
-    detail: offline_reason ?? fallback ?? "the Stack did not say why",
-  });
+  const previous = downSince.get(role);
+  const down: DownRecord = { since: previous?.since ?? now, state, detail: offline_reason ?? fallback ?? "the Stack did not say why", escalated: previous?.escalated ?? false, timer: previous?.timer };
+  downSince.set(role, down);
+  raiseOffline(role, down, now);
+  // While chat is paused Send is held, so no new request would ever carry
+  // the outage past the window: the window's own end does it instead.
+  if (!down.escalated && !down.timer) {
+    down.timer = setTimeout(() => {
+      const current = downSince.get(role);
+      if (!current) return;
+      current.timer = undefined;
+      raiseOffline(role, current, Date.now());
+    }, Math.max(0, down.since + STACK_RECOVERY_WINDOW_MS - Date.now()) + 50);
+    (down.timer as { unref?: () => void }).unref?.();
+  }
+}
+
+/** CHAT-CALM-ERRORS-01d (design section 6): the severity Repairs holds for
+ * this role right now, from the same window and states reportStackOffline()
+ * uses, so the header pill and Repairs never disagree: "warning" while the
+ * Stack can still bring the role back on its own, "error" after the window
+ * or for any other state, null when no refusal is on record. */
+export function stackOfflineSeverity(role: string, now = Date.now()): "warning" | "error" | null {
+  const down = downSince.get(role);
+  return down ? offlineSeverity(down, now) : null;
+}
+
+function forgetDown(role: string): void {
+  const down = downSince.get(role);
+  if (down?.timer) clearTimeout(down.timer);
+  downSince.delete(role);
 }
 
 /** Called on every non-offline outcome (a real success, or a failure of
@@ -347,6 +383,6 @@ export function reportStackOffline(offline_reason: string | undefined, role: str
  * or clears another's. */
 export function resolveStackOffline(role: string): void {
   refusals.delete(role);
-  downSince.delete(role);
+  forgetDown(role);
   resolveIssue(ISSUE_SOURCE, `offline.${role}`);
 }

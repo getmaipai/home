@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { StatusIndicator } from "@/shell/StatusIndicator";
+import { NotificationBell } from "@/shell/NotificationBell";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { sidebarItemStatus } from "@/shell/statusApps";
@@ -184,7 +185,7 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
         {/* THEME-TOGGLE-01 (2026-09-26): light/dark already lives at
             Settings > Me > Appearance (ui.appearance) - the header's
             own shortcut duplicated it, so it's off here. */}
-        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} statusIndicator={<StatusIndicator />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} defaultSidebarOpen={false} showSidebarTriggerInMenu showHeaderSidebarTrigger={false} />}>
+        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} statusIndicator={<StatusIndicator child={person.role === "child"} />} notifications={<NotificationBell />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} defaultSidebarOpen={false} showSidebarTriggerInMenu showHeaderSidebarTrigger={false} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />

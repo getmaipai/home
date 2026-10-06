@@ -107,6 +107,9 @@ describe("NextUiShowcasePage", () => {
   test("failure-generic renders the kit error panel", async () => {
     const view = open();
     fireEvent.click(await waitFor(() => view.getByRole("button", { name: /^Failure: mid-stream error\./ })));
-    await waitFor(() => expect(view.getByRole("alert").textContent).toContain("Couldn't finish that reply"), { timeout: 5000 });
+    // CHAT-CALM-ERRORS-01d: the panel carries the person's line and Retry, no title.
+    await waitFor(() => expect(view.container.querySelector('[data-slot="error-state"][role="alert"]')).toBeTruthy(), { timeout: 5000 });
+    expect(view.getByRole("alert").textContent).not.toContain("Couldn't finish that reply");
+    expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 });

@@ -131,3 +131,12 @@ export const DraftConversationContext = createContext<string | undefined>(undefi
 export type ConnectionState = { phase: ConnectionPhase; attempt?: number; resumedTokens?: number };
 export const ConnectionStateContext = createContext<ConnectionState & { setConnection?(state: ConnectionState): void }>({ phase: "online" });
 export const WakeWordPersonContext = createContext<Roster | null>(null);
+
+/** CHAT-CALM-ERRORS-01d (design section 7): the one quiet line under the
+ * composer while chat cannot answer, already chosen for this person's band
+ * (the words come from the health row, backend failureCopy.ts), plus the
+ * Repairs link words for an owner or admin. Null when chat is ready; the
+ * showcase mounts without the chat page's providers, so null is the safe
+ * default. */
+export type ChatComposerNoticeValue = { text: string; repairsLink: string | null };
+export const ChatComposerNoticeContext = createContext<ChatComposerNoticeValue | null>(null);

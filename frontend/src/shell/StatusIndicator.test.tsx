@@ -7,16 +7,18 @@ import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 afterEach(cleanup);
 
 const appStatus = (state: "operational" | "degraded" | "down" | "waiting_for_internet") => [{
-  id: "chat", name: "Chat", state, reason: state === "operational" ? null : "Chat isn't working right now.",
+  id: "chat", name: "Chat", state, paused: state === "degraded", reason: state === "operational" ? null : "Chat isn't working right now.",
   needs: [{ kind: "engine", id: "chat", name: "Brain", state: state === "waiting_for_internet" ? "waiting" : state, purpose: "Chat model", required: true }], history: [], uptimePercent: 100,
 }];
 
 describe("StatusIndicator", () => {
   test.each([
     ["operational", "online", "All good"],
-    ["degraded", "degraded", "Degraded"],
+    // CHAT-CALM-ERRORS-01d: chat alone affected names the part; more than
+    // one part keeps "Something is down" (calmStatus.test.tsx).
+    ["degraded", "degraded", "Chat paused"],
     ["waiting_for_internet", "degraded", "Degraded"],
-    ["down", "offline", "Something is down"],
+    ["down", "offline", "Chat is down"],
   ] as const)("renders the %s app state and label", async (state, status, label) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {

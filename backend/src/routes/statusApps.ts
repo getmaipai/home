@@ -11,7 +11,7 @@ import type { StatusAppsWire } from "../wire";
 export const statusAppsRoutes = apiRouter();
 const NeedSchema = z.object({ kind: z.enum(["engine", "service", "internet"]), id: z.string(), name: z.string(), purpose: z.string(), required: z.boolean(), state: z.enum(["operational", "degraded", "down", "waiting", "unknown"]), last_success_at: z.string().nullable().optional(), last_error_class: z.string().nullable().optional(), success_count: z.number().optional(), failure_count: z.number().optional() });
 const AppDayMinutesSchema = z.object({ operational: z.number(), degraded: z.number(), outage: z.number(), maintenance: z.number() });
-const AppSchema = z.object({ id: z.string(), name: z.string(), state: z.enum(["operational", "degraded", "down", "waiting_for_internet"]), reason: z.string().nullable(), needs: z.array(NeedSchema).optional(), history: z.array(z.object({ date: z.string(), state: z.enum(["operational", "degraded", "down", "waiting_for_internet"]), uptime: z.number(), minutes: AppDayMinutesSchema })).length(90), uptimePercent: z.number() });
+const AppSchema = z.object({ id: z.string(), name: z.string(), state: z.enum(["operational", "degraded", "down", "waiting_for_internet"]), reason: z.string().nullable(), paused: z.boolean().optional(), needs: z.array(NeedSchema).optional(), history: z.array(z.object({ date: z.string(), state: z.enum(["operational", "degraded", "down", "waiting_for_internet"]), uptime: z.number(), minutes: AppDayMinutesSchema })).length(90), uptimePercent: z.number() });
 const ResponseSchema = z.array(AppSchema) satisfies z.ZodType<StatusAppsWire>;
 
 export const appsRoute = createRoute({ method: "get", path: "/apps", tags: ["Status"], summary: "Read app health derived from declared needs",

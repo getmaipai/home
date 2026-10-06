@@ -5,8 +5,10 @@ import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { ComposerDictationWaveform, DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 
+let runs = 0;
 const chatAdapter: ChatModelAdapter = {
   async *run() {
+    runs += 1;
     yield { content: [] };
   },
 };
@@ -39,8 +41,10 @@ function Harness({ meter, availability = "ready" }: { meter: LevelMeter | null; 
     <AssistantRuntimeProvider runtime={runtime}>
       <DictationLevelMeterProvider value={meter}>
         <ChatAvailabilityContext.Provider value={availability}>
+        <ComposerPrimitive.Root>
         <ComposerPrimitive.Dictate>Start dictation</ComposerPrimitive.Dictate>
         <ComposerDictationWaveform />
+        </ComposerPrimitive.Root>
         </ChatAvailabilityContext.Provider>
       </DictationLevelMeterProvider>
     </AssistantRuntimeProvider>
@@ -61,20 +65,31 @@ describe("ComposerDictationWaveform", () => {
     expect(queryAllByTestId("dictation-bar")).toHaveLength(0);
   });
 
-  test("unavailable disables the input and explains why", () => {
-    const { getByLabelText } = render(<Harness meter={null} availability="unavailable" />);
+  // CHAT-CALM-ERRORS-01d (design section 7): while chat is paused or
+  // starting the field stays usable so a thought is not lost; the composer
+  // line says why (NextChatPage.calmErrors.test.tsx), and Enter sends nothing.
+  test.each(["unavailable", "starting"] as const)("%s keeps the input usable with the plain placeholder, and Enter sends nothing", async (availability) => {
+    runs = 0;
+    const { getByLabelText } = render(<Harness meter={null} availability={availability} />);
     const input = getByLabelText("Message input") as HTMLTextAreaElement;
-    expect(input.disabled).toBe(true);
-    expect(input.placeholder).toBe("MaiPai's AI isn't running right now");
+    expect(input.disabled).toBe(false);
+    expect(input.placeholder).toBe("Send a message...");
+    fireEvent.change(input, { target: { value: "hold this" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(runs).toBe(0);
+    expect(input.value).toBe("hold this");
   });
 
-  test("becoming ready re-enables the input", () => {
+  test("becoming ready lets Enter send again", async () => {
+    runs = 0;
     const view = render(<Harness meter={null} availability="unavailable" />);
-    expect((view.getByLabelText("Message input") as HTMLTextAreaElement).disabled).toBe(true);
     view.rerender(<Harness meter={null} availability="ready" />);
     const input = view.getByLabelText("Message input") as HTMLTextAreaElement;
     expect(input.disabled).toBe(false);
-    expect(input.placeholder).toBe("Send a message...");
+    fireEvent.change(input, { target: { value: "go" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(runs).toBe(1));
   });
 
   test("dictating: swaps to a fixed row of bars, at their resting height, and the real input is gone", async () => {

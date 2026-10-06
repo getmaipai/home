@@ -11,7 +11,7 @@ import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 import { db } from "@/db";
 import { conversationTurns } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
-import { DEFAULT_PACE, UI_FIXTURES, findFixture } from "@/lib/uiFixtures";
+import { DEFAULT_PACE, UI_FIXTURES, findFixture, fixtureListing } from "@/lib/uiFixtures";
 
 export const devUiRoutes = apiRouter();
 
@@ -21,12 +21,12 @@ const listRoute = createRoute({
   description: "Owner/admin only: the canned turns the Chat showcase can play, each with a one-line description.",
   middleware: [requireRole("owner", "admin")] as const,
   responses: {
-    200: { content: { "application/json": { schema: z.object({ fixtures: z.array(z.object({ id: z.string(), title: z.string(), description: z.string() })) }) } }, description: "The scenarios, in showcase order." },
+    200: { content: { "application/json": { schema: z.object({ fixtures: z.array(z.object({ id: z.string(), title: z.string(), description: z.string(), availability: z.enum(["ready", "starting", "unavailable"]), notice: z.object({ adult: z.string(), teen: z.string(), child: z.string(), repairs_link: z.string().nullable() }).nullable() })) }) } }, description: "The scenarios, in showcase order." },
     ...errorResponses({ 403: "Not owner/admin" }),
   },
 });
 
-devUiRoutes.openapi(listRoute, (c) => c.json({ fixtures: UI_FIXTURES.map(({ id, title, description }) => ({ id, title, description })) }, 200));
+devUiRoutes.openapi(listRoute, (c) => c.json({ fixtures: UI_FIXTURES.map(fixtureListing) }, 200));
 
 const streamRoute = createRoute({
   method: "post", path: "/{fixture_id}/stream", tags: ["Developer"],

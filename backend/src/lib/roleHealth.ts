@@ -16,7 +16,7 @@ const STACK_ROLE_ID: Partial<Record<HealthRole, string>> = { embed: "embed", bac
  * (llm.ts, tts.ts, stt.ts) - what a remembered refusal is keyed by,
  * which is not always the Stack's own role id above (the background
  * worker calls the "judge" role under the name "background"). */
-const STACK_REFUSAL_KEY: Record<HealthRole, string> = { chat: "chat", embed: "embed", background: "background", voice: "tts" };
+export const STACK_REFUSAL_KEY: Record<HealthRole, string> = { chat: "chat", embed: "embed", background: "background", voice: "tts" };
 const STACK_IDLE_REASON = "No request through the public route in the last hour.";
 
 export async function localRoleHealthEntry(role: HealthRole): Promise<EngineHealthEntry> {

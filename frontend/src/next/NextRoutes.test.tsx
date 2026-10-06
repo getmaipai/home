@@ -186,6 +186,38 @@ describe("NextRoutes status indicator", () => {
   });
 });
 
+// CHAT-CALM-ERRORS-01d: the header bell is Home's own (the real pending
+// list and a count whose tone follows urgency), never the kit template's
+// sample dropdown with its always-pinging red dot.
+describe("NextRoutes notifications bell", () => {
+  test("shows the household's real pending count and no sample red dot", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health")) return Promise.resolve(healthResponse());
+      if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/notifications")) return Promise.resolve(Response.json([{ id: "n1", typeId: "repairs.new", level: "time_sensitive", text: "MaiPai Stack is offline", channels: ["in_app"], createdAt: "2026-10-06T00:00:00.000Z", readAt: null, dismissedAt: null, subjectTurnId: null, memoryIds: null, toast: false }]));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/dashboard")) return Promise.resolve(Response.json({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(
+        <TooltipProvider>
+          <MemoryRouter initialEntries={["/chat"]}>
+            <Routes><Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} /></Routes>
+          </MemoryRouter>
+        </TooltipProvider>,
+      );
+      const bell = await view.findByRole("button", { name: "Notifications (1 pending)" });
+      expect(bell.closest("header")).not.toBeNull();
+      expect(view.container.querySelector(".animate-ping.bg-destructive")).toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 describe("NextRoutes Incognito toggle", () => {
   test("turning Incognito off clears the adapter's Incognito thread ids", async () => {
     sessionStorage.setItem("maipai.incognito", "1");

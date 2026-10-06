@@ -238,6 +238,31 @@
                             "detail": {
                               "type": "string",
                               "nullable": true
+                            },
+                            "notice": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "adult": {
+                                  "type": "string"
+                                },
+                                "teen": {
+                                  "type": "string"
+                                },
+                                "child": {
+                                  "type": "string"
+                                },
+                                "repairs_link": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "adult",
+                                "teen",
+                                "child",
+                                "repairs_link"
+                              ]
                             }
                           },
                           "required": [
@@ -297,6 +322,31 @@
                             "detail": {
                               "type": "string",
                               "nullable": true
+                            },
+                            "notice": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "adult": {
+                                  "type": "string"
+                                },
+                                "teen": {
+                                  "type": "string"
+                                },
+                                "child": {
+                                  "type": "string"
+                                },
+                                "repairs_link": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "adult",
+                                "teen",
+                                "child",
+                                "repairs_link"
+                              ]
                             }
                           },
                           "required": [
@@ -356,6 +406,31 @@
                             "detail": {
                               "type": "string",
                               "nullable": true
+                            },
+                            "notice": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "adult": {
+                                  "type": "string"
+                                },
+                                "teen": {
+                                  "type": "string"
+                                },
+                                "child": {
+                                  "type": "string"
+                                },
+                                "repairs_link": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "adult",
+                                "teen",
+                                "child",
+                                "repairs_link"
+                              ]
                             }
                           },
                           "required": [
@@ -415,6 +490,31 @@
                             "detail": {
                               "type": "string",
                               "nullable": true
+                            },
+                            "notice": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "adult": {
+                                  "type": "string"
+                                },
+                                "teen": {
+                                  "type": "string"
+                                },
+                                "child": {
+                                  "type": "string"
+                                },
+                                "repairs_link": {
+                                  "type": "string",
+                                  "nullable": true
+                                }
+                              },
+                              "required": [
+                                "adult",
+                                "teen",
+                                "child",
+                                "repairs_link"
+                              ]
                             }
                           },
                           "required": [
@@ -9475,6 +9575,9 @@
                         "type": "string",
                         "nullable": true
                       },
+                      "paused": {
+                        "type": "boolean"
+                      },
                       "needs": {
                         "type": "array",
                         "items": {
@@ -14607,12 +14710,47 @@
                           },
                           "description": {
                             "type": "string"
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": [
+                              "ready",
+                              "starting",
+                              "unavailable"
+                            ]
+                          },
+                          "notice": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "adult": {
+                                "type": "string"
+                              },
+                              "teen": {
+                                "type": "string"
+                              },
+                              "child": {
+                                "type": "string"
+                              },
+                              "repairs_link": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "adult",
+                              "teen",
+                              "child",
+                              "repairs_link"
+                            ]
                           }
                         },
                         "required": [
                           "id",
                           "title",
-                          "description"
+                          "description",
+                          "availability",
+                          "notice"
                         ]
                       }
                     }

@@ -34,13 +34,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/toolt
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type TurnErrorDetail, type TurnStats } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
-import { AdminContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { AdminContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/next/pages/TurnErrorDetails";
 
@@ -68,6 +69,29 @@ export function ComposerExtraControls() {
         </ComposerPrimitive.Send>
       ) : null}
     </>
+  );
+}
+
+/** CHAT-CALM-ERRORS-01d (design sections 2 and 7): the kit Thread's
+ * ComposerNotice slot, the one place chat says it cannot answer right now.
+ * The kit draws the muted one-line frame; this fills it with the band's line
+ * from the health row and, for an owner or admin, the Repairs link (the link
+ * the old full-width banner carried, ported here). Nothing while chat is
+ * ready. */
+export function ChatComposerNotice() {
+  const notice = useContext(ChatComposerNoticeContext);
+  if (!notice) return null;
+  return (
+    // The kit frame is one truncated line; on a phone the Repairs link goes
+    // first so it is never the part that is cut off.
+    <span data-chat-notice role="status" aria-live="polite" title={notice.text} className="inline-flex max-w-full items-baseline gap-1">
+      <span className="min-w-0 truncate">{notice.text}</span>
+      {/* Deliberate touch-target-floor exception (docs/UI.md): a text link
+          inside the notice's one sentence (WCAG 2.5.8's inline exception).
+          The design caps this line at 24 px, so a 48 px link would undo it;
+          Repairs is also one tap away in Settings. */}
+      {notice.repairsLink ? <Link to="/repairs" data-touch-target-exempt className="order-first shrink-0 underline underline-offset-2 sm:order-none">{notice.repairsLink}</Link> : null}
+    </span>
   );
 }
 

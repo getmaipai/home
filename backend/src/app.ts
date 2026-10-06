@@ -103,6 +103,9 @@ const EngineHealthSchema = z.object({
   // THIN-1C (#203): the Stack's own stated reason for refusing the role,
   // in household wording; only present after such a refusal.
   detail: z.string().nullable().optional(),
+  // CHAT-CALM-ERRORS-01d: the composer line per band while chat cannot
+  // answer (failureCopy.ts); absent when the engine is ready.
+  notice: z.object({ adult: z.string(), teen: z.string(), child: z.string(), repairs_link: z.string().nullable() }).nullable().optional(),
 });
 const HealthResponseSchema = z.object({
   brain: z.string(),

@@ -656,6 +656,18 @@ export interface EngineHealthEntry {
   context_per_slot?: number | null;
   context_scope?: "total" | "per_slot" | null;
   context_message?: string | null;
+  /** CHAT-CALM-ERRORS-01d: the composer line for each band while chat
+   * cannot answer (failureCopy.ts's composerNotice); absent or null when
+   * the engine is ready. Additive: clients that ignore it lose nothing. */
+  notice?: ComposerNotice | null;
+}
+
+/** Mirrors lib/failureCopy.ts's ComposerNotice (that file stays import-free). */
+export interface ComposerNotice {
+  adult: string;
+  teen: string;
+  child: string;
+  repairs_link: string | null;
 }
 
 export interface HealthStatus {
@@ -1058,5 +1070,5 @@ export interface Performance {
 
 /** Status apps GET wire contract, shared by the OpenAPI route and frontend. */
 export type StatusAppNeedWire = { kind: "engine" | "service" | "internet"; id: string; name: string; purpose: string; required: boolean; state: "operational" | "degraded" | "down" | "waiting" | "unknown"; last_success_at?: string | null; last_error_class?: string | null };
-export type StatusAppWire = { id: string; name: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; reason: string | null; needs?: StatusAppNeedWire[]; history: Array<{ date: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; uptime: number; minutes: { operational: number; degraded: number; outage: number; maintenance: number } }>; uptimePercent: number };
+export type StatusAppWire = { id: string; name: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; reason: string | null; paused?: boolean; needs?: StatusAppNeedWire[]; history: Array<{ date: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; uptime: number; minutes: { operational: number; degraded: number; outage: number; maintenance: number } }>; uptimePercent: number };
 export type StatusAppsWire = StatusAppWire[];

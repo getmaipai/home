@@ -1,5 +1,5 @@
 import type { TurnStreamEvent, TurnValue } from "../wire";
-import { FAILURE_ADVICE, failureLine, partialReplyNote, promptLimitLine } from "./failureCopy";
+import { FAILURE_ADVICE, composerNotice, failureLine, partialReplyNote, promptLimitLine, type ComposerNotice } from "./failureCopy";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 // UI-SHOWCASE: canned turns for the admin's Chat showcase (/dev/ui). A fixture
@@ -20,6 +20,17 @@ export interface UiFixture {
   storedStats?: unknown;
   /** Milliseconds between events at "normal" and "slow"; "instant" is always 0. */
   pace?: { normal: number; slow: number };
+  /** CHAT-CALM-ERRORS-01d: the chat health the showcase plays this scenario
+   * under (ready when absent), so the composer line and the held Send show
+   * as they would on the chat page. */
+  availability?: "ready" | "starting" | "unavailable";
+}
+
+/** The list row the showcase reads: the scenario, its chat health, and the
+ * composer line that health carries (the same words /api/health sends). */
+export function fixtureListing(fixture: UiFixture): { id: string; title: string; description: string; availability: "ready" | "starting" | "unavailable"; notice: ComposerNotice | null } {
+  const availability = fixture.availability ?? "ready";
+  return { id: fixture.id, title: fixture.title, description: fixture.description, availability, notice: composerNotice(availability) };
 }
 
 export const DEFAULT_PACE = { normal: 30, slow: 140 } as const;
@@ -222,6 +233,12 @@ export const UI_FIXTURES: UiFixture[] = [
   // kit thread list's own New chat action starts the chat that carries the
   // summary forward (carry_offer marks it). No in-reply button.
   { id: "carry-offer", title: "Long chat: new chat carries the summary", description: "The prompt could not fit beside this chat's summary: a written reply offers a new chat that brings the summary along (carry_offer), started with the sidebar's New chat.", events: turn("carry-offer", promptLimitLine("carry_offer", false), { value: { carry_offer: true } }) },
+  // CHAT-CALM-ERRORS-01d (design section 2): one cause, one visual. The
+  // engine paused before anything streamed, it died part way through a
+  // reply, and one reply failed while the engine stayed up.
+  { id: "engine-paused", title: "Calm: chat paused", description: "The chat engine is stopped: the one quiet line under the composer, Send held, nothing red and nothing in the thread but the message.", availability: "unavailable", events: failing("engine-paused", "", { type: "error", error: failureLine("stopped", false), code: "engine_unavailable" }) },
+  { id: "engine-died-mid-reply", title: "Calm: engine stopped mid-reply", description: "Part of a reply streams, then the engine stops: the text stays, the composer line owns the cause, no inline failure.", availability: "unavailable", events: failing("engine-died-mid-reply", "The recipe starts with two cups of flour, a pinch of salt and then you", { type: "error", error: failureLine("stopped", false), code: "engine_unavailable" }) },
+  { id: "reply-failed-engine-up", title: "Calm: one reply failed", description: "The engine refused this one reply but is up again: one muted inline line with Retry, no composer line.", events: failing("reply-failed-engine-up", "", { type: "error", error: failureLine("busy", false), code: "engine_unavailable" }) },
   { id: "failure-engine-down-spoken", title: "Failure: engine down (spoken or child)", description: "The engine is down on a spoken or non-chat surface: the short grown-ups line, code engine_unavailable.", events: failing("failure-engine-down-spoken", "", { type: "error", error: failureLine("unreachable", true), code: "engine_unavailable" }) },
   { id: "failure-unavailable", title: "Failure: unavailable", description: "A generic unavailable failure after the turn started, code unavailable.", events: failing("failure-unavailable", "", { type: "error", error: failureLine("busy", false), code: "unavailable" }) },
   { id: "failure-generic", title: "Failure: mid-stream error", description: "The engine fails with no catalogue code (the plain generic error event).", events: failing("failure-generic", "", { type: "error", error: failureLine("other", false) }) },

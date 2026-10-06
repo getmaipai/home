@@ -121,13 +121,15 @@ describe("ChatMessageError", () => {
     expect(memberView.queryByRole("button", { name: "Error details" })).toBeNull();
   });
 
-  test("a failed reply renders the plain line in the kit error panel", async () => {
+  // CHAT-CALM-ERRORS-01d: the person's line is the whole message, with no
+  // "Couldn't finish that reply" title above it, in the kit's muted panel.
+  test("a failed reply renders the plain line, and only that line, in the kit error panel", async () => {
     const message = "The AI is busy starting up. Try again in a moment.";
     const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError(message, "unavailable"))} />);
     await sendFailingMessage(view);
 
-    expect(view.getByRole("alert").textContent).toContain("Couldn't finish that reply");
-    expect(view.getByRole("alert").textContent).toContain(message);
+    expect(view.getByRole("alert").textContent).toBe(`${message}Retry`);
+    expect(view.getByRole("alert").textContent).not.toContain("Couldn't finish that reply");
     expect(view.getByRole("button", { name: "Retry" })).toBeTruthy();
   });
 
@@ -147,7 +149,7 @@ describe("ChatMessageError", () => {
     const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError("Safe refusal copy.", "safety_refused"))} />);
     await sendRefusedMessage(view);
 
-    expect(view.container.textContent).not.toContain("Couldn't finish that reply");
+    expect(view.container.querySelector('[data-slot="error-state"]')).toBeNull();
   });
 
   test("a refusal notice shows no alternatives block and no raw category text", async () => {

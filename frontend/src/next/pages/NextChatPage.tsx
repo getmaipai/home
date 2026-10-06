@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
@@ -45,7 +45,7 @@ import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
-import { ChatAvailabilityContext, useChatAvailability } from "@/apps/chat/useChatAvailability";
+import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice } from "@/apps/chat/useChatAvailability";
 import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
@@ -60,7 +60,7 @@ import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognito
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { ChatShortcutReference } from "@/next/pages/ChatShortcutReference";
-import { ArtifactOpenContext, AdminContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, AdminContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, MODEL_EFFORTS, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
@@ -1099,6 +1099,8 @@ export function NextChatPage({ person }: { person: Roster }) {
   const navigate = useNavigate();
   const [draftConversationId, setDraftConversationId] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get("conversation") ?? undefined);
   const chatAvailability = useChatAvailability();
+  const composerNotice = useChatComposerNotice(person);
+
   // CHAT-HEADER-01: ChatHeaderBar is a stable, zero-prop reference - the
   // shell header's own slot (ui-v0.5.35) mounts and unmounts it, never
   // re-created per render.
@@ -1619,6 +1621,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ChatAvailabilityContext.Provider value={chatAvailability}>
+      <ChatComposerNoticeContext.Provider value={composerNotice}>
       <ArtifactOpenContext.Provider value={setOpenArtifactId}>
       <ReloadMainThreadProvider>
       <ConfirmAskAnswerProvider askAnswerRef={askAnswerRef}>
@@ -1693,15 +1696,10 @@ export function NextChatPage({ person }: { person: Roster }) {
               <AlertDescription>Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards.</AlertDescription>
             </Alert>
           ) : null}
-          {chatAvailability === "unavailable" ? (
-            <Alert variant="destructive" className="mx-4 mt-2 mb-2" role="status">
-              <AlertTitle>MaiPai's AI isn't running right now</AlertTitle>
-              <AlertDescription>
-                You can't send messages until it's back.{" "}
-                {isOwnerOrAdminRole(person.role) ? <Link to="/repairs" className="inline-flex min-h-12 items-center">Open Repairs to see what's wrong.</Link> : null}
-              </AlertDescription>
-            </Alert>
-          ) : null}
+          {/* CHAT-CALM-ERRORS-01d: no engine-state banner. While chat cannot
+              answer, the one quiet line under the composer says so
+              (ChatComposerNotice), and an owner's or admin's line carries the
+              Repairs link this banner used to. */}
           {banner ? (
             <Alert className="mx-4 mt-2 mb-2">
               <AlertDescription>{banner}</AlertDescription>
@@ -1948,6 +1946,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </ConfirmAskAnswerProvider>
       </ReloadMainThreadProvider>
       </ArtifactOpenContext.Provider>
+      </ChatComposerNoticeContext.Provider>
       </ChatAvailabilityContext.Provider>
     </AssistantRuntimeProvider>
   );

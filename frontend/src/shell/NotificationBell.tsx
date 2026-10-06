@@ -102,7 +102,9 @@ export function NotificationToaster(): null {
 export function NotificationBell() {
   const queryClient = useQueryClient();
   const query = useNotificationsQuery();
-  const items = query.data ?? [];
+  // Only a real list counts: a malformed answer shows nothing pending rather
+  // than crashing the header the bell now sits in (CHAT-CALM-ERRORS-01d).
+  const items = Array.isArray(query.data) ? query.data : [];
   const [open, setOpen] = useState(false);
   const BellIcon = getIcon("bell");
 
@@ -179,7 +181,10 @@ export function NotificationBell() {
         <Button variant="ghost" size="icon" aria-label={`Notifications${items.length > 0 ? ` (${items.length} pending)` : ""}`} className="relative">
           <BellIcon className="h-5 w-5" aria-hidden />
           {items.length > 0 ? (
-            <span className="absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-base leading-none text-destructive-foreground">
+            // CHAT-CALM-ERRORS-01d (design section 6): the count is red only
+            // when something urgent (an `immediate` item) is waiting; a
+            // Repairs notice or any other item gets a neutral count.
+            <span className={`absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-base leading-none ${items.some((n) => n.level === "immediate") ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background"}`}>
               {items.length}
             </span>
           ) : null}
