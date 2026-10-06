@@ -3524,13 +3524,21 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
 
   afterEach(() => __setUnwiredControlsForTests(false));
 
-  function stubAddMenuFetch(streamBody?: ReadableStream<Uint8Array>, imageRoleReady = false, width = 390): () => void {
+  // UPLOAD-IMG-02: `photos` is the person's resolved chat.photo_uploads
+  // (the hub's own GET /api/settings shape); on by default, as the hub
+  // resolves it for an adult.
+  function stubAddMenuFetch(streamBody?: ReadableStream<Uint8Array>, imageRoleReady = false, width = 390, photos: { value: boolean; source: string } = { value: true, source: "default" }): () => void {
     const original = globalThis.fetch;
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
     (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/settings?scope=person")) return Promise.resolve(Response.json([{ key: "chat.photo_uploads", value: photos.value, source: photos.source }]));
+      if (url.includes("/api/attachments/upload")) {
+        const file = (init?.body as FormData).get("file") as File;
+        return Promise.resolve(Response.json({ conversation_id: "conv-addmenu1", turn_id: String((init?.body as FormData).get("turn_id")), image: { id: "file-robot0001", name: file.name, width: 640, height: 480, media_type: "image/jpeg" } }, { status: 201 }));
+      }
       if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-addmenu1", status: "open", surface: "chat" }));
       if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
       if (url.includes("/api/plugins")) return Promise.resolve(Response.json([PLUGIN]));
@@ -3685,6 +3693,109 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
       await within(addMenu()).findByText("Add photos and files");
       const items = Array.from(addMenu().querySelectorAll('[data-slot="composer-menu-item"]')).map((el) => el.textContent);
       expect(items).toEqual([expect.stringContaining("Add photos and files"), expect.stringContaining("Take a photo")]);
+    } finally {
+      restore();
+    }
+  });
+
+  // UPLOAD-IMG-02: a child whose parent has not turned on photos gets no
+  // photo controls at all: no camera row, and the picker row offers files.
+  test("a child with photo uploads off sees no photo or camera control", async () => {
+    const restore = stubAddMenuFetch(undefined, false, 390, { value: true, source: "default" });
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson({ role: "child" })} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      await within(addMenu()).findByText("Add files");
+      const items = Array.from(addMenu().querySelectorAll('[data-slot="composer-menu-item"]')).map((el) => el.textContent);
+      expect(items).toEqual([expect.stringContaining("Add files")]);
+      expect(within(addMenu()).queryByText("Take a photo")).toBeNull();
+      expect(within(addMenu()).queryByText("Add photos and files")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a child whose parent turned photos on gets the photo controls", async () => {
+    const restore = stubAddMenuFetch(undefined, false, 390, { value: true, source: "user" });
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson({ role: "child" })} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      await within(addMenu()).findByText("Add photos and files");
+      expect(within(addMenu()).getByText("Take a photo")).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+
+  // UPLOAD-IMG-02, end to end through the shipped composer: a picture taken
+  // with the phone camera row becomes the kit's attachment tile in the
+  // composer, then rides the send. The picture is uploaded to the hub's
+  // store first, the turn carries only its id, and the sent message shows
+  // the kit's image attachment above the person's bubble.
+  test("a camera picture shows as a composer tile, uploads first, and the sent message keeps its picture", async () => {
+    const restore = stubAddMenuFetch(
+      ndjsonStream([
+        { type: "delta", text: "I can't see pictures yet." },
+        { type: "done", value: { turn_id: "turn-photo1", reply: { text: "I can't see pictures yet." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      // The camera row builds its own file input (composerAddMenu.tsx's
+      // TakeAPhotoItem); catch it as it is attached to the page.
+      const appended: HTMLInputElement[] = [];
+      const appendChild = document.body.appendChild.bind(document.body);
+      document.body.appendChild = (<T extends Node>(node: T): T => {
+        if (node instanceof HTMLInputElement) appended.push(node);
+        return appendChild(node);
+      }) as typeof document.body.appendChild;
+      try {
+        fireEvent.click(await within(addMenu()).findByText("Take a photo"));
+      } finally {
+        document.body.appendChild = appendChild;
+      }
+      const input = appended[0]!;
+      expect(input.type).toBe("file");
+      expect(input.accept).toBe("image/*");
+      Object.defineProperty(input, "files", { configurable: true, value: [new File(["robot bytes"], "robot.png", { type: "image/png" })] });
+      await act(async () => {
+        await input.onchange?.(new Event("change"));
+      });
+      await waitFor(() => expect(document.querySelector('.aui-composer-attachments [aria-label="Image attachment"]')).toBeTruthy());
+      expect(document.querySelector(".aui-composer-attachments .aui-attachment-tile-remove")).toBeTruthy();
+      fireEvent.change(await view.findByLabelText("Message input"), { target: { value: "this is my new robot" } });
+      const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+      await waitFor(() => expect(send.disabled).toBe(false));
+      fireEvent.click(send);
+      await view.findByText("I can't see pictures yet.");
+      const calls = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls as [RequestInfo | URL, RequestInit | undefined][];
+      const urlOf = (c: [RequestInfo | URL, RequestInit | undefined]) => (typeof c[0] === "string" ? c[0] : c[0].toString());
+      const uploadIndex = calls.findIndex((c) => urlOf(c).includes("/api/attachments/upload"));
+      const turnIndex = calls.findIndex((c) => urlOf(c).includes("/api/turn/stream"));
+      expect(uploadIndex).toBeGreaterThan(-1);
+      expect(turnIndex).toBeGreaterThan(uploadIndex);
+      const body = JSON.parse(calls[turnIndex]![1]!.body as string);
+      expect(body.images).toEqual([{ id: "file-robot0001", name: "robot.png", width: 640, height: 480, media_type: "image/jpeg" }]);
+      expect(JSON.stringify(body)).not.toContain("data:");
+      // The sent message: the kit's UserMessageAttachments, outside the composer.
+      await waitFor(() => expect(document.querySelector('.aui-user-message-attachments-end [aria-label="Image attachment"]')).toBeTruthy());
+      expect(document.querySelector(".aui-composer-attachments [aria-label=\"Image attachment\"]")).toBeNull();
     } finally {
       restore();
     }

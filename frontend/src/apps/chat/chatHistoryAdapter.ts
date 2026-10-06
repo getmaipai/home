@@ -1,4 +1,4 @@
-import { ExportedMessageRepository, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
+import { ExportedMessageRepository, type CompleteAttachment, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
@@ -115,6 +115,20 @@ function storedToolFailed(outcomes: unknown): boolean {
   }
 }
 
+/** A stored turn's `images` (UPLOAD-IMG-01's ids) as complete image
+ * attachments, each served by the hub's own store. `full` because the same
+ * source feeds the kit's preview dialog; `conversation_id` scopes the read. */
+function sentPictureAttachments(images: NonNullable<ConversationTurnWithMemoryIds["images"]>, conversationId: string): CompleteAttachment[] {
+  return images.map((image) => ({
+    id: image.id,
+    type: "image",
+    name: image.name,
+    contentType: image.media_type,
+    status: { type: "complete" },
+    content: [{ type: "image", image: `/api/attachments/${encodeURIComponent(image.id)}?v=full&conversation_id=${encodeURIComponent(conversationId)}`, filename: image.name }],
+  }));
+}
+
 export function rowsToBranchableMessages(
   rows: ConversationTurnWithMemoryIds[],
   selfName: string,
@@ -135,6 +149,10 @@ export function rowsToBranchableMessages(
       id: userId,
       role: "user",
       content: row.userText,
+      // UPLOAD-IMG-02: the person's sent pictures, rebuilt as the same
+      // image attachments a live send carries, so the shipped Thread's
+      // UserMessageAttachments draws them above the bubble on a reload too.
+      ...(row.images?.length ? { attachments: sentPictureAttachments(row.images, conversationId) } : {}),
       createdAt,
       // CHAT-20: the same memory fields the reply carries below - a
       // turn's memory belongs to the whole exchange, not one side of it

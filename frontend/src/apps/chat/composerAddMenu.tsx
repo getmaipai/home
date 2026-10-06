@@ -21,7 +21,8 @@
 // different - see commons commit d438eac.
 import { createContext, useContext, useState, type ComponentProps, type ComponentType } from "react";
 import { DismissableLayer } from "radix-ui/internal";
-import { ComposerPrimitive } from "@assistant-ui/react";
+import { ComposerPrimitive, useAuiEvent } from "@assistant-ui/react";
+import { toast } from "sonner";
 import { useComposerAddAttachment } from "@assistant-ui/core/react";
 import { useQuery } from "@tanstack/react-query";
 import { ComposerAttachButton, ComposerMenu, ComposerMenuItem } from "@maipai/ui/src/elements/composer";
@@ -106,12 +107,41 @@ function GroupLabel({ children }: { children: string }) {
  * attachments adapter declares - images, text/Markdown and PDF/office
  * `useNextChatRuntime`'s own `CompositeAttachmentAdapter`), styled as a
  * menu row via `asChild` instead of its own bare button. */
-function AddPhotosAndFilesItem({ onSelect }: { onSelect: () => void }) {
+function AddPhotosAndFilesItem({ onSelect, photos }: { onSelect: () => void; photos: boolean }) {
   return (
     <ComposerPrimitive.AddAttachment asChild>
-      <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description="Images, text, PDF, Office" onClick={onSelect} />
+      {photos
+        ? <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description="Images, text, PDF, Office" onClick={onSelect} />
+        : <ComposerAddMenuItem icon={FileTextIcon} name="Add files" description="Text, PDF, Office" onClick={onSelect} />}
     </ComposerPrimitive.AddAttachment>
   );
+}
+
+/** UPLOAD-IMG-02: whether this person may send pictures - NextChatPage's
+ * own `photoUploadsEnabled`, the same value its image attachment adapter is
+ * built from (chat.photo_uploads; a child stays off until a parent turns it
+ * on). Passed down as-is, never recomputed here. Off by default so a menu
+ * outside the chat page never offers a photo control it cannot honour. */
+export const PhotoUploadsContext = createContext(false);
+
+/** UPLOAD-IMG-02: the plain line for a refused file. assistant-ui reports a
+ * refused add as an event, never a tile, so without this a fifth picture,
+ * a 12 MB one or a child's pasted photo would silently do nothing. The
+ * adapter's own messages are already plain (CHAT_IMAGE_REFUSAL and the
+ * photo-uploads line); the runtime's own "not accepted" text is not. */
+export function attachmentAddErrorMessage(error: { reason: string; message: string; contentType?: string }, photosAllowed: boolean): string {
+  if (error.reason === "not-accepted") {
+    if (!photosAllowed && error.contentType?.toLowerCase().startsWith("image/")) return "Photo uploads are turned off for this profile.";
+    return "That kind of file can't be added here.";
+  }
+  return error.message || "That file could not be added.";
+}
+
+/** Shows the plain line for a refused file, once, as a toast. */
+function useAttachmentAddErrorToast(photosAllowed: boolean): void {
+  useAuiEvent("composer.attachmentAddError", (error) => {
+    toast.error(attachmentAddErrorMessage(error, photosAllowed), { id: "composer-attachment-add-error" });
+  });
 }
 
 /** Take a photo: no shipped Element or primitive exposes the file
@@ -222,6 +252,8 @@ function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) 
 export function ComposerAddMenu() {
   const [open, setOpen] = useState(false);
   const { setScope } = useContext(PackageScopeContext);
+  const photosAllowed = useContext(PhotoUploadsContext);
+  useAttachmentAddErrorToast(photosAllowed);
   const breakpoint = useBreakpoint();
   const directAttachment = breakpoint.atLeast(640);
   const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: !directAttachment });
@@ -234,17 +266,24 @@ export function ComposerAddMenu() {
     );
   }
   return (
-    <DismissableLayer.Root className="relative" onDismiss={open ? close : undefined}>
+    // UPLOAD-IMG-02: not `relative` - the menu anchors on the kit's own
+    // `relative` action wrapper at the composer's right edge, so "end" below
+    // keeps the whole menu on a phone screen (anchored to this small wrapper
+    // it ran off one edge or the other).
+    <DismissableLayer.Root onDismiss={open ? close : undefined}>
       <ComposerAttachButton
         aria-label="Add"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
         className="relative before:absolute before:-inset-2 before:content-['']"
       />
-      <ComposerMenu open={open} inert={!open} align="start">
+      {/* UPLOAD-IMG-02: "end", not "start" - Home's compact composer puts
+          this "+" near the right end of the row (tokens.css), so a
+          start-aligned menu opened past the phone's right edge. */}
+      <ComposerMenu open={open} inert={!open} align="end">
         <GroupLabel>Add</GroupLabel>
-        <AddPhotosAndFilesItem onSelect={close} />
-        <TakeAPhotoItem onSelect={close} />
+        <AddPhotosAndFilesItem onSelect={close} photos={photosAllowed} />
+        {photosAllowed && <TakeAPhotoItem onSelect={close} />}
         <CreateImageItem overview={enginesQuery.data} onSelect={close} />
         <WebSearchItem onSelect={close} />
         <AppsGroup

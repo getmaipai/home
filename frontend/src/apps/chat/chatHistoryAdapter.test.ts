@@ -43,6 +43,24 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message).toMatchObject({ role: "assistant", content: "first reply", status: { type: "complete", reason: "stop" } });
   });
 
+  // UPLOAD-IMG-02: a reopened chat shows the person's sent pictures the
+  // way the live send did, as the kit's image attachments above the
+  // bubble, loaded from the hub's own store by id (never a data: URL).
+  test("a stored turn's sent pictures come back as image attachments on the person's message", () => {
+    const images = [
+      { id: "file-robot0001", name: "robot.jpg", width: 640, height: 480, media_type: "image/jpeg" },
+      { id: "file-picker002", name: "picker.png", width: 800, height: 600, media_type: "image/jpeg" },
+    ];
+    const row = { ...makeRow("row-1", "a reply"), images } as ConversationTurnWithMemoryIds;
+    const items = flatten(rowsToBranchableMessages([row, makeRow("row-2", "plain")], "Nova", "conv-example123"));
+    expect(items[0]!.message.attachments).toEqual([
+      { id: "file-robot0001", type: "image", name: "robot.jpg", contentType: "image/jpeg", status: { type: "complete" }, content: [{ type: "image", image: "/api/attachments/file-robot0001?v=full&conversation_id=conv-example123", filename: "robot.jpg" }] },
+      { id: "file-picker002", type: "image", name: "picker.png", contentType: "image/jpeg", status: { type: "complete" }, content: [{ type: "image", image: "/api/attachments/file-picker002?v=full&conversation_id=conv-example123", filename: "picker.png" }] },
+    ]);
+    // A turn with no pictures carries no attachments at all.
+    expect(items[2]!.message.attachments).toBeUndefined();
+  });
+
   test("each pair carries the row's real id as metadata.custom.turnId - what remember/forget attribute to", () => {
     const items = flatten(rowsToBranchableMessages([makeRow("row-1", "a reply")], "Nova", "conv-example123"));
     expect(items[0]!.message.metadata!.custom!.turnId).toBe("row-1");

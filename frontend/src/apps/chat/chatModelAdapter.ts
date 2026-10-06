@@ -186,12 +186,24 @@ export interface ChatModelAdapterDeps {
 // same deltas. Ported, not rewritten from scratch: every quirk below has
 // a code-review paper trail (2026-09-04/05) from when it was first found
 // live, and the fix stays exactly as narrow as the bug that prompted it.
+/** A sent picture rebuilt from the hub's store (no File, its image served
+ * by GET /api/attachments/:id), as opposed to one picked in this session. */
+function isStoredPicture(attachment: { file?: File; content?: readonly { type: string; image?: string }[] }): boolean {
+  return !attachment.file && (attachment.content ?? []).some((part) => part.type === "image" && typeof part.image === "string" && part.image.startsWith("/api/attachments/"));
+}
+
 export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAdapter {
   return {
     async *run({ messages, abortSignal }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
       deps.onDraftSent?.();
       const lastMessage = messages[messages.length - 1];
-      const imageAttached = lastMessage?.role === "user" && lastMessage.attachments.some((attachment) => attachment.type === "image");
+      // UPLOAD-IMG-02: only a picture picked in this session (it still holds
+      // its File) is uploaded with the turn. A picture rebuilt from the hub's
+      // store on a reopened chat (chatHistoryAdapter.ts) is already saved
+      // against its own turn, so "Try again" or an edit of that message
+      // runs as text, never "attach it again".
+      const newPictures = lastMessage?.role === "user" ? lastMessage.attachments.filter((attachment) => attachment.type === "image" && !isStoredPicture(attachment)) : [];
+      const imageAttached = newPictures.length > 0;
       const documentPayloads = lastMessage?.role === "user" ? (await Promise.all(lastMessage.attachments.filter((attachment) => attachment.type === "file").map((attachment) => stagedDocumentPayload(attachment.id)))).filter((item): item is NonNullable<typeof item> => Boolean(item)) : [];
       const typedText = lastUserText(messages);
       const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : undefined);
@@ -309,7 +321,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         const imageParts: { id: string; name: string; width: number; height: number; media_type: string }[] = [];
         const photoTurnId = imageAttached ? `turn-${crypto.randomUUID().replaceAll("-", "").toLowerCase()}` : undefined;
         if (imageAttached && lastMessage?.role === "user") {
-          const photos = lastMessage.attachments.filter((attachment) => attachment.type === "image");
+          const photos = newPictures;
           if (photos.length > MAX_CHAT_IMAGES) throw new Error(CHAT_IMAGE_REFUSAL);
           for (const attachment of photos) {
             if (!attachment.file) throw new Error("The selected picture is no longer available. Please attach it again.");

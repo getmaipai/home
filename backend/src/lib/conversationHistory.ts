@@ -39,6 +39,8 @@ import { deleteAttachmentsForTurns } from "@/lib/attachments";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands, openQuestions, relationships } from "@/db/schema";
 import { pruneTemporaryChatImages } from "@/lib/attachments";
+import { picturesWindowNote, storedImages } from "@/lib/chatImageNote";
+import type { ChatImagePart } from "@/wire";
 import { TurnArtifact, type TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 import { newConversationTurnId, newConversationId, newOpenQuestionId } from "@/lib/id";
 import { canAccessPerson, canHaveTemporaryChat } from "@/lib/access";
@@ -2042,9 +2044,16 @@ function replaySearchOutcomes(t: ConversationTurnRow): ToolExecutionOutcome[] {
   } catch { return []; }
 }
 
+function withPicturesNote(text: string, images: readonly ChatImagePart[]): string {
+  return images.length > 0 ? `${text}\n\n${picturesWindowNote(images)}` : text;
+}
+
 function turnTextMessages(t: ConversationTurnRow): LlmMessage[] {
   return [
-    { role: "user", content: redactCredentials(t.userText) },
+    // UPLOAD-IMG-02: an earlier message's pictures stay a known, unseen
+    // fact in the window (chatImageNote.ts), so a follow-up never reads as
+    // if the picture had been described.
+    { role: "user", content: redactCredentials(withPicturesNote(t.userText, storedImages(t.images))) },
     (t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")) && t.guardReason
       ? { role: "system", content: guardedTurnNote(t) }
       : t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")

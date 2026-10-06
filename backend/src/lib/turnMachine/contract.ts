@@ -41,7 +41,7 @@ export interface ContextItem {
    * contextQuoteGrounded excludes it, and messages.ts never re-prints
    * it into the prompt's context block, since it is already the final
    * user message contextToMessages() appends). */
-  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "subjects" | "tool_result" | "search_result" | "document" | "notification" | "quoted" | "utterance";
+  source: "window" | "memory" | "episode" | "profile" | "clock" | "roster" | "subjects" | "tool_result" | "search_result" | "document" | "notification" | "quoted" | "utterance" | "attachment";
   /** Entity ids the item mentions (household-subject rule, grounding). */
   subjects: string[];
   disclosure: "child_ok" | "teen_ok" | "adult_only";

@@ -133,6 +133,31 @@ describe("stripThinking", () => {
 });
 
 describe("sent image transport", () => {
+  // UPLOAD-IMG-02 (review finding): a reopened chat rebuilds a sent picture
+  // from the hub's store (chatHistoryAdapter.ts) with no File. "Try again"
+  // or an edit of that message must still run the turn, never fail with
+  // "attach it again", and must not try to upload the stored copy.
+  test("a picture rebuilt from history is not re-uploaded and the retry still runs", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "delta", text: "Here is another answer." },
+      { type: "done", value: { turn_id: "turn-retry1", reply: { text: "Here is another answer." }, source: "model", safety: SAFETY } },
+    ]));
+    const message = {
+      ...fakeUserMessage("this is my new robot"),
+      attachments: [{ id: "file-robot0001", type: "image", name: "robot.jpg", contentType: "image/jpeg", status: { type: "complete" as const }, content: [{ type: "image" as const, image: "/api/attachments/file-robot0001?v=full&conversation_id=conv-images", filename: "robot.jpg" }] }],
+    };
+    try {
+      const result = await collect([message as unknown as ThreadMessage]);
+      expect(result.error).toBeUndefined();
+      expect(lastText(result.yields)).toContain("Here is another answer.");
+      expect(env.imageUploads).toHaveLength(0);
+      expect(env.turnBodies).toHaveLength(1);
+      expect((env.turnBodies[0] as { images?: unknown }).images).toBeUndefined();
+    } finally {
+      env.restore();
+    }
+  });
+
   test("uploads the image first and sends only additive id metadata in the turn body", async () => {
     const env = stubEnvironment(ndjsonStream([
       { type: "delta", text: "I can help with the picture." },

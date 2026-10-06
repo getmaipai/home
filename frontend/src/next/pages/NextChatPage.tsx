@@ -37,7 +37,7 @@ import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSup
 import { createChatThreadListAdapter, needsTitleCatchUp } from "@/apps/chat/chatThreadListAdapter";
 import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
-import { PackageScopeContext } from "@/apps/chat/composerAddMenu";
+import { PackageScopeContext, PhotoUploadsContext } from "@/apps/chat/composerAddMenu";
 import "@/next/pages/nextChatTouchTargets.css";
 import "@/next/pages/chatReplyMarkdown.css";
 import { WakeWordController } from "@/apps/chat/WakeWordController";
@@ -846,7 +846,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     },
   });
 
-  return { runtime, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1395,7 +1395,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
+  const { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setRailPeeked(false);
     setOpenArtifactId(null);
@@ -1647,6 +1647,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <TemporaryChatContext.Provider value={temporaryChatValue}>
       <DraftConversationContext.Provider value={draftConversationId}>
       <PackageScopeContext.Provider value={packageScopeValue}>
+      <PhotoUploadsContext.Provider value={photoUploadsEnabled}>
       <VoiceSessionProvider value={{ open: voiceOpen, setOpen: setVoiceOpen }}>
       <WakeWordPersonContext.Provider value={person}>
       <DictationLevelMeterProvider value={dictationLevelMeter}>
@@ -1946,6 +1947,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </DictationLevelMeterProvider>
       </WakeWordPersonContext.Provider>
       </VoiceSessionProvider>
+      </PhotoUploadsContext.Provider>
       </PackageScopeContext.Provider>
       </DraftConversationContext.Provider>
       </TemporaryChatContext.Provider>

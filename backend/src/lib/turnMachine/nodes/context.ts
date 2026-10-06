@@ -28,6 +28,7 @@ import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { shapeOf } from "@/lib/turnSignal";
 import { planFor } from "@/lib/register";
 import type { Node, ContextItem, TurnState } from "../contract";
+import { picturesAttachedNote } from "@/lib/chatImageNote";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
  * below which a match never becomes a context item, a pinned record
@@ -112,6 +113,13 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // back proves nothing) and from the prompt's context block in messages.ts
   // (it is already the turn's final user message there, never printed twice).
   items.push({ id: "utterance", text: input.utterance, source: "utterance", subjects: [], disclosure: "child_ok" });
+  // UPLOAD-IMG-02: pictures sent with this message. No vision engine reads
+  // them yet (VISION-01), so the model is told they exist and that it cannot
+  // see them, never left to guess. Not for a bare turn (the route refuses
+  // pictures there).
+  if (state.images?.length && !state.bare) {
+    items.push({ id: "attachment-pictures", text: picturesAttachedNote(state.images), source: "attachment", subjects: [], disclosure: "child_ok" });
+  }
 
   // The window (THIN-3C): every turn after the summary's anchor, sized by
   // the engine's count once the rest of the prompt is known (below). What
@@ -360,7 +368,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // tools block drop first. Only when the core itself cannot fit does a
     // written chat offer a new chat carrying the summary; a spoken turn
     // never hears it and answers from the message alone.
-    const core = items.filter((item) => item.source === "utterance" || item.source === "profile" || item.source === "roster");
+    const core = items.filter((item) => item.source === "utterance" || item.source === "attachment" || item.source === "profile" || item.source === "roster");
     const countCore = (withSummary: boolean) => countTokens(contextToMessages([...core, ...(withSummary ? summaryItem : [])], input.utterance, state.persona, state.plan, state.signal, surfaceClass));
     const withSummary = await countCore(true);
     const alone = withSummary !== null && withSummary + reply <= context ? withSummary : await countCore(false);

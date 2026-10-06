@@ -94,7 +94,11 @@ The setting is off by default, and children do not see the stats at all.
 
 ## Attach a document or picture
 
-Tap the **+** button next to the message box, choose a document or a picture from your device, and it appears as a small tile above the box. Type your question, then send. MaiPai reads the file and answers about it.
+Tap the **+** button next to the message box, choose a document or a picture from your device, and it appears as a small tile above the box. On a phone, **Take a photo** opens the camera. You can also paste a picture or drag it onto the chat. Tap the **x** on a tile to take it back out. Type your question, then send. MaiPai reads a document and answers about it.
+
+Pictures you send show as small thumbnails above your message. Tap one to see it full size. MaiPai cannot see pictures yet: it knows you sent one and what the file is called, and it tells you it can't look at it. You can add up to 4 pictures to a message, each up to 10 MB.
+
+Pictures are cleaned before they are saved: the hidden details a camera adds (like where the photo was taken) are removed. Children cannot send pictures until a parent turns on **Send photos in chat** for them. Teens and adults can send pictures from the start.
 
 The file stays on the hub, attached to that conversation, and it is deleted on the same schedule as the conversation. A child's picture follows the same rules as everything else they see: the answer stays within the child band, and the source links stay hidden.
 

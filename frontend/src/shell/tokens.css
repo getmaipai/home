@@ -165,6 +165,28 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
   flex: 0 0 auto;
 }
 
+/* UPLOAD-IMG-02: the kit's composer tiles get their own row above the text,
+ * as ChatGPT lays them out. The shell above is a row (the compact composer),
+ * so it wraps, and the tile strip takes the full width. The strip is
+ * `empty:hidden` in the kit, so a composer with nothing attached keeps its
+ * single line. */
+[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] {
+  flex-wrap: wrap;
+}
+
+/* The text field (Home's dictation override renders it `w-full`, with no
+ * kit class) grows from a zero basis, so on a phone it never pushes the
+ * controls onto a second line: only the tile strip takes its own row. */
+[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] > :not(.aui-composer-attachments):not(.aui-composer-action-wrapper) {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+[data-slot="next-chat-pane"] .aui-composer-attachments {
+  flex: 1 0 100%;
+  padding: 6px 0 2px;
+}
+
 /* CHAT-QUIET-01: the shipped spec sheet uses the mono token for labels;
  * Home's result-card rows read more naturally in the body face. */
 [data-slot="spec-sheet"] {

@@ -49,6 +49,8 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance"
   document: "document",
   notification: "notification",
   quoted: "quoted",
+  // UPLOAD-IMG-02: the fact that pictures were attached (chatImageNote.ts).
+  attachment: "attached",
 };
 
 function renderContextLine(item: ContextItem): string {

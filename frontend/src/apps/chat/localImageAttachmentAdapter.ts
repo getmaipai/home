@@ -66,10 +66,10 @@ function validateImage(file: File): void {
  * composer catches that rejection - the person saw nothing happen at
  * all, not an error. `add`'s own rejection path is the one that already
  * works (the same one `validateImage`'s existing checks already use):
- * caught by the runtime, surfaced as the attachment's own visible
- * "incomplete/error" status. Checked here instead - a photo is refused
- * the moment it's picked, with the real reason, never a silently dead
- * Send button. */
+ * the runtime reports it as a `composer.attachmentAddError` event (no tile
+ * is created), which composerAddMenu.tsx shows as one plain toast
+ * (UPLOAD-IMG-02). Checked here instead - a photo is refused the moment
+ * it's picked, with the real reason, never a silently dead Send button. */
 export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentAdapterOptions = {}): AttachmentAdapter {
 
   const imagesEnabled = options.enabled?.() !== false;

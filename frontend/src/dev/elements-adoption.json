@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T11:03:29.433Z",
+  "generatedAt": "2026-10-06T12:18:09.528Z",
   "kitTag": "ui-v0.5.105",
   "items": [
     {
@@ -57,7 +57,8 @@
       "name": "attachment",
       "group": "composer",
       "verdict": "wire-now",
-      "implemented": false
+      "implemented": false,
+      "reading": "UPLOAD-IMG-02: in use through the shipped thread.aui.tsx, which renders ComposerAttachments (tiles, remove, running and error states, preview dialog) inside the composer and UserMessageAttachments (image thumbnails above the bubble, preview dialog on click); Home feeds it through its attachment adapter and the history adapter, never imports it directly, so the scan reads it as not implemented."
     },
     {
       "file": "background-inbox.tsx",
@@ -473,7 +474,8 @@
       "name": "message-attachment",
       "group": "composer",
       "verdict": "wire-now",
-      "implemented": false
+      "implemented": false,
+      "reading": "UPLOAD-IMG-02: not wired. It is a name-and-size metadata card (a 48 px swatch beside the file name), not the thumbnail ChatGPT shows above the bubble, and thread.aui.tsx has no slot for it; the sent-picture thumbnails come from attachment.aui.tsx UserMessageAttachments instead."
     },
     {
       "file": "message-branches.tsx",

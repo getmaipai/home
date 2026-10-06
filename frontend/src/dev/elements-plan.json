@@ -137,7 +137,8 @@
       "showcaseScenario": "NEW: attachments (image, pdf, upload error)",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "reading": "UPLOAD-IMG-02: in use through the shipped thread.aui.tsx, which renders ComposerAttachments (tiles, remove, running and error states, preview dialog) inside the composer and UserMessageAttachments (image thumbnails above the bubble, preview dialog on click); Home feeds it through its attachment adapter and the history adapter, never imports it directly, so the scan reads it as not implemented."
     },
     {
       "file": "background-inbox.tsx",
@@ -1100,7 +1101,8 @@
       "showcaseScenario": "NEW: attachments",
       "batch": 3,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "reading": "UPLOAD-IMG-02: not wired. It is a name-and-size metadata card (a 48 px swatch beside the file name), not the thumbnail ChatGPT shows above the bubble, and thread.aui.tsx has no slot for it; the sent-picture thumbnails come from attachment.aui.tsx UserMessageAttachments instead."
     },
     {
       "file": "message-branches.tsx",

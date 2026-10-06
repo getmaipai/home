@@ -287,6 +287,9 @@ const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatHistoryReview = process.argv.includes("--next-chat-history-review");
 const nextChatAnswerImages = process.argv.includes("--next-chat-answer-images");
+// UPLOAD-IMG-02: sent pictures in the composer, above the bubble, in the
+// preview dialog, and a child with photo uploads off.
+const nextChatSentPictures = process.argv.includes("--next-chat-sent-pictures");
 const showcaseScrollReview = process.argv.includes("--showcase-scroll-review");
 const nextChatScrollReview = process.argv.includes("--next-chat-scroll-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
@@ -303,7 +306,7 @@ const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audi
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatComposerReview || nextChatQueueReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || nextChatQueueReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -3323,6 +3326,193 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
     await page.close();
   } finally {
     await wideTenContext.close();
+  }
+}
+
+/** UPLOAD-IMG-02: the person's own pictures, end to end through the real
+ * composer. Two licence-clean synthetic pictures (drawn here with sharp,
+ * nothing downloaded) are picked through the browser's own file chooser,
+ * exactly as a person picks them, so they pass the real adapter, the real
+ * upload route and the real turn. Captures, at 1440 and 390 in both themes:
+ * the two tiles in the composer (`composer`), the reopened conversation with
+ * the thumbnails above the person's bubble as the history path renders them
+ * (`sent`), the kit's preview dialog after a click (`lightbox`), and the
+ * child Nova, whose photo uploads are off by default (`child-off`: the phone's
+ * "+" menu with no photo rows; on desktop the plain line after picking a
+ * picture). With UI_EVIDENCE_TAG=before the same steps run and log what they
+ * find instead of failing on what the old code lacks. */
+async function captureNextChatSentPictures(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const evidenceTag = process.env.UI_EVIDENCE_TAG ?? "after";
+  const strict = evidenceTag === "after";
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const title = "My new robot";
+  const drawSource = `
+    import sharp from "sharp";
+    const robot = '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900"><rect width="900" height="900" fill="#c9b8a6"/><rect y="560" width="900" height="340" fill="#7a5c45"/><rect x="250" y="250" width="400" height="460" rx="180" fill="#f4f4f2"/><rect x="300" y="330" width="300" height="130" rx="60" fill="#1d1d22"/><circle cx="380" cy="395" r="34" fill="#e8e8ea"/><circle cx="520" cy="395" r="34" fill="#e8e8ea"/><line x1="360" y1="250" x2="320" y2="150" stroke="#2a2a30" stroke-width="10"/><line x1="540" y1="250" x2="580" y2="150" stroke="#2a2a30" stroke-width="10"/><circle cx="320" cy="145" r="16" fill="#2a2a30"/><circle cx="580" cy="145" r="16" fill="#2a2a30"/></svg>';
+    let lines = "";
+    for (let i = 0; i < 14; i++) lines += '<rect x="90" y="' + (150 + i * 46) + '" width="' + (520 - (i % 4) * 90) + '" height="14" rx="7" fill="#c8ccd4"/>';
+    const page = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><rect width="1200" height="900" fill="#ffffff"/><rect width="1200" height="64" fill="#eef0f4"/><rect x="40" y="22" width="180" height="20" rx="10" fill="#9aa3b2"/>' + lines + '<rect x="760" y="140" width="380" height="640" rx="18" fill="#f3f5f9" stroke="#d5dae3"/><rect x="800" y="190" width="300" height="16" rx="8" fill="#9aa3b2"/></svg>';
+    const out = {
+      robot: (await sharp(Buffer.from(robot)).png().toBuffer()).toString("base64"),
+      page: (await sharp(Buffer.from(page)).png().toBuffer()).toString("base64"),
+    };
+    console.log(JSON.stringify(out));
+  `;
+  const drawn = Bun.spawnSync({ cmd: ["bun", "-e", drawSource], cwd: join(ROOT, "backend"), stdout: "pipe", stderr: "pipe" });
+  if (drawn.exitCode !== 0) throw new Error(`captureNextChatSentPictures: drawing the demo pictures failed: ${drawn.stderr.toString()}`);
+  const pictures = JSON.parse(drawn.stdout.toString().trim().split("\n").at(-1)!) as { robot: string; page: string };
+  const files = [
+    { name: "my-robot.png", mimeType: "image/png", buffer: Buffer.from(pictures.robot, "base64") },
+    { name: "notes-page.png", mimeType: "image/png", buffer: Buffer.from(pictures.page, "base64") },
+  ];
+
+  /** Picks `picked` through the real "+" control: a direct button on
+   * desktop, the "Add photos and files" row of the menu on a phone. */
+  const pickPictures = async (page: Page, slug: "desktop" | "phone", picked: typeof files): Promise<void> => {
+    try {
+      const chooser = page.waitForEvent("filechooser", { timeout: 15000 });
+      chooser.catch(() => {});
+      await page.getByRole("button", { name: "Add", exact: true }).first().click();
+      if (slug === "phone") {
+        const menu = page.locator('[data-slot="composer-menu"][data-open]').first();
+        await menu.waitFor({ timeout: 5000 });
+        await settleAnimations(page);
+        await menu.getByText(/^Add (photos and )?files$/).first().click({ timeout: 5000 });
+      }
+      await (await chooser).setFiles(picked);
+    } catch (error) {
+      await page.screenshot({ path: join(outDir, `next-chat-sent-pictures-debug-${slug}.png`) });
+      throw error;
+    }
+  };
+  const imagesLoaded = async (page: Page, selector: string, count: number): Promise<number> => {
+    const deadline = Date.now() + 10000;
+    for (;;) {
+      const loaded = await page.locator(selector).evaluateAll((imgs) => imgs.filter((img) => (img as HTMLImageElement).complete && (img as HTMLImageElement).naturalWidth > 0).length);
+      if (loaded >= count || Date.now() > deadline) return loaded;
+      await page.waitForTimeout(100);
+    }
+  };
+
+  // One stored conversation with the two pictures sent through the real path.
+  const conversation = await seedTitledConversation("captureNextChatSentPictures", cookie, title);
+  const seedContext = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "dark", sessionValue);
+  try {
+    const page = await seedContext.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await openStoredConversation(page, conversation.id, title);
+    await pickPictures(page, "desktop", files);
+    await page.locator(".aui-composer-attachments .aui-attachment-tile").nth(1).waitFor();
+    const uploads: string[] = [];
+    page.on("request", (request) => { if (request.url().includes("/api/attachments/upload")) uploads.push(request.method()); });
+    let turnBody = "";
+    page.on("request", (request) => { if (request.url().includes("/api/turn/stream")) turnBody = request.postData() ?? ""; });
+    await sendChatMessage(page, "can you see these files?");
+    await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor({ timeout: 30000 });
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    console.log(`captureNextChatSentPictures ${evidenceTag}: ${JSON.stringify({ uploads: uploads.length, turnCarriesIds: /"images":\[\{"id":"file-/.test(turnBody), turnCarriesDataUrl: turnBody.includes("data:image") })}`);
+  } finally {
+    await seedContext.close();
+  }
+
+  const people = await (await fetch(`${BASE_URL}/api/people`, { headers: cookie })).json() as Array<{ id: string; display_name: string; role: string }>;
+  const child = people.find((p) => p.display_name === "Nova" && p.role === "child");
+  if (!child) throw new Error("captureNextChatSentPictures: the seeded child Nova is required");
+  const childSignIn = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
+  const childSession = childSignIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("captureNextChatSentPictures: Nova's sign-in carried no session cookie");
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const shot = (name: string) => join(outDir, `next-chat-sent-pictures-${evidenceTag}-${name}-${viewport.width}-${theme}.png`);
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        // The composer with two pictures picked, nothing sent.
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        if (slug === "phone") {
+          // The adult's phone "+" menu: the photo rows are there.
+          await page.waitForLoadState("networkidle");
+          await page.getByRole("button", { name: "Add", exact: true }).first().click();
+          const menu = page.locator('[data-slot="composer-menu"][data-open]').first();
+          await menu.waitFor();
+          await settleAnimations(page);
+          const rows = await menu.locator('[data-slot="composer-menu-item"]').allInnerTexts();
+          const box = await menu.boundingBox();
+          console.log(`captureNextChatSentPictures ${evidenceTag} ${slug}/${theme}: adult menu rows ${JSON.stringify(rows.map((r) => r.replace(/\s+/g, " ").trim()))}, menu x ${box?.x} to ${box ? box.x + box.width : "?"} of ${viewport.width}`);
+          if (strict && (!box || box.x < 0 || box.x + box.width > viewport.width)) throw new Error(`captureNextChatSentPictures: the phone "+" menu runs off the screen on ${theme}`);
+          await page.screenshot({ path: shot("menu") });
+          await page.getByRole("button", { name: "Add", exact: true }).first().click();
+          await page.locator('[data-slot="composer-menu"][data-open]').waitFor({ state: "detached" });
+        }
+        await pickPictures(page, slug, files);
+        const tiles = await imagesLoaded(page, ".aui-composer-attachments img", 2);
+        await page.getByRole("textbox", { name: "Message input" }).fill("can you see these files?");
+        await settleAnimations(page);
+        console.log(`captureNextChatSentPictures ${evidenceTag} ${slug}/${theme}: composer tiles painted ${tiles}, remove buttons ${await page.locator(".aui-composer-attachments .aui-attachment-tile-remove").count()}`);
+        if (strict && tiles !== 2) throw new Error(`captureNextChatSentPictures: ${tiles} of 2 composer tiles painted on ${slug}/${theme}`);
+        await page.screenshot({ path: shot("composer") });
+
+        // The reopened conversation: what the history path renders.
+        await openStoredConversation(page, conversation.id, title);
+        await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).first().waitFor();
+        const thumbs = await imagesLoaded(page, ".aui-user-message-attachments-end img", 2);
+        const srcs = await page.locator(".aui-user-message-attachments-end img").evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src") ?? ""));
+        await settleAnimations(page);
+        console.log(`captureNextChatSentPictures ${evidenceTag} ${slug}/${theme}: reopened thumbnails painted ${thumbs}, all from the hub ${srcs.length > 0 && srcs.every((src) => src.startsWith("/api/attachments/"))}`);
+        if (strict && thumbs !== 2) throw new Error(`captureNextChatSentPictures: ${thumbs} of 2 sent thumbnails painted after reopening on ${slug}/${theme}`);
+        await page.screenshot({ path: shot("sent") });
+
+        // A click opens the kit's preview dialog.
+        if (thumbs > 0) {
+          await page.locator(".aui-user-message-attachments-end .aui-attachment-tile").first().click();
+          await page.getByRole("dialog").waitFor();
+          await imagesLoaded(page, '[role="dialog"] img', 1);
+          await settleAnimations(page);
+          await page.screenshot({ path: shot("lightbox") });
+          await page.keyboard.press("Escape");
+          await page.getByRole("dialog").waitFor({ state: "detached" });
+        }
+        await page.close();
+      } finally {
+        await context.close();
+      }
+
+      // The child, photo uploads off (the default until a parent turns it on).
+      const childContext = await newContext(browser, viewport, theme, childSession);
+      try {
+        const page = await childContext.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        await page.waitForLoadState("networkidle");
+        if (slug === "phone") {
+          await page.getByRole("button", { name: "Add", exact: true }).first().click();
+          await page.locator('[data-slot="composer-menu"][data-open]').first().waitFor();
+          const rows = await page.locator('[data-slot="composer-menu"][data-open] [data-slot="composer-menu-item"]').allInnerTexts();
+          console.log(`captureNextChatSentPictures ${evidenceTag} ${slug}/${theme}: child menu rows ${JSON.stringify(rows.map((r) => r.replace(/\s+/g, " ").trim()))}`);
+          if (strict && rows.some((row) => /photo/i.test(row))) throw new Error(`captureNextChatSentPictures: the child's menu offers a photo row on ${slug}/${theme}`);
+        } else {
+          await pickPictures(page, slug, files.slice(0, 1));
+          const toast = page.getByText("Photo uploads are turned off for this profile.").first();
+          const shown = await toast.waitFor({ timeout: 5000 }).then(() => true, () => false);
+          const staged = await page.locator(".aui-composer-attachments .aui-attachment-tile").count();
+          console.log(`captureNextChatSentPictures ${evidenceTag} ${slug}/${theme}: child picture refused with the plain line ${shown}, tiles staged ${staged}`);
+          if (strict && (!shown || staged !== 0)) throw new Error(`captureNextChatSentPictures: the child's picture was not refused plainly on ${slug}/${theme}`);
+        }
+        await settleAnimations(page);
+        await page.screenshot({ path: shot("child-off") });
+        await page.close();
+      } finally {
+        await childContext.close();
+      }
+      console.log(`Wrote next-chat-sent-pictures-${evidenceTag}-{composer,sent,lightbox,child-off}-${viewport.width}-${theme}.png`);
+    }
   }
 }
 
@@ -7398,6 +7588,12 @@ async function main() {
     if (nextChatAnswerImages) {
       await captureNextChatAnswerImages(browser, sessionValue);
       console.log("completed named review: --next-chat-answer-images");
+      return;
+    }
+
+    if (nextChatSentPictures) {
+      await captureNextChatSentPictures(browser, sessionValue);
+      console.log("completed named review: --next-chat-sent-pictures");
       return;
     }
 
