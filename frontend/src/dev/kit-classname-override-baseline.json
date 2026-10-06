@@ -102,14 +102,6 @@
       "ed": "ED-035",
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     },
-    "ModelSelectorTrigger": {
-      "tokens": [
-        "max-w-40",
-        "min-w-0"
-      ],
-      "ed": "ED-029",
-      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
-    },
     "ReasoningText": {
       "tokens": [
         "pe-2"
@@ -153,16 +145,6 @@
     "ComposerMenuItem": {
       "tokens": [
         "min-h-13"
-      ],
-      "ed": "ED-029",
-      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
-    },
-    "ComposerAttachButton": {
-      "tokens": [
-        "before:-inset-2",
-        "before:absolute",
-        "before:content-['']",
-        "relative"
       ],
       "ed": "ED-029",
       "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."

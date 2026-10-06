@@ -261,7 +261,7 @@ export function ComposerAddMenu() {
   if (directAttachment) {
     return (
       <ComposerPrimitive.AddAttachment asChild>
-        <ComposerAttachButton aria-label="Add" className="relative before:absolute before:-inset-2 before:content-['']" />
+        <ComposerAttachButton aria-label="Add" />
       </ComposerPrimitive.AddAttachment>
     );
   }
@@ -275,7 +275,6 @@ export function ComposerAddMenu() {
         aria-label="Add"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="relative before:absolute before:-inset-2 before:content-['']"
       />
       {/* UPLOAD-IMG-02: "end", not "start" - Home's compact composer puts
           this "+" near the right end of the row (tokens.css), so a

@@ -112,6 +112,9 @@ export const THREAD_SLOTS = {
   // VOICE-LIVE-04b: owns the composer's text-field region (waveform or a real
   // ComposerPrimitive.Input), so it is unconditional.
   ComposerInputOverride: ComposerDictationWaveform,
+  // ELT-COMPOSER-KIT-01: the kit's slim ChatGPT-shaped composer; Home sets only
+  // its colour tokens (shell/tokens.css), the layout lives in the kit.
+  composerDensity: "compact",
   ReasoningGroup: NextReasoningGroup,
 } as const;
 

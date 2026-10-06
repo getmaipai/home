@@ -207,6 +207,8 @@ describe("ChatThread", () => {
         expect(typeof markdown).toBe("object");
         expect(typeof markdown.preprocess).toBe("function");
         expect(typeof markdown.components?.a).toBe("function");
+      } else if (name === "composerDensity") {
+        expect(slot).toBe("compact");
       } else {
         expect(typeof slot).toBe("function");
       }

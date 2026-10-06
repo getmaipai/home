@@ -141,137 +141,16 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
   min-height: 0;
 }
 
-/* COMPOSER-01 composer (owner, 2026-10-06: slimmer and closer to ChatGPT's).
- * One container, one 1px outline, 20px radius, 16px off the bottom, aligned
- * with the message column. Empty or one line it is a single 56px row: Add
- * (32px, its icon 12px from the edge), the text 8px after it, then the model
- * label, voice and a 36px Send. Once the text wraps (`data-multiline`, set
- * by ComposerDictationWaveform) the text takes its own row and the controls
- * stay anchored on the row below; the text field stops growing at 160px
- * (the composer is about 216px) and scrolls inside. The kit's two action
- * groups are placed in the grid with `display: contents`, so no kit markup
- * changes. Each control keeps a 48px invisible hit area. */
-[data-slot="next-chat-pane"] .aui-thread-viewport-footer {
-  padding-bottom: 16px !important;
+/* Composer (COMPOSER-01, owner 2026-10-06). The slim ChatGPT-shaped layout is
+ * the kit's compact density (`composerDensity: "compact"` in
+ * apps/chat/elementBindings.ts, ui-v0.5.114): row height, control sizes,
+ * insets, radius, 48px hit areas and the wrapped-text row all live in the
+ * kit. Home only supplies the colour tokens the kit reads. */
+[data-slot="next-chat-pane"] {
+  --composer-compact-bg: var(--shell-composer-bg);
+  --composer-compact-border: var(--shell-composer-border);
+  --composer-compact-border-focus: var(--shell-composer-border-focus);
 }
-
-[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] {
-  box-sizing: border-box;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas: "att att att" "lead input trail";
-  align-items: end;
-  column-gap: 0;
-  row-gap: 0;
-  min-height: 56px;
-  padding: 3px 10px 3px 12px;
-  border-radius: 20px;
-  background: var(--shell-composer-bg);
-  border-color: var(--shell-composer-border);
-}
-
-[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"]:focus-within {
-  border-color: var(--shell-composer-border-focus);
-}
-
-[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"][data-multiline] {
-  grid-template-areas: "att att att" "input input input" "lead . trail";
-}
-
-/* A phone row cannot hold the text beside the model label, so with the label
- * present the text takes its own row from the start. */
-@media (max-width: 639px) {
-  [data-slot="next-chat-pane"] [data-slot="aui_composer-shell"]:has([data-slot="model-selector-trigger"]) {
-    grid-template-areas: "att att att" "input input input" "lead . trail";
-  }
-}
-
-[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] > :not(.aui-composer-attachments):not(.aui-composer-action-wrapper) {
-  grid-area: input;
-  min-width: 0;
-}
-
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper {
-  display: contents;
-}
-
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper > :first-child {
-  grid-area: lead;
-  height: 48px;
-  align-items: center;
-  gap: 2px;
-}
-
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper > :last-child {
-  grid-area: trail;
-  height: 48px;
-  align-items: center;
-  gap: 2px;
-  min-width: 0;
-}
-
-/* Every round control is 32px (the menu rows inside the phone Add menu and
- * the model label are not controls of this kind); Send and Stop are 36px. */
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper button:where(:not([data-slot="composer-menu-item"]):not([data-slot="model-selector-trigger"])) {
-  position: relative;
-  box-sizing: border-box;
-  width: 32px;
-  height: 32px;
-  flex: none;
-  border-radius: 9999px;
-}
-
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper button[aria-label="Send message"],
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper button[aria-label="Stop generating"] {
-  width: 36px;
-  height: 36px;
-  margin-inline-start: 2px;
-}
-
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* The model label reads like ChatGPT's "Instant": 13px, quiet, no border,
- * a small chevron, truncating before it pushes the mic off the row. */
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper [data-slot="model-selector-trigger"] {
-  height: 32px;
-  padding: 0 8px;
-  gap: 4px;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--muted-foreground);
-  border-radius: 9999px;
-}
-
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper [data-slot="model-selector-trigger"]:hover {
-  color: var(--foreground);
-}
-
-[data-slot="next-chat-pane"] .aui-composer-action-wrapper [data-slot="model-selector-trigger"] svg {
-  width: 14px;
-  height: 14px;
-}
-
-/* A placeholder never wraps to a second line (it would grow the empty row). */
-[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] textarea:placeholder-shown {
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  /* The autosize measures the placeholder text, so a narrow row that wraps it
-   * left an empty field two lines tall. An empty field is one line. */
-  max-height: 48px !important;
-}
-
-[data-slot="next-chat-pane"] .aui-composer-attachments {
-  grid-area: att;
-  padding: 4px 0 6px;
-}
-
-/* UPLOAD-IMG-02: the kit's composer tiles get their own row above the
- * text, as ChatGPT lays them out (the `att` area above). The strip is
- * `empty:hidden` in the kit, so a composer with nothing attached keeps
- * its single row. */
 
 /* SHELL2 tones (owner, 2026-10-06: "change our color scheme to
  * chatgpt's"). Sampled from his ChatGPT desktop reference (dark, 2x

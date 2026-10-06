@@ -165,7 +165,7 @@ export function ComposerModelSelector() {
       effort={mode}
       onEffortChange={(effort) => setMode(effort === "thinking" ? "thinking" : "instant")}
     >
-      <ModelSelectorTrigger variant="ghost" size="sm" aria-label="Choose model" className="max-w-40 shrink min-w-0">
+      <ModelSelectorTrigger variant="ghost" size="sm" aria-label="Choose model">
         <ModelSelectorValue showEffort />
       </ModelSelectorTrigger>
       <ModelSelectorContent side="top" align="start">

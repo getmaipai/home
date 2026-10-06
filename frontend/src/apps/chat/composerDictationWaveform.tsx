@@ -22,7 +22,8 @@
 // call: `sttDictationAdapter.ts` builds the meter over the exact stream
 // its own real capture pipeline already opened.
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { ComposerPrimitive, useAui, useAuiState } from "@assistant-ui/react";
+import { useAui, useAuiState } from "@assistant-ui/react";
+import { ComposerInputField } from "@maipai/ui/src/elements/thread.aui";
 import { DraftRestore } from "@maipai/ui/src/elements/draft-restore";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
@@ -108,29 +109,10 @@ export function ComposerDictationWaveform() {
     return () => clearInterval(timer);
   }, [dictating, meter]);
 
-  // RAIL-01 (owner's layout, 2026-10-06): an empty or one-line composer is
-  // one compact row (Add and the model chip, the text, voice and Send).
-  // Once the text wraps, the shell is marked multiline and the text takes
-  // its own full-width row above the controls, which stay anchored at the
-  // bottom. It returns to one row only when the text is cleared, so a line
-  // that fits the wider row never flips the layout back and forth.
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    const element = inputRef.current;
-    const shell = element?.closest<HTMLElement>('[data-slot="aui_composer-shell"]');
-    if (!element || !shell) return;
-    if (!text) {
-      shell.removeAttribute("data-multiline");
-      return;
-    }
-    if (shell.hasAttribute("data-multiline")) return;
-    const lineHeight = parseFloat(getComputedStyle(element).lineHeight) || 22;
-    if (text.includes("\n") || element.scrollHeight > lineHeight * 1.5 + 26) shell.setAttribute("data-multiline", "");
-  }, [text, dictating]);
-
+  // The kit's compact composer (Thread `composerDensity`) owns the single-row
+  // versus wrapped layout and marks its own shell when the text wraps.
   const input = !dictating ? (
-    <ComposerPrimitive.Input
-      ref={inputRef}
+    <ComposerInputField
       // CHAT-CALM-ERRORS-01d (design section 7): the field stays usable
       // while chat is paused or starting so a thought is not lost; the kit
       // holds Send (Thread `sendHeld`, ChatThread.tsx) and Enter sends
@@ -139,21 +121,6 @@ export function ComposerDictationWaveform() {
       placeholder="Send a message..."
       submitMode={held ? "none" : undefined}
       onKeyDown={held ? (event) => { if (event.key === "Enter" && !event.shiftKey) event.preventDefault(); } : undefined}
-      // The kit's own default Input, verbatim (elements/thread.aui.tsx's
-      // Composer) - `autoFocus` isn't part of this zero-prop slot's own
-      // shape (`ComponentType`, the same as every other ThreadComponents
-      // override), so a page load's own autofocus is the one behavior this
-      // trades away; every other prop matches exactly.
-      // Same Tailwind utilities as the kit's own default Input - not
-      // its "aui-composer-input" marker class, which has no real CSS
-      // rule anywhere and only the kit's own thread.aui.tsx carries an
-      // eslint exemption for that non-Tailwind naming convention.
-      // deliberate type-floor exception: the owner's chat layout (RAIL-01,
-      // 2026-10-06) sets the composer text at 15px, ChatGPT's density.
-      className="caret-primary placeholder:text-muted-foreground/60 max-h-40 min-h-12 w-full resize-none bg-transparent px-2 py-[13px] text-[15px] leading-[22px] outline-none"
-      rows={1}
-      enterKeyHint="send"
-      aria-label="Message input"
     />
   ) : (
     // w-full, not flex-1: the kit's own composer-shell is flex-col (the
