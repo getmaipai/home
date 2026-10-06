@@ -3346,6 +3346,7 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.addInitScript(() => localStorage.setItem("maipai.chat.rail-collapsed", "0"));
         await page.goto(`${BASE_URL}/chat`);
         await page.getByRole("textbox", { name: "Message input" }).waitFor();
         // On phone the rail column is still in the DOM (hidden, not
@@ -3359,6 +3360,9 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
           scope = page.getByRole("dialog");
         }
         await scope.getByText("Weekend garden plans", { exact: true }).waitFor();
+        if (!(await scope.getByRole("textbox", { name: "Search threads" }).count())) {
+          await scope.getByRole("button", { name: "Search chats" }).click();
+        }
         await scope.getByRole("textbox", { name: "Search threads" }).waitFor();
         // CHAT-LIST-01's temporary-chat affordance is absent from the
         // current NextThreadList composition. Capture the controls that

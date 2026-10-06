@@ -92,6 +92,15 @@ describe("(a) one cause, one visual", () => {
       const dot = notice(view.container)?.querySelector('[data-slot="chat-notice-dot"]');
       expect(dot?.innerHTML).toContain("tint-attention-fg");
       expect(dot?.innerHTML).not.toContain("animate-ping");
+      const repairs = view.getByRole("link", { name: "Open Repairs" });
+      expect(repairs.getAttribute("data-slot")).toBe("button");
+      expect(repairs.getAttribute("data-size")).toBe("sm");
+      expect(repairs.className).toContain("before:-inset-2");
+      expect([...notice(view.container)!.children].map((node) => (node as HTMLElement).dataset.slot ?? node.tagName)).toEqual([
+        "chat-notice-dot",
+        "SPAN",
+        "button",
+      ]);
       expect(inlineFailure(view.container)).toBeNull();
       expect(view.queryByText("MaiPai's AI isn't running right now")).toBeNull();
       expect(view.container.querySelector('[data-slot="alert"]')).toBeNull();

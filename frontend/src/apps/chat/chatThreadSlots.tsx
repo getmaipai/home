@@ -34,6 +34,7 @@ import { RegenerateMenu } from "@maipai/ui/src/elements/regenerate-menu";
 // the dashboard Button belongs to the surrounding page chrome, not this
 // row.
 import { Button as ElementsButton } from "@maipai/ui/src/elements/ui/button";
+import { Button as KitButton } from "@maipai/ui/src/ui/button";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -101,8 +102,9 @@ export function ChatComposerNotice() {
   if (!notice) return null;
   const level = chatNoticeLevel(apps);
   return (
-    // The kit frame is one truncated line; on a phone the Repairs link goes
-    // first so it is never the part that is cut off.
+    // The kit frame is one truncated line. The kit Button's compact size
+    // keeps the Repairs link's visible label small and extends its hit area
+    // to 48px without changing this row's layout.
     // CHAT-NOTICE-LED-01 (owner, 2026-10-06): ChatGPT's quiet status line, a small
     // LED dot then one sentence in the normal foreground. The dot is the
     // kit's StatusIndicator (degraded or offline, no ping), the same dot as the
@@ -112,11 +114,11 @@ export function ChatComposerNotice() {
     <span data-chat-notice data-level={level} role="status" aria-live="polite" title={notice.text} className="text-foreground inline-flex max-w-full items-center gap-2">
       <StatusIndicator data-slot="chat-notice-dot" status={level === "red" ? "offline" : "degraded"} ping={false} />
       <span className="min-w-0 truncate">{notice.text}</span>
-      {/* Deliberate touch-target-floor exception (docs/UI.md): a text link
-          inside the notice's one sentence (WCAG 2.5.8's inline exception).
-          The design caps this line at 24 px, so a 48 px link would undo it;
-          Repairs is also one tap away in Settings. */}
-      {notice.repairsLink ? <Link to="/repairs" data-touch-target-exempt className="order-first shrink-0 underline underline-offset-2 sm:order-none">{notice.repairsLink}</Link> : null}
+      {notice.repairsLink ? (
+        <KitButton variant="link" size="sm" asChild>
+          <Link to="/repairs">{notice.repairsLink}</Link>
+        </KitButton>
+      ) : null}
     </span>
   );
 }
