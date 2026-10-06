@@ -16,7 +16,10 @@ function prefersReducedMotion(): boolean {
 /** `child`: while something is paused or down a child sees no pill
  * (CHAT-CALM-ERRORS-01d, design section 6): they cannot fix it, and in chat
  * their composer line is the one signal they get. */
-export function StatusIndicator({ child = false }: { child?: boolean } = {}) {
+/** The one status summary the header pill and the rail's profile menu
+ * both read (RAIL-01): the apps summary, with maintenance shown when
+ * everything else is online. */
+export function useStatusSummary() {
   const board = useQuery<StatusBoard>({ queryKey: STATUS_BOARD_QUERY_KEY, queryFn: () => api.statusBoard(), refetchInterval: 30_000 });
   const underMaintenance = activeMaintenanceParts(Array.isArray(board.data?.maintenance) ? board.data.maintenance : undefined);
   const appsQuery = useStatusApps();
@@ -25,6 +28,11 @@ export function StatusIndicator({ child = false }: { child?: boolean } = {}) {
     ? { ...appsSummary, level: "maintenance" as const, text: "Maintenance" }
     : appsSummary;
   const title = appsSummary.level === "online" ? summary.text : appsSummary.message;
+  return { summary, title };
+}
+
+export function StatusIndicator({ child = false }: { child?: boolean } = {}) {
+  const { summary, title } = useStatusSummary();
   // No ping on a failure state (design section 4): a paused or down part is
   // shown, never animated.
   const ping = (summary.level === "online" || summary.level === "maintenance") && !prefersReducedMotion();

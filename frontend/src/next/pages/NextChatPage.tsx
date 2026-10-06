@@ -47,7 +47,6 @@ import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice } from "@/apps/chat/useChatAvailability";
 import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
-import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { photoUploadsEnabledForBand } from "@/apps/chat/photoUploadAccess";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
@@ -1091,10 +1090,10 @@ export function NextChatPage({ person }: { person: Roster }) {
   const chatAvailability = useChatAvailability();
   const composerNotice = useChatComposerNotice(person);
 
-  // CHAT-HEADER-01: ChatHeaderBar is a stable, zero-prop reference - the
-  // shell header's own slot (ui-v0.5.35) mounts and unmounts it, never
-  // re-created per render.
-  useHeaderExtra(ChatHeaderBar);
+  // RAIL-01 (owner's layout, 2026-10-06): the chat draws its own slim
+  // header at the top of the conversation pane, beside the history column,
+  // instead of filling the shell header's slot (which spanned the history
+  // column too).
   const { on: temporaryNext } = useIncognitoContext();
   // VOICE-LIVE-02: owned here (not inside useNextChatRuntime) since both
   // the composer's own waveform button (via VoiceSessionProvider,
@@ -1601,7 +1600,7 @@ export function NextChatPage({ person }: { person: Roster }) {
           aria-expanded={toggleExpanded}
           aria-controls="next-chat-rail"
           // eslint-disable-next-line shadcn/no-restyle -- positioning classes for the rail toggle button are intentional layout, not restyling of the button's own shape
-          className="absolute top-0 left-0 z-20 hidden lg:flex"
+          className="absolute top-2 left-2 z-20 hidden lg:flex"
           onPointerEnter={handleToggleEnter}
           onPointerLeave={handleToggleLeave}
           onFocus={handleToggleFocus}
@@ -1682,28 +1681,6 @@ export function NextChatPage({ person }: { person: Roster }) {
             </Button>
             <ChatHeaderBar phoneRow />
           </div>
-          {bareMode ? (
-            // COORDINATOR, 2026-09-22: "while it is on, it is obvious...
-            // a persistent visible marker on the conversation for as
-            // long as bare mode is active, not a toast." No dismiss
-            // control - the switch itself is the only way off, the same
-            // way the wake-word invariants treat a mode that changes
-            // behavior.
-            <Alert variant="destructive" className="mx-4 mt-2 mb-2" role="status">
-              <CompareIcon className="size-4" />
-              <AlertTitle>Bare mode is on</AlertTitle>
-              <AlertDescription>Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards.</AlertDescription>
-            </Alert>
-          ) : null}
-          {/* CHAT-CALM-ERRORS-01d: no engine-state banner. While chat cannot
-              answer, the one quiet line under the composer says so
-              (ChatComposerNotice), and an owner's or admin's line carries the
-              Repairs link this banner used to. */}
-          {banner ? (
-            <Alert className="mx-4 mt-2 mb-2">
-              <AlertDescription>{banner}</AlertDescription>
-            </Alert>
-          ) : null}
           <div className="relative flex min-h-0 flex-1">
             {/* `lg:` not `sm:` - tokens.css's own --breakpoint-lg note
                 (the kit's 960px default reopens a squeeze at tablet
@@ -1762,17 +1739,19 @@ export function NextChatPage({ person }: { person: Roster }) {
               // itself, present only in the two states that actually
               // have width to put them in.
               className={cn(
-                "overflow-y-auto bg-background",
+                "overflow-y-auto",
                 // Only a click (`startRailWidthAnimation`) ever puts this
                 // back on the element - see that function's own comment.
                 // Hovering the peek open or closed must jump, never ease.
                 // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate a dynamic rail width
                 railWidthAnimating && "transition-[width] duration-300 ease-out motion-reduce:transition-none",
+                // RAIL-01: one flat 260px column, a single 1px divider on
+                // its right edge, its own tone (`--shell-history`, tokens.css).
                 railCollapsed
                   ? railPeeked
-                    ? "absolute inset-y-0 left-0 z-20 block w-64 border-r border-border pr-2 shadow-lg animate-in slide-in-from-left-4 fade-in motion-reduce:animate-none"
+                    ? "absolute inset-y-0 left-0 z-20 block w-65 border-r border-border px-2.5 pt-2.5 shadow-lg animate-in slide-in-from-left-4 fade-in motion-reduce:animate-none"
                     : "hidden w-0 lg:block lg:overflow-hidden"
-                  : "hidden w-64 shrink-0 border-r border-border pr-2 lg:block",
+                  : "hidden w-65 shrink-0 border-r border-border px-2.5 pt-2.5 lg:block",
               )}
               onPointerLeave={(e) => {
                 closeRailPeek(e.relatedTarget);
@@ -1807,12 +1786,38 @@ export function NextChatPage({ person }: { person: Roster }) {
                 still slides smoothly. */}
             <div
               data-slot="next-chat-pane"
-              className={cn(
-                // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[margin-inline-start] is the only way to animate the pane's margin as the rail collapses
-                "min-w-0 flex-1 transition-[margin-inline-start] duration-300 ease-out motion-reduce:transition-none",
-                railCollapsed ? "ms-0" : "ms-4",
-              )}
+              className="min-w-0 flex-1"
             >
+              {/* RAIL-01: the conversation's own header, spanning the
+                  workspace only (never the history column): title and
+                  conversation actions on the left and right, and a slot
+                  on the right for the agent/task activity toggle. The
+                  phone row above carries the same bar below lg. */}
+              <header data-slot="next-chat-header" className={cn("hidden h-13 shrink-0 items-center gap-1 border-b border-border px-5 lg:flex", railCollapsed && "ps-14")}>
+                <ChatHeaderBar />
+              </header>
+          {bareMode ? (
+            // COORDINATOR, 2026-09-22: "while it is on, it is obvious...
+            // a persistent visible marker on the conversation for as
+            // long as bare mode is active, not a toast." No dismiss
+            // control - the switch itself is the only way off, the same
+            // way the wake-word invariants treat a mode that changes
+            // behavior.
+            <Alert variant="destructive" className="mx-auto mt-3 mb-1 w-full max-w-200" role="status">
+              <CompareIcon className="size-4" />
+              <AlertTitle>Bare mode is on</AlertTitle>
+              <AlertDescription>Every reply in this conversation is the bare model - no persona, routing, packages, or quality guards.</AlertDescription>
+            </Alert>
+          ) : null}
+          {/* CHAT-CALM-ERRORS-01d: no engine-state banner. While chat cannot
+              answer, the one quiet line under the composer says so
+              (ChatComposerNotice), and an owner's or admin's line carries the
+              Repairs link this banner used to. */}
+          {banner ? (
+            <Alert className="mx-auto mt-3 mb-1 w-full max-w-200">
+              <AlertDescription>{banner}</AlertDescription>
+            </Alert>
+          ) : null}
               <ConnectionStateContext.Provider value={{ ...connection, setConnection }}>
                 <ChatThread
                   temporary={temporaryNext}

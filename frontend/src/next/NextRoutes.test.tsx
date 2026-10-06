@@ -156,8 +156,10 @@ describe("NextRoutes appearance", () => {
   });
 });
 
+// RAIL-01 (owner's layout, 2026-10-06): system status moved from the
+// header pill into the rail's profile menu; the row still links to /status.
 describe("NextRoutes status indicator", () => {
-  test.each(["/", "/chat"])("shows the shared status link on %s", async (path) => {
+  test.each(["/", "/chat"])("shows the shared status link in the profile menu on %s", async (path) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -178,17 +180,20 @@ describe("NextRoutes status indicator", () => {
           </MemoryRouter>
         </TooltipProvider>,
       );
-      const statusLink = await view.findByRole("link", { name: /All good/ });
-      expect(statusLink.getAttribute("href")).toBe("/status");
+      fireEvent.click(await view.findByRole("button", { name: /Open profile menu for Nova/ }));
+      const statusRow = await view.findByRole("menuitem", { name: /System status/ });
+      await waitFor(() => expect(statusRow.textContent).toContain("Good"));
+      expect(statusRow.getAttribute("href")).toBe("/status");
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 });
 
-// CHAT-CALM-ERRORS-01d: the header bell is Home's own (the real pending
-// list and a count whose tone follows urgency), never the kit template's
-// sample dropdown with its always-pinging red dot.
+// CHAT-CALM-ERRORS-01d: the bell is Home's own (the real pending list),
+// never the kit template's sample dropdown with its always-pinging red
+// dot. RAIL-01: the count shows on the rail avatar and the profile menu's
+// Notifications row, which opens the same pending list.
 describe("NextRoutes notifications bell", () => {
   test("shows the household's real pending count and no sample red dot", async () => {
     const originalFetch = globalThis.fetch;
@@ -209,9 +214,12 @@ describe("NextRoutes notifications bell", () => {
           </MemoryRouter>
         </TooltipProvider>,
       );
-      const bell = await view.findByRole("button", { name: "Notifications (1 pending)" });
-      expect(bell.closest("header")).not.toBeNull();
+      const avatar = await view.findByRole("button", { name: /Open profile menu for Nova \(1 notification/ });
+      expect(avatar.closest("nav")?.getAttribute("aria-label")).toBe("Primary navigation");
       expect(view.container.querySelector(".animate-ping.bg-destructive")).toBeNull();
+      fireEvent.click(avatar);
+      fireEvent.click(await view.findByRole("menuitem", { name: /Notifications/ }));
+      expect(await view.findByText("MaiPai Stack is offline")).toBeTruthy();
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -251,7 +259,10 @@ describe("NextRoutes Incognito toggle", () => {
           </MemoryRouter>
         </TooltipProvider>,
       );
-      fireEvent.click(await view.findByRole("button", { name: "Incognito On" }));
+      fireEvent.click(await view.findByRole("button", { name: /Open profile menu for Nova/ }));
+      const incognitoRow = await view.findByRole("menuitem", { name: /Incognito/ });
+      expect(incognitoRow.textContent).toContain("On");
+      fireEvent.click(incognitoRow);
       await waitFor(() => expect(discardCalls).toEqual(["/api/conversations/incognito/discard"]));
       await expect(createChatThreadListAdapter("Nova", { incognito: true }).fetch("conv-toggle-incognito")).rejects.toThrow();
     } finally {
@@ -317,10 +328,10 @@ describe("NextRoutes sign-in redirect", () => {
       // assertion targets the destination page directly.
       expect(await view.findByRole("heading", { name: "Home" })).toBeTruthy();
       expect(view.queryByPlaceholderText("PIN or password")).toBeNull();
-      fireEvent.click(await view.findByRole("button", { name: "Open account menu for Nova" }));
-      expect(await view.findByRole("heading", { name: "Nova" })).toBeTruthy();
-      expect(view.getByRole("link", { name: "Settings" }).getAttribute("href")).toBe("/next/settings");
-      expect(view.getByRole("link", { name: "Help" }).getAttribute("href")).toContain("docs/user/README.md");
+      fireEvent.click(await view.findByRole("button", { name: /Open profile menu for Nova/ }));
+      expect(await view.findByText("Nova", { selector: '[data-slot="rail-profile-identity"] span' })).toBeTruthy();
+      expect(view.getByRole("menuitem", { name: "Settings" }).getAttribute("href")).toBe("/settings");
+      expect(view.getByRole("menuitem", { name: "Help" }).getAttribute("href")).toContain("docs/user/README.md");
       expect(view.queryByText(/Cameron|shadcndashboard\.com|Invoice|Subscription/)).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;

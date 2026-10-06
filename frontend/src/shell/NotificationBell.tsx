@@ -99,13 +99,29 @@ export function NotificationToaster(): null {
 // NOTIFICATIONS.md: "the shell's notification center") - browsing and
 // dismissing. Not a Dialog (docs/MODALS.md): a non-modal Popover, since
 // doing either never blocks the rest of the page.
-export function NotificationBell() {
+/** RAIL-01: with `anchored`, the bell draws no button of its own. The
+ * pending list opens from the rail's profile menu (its Notifications
+ * row), anchored beside the avatar; the caller owns `open`. */
+export function NotificationBell({ anchored = false, open: controlledOpen, onOpenChange }: { anchored?: boolean; open?: boolean; onOpenChange?: (open: boolean) => void } = {}) {
   const queryClient = useQueryClient();
   const query = useNotificationsQuery();
   // Only a real list counts: a malformed answer shows nothing pending rather
   // than crashing the header the bell now sits in (CHAT-CALM-ERRORS-01d).
   const items = Array.isArray(query.data) ? query.data : [];
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
+  // Anchored, the caller opens the list by prop, so Radix's onOpenChange
+  // never sees the open: pause TV navigation from the state itself, once
+  // per open, and release it on close or unmount.
+  useEffect(() => {
+    if (!anchored || !open) return;
+    pauseTvNavForOverlay(true);
+    return () => pauseTvNavForOverlay(false);
+  }, [anchored, open]);
   const BellIcon = getIcon("bell");
 
   // Shared by both dismiss mutations below (a review caught them
@@ -174,10 +190,10 @@ export function NotificationBell() {
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        pauseTvNavForOverlay(next);
+        if (!anchored) pauseTvNavForOverlay(next);
       }}
     >
-      <RadixPopover.Trigger asChild>
+      {anchored ? <RadixPopover.Anchor className="pointer-events-none absolute inset-0" /> : <RadixPopover.Trigger asChild>
         <Button variant="ghost" size="icon" aria-label={`Notifications${items.length > 0 ? ` (${items.length} pending)` : ""}`} className="relative">
           <BellIcon className="h-5 w-5" aria-hidden />
           {items.length > 0 ? (
@@ -189,9 +205,11 @@ export function NotificationBell() {
             </span>
           ) : null}
         </Button>
-      </RadixPopover.Trigger>
+      </RadixPopover.Trigger>}
       <RadixPopover.Portal>
         <RadixPopover.Content
+          aria-label="Notifications"
+          side={anchored ? "right" : "bottom"}
           align="end"
           sideOffset={8}
           className="z-40 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-border bg-card p-2 text-card-foreground shadow-lg"

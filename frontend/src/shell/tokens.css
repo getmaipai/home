@@ -121,7 +121,7 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
 
 /* CHAT-QUIET-01: the composer uses the same page surface as its thread. */
 .aui-root.aui-thread-root {
-  --composer-bg: var(--background) !important;
+  --composer-bg: var(--shell-composer-bg) !important;
 }
 
 /* CHAT-LAYOUT-01: the shipped Thread Element's own max-width token is
@@ -129,62 +129,223 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
  * widen that one Element through its token, without changing the kit's
  * message or composer markup. */
 .aui-root.aui-thread-root {
-  --thread-max-width: 53rem !important;
+  --thread-max-width: 52rem !important;
 }
 
 /* CHAT-COMPOSER-01: ChatThread's shipped wrapper is flex-1, so make its
  * pane a column that gives the assistant-ui Thread the full available
- * height. The kit footer already sticks to the bottom when a thread has
- * messages; a compact inline shell keeps its controls alongside the
- * input, with a small footer inset. */
+ * height. */
 [data-slot="next-chat-pane"] {
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
+/* RAIL-01 composer (owner's layout, 2026-10-06): one container, one 1px
+ * outline, about 20px radius, 16px off the bottom, aligned with the
+ * message column. Empty or one line, it is a single 56px row: Add and the
+ * model chip, the text, then voice and Send. Once the text wraps
+ * (`data-multiline`, set by ComposerDictationWaveform) the text takes its
+ * own row and the controls stay anchored on the row below. The shipped
+ * action row's two groups are placed in the grid with `display:
+ * contents`, so no kit markup changes. */
 [data-slot="next-chat-pane"] .aui-thread-viewport-footer {
-  padding-bottom: 8px !important;
+  padding-bottom: 16px !important;
 }
 
 [data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] {
-  align-items: center;
-  flex-direction: row;
-  gap: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "att att att" "lead input trail";
+  align-items: end;
+  column-gap: 4px;
+  row-gap: 0;
   min-height: 56px;
-  padding: 6px 12px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: var(--shell-composer-bg);
+  border-color: color-mix(in oklab, var(--foreground) 12%, transparent);
 }
 
-[data-slot="next-chat-pane"] .aui-composer-input {
-  flex: 1 1 auto;
+[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"]:focus-within {
+  border-color: color-mix(in oklab, var(--foreground) 24%, transparent);
+}
+
+[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"][data-multiline] {
+  grid-template-areas: "att att att" "input input input" "lead . trail";
+  row-gap: 4px;
+}
+
+[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] > :not(.aui-composer-attachments):not(.aui-composer-action-wrapper) {
+  grid-area: input;
   min-width: 0;
-  padding: 8px 4px;
 }
 
 [data-slot="next-chat-pane"] .aui-composer-action-wrapper {
-  flex: 0 0 auto;
+  display: contents;
 }
 
-/* UPLOAD-IMG-02: the kit's composer tiles get their own row above the text,
- * as ChatGPT lays them out. The shell above is a row (the compact composer),
- * so it wraps, and the tile strip takes the full width. The strip is
- * `empty:hidden` in the kit, so a composer with nothing attached keeps its
- * single line. */
-[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] {
-  flex-wrap: wrap;
+[data-slot="next-chat-pane"] .aui-composer-action-wrapper > :first-child {
+  grid-area: lead;
+  height: 48px;
+  align-items: center;
+  gap: 4px;
 }
 
-/* The text field (Home's dictation override renders it `w-full`, with no
- * kit class) grows from a zero basis, so on a phone it never pushes the
- * controls onto a second line: only the tile strip takes its own row. */
-[data-slot="next-chat-pane"] [data-slot="aui_composer-shell"] > :not(.aui-composer-attachments):not(.aui-composer-action-wrapper) {
-  flex: 1 1 0%;
-  min-width: 0;
+[data-slot="next-chat-pane"] .aui-composer-action-wrapper > :last-child {
+  grid-area: trail;
+  height: 48px;
+  align-items: center;
+  gap: 4px;
+}
+
+[data-slot="next-chat-pane"] .aui-composer-action-wrapper button[aria-label="Send message"],
+[data-slot="next-chat-pane"] .aui-composer-action-wrapper button[aria-label="Stop generating"] {
+  border-radius: 9999px;
+}
+
+[data-slot="next-chat-pane"] .aui-composer-action-wrapper svg {
+  width: 18px;
+  height: 18px;
 }
 
 [data-slot="next-chat-pane"] .aui-composer-attachments {
-  flex: 1 0 100%;
-  padding: 6px 0 2px;
+  grid-area: att;
+  padding: 4px 0 6px;
+}
+
+/* UPLOAD-IMG-02: the kit's composer tiles get their own row above the
+ * text, as ChatGPT lays them out (the `att` area above). The strip is
+ * `empty:hidden` in the kit, so a composer with nothing attached keeps
+ * its single row. */
+
+/* RAIL-01 tones: separation by tone, not borders. Dark: the rail darkest,
+ * the history column a step lighter, the header a touch apart from the
+ * conversation, which is the main surface. Light keeps the same order. */
+:root {
+    --shell-rail: color-mix(in oklab, var(--background), black 7%);
+  --shell-history: color-mix(in oklab, var(--background), black 3.5%);
+  --shell-header: color-mix(in oklab, var(--background), black 1.5%);
+  --shell-composer-bg: color-mix(in oklab, var(--background), var(--foreground) 3%);
+  --shell-user-bubble: color-mix(in oklab, var(--primary) 14%, var(--background));
+}
+:root.dark {
+  --shell-rail: color-mix(in oklab, var(--background), black 55%);
+  --shell-history: color-mix(in oklab, var(--background), black 30%);
+  --shell-header: color-mix(in oklab, var(--background), white 2%);
+  --shell-composer-bg: color-mix(in oklab, var(--background), white 5%);
+  --shell-user-bubble: color-mix(in oklab, var(--primary) 26%, var(--background));
+}
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --shell-rail: color-mix(in oklab, var(--background), black 55%);
+    --shell-history: color-mix(in oklab, var(--background), black 30%);
+    --shell-header: color-mix(in oklab, var(--background), white 2%);
+    --shell-composer-bg: color-mix(in oklab, var(--background), white 5%);
+    --shell-user-bubble: color-mix(in oklab, var(--primary) 26%, var(--background));
+  }
+}
+
+[data-slot="app-rail"] {
+  background: var(--shell-rail);
+}
+[data-slot="next-chat-rail"] {
+  background: var(--shell-history);
+}
+[data-slot="next-chat-header"] {
+  background: var(--shell-header);
+}
+/* Other pages sit on --page, so their title bar is a touch apart from it. */
+[data-slot="rail-page-header"] {
+  background: color-mix(in oklab, var(--page), var(--foreground) 2.5%);
+}
+
+/* RAIL-01 history column: New chat and conversation search at about
+ * 36px, 12px section labels, 36px rows with 14px titles. A touch screen
+ * keeps the kit's 48px floor (SHELL-09); a mouse gets the denser list. */
+@media (pointer: fine) {
+  [data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"],
+  [data-slot="next-chat-rail"] [data-slot="aui_thread-list-item-trigger"] {
+    min-height: 36px;
+    height: 36px;
+  }
+  [data-slot="next-chat-rail"] [data-slot="aui_thread-list-new"] {
+    min-height: 36px;
+    height: 36px;
+  }
+}
+/* The 48px touch floor (SHELL-09) on a 36px control: a transparent
+ * overhang, the kit's own hitArea() technique. */
+[data-slot="next-chat-rail"] [data-slot="aui_thread-list-new"]::before {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+[data-slot="next-chat-rail"] [data-slot="aui_thread-list-new"] {
+  position: relative;
+  font-size: 14px;
+  gap: 8px;
+  padding-inline: 10px;
+}
+[data-slot="next-chat-rail"] [data-slot="aui_thread-list-new-icon"] {
+  width: 18px;
+  height: 18px;
+}
+[data-slot="next-chat-rail"] [data-slot="thread-search"] > div {
+  height: 36px;
+  margin-top: 8px;
+  border-radius: 8px;
+  padding-inline: 10px;
+}
+[data-slot="next-chat-rail"] [data-slot="thread-search"] svg {
+  width: 16px;
+  height: 16px;
+}
+[data-slot="next-chat-rail"] [data-slot="thread-search"] input {
+  font-size: 14px;
+}
+[data-slot="next-chat-rail"] [data-slot="aui_thread-list-group-label"] {
+  font-size: 12px;
+  font-weight: 500;
+  padding-top: 16px;
+  padding-bottom: 4px;
+}
+[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"] {
+  border-radius: 8px;
+}
+[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]:hover {
+  background-color: color-mix(in oklab, var(--foreground) 5%, transparent);
+}
+[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"][data-active="true"] {
+  background-color: color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+
+/* RAIL-01 conversation: assistant text sits on the surface at 15/24;
+ * markdown headings at 22, 19 and 17; user messages are compact filled
+ * bubbles at most 70% of the column. */
+[data-slot="next-chat-pane"] [data-slot="aui_assistant-message-content"] {
+  font-size: 15px;
+  line-height: 24px;
+}
+[data-slot="next-chat-pane"] [data-slot="aui_assistant-message-content"] h1 {
+  font-size: 22px;
+  line-height: 30px;
+}
+[data-slot="next-chat-pane"] [data-slot="aui_assistant-message-content"] h2 {
+  font-size: 19px;
+  line-height: 26px;
+}
+[data-slot="next-chat-pane"] [data-slot="aui_assistant-message-content"] h3 {
+  font-size: 17px;
+  line-height: 24px;
+}
+[data-slot="next-chat-pane"] .aui-user-message-content {
+  max-width: min(560px, 100%);
+  padding: 8px 14px;
+  border-radius: 18px;
+  font-size: 15px;
+  line-height: 24px;
+  background: var(--shell-user-bubble);
 }
 
 /* CHAT-QUIET-01: the shipped spec sheet uses the mono token for labels;
@@ -529,80 +690,33 @@ html:has([data-slot="next-chat-shell"]) {
   overscroll-behavior-y: none;
 }
 
-/* UI-SHOWCASE: give the full-height showcase thread the same bounded
- * outlet chain as chat. The showcase keeps its own slot so chat's footer
- * and overscroll rules do not leak into this developer page. */
-main:has([data-slot="next-chat-showcase-shell"]) {
-  height: calc(100svh - 1rem);
+/* RAIL-01 (owner's layout, 2026-10-06): the rail layout's body scrolls
+ * on its own under a fixed-height workspace. Chat (and the showcase's
+ * thread) fill that body instead: no padding, no width cap, no page
+ * scroll; the thread viewport stays the one scroller. */
+[data-slot="rail-workspace"]:has([data-slot="next-chat-shell"]),
+[data-slot="rail-workspace"]:has([data-slot="next-chat-showcase-shell"]) {
+  height: 100svh;
 }
-main:has([data-slot="next-chat-showcase-shell"]) > div {
+[data-slot="rail-body"]:has([data-slot="next-chat-shell"]),
+[data-slot="rail-body"]:has([data-slot="next-chat-showcase-shell"]) {
+  display: flex;
+  flex-direction: column;
   min-height: 0;
-  padding-bottom: 0;
+  overflow: hidden;
 }
-.container:has([data-slot="next-chat-showcase-shell"]) {
+[data-slot="rail-body"]:has([data-slot="next-chat-shell"]) > .container,
+[data-slot="rail-body"]:has([data-slot="next-chat-showcase-shell"]) > .container {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
-.container:has([data-slot="next-chat-showcase-shell"]) > :first-child {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
+[data-slot="next-chat-shell"],
 [data-slot="next-chat-showcase-shell"] {
-  min-height: 0;
-}
-
-/* Jesse's own ChatGPT comparison (23:55): the column and the composer
- * both stopped ~60px short of the window's real bottom edge, a gap
- * below them neither reaches. Root cause: FullLayout.tsx's own chain
- * from `SidebarInset` down to the Outlet is a stack of plain block
- * divs that each shrink-wrap to their own content's height rather than
- * stretching to fill the flex row above them - `next-chat-shell`'s own
- * `h-[calc(100vh-140px)]` (NextChatPage.tsx) was a magic-number guess
- * at the leftover space that never quite matched what the real chain
- * (header height, `SidebarInset`'s own `m-2` margin, the body div's
- * `p-4`, the container's own footer slot) actually consumed. Reached
- * through the identical `data-slot="next-chat-shell"` marker the two
- * rules above already key on, turning every intervening shrink-wrap
- * div into a real flex conduit instead: `main` (SidebarInset itself)
- * gets a real, fixed height, its body div and the container div below
- * it both become `flex-1 min-h-0` columns, and the Outlet's own
- * `min-h-[calc(100vh-140px)]` wrapper becomes the same. `next-chat-
- * shell` (NextChatPage.tsx) then just reads `h-full` off that real
- * chain instead of its own guessed number. The footer's own trailing
- * slot (`Footer` itself renders null, but its wrapper's `pt-6` still
- * claimed real space) is hidden outright - a full-height chat
- * interface has no room for it, the same reason ChatGPT's own thread
- * reaches the window's bottom edge with nothing below it. */
-/* A review caught this: `SidebarInset`'s own `m-2` (its component
- * default is `md:`-gated, but `FullLayout.tsx:19` passes a second,
- * plain `m-2` in its own `className` - `cn()`'s `twMerge` only dedupes
- * classes sharing the identical variant chain, so the unconditional one
- * coexists with the gated one rather than replacing it) is real at
- * every width, not only at the kit's own `--breakpoint-md` and up. No
- * media query needed: always subtract the 1rem it claims. */
-main:has([data-slot="next-chat-shell"]) {
-  height: calc(100svh - 1rem);
-}
-main:has([data-slot="next-chat-shell"]) > div {
-  min-height: 0;
-  padding-bottom: 0;
-}
-.container:has([data-slot="next-chat-shell"]) {
-  display: flex;
-  flex-direction: column;
   flex: 1;
   min-height: 0;
-}
-.container:has([data-slot="next-chat-shell"]) > :first-child {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-.container:has([data-slot="next-chat-shell"]) > :last-child {
-  display: none;
 }

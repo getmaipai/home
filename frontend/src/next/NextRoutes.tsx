@@ -34,8 +34,7 @@ import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
-import { StatusIndicator } from "@/shell/StatusIndicator";
-import { NotificationBell } from "@/shell/NotificationBell";
+import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { sidebarItemStatus } from "@/shell/statusApps";
@@ -105,18 +104,18 @@ function NextPageHeaderLayout() {
 // component rather than inlining the hook call in `NextRoutes` itself,
 // which needs to return `<ThemeProvider>` before anything inside it
 // can call a hook that reads from it.
-function NextRoutesInner({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
+function NextRoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
   useNextAppearance(person.id);
   useNextLook(person.id);
 
   return (
     <IncognitoProvider>
-      <NextRoutesWithIncognito person={person} onPersonChange={onPersonChange} />
+      <NextRoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} />
     </IncognitoProvider>
   );
 }
 
-function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
+function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
   const statusAppsQuery = useStatusApps();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
 
@@ -185,7 +184,13 @@ function NextRoutesWithIncognito({ person, onPersonChange }: { person: Roster; o
         {/* THEME-TOGGLE-01 (2026-09-26): light/dark already lives at
             Settings > Me > Appearance (ui.appearance) - the header's
             own shortcut duplicated it, so it's off here. */}
-        <Route element={<FullLayout headerSearchRemote={api.search} profileDisplayName={person.display_name} incognito={incognito} onIncognitoChange={onIncognitoChange} showThemeToggle={false} statusIndicator={<StatusIndicator child={person.age_band === "child"} />} notifications={<NotificationBell />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} defaultSidebarOpen={false} showSidebarTriggerInMenu showHeaderSidebarTrigger={false} />}>
+        {/* RAIL-01 (owner's layout, 2026-10-06; design rule S1): the
+            permanent 56px app rail. Search sits at its top, the apps below,
+            and the profile at its bottom opens the one menu that holds
+            Notifications, System status, Incognito, Settings, Help and Log
+            out. Pages draw their own slim title bar; chat draws its own
+            beside the history column. */}
+        <Route element={<FullLayout rail headerSearchRemote={api.search} railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />
@@ -230,5 +235,5 @@ function NextSignedOutRoutes({ onSignedIn }: { onSignedIn: () => void }) {
 }
 
 export function NextRoutes({ person, onSignedIn, onPersonChange = () => {} }: { person: Roster | null; onSignedIn: () => void; onPersonChange?: () => void | Promise<void> }) {
-  return <ThemeProvider>{person === null ? <NextSignedOutRoutes onSignedIn={onSignedIn} /> : <NextRoutesInner person={person} onPersonChange={onPersonChange} />}</ThemeProvider>;
+  return <ThemeProvider>{person === null ? <NextSignedOutRoutes onSignedIn={onSignedIn} /> : <NextRoutesInner person={person} onPersonChange={onPersonChange} onSignedOut={onSignedIn} />}</ThemeProvider>;
 }

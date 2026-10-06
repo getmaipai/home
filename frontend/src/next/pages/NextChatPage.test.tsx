@@ -2059,7 +2059,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).toContain("w-65");
       expect(classes(rail())).not.toContain("absolute");
       const toggle = view.getByRole("button", { name: "Hide conversations" });
       expect(toggle).toHaveAttribute("aria-controls", "next-chat-rail");
@@ -2099,7 +2099,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       );
       await view.findByLabelText("Message input");
       expect(view.getByRole("button", { name: "New chat" })).toBeVisible();
-      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).toContain("w-65");
 
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
       expect(classes(rail())).toContain("hidden");
@@ -2112,7 +2112,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // phone-width utility, overridden at `lg:`); `w-64` vs `w-0` is
       // what actually distinguishes the two states, the same assertion
       // the "open:" test above this one uses.
-      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).toContain("w-65");
       expect(classes(rail())).not.toContain("w-0");
       expect(view.getByRole("button", { name: "New chat" })).toBeVisible();
     } finally {
@@ -2224,7 +2224,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // Never remounted, never a second column instance - the exact same
       // node that was measured "open" a moment ago.
       expect(rail()).toBe(railNode);
-      expect(classes(rail())).toEqual(expect.arrayContaining(["absolute", "inset-y-0", "left-0", "w-64"]));
+      expect(classes(rail())).toEqual(expect.arrayContaining(["absolute", "inset-y-0", "left-0", "w-65"]));
       // The collapsed-only toggle instance is gone; the inline one, now
       // visible again inside the peeked rail, is what's on screen.
       expect(view.queryAllByRole("button", { name: "Show conversations" })).toHaveLength(1);
@@ -2356,7 +2356,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
       fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).toContain("w-65");
       expect(classes(rail())).not.toContain("absolute");
       expect(classes(rail())).toContain("transition-[width]");
       await waitFor(() => expect(classes(rail())).not.toContain("transition-[width]"), { timeout: 1000 });
@@ -2368,10 +2368,10 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
   test("the chat pane's own spacing is identical collapsed and peeked - only a click (a real width change) moves it", async () => {
     // Jesse found this: the pane bumped right on hover-in and back on
     // hover-out, reading as a peek that reflows the layout it's meant
-    // to sit ABOVE, not shift. The pane's own spacing is keyed on
-    // `railCollapsed` alone (NextChatPage.tsx's own comment on why) -
-    // this proves it directly, className to className, since happy-dom
-    // computes no real box geometry to measure a pixel rect against.
+    // to sit ABOVE, not shift. RAIL-01: the pane carries no margin of its
+    // own in any state, and the conversation header's room for the
+    // floating toggle is keyed on `railCollapsed` alone, so a peek moves
+    // neither; only a click does.
     const restore = stubFetch();
     try {
       const view = renderPage(
@@ -2380,28 +2380,27 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
+      const header = () => view.container.querySelector<HTMLElement>('[data-slot="next-chat-header"]')!;
       const openPaneClasses = classes(pane());
-      expect(openPaneClasses).toContain("ms-4");
-      expect(openPaneClasses).not.toContain("ms-0");
+      expect(classes(header())).not.toContain("ps-14");
 
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      const collapsedPaneClasses = classes(pane());
-      expect(collapsedPaneClasses).toContain("ms-0");
-      expect(collapsedPaneClasses).not.toContain("ms-4");
+      expect(classes(pane())).toEqual(openPaneClasses);
+      const collapsedHeaderClasses = classes(header());
+      expect(collapsedHeaderClasses).toContain("ps-14");
 
       const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
       fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
-      // Peeked now - the pane's own classes must not have changed at
-      // all from the collapsed-not-peeked state above.
-      expect(classes(pane())).toEqual(collapsedPaneClasses);
+      // Peeked now - neither the pane nor the header moved.
+      expect(classes(pane())).toEqual(openPaneClasses);
+      expect(classes(header())).toEqual(collapsedHeaderClasses);
 
       fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
       expect(classes(rail())).toContain("hidden");
-      // Closed again - still identical to the collapsed-not-peeked
-      // snapshot, never having moved through any of this.
-      expect(classes(pane())).toEqual(collapsedPaneClasses);
+      expect(classes(pane())).toEqual(openPaneClasses);
+      expect(classes(header())).toEqual(collapsedHeaderClasses);
     } finally {
       restore();
     }
@@ -2451,7 +2450,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // real pointer would be over next, so the click lands on it, not
       // the (now unmounted) collapsed-only button.
       fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).toContain("w-65");
       expect(classes(rail())).toContain("lg:block");
       expect(classes(rail())).not.toContain("absolute");
       // Pinning open resets the peek - collapsing again later starts
@@ -2633,7 +2632,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
       fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-64");
+      expect(classes(rail())).toContain("w-65");
       expect(classes(rail())).not.toContain("absolute");
     } finally {
       restore();

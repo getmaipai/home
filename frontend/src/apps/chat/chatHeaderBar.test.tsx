@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
+import { Button } from "@maipai/ui/src/ui/button";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { ChatHeaderDataProvider, useSetChatHeaderData, type ChatHeaderData } from "@/apps/chat/chatHeaderData";
 
@@ -22,12 +23,12 @@ async function openActionsMenu(view: { findByRole: (role: string, opts: { name: 
   });
 }
 
-function renderBar(data: ChatHeaderData | null) {
+function renderBar(data: ChatHeaderData | null, phoneRow = false) {
   return render(
     <TooltipProvider>
       <ChatHeaderDataProvider>
         <TestBridge data={data} />
-        <ChatHeaderBar />
+        <ChatHeaderBar phoneRow={phoneRow} />
       </ChatHeaderDataProvider>
     </TooltipProvider>,
   );
@@ -65,31 +66,48 @@ describe("ChatHeaderBar", () => {
   // grow into the header's free space and truncate only once it must
   // are present, not the actual pixel behavior (that's the captures at
   // 1440/390 the item's own exit line asks for).
-  test("the title can shrink while keeping a 48 px minimum and truncates its text", async () => {
+  // RAIL-01 (owner's layout, 2026-10-06): on desktop the title is a
+  // 36px control in the 52px conversation header (the spec's 32 to 36px
+  // header targets) that truncates; the phone row keeps the 48px floor.
+  test("the desktop title is a 36 px control that truncates its text", async () => {
     const view = renderBar(baseData({ title: "What's 2 plus 2?" }));
     const title = (await view.findByText("What's 2 plus 2?")).closest("button")!;
     const layoutClasses = title.className.split(" relative before:").at(0) ?? "";
-    expect(layoutClasses).toContain("flex-1");
-    expect(layoutClasses).toContain("min-w-12");
-    expect(layoutClasses).toContain("h-12");
-    expect(layoutClasses.split(" ")).not.toContain("h-10");
+    expect(layoutClasses.split(" ")).toContain("h-9");
+    expect(layoutClasses).toContain("min-w-0");
+    expect(layoutClasses).toContain("max-w-full");
     expect(layoutClasses.split(" ")).not.toContain("shrink-0");
-    expect(layoutClasses).not.toContain("grow");
-    expect(layoutClasses).not.toContain("max-w-full");
     expect(title.querySelector("span")?.className).toContain("min-w-0");
     expect(title.querySelector("span")?.className).toContain("truncate");
     expect(title.className).not.toContain("max-w-64");
   });
 
-  test("the New Chat title keeps a 48 px target while its text can truncate", async () => {
-    const view = renderBar(baseData({ title: "" }));
-    const button = await view.findByRole("button", { name: "New Chat" });
-    const layoutClasses = button.className.split(" relative before:").at(0) ?? "";
-    expect(layoutClasses).toContain("min-w-12");
-    expect(layoutClasses).toContain("h-12");
-    expect(layoutClasses).toContain("flex-1");
-    expect(layoutClasses.split(" ")).not.toContain("shrink-0");
-    expect(button.querySelector("span")?.className).toContain("min-w-0 truncate");
+  test("the phone title keeps a 48 px target while its text can truncate", async () => {
+    for (const title of ["What's 2 plus 2?", ""]) {
+      const view = renderBar(baseData({ title }), true);
+      const button = (await view.findByText(title || "New Chat")).closest("button")!;
+      const layoutClasses = button.className.split(" relative before:").at(0) ?? "";
+      expect(layoutClasses).toContain("min-w-12");
+      expect(layoutClasses).toContain("h-12");
+      expect(layoutClasses).toContain("flex-1");
+      expect(layoutClasses.split(" ")).not.toContain("shrink-0");
+      expect(button.querySelector("span")?.className).toContain("min-w-0 truncate");
+      view.unmount();
+    }
+  });
+
+  test("the activity slot renders at the right of the header, before the conversation actions", async () => {
+    const view = render(
+      <TooltipProvider>
+        <ChatHeaderDataProvider>
+          <TestBridge data={baseData({ title: "Plans" })} />
+          <ChatHeaderBar trailing={<Button type="button">Activity</Button>} />
+        </ChatHeaderDataProvider>
+      </TooltipProvider>,
+    );
+    const activity = await view.findByRole("button", { name: "Activity" });
+    const actions = view.getByRole("button", { name: "Conversation actions" });
+    expect(activity.compareDocumentPosition(actions) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   // A review (2026-09-23): the rename Input kept the old fixed

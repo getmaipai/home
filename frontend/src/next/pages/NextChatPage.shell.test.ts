@@ -11,7 +11,10 @@ describe("SHELL-FOLD-01 phone chat header", () => {
     expect(row).toContain("<ChatHeaderBar phoneRow />");
     expect(header).toContain('phoneRow ? "flex min-w-0 flex-1 items-center gap-1 overflow-hidden"');
     expect(header).toContain('"hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex"');
+    // RAIL-01: the app rail never expands, so the shell has no fold
+    // trigger anywhere; chat draws its own header beside its history.
     const routes = readFileSync(new URL("../NextRoutes.tsx", import.meta.url), "utf8");
-    expect(routes).toContain("showSidebarTriggerInMenu showHeaderSidebarTrigger={false}");
+    expect(routes).toContain("<FullLayout rail ");
+    expect(source).toContain('data-slot="next-chat-header"');
   });
 });

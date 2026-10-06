@@ -308,6 +308,9 @@ const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
+// RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
+// column, the conversation header, messages and composer, measured.
+const chatShellReview = process.argv.includes("--chat-shell-review");
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -527,7 +530,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit) {
+  if (chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview) {
     for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -2205,6 +2208,203 @@ async function captureShellRail(browser: Browser, sessionValue: string, theme: "
 
     await trigger.click();
     await page.getByRole("navigation", { name: "Main navigation" }).getByText("MaiPai Home", { exact: false }).waitFor();
+  } finally {
+    await context.close();
+  }
+}
+
+/** RAIL-01 (owner's layout, 2026-10-06): the rail, the 260px history
+ * column with many conversations, the conversation header, a real
+ * exchange (a user message and a markdown reply), the composer empty and
+ * multiline, the profile menu, and the avatar's attention badge, at 1440
+ * in both themes plus one 390 sanity shot. Every key size is measured
+ * in the browser and logged, and the run fails on a horizontal page
+ * overflow. Written to data-scratch/chat-ab/shell-shots for review. */
+async function captureChatShellReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "shell-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const titles = [
+    "Weekend garden plans", "Shopping list ideas", "Science fair volcano", "Bedtime story about a fox", "Packing for the beach",
+    "Birthday party games", "Fixing the bike chain", "Spanish homework help", "Soup recipes for winter", "Cleaning the fish tank",
+    "Board games for four", "Planning a camping trip", "Why the sky is blue", "Piano practice schedule", "Car trip playlist",
+    "Library books to borrow", "Making pancakes", "How volcanoes work", "Thank you note wording", "Chores chart",
+  ];
+  for (const title of titles) await seedTitledConversation("captureChatShellReview", cookie, title);
+  const conversation = await seedTitledConversation("captureChatShellReview", cookie, "Homework helper notes");
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const seedContext = await newContext(browser, desktop, "dark", sessionValue);
+  try {
+    const page = await seedContext.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await openStoredConversation(page, conversation.id, "Homework helper notes");
+    await sendChatMessage(page, RICH_REPLY_PROMPT);
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    await page.getByRole("heading", { name: "Homework helper" }).waitFor({ timeout: 30000 });
+  } finally {
+    await seedContext.close();
+  }
+
+  const measure = (page: Page) => page.evaluate(() => {
+    const box = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) };
+    };
+    const font = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return `${style.fontSize}/${style.lineHeight} ${style.fontWeight}`;
+    };
+    const bg = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      return element ? getComputedStyle(element).backgroundColor : null;
+    };
+    return {
+      rail: box('[data-slot="app-rail"]'),
+      railItem: box('[data-slot="app-rail-item"]'),
+      profile: box('[data-slot="rail-profile-trigger"]'),
+      history: box('[data-slot="next-chat-rail"]'),
+      newChat: box('[data-slot="aui_thread-list-new"]'),
+      search: box('[data-slot="next-chat-rail"] input'),
+      row: box('[data-slot="aui_thread-list-item"]'),
+      rowFont: font('[data-slot="aui_thread-list-item-title"]'),
+      sectionLabelFont: font('[data-slot="aui_thread-list-group-label"]'),
+      header: box('[data-slot="next-chat-header"]'),
+      titleFont: font('[data-chat-header-bar] button span'),
+      column: box('[data-slot="aui_thread-viewport"] > .mx-auto'),
+      userBubble: box('.aui-user-message-content'),
+      userFont: font('.aui-user-message-content'),
+      assistantFont: font('[data-slot="aui_assistant-message-content"] p'),
+      composer: box('[data-slot="aui_composer-shell"]'),
+      composerInput: box('[data-slot="aui_composer-shell"] textarea'),
+      composerFont: font('[data-slot="aui_composer-shell"] textarea'),
+      sendButton: box('[data-slot="aui_composer-shell"] button[aria-label="Send message"]'),
+      historyRows: document.querySelectorAll('[data-slot="aui_thread-list-item"]').length,
+      historyRowsVisible: [...document.querySelectorAll<HTMLElement>('[data-slot="aui_thread-list-item"]')].filter((row) => { const r = row.getBoundingClientRect(); return r.height > 0 && r.bottom <= window.innerHeight; }).length,
+      tones: { rail: bg('[data-slot="app-rail"]'), history: bg('[data-slot="next-chat-rail"]'), header: bg('[data-slot="next-chat-header"]'), workspace: bg('[data-slot="rail-workspace"]') },
+      vars: Object.fromEntries(["--background", "--page", "--shell-rail", "--shell-history", "--shell-header", "--shell-composer-bg"].map((name) => [name, getComputedStyle(document.documentElement).getPropertyValue(name).trim()])),
+      pageOverflowX: document.documentElement.scrollWidth > window.innerWidth,
+    };
+  });
+
+  const shoot = async (page: Page, name: string) => {
+    await settleAnimations(page);
+    const file = join(outDir, `${name}.png`);
+    await page.screenshot({ path: file });
+    console.log(`Wrote ${file}`);
+  };
+
+  for (const theme of THEMES) {
+    const context = await newContext(browser, desktop, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await openStoredConversation(page, conversation.id, "Homework helper notes");
+      await page.getByRole("heading", { name: "Homework helper" }).waitFor();
+      await page.getByRole("navigation", { name: "Primary navigation" }).waitFor();
+      await shoot(page, `shell-conversation-1440-${theme}`);
+      const numbers = await measure(page);
+      console.log(`chat-shell measure 1440/${theme}: ${JSON.stringify(numbers)}`);
+      if (numbers.pageOverflowX) throw new Error(`captureChatShellReview: horizontal page overflow at 1440/${theme}`);
+
+      const composer = page.getByRole("textbox", { name: "Message input" });
+      await composer.fill(Array.from({ length: 12 }, (_, i) => `Line ${i + 1} of a longer message that keeps going.`).join("\n"));
+      await shoot(page, `shell-composer-multiline-1440-${theme}`);
+      console.log(`chat-shell composer multiline 1440/${theme}: ${JSON.stringify(await measure(page).then((m) => ({ composer: m.composer, input: m.composerInput })))}`);
+      await composer.fill("");
+
+      await page.locator('[data-slot="rail-profile-trigger"]').click();
+      await page.getByRole("menuitem", { name: /Settings/ }).waitFor();
+      await shoot(page, `shell-profile-menu-1440-${theme}`);
+      const menu = await page.evaluate(() => {
+        const popup = document.querySelector<HTMLElement>('[data-slot="dropdown-menu-content"]');
+        const item = document.querySelector<HTMLElement>('[data-slot="dropdown-menu-item"]');
+        return { menu: popup && { width: Math.round(popup.getBoundingClientRect().width) }, row: item && { height: Math.round(item.getBoundingClientRect().height) } };
+      });
+      console.log(`chat-shell profile menu 1440/${theme}: ${JSON.stringify(menu)}`);
+      await page.keyboard.press("Escape");
+
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      await shoot(page, `shell-new-chat-1440-${theme}`);
+      console.log(`chat-shell new chat 1440/${theme}: ${JSON.stringify(await measure(page).then((m) => ({ composer: m.composer, column: m.column })))}`);
+    } finally {
+      await context.close();
+    }
+  }
+
+  // The attention badge: a real flagged turn notifies the signed-in admin.
+  await flagTurnsAsMarlow(sessionValue, ["I want to kill myself"], "captureChatShellReview");
+  for (const theme of THEMES) {
+    const context = await newContext(browser, desktop, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await openStoredConversation(page, conversation.id, "Homework helper notes");
+      await page.locator('[data-slot="rail-profile-badge"]').waitFor({ timeout: 30000 });
+      await shoot(page, `shell-attention-1440-${theme}`);
+      await page.locator('[data-slot="rail-profile-trigger"]').click();
+      await page.getByRole("menuitem", { name: /Notifications/ }).waitFor();
+      await shoot(page, `shell-attention-menu-1440-${theme}`);
+      await page.getByRole("menuitem", { name: /Notifications/ }).click();
+      await page.getByRole("button", { name: "Dismiss all" }).waitFor();
+      await shoot(page, `shell-notifications-open-1440-${theme}`);
+    } finally {
+      await context.close();
+    }
+  }
+
+  // Other pages keep the rail and get the slim page title bar.
+  {
+    const context = await newContext(browser, desktop, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      for (const [path, name] of [["/", "home"], ["/settings", "settings"], ["/people", "family"]] as const) {
+        await page.goto(`${BASE_URL}${path}`);
+        await page.getByRole("heading", { level: 1 }).first().waitFor({ state: "attached" });
+        await page.locator('[role="status"][aria-label*="oading"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+        await page.waitForTimeout(800);
+        await shoot(page, `shell-page-${name}-1440-dark`);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+        if (overflow) throw new Error(`captureChatShellReview: horizontal page overflow on ${path}`);
+      }
+      // Incognito on: the menu row shows it, the avatar wears the ring.
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      await page.locator('[data-slot="rail-profile-trigger"]').click();
+      await page.getByRole("menuitem", { name: /Incognito/ }).click();
+      // Incognito cross-fades through an 800ms view transition, which
+      // holds pointer events on <html> until it ends.
+      await page.waitForTimeout(1200);
+      await page.keyboard.press("Escape");
+      const explain = page.getByRole("dialog");
+      if (await explain.count()) {
+        await page.keyboard.press("Escape");
+        await explain.waitFor({ state: "detached" }).catch(() => {});
+      }
+      await page.locator('[data-slot="rail-profile-trigger"]').click();
+      await page.getByRole("menuitem", { name: /Incognito/ }).waitFor();
+      await shoot(page, "shell-incognito-menu-1440-dark");
+    } finally {
+      await context.close();
+    }
+  }
+
+  const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
+  const context = await newContext(browser, phone, "dark", sessionValue);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await openStoredConversation(page, conversation.id, "Homework helper notes");
+    await page.getByRole("heading", { name: "Homework helper" }).waitFor();
+    await shoot(page, "shell-conversation-390-dark");
+    const numbers = await measure(page);
+    console.log(`chat-shell measure 390/dark: ${JSON.stringify(numbers)}`);
+    if (numbers.pageOverflowX) throw new Error("captureChatShellReview: horizontal page overflow at 390");
   } finally {
     await context.close();
   }
@@ -6983,8 +7183,10 @@ async function buttonTransitionDuration(browser: Browser, sessionValue: string, 
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/`);
     await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    const menu = page.locator('[data-slot="sidebar"]').first();
-    const trigger = menu.getByRole("button", { name: "Toggle app menu", exact: true });
+    // RAIL-01: the app rail's Search button (a kit Button, always
+    // mounted on every signed-in page) replaced the sidebar fold trigger.
+    const menu = page.getByRole("navigation", { name: "Primary navigation" });
+    const trigger = menu.getByRole("button", { name: "Search", exact: true });
     await trigger.waitFor({ timeout: 15000 });
     const duration = await trigger.evaluate((el) => parseFloat(getComputedStyle(el).transitionDuration));
     return duration;
@@ -7108,6 +7310,11 @@ async function checkKeyboardTrap(browser: Browser, sessionValue: string): Promis
         const tail = visited.slice(-windowLen);
         const cycle = tail.slice(0, period);
         const repeats = Array.from({ length: REPEATS_REQUIRED }, (_, k) => tail.slice(k * period, (k + 1) * period));
+        // A cycle through "(body)" is focus leaving the page to the
+        // browser and starting over, the opposite of a trap. Found with
+        // RAIL-01: the dashboard's whole tab order (rail, two cards) is
+        // short enough to repeat inside MAX_PERIOD.
+        if (cycle.includes("(body)")) continue;
         if (repeats.every((chunk) => chunk.every((v, j) => v === cycle[j]))) {
           return [
             `keyboard trap suspected: focus repeated the same ${period}-element cycle ${REPEATS_REQUIRED} times in a row after ${visited.length} ${tabKey} presses (${cycle.join(" -> ")})`,
@@ -7329,7 +7536,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit ? startScreenshotStack(chatModel.url) : undefined;
+  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview ? startScreenshotStack(chatModel.url) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -7346,7 +7553,7 @@ async function main() {
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
       // This matrix never calls speech; all speech requests go to the Stack.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", ...(!chatIncognitoAudit ? { MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1" } : {}), MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", ...(!chatIncognitoAudit ? { MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1" } : {}), MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
       stdout: "pipe",
       stderr: "inherit",
     });
@@ -7796,6 +8003,12 @@ async function main() {
         await captureChatStreaming(browser, sessionValue, viewport, combo.theme);
         await captureChatEngineNotReady(browser, sessionValue, viewport, combo.theme);
       }
+    }
+
+    if (chatShellReview) {
+      await captureChatShellReview(browser, sessionValue);
+      console.log("completed named review: --chat-shell-review");
+      return;
     }
 
     if (!a11yOnly && shellRailReview) {

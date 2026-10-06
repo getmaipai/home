@@ -108,8 +108,29 @@ export function ComposerDictationWaveform() {
     return () => clearInterval(timer);
   }, [dictating, meter]);
 
+  // RAIL-01 (owner's layout, 2026-10-06): an empty or one-line composer is
+  // one compact row (Add and the model chip, the text, voice and Send).
+  // Once the text wraps, the shell is marked multiline and the text takes
+  // its own full-width row above the controls, which stay anchored at the
+  // bottom. It returns to one row only when the text is cleared, so a line
+  // that fits the wider row never flips the layout back and forth.
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const element = inputRef.current;
+    const shell = element?.closest<HTMLElement>('[data-slot="aui_composer-shell"]');
+    if (!element || !shell) return;
+    if (!text) {
+      shell.removeAttribute("data-multiline");
+      return;
+    }
+    if (shell.hasAttribute("data-multiline")) return;
+    const lineHeight = parseFloat(getComputedStyle(element).lineHeight) || 24;
+    if (text.includes("\n") || element.scrollHeight > lineHeight * 1.5 + 24) shell.setAttribute("data-multiline", "");
+  }, [text, dictating]);
+
   const input = !dictating ? (
     <ComposerPrimitive.Input
+      ref={inputRef}
       // CHAT-CALM-ERRORS-01d (design section 7): the field stays usable
       // while chat is paused or starting so a thought is not lost; the kit
       // holds Send (Thread `sendHeld`, ChatThread.tsx) and Enter sends
@@ -127,7 +148,9 @@ export function ComposerDictationWaveform() {
       // its "aui-composer-input" marker class, which has no real CSS
       // rule anywhere and only the kit's own thread.aui.tsx carries an
       // eslint exemption for that non-Tailwind naming convention.
-      className="caret-primary placeholder:text-muted-foreground/60 max-h-48 min-h-12 w-full resize-none bg-transparent px-2.5 py-1 text-base leading-6 outline-none"
+      // deliberate type-floor exception: the owner's chat layout (RAIL-01,
+      // 2026-10-06) sets the composer text at 15px, ChatGPT's density.
+      className="caret-primary placeholder:text-muted-foreground/60 max-h-38 min-h-12 w-full resize-none bg-transparent px-2 py-3 text-[15px] leading-6 outline-none"
       rows={1}
       enterKeyHint="send"
       aria-label="Message input"

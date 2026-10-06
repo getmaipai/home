@@ -66,7 +66,7 @@
 // gap itself is unchanged (still latent, still worth a real fix if a
 // much busier header slot is ever built here) - not re-litigated in
 // this comment a second time, see git history for the original.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import {
@@ -82,13 +82,7 @@ import { useChatHeaderData } from "@/apps/chat/chatHeaderData";
 
 const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
-const ChevronDownIcon = getIcon("chevron-down");
-// The exact icon SidebarContent (commons sidebaritems.ts) already
-// uses for "Chat" - nextPageHeaderTitle.tsx's own header comment has
-// the full reasoning for why every /next page's header icon mirrors
-// the sidebar's own choice; chat mirrors it here directly since it
-// never mounts that shared component at all.
-const ChatIcon = getIcon("message-circle");
+const MoreIcon = getIcon("more-horizontal");
 
 function ChatHeaderRename({ title, onRename, onDone }: { title: string; onRename: (title: string) => Promise<void>; onDone: () => void }) {
   const [value, setValue] = useState(title);
@@ -140,7 +134,12 @@ function ChatHeaderRename({ title, onRename, onDone }: { title: string; onRename
   );
 }
 
-export function ChatHeaderBar({ phoneRow = false }: { phoneRow?: boolean } = {}) {
+/** RAIL-01 (owner's layout, 2026-10-06): the conversation header holds
+ * only this conversation's title and actions. The title (one click
+ * renames) sits on the left; the conversation's options menu and
+ * `trailing` (the agent/task activity toggle's slot, when there is one)
+ * sit on the right. */
+export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boolean; trailing?: ReactNode } = {}) {
   const data = useChatHeaderData();
   const [renaming, setRenaming] = useState(false);
   const [open, setOpen] = useState(false);
@@ -160,7 +159,6 @@ export function ChatHeaderBar({ phoneRow = false }: { phoneRow?: boolean } = {})
 
   return (
     <div data-chat-header-bar className={phoneRow ? "flex min-w-0 flex-1 items-center gap-1 overflow-hidden" : "hidden min-w-0 flex-1 items-center gap-1 overflow-hidden lg:flex"}>
-      <ChatIcon className="text-muted-foreground size-4 shrink-0" />
       {renaming ? (
         <ChatHeaderRename title={data.title} onRename={data.onRename} onDone={() => setRenaming(false)} />
       ) : (
@@ -172,20 +170,22 @@ export function ChatHeaderBar({ phoneRow = false }: { phoneRow?: boolean } = {})
           <Button
             type="button"
             variant="ghost"
-            className="h-12 min-w-12 flex-1 justify-start px-2 text-base font-medium"
+            className={phoneRow ? "h-12 min-w-12 flex-1 justify-start px-2 text-[15px] font-medium" : "-ms-2 h-9 min-w-0 max-w-full shrink justify-start px-2 text-[15px] font-medium relative before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-['']"}
             onClick={() => setRenaming(true)}
           >
             <span className="min-w-0 truncate">{title}</span>
           </Button>
+          {phoneRow ? null : <span className="flex-1" aria-hidden />}
+          {trailing}
           <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild>
               {/* Keep an 8px visual gap between the two independent
                   48px targets. */}
-              <Button type="button" variant="ghost" size="icon-lg" className="ms-1" aria-label="Conversation actions">
-                <ChevronDownIcon className="size-4" />
+              <Button type="button" variant="ghost" size={phoneRow ? "icon-lg" : "icon"} className="text-muted-foreground" aria-label="Conversation actions">
+                <MoreIcon className="size-[18px]" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setRenaming(true)}>
                 <PencilIcon className="size-4" />
                 Rename
