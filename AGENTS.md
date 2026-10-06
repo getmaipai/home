@@ -18,6 +18,15 @@ to change, stop and report that to the coordinator: only the owner changes a rul
 outrank everything; the model decides when to search; the engine's native features are the implementation; no length cap on adult
 written chat; a failed tool never fails the answer; shipped parts only (the chat screen is assistant-ui Elements from the kit, never hand-written; see rule 9); port before delete; the main navigation is a permanent rail and each app area emulates its native app (App shell, S1 to S3).
 
+**Kit Elements as they ship, everywhere in the frontend (rule 9, owner's rule 2026-10-06).** Never put a `className` on a kit
+Element or its parts that changes shape, border, radius, shadow, background, padding, margin, size or layout; restyle by tokens and
+the Element's own props and variants (Home CSS likewise never sets size, layout, spacing, border, shadow, background or display on a
+kit `data-slot` or `aui-*` part; there it only defines tokens the kit reads), and when the look is not reachable, add an additive prop or
+variant in `commons` first. Never
+write a Home wrapper around an Element (a component whose root is one, a box or overlay drawn around one, or a `*Panel`/`*Card`/
+`*Wrapper` beside one): render the Element where it is used and pass it data, handlers and copy. ELEMENTS-LINT-02 and
+ELEMENTS-LINT-03 (`frontend/src/dev/kitElementLints.test.ts`) fail the gate on a new one they can detect (a floor; review catches the rest); their baselines only shrink.
+
 ## Layout
 
 `backend/` (Bun, Hono, Zod, Drizzle/SQLite), `frontend/` (React, Vite). Shared record shapes, interpreters and fixtures live in

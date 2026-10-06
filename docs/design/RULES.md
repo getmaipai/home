@@ -127,6 +127,49 @@ wins.
    A real gap is named in this record first. `bun run elements:status`
    prints how many Elements are implemented; a lint keeps the list of
    hand-built chat components from growing.
+   **Kit Elements as they ship: no overrides, no wrappers (owner's rule
+   2026-10-06, his words: "create whatever rules you need to prevent
+   this in the future").** This holds for every kit Element in Home's
+   frontend, chat or not: anything imported from the kit's
+   `src/elements/**`, `src/ui/**` or the vendored
+   `src/dashboard/components/ui/**`, and each of its parts.
+   (a) No `className` (or `class`) on a kit Element or one of its parts
+   that changes its shape, border, radius, shadow, background, padding,
+   margin, size or layout (flex, grid, gap, alignment, position, inset).
+   The look changes only through the tokens in the kit's `tokens.css`
+   and the Element's own props and variants. Classes that only place
+   the Element in its parent (`flex-1`, `shrink-0`, `self-*`, `order-*`,
+   `col-span-*`) and text color or type tokens are allowed; a color token
+   used as a background or border (`bg-card`, `border-border`) is still
+   a background or border override. If the look is
+   not reachable that way, the fix is an additive prop or variant in
+   `commons`, pinned by a new tag, never an override in Home. The same
+   holds in Home's stylesheets: no CSS rule whose selector targets a kit
+   part (a kit `data-slot`, an `aui-*` class or another kit class) may
+   set shape, size, layout, spacing, border, shadow, background or
+   display properties (`width`, `height`, `border-radius`, `display`,
+   including `display: contents`, `grid-template-areas`, `gap`,
+   `padding` and the like). Home CSS aimed at a kit part only defines
+   design tokens (CSS custom properties) the kit itself reads; a compact composer, for
+   example, is a kit variant Home selects, never a block of Home CSS.
+   (b) No Home component whose job is to wrap, compose or re-skin a kit
+   Element (a wrapper): one whose root is a kit Element, one that draws
+   its own box, row or overlay around an Element, or one named like a
+   wrapper (`*Panel`, `*Card`, `*Wrapper`) in a file that imports one.
+   Home renders the Element where it is used and passes it data,
+   handlers and copy; Home provides routes, data and copy. The only
+   allowed exceptions are the entries of the shrink-only allowlist
+   `frontend/src/dev/kit-wrapper-baseline.json`, each with its reason;
+   an entry is never added, only removed.
+   (c) A prop, slot or variant an Element lacks is a kit change first,
+   landed in `commons` before the Home change that uses it.
+   ELEMENTS-LINT-02 (`kit-classname-override-baseline.json` for
+   `className`, `kit-css-override-baseline.json` for Home CSS) and
+   ELEMENTS-LINT-03 (`kit-wrapper-baseline.json`), run by the frontend
+   suite in `scripts/check.sh`, fail on each new override or wrapper they
+   can detect statically; they are a floor, and review and the architect
+   catch the rest. Both baselines only shrink, and the Elements slices
+   empty them.
 10. **The safety gate stays, and its strictness follows the person.**
     The output gate is the safety floor and is not a formatting step.
     For a child, and for every spoken turn, every sentence is checked

@@ -1,0 +1,172 @@
+{
+  "apps/chat/ChatActivityCard.tsx": {
+    "ChatActivityCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit: hand-built activity card in the hand-built chat baseline."
+  },
+  "apps/chat/ChatThread.tsx": {
+    "ChatThread": "draws its own <div> box around <Thread>. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/ChatThreadExtras.tsx": {
+    "ChatThreadExtras": "draws its own <div> box around <ConversationSearch>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set E (command-palette): hand-drawn modal overlay; the kit ships ui/dialog."
+  },
+  "apps/chat/ComposerWakeWordControl.tsx": {
+    "ComposerWakeWordControl": "returns <TooltipIconButton> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/chatAnswerImages.tsx": {
+    "AnswerImagesDataRender": "draws its own <div> box around <ImageGallery>. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/chatCitationLink.tsx": {
+    "ChatCitationLink": "returns <Citation> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/chatConnectionBanner.tsx": {
+    "ChatConnectionBanner": "returns <ConnectionState> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/chatDateDivider.tsx": {
+    "ChatDateDivider": "returns <DayDivider> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/chatHeaderBar.tsx": {
+    "ChatHeaderRename": "returns <Input> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/chatThreadSlots.tsx": {
+    "ChatQueueRow": "returns <MessageQueue> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "ComposerModelSelector": "returns <ModelSelectorRoot> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "ChatThinkingIndicator": "returns <ThinkingIndicator> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "NextReasoningGroup": "returns <ReasoningRoot> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "SourcesActionBarTrigger": "returns <Tooltip> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C D4: sources drawn by hand around Element parts; move to native source parts.",
+    "SourcesFooterContent": "draws its own <div> box around <Source>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C D4: sources drawn by hand around Element parts; move to native source parts.",
+    "MessageDetailsContextBar": "returns <ContextDisplay.Bar> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "MessageDetailsReveal": "draws its own <div> box around <MessageTiming>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C: details row wrapper in the hand-built baseline.",
+    "BareModelBadge": "returns <Badge> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C: admin badge wrapper."
+  },
+  "apps/chat/chatToolUis.tsx": {
+    "SpecSheetToolRender": "returns <SpecSheet> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "ProducedArtifactCard": "draws its own <div> box around <ArtifactCard>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D (artifact-card): hand-built More menu beside the Element; needs a kit actions slot.",
+    "ProjectToolRender": "returns <JobProgress> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "ToolTimelineToolRender": "returns <ToolTimeline> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/composerAddMenu.tsx": {
+    "ComposerAddMenuItem": "returns <ComposerMenuItem> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/composerVoiceControls.tsx": {
+    "WaveformButton": "returns <TooltipIconButton> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/chat/liveVoiceSession.tsx": {
+    "LiveVoiceSession": "draws its own <div> box around <TooltipIconButton>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set B (voice-conversation): gear overlay drawn around the Element."
+  },
+  "apps/people/FaceEnrollmentCard.tsx": {
+    "FaceEnrollmentCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/people/FaceEnrollmentPage.tsx": {
+    "StatusCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/people/PersonProfilePage.tsx": {
+    "ProfileHeaderCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "EditProfileDialog": "returns <Dialog> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/people/ProfileForm.tsx": {
+    "ProfileForm": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "apps/settings/ModelsSection.tsx": {
+    "ChatModelCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set B (model-picker): hand-built role cards (HOME-FIT-02).",
+    "FitVerdictBadge": "returns <Badge> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "CheckModelCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set B (model-picker): hand-built role cards (HOME-FIT-02).",
+    "DetailsFitPanel": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D: fit verdict panel; recommendation-card ships (HOME-FIT-03).",
+    "FitPanel": "draws its own <div> box around <SpecSheet>. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D: SpecSheet plus hand-built text where recommendation-card ships (HOME-FIT-03).",
+    "CompareCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D: hand-built compare view where comparison-card ships (HOME-FIT-04).",
+    "ComputerMemoryCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "PlannedRoleCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set B (model-picker): hand-built role cards (HOME-FIT-02)."
+  },
+  "apps/settings/RobotCard.tsx": {
+    "RobotCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "dev/ElementsAdoptionPanel.tsx": {
+    "ElementsAdoptionPanel": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/components/NextDataTable.tsx": {
+    "NextDataTable": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D: hand-built data table; use the dashboard template's data table as shipped."
+  },
+  "next/pages/ChatColumn.tsx": {
+    "ChatColumnToggle": "returns <Tooltip> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "ChatHistoryPanel": "returns <ThreadListRoot> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/ChatShortcutReference.tsx": {
+    "ChatShortcutReference": "returns <Dialog> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/NextChatPage.tsx": {
+    "ArtifactCanvasPanel": "returns <CanvasSplit> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D (canvas-split): fold into the page with a kit CanvasSplit pane variant.",
+    "BareCompareCanvasPanel": "returns <CanvasSplit> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set D (canvas-split): fold into the page with a kit CanvasSplit pane variant."
+  },
+  "next/pages/NextFamilyPage.tsx": {
+    "FamilyCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "PersonCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "NextFamilyPage": "returns <Tabs> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/NextPersonProfilePage.tsx": {
+    "ProfileHeaderCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "EditProfileDialog": "returns <Dialog> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/NextPrivacyPage.tsx": {
+    "ConnectionGroup": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/TurnErrorDetails.tsx": {
+    "TurnErrorDetails": "returns <Popover> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C D8: hand-built admin detail popover; tool-error ships."
+  },
+  "next/pages/dashboard/RecentActivityTable.tsx": {
+    "RecentActivityTable": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/dashboard/StatCard.tsx": {
+    "StatCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/performance/DiskHardwareCard.tsx": {
+    "DiskHardwareCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/performance/EnginesHealthCard.tsx": {
+    "EnginesHealthCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/performance/LabelsCard.tsx": {
+    "LabelsCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/performance/LayersCard.tsx": {
+    "LayersCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/performance/QueuesCard.tsx": {
+    "QueuesCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/performance/RoutesCard.tsx": {
+    "RoutesCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/performance/TurnsByEngineTable.tsx": {
+    "TurnsByEngineTable": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/performance/TurnsChart.tsx": {
+    "TurnsChart": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/settings/NextHouseholdSettings.tsx": {
+    "LinkCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/settings/NextMeSettings.tsx": {
+    "DeviceAppearanceControl": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "TelegramAdvanced": "returns <Collapsible> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "LinkCard": "named like a wrapper in a file that imports a kit Element. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/settings/PersonMultiSelect.tsx": {
+    "PersonMultiSelect": "returns <Combobox> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/status/StatusApps.tsx": {
+    "AppRow": "returns <Collapsible> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/status/StatusBoard.tsx": {
+    "NoteAlert": "returns <Alert> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "StatusMaintenanceCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/status/StatusComponents.tsx": {
+    "StatusComponents": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "OverallBanner": "returns <Alert> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "next/pages/status/StatusIncident.tsx": {
+    "StatusIncident": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
+    "RecentProblems": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  },
+  "shell/ThemeToggle.tsx": {
+    "ThemeToggle": "returns <Button> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+  }
+}

@@ -1,0 +1,372 @@
+{
+  "next/pages/nextChatTouchTargets.css": {
+    "[data-slot=\"next-chat-pane\"] .aui-composer-dictate": [
+      "position"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-send": [
+      "position"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-dictate::before": [
+      "inset",
+      "position"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-send::before": [
+      "inset",
+      "position"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-assistant-action-bar-root button": [
+      "position"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-user-action-bar-root button": [
+      "position"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-branch-picker-root button": [
+      "position"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-assistant-action-bar-root button::before": [
+      "left",
+      "min-height",
+      "min-width",
+      "position",
+      "top"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-user-action-bar-root button::before": [
+      "left",
+      "min-height",
+      "min-width",
+      "position",
+      "top"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-branch-picker-root button::before": [
+      "left",
+      "min-height",
+      "min-width",
+      "position",
+      "top"
+    ]
+  },
+  "shell/tokens.css": {
+    "html.incognito body[class*=\"style-\"] [data-slot=\"sidebar-inner\"]": [
+      "background-color"
+    ],
+    "[data-slot=\"sidebar-inner\"] a[data-slot=\"sidebar-menu-button\"][data-active]": [
+      "background-color"
+    ],
+    "html.incognito body[class*=\"style-\"] [data-slot=\"sidebar-inner\"] a[data-slot=\"sidebar-menu-button\"][data-active]": [
+      "background-color"
+    ],
+    "html.incognito body[class*=\"style-\"] [data-slot=\"sidebar-inset\"]": [
+      "background"
+    ],
+    "html.incognito body[class*=\"style-\"] .aui-root.aui-thread-root": [
+      "background"
+    ],
+    "html.incognito body[class*=\"style-\"] .aui-thread-viewport-footer": [
+      "background"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-thread-viewport-footer": [
+      "background-color",
+      "padding-bottom"
+    ],
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"]": [
+      "align-items",
+      "background",
+      "border-color",
+      "border-radius",
+      "column-gap",
+      "display",
+      "grid-template-areas",
+      "grid-template-columns",
+      "min-height",
+      "padding",
+      "row-gap"
+    ],
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"]:focus-within": [
+      "border-color"
+    ],
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"][data-multiline]": [
+      "grid-template-areas"
+    ],
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"]:has([data-slot=\"model-selector-trigger\"])": [
+      "grid-template-areas"
+    ],
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"] > :not(.aui-composer-attachments):not(.aui-composer-action-wrapper)": [
+      "grid-area",
+      "min-width"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper": [
+      "display"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper > :first-child": [
+      "align-items",
+      "gap",
+      "grid-area",
+      "height"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper > :last-child": [
+      "align-items",
+      "gap",
+      "grid-area",
+      "height",
+      "min-width"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper button:where(:not([data-slot=\"composer-menu-item\"]):not([data-slot=\"model-selector-trigger\"]))": [
+      "border-radius",
+      "flex",
+      "height",
+      "position",
+      "width"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper button[aria-label=\"Send message\"]": [
+      "height",
+      "margin-inline-start",
+      "width"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper button[aria-label=\"Stop generating\"]": [
+      "height",
+      "margin-inline-start",
+      "width"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper svg": [
+      "height",
+      "width"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper [data-slot=\"model-selector-trigger\"]": [
+      "border-radius",
+      "gap",
+      "height",
+      "padding"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-action-wrapper [data-slot=\"model-selector-trigger\"] svg": [
+      "height",
+      "width"
+    ],
+    "[data-slot=\"next-chat-pane\"] [data-slot=\"aui_composer-shell\"] textarea:placeholder-shown": [
+      "max-height"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-composer-attachments": [
+      "grid-area",
+      "padding"
+    ],
+    "[data-slot=\"rail-workspace\"]:has([data-slot=\"next-chat-shell\"])": [
+      "background",
+      "height"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-root.aui-thread-root": [
+      "background-color"
+    ],
+    "[data-slot=\"rail-page-header\"]": [
+      "background"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-new\"]": [
+      "background",
+      "border",
+      "border-radius",
+      "box-shadow",
+      "display",
+      "gap",
+      "height",
+      "justify-content",
+      "min-height",
+      "padding",
+      "position",
+      "width"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-new\"]:hover": [
+      "background-color"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-new\"]::before": [
+      "inset",
+      "position"
+    ],
+    "[data-slot=\"chat-column-header\"] [data-slot=\"thread-search\"] > div": [
+      "background-color",
+      "border",
+      "border-radius",
+      "box-shadow",
+      "height",
+      "padding-inline"
+    ],
+    "[data-slot=\"chat-column-header\"] [data-slot=\"thread-search\"] svg": [
+      "height",
+      "width"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-items\"]": [
+      "gap"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-group-label\"]": [
+      "padding"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-items\"] > [data-slot=\"aui_thread-list-group-label\"]:first-child": [
+      "padding-top"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"]": [
+      "border-radius",
+      "height",
+      "min-height"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item-trigger\"]": [
+      "height",
+      "min-height",
+      "padding-inline"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"]:hover": [
+      "background-color"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"][data-active=\"true\"]": [
+      "background-color"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item\"]:not(:hover):not(:has(:focus-visible)):not(:has([data-state=\"open\"])) [data-slot=\"aui_thread-list-item-trigger\"]": [
+      "padding-inline-end"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-item-more\"]": [
+      "border-radius"
+    ],
+    "[data-slot=\"chat-column-panel\"] [data-slot=\"aui_thread-list-skeleton-wrapper\"]": [
+      "height",
+      "padding-inline"
+    ],
+    "[data-slot=\"next-chat-pane\"] .aui-user-message-content": [
+      "background",
+      "border-radius",
+      "max-width",
+      "padding"
+    ],
+    "html.incognito [data-slot=\"input\"]": [
+      "border-color"
+    ],
+    ".sidebar-box [data-slot=\"sidebar-header\"]": [
+      "border-bottom-width"
+    ],
+    "[data-mobile=\"true\"][data-sidebar=\"sidebar\"] [data-slot=\"sidebar-header\"]": [
+      "border-bottom-width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"expanded\"] .sidebar-box [data-slot=\"sidebar-footer\"]": [
+      "padding-inline"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-group\"]": [
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-group-content\"]": [
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu\"]": [
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-content\"] [data-slot=\"sidebar-group\"]": [
+      "margin-inline",
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-group\"]": [
+      "margin-inline",
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] > .hide-menu": [
+      "align-self",
+      "flex",
+      "min-width",
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-button\"]": [
+      "height",
+      "justify-content",
+      "margin-inline",
+      "min-height",
+      "min-width",
+      "padding",
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-item\"]": [
+      "display",
+      "justify-content"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-item\"] > [data-slot=\"sidebar-menu-button\"]": [
+      "margin-inline"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-menu-button\"] > span": [
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-menu-button\"] > div.relative.flex.items-center": [
+      "justify-content"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-menu-button\"] .hide-menu": [
+      "display",
+      "height",
+      "position",
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-header\"]": [
+      "min-height",
+      "position"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-header\"] > button[aria-label=\"Toggle app menu\"]": [
+      "height",
+      "left",
+      "min-height",
+      "min-width",
+      "padding",
+      "position",
+      "top",
+      "width"
+    ],
+    "[data-slot=\"sidebar\"][data-state=\"collapsed\"] .sidebar-box [data-slot=\"sidebar-header\"] > a:has(img[alt=\"logo\"])": [
+      "display"
+    ],
+    "header [data-slot=\"sidebar-trigger\"]": [
+      "height",
+      "min-height",
+      "min-width",
+      "padding",
+      "width"
+    ],
+    "[data-mobile=\"true\"][data-slot=\"sidebar\"] [data-slot=\"sidebar-header\"] > button[aria-label=\"Toggle app menu\"]": [
+      "display"
+    ],
+    ".sidebar-box [data-slot=\"sidebar-footer\"] [data-slot=\"sidebar-menu-button\"] > div.relative.flex.items-center.gap-3": [
+      "gap"
+    ],
+    ".dark [data-slot=\"badge\"][data-variant=\"destructive\"]": [
+      "background-color"
+    ],
+    ".dark [data-slot=\"button\"][data-variant=\"destructive\"]": [
+      "background-color"
+    ],
+    ":root:not(.light) [data-slot=\"badge\"][data-variant=\"destructive\"]": [
+      "background-color"
+    ],
+    ":root:not(.light) [data-slot=\"button\"][data-variant=\"destructive\"]": [
+      "background-color"
+    ],
+    "[data-slot=\"rail-workspace\"]:has([data-slot=\"next-chat-showcase-shell\"])": [
+      "height"
+    ],
+    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-shell\"])": [
+      "display",
+      "flex-direction",
+      "min-height"
+    ],
+    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-showcase-shell\"])": [
+      "display",
+      "flex-direction",
+      "min-height"
+    ],
+    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-shell\"]) > .container": [
+      "display",
+      "flex",
+      "flex-direction",
+      "margin",
+      "max-width",
+      "min-height",
+      "padding"
+    ],
+    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-showcase-shell\"]) > .container": [
+      "display",
+      "flex",
+      "flex-direction",
+      "margin",
+      "max-width",
+      "min-height",
+      "padding"
+    ]
+  }
+}

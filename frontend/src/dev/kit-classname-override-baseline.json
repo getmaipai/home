@@ -1,0 +1,1144 @@
+{
+  "apps/chat/ChatActivityCard.tsx": {
+    "Alert": [
+      "bg-[var(--tint-attention)]",
+      "border-[var(--tint-attention-hairline)]",
+      "my-2"
+    ],
+    "AlertTitle": [
+      "flex",
+      "gap-3",
+      "items-baseline",
+      "justify-between"
+    ],
+    "Progress": [
+      "mt-2",
+      "w-auto"
+    ]
+  },
+  "apps/chat/ComposerWakeWordControl.tsx": {
+    "TooltipIconButton": [
+      "before:-inset-3",
+      "before:absolute",
+      "before:content-['']",
+      "relative",
+      "rounded-full",
+      "size-7"
+    ]
+  },
+  "apps/chat/chatDateDivider.tsx": {
+    "DayDivider": [
+      "max-w-xs",
+      "mx-auto",
+      "w-full"
+    ]
+  },
+  "apps/chat/chatErrorSlot.tsx": {
+    "ErrorState": [
+      "max-w-none",
+      "px-0",
+      "py-1"
+    ]
+  },
+  "apps/chat/chatHeaderBar.tsx": {
+    "Input": [
+      "h-8",
+      "min-w-0"
+    ],
+    "Button": [
+      "-ms-2",
+      "before:-inset-y-1.5",
+      "before:absolute",
+      "before:content-['']",
+      "before:inset-x-0",
+      "h-12",
+      "h-9",
+      "justify-start",
+      "max-w-full",
+      "min-w-0",
+      "min-w-12",
+      "px-2",
+      "relative"
+    ]
+  },
+  "apps/chat/chatThreadSlots.tsx": {
+    "ElementsButton": [
+      "rounded-full",
+      "size-7"
+    ],
+    "ModelSelectorTrigger": [
+      "max-w-40",
+      "min-w-0"
+    ],
+    "ReasoningText": [
+      "pe-2"
+    ],
+    "SourceIcon": [
+      "-ml-1.5"
+    ],
+    "Badge": [
+      "mb-1"
+    ]
+  },
+  "apps/chat/chatToolUis.tsx": {
+    "ArtifactCard": [
+      "min-w-0"
+    ],
+    "Kbd": [
+      "bg-primary-foreground/20",
+      "ms-1"
+    ]
+  },
+  "apps/chat/composerAddMenu.tsx": {
+    "ComposerMenuItem": [
+      "min-h-13"
+    ],
+    "ComposerAttachButton": [
+      "before:-inset-2",
+      "before:absolute",
+      "before:content-['']",
+      "relative"
+    ]
+  },
+  "apps/chat/composerVoiceControls.tsx": {
+    "TooltipIconButton": [
+      "before:-inset-3",
+      "before:absolute",
+      "before:content-['']",
+      "relative",
+      "rounded-full",
+      "size-7"
+    ]
+  },
+  "apps/chat/liveVoiceSession.tsx": {
+    "TooltipIconButton": [
+      "absolute",
+      "before:-inset-3",
+      "before:absolute",
+      "before:content-['']",
+      "right-4",
+      "sm:-right-2",
+      "sm:-top-2",
+      "top-4"
+    ]
+  },
+  "apps/memory/PeopleAndThings.tsx": {
+    "Button": [
+      "h-auto",
+      "p-0",
+      "w-fit"
+    ]
+  },
+  "apps/notifications/NotificationsPage.tsx": {
+    "Checkbox": [
+      "mt-1"
+    ]
+  },
+  "apps/people/FaceEnrollmentCard.tsx": {
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-4"
+    ],
+    "Button": [
+      "min-h-12"
+    ]
+  },
+  "apps/people/FaceEnrollmentPage.tsx": {
+    "Card": [
+      "max-w-md",
+      "mx-auto",
+      "w-full"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-3",
+      "items-center",
+      "p-6"
+    ]
+  },
+  "apps/people/PersonProfilePage.tsx": {
+    "TabsContent": [
+      "flex",
+      "flex-col",
+      "gap-4",
+      "py-2"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-wrap",
+      "gap-4",
+      "items-center",
+      "p-6"
+    ],
+    "Button": [
+      "gap-1.5"
+    ]
+  },
+  "apps/search/SearchPage.tsx": {
+    "Button": [
+      "gap-2",
+      "justify-start",
+      "w-full"
+    ]
+  },
+  "apps/settings/AddRobotSection.tsx": {
+    "Button": [
+      "w-fit"
+    ]
+  },
+  "apps/settings/BackupsSection.tsx": {
+    "Button": [
+      "w-fit"
+    ]
+  },
+  "apps/settings/ChangeSecretSection.tsx": {
+    "Button": [
+      "w-fit"
+    ]
+  },
+  "apps/settings/ClonedVoicesSection.tsx": {
+    "Button": [
+      "w-fit"
+    ]
+  },
+  "apps/settings/CommandsSection.tsx": {
+    "Button": [
+      "w-fit"
+    ]
+  },
+  "apps/settings/HuggingFaceTokenSection.tsx": {
+    "Button": [
+      "w-fit"
+    ]
+  },
+  "apps/settings/ModelsSection.tsx": {
+    "Badge": [
+      "bg-[var(--hue-orange)]",
+      "bg-[var(--hue-teal)]"
+    ],
+    "Card": [
+      "gap-3",
+      "p-4"
+    ],
+    "Button": [
+      "gap-1",
+      "justify-start",
+      "w-fit"
+    ]
+  },
+  "apps/settings/RobotCard.tsx": {
+    "CardFooter": [
+      "gap-2",
+      "justify-end"
+    ]
+  },
+  "apps/settings/RobotPasswordSection.tsx": {
+    "Button": [
+      "w-fit"
+    ]
+  },
+  "apps/settings/SettingsPage.tsx": {
+    "Button": [
+      "bg-background",
+      "bg-primary/10",
+      "gap-2.5",
+      "h-auto",
+      "justify-start",
+      "min-h-10",
+      "px-2",
+      "px-3",
+      "py-1.5",
+      "py-2",
+      "rounded-md",
+      "rounded-xl",
+      "shadow-sm"
+    ],
+    "Input": [
+      "bg-card",
+      "h-12",
+      "rounded-xl"
+    ]
+  },
+  "apps/settings/UsersSection.tsx": {
+    "Input": [
+      "max-w-48",
+      "w-20"
+    ]
+  },
+  "apps/settings/VoiceCatalogSection.tsx": {
+    "Button": [
+      "h-auto",
+      "min-h-12",
+      "w-full"
+    ],
+    "Input": [
+      "w-full"
+    ]
+  },
+  "apps/setup/SetupWizard.tsx": {
+    "Checkbox": [
+      "mt-0.5"
+    ]
+  },
+  "dev/ElementsAdoptionPanel.tsx": {
+    "CollapsibleContent": [
+      "flex",
+      "flex-col",
+      "gap-1",
+      "max-h-64"
+    ],
+    "Button": [
+      "justify-between",
+      "w-full"
+    ]
+  },
+  "next/components/NextDataTable.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardContent": [
+      "pt-0",
+      "px-0!"
+    ],
+    "Input": [
+      "min-h-12",
+      "min-w-0",
+      "sm:max-w-96"
+    ],
+    "Button": [
+      "h-auto",
+      "min-h-12",
+      "min-w-12",
+      "px-2",
+      "size-12"
+    ],
+    "TableRow": [
+      "border-border",
+      "hover:bg-muted/30",
+      "hover:bg-transparent"
+    ],
+    "TableCell": [
+      "p-1",
+      "py-6",
+      "w-10"
+    ],
+    "DropdownMenuItem": [
+      "min-h-13",
+      "min-w-12!"
+    ],
+    "SelectTrigger": [
+      "min-h-12",
+      "w-20"
+    ]
+  },
+  "next/pages/ChatColumn.tsx": {
+    "ThreadListRoot": [
+      "flex",
+      "flex-col",
+      "gap-0",
+      "h-full",
+      "min-h-0"
+    ],
+    "ThreadSearch": [
+      "min-w-0"
+    ]
+  },
+  "next/pages/NextBackupsPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "p-6"
+    ],
+    "Button": [
+      "min-h-13",
+      "mt-3",
+      "w-fit"
+    ]
+  },
+  "next/pages/NextChatPage.tsx": {
+    "CanvasSplit": [
+      "border-0",
+      "border-l",
+      "md:h-full",
+      "rounded-none"
+    ],
+    "Alert": [
+      "max-w-200",
+      "mb-1",
+      "mt-3",
+      "mx-auto",
+      "w-full"
+    ],
+    "SheetContent": [
+      "[&_[data-slot='sheet-close']]:right-3",
+      "[&_[data-slot='sheet-close']]:top-3.5",
+      "gap-0",
+      "max-h-[85vh]",
+      "max-w-[calc(100vw-2rem)]",
+      "p-0",
+      "w-80"
+    ]
+  },
+  "next/pages/NextCommandsPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ]
+  },
+  "next/pages/NextDevicesPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ]
+  },
+  "next/pages/NextEnginesPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "flex",
+      "gap-3",
+      "items-center",
+      "p-6"
+    ]
+  },
+  "next/pages/NextFamilyPage.tsx": {
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-3",
+      "items-center",
+      "p-6"
+    ],
+    "TabsList": [
+      "h-auto",
+      "min-h-14",
+      "p-1"
+    ],
+    "TabsTrigger": [
+      "min-h-12",
+      "min-w-12"
+    ],
+    "CardHeader": [
+      "p-0"
+    ]
+  },
+  "next/pages/NextFilesPage.tsx": {
+    "CardHeader": [
+      "border-b",
+      "border-border",
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-3",
+      "gap-4",
+      "grid",
+      "p-4",
+      "sm:grid-cols-3"
+    ],
+    "Button": [
+      "min-h-12"
+    ]
+  },
+  "next/pages/NextModelsPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "p-6"
+    ]
+  },
+  "next/pages/NextPersonProfilePage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "TabsList": [
+      "h-auto",
+      "min-h-14",
+      "p-1"
+    ],
+    "TabsTrigger": [
+      "min-h-12"
+    ],
+    "TabsContent": [
+      "flex",
+      "flex-col",
+      "gap-4",
+      "py-2"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-wrap",
+      "gap-4",
+      "items-center",
+      "p-6"
+    ],
+    "Button": [
+      "gap-1.5",
+      "min-h-12"
+    ]
+  },
+  "next/pages/NextPrivacyPage.tsx": {
+    "CardHeader": [
+      "border-b",
+      "border-border",
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "Card": [
+      "h-24",
+      "h-48"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-3",
+      "items-start",
+      "p-5"
+    ]
+  },
+  "next/pages/NextRepairsPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "p-6"
+    ]
+  },
+  "next/pages/NextSettingsPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "TabsList": [
+      "h-auto",
+      "min-h-12",
+      "w-auto"
+    ],
+    "TabsTrigger": [
+      "min-h-12",
+      "min-w-fit",
+      "px-4"
+    ],
+    "TabsContent": [
+      "flex",
+      "flex-col",
+      "gap-4"
+    ]
+  },
+  "next/pages/NextSignInPage.tsx": {
+    "Card": [
+      "border-none",
+      "max-w-md",
+      "p-6",
+      "shadow-lg",
+      "w-full"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-4",
+      "p-0",
+      "pt-4"
+    ],
+    "Button": [
+      "rounded-lg",
+      "w-full"
+    ]
+  },
+  "next/pages/NextStoragePage.tsx": {
+    "CardHeader": [
+      "border-b",
+      "border-border",
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "p-5"
+    ]
+  },
+  "next/pages/NextUiShowcasePage.tsx": {
+    "Alert": [
+      "mb-2",
+      "mt-2",
+      "mx-4"
+    ]
+  },
+  "next/pages/NextUpdatesPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "p-6"
+    ]
+  },
+  "next/pages/NextUsersPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "p-6"
+    ]
+  },
+  "next/pages/NextVoicesPage.tsx": {
+    "CardHeader": [
+      "p-0"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ]
+  },
+  "next/pages/dashboard/RecentActivityTable.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardHeader": [
+      "border-b",
+      "border-border"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "px-0!"
+    ],
+    "TableRow": [
+      "border-border",
+      "hover:bg-muted/30",
+      "hover:bg-transparent"
+    ],
+    "TableHead": [
+      "h-auto",
+      "pl-4!",
+      "pr-4!",
+      "px-4",
+      "py-3",
+      "w-32.5",
+      "w-40"
+    ],
+    "TableCell": [
+      "pl-4!",
+      "pr-4!",
+      "px-4",
+      "py-3",
+      "py-6",
+      "w-32.5",
+      "w-40"
+    ]
+  },
+  "next/pages/dashboard/StatCard.tsx": {
+    "CardContent": [
+      "flex",
+      "flex-row",
+      "justify-between",
+      "px-6"
+    ],
+    "Card": [
+      "hover:bg-accent",
+      "py-6"
+    ]
+  },
+  "next/pages/performance/DiskHardwareCard.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardHeader": [
+      "border-b",
+      "border-border"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-4",
+      "p-5"
+    ]
+  },
+  "next/pages/performance/EnginesHealthCard.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardHeader": [
+      "border-b",
+      "border-border"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "p-6",
+      "px-0!"
+    ]
+  },
+  "next/pages/performance/LabelsCard.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardHeader": [
+      "border-b",
+      "border-border"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-4",
+      "px-0!"
+    ]
+  },
+  "next/pages/performance/LayersCard.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardHeader": [
+      "border-b",
+      "border-border"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "p-6",
+      "px-0!"
+    ]
+  },
+  "next/pages/performance/QueuesCard.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardHeader": [
+      "border-b",
+      "border-border"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-4",
+      "p-5"
+    ]
+  },
+  "next/pages/performance/RoutesCard.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardHeader": [
+      "border-b",
+      "border-border"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "px-0!"
+    ]
+  },
+  "next/pages/performance/TurnsByEngineTable.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardHeader": [
+      "border-b",
+      "border-border"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "px-0!"
+    ]
+  },
+  "next/pages/performance/TurnsChart.tsx": {
+    "Card": [
+      "flex",
+      "flex-col",
+      "gap-0!"
+    ],
+    "CardHeader": [
+      "border-b",
+      "border-border"
+    ],
+    "CardTitle": [
+      "flex",
+      "gap-2",
+      "items-center"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-6",
+      "p-5"
+    ],
+    "ChartContainer": [
+      "h-53.75!",
+      "w-full"
+    ]
+  },
+  "next/pages/settings/NextHouseholdSettings.tsx": {
+    "CardHeader": [
+      "pb-2"
+    ],
+    "CollapsibleTrigger": [
+      "flex",
+      "items-center",
+      "justify-between",
+      "min-h-12",
+      "w-full"
+    ],
+    "CollapsibleContent": [
+      "pb-5",
+      "px-6"
+    ],
+    "Card": [
+      "h-full",
+      "hover:bg-accent",
+      "py-4"
+    ]
+  },
+  "next/pages/settings/NextMeSettings.tsx": {
+    "CardHeader": [
+      "pb-2"
+    ],
+    "CollapsibleTrigger": [
+      "flex",
+      "items-center",
+      "justify-between",
+      "min-h-12",
+      "w-full"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-wrap",
+      "gap-3",
+      "items-center",
+      "pt-0"
+    ],
+    "SelectTrigger": [
+      "min-h-12",
+      "w-48"
+    ],
+    "Button": [
+      "min-h-12"
+    ],
+    "Card": [
+      "h-full",
+      "hover:bg-accent",
+      "py-4"
+    ]
+  },
+  "next/pages/settings/NextSettingField.tsx": {
+    "Input": [
+      "min-h-12",
+      "w-32",
+      "w-40",
+      "w-64"
+    ],
+    "Button": [
+      "h-auto",
+      "min-h-12",
+      "min-w-12",
+      "p-0",
+      "w-fit"
+    ],
+    "Switch": [
+      "after:-inset-y-4"
+    ],
+    "SelectTrigger": [
+      "min-h-12",
+      "w-40"
+    ]
+  },
+  "next/pages/settings/NextSettingsRenderer.tsx": {
+    "CardContent": [
+      "divide-border",
+      "divide-y",
+      "flex",
+      "flex-col"
+    ],
+    "Button": [
+      "h-auto",
+      "min-h-12",
+      "p-0",
+      "pt-3",
+      "w-fit"
+    ]
+  },
+  "next/pages/settings/PersonMultiSelect.tsx": {
+    "ComboboxChips": [
+      "w-64"
+    ]
+  },
+  "next/pages/settings/SettingsSectionFrame.tsx": {
+    "NativeSelect": [
+      "[&>select]:min-h-12",
+      "w-full"
+    ],
+    "Tabs": [
+      "w-full"
+    ],
+    "TabsList": [
+      "bg-transparent",
+      "gap-1",
+      "h-auto",
+      "items-stretch",
+      "md:flex",
+      "md:w-56",
+      "p-0",
+      "w-full"
+    ],
+    "TabsTrigger": [
+      "justify-start",
+      "min-h-12",
+      "px-3"
+    ],
+    "TabsContent": [
+      "flex",
+      "flex-col",
+      "gap-5",
+      "mt-0"
+    ]
+  },
+  "next/pages/status/StatusApps.tsx": {
+    "CollapsibleTrigger": [
+      "flex",
+      "gap-3",
+      "items-center",
+      "justify-between",
+      "min-h-12",
+      "rounded-md",
+      "w-full"
+    ],
+    "CardContent": [
+      "divide-border",
+      "divide-y",
+      "flex",
+      "flex-col"
+    ]
+  },
+  "next/pages/status/StatusBanner.tsx": {
+    "Badge": [
+      "bg-destructive/10",
+      "bg-primary/10",
+      "border-destructive/30",
+      "border-primary/30"
+    ]
+  },
+  "next/pages/status/StatusBoard.tsx": {
+    "Alert": [
+      "bg-primary/10",
+      "border-primary/40"
+    ],
+    "CardHeader": [
+      "flex",
+      "flex-row",
+      "flex-wrap",
+      "gap-3",
+      "items-center",
+      "justify-between"
+    ],
+    "CardContent": [
+      "divide-border",
+      "divide-y",
+      "flex",
+      "flex-col"
+    ],
+    "DialogContent": [
+      "max-h-screen",
+      "sm:max-w-lg"
+    ],
+    "SelectTrigger": [
+      "min-h-12",
+      "w-full"
+    ],
+    "PopoverContent": [
+      "p-0",
+      "w-auto"
+    ]
+  },
+  "next/pages/status/StatusComponents.tsx": {
+    "CardContent": [
+      "divide-border",
+      "divide-y",
+      "flex",
+      "flex-col"
+    ],
+    "Alert": [
+      "flex",
+      "flex-wrap",
+      "gap-3",
+      "items-center"
+    ]
+  },
+  "next/pages/status/StatusIncident.tsx": {
+    "CardHeader": [
+      "flex",
+      "flex-row",
+      "gap-3",
+      "items-start",
+      "pb-2"
+    ],
+    "CardContent": [
+      "divide-border",
+      "divide-y",
+      "flex",
+      "flex-col",
+      "pl-11"
+    ]
+  },
+  "shell/NotificationBell.tsx": {
+    "Button": [
+      "px-3",
+      "relative"
+    ]
+  },
+  "shell/PhoneHeaderExtras.tsx": {
+    "Button": [
+      "gap-2",
+      "h-auto",
+      "justify-start",
+      "min-h-12",
+      "px-2"
+    ]
+  },
+  "shell/ProfileSwitcher.tsx": {
+    "Button": [
+      "gap-2",
+      "h-auto",
+      "justify-start",
+      "min-h-12",
+      "px-2"
+    ],
+    "Separator": [
+      "my-1"
+    ]
+  },
+  "shell/StatusIndicator.tsx": {
+    "Status": [
+      "gap-1.5",
+      "px-2",
+      "py-1"
+    ]
+  },
+  "shell/sessionLockContext.tsx": {
+    "Card": [
+      "border-none",
+      "max-w-md",
+      "p-6",
+      "shadow-lg",
+      "w-full"
+    ],
+    "CardContent": [
+      "flex",
+      "flex-col",
+      "gap-4",
+      "items-center",
+      "p-0"
+    ],
+    "Button": [
+      "rounded-lg",
+      "w-full"
+    ]
+  }
+}
