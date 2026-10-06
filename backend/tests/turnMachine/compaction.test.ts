@@ -28,6 +28,7 @@ import type { TurnValue } from "@/wire";
 import type { TurnState } from "@/lib/turnMachine/contract";
 import { withTurnDefaults } from "./turnStateDefaults";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
+import { acquireTurnLease } from "@/lib/turnActivity";
 
 const SAFE: TurnValue["safety"] = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() };
 
@@ -185,6 +186,50 @@ describe("the compaction ladder's checkpoint (THIN-3C, THIN-3F)", () => {
     if (!record.ok) throw new Error(record.error);
     const window = await buildConversationWindow(record.value, { historyBudgetTokens: 1_000_000 });
     expect(window.turnIds).toHaveLength(20);
+  });
+
+  test("a turn whose history outgrew its window before the idle fold ran folds first: no turn is in neither the window nor the summary", async () => {
+    // Rule 4: "no exchange leaves the window before its fold is stored".
+    // Turns land faster than the idle fold (or it was skipped), so the
+    // history is over budget when the next turn's context is built.
+    const conv = resolveOrCreateConversation(people.owner, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const ids: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      ids.push(`turn-lag-${i}`);
+      logTurn(people.owner, "chat", `message ${i} ${"about the garden ".repeat(20)}`, { reply: { text: `reply ${i} ${"water early ".repeat(20)}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-lag-${i}` });
+    }
+    engineWithContext(5200);
+    const state = withTurnDefaults({ actor: people.owner, surface: "chat", conversationId: conv.value.id, budget: { ...(await import("@/lib/turnMachine/budget")).resolveTurnBudget(undefined, "adult"), context_tokens: 5200, context_window_tokens: 5200 } } as TurnState);
+    const { output } = await contextNode(state, { utterance: "what should I plant next?" }, new AbortController().signal);
+    const inWindow = output.items.filter((item) => item.source === "window" && item.id.startsWith("window-user-")).length;
+    const anchor = anchorOf(conv.value.id);
+    const covered = anchor ? ids.indexOf(anchor) + 1 : 0;
+    expect(inWindow).toBeLessThan(12);
+    expect(covered + inWindow).toBe(12);
+    // The fold that covers them is in this prompt as its summary.
+    expect(output.items.some((item) => item.id === "window-system-summary")).toBe(true);
+    // And the whole prompt still fits the engine: the turn runs.
+    expect(summaryPrompts.length).toBeGreaterThan(0);
+  }, 20_000);
+
+  test("the idle fold never runs beside a live turn on the shared engine; it runs once the turn ends", async () => {
+    engineWithContext(32768);
+    const conv = resolveOrCreateConversation(people.owner, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    for (let i = 0; i < 20; i++) logTurn(people.owner, "chat", `message ${i} about the garden`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-idle-${i}` });
+    await buildConversationWindow(conv.value, { historyBudgetTokens: 200 });
+    const lease = acquireTurnLease();
+    try {
+      await maybeRefreshConversationSummary(conv.value.id);
+      expect(summaryPrompts).toHaveLength(0);
+      expect(anchorOf(conv.value.id)).toBeNull();
+    } finally {
+      lease.release();
+    }
+    await maybeRefreshConversationSummary(conv.value.id);
+    expect(summaryPrompts.length).toBeGreaterThan(0);
+    expect(anchorOf(conv.value.id)).not.toBeNull();
   });
 
   test("the context node sizes the window from the engine's per-slot context less the reply ceiling and the counted rest of the prompt", async () => {

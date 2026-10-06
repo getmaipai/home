@@ -17,9 +17,12 @@ export function scheduleSummaryRefresh(conversationId: string): void {
   if (existing) clearTimeout(existing);
   const timer = setTimeout(() => {
     pendingSummaryRefreshes.delete(conversationId);
-    maybeRefreshConversationSummary(conversationId).catch((err: unknown) =>
-      console.error(`[turn] conversation summary refresh failed: ${(err as Error).message}`),
-    );
+    // A fold that stopped for a live turn (the idle gate) is asked again
+    // after the next idle window, since that turn may be another
+    // conversation's and would not schedule this one.
+    maybeRefreshConversationSummary(conversationId)
+      .then((yielded) => { if (yielded && !pendingSummaryRefreshes.has(conversationId)) scheduleSummaryRefresh(conversationId); })
+      .catch((err: unknown) => console.error(`[turn] conversation summary refresh failed: ${(err as Error).message}`));
   }, summaryRefreshDelayMs);
   pendingSummaryRefreshes.set(conversationId, timer);
 }

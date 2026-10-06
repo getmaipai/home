@@ -420,7 +420,11 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     }
   }
   const historyBudgetTokens = left === null ? null : Math.floor(toolRound ? Math.max(0, left) * (1 - TOOL_ROUND_SHARE) : Math.max(0, left));
-  const window = await buildConversationWindow(conversation, { ...windowOpts, historyBudgetTokens });
+  // Rule 4: a history over its budget before the idle fold landed folds
+  // on this turn's path first, never dropping a turn the summary does not
+  // yet cover. Not when the history budget is zero on purpose (THIN-3G's
+  // carry offer or a message too big to send): no fold would make room.
+  const window = await buildConversationWindow(conversation, { ...windowOpts, historyBudgetTokens, foldWhenOver: historyBudgetTokens !== null && historyBudgetTokens > 0 });
   pushWindow(holdSummary ? { ...window, summaryLine: undefined } : window);
   if (recallEarlier && promptLimit === undefined) {
     // RECALL-03's block joins after the window is sized, so it is counted

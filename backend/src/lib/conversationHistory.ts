@@ -51,6 +51,7 @@ import { complete, type LlmMessage, completeBackground } from "@/lib/llm";
 import { countTokens } from "@/lib/tokenCount";
 import { evaluateReply } from "@/lib/safety";
 import { resolveTurnBudgetWithStack } from "@/lib/turnMachine/budget";
+import { activeTurnCount } from "@/lib/turnActivity";
 import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
 import { recordEpisodes, deleteEpisodesForTurns, contentTerms } from "@/lib/episodes";
@@ -2373,12 +2374,15 @@ const lastHistoryBudgets = new Map<string, number | null>();
  * summary's anchor, verbatim, with the one most recent eligible search
  * replay when it fits. The anchor moves only when a fold is stored, so a
  * turn never leaves the window before the summary covers it. If the
- * history outgrows the budget before its fold has landed (a fold that
- * failed, or turns faster than the idle debounce), the window keeps the
- * newest turns that fit rather than fail the turn and logs it; the turns
- * it skips stay in episode recall (droppedOlder) and enter the summary at
- * the next fold. */
-export async function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null; historyBudgetTokens?: number | null } = {}): Promise<ConversationWindow> {
+ * history outgrows the budget before its fold has landed (turns faster
+ * than the idle debounce, or a fold that waited behind a live turn), a
+ * caller that sets `foldWhenOver` (the turn's own context node) folds
+ * first and rebuilds from the stored anchor. Only when no fold can be
+ * stored (the background engine is unavailable, or the output floor
+ * refused it) does the window keep the newest turns that fit rather than
+ * fail the turn, and log it; the turns it skips stay in episode recall
+ * (droppedOlder) and enter the summary at the next stored fold. */
+export async function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null; historyBudgetTokens?: number | null; foldWhenOver?: boolean } = {}): Promise<ConversationWindow> {
   const { liveRows, uncovered, anchored } = windowRows(conversation, opts);
   // CHAT-03 (#89): the stored summary is model-written from rows that
   // may predate the policy; it is redacted on the way in like a row.
@@ -2406,7 +2410,36 @@ export async function buildConversationWindow(conversation: Conversation, opts: 
   if (budget === null || total === null) return done(uncovered.slice(-MINIMUM_WINDOW_MAX_TURNS), false, null);
   if (total <= budget) return done(uncovered, replayCounts, total);
 
-  // Past the budget before the fold landed: never fail the turn.
+  // Past the budget before the fold landed (turns faster than the idle
+  // fold, or a fold that waited behind a live turn). Rule 4: no exchange
+  // leaves the window before its fold is stored, so the turn folds first
+  // (the request path pays for it only when the idle fold fell behind) and
+  // the window is rebuilt from the stored anchor. The new summary is
+  // counted against the same budget: what it grew by comes off the
+  // history, so the prompt the caller measured still fits.
+  if (opts.foldWhenOver && opts.historyBudgetTokens !== undefined) {
+    // A fold that throws (its own or one in flight it waited for) never
+    // fails the turn: the window below takes over (a review).
+    try {
+      await foldInTurn(conversation.id);
+      const fresh = foldTarget(conversation.id)?.conversation;
+      if (fresh && fresh.summary_through_turn !== conversation.summary_through_turn) {
+        const grew = fresh.summary ? await summaryGrowth(summaryLine, summaryLineFor(fresh.summary)) : 0;
+        if (grew !== null) {
+          const rebuilt = await buildConversationWindow(fresh, { ...opts, foldWhenOver: false, historyBudgetTokens: Math.max(0, budget - grew) });
+          lastHistoryBudgets.set(conversation.id, budget);
+          return rebuilt;
+        }
+      }
+    } catch (err) {
+      console.warn(`[conversationHistory] the fold on a turn's path failed (${(err as Error).message}); the window keeps what fits`);
+    }
+  }
+
+  // The fold could not be stored (the background engine is unavailable,
+  // or the output floor refused it and it is backing off): never fail the
+  // turn. The anchor has not moved, so the turns skipped here stay in
+  // episode recall and are the first the next stored fold takes.
   let withReplay = replayCounts;
   let kept = await newestThatFit(uncovered, 0, budget, (run) => render(run, withReplay));
   if (withReplay && kept !== null && !uncovered.slice(uncovered.length - kept).some((t) => t.id === replayTurn!.id)) {
@@ -2422,7 +2455,7 @@ export async function buildConversationWindow(conversation: Conversation, opts: 
 /** One fold at a time per conversation. A request while one runs is not
  * dropped (a review): it runs once more when the current one ends, since
  * turns may have landed in the meantime. */
-const foldsInFlight = new Map<string, Promise<void>>();
+const foldsInFlight = new Map<string, Promise<boolean>>();
 const foldsAgain = new Set<string>();
 
 /** Post-turn, never in the request path. THIN-3F (rule 4): once the
@@ -2433,21 +2466,45 @@ const foldsAgain = new Set<string>();
  * same write as the summary that covers them, so no turn leaves the
  * window before its fold is stored. Below the mark it does nothing. Best
  * effort: skipped on an unavailable background engine and any failure is
- * logged, never thrown, and the block stays verbatim. */
-export async function maybeRefreshConversationSummary(conversationId: string): Promise<void> {
+ * logged, never thrown, and the block stays verbatim. True when it stopped
+ * for a live turn (the idle gate) and should be asked again later. */
+export async function maybeRefreshConversationSummary(conversationId: string): Promise<boolean> {
   const running = foldsInFlight.get(conversationId);
   if (running) {
     foldsAgain.add(conversationId);
     return running;
   }
   const fold = (async () => {
+    let yielded = false;
     do {
       foldsAgain.delete(conversationId);
-      await foldConversation(conversationId);
+      yielded = await foldConversation(conversationId);
     } while (foldsAgain.has(conversationId));
+    return yielded;
   })().finally(() => foldsInFlight.delete(conversationId));
   foldsInFlight.set(conversationId, fold);
   return fold;
+}
+
+/** The fold a turn runs on its own request path when its history is over
+ * budget (buildConversationWindow's `foldWhenOver`): it waits for a fold
+ * already in flight, then folds once itself, past the idle gate, since it
+ * is the live turn's own work. */
+async function foldInTurn(conversationId: string): Promise<void> {
+  for (let running = foldsInFlight.get(conversationId); running; running = foldsInFlight.get(conversationId)) await running;
+  const fold = foldConversation(conversationId, { inTurn: true }).finally(() => foldsInFlight.delete(conversationId));
+  foldsInFlight.set(conversationId, fold);
+  await fold;
+}
+
+/** How many tokens a new summary line adds over the one the caller's
+ * prompt was measured with; null when the engine could not count. */
+async function summaryGrowth(before: string | undefined, after: string): Promise<number | null> {
+  const next = await countTokens([{ role: "system", content: after }]);
+  if (next === null) return null;
+  if (!before) return next;
+  const prior = await countTokens([{ role: "system", content: before }]);
+  return prior === null ? null : Math.max(0, next - prior);
 }
 
 /** The conversation a fold reads: a temporary chat's from its session
@@ -2461,8 +2518,15 @@ function foldTarget(conversationId: string): { conversation: Conversation; tempo
   return { conversation: toConversationRecord(row), temporary: false };
 }
 
-async function foldConversation(conversationId: string): Promise<void> {
-  if ((foldRefusedUntil.get(conversationId) ?? 0) > Date.now()) return;
+async function foldConversation(conversationId: string, opts: { inTurn?: boolean } = {}): Promise<boolean> {
+  if ((foldRefusedUntil.get(conversationId) ?? 0) > Date.now()) return false;
+  // The idle fold yields to a live turn (the judge's rule, memoryJudge.ts):
+  // on one shared engine slot a fold pass beside a turn delays that turn's
+  // reply. It is checked before every pass; a fold stopped here is
+  // scheduled again when the turn ends (summaryRefresh.ts), and a turn
+  // whose history is over budget meanwhile folds on its own path.
+  const yieldsToTurn = () => !opts.inTurn && activeTurnCount() > 0;
+  if (yieldsToTurn()) return true;
   const budget = lastHistoryBudgets.has(conversationId) ? lastHistoryBudgets.get(conversationId)! : await defaultHistoryBudget();
   const contextTokens = (await resolveTurnBudgetWithStack(undefined, "adult")).context_tokens;
   // The checkpoint's target (the last turn the block takes) is decided
@@ -2471,12 +2535,13 @@ async function foldConversation(conversationId: string): Promise<void> {
   // stopped a long block part way, above the low-water mark).
   let target: string | null = null;
   for (let pass = 0; pass < FOLD_PASSES_MAX; pass++) {
+    if (pass > 0 && yieldsToTurn()) return true;
     const found = foldTarget(conversationId);
-    if (!found) return;
+    if (!found) return false;
     const { conversation, temporary } = found;
     const { liveRows, uncovered } = windowRows(conversation, {}, "oldest");
     if (target === null) {
-      if (uncovered.length <= FOLD_KEEPS_NEWEST_TURNS) return;
+      if (uncovered.length <= FOLD_KEEPS_NEWEST_TURNS) return false;
       const replayTurn = recentReplayTurn(liveRows);
       const render = (run: readonly ConversationTurnRow[]) => renderTurns(run, replayTurn, true);
       const total = budget === null ? null : await countTokens(render(uncovered));
@@ -2484,19 +2549,19 @@ async function foldConversation(conversationId: string): Promise<void> {
       if (budget === null || total === null) {
         // The named minimum, counted in turns: past MINIMUM_WINDOW_FOLD_AT,
         // fold down to the newest MINIMUM_WINDOW_TURNS.
-        if (uncovered.length <= MINIMUM_WINDOW_FOLD_AT) return;
+        if (uncovered.length <= MINIMUM_WINDOW_FOLD_AT) return false;
         blockEnd = uncovered.length - MINIMUM_WINDOW_TURNS;
       } else {
-        if (total <= HIGH_WATER * budget) return;
+        if (total <= HIGH_WATER * budget) return false;
         const kept = await newestThatFit(uncovered, FOLD_KEEPS_NEWEST_TURNS, LOW_WATER * budget, render);
-        if (kept === null) return;
+        if (kept === null) return false;
         blockEnd = uncovered.length - Math.max(kept, FOLD_KEEPS_NEWEST_TURNS);
       }
-      if (blockEnd <= 0) return;
+      if (blockEnd <= 0) return false;
       target = uncovered[blockEnd - 1]!.id;
     }
     const targetIndex = uncovered.findIndex((t) => t.id === target);
-    if (targetIndex === -1) return; // reached (or the target was edited away)
+    if (targetIndex === -1) return false; // reached (or the target was edited away)
     // A long block is folded in passes, oldest first, each one small
     // enough for the background model to summarise well.
     const inputCap = Math.floor(FOLD_INPUT_SHARE * contextTokens);
@@ -2514,8 +2579,9 @@ async function foldConversation(conversationId: string): Promise<void> {
       block = block.slice(0, lo);
     }
     const stored = await storeFold(conversation, temporary, block, Math.floor(SUMMARY_CAP_SHARE * contextTokens));
-    if (!stored || block[block.length - 1]!.id === target) return;
+    if (!stored || block[block.length - 1]!.id === target) return false;
   }
+  return false;
 }
 
 /** THIN-3F (rule 4: the summary "never holds crisis, consent or age
