@@ -25,7 +25,7 @@ function setup(role: Roster["role"], initialUrl = "/settings", telegramChatId = 
     makeKey("notifications.browser.enabled", "person.notifications", "boolean"),
     { ...makeKey("person.quiet_hours.from", "robot.settings", "time"), default: null }, { ...makeKey("person.quiet_hours.to", "robot.settings", "time"), default: null },
     ...["approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available", "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated", "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available"].map((name) => makeKey(`notifications.${name}.telegram`, "person.notifications", "boolean")),
-    makeKey("personality.style", "person.persona"), makeKey("search.safe_search", "person.search", "boolean"), makeKey("tts.voice_id", "person.voice", "select"),
+    makeKey("personality.style", "person.persona"), makeKey("search.safe_search", "person.search", "boolean"), makeKey("chat.photo_uploads", "person.chat", "boolean"), makeKey("tts.voice_id", "person.voice", "select"),
     makeKey("storage.cap", "person.storage", "number"), makeKey("storage.cap_warning", "person.storage", "number"),
   ];
   const values: ResolvedSetting[] = registry.map((key) => ({ key: key.key, value: key.key === "notifications.telegram.chat_id" ? telegramChatId : key.default ?? "sample", source: "default", label: key.label, help: key.help, level: key.level, secret: key.secret }));
@@ -53,7 +53,7 @@ describe("NextMeSettings", () => {
       await waitFor(() => expect(document.querySelector("input#profile-display-name")).not.toBeNull());
       expect((document.querySelector("input#profile-display-name") as HTMLInputElement).value).toBe("Nova");
       expect(document.body.textContent).toContain("Face recognition");
-      for (const name of ["Profile", "Appearance", "Voice and AI", "Notifications", "Privacy and data"]) expect(document.body.textContent).toContain(name);
+      for (const name of ["Profile", "Appearance", "Chat", "Voice and AI", "Notifications", "Privacy and data"]) expect(document.body.textContent).toContain(name);
       expect(document.body.textContent).not.toContain("Limits");
       expect(document.body.textContent).not.toContain("Allowance");
       expect(document.body.textContent).not.toContain("My storage");
@@ -71,7 +71,8 @@ describe("NextMeSettings", () => {
       expect(document.getElementById("settings-person.storage")).toBeNull();
       const sectionsToCheck = [
         { group: "profile.appearance", title: "Appearance" },
-        { group: "person.persona", title: "Voice and AI" },
+        { group: "person.persona", title: "Chat" },
+        { group: "person.voice", title: "Voice and AI" },
         { group: "person.notifications", title: "Notifications" },
       ];
       for (const { group, title } of sectionsToCheck) {
@@ -141,13 +142,34 @@ describe("NextMeSettings", () => {
     } finally { restore(); }
   });
 
-  test("Voice and AI renders the three settings in one card", async () => {
+  test("Voice and AI keeps only the voice setting", async () => {
     const { restore, getByRole } = setup("owner", "/settings?section=voice-ai");
     try {
       await waitFor(() => expect(getByRole("tab", { name: "Voice and AI" }).getAttribute("aria-selected")).toBe("true"));
       await waitFor(() => expect(document.querySelectorAll("[id^='settings-person.']").length).toBe(1));
-      expect(document.querySelectorAll("[id^='settings-person.']")[0]?.textContent).toContain("personality.style");
-      expect(document.body.textContent).toContain("Voice and AI");
+      expect(document.querySelectorAll("[id^='settings-person.']")[0]?.textContent).toContain("tts.voice_id");
+      expect(document.body.textContent).not.toContain("personality.style");
+    } finally { restore(); }
+  });
+
+  test("Chat holds personality, safe search and photo uploads in one card for an adult", async () => {
+    const { restore, getByRole } = setup("owner", "/settings?section=chat");
+    try {
+      await waitFor(() => expect(getByRole("tab", { name: "Chat" }).getAttribute("aria-selected")).toBe("true"));
+      await waitFor(() => expect(document.querySelectorAll("[id^='settings-person.']").length).toBe(1));
+      const card = document.querySelectorAll("[id^='settings-person.']")[0]!.textContent ?? "";
+      for (const label of ["personality.style", "search.safe_search", "chat.photo_uploads"]) expect(card).toContain(label);
+    } finally { restore(); }
+  });
+
+  test("a child's Chat section has no photo uploads switch (a parent's setting)", async () => {
+    const { restore, getByRole } = setup("child", "/settings?section=chat");
+    try {
+      await waitFor(() => expect(getByRole("tab", { name: "Chat" }).getAttribute("aria-selected")).toBe("true"));
+      await waitFor(() => expect(document.querySelectorAll("[id^='settings-person.']").length).toBe(1));
+      const card = document.querySelectorAll("[id^='settings-person.']")[0]!.textContent ?? "";
+      expect(card).toContain("search.safe_search");
+      expect(card).not.toContain("chat.photo_uploads");
     } finally { restore(); }
   });
 

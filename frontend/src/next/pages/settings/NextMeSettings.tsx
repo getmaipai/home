@@ -19,7 +19,8 @@ const telegramNotificationKeys = ["notifications.telegram.chat_id", ...["approva
 const sections = [
   { id: "profile", title: "Profile", description: "Your name and profile photo." },
   { id: "appearance", title: "Appearance", description: "Choose how MaiPai looks." },
-  { id: "voice-ai", title: "Voice and AI", description: "Choose how MaiPai speaks and responds." },
+  { id: "chat", title: "Chat", description: "Choose how chat talks, searches and handles photos." },
+  { id: "voice-ai", title: "Voice and AI", description: "Choose how MaiPai speaks." },
   { id: "notifications", title: "Notifications", description: "Choose what you hear about." },
   { id: "privacy-data", title: "Privacy and data", description: "Review your data and signed-in devices." },
 ] as const;
@@ -39,7 +40,15 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
         </Collapsible>
       </>;
     }
-    if (id === "voice-ai") return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.persona", "person.voice", "person.search"]} titleOverrides={{ "person.persona": "Voice and AI", "person.voice": "Voice and AI", "person.search": "Voice and AI" }} mergeGroups /><ManagementLinks links={["Voices", "Commands"]} /></>;
+    // CHAT-SETTINGS-01: the chat keys, routed by their existing `lives_in`
+    // groups into one card (personality, safe search, photo uploads). A child
+    // keeps seeing what they could before: photo uploads is a parent's switch
+    // for a child, so its group is not offered to a child.
+    if (id === "chat") {
+      const groups = person.role === "child" ? ["person.persona", "person.search"] : ["person.persona", "person.search", "person.chat"];
+      return <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={groups} titleOverrides={Object.fromEntries(groups.map((group) => [group, "Chat"]))} mergeGroups />;
+    }
+    if (id === "voice-ai") return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.voice"]} titleOverrides={{ "person.voice": "Voice and AI" }} /><ManagementLinks links={["Voices", "Commands"]} /></>;
     if (id === "notifications") return <NotificationSettings person={person} />;
     return <><ManagementLinks links={["Devices"]} /><div className="grid gap-4 sm:grid-cols-2">
       <LinkCard title="Storage" description="Usage against your storage limit." to="/storage" />

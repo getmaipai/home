@@ -18,12 +18,16 @@ export const CHAT_COLUMN_ID = "next-chat-rail";
 /** Below this width the column starts hidden (a default, never a lock). */
 export const CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH = 1024;
 
+/** Where "Chat settings" goes: Settings, Me tab, Chat section. */
+export const CHAT_SETTINGS_PATH = "/settings?tab=me&section=chat";
+
 const ColumnCloseIcon = getIcon("panel-left-close");
 const ColumnOpenIcon = getIcon("panel-left-open");
 const NewChatIcon = getIcon("pencil");
 const SearchIcon = getIcon("search");
 const CloseIcon = getIcon("x");
 const CustomizeIcon = getIcon("sliders-horizontal");
+const ChatSettingsIcon = getIcon("settings");
 
 // Focus this page moves on a person's behalf (handing focus between the two
 // toggles, back to the search button) must not pop a tooltip open: a
@@ -294,6 +298,16 @@ export function ChatHistoryPanel({
         ) : (
           <div data-slot="chat-column-header" className="flex items-center gap-1">
             <span data-slot="chat-column-title" className="min-w-0 flex-1 truncate">Chat</span>
+            <Tooltip>
+              <TooltipTrigger asChild onFocus={skipTooltipOnQuietFocus}>
+                <Button asChild variant="ghost" size="icon-sm" data-slot="chat-column-icon">
+                  <Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings">
+                    <ChatSettingsIcon className="size-4.5" />
+                  </Link>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Chat settings</TooltipContent>
+            </Tooltip>
             {hasThreads ? (
               <Tooltip>
                 <TooltipTrigger asChild onFocus={skipTooltipOnQuietFocus}>

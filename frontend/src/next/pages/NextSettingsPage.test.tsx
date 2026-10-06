@@ -398,7 +398,7 @@ describe("NextSettingsPage", () => {
           <NextSettingsPage person={makePerson({ role: "adult" })} />
         </MemoryRouter>,
       );
-      const voiceTab = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Voice and AI") as HTMLElement);
+      const voiceTab = await waitFor(() => Array.from(document.querySelectorAll('[role="tab"]')).find((el) => el.textContent === "Chat") as HTMLElement);
       fireEvent.click(voiceTab);
       await waitFor(() => expect(document.body.textContent).toContain("Media Key"));
       expect(document.body.textContent).toContain("Not supported in this hub version yet.");

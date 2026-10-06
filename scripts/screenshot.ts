@@ -2754,6 +2754,30 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
     }
   }
 
+  // COLUMN-02 chat settings: the gear opens Settings, Me, Chat.
+  for (const theme of THEMES) {
+    const context = await newContext(browser, desktop, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.addInitScript(() => localStorage.setItem("maipai.chat.rail-collapsed", "0"));
+      await openStoredConversation(page, conversation.id, "Homework helper notes");
+      await page.getByRole("heading", { name: "Homework helper" }).waitFor();
+      const gear = page.getByRole("link", { name: "Chat settings" });
+      await gear.hover();
+      await page.getByRole("tooltip").waitFor();
+      await shoot(page, `column-chat-settings-tooltip-1440-${theme}`);
+      await gear.click();
+      await page.getByRole("tab", { name: "Chat", exact: true }).last().waitFor();
+      await page.waitForTimeout(1500);
+      log(`chat settings ids 1440/${theme}`, await page.evaluate(() => [...document.querySelectorAll('[id^="settings-"]')].map((el) => el.id)));
+      log(`chat settings url 1440/${theme}`, page.url());
+      await shoot(page, `settings-chat-1440-${theme}`);
+    } finally {
+      await context.close();
+    }
+  }
+
 
   // Loading: hold the conversation list so the skeleton rows show.
   {
@@ -6520,6 +6544,7 @@ async function captureNextSettingsS2Review(browser: Browser, ownerSession: strin
     { id: "me", path: "/settings?tab=me", heading: "Profile" },
     { id: "profile", path: "/settings?tab=me&section=profile", heading: "Profile" },
     { id: "appearance", path: "/settings?tab=me&section=appearance", heading: "Appearance" },
+    { id: "chat", path: "/settings?tab=me&section=chat", heading: "Chat" },
     { id: "voice-ai", path: "/settings?tab=me&section=voice-ai", heading: "Voice and AI" },
     { id: "notifications", path: "/settings?tab=me&section=notifications", heading: "Notifications" },
     { id: "privacy-data", path: "/settings?tab=me&section=privacy-data", heading: "Privacy and data" },
@@ -6552,7 +6577,8 @@ async function captureNextSettingsS2Review(browser: Browser, ownerSession: strin
             }
             if (entry.id === "profile" || entry.id === "me") await page.getByLabel("Name", { exact: true }).waitFor({ state: "visible" });
             if (entry.id === "appearance") await page.getByRole("combobox", { name: "Appearance", exact: true }).waitFor({ state: "visible" });
-            if (entry.id === "voice-ai") await page.locator('[id="settings-person.persona"]').waitFor({ state: "visible" });
+            if (entry.id === "chat") await page.locator('[id="settings-person.persona"]').waitFor({ state: "visible" });
+            if (entry.id === "voice-ai") await page.locator('[id="settings-person.voice"]').waitFor({ state: "visible" });
             if (entry.id === "notifications") await page.getByRole("button", { name: /Telegram options/ }).waitFor({ state: "visible" });
             if (entry.id === "privacy-data") await page.getByRole("link", { name: "Privacy" }).waitFor({ state: "visible" });
             if (person === "member") {
