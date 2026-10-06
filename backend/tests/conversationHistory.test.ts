@@ -1,10 +1,12 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture as makeStackFixture, type StackFixture, offlineResponse } from "./stackFixture";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { useDefaultScriptedStack } from "./stackFixture";
+import { __setChatWindowContextForTests } from "@/lib/roleHealth";
+import { countTokens } from "@/lib/tokenCount";
 import { FAILURE_COPY } from "@/lib/failureCopy";
 
 const backgroundFixtures: StackFixture[] = [];
@@ -1250,14 +1252,15 @@ describe("CHAT-03 (#89): a stored summary is redacted on every read", () => {
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
     const value = `Jun${"i".repeat(2)}per${20}26`;
-    // Enough turns that older ones fall out of the verbatim window, so the summary line is used.
+    // Enough turns after the anchor that the refresh is due (THIN-3F: past
+    // the named minimum's fold mark of six), so it really sends a prompt.
     const longText = "x".repeat(1200);
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 10; i++) {
       logTurn(actor, "chat", `${longText} turn ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-sum${i}` });
     }
     db.update(conversations).set({ summary: `Earlier they set the wifi password to ${value} and planned a trip.`, summaryThroughTurn: "turn-sum1" }).where(eq(conversations.id, conv.value.id)).run();
     const fresh = db.select().from(conversations).where(eq(conversations.id, conv.value.id)).get()!;
-    const window = await buildConversationWindow({ ...conv.value, summary: fresh.summary, summaryThroughTurn: fresh.summaryThroughTurn } as typeof conv.value);
+    const window = await buildConversationWindow({ ...conv.value, summary: fresh.summary, summary_through_turn: fresh.summaryThroughTurn });
     expect(window.summaryLine).toBeDefined();
     expect(window.summaryLine).not.toContain(value);
     expect(window.summaryLine).toContain("[credential redacted]");
@@ -1279,11 +1282,16 @@ describe("CHAT-03 (#89): a stored summary is redacted on every read", () => {
       conversationStubs.push(stub);
       delete process.env.MAIPAI_BACKGROUND_URL;
     }
+    expect(seen.length).toBeGreaterThan(0);
     expect(seen.join("")).not.toContain(value);
   });
 });
 
 describe("buildConversationWindow() (step 3)", () => {
+  // THIN-3C: these windows are measured, as on a Stack that reports its
+  // context length (an unreported one gets the named minimum instead).
+  beforeEach(() => __setChatWindowContextForTests(32768));
+  afterEach(() => __setChatWindowContextForTests());
   test("replays a successful search as one native tool exchange, and preserves the prefix when a later turn is added", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
@@ -1312,7 +1320,9 @@ describe("buildConversationWindow() (step 3)", () => {
       const long = "x".repeat(400);
       logTurn(actor, "chat", `new turn ${i} ${long}`, { reply: { text: `${long} reply` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-new-${i}` });
     }
-    const window = await buildConversationWindow(conv.value);
+    // THIN-3C: a budget the turns fit but the turns and the replay do not.
+    const turnsOnly = await countTokens((await buildConversationWindow(conv.value, { historyBudgetTokens: 1_000_000 })).messages.filter((m) => !m.tool_calls && m.role !== "tool"));
+    const window = await buildConversationWindow(conv.value, { historyBudgetTokens: turnsOnly! + 10 });
     expect(window.messages.some((m) => m.content.includes("old search question"))).toBe(true);
     expect(window.messages.some((m) => m.tool_calls?.some((call) => call.id === "old-web"))).toBe(false);
     expect(window.messages.some((m) => m.role === "tool" && m.tool_call_id === "old-web")).toBe(false);
@@ -1370,29 +1380,31 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(pending.messages.some((m) => m.content.includes("No memory was saved"))).toBe(false);
   });
 
-  test("the newest 4 turns are always included verbatim; oldest dropped first past the 1,200-token estimate", async () => {
+  test("every turn after the anchor is verbatim while it fits; past the budget before its fold, the newest that fit are kept", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
-
-    // ~400 chars each side (~100 tokens), so 10 turns (~2,000 tokens)
-    // comfortably exceeds the 1,200-token budget once several exist.
     const longText = "x".repeat(400);
     for (let i = 0; i < 10; i++) {
-      logTurn(actor, "chat", `${longText} turn ${i}`, {
-        reply: { text: `${longText} reply ${i}` },
-        source: "model",
-        safety: SAFE,
-        conversation_id: conv.value.id,
-        turn_id: `turn-window${i}`,
-      });
+      logTurn(actor, "chat", `${longText} turn ${i}`, { reply: { text: `${longText} reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-window${i}` });
     }
-
-    const window = await buildConversationWindow(conv.value);
-    expect(window.messages.length).toBeLessThan(20); // 10 turns * 2 messages each
-    expect(window.messages.some((m) => m.content.includes("turn 9"))).toBe(true); // newest, always kept
-    for (let i = 6; i <= 9; i++) expect(window.messages.some((m) => m.content.includes(`turn ${i}`))).toBe(true);
-    expect(window.messages.some((m) => m.content.includes("turn 0"))).toBe(false); // oldest, dropped first
+    const all = await buildConversationWindow(conv.value, { historyBudgetTokens: 1_000_000 });
+    expect(all.turnIds).toHaveLength(10);
+    const total = all.historyTokens!;
+    // Over the high-water mark but inside the budget: every turn still.
+    const high = await buildConversationWindow(conv.value, { historyBudgetTokens: Math.ceil(total / 0.8) });
+    expect(high.turnIds).toHaveLength(10);
+    // Past the budget (the fold has not landed): the newest turns that fit.
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const over = await buildConversationWindow(conv.value, { historyBudgetTokens: Math.floor(total / 2) });
+      expect(over.turnIds.at(-1)).toBe("turn-window9");
+      expect(over.turnIds.length).toBeLessThan(10);
+      expect(over.historyTokens!).toBeLessThanOrEqual(Math.floor(total / 2));
+      expect(over.droppedOlder).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   test("with nothing fallen out of the window yet, there's no summary line even if a summary exists", async () => {
@@ -1408,31 +1420,21 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(window.summaryLine).toBeUndefined();
   });
 
-  test("a summary line appears once older turns exist beyond the token budget and a summary is on file", async () => {
+  test("a summary line rides whenever a stored summary covers turns before the anchor, and the window starts after it", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
-    // Long enough (like the token-budget test above) that some genuinely
-    // fall outside the window - a short-text conversation never has
-    // "uncovered older" turns even with a summary on file, and the
-    // summary line only ever covers what the window itself dropped.
-    const longText = "x".repeat(400);
-    for (let i = 0; i < 10; i++) {
-      logTurn(actor, "chat", `${longText} turn ${i}`, {
-        reply: { text: `${longText} reply ${i}` },
-        source: "model",
-        safety: SAFE,
-        conversation_id: conv.value.id,
-        turn_id: `turn-summaryline${i}`,
-      });
+    for (let i = 0; i < 6; i++) {
+      logTurn(actor, "chat", `turn ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-summaryline${i}` });
     }
-    db.update(conversations).set({ summary: "Riff asked about the weather earlier." }).where(eq(conversations.id, conv.value.id)).run();
+    db.update(conversations).set({ summary: "Riff asked about the weather earlier.", summaryThroughTurn: "turn-summaryline2" }).where(eq(conversations.id, conv.value.id)).run();
 
     const refreshed = getConversation(actor, conv.value.id);
     if (!refreshed.ok) throw new Error(refreshed.error);
     const window = await buildConversationWindow(refreshed.value);
     expect(window.summaryLine).toBeDefined();
     expect(window.summaryLine as string).toContain("Riff asked about the weather earlier.");
+    expect(window.turnIds).toEqual(["turn-summaryline3", "turn-summaryline4", "turn-summaryline5"]);
   });
 
   // Fix B3 (docs/dev.md's "Chat reliability: the 2026-09-07 incident and
@@ -1676,7 +1678,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     delete process.env.MAIPAI_BACKGROUND_URL;
   });
 
-  test("does not run before at least 4 turns have fallen out of the window", async () => {
+  test("does not run before the history passes its fold mark (the named minimum: six turns after the anchor)", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
@@ -1704,7 +1706,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     expect(row.value.summary).toBeNull();
   });
 
-  test("runs once at least 4 turns have fallen out of the window, using a real (if stub-shaped) completion", async () => {
+  test("runs once the history passes its fold mark, folding the oldest turns as one block, using a real (if stub-shaped) completion", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
@@ -1741,8 +1743,9 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     const stub = startStubLlmServer();
     useBackgroundStack(stub.url);
     try {
-      // First batch: 8 turns triggers a first summary covering the 4
-      // oldest (turn-anchor0..3); summary_through_turn lands on turn-anchor3.
+      // First batch: 8 turns pass the named minimum's fold mark (six) and
+      // the fold takes the block down to the newest four (turn-anchor0..3);
+      // summary_through_turn lands on turn-anchor3.
       for (let i = 0; i < 8; i++) {
         logTurn(actor, "chat", `first batch msg ${i}`, { reply: { text: `first batch reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-anchor${i}` });
       }
@@ -1760,7 +1763,7 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
         { reply: { text: "edited anchor reply" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-anchor3-edited" },
         { supersedes: "turn-anchor3" },
       );
-      // Four more turns fall out of the window past the (still-valid) anchor point.
+      // Four more turns past the (still-valid) anchor point pass the mark again.
       for (let i = 0; i < 4; i++) {
         logTurn(actor, "chat", `second batch msg ${i}`, { reply: { text: `second batch reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-second${i}` });
       }

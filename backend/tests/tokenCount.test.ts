@@ -15,6 +15,7 @@ import { countTokens, __clearTokenCountCacheForTests } from "@/lib/tokenCount";
 import { buildConversationWindow, logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { stubRenderTemplate, stubTokenize } from "@maipai/spec/llm/ts/stubServer.js";
 import { db } from "@/db";
+import { __setChatWindowContextForTests } from "@/lib/roleHealth";
 import { conversationTurns, people } from "@/db/schema";
 import type { TurnValue } from "@/wire";
 
@@ -49,9 +50,12 @@ beforeEach(() => {
   useDefaultScriptedStack();
   __clearTokenCountCacheForTests();
   counted.length = 0;
+  // A Stack that reports its context length: the window is measured.
+  __setChatWindowContextForTests(8192);
 });
 
 afterEach(() => {
+  __setChatWindowContextForTests();
   fixture?.stop();
   fixture = null;
   __resetStackEngineForTests();
@@ -126,17 +130,18 @@ describe("the window's counts (THIN-3B)", () => {
     expect(counted.some((body) => body.messages?.some((m) => m.role === "system" && m.content.startsWith("[")))).toBe(true);
   });
 
-  test("a count that fails leaves the named minimum window (the newest four turns), logged", async () => {
+  test("a count that fails leaves the named minimum window (the newest eight turns after the anchor), logged", async () => {
     const actor = await owner();
     countingStack(501);
     const warn = spyOn(console, "warn").mockImplementation(() => {});
     try {
       const conv = resolveOrCreateConversation(actor, "chat");
       if (!conv.ok) throw new Error(conv.error);
-      for (let i = 0; i < 7; i++) logTurn(actor, "chat", `short ${i}`, { reply: { text: `ok ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-min-${i}` });
+      for (let i = 0; i < 10; i++) logTurn(actor, "chat", `short ${i}`, { reply: { text: `ok ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-min-${i}` });
       const window = await buildConversationWindow(conv.value);
-      expect(window.turnIds).toEqual(["turn-min-3", "turn-min-4", "turn-min-5", "turn-min-6"]);
+      expect(window.turnIds).toEqual(["turn-min-2", "turn-min-3", "turn-min-4", "turn-min-5", "turn-min-6", "turn-min-7", "turn-min-8", "turn-min-9"]);
       expect(window.droppedOlder).toBe(true);
+      expect(window.historyTokens).toBeNull();
       expect(warn.mock.calls.some((call) => String(call[0]).includes("falls back to its named minimum"))).toBe(true);
     } finally {
       warn.mockRestore();

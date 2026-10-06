@@ -10,6 +10,7 @@ import { createBenchPeople, type BenchPeople } from "../../scripts/bench/convers
 import { contextNode } from "@/lib/turnMachine/nodes/context";
 import { createConversation, logTurn } from "@/lib/conversationHistory";
 import type { TurnState } from "@/lib/turnMachine/contract";
+import { withTurnDefaults } from "./turnStateDefaults";
 import type { TurnValue } from "@/wire";
 import { useDefaultScriptedStack } from "../stackFixture";
 
@@ -37,7 +38,7 @@ function newConversation(actor: BenchPeople["owner"]): string {
 }
 
 function stateIn(actor: BenchPeople["owner"], conversationId: string): TurnState {
-  return { actor, surface: "chat", conversationId } as TurnState;
+  return withTurnDefaults({ actor, surface: "chat", conversationId } as TurnState);
 }
 
 function episodeText(items: { source: string; text: string }[]): string {

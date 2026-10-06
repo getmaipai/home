@@ -31,7 +31,7 @@
 // best-effort upgrade on top of it, not a precondition. See
 // summarizeBeforeDelete()'s own comment for exactly what that means
 // when no real model is running yet.
-import { eq, and, or, not, lt, gt, isNull, isNotNull, inArray, desc, sql } from "drizzle-orm";
+import { eq, and, or, not, lt, gt, gte, isNull, isNotNull, inArray, asc, desc, sql } from "drizzle-orm";
 import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from "@/lib/memoryContentPolicy";
 import { withoutBankLines, bankLineNote, bankLinesOf, splitIntoSentences } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
@@ -46,6 +46,7 @@ import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { complete, type LlmMessage, completeBackground } from "@/lib/llm";
 import { countTokens } from "@/lib/tokenCount";
+import { resolveTurnBudgetWithStack } from "@/lib/turnMachine/budget";
 import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
 import { recordEpisodes, deleteEpisodesForTurns, contentTerms } from "@/lib/episodes";
@@ -1931,15 +1932,34 @@ export function clearConversations(actor: PersonRow): { deleted: number } {
 
 // ==== The prompt window (step 3) ====
 //
-// THIN-3B (rules 2 and 4): every size below is the chat engine's own token
-// count on the rendered messages (tokenCount.ts's countTokens()), taken
-// after credential redaction and note substitution, never an estimate.
-// The newest WINDOW_NEWEST_TURNS_KEPT turns are always kept whole; older
-// turns fill WINDOW_TOKEN_BUDGET (THIN-3C sizes it from the engine's
-// context). When the engine cannot count, the window is its named minimum,
-// the WINDOW_NEWEST_TURNS_KEPT newest turns, logged by the counter.
-const WINDOW_NEWEST_TURNS_KEPT = 4;
-const WINDOW_TOKEN_BUDGET = 1200;
+// THIN-3B, THIN-3C and THIN-3F (rules 2 and 4). The window is every live
+// turn after the rolling summary's anchor (`summary_through_turn`),
+// verbatim, sized by the engine's own count (tokenCount.ts) against the
+// history budget the context node measures from the engine's per-slot
+// context: the context less the turn's own reply ceiling and the counted
+// rest of the prompt (stable prefix, tools, memory, the message). Turns
+// leave the window only at a checkpoint, as one block, once the fold job
+// (maybeRefreshConversationSummary below) has stored the summary that
+// covers them and moved the anchor past them: between checkpoints the
+// window only grows at its end, so the prompt-cache prefix holds, and a
+// checkpoint takes the history from above HIGH_WATER of the budget to at
+// most LOW_WATER in one step. When the window cannot be measured (the
+// engine cannot count, or the Stack reports no context length), it is its
+// named minimum: the same rule counted in turns, every turn after the
+// anchor up to MINIMUM_WINDOW_MAX_TURNS, folded at MINIMUM_WINDOW_FOLD_AT
+// down to MINIMUM_WINDOW_TURNS.
+const HIGH_WATER = 0.75;
+const LOW_WATER = 0.4;
+/** The newest turns a fold never takes, whatever their size. */
+const FOLD_KEEPS_NEWEST_TURNS = 2;
+const MINIMUM_WINDOW_TURNS = 4;
+const MINIMUM_WINDOW_FOLD_AT = 6;
+const MINIMUM_WINDOW_MAX_TURNS = 8;
+/** The most of one fold's input, as a share of the engine's context: a
+ * longer block is folded in several passes (a small model summarises
+ * short inputs well and long ones badly, the design record's survey). */
+const FOLD_INPUT_SHARE = 0.25;
+const FOLD_PASSES_MAX = 8;
 // Bounds buildConversationWindow()/maybeRefreshConversationSummary()'s
 // own per-conversation query (a code review, 2026-09-05): it only stops
 // the query and its JS sort from growing with a long-lived
@@ -2018,10 +2038,13 @@ export interface ConversationWindow {
   /** RECALL-03: true when the conversation has turns older than the
    * window (the summary line may or may not cover them). */
   droppedOlder: boolean;
-  /** One system-side line covering everything older than the window,
-   * only when older turns actually exist AND a summary already covers
-   * them - never a placeholder for "there's more but no summary yet". */
+  /** One system-side line holding the rolling summary, whenever a stored
+   * summary covers turns before the window (the anchor). */
   summaryLine?: string;
+  /** THIN-3C: the engine's count of the history the window holds, and the
+   * budget it was sized against; null when the engine could not count. */
+  historyTokens: number | null;
+  historyBudgetTokens: number | null;
 }
 
 /** A household command's own trigger phrase, for the `command`/
@@ -2123,200 +2146,270 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
   }
 }
 
-/** The follow-up-turn context (step 3: "and tomorrow?" needs the prior
- * exchange in the prompt to mean anything). The newest
- * WINDOW_NEWEST_TURNS_KEPT user/reply pairs are always included, whatever
- * their size. One most-recent eligible search replay shares the older
- * turns' WINDOW_TOKEN_BUDGET and is dropped whole if it does not fit;
- * older turns are added back to front while the engine's own count stays
- * under the remaining budget, stopping as soon as one more would exceed
- * it. Whatever's older than what fit is represented by the conversation's
- * own rolling `summary` as one line instead, when one exists. */
-export async function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null } = {}): Promise<ConversationWindow> {
-  // Bounded, not the full history (a code review, 2026-09-05).
-  // getmaipai/home#131: excludes a still-"running" provisional row (this
-  // turn's own - inserted by insertProvisionalTurn() before this same
-  // function runs, so it already exists here - or a genuinely
-  // concurrent turn on the same conversation, which nothing serializes)
-  // from the model's own context window. An in-flight row's replyText
-  // is a placeholder; feeding it back to the model as history would
-  // read as the assistant having already answered with nothing.
-  // TEMP-CHAT-01: a temporary conversation has no conversation_turns rows
-  // to query - its turns live in temporarySessions instead (appended by
-  // appendTemporaryTurn()). Read from there and feed the identical
-  // windowing/redaction/message-building logic below: one implementation
-  // of "what a window looks like", not two, regardless of where its rows
-  // came from.
+/** The rows a window or a fold reads: the live branch (superseded and
+ * excluded rows dropped), and of it the turns after the summary's anchor.
+ * getmaipai/home#131: only finished rows ("done"), never a running one.
+ * TEMP-CHAT-01: a temporary conversation's turns live in its session, read
+ * through the same code. */
+function windowRows(conversation: Pick<Conversation, "id" | "mode" | "summary_through_turn">, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null } = {}, order: "newest" | "oldest" = "newest") {
+  // Only the turns from the anchor on are read (a review: an anchor that
+  // trails more than WINDOW_ROW_FETCH_LIMIT turns behind must not lose the
+  // turns between it and the newest rows). The window reads the newest of
+  // them, the fold the oldest, so a long backlog is folded from its start.
+  const anchorAt = conversation.mode !== "temporary" && conversation.summary_through_turn
+    ? db.select({ createdAt: conversationTurns.createdAt }).from(conversationTurns).where(eq(conversationTurns.id, conversation.summary_through_turn)).get()?.createdAt
+    : undefined;
   const rows =
     conversation.mode === "temporary"
       ? [...(temporarySessions.get(conversation.id)?.turns ?? [])]
       : db
           .select()
           .from(conversationTurns)
-          .where(and(eq(conversationTurns.conversationId, conversation.id), eq(conversationTurns.status, "done")))
-          .orderBy(desc(conversationTurns.createdAt))
+          .where(and(eq(conversationTurns.conversationId, conversation.id), eq(conversationTurns.status, "done"), anchorAt ? gte(conversationTurns.createdAt, anchorAt) : undefined))
+          .orderBy(order === "newest" ? desc(conversationTurns.createdAt) : asc(conversationTurns.createdAt))
           .limit(WINDOW_ROW_FETCH_LIMIT)
           .all();
   rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   // ADMIN-COMPARE-01: a caller reconstructing history as it stood AT a
-  // given turn (rather than "now") names that turn's own createdAt here.
+  // given turn names that turn's own createdAt here.
   const scoped = opts.beforeCreatedAt ? rows.filter((r) => r.createdAt < opts.beforeCreatedAt!) : rows;
   const liveRows = excludeSupersededRows(scoped, opts.supersedes, opts.excludeTurnId);
-  if (liveRows.length === 0) return { messages: [], turnIds: [], droppedOlder: false };
-
-  const newest = liveRows.slice(-WINDOW_NEWEST_TURNS_KEPT);
-  const older = liveRows.slice(0, Math.max(0, liveRows.length - WINDOW_NEWEST_TURNS_KEPT));
-
-  // THIN-3B: the engine counts the window as the model will read it, one
-  // whole list per probe (a list of separately counted turns would break
-  // strict templates and count a template's own text once per turn, a
-  // review). The largest run of older turns that fits is found by binary
-  // search, so a long conversation costs a handful of calls, and the
-  // counter's cache makes an unchanged probe free. A failed count leaves
-  // the named minimum: the newest turns and nothing else.
-  const replayTurn = [...liveRows].reverse().find((turn) => replaySearchOutcomes(turn).length > 0);
-  const replay = replayTurn ? searchReplayMessages(replaySearchOutcomes(replayTurn)) : [];
-  const render = (turns: readonly ConversationTurnRow[], withReplay: boolean): LlmMessage[] => {
-    const messages: LlmMessage[] = [];
-    for (const t of turns) {
-      const turnMessages = turnTextMessages(t);
-      // CHAT-03, the read side: a row from before the policy (or an import)
-      // is redacted on the way into the model's window, never rewritten.
-      // A `model` turn's own reply enters the window in its own voice
-      // (`assistant`); any other source instead gets a `system` note
-      // (nonModelWindowNote(), Fix B3) describing what really happened -
-      // never BOTH, since pushing the raw canned/failure text as `assistant`
-      // too would reintroduce the exact bug B3 fixes (the model reading a
-      // Tier 1 handler's own words as something it had said itself).
-      // Item 1b (#67): a model turn a guard replaced (its `guard_reason`
-      // set, #78) holds the guard's own line, not the model's words; fed
-      // back as an assistant message the model imitated it on the turns
-      // after ("nobody's told me" four times about one film). It enters
-      // as a system note instead: the honesty vocabulary never reaches
-      // the model, and a line that carries a fact the next turn needs
-      // ("I haven't added anything to your list") is quoted as a note, in
-      // nobody's voice (a review).
-      messages.push(turnMessages[0]!);
-      if (withReplay && t.id === replayTurn?.id) messages.push(...replay);
-      messages.push(...turnMessages.slice(1));
-    }
-    return messages;
-  };
-  /** How many of the older turns fit beside the newest ones, or null when
-   * the engine could not count. */
-  const olderThatFit = async (withReplay: boolean): Promise<number | null> => {
-    const fits = async (k: number): Promise<boolean | null> => {
-      const count = await countTokens(render([...older.slice(older.length - k), ...newest], withReplay));
-      return count === null ? null : count <= WINDOW_TOKEN_BUDGET;
-    };
-    const none = await fits(0);
-    if (none === null) return null;
-    if (!none) return withReplay ? -1 : 0;
-    let lo = 0;
-    let hi = older.length;
-    while (lo < hi) {
-      const mid = Math.ceil((lo + hi) / 2);
-      const ok = await fits(mid);
-      if (ok === null) return null;
-      if (ok) lo = mid;
-      else hi = mid - 1;
-    }
-    return lo;
-  };
-  let includeReplay = replay.length > 0;
-  let keptOlder = includeReplay ? await olderThatFit(true) : await olderThatFit(false);
-  // The replay rides only on a turn the window keeps, and only when the
-  // newest turns and the replay fit together (-1 above); otherwise it is
-  // dropped whole and the older turns are fitted without it.
-  if (includeReplay && (keptOlder === -1 || (keptOlder !== null && replayTurn && !newest.some((t) => t.id === replayTurn.id) && !older.slice(older.length - keptOlder).some((t) => t.id === replayTurn.id)))) {
-    includeReplay = false;
-    keptOlder = await olderThatFit(false);
-  }
-  if (keptOlder === null) includeReplay = false;
-  const includedOlder = keptOlder === null || keptOlder < 0 ? [] : older.slice(older.length - keptOlder);
-  const windowTurns = [...includedOlder, ...newest];
-  const messages = render(windowTurns, includeReplay);
-
-  const hasUncoveredOlder = older.length - includedOlder.length > 0;
-  // CHAT-03 (#89): the stored summary is model-written from rows that
-  // may predate the policy; it is redacted on the way in like a row.
-  const summaryLine =
-    hasUncoveredOlder && conversation.summary ? `Summary of earlier conversation: ${redactCredentials(conversation.summary)}` : undefined;
-
-  return { messages, summaryLine, turnIds: windowTurns.map((t) => t.id), droppedOlder: hasUncoveredOlder };
+  // The anchor is found by POSITION in the fetched rows, superseded ones
+  // included (#60: an anchor turn that was later edited is still a real
+  // boundary, and same-millisecond turns make a timestamp inexact).
+  const anchorIndex = conversation.summary_through_turn ? scoped.findIndex((t) => t.id === conversation.summary_through_turn) : -1;
+  const uncovered = anchorIndex === -1 ? liveRows : liveRows.filter((t) => scoped.indexOf(t) > anchorIndex);
+  return { liveRows, uncovered, anchored: conversation.summary_through_turn !== null };
 }
 
-// ==== The rolling summary refresh (step 3) ====
+function summaryLineFor(summary: string): string {
+  return `Summary of earlier conversation: ${redactCredentials(summary)}`;
+}
 
-// "at least 4 turns have fallen out of the window since summary_through_
-// turn" (the plan's own words) - the same WINDOW_NEWEST_TURNS_KEPT
-// number, not a separate tuning: the window and the refresh trigger are
-// two views of the identical boundary (what's still verbatim vs. what
-// needs a summary to be reachable at all).
-const SUMMARY_REFRESH_THRESHOLD_TURNS = WINDOW_NEWEST_TURNS_KEPT;
+/** What the context node reads about a window before it can size one:
+ * the user's own words in the turns after the anchor (redacted, for name
+ * resolution) and the summary line the window will carry. */
+export function windowPreview(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null } = {}): { userTexts: string[]; summaryLine?: string } {
+  const { uncovered, anchored } = windowRows(conversation, opts);
+  return {
+    userTexts: uncovered.map((t) => redactCredentials(t.userText)),
+    ...(anchored && conversation.summary ? { summaryLine: summaryLineFor(conversation.summary) } : {}),
+  };
+}
 
-/** Post-turn, never in the request path (step 3 is explicit: "it never
- * runs in the request path"). Refreshes a conversation's rolling
- * `summary` once at least SUMMARY_REFRESH_THRESHOLD_TURNS turns have
- * fallen out of the live window since `summary_through_turn`. Best
- * effort, the same posture summarizeBeforeDelete() (4.14) already
- * takes: skipped entirely on the stub model (a canned reply is worse
- * than no summary), and any failure is logged, never thrown - a summary
- * is a quality upgrade on the window, never something a turn's own
- * success depends on. */
+/** The messages a run of turns enters the prompt as, the one most recent
+ * eligible search replay riding on its own turn when that turn is in the
+ * run and `withReplay` is set. */
+function renderTurns(turns: readonly ConversationTurnRow[], replayTurn: ConversationTurnRow | undefined, withReplay: boolean): LlmMessage[] {
+  const replay = withReplay && replayTurn ? searchReplayMessages(replaySearchOutcomes(replayTurn)) : [];
+  const messages: LlmMessage[] = [];
+  for (const t of turns) {
+    const turnMessages = turnTextMessages(t);
+    // CHAT-03, the read side: a row from before the policy (or an import)
+    // is redacted on the way into the model's window, never rewritten.
+    // A `model` turn's own reply enters the window in its own voice
+    // (`assistant`); any other source instead gets a `system` note
+    // (nonModelWindowNote(), Fix B3) describing what really happened -
+    // never BOTH, since pushing the raw canned/failure text as `assistant`
+    // too would reintroduce the exact bug B3 fixes (the model reading a
+    // Tier 1 handler's own words as something it had said itself).
+    // Item 1b (#67): a model turn a guard replaced (its `guard_reason`
+    // set, #78) holds the guard's own line, not the model's words; fed
+    // back as an assistant message the model imitated it on the turns
+    // after ("nobody's told me" four times about one film). It enters
+    // as a system note instead: the honesty vocabulary never reaches
+    // the model, and a line that carries a fact the next turn needs
+    // ("I haven't added anything to your list") is quoted as a note, in
+    // nobody's voice (a review).
+    messages.push(turnMessages[0]!);
+    if (replay.length > 0 && t.id === replayTurn?.id) messages.push(...replay);
+    messages.push(...turnMessages.slice(1));
+  }
+  return messages;
+}
+
+/** The newest run of `turns` (at least `keep` of them) whose rendered
+ * messages fit `budget` by the engine's count, found by binary search over
+ * whole-list counts; null when the engine could not count. */
+async function newestThatFit(turns: readonly ConversationTurnRow[], keep: number, budget: number, render: (run: readonly ConversationTurnRow[]) => LlmMessage[]): Promise<number | null> {
+  const floor = Math.min(keep, turns.length);
+  let lo = floor;
+  let hi = turns.length;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    const count = await countTokens(render(turns.slice(turns.length - mid)));
+    if (count === null) return null;
+    if (count <= budget) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
+}
+
+/** The budget a window is sized against when its caller measured none
+ * (the admin compare's replay, a bench): the engine's per-slot context
+ * less an adult written reply's ceiling; null when the Stack reports no
+ * context length (the named minimum, THIN-3A). A turn's own window is
+ * sized by the context node against the counted rest of its prompt. */
+async function defaultHistoryBudget(): Promise<number | null> {
+  const budget = await resolveTurnBudgetWithStack(undefined, "adult");
+  if (budget.context_window_tokens === null || budget.context_window_tokens === undefined) return null;
+  // context_tokens is the per-slot figure (context_window_tokens is the
+  // same number when reported, null when not).
+  return Math.max(0, budget.context_tokens - budget.reply_ceiling_tokens - budget.thinking_budget_tokens);
+}
+
+/** The last history budget a turn measured per conversation, so the fold
+ * job sizes its checkpoint against the same number. In process memory
+ * only; a restart falls back to defaultHistoryBudget(). */
+const lastHistoryBudgets = new Map<string, number | null>();
+
+/** The follow-up-turn context (step 3: "and tomorrow?" needs the prior
+ * exchange in the prompt to mean anything). Every live turn after the
+ * summary's anchor, verbatim, with the one most recent eligible search
+ * replay when it fits. The anchor moves only when a fold is stored, so a
+ * turn never leaves the window before the summary covers it. If the
+ * history outgrows the budget before its fold has landed (a fold that
+ * failed, or turns faster than the idle debounce), the window keeps the
+ * newest turns that fit rather than fail the turn and logs it; the turns
+ * it skips stay in episode recall (droppedOlder) and enter the summary at
+ * the next fold. */
+export async function buildConversationWindow(conversation: Conversation, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null; historyBudgetTokens?: number | null } = {}): Promise<ConversationWindow> {
+  const { liveRows, uncovered, anchored } = windowRows(conversation, opts);
+  // CHAT-03 (#89): the stored summary is model-written from rows that
+  // may predate the policy; it is redacted on the way in like a row.
+  const summaryLine = anchored && conversation.summary ? summaryLineFor(conversation.summary) : undefined;
+  const budget = opts.historyBudgetTokens !== undefined ? opts.historyBudgetTokens : await defaultHistoryBudget();
+  if (opts.historyBudgetTokens !== undefined) lastHistoryBudgets.set(conversation.id, opts.historyBudgetTokens);
+  const empty = { messages: [], turnIds: [], droppedOlder: liveRows.length > 0, summaryLine, historyTokens: 0, historyBudgetTokens: budget };
+  if (uncovered.length === 0) return empty;
+
+  const replayTurn = [...liveRows].reverse().find((turn) => replaySearchOutcomes(turn).length > 0);
+  const render = (run: readonly ConversationTurnRow[], withReplay: boolean) => renderTurns(run, replayTurn, withReplay);
+  const done = (run: readonly ConversationTurnRow[], withReplay: boolean, historyTokens: number | null): ConversationWindow => ({
+    messages: render(run, withReplay),
+    turnIds: run.map((t) => t.id),
+    droppedOlder: liveRows.length > run.length,
+    summaryLine,
+    historyTokens,
+    historyBudgetTokens: budget,
+  });
+
+  const replayCounts = replayTurn !== undefined && uncovered.some((t) => t.id === replayTurn.id);
+  const total = budget === null ? null : await countTokens(render(uncovered, replayCounts));
+  // The named minimum: the window cannot be measured, so the rule runs in
+  // turns (no replay: its size is unknown).
+  if (budget === null || total === null) return done(uncovered.slice(-MINIMUM_WINDOW_MAX_TURNS), false, null);
+  if (total <= budget) return done(uncovered, replayCounts, total);
+
+  // Past the budget before the fold landed: never fail the turn.
+  let withReplay = replayCounts;
+  let kept = await newestThatFit(uncovered, 1, budget, (run) => render(run, withReplay));
+  if (withReplay && kept !== null && !uncovered.slice(uncovered.length - kept).some((t) => t.id === replayTurn!.id)) {
+    withReplay = false;
+    kept = await newestThatFit(uncovered, 1, budget, (run) => render(run, false));
+  }
+  if (kept === null) return done(uncovered.slice(-MINIMUM_WINDOW_MAX_TURNS), false, null);
+  const run = uncovered.slice(uncovered.length - kept);
+  console.warn(`[conversationHistory] the history outgrew its window before its fold was stored; ${uncovered.length - kept} turn(s) wait for the fold`);
+  return done(run, withReplay, await countTokens(render(run, withReplay)));
+}
+
+/** One fold at a time per conversation. A request while one runs is not
+ * dropped (a review): it runs once more when the current one ends, since
+ * turns may have landed in the meantime. */
+const foldsInFlight = new Map<string, Promise<void>>();
+const foldsAgain = new Set<string>();
+
+/** Post-turn, never in the request path. THIN-3F (rule 4): once the
+ * history after the summary's anchor passes HIGH_WATER of the window's
+ * budget, the oldest turns down to LOW_WATER are folded into the rolling
+ * summary as one block (in passes when the block is long, until the
+ * low-water target is reached), and the anchor moves past them in the
+ * same write as the summary that covers them, so no turn leaves the
+ * window before its fold is stored. Below the mark it does nothing. Best
+ * effort: skipped on an unavailable background engine and any failure is
+ * logged, never thrown, and the block stays verbatim. */
 export async function maybeRefreshConversationSummary(conversationId: string): Promise<void> {
-  const conversation = db.select().from(conversations).where(eq(conversations.id, conversationId)).get();
-  if (!conversation || conversation.status === "deleted") return;
+  const running = foldsInFlight.get(conversationId);
+  if (running) {
+    foldsAgain.add(conversationId);
+    return running;
+  }
+  const fold = (async () => {
+    do {
+      foldsAgain.delete(conversationId);
+      await foldConversation(conversationId);
+    } while (foldsAgain.has(conversationId));
+  })().finally(() => foldsInFlight.delete(conversationId));
+  foldsInFlight.set(conversationId, fold);
+  return fold;
+}
 
-  // Same bound as buildConversationWindow() above, for the identical
-  // reason: this job runs after every turn, so summary_through_turn is
-  // always recent in practice - WINDOW_ROW_FETCH_LIMIT is generous
-  // headroom, not a tight fit.
-  // getmaipai/home#131: excludes status="running" - this runs off a
-  // debounced timer (scheduleSummaryRefresh()), not inline with the
-  // turn that scheduled it, so a newer turn on the same conversation
-  // can genuinely be in flight by the time this fires.
-  const rows = db
-    .select()
-    .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done")))
-    .orderBy(desc(conversationTurns.createdAt))
-    .limit(WINDOW_ROW_FETCH_LIMIT)
-    .all();
-  rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-  const liveRows = excludeSupersededRows(rows);
-  if (liveRows.length <= WINDOW_NEWEST_TURNS_KEPT) return; // nothing has fallen out of the window yet
+async function foldConversation(conversationId: string): Promise<void> {
+  const budget = lastHistoryBudgets.has(conversationId) ? lastHistoryBudgets.get(conversationId)! : await defaultHistoryBudget();
+  const contextTokens = (await resolveTurnBudgetWithStack(undefined, "adult")).context_tokens;
+  // The checkpoint's target (the last turn the block takes) is decided
+  // once, against the high-water mark; the passes then fold until the
+  // anchor reaches it (a review: re-checking the mark between passes
+  // stopped a long block part way, above the low-water mark).
+  let target: string | null = null;
+  for (let pass = 0; pass < FOLD_PASSES_MAX; pass++) {
+    const row = db.select().from(conversations).where(eq(conversations.id, conversationId)).get();
+    if (!row || row.status === "deleted") return;
+    const conversation = toConversationRecord(row);
+    const { liveRows, uncovered } = windowRows(conversation, {}, "oldest");
+    if (target === null) {
+      if (uncovered.length <= FOLD_KEEPS_NEWEST_TURNS) return;
+      const replayTurn = [...liveRows].reverse().find((turn) => replaySearchOutcomes(turn).length > 0);
+      const render = (run: readonly ConversationTurnRow[]) => renderTurns(run, replayTurn, true);
+      const total = budget === null ? null : await countTokens(render(uncovered));
+      let blockEnd: number;
+      if (budget === null || total === null) {
+        // The named minimum, counted in turns: past MINIMUM_WINDOW_FOLD_AT,
+        // fold down to the newest MINIMUM_WINDOW_TURNS.
+        if (uncovered.length <= MINIMUM_WINDOW_FOLD_AT) return;
+        blockEnd = uncovered.length - MINIMUM_WINDOW_TURNS;
+      } else {
+        if (total <= HIGH_WATER * budget) return;
+        const kept = await newestThatFit(uncovered, FOLD_KEEPS_NEWEST_TURNS, LOW_WATER * budget, render);
+        if (kept === null) return;
+        blockEnd = uncovered.length - Math.max(kept, FOLD_KEEPS_NEWEST_TURNS);
+      }
+      if (blockEnd <= 0) return;
+      target = uncovered[blockEnd - 1]!.id;
+    }
+    const targetIndex = uncovered.findIndex((t) => t.id === target);
+    if (targetIndex === -1) return; // reached (or the target was edited away)
+    // A long block is folded in passes, oldest first, each one small
+    // enough for the background model to summarise well.
+    const inputCap = Math.floor(FOLD_INPUT_SHARE * contextTokens);
+    let block = uncovered.slice(0, targetIndex + 1);
+    const blockTokens = await countTokens(renderTurns(block, undefined, false));
+    if (blockTokens !== null && blockTokens > inputCap && block.length > 1) {
+      let lo = 1;
+      let hi = block.length;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        const count = await countTokens(renderTurns(block.slice(0, mid), undefined, false));
+        if (count !== null && count <= inputCap) lo = mid;
+        else hi = mid - 1;
+      }
+      block = block.slice(0, lo);
+    }
+    const stored = await storeFold(conversation, block);
+    if (!stored || block[block.length - 1]!.id === target) return;
+  }
+}
 
-  const olderThanWindow = liveRows.slice(0, liveRows.length - WINDOW_NEWEST_TURNS_KEPT);
-  // getmaipai/home#60: `summary_through_turn` names a turn id, but that
-  // exact row may since have been superseded (edited) and so dropped from
-  // `liveRows` above - looking it up there by id would then miss it
-  // entirely (findIndex -1) and treat NOTHING as summarized yet, redoing
-  // the whole older-than-window range instead of just the new increment.
-  // Resolved by POSITION in the original `rows` instead of by timestamp:
-  // a code review (2026-09-05) on listConversationTurns()'s own `since`
-  // cursor already found same-millisecond turns make timestamp
-  // comparison inexact ("same millisecond, different id"), and slicing
-  // by index is what that fix landed on - `rows.indexOf` works here
-  // because `liveRows`/`olderThanWindow` are filtered VIEWS of the same
-  // row objects, not copies.
-  const throughIndex = conversation.summaryThroughTurn ? rows.findIndex((t) => t.id === conversation.summaryThroughTurn) : -1;
-  const newSinceLastSummary = throughIndex === -1 ? olderThanWindow : olderThanWindow.filter((t) => rows.indexOf(t) > throughIndex);
-  if (newSinceLastSummary.length < SUMMARY_REFRESH_THRESHOLD_TURNS) return;
-  // The summary runs on the background engine (MEM-02), so the CHAT
-  // engine's kind is irrelevant here; an unresolved background backend
-  // is resolved by the call itself, and the post-call check below
-  // catches the "resolved to the stub just now" case.
-
+/** Folds `block` into the conversation's summary and moves the anchor to
+ * its last turn, in one write, only if the anchor has not moved since the
+ * block was read. True when the fold was stored. */
+async function storeFold(conversation: Conversation, block: readonly ConversationTurnRow[]): Promise<boolean> {
   // CHAT-03: read-side redaction. Item 1b: a guard-replaced turn reads
   // as its note here too, so the honesty vocabulary reaches neither the
   // summary nor, through it, the model.
-  let transcript = newSinceLastSummary.map((r) => `User: ${redactCredentials(r.userText)}\nReply: ${r.source === "model" && r.guardReason ? guardedTurnNote(r) : redactCredentials(r.replyText)}`).join("\n\n");
-  if (transcript.length > MAX_SUMMARY_INPUT_CHARS) {
-    transcript = transcript.slice(transcript.length - MAX_SUMMARY_INPUT_CHARS);
-  }
+  const transcript = block.map((r) => `User: ${redactCredentials(r.userText)}\nReply: ${r.source === "model" && r.guardReason ? guardedTurnNote(r) : redactCredentials(r.replyText)}`).join("\n\n");
   const priorSummary = conversation.summary ? `Prior summary: ${redactCredentials(conversation.summary)}\n\n` : ""; // CHAT-03 (#89): the refresh never re-reads a credential from its own prior summary
-
   try {
     const result = await completeBackground([
       {
@@ -2328,20 +2421,22 @@ export async function maybeRefreshConversationSummary(conversationId: string): P
       },
     ]);
     if (!result.ok) {
-      console.log(`[conversationHistory] summary refresh skipped for ${conversationId}: unavailable`);
-      return;
+      console.log(`[conversationHistory] summary refresh skipped for ${conversation.id}: unavailable`);
+      return false;
     }
+    // Read and write in one synchronous step: the anchor must still be
+    // where this fold read it (a deleted conversation, or another writer,
+    // leaves it alone).
+    const current = db.select({ through: conversations.summaryThroughTurn, status: conversations.status }).from(conversations).where(eq(conversations.id, conversation.id)).get();
+    if (!current || current.status === "deleted" || current.through !== conversation.summary_through_turn) return false;
     db.update(conversations)
-      .set({
-        summary: result.text,
-        summaryThroughTurn: newSinceLastSummary[newSinceLastSummary.length - 1]!.id,
-        updatedAt: new Date().toISOString(),
-        hlc: nextHlc(),
-      })
-      .where(eq(conversations.id, conversationId))
+      .set({ summary: result.text, summaryThroughTurn: block[block.length - 1]!.id, updatedAt: new Date().toISOString(), hlc: nextHlc() })
+      .where(eq(conversations.id, conversation.id))
       .run();
+    return true;
   } catch (err) {
-    console.log(`[conversationHistory] summary refresh failed for ${conversationId}: ${(err as Error).message}`);
+    console.log(`[conversationHistory] summary refresh failed for ${conversation.id}: ${(err as Error).message}`);
+    return false;
   }
 }
 

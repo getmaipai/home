@@ -10,7 +10,10 @@
 // stay in memory.ts's own canRead() (RULES-AND-LEARNED-COMPONENTS.md,
 // "household privacy and disclosure ... filtered before the prompt,
 // never left to the model").
-import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConversation } from "@/lib/conversationHistory";
+import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConversation, windowPreview, type ConversationWindow } from "@/lib/conversationHistory";
+import { countTokens } from "@/lib/tokenCount";
+import { contextToMessages } from "../messages";
+import { toolSpecFor, replyMaxTokensFor } from "./model";
 import { recall, getProfileParagraph, embedQueryForRecall, bumpUsage } from "@/lib/memory";
 import { subjectRosterFor } from "@/lib/subjects";
 import { subjectsForTurn } from "@/lib/askNames";
@@ -31,6 +34,10 @@ import type { Node, ContextItem, TurnState } from "../contract";
  * exempted (see its own use site below for the full account and the
  * bench numbers behind 0.1). */
 export const MEMORY_CONTEXT_MIN_SCORE = 0.1;
+
+/** THIN-3C: the share of the history space a turn that may call a tool
+ * keeps free for that round's call and results. */
+export const TOOL_ROUND_SHARE = 0.25;
 
 /** "Reasoning is a second output" (the owner's ruling): decided once,
  * here, from the age band and the surface - "a minor's turn never
@@ -104,29 +111,30 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // (it is already the turn's final user message there, never printed twice).
   items.push({ id: "utterance", text: input.utterance, source: "utterance", subjects: [], disclosure: "child_ok" });
 
-  // The window: every prior turn this conversation already holds,
-  // verbatim (RECALL-03's own window, unchanged for a temporary chat -
-  // buildConversationWindow() reads the in-process session the same
-  // way it reads a persisted one, so "context reads no table" for a
-  // temporary chat is buildConversationWindow()'s own property, not
-  // something this node has to special-case).
-  const window = await buildConversationWindow(conversation, { supersedes: state.supersedes, excludeTurnId: state.continuation?.fromTurnId });
-  for (const message of window.messages) {
-    // ContextItem has no role field (the contract's own shape); the
-    // window's real user/assistant/tool ordering is real signal
-    // messages.ts's contextToMessages() must not lose, so it rides in
-    // the id, the one place a source-specific detail can travel without
-    // widening the contract for every other source. Parsed back out by
-    // windowRoleFromId() in messages.ts - the two stay paired on purpose.
-    items.push({ id: `window-${message.role}-${++windowItemSeq}`, text: typeof message.content === "string" ? message.content : JSON.stringify(message.content), ...(message.tool_calls ? { toolCalls: message.tool_calls } : {}), ...(message.tool_call_id ? { toolCallId: message.tool_call_id } : {}), source: "window", subjects: [], disclosure: "child_ok" });
-  }
-  if (window.summaryLine) {
-    items.push({ id: `window-system-summary`, text: window.summaryLine, source: "window", subjects: [], disclosure: "child_ok" });
-  }
+  // The window (THIN-3C): every turn after the summary's anchor, sized by
+  // the engine's count once the rest of the prompt is known (below). What
+  // the name resolution needs from it is read now.
+  const windowOpts = { supersedes: state.supersedes, excludeTurnId: state.continuation?.fromTurnId };
+  const preview = windowPreview(conversation, windowOpts);
+  const pushWindow = (window: ConversationWindow) => {
+    for (const message of window.messages) {
+      // ContextItem has no role field (the contract's own shape); the
+      // window's real user/assistant/tool ordering is real signal
+      // messages.ts's contextToMessages() must not lose, so it rides in
+      // the id, the one place a source-specific detail can travel without
+      // widening the contract for every other source. Parsed back out by
+      // windowRoleFromId() in messages.ts - the two stay paired on purpose.
+      items.push({ id: `window-${message.role}-${++windowItemSeq}`, text: typeof message.content === "string" ? message.content : JSON.stringify(message.content), ...(message.tool_calls ? { toolCalls: message.tool_calls } : {}), ...(message.tool_call_id ? { toolCallId: message.tool_call_id } : {}), source: "window", subjects: [], disclosure: "child_ok" });
+    }
+    if (window.summaryLine) {
+      items.push({ id: `window-system-summary`, text: window.summaryLine, source: "window", subjects: [], disclosure: "child_ok" });
+    }
+  };
 
   // THIN-7C (bare mode): the raw model sees the conversation and nothing the
   // household's own data adds: no memory, profile, episode, clock or roster.
   if (state.bare) {
+    pushWindow(await buildConversationWindow(conversation, windowOpts));
     return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state) } };
   }
 
@@ -134,9 +142,13 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // (askNames.ts over unknownNames.ts). The unknown line ("Names in this message you have
   // never heard before: ...") and one line per registry subject go ahead of the memory
   // block; the question itself is appended to the reply by the model node.
-  const recentUserTexts = window.messages.filter((m) => m.role === "user").map((m) => m.content);
+  const recentUserTexts = preview.userTexts;
   const resolvedSubjects = subjectsForTurn({ actor: state.actor, text: input.utterance, signal: state.signal, recentUserTexts, conversationId: conversation.id, supersedes: state.supersedes, turnId: state.turnId, temporary });
   if (resolvedSubjects.section) items.push({ id: "subjects", text: resolvedSubjects.section, source: "subjects", subjects: [], disclosure: "child_ok" });
+
+  // RECALL-03, run once the window is sized (below): set inside the
+  // persisted-chat branch, so a temporary chat recalls nothing.
+  let recallEarlier: ((window: ConversationWindow) => Promise<void>) | null = null;
 
   // Memories, dated and labeled (U5/REPLY-FIND-04's own shape): never
   // for a temporary chat (no memory:write either - the policy node's
@@ -270,22 +282,24 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     const episodeMatches = episodeQueryEligible(input.utterance)
       ? recallEpisodes(state.actor, input.utterance, queryVector, { now, excludeConversationId: conversation.id, excludeWholeConversation: true, limit: PROMPT_BLOCK_MAX_LINES, withholdSensitive, anonymous, ...(asksWhatHubSaid(input.utterance) ? { sides: "both" as const, preferHubSide: true } : { sides: "user" as const }) })
       : [];
-    // RECALL-03: this conversation's own turns that fell out of the window
-    // are evidence too, the person's words only, and the earliest dropped
-    // turn when the question is about how the chat began.
-    const earlierMatches: EpisodeMatch[] = [];
-    if (window.droppedOlder) {
-      const byFloors = contentTerms(input.utterance).length >= 2 && !isBareSocialTurn(input.utterance)
-        ? recallEpisodes(state.actor, input.utterance, queryVector, { now, withinConversationId: conversation.id, excludeTurnIds: state.supersedes ? [...window.turnIds, state.supersedes] : window.turnIds, sides: "user", limit: 2, withholdSensitive, anonymous })
-        : [];
-      earlierMatches.push(...byFloors.map((m) => ({ ...m, earlierInThisConversation: true })));
-      if (ASKS_ABOUT_START_RE.test(input.utterance)) {
-        const first = earliestDroppedTurn(state.actor, conversation.id, state.supersedes ? [...window.turnIds, state.supersedes] : window.turnIds, state.supersedes ?? null);
-        if (first && !earlierMatches.some((m) => m.episode.turnId === first.episode.turnId)) earlierMatches.unshift({ ...first, earlierInThisConversation: true });
+    recallEarlier = async (window: ConversationWindow) => {
+      // RECALL-03: this conversation's own turns that fell out of the window
+      // are evidence too, the person's words only, and the earliest dropped
+      // turn when the question is about how the chat began.
+      const earlierMatches: EpisodeMatch[] = [];
+      if (window.droppedOlder) {
+        const byFloors = contentTerms(input.utterance).length >= 2 && !isBareSocialTurn(input.utterance)
+          ? recallEpisodes(state.actor, input.utterance, queryVector, { now, withinConversationId: conversation.id, excludeTurnIds: state.supersedes ? [...window.turnIds, state.supersedes] : window.turnIds, sides: "user", limit: 2, withholdSensitive, anonymous })
+          : [];
+        earlierMatches.push(...byFloors.map((m) => ({ ...m, earlierInThisConversation: true })));
+        if (ASKS_ABOUT_START_RE.test(input.utterance)) {
+          const first = earliestDroppedTurn(state.actor, conversation.id, state.supersedes ? [...window.turnIds, state.supersedes] : window.turnIds, state.supersedes ?? null);
+          if (first && !earlierMatches.some((m) => m.episode.turnId === first.episode.turnId)) earlierMatches.unshift({ ...first, earlierInThisConversation: true });
+        }
       }
-    }
-    const earlierBlock = formatEpisodesForPrompt(earlierMatches, displayName, episodeLocale, now, EARLIER_HEADER);
-    if (earlierBlock) items.push({ id: "episodes-earlier-in-conversation", text: earlierBlock, source: "episode", subjects: [], disclosure: "child_ok" });
+      const earlierBlock = formatEpisodesForPrompt(earlierMatches, displayName, episodeLocale, now, EARLIER_HEADER);
+      if (earlierBlock) items.push({ id: "episodes-earlier-in-conversation", text: earlierBlock, source: "episode", subjects: [], disclosure: "child_ok" });
+    };
     const episodesBlock = formatEpisodesForPrompt(episodeMatches, displayName, episodeLocale, now);
     if (episodesBlock) items.push({ id: "episodes-earlier-conversations", text: episodesBlock, source: "episode", subjects: [], disclosure: "child_ok" });
   }
@@ -308,7 +322,43 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     items.push({ id: `roster-${i}`, text: name, source: "roster", subjects: [], disclosure: "child_ok" });
   });
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning: decideReasoning(state), disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk } };
+  // THIN-3C (rule 4): the history budget is the engine's per-slot context
+  // less this turn's own reply ceiling and the engine's count of the rest
+  // of the prompt as the model node will send it (stable prefix, tools
+  // block, memory, episodes, clock, roster, the summary and the message).
+  // A failed count leaves the budget unmeasured and the window at its
+  // named minimum.
+  const reasoning = decideReasoning(state);
+  const surfaceClass = state.planBasis.surfaceClass ?? "spoken";
+  const thinking = state.budget.thinking_budget_tokens > 0 && reasoning.emit;
+  const summaryItem: ContextItem[] = preview.summaryLine ? [{ id: "window-system-summary", text: preview.summaryLine, source: "window", subjects: [], disclosure: "child_ok" }] : [];
+  const tools = state.budget.tools_offered.slice().sort().map(toolSpecFor).filter((t): t is NonNullable<typeof t> => t !== null);
+  const rest = await countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass), { tools });
+  // A Stack that reports no context length leaves the window unmeasured
+  // too (THIN-3A's named minimum): its 2,048-token stand-in is a floor,
+  // not the engine's real size.
+  const measured = rest !== null && state.budget.context_window_tokens !== null && state.budget.context_window_tokens !== undefined;
+  // A turn that may run a tool round keeps TOOL_ROUND_SHARE of what is
+  // left for the round's own messages (the call and its results, which
+  // the composer sizes to the context), so history at its high-water mark
+  // still leaves a search room to land (a review).
+  const left = measured ? Math.max(0, state.budget.context_tokens - replyMaxTokensFor(state, thinking) - rest) : null;
+  const historyBudgetTokens = left === null ? null : Math.floor(tools.length > 0 ? left * (1 - TOOL_ROUND_SHARE) : left);
+  const window = await buildConversationWindow(conversation, { ...windowOpts, historyBudgetTokens });
+  pushWindow(window);
+  if (recallEarlier) {
+    // RECALL-03's block joins after the window is sized, so it is counted
+    // here and left out when it does not fit beside the window (a review).
+    const before = items.length;
+    await recallEarlier(window);
+    const added = items.slice(before);
+    if (added.length > 0 && historyBudgetTokens !== null && window.historyTokens !== null) {
+      const extra = await countTokens(added.map((item) => ({ role: "system" as const, content: item.text })));
+      if (extra === null || window.historyTokens + extra > historyBudgetTokens) items.splice(before, added.length);
+    }
+  }
+
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning, disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk } };
 };
 
 /** Applies the node's output onto TurnState, the same small

@@ -18,6 +18,7 @@ import { classifyTurnSignal } from "@/lib/turnSignal";
 import { planFor } from "@/lib/register";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { TurnState } from "@/lib/turnMachine/contract";
+import { withTurnDefaults } from "./turnStateDefaults";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import { injectVector } from "../fixtures/injectVector";
 import { useDefaultScriptedStack } from "../stackFixture";
@@ -37,7 +38,7 @@ const SIGNAL = new AbortController().signal;
  * the same minimal-real-state pattern outputGate.test.ts already uses
  * for a node whose tested branch reads only part of TurnState. */
 function stateFor(actor: BenchPeople["owner"]): TurnState {
-  return { actor, surface: "chat", conversationId: "" } as TurnState;
+  return withTurnDefaults({ actor, surface: "chat", conversationId: "" } as TurnState);
 }
 
 describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor gated", () => {
@@ -246,7 +247,7 @@ describe("contextNode: THIN-0D, an unidentified robot speaker is anonymous", () 
   }
 
   function robotState(evidence: TurnState["speakerEvidence"]): TurnState {
-    return { actor: people.owner, surface: "robot", conversationId: "", speakerEvidence: evidence } as TurnState;
+    return withTurnDefaults({ actor: people.owner, surface: "robot", conversationId: "", speakerEvidence: evidence } as TurnState);
   }
 
   const texts = (items: { source: string; text: string }[], source: string) => items.filter((i) => i.source === source).map((i) => i.text);
@@ -278,7 +279,7 @@ describe("contextNode: THIN-0D, an unidentified robot speaker is anonymous", () 
 
   test("a non-robot surface is unchanged, evidence or not", async () => {
     await seedHousehold();
-    const { output } = await contextNode({ actor: people.owner, surface: "chat", conversationId: "" } as TurnState, { utterance: ASK }, SIGNAL);
+    const { output } = await contextNode(withTurnDefaults({ actor: people.owner, surface: "chat", conversationId: "" } as TurnState), { utterance: ASK }, SIGNAL);
     expect(texts(output.items, "memory")).toContain(PERSONAL);
     expect(texts(output.items, "profile")).toEqual([PROFILE]);
   });
@@ -315,7 +316,7 @@ describe("contextNode: THIN-0B, a withheld record reaches the plan", () => {
   function stateFor(actor: BenchPeople["owner"], utterance: string): TurnState {
     const signal = classifyTurnSignal({ text: utterance, ageBand: speakerAgeBand(actor, new Date()), commandOpeners: new Set<string>() });
     const planBasis = { signal, surface: "chat", surfaceClass: "written", brevity: false, companion: { directness: "direct", engagement: "balanced", complexity: "standard" }, band: speakerAgeBand(actor, new Date()), deferred: false, disclosureWithheld: false } as TurnState["planBasis"];
-    return { actor, surface: "chat", conversationId: "", utterance, signal, planBasis, plan: planFor({ ...planBasis, evidence: { choices: 0, sources: 0, deliverable: false } }) } as TurnState;
+    return withTurnDefaults({ actor, surface: "chat", conversationId: "", utterance, signal, planBasis, plan: planFor({ ...planBasis, evidence: { choices: 0, sources: 0, deliverable: false } }) } as TurnState);
   }
 
   test("a child's question whose matching household record is withheld marks the plan: some_withheld, offer_to_ask, and the record stays out of the context", async () => {

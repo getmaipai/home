@@ -173,7 +173,7 @@ export function toolSpecFor(id: string): ToolSpec | null {
  * ceiling is the only cap, every round; a minor's typed turn and every
  * spoken or glance turn still fall through to the formula unchanged
  * (rule 0). */
-function replyMaxTokensFor(state: TurnState, thinking: boolean): number {
+export function replyMaxTokensFor(state: Pick<TurnState, "planBasis" | "plan" | "budget">, thinking: boolean): number {
   const isWrittenAdult = isWrittenAdultTurn(state.planBasis.surfaceClass, state.plan.age_band) && !state.planBasis.brevity;
   if (isWrittenAdult) return state.budget.reply_ceiling_tokens + (thinking ? state.budget.thinking_budget_tokens_toggled : 0);
   return visibleReplyMaxTokens(state.plan.max_words, thinking);
