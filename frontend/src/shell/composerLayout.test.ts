@@ -30,7 +30,7 @@ describe("composer layout contract (COMPOSER-01)", () => {
   test("the text field stops at 160px so the composer tops out near 216px", () => {
     const input = readFileSync(join(import.meta.dir, "../apps/chat/composerDictationWaveform.tsx"), "utf8");
     expect(input).toContain("max-h-40");
-    expect(input).toContain("min-h-9");
+    expect(input).toContain("min-h-12");
   });
 
   test("Send and Stop are 36px, every other round control 32px", () => {

@@ -164,7 +164,7 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
   column-gap: 0;
   row-gap: 0;
   min-height: 56px;
-  padding: 9px 10px 9px 12px;
+  padding: 3px 10px 3px 12px;
   border-radius: 20px;
   background: var(--shell-composer-bg);
   border-color: var(--shell-composer-border);
@@ -197,14 +197,14 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
 
 [data-slot="next-chat-pane"] .aui-composer-action-wrapper > :first-child {
   grid-area: lead;
-  height: 36px;
+  height: 48px;
   align-items: center;
   gap: 2px;
 }
 
 [data-slot="next-chat-pane"] .aui-composer-action-wrapper > :last-child {
   grid-area: trail;
-  height: 36px;
+  height: 48px;
   align-items: center;
   gap: 2px;
   min-width: 0;
@@ -260,7 +260,7 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
   text-overflow: ellipsis;
   /* The autosize measures the placeholder text, so a narrow row that wraps it
    * left an empty field two lines tall. An empty field is one line. */
-  max-height: 36px !important;
+  max-height: 48px !important;
 }
 
 [data-slot="next-chat-pane"] .aui-composer-attachments {

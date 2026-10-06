@@ -5122,7 +5122,7 @@ async function captureComposerLayoutReview(browser: Browser, sessionValue: strin
         const emptyH = m.shell!.height;
         results.push(`${tag} empty ${emptyH.toFixed(1)}px send ${m.send!.width.toFixed(0)}x${m.send!.height.toFixed(0)} selectors ${m.selectors}`);
         if (m.selectors !== (withModels ? 1 : 0)) fail(`composer ${tag}: ${m.selectors} model selectors, want ${withModels ? 1 : 0}`);
-        const maxRow = withModels && width < 640 ? 100 : 60.5; // a phone with the model label stacks its controls
+        const maxRow = withModels && width < 640 ? 110 : 60.5; // a phone with the model label stacks its controls
         if (emptyH < 55 || emptyH > maxRow) fail(`composer ${tag}: empty height ${emptyH}px, want 56 to 60`);
         if (m.send!.width < 31.5 || m.send!.width > 36.5) fail(`composer ${tag}: send is ${m.send!.width}px, want 32 to 36`);
                 if (m.overflowX) fail(`composer ${tag}: horizontal overflow`);
