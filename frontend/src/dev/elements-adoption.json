@@ -34,8 +34,9 @@
       "file": "agent-status.tsx",
       "name": "agent-status",
       "group": "agent/workflow",
-      "verdict": "no-fit",
-      "implemented": false
+      "verdict": "wire-after",
+      "implemented": false,
+      "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
     },
     {
       "file": "approval-card.tsx",
@@ -63,7 +64,8 @@
       "name": "background-inbox",
       "group": "agent/workflow",
       "verdict": "wire-after",
-      "implemented": false
+      "implemented": false,
+      "reading": "NEEDS-YOU-01 uses background-inbox when its additive route and source records are ready."
     },
     {
       "file": "canvas-split.tsx",
@@ -420,8 +422,9 @@
       "file": "memory-chips.tsx",
       "name": "memory-chips",
       "group": "other",
-      "verdict": "wire-now",
-      "implemented": false
+      "verdict": "wire-after",
+      "implemented": false,
+      "reading": "LEARNED-01 is the one dashboard Memory card; it also closes the existing chat chip wiring."
     },
     {
       "file": "mermaid-diagram.tsx",
@@ -672,8 +675,9 @@
       "file": "speaker-identity.tsx",
       "name": "speaker-identity",
       "group": "voice",
-      "verdict": "later",
-      "implemented": false
+      "verdict": "wire-after",
+      "implemented": false,
+      "reading": "CHAR-01 uses SpeakerIdentity as the shipped assistant reply speaker mark."
     },
     {
       "file": "spec-sheet.tsx",
@@ -833,8 +837,9 @@
       "file": "timeline.tsx",
       "name": "timeline",
       "group": "agent/workflow",
-      "verdict": "no-fit",
-      "implemented": false
+      "verdict": "wire-after",
+      "implemented": false,
+      "reading": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline."
     },
     {
       "file": "todo-list.tsx",

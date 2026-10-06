@@ -535,3 +535,7 @@ close control returns focus to the row; below 960px it is a
 full-width overlay and below 720px a full-screen sheet with a
 visible Back and sticky actions. A things page's controls dock and
 table header stick inside the content region, the rows scroll.
+
+### Row-Bot dashboard additions (2026-10-06)
+
+The first dashboard card is Needs you for the signed-in person. It includes parked asks and failed routine runs; repairs remain in the existing admin strip, and the card reads setup progress from HOME-ALIVE-01g. The Since you were last here timeline contains run and delivery facts only, never conversation content, and never shows a teen's rows to an admin. LEARNED-01 is the single Memory tile: it shows only the signed-in person's saved memories from the last seven days.

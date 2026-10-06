@@ -68,7 +68,7 @@
       "file": "agent-status.tsx",
       "name": "agent-status",
       "group": "agent/workflow",
-      "verdict": "no-fit",
+      "verdict": "wire-after",
       "backendNeeded": null,
       "effort": null,
       "specTagNeeded": false,
@@ -78,7 +78,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
     },
     {
       "file": "approval-card.tsx",
@@ -152,7 +153,8 @@
       "showcaseScenario": null,
       "batch": 6,
       "replacesHandBuilt": [],
-      "realTurnToday": false
+      "realTurnToday": false,
+      "reading": "NEEDS-YOU-01 uses background-inbox when its additive route and source records are ready."
     },
     {
       "file": "canvas-split.tsx",
@@ -982,7 +984,8 @@
       "replacesHandBuilt": [
         "frontend/src/apps/chat/chatActionBar.tsx:183-265"
       ],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "reading": "LEARNED-01 is the one dashboard Memory card; it also closes the existing chat chip wiring."
     },
     {
       "file": "mermaid-diagram.tsx",
@@ -1566,7 +1569,7 @@
       "file": "speaker-identity.tsx",
       "name": "speaker-identity",
       "group": "voice",
-      "verdict": "later",
+      "verdict": "wire-after",
       "backendNeeded": "VOICE-LIVE-*",
       "effort": null,
       "specTagNeeded": false,
@@ -1576,7 +1579,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "reading": "CHAR-01 uses SpeakerIdentity as the shipped assistant reply speaker mark."
     },
     {
       "file": "spec-sheet.tsx",
@@ -1941,7 +1945,7 @@
       "file": "timeline.tsx",
       "name": "timeline",
       "group": "agent/workflow",
-      "verdict": "no-fit",
+      "verdict": "wire-after",
       "backendNeeded": null,
       "effort": null,
       "specTagNeeded": false,
@@ -1951,7 +1955,8 @@
       "showcaseScenario": null,
       "batch": null,
       "replacesHandBuilt": [],
-      "realTurnToday": null
+      "realTurnToday": null,
+      "reading": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline."
     },
     {
       "file": "todo-list.tsx",
