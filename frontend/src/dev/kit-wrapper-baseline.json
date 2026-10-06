@@ -315,26 +315,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/settings/NextHouseholdSettings.tsx": {
-    "LinkCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "next/pages/settings/NextMeSettings.tsx": {
-    "DeviceAppearanceControl": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "TelegramAdvanced": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "LinkCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "next/pages/settings/PersonMultiSelect.tsx": {
     "PersonMultiSelect": {
       "ed": "ED-038",

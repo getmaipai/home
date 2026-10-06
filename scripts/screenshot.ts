@@ -331,6 +331,8 @@ const chatProjectsReview = process.argv.includes("--chat-projects-review");
 const chatSkillsReview = process.argv.includes("--chat-skills-review");
 // ENGINE-DOWN-UI-01: a reply with its action row while chat is ready and while it is paused.
 const engineDownReview = process.argv.includes("--engine-down-review");
+// APP-SET-02: the settings areas (Account, Chat settings, Home settings) as an admin, an adult, a teen and a child see them.
+const appSettingsReview = process.argv.includes("--app-settings-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
@@ -365,7 +367,9 @@ const ROUTES: RouteSpec[] = [
   // Family-tab screenshots are a follow-up; the existing People route capture stays here.
   { slug: "people-memories", path: "/memory" },
   { slug: "privacy", path: "/privacy" },
-  { slug: "settings", path: "/settings" },
+  // APP-SET-02: Home settings General, the page `/settings` opened for an admin
+  // before the settings areas (the shell's own phone start is a column list).
+  { slug: "settings", path: "/settings/home/general" },
   { slug: "status", path: "/status" },
   { slug: "settings-models", path: "/models" },
   { slug: "settings-backups", path: "/backups" },
@@ -912,6 +916,13 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
         if (style.visibility === "hidden" || style.display === "none") continue;
         let width = rect.width;
         let height = rect.height;
+        // A text input cannot carry a pseudo-element, so the kit (KIT-SET-05's
+        // HitField) seats it in a native <label> at least 48 px tall: a click
+        // anywhere on the label focuses the input. Credit that label's box.
+        if (el.tagName === "INPUT") {
+          const label = el.closest("label")?.getBoundingClientRect();
+          if (label) { width = Math.max(width, label.width); height = Math.max(height, label.height); }
+        }
         for (const pseudo of ["::before", "::after"] as const) {
           const layer = getComputedStyle(el, pseudo);
           if (layer.content !== "none" && layer.position === "absolute") {
@@ -2597,6 +2608,73 @@ async function captureChatSkillsReview(browser: Browser, ownerSession: string): 
           const file = join(outDir, `skills-${who}-${viewport.width}-${theme}.png`);
           await page.screenshot({ path: file, fullPage: true });
           console.log(`Wrote ${file}`);
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
+}
+
+/** APP-SET-02: the three settings areas on the seeded household, as an admin
+ * (the owner), an adult, a teen and a child, at 1440 and 390 in both themes.
+ * A persona sees only its own areas: the adult, teen and child land on
+ * Account when they ask for Home settings, which the capture shows. Each
+ * capture logs what the page measured (column width, card width, title size,
+ * first row height) so a reviewer can compare it with the reference. */
+async function captureAppSettingsReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "app-settings-shots");
+  mkdirSync(outDir, { recursive: true });
+  const ownerHeaders = { "Content-Type": "application/json", Cookie: `session=${ownerSession}` };
+  const personas: Array<[string, string]> = [["admin", ownerSession]];
+  for (const [who, role, secret] of [["adult", "adult", "review-settings-adult"], ["teen", "teen", "review-settings-teen"], ["child", "child", ""]] as const) {
+    const created = await fetch(`${BASE_URL}/api/people`, {
+      method: "POST", headers: ownerHeaders,
+      body: JSON.stringify({ displayName: `Settings ${who}`, role, ...(secret ? { secret } : {}) }),
+    });
+    if (!created.ok) throw new Error(`app settings review ${who} setup failed: ${created.status} ${await created.text()}`);
+    const person = await created.json() as { id: string };
+    const signedIn = secret
+      ? await fetch(`${BASE_URL}/api/auth/verify-secret`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: person.id, secret }) })
+      : await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: person.id }) });
+    const session = signedIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+    if (!session) throw new Error(`app settings review ${who} sign-in carried no session cookie`);
+    personas.push([who, session]);
+  }
+  const pages = [["account", "/settings/account/profile"], ["chat", "/settings/chat/general"], ["home", "/settings/home/general"]] as const;
+  for (const [who, session] of personas) {
+    for (const slug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          for (const [area, path] of pages) {
+            await page.goto(`${BASE_URL}${path}`);
+            await page.locator('[data-slot="settings-shell"]').waitFor();
+            await page.waitForTimeout(600);
+            const measured = await page.evaluate(() => {
+              const box = (selector: string) => document.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
+              const groups = [...document.querySelectorAll<HTMLElement>('[data-slot="item-group"]')];
+              const firstRow = document.querySelector<HTMLElement>('[data-slot="item"]')?.getBoundingClientRect();
+              return {
+                path: location.pathname,
+                column: Math.round(box('[data-slot="settings-column"]')?.width ?? 0),
+                card: Math.round(groups[0]?.getBoundingClientRect().width ?? 0),
+                title: getComputedStyle(document.querySelector("h1") ?? document.body).fontSize,
+                firstRow: Math.round(firstRow?.height ?? 0),
+                rows: [...document.querySelectorAll('[data-slot="settings-column"] a')].map((a) => a.textContent?.trim()),
+                overflow: document.documentElement.scrollWidth > window.innerWidth,
+              };
+            });
+            console.log(`app-settings ${who} ${area} ${slug} ${theme}: ${JSON.stringify(measured)}`);
+            if (measured.overflow) throw new Error(`app settings ${who} ${area} ${slug} ${theme} scrolls sideways`);
+            await settleAnimations(page);
+            const file = join(outDir, `settings-${who}-${area}-${viewport.width}-${theme}.png`);
+            await page.screenshot({ path: file, fullPage: false });
+            console.log(`Wrote ${file}`);
+          }
         } finally {
           await context.close();
         }
@@ -9284,6 +9362,12 @@ async function main() {
     if (chatSkillsReview) {
       await captureChatSkillsReview(browser, sessionValue);
       console.log("completed named review: --chat-skills-review");
+      return;
+    }
+
+    if (appSettingsReview) {
+      await captureAppSettingsReview(browser, sessionValue);
+      console.log("completed named review: --app-settings-review");
       return;
     }
 

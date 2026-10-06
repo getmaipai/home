@@ -9,6 +9,8 @@ import type { conversationTurns, conversations } from "./db/schema";
 // and modelCatalog.ts below, so its types are re-exported directly
 // instead of hand-copied a second time.
 export type { HardwareInfo, CudaDevice } from "./lib/hardware";
+// APP-SET-02: what a child or teen saw in Settings before the per-app areas.
+export { minorVisibleSettingKeys } from "./lib/settingsMinorSnapshot";
 
 // The wire shapes a browser client needs, kept alias-free (relative
 // imports only, never "@/...") so frontend/src/lib/api.ts can import this

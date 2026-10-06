@@ -7,6 +7,8 @@ import { Page } from "@maipai/ui/src/primitives/Page";
 import { List } from "@maipai/ui/src/primitives/List";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { SplitView } from "@maipai/ui/src/primitives/SplitView";
+import { SettingsShellShowcase } from "@maipai/ui/src/settings/SettingsShellShowcase";
+import { SettingsShowcase } from "@maipai/ui/src/settings/SettingsShowcase";
 import { ElementsAdoptionPanel } from "@/dev/ElementsAdoptionPanel";
 import { AdminGatedContent } from "@/apps/settings/AdminGatedContent";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
@@ -73,6 +75,12 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, setScenario, settleRef }:
   const scenarioIds = useMemo(() => new Set(scenarios.map((scenario) => scenario.id)), [scenarios]);
   return (
     <div className="flex h-full min-h-0 flex-col">
+    {/* APP-SET-02 (kit report KIT-SET-02): the settings look and the settings shell, as the kit ships them. */}
+    <details>
+      <summary>Settings look and shell</summary>
+      <SettingsShowcase />
+      <SettingsShellShowcase />
+    </details>
     <ElementsAdoptionPanel scenarioIds={scenarioIds} onPlay={(id) => { const scenario = scenarios.find((entry) => entry.id === id); if (scenario) send(scenario); }} />
     <div className="min-h-0 flex-1">
     <SplitView

@@ -1,0 +1,9 @@
+/* APP-SET-02: the Neutral look's switch colour on the settings pages.
+ * ChatGPT's settings switches are blue (sampled #3983f7); the kit reads
+ * `--switch-checked` (default: the look's `--primary`) and the other looks
+ * keep their own primary. Only a design token is set here, as the kit asks
+ * (kit report KIT-SET-01, "Things Home needs to know"). Light mirrors dark
+ * until a light reference exists (owner, 2026-10-06). */
+.style-neutral {
+  --switch-checked: #3983f7;
+}

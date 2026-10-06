@@ -12,6 +12,7 @@ import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { AreasFile, AreaCard, AreaSection, SettingsArea, Role, Band } from "@maipai/spec/settings/areas-check.js";
 import { SPEC_DIR } from "./specDir.js";
 import { speakerAgeBand } from "./ageBand";
+import { minorVisibleSettingKeys } from "./settingsMinorSnapshot";
 import { listActivePeople } from "./access";
 import { listDevicesByKind } from "./devices";
 import { areWakewordAssetsInstalled } from "./wakewordAssets";
@@ -59,6 +60,9 @@ export interface SettingPlace { area: string; section: string; card: string }
  * are never placed here, matching search's own disclosure rule. */
 export function placeSetting(key: SettingsKey, viewer: SettingsViewer): SettingPlace | undefined {
   if (key.level === "expert") return undefined;
+  // A child or teen is never shown more than the old Settings page showed them.
+  const minorKeys = minorVisibleSettingKeys(viewer.band);
+  if (minorKeys && !minorKeys.has(key.key)) return undefined;
   for (const area of getSettingsAreas().areas as SettingsArea[]) {
     if (!allows(viewer, area.audience)) continue;
     for (const section of area.sections as AreaSection[]) {

@@ -8,6 +8,7 @@ import { NextRoutes } from "@/next/NextRoutes";
 import { createChatThreadListAdapter } from "@/apps/chat/chatThreadListAdapter";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
+import { mockHome } from "@/next/pages/settings/settingsTestKit";
 import type { Roster } from "@/lib/api";
 
 afterEach(() => {
@@ -462,6 +463,28 @@ describe("next Manage routes", () => {
       await view.findByRole("table");
     } finally {
       globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+// APP-SET-02 (RULES S4): the settings areas sit beside chat, outside
+// NextPageHeaderLayout: no slim title bar, the shell's column title is the
+// page's heading, and `/settings` itself replaces to Account.
+describe("NextRoutes settings areas", () => {
+  test.each(["/settings/account/profile", "/settings"])("%s draws the settings shell with no page-header title", async (path) => {
+    const fixture = mockHome();
+    try {
+      const view = renderWithQueryClient(
+        <MemoryRouter initialEntries={[path]}>
+          <Routes><Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} /></Routes>
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(view.container.querySelector('[data-slot="settings-shell"]')).toBeTruthy());
+      expect(view.getByRole("heading", { level: 1, name: "Profile" })).toBeTruthy();
+      expect(view.container.querySelector("h1.sr-only")).toBeNull();
+      expect(view.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();
+    } finally {
+      fixture.restore();
     }
   });
 });

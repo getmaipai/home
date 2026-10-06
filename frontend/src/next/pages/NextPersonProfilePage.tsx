@@ -159,7 +159,7 @@ function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { p
           {profile.bio ? <p className="text-base text-muted-foreground">{profile.bio}</p> : null}
         </div>
         <div className="flex basis-full flex-row items-center justify-end gap-4 sm:w-auto sm:basis-auto sm:flex-col sm:items-end sm:gap-2">
-          {showSelfEdit && canEdit ? <Link to="/settings?tab=me&section=profile" className="min-h-12 content-center text-sm text-primary underline">Edit profile</Link> : canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="min-h-12 gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
+          {showSelfEdit && canEdit ? <Link to="/settings/account/profile" className="min-h-12 content-center text-sm text-primary underline">Edit profile</Link> : canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="min-h-12 gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
         </div>
       </CardContent>
       {canEdit && !viewingSelf ? <EditProfileDialog profile={profile} open={editOpen} onOpenChange={setEditOpen} onPersonChange={onPersonChange} /> : null}

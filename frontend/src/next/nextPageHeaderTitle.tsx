@@ -20,7 +20,6 @@
 import { useLocation } from "react-router-dom";
 import type { Icon } from "@maipai/ui/src/icons";
 import SidebarContent from "@maipai/ui/src/dashboard/layouts/full/vertical/sidebar/sidebaritems";
-import { SettingsIcon } from "@/next/pages/NextSettingsPage";
 import { EnginesIcon } from "@/next/pages/NextEnginesPage";
 import { PerformanceIcon } from "@/next/pages/NextPerformancePage";
 import { UpdatesIcon } from "@/next/pages/NextUpdatesPage";
@@ -52,7 +51,6 @@ for (const group of SidebarContent) {
 }
 
 const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
-  "/settings": { icon: SettingsIcon, label: "Settings" },
   "/storage": { icon: StorageIcon, label: "Storage" },
   "/status": { icon: StatusIcon, label: "Status" },
   "/engines": { icon: EnginesIcon, label: "Engines" },

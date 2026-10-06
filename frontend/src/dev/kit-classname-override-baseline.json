@@ -915,51 +915,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextSettingsPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "TabsList": {
-      "tokens": [
-        "h-auto",
-        "min-h-12",
-        "w-auto"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "TabsTrigger": {
-      "tokens": [
-        "min-h-12",
-        "min-w-fit",
-        "px-4"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "TabsContent": {
-      "tokens": [
-        "flex",
-        "flex-col",
-        "gap-4"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "next/pages/NextSignInPage.tsx": {
     "Card": {
       "tokens": [
@@ -1409,98 +1364,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/settings/NextHouseholdSettings.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "pb-2"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "CollapsibleTrigger": {
-      "tokens": [
-        "flex",
-        "items-center",
-        "justify-between",
-        "min-h-12",
-        "w-full"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "CollapsibleContent": {
-      "tokens": [
-        "pb-5",
-        "px-6"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Card": {
-      "tokens": [
-        "h-full",
-        "hover:bg-accent",
-        "py-4"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "next/pages/settings/NextMeSettings.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "pb-2"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "CollapsibleTrigger": {
-      "tokens": [
-        "flex",
-        "items-center",
-        "justify-between",
-        "min-h-12",
-        "w-full"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "CardContent": {
-      "tokens": [
-        "flex",
-        "flex-wrap",
-        "gap-3",
-        "items-center",
-        "pt-0"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "SelectTrigger": {
-      "tokens": [
-        "min-h-12",
-        "w-48"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Button": {
-      "tokens": [
-        "min-h-12"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Card": {
-      "tokens": [
-        "h-full",
-        "hover:bg-accent",
-        "py-4"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
   "next/pages/settings/NextSettingField.tsx": {
     "Input": {
       "tokens": [
@@ -1566,56 +1429,6 @@
     "ComboboxChips": {
       "tokens": [
         "w-64"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "next/pages/settings/SettingsSectionFrame.tsx": {
-    "NativeSelect": {
-      "tokens": [
-        "[&>select]:min-h-12",
-        "w-full"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Tabs": {
-      "tokens": [
-        "w-full"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "TabsList": {
-      "tokens": [
-        "bg-transparent",
-        "gap-1",
-        "h-auto",
-        "items-stretch",
-        "md:flex",
-        "md:w-56",
-        "p-0",
-        "w-full"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "TabsTrigger": {
-      "tokens": [
-        "justify-start",
-        "min-h-12",
-        "px-3"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "TabsContent": {
-      "tokens": [
-        "flex",
-        "flex-col",
-        "gap-5",
-        "mt-0"
       ],
       "ed": "ED-037",
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."

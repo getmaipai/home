@@ -9,7 +9,8 @@ import { NextPageHeaderTitle } from "@/next/nextPageHeaderTitle";
 import { NextDashboardPage } from "@/next/pages/NextDashboardPage";
 import { NextChatPage } from "@/next/pages/NextChatPage";
 import { NextFamilyPage } from "@/next/pages/NextFamilyPage";
-import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
+import { SettingsAreaPage } from "@/next/pages/settings/SettingsAreaPage";
+import { CustomizeRedirect, SettingsEntryRedirect } from "@/next/pages/settings/SettingsEntryRedirect";
 import { NextStoragePage } from "@/next/pages/NextStoragePage";
 import { NextEnginesPage } from "@/next/pages/NextEnginesPage";
 import { NextPerformancePage } from "@/next/pages/NextPerformancePage";
@@ -74,7 +75,6 @@ function NextPageHeaderLayout() {
   useHeaderExtra(NextPageHeaderTitle);
   const titleByPath: Record<string, string> = {
     "/people": "Family",
-    "/settings": "Settings",
     "/storage": "Storage",
     "/engines": "Engines",
     "/performance": "Performance",
@@ -171,11 +171,18 @@ function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { pers
             beside the history column. */}
         <Route element={<FullLayout rail headerSearchRemote={api.search} railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
+          {/* APP-SET-02 (RULES S4): the settings areas draw no slim title bar,
+              like ChatGPT's own settings page: the column title is the page's
+              heading, so these routes sit beside chat, outside
+              NextPageHeaderLayout. `/settings` and every old `?tab=` link
+              replace to the page that holds them now; `/customize` is gone. */}
+          <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
+          <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={onPersonChange} />} />
+          <Route path="customize" element={<CustomizeRedirect person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />
             <Route path="people" element={<NextFamilyPage person={person} />} />
             <Route path="people/:id" element={<NextPersonProfilePage person={person} onPersonChange={onPersonChange} />} />
-            <Route path="settings" element={<NextSettingsPage person={person} onPersonChange={onPersonChange} />} />
             <Route path="storage" element={<NextStoragePage person={person} />} />
             <Route path="engines" element={<NextEnginesPage person={person} />} />
             <Route path="performance" element={<NextPerformancePage />} />

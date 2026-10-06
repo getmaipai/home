@@ -1363,7 +1363,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
                   modelPickerAllowed={modelPickerAllowed}
                   canUseIncognito={person.age_band === "adult" && canHaveTemporaryChatRole(person.role)}
-                  onOpenSettings={() => navigate("/settings")}
+                  onOpenSettings={() => navigate("/settings/chat")}
                   openingConversationId={openingConversationId}
                 />
               </ConnectionStateContext.Provider>

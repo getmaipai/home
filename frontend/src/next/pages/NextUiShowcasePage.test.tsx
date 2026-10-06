@@ -75,6 +75,13 @@ describe("NextUiShowcasePage", () => {
     expect(streamed).toEqual([]);
   });
 
+  test("mounts the kit's settings showcases (APP-SET-02)", async () => {
+    const view = open();
+    await waitFor(() => expect(view.getByText("Settings look and shell")).toBeTruthy());
+    expect(view.container.querySelector('[data-slot="settings-shell"]')).toBeTruthy();
+    expect(view.container.querySelectorAll('[data-slot="item-group"]').length).toBeGreaterThan(0);
+  });
+
   test("lists every scenario as a button", async () => {
     const view = open();
     await waitFor(() => expect(view.getAllByRole("button", { name: /^Table\./ })).toHaveLength(1));

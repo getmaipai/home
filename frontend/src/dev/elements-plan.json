@@ -495,6 +495,23 @@
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
+      "file": "thread.engine-down.test.tsx",
+      "name": "thread.engine-down.test",
+      "group": "thread.engine",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
+    },
+    {
       "file": "command-palette.test.tsx",
       "name": "command-palette.test",
       "group": "command",

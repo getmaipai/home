@@ -194,4 +194,19 @@ describe("GET /api/search: settings", () => {
     expect(results.every((r) => r.href.startsWith("/settings/account/") || r.href.startsWith("/settings/chat/"))).toBe(true);
     expect(results.find((r) => r.id.startsWith("household."))).toBeUndefined();
   });
+  // APP-SET-02: nobody gains a key. A child or teen is shown no more than the
+  // old Settings page showed them, so a key placed in a card later is still
+  // not a minor's search result.
+  test("a teen's search never finds a key the old Settings page did not show a teen", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: teenClient } = await addPerson(ownerClient, "Nova", "teen");
+    const { client: childClient } = await addPerson(ownerClient, "Sprout", "child");
+    const adult = await addPerson(ownerClient, "Marsh", "adult");
+    const find = async (c: TestClient, q: string, id: string) => group(await search(c, q), "setting")?.results.find((r) => r.id === id);
+    expect(await find(adult.client, "pictures in answers", "reference.images")).toBeDefined();
+    expect(await find(teenClient, "pictures in answers", "reference.images")).toBeUndefined();
+    expect(await find(childClient, "pictures in answers", "reference.images")).toBeUndefined();
+    expect(await find(teenClient, "Send photos", "chat.photo_uploads")).toBeDefined();
+    expect(await find(childClient, "Send photos", "chat.photo_uploads")).toBeUndefined();
+  });
 });
