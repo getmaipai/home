@@ -36,7 +36,7 @@ function bandOf(role: string): RunningNowBand {
   return role === "child" ? "child" : role === "teen" ? "teen" : "adult";
 }
 
-export type ActivityCardPick = { row: RunningNowRow; kind: "waiting" | "running" | "done"; more: number };
+export type ActivityCardPick = { row: RunningNowRow; kind: "waiting" | "running" | "done" | "failed"; more: number };
 
 /** The single most urgent thing to show, or nothing. Waiting beats
  * running beats finished. An approval or ask that belongs to the chat the
@@ -48,6 +48,8 @@ export function pickActivity(view: RunningNowView, currentConversationId: string
   const done = view.done.filter((row) => row.own && !dismissed.has(row.id) && row.finishedAt !== undefined && now - row.finishedAt <= RECENT_DONE_MS);
   if (waiting.length > 0) return { row: waiting[0]!, kind: "waiting", more: waiting.length - 1 + running.length };
   if (running.length > 0) return { row: running[0]!, kind: "running", more: running.length - 1 };
+  const failed = done.find((row) => row.failed);
+  if (failed) return { row: failed, kind: "failed", more: done.length - 1 };
   if (done.length > 0) return { row: done[0]!, kind: "done", more: done.length - 1 };
   return null;
 }
@@ -98,6 +100,7 @@ export function ChatActivityCard() {
   const actions = row.actions;
   const percent = row.progress === undefined ? undefined : Math.round(Math.max(0, Math.min(1, row.progress)) * 100);
   const attention = kind === "waiting";
+  const failed = kind === "failed";
   return (
     <>
       {live}
@@ -105,6 +108,7 @@ export function ChatActivityCard() {
         data-slot="chat-activity-card"
         data-kind={kind}
         role="status"
+        variant={failed ? "destructive" : "default"}
         className={attention ? "my-2 border-[var(--tint-attention-hairline)] bg-[var(--tint-attention)] text-foreground" : "my-2 text-foreground"}
       >
         <AlertTitle className="flex items-baseline justify-between gap-3 text-base">
@@ -115,14 +119,14 @@ export function ChatActivityCard() {
           {row.detail || more > 0 ? <p>{row.detail ? [row.detail, more > 0 ? `${more} more` : ""].filter(Boolean).join(" · ") : `and ${more} more`}</p> : null}
         </AlertDescription>
         {percent !== undefined ? <Progress value={percent} aria-label={`${row.title} progress`} className="mt-2 w-auto" /> : null}
-        {actions.length > 0 || kind === "done" ? (
+        {actions.length > 0 || kind === "done" || failed ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {actions.map((key) => (
               <Button key={key} type="button" size="sm" variant={key === "approve" ? "default" : "outline"} className="text-base" disabled={busy && key !== "open"} aria-label={`${ACTION_LABEL[key]} ${row.title}`} onClick={() => act(key)}>
                 {ACTION_LABEL[key]}
               </Button>
             ))}
-            {kind === "done" ? (
+            {kind === "done" || failed ? (
               <Button type="button" size="sm" variant="ghost" className="text-base" onClick={() => setDismissed((current) => new Set(current).add(row.id))}>
                 Dismiss
               </Button>

@@ -77,6 +77,11 @@ describe("runningNowView", () => {
     expect(view.running[0]?.detail).toBe("About 3 minutes left");
   });
 
+  test("a zero ETA does not claim there is time left", () => {
+    const view = runningNowView({ jobs: [job({ progress: { eta_seconds: 0 } })], viewer: adult, now: NOW });
+    expect(view.running[0]?.detail).toBeUndefined();
+  });
+
   test("steps read as step n of m", () => {
     const view = runningNowView({ jobs: [job({ progress: { step_index: 1, step_count: 4 } })], viewer: adult, now: NOW });
     expect(view.running[0]?.detail).toBe("Step 2 of 4");
@@ -139,4 +144,3 @@ describe("runningNowAnnouncement", () => {
     expect(runningNowView({ jobs: [sweep, download], viewer: admin, now: NOW }).running.map((r) => r.id)).toEqual(["model:1"]);
   });
 });
-

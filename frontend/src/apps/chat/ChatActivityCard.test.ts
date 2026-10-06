@@ -42,4 +42,10 @@ describe("pickActivity (the one calm card above the composer)", () => {
     expect(pick?.row.actions).toContain("open");
     expect(pickActivity(view(jobs), undefined, NOW, new Set(["d"]))).toBeNull();
   });
+
+  test("a failed job remains visibly distinct from successful completion", () => {
+    const jobs = [job({ id: "failed", state: "failed", updatedAt: ago(60) })];
+    const pick = pickActivity(view(jobs), undefined, NOW, none);
+    expect(pick).toMatchObject({ kind: "failed", row: { failed: true, status: "Didn't finish", detail: "It stopped before it finished." } });
+  });
 });

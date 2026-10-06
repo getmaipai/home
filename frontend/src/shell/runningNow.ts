@@ -32,6 +32,8 @@ export interface RunningNowRow {
   finishedAt?: number;
   /** Whether this row is the viewer's own (only those are announced). */
   own: boolean;
+  /** A completed row may have ended unsuccessfully. */
+  failed?: boolean;
 }
 
 export interface RunningNowView {
@@ -86,7 +88,7 @@ function detailFor(job: HomeJobView, viewer: RunningNowViewer, now: number): str
   if (stepIndex !== undefined && stepCount !== undefined && stepCount > 0) return `Step ${Math.min(stepCount, stepIndex + 1)} of ${stepCount}`;
   if (viewer.band === "child") return undefined;
   const eta = num(progress.eta_seconds) ?? num(progress.etaSeconds);
-  if (eta !== undefined) return etaWords(eta);
+  if (eta !== undefined) return eta > 0 ? etaWords(eta) : undefined;
   if (job.state === "running" && job.createdAt) return elapsedWords((now - Date.parse(job.createdAt)) / 1000);
   return undefined;
 }
@@ -160,6 +162,7 @@ function rowFor(job: HomeJobView, viewer: RunningNowViewer, now: number): Runnin
     ...(href ? { href } : {}),
     ...(job.conversationId ? { conversationId: job.conversationId } : {}),
     own,
+    ...(state === "failed" ? { failed: true } : {}),
   };
 }
 
