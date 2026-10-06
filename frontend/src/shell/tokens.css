@@ -145,8 +145,17 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
  * the kit's compact density (`composerDensity: "compact"` in
  * apps/chat/elementBindings.ts, ui-v0.5.114): row height, control sizes,
  * insets, radius, 48px hit areas and the wrapped-text row all live in the
- * kit. Home only supplies the colour tokens the kit reads. */
+ * kit. Home only sets the tokens the kit reads. COMPOSER-SIZE-01 (owner,
+ * 2026-10-06, "chat input is still too large"): a 48px row (50 outer with the
+ * border), 30px controls, 32px Send, no vertical inset, tighter side insets;
+ * three lines are about 140px and the 160px field cap about 210px. */
 [data-slot="next-chat-pane"] {
+  --composer-compact-row-height: 48px;
+  --composer-compact-control-size: 30px;
+  --composer-compact-send-size: 32px;
+  --composer-compact-inset-y: 0px;
+  --composer-compact-inset-start: 10px;
+  --composer-compact-inset-end: 8px;
   --composer-compact-bg: var(--shell-composer-bg);
   --composer-compact-border: var(--shell-composer-border);
   --composer-compact-border-focus: var(--shell-composer-border-focus);
