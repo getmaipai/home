@@ -52,7 +52,7 @@
 // other real method here already follows. See spec/llm/README.md and
 // docs/dev.md's Package Host section for everything else deferred and
 // why.
-import { isAdultOnlyImageEngine } from "@/lib/searchEngines";
+import { isPrivacyFlaggedSearchEngine } from "@/lib/searchEngines";
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -643,10 +643,7 @@ export async function answerImageSearch(query: string, actor: PersonRow, band: A
   if (!baseUrl) return [];
   try {
     const level = band === "child" ? "strict" : resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
-    // Yandex, when the household enables it in its own SearXNG, is for adults
-    // only (owner, 2026-10-06): a minor's engine list never names it (a copy:
-    // the cached list is shared).
-    const safeEngines = band === "adult" ? undefined : (await safesearchEnginesFor(baseUrl, "images", { signal, deadlineAt: Date.now() + 1_500 }))?.filter((e) => !isAdultOnlyImageEngine(e));
+    const safeEngines = band === "adult" ? undefined : await safesearchEnginesFor(baseUrl, "images", { signal, deadlineAt: Date.now() + 1_500 }, true);
     if (band !== "adult" && (!safeEngines || safeEngines.length === 0)) return [];
     const engines = safeEngines ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
     const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json&categories=images&safesearch=${safeSearchNumericLevel(level)}${engines}`;
@@ -879,7 +876,7 @@ export function __resetSearchRotationForTests(): void {
  * outright over a filter this could not build) or an empty array when
  * the instance genuinely has no safe-search-capable engine for this
  * category - the caller treats both the same way. */
-async function safesearchEnginesFor(baseUrl: string, category: "general" | "images", options: { signal?: AbortSignal; deadlineAt?: number } = {}): Promise<string[] | null> {
+async function safesearchEnginesFor(baseUrl: string, category: "general" | "images", options: { signal?: AbortSignal; deadlineAt?: number } = {}, excludePrivacyFlagged = false): Promise<string[] | null> {
   const now = Date.now();
   if (!searxngEnginesCache || searxngEnginesCache.baseUrl !== baseUrl || now - searxngEnginesCache.fetchedAt > SEARXNG_ENGINES_CACHE_TTL_MS) {
     const url = `${baseUrl.replace(/\/+$/, "")}/config`;
@@ -900,13 +897,13 @@ async function safesearchEnginesFor(baseUrl: string, category: "general" | "imag
     });
     searxngEnginesCache = { baseUrl, fetchedAt: now, engines };
   }
-  return searxngEnginesCache.engines.filter((e) => e.enabled && e.safesearch && e.categories.includes(category)).map((e) => e.name);
+  return searxngEnginesCache.engines.filter((e) => e.enabled && e.safesearch && e.categories.includes(category) && (!excludePrivacyFlagged || !isPrivacyFlaggedSearchEngine(e.name))).map((e) => e.name);
 }
 
-async function webRotationPool(baseUrl: string, safeLevel: SafeSearchLevel, options: { signal?: AbortSignal; deadlineAt?: number } = {}): Promise<string[] | null> {
+async function webRotationPool(baseUrl: string, safeLevel: SafeSearchLevel, options: { signal?: AbortSignal; deadlineAt?: number } = {}, excludePrivacyFlagged = false): Promise<string[] | null> {
   const now = Date.now();
   if (!searxngEnginesCache || searxngEnginesCache.baseUrl !== baseUrl || now - searxngEnginesCache.fetchedAt > SEARXNG_ENGINES_CACHE_TTL_MS) {
-    await safesearchEnginesFor(baseUrl, "general", options);
+    await safesearchEnginesFor(baseUrl, "general", options, excludePrivacyFlagged);
   }
   const engines = searxngEnginesCache?.baseUrl === baseUrl ? searxngEnginesCache.engines : null;
   if (!engines) return null;
@@ -917,7 +914,7 @@ async function webRotationPool(baseUrl: string, safeLevel: SafeSearchLevel, opti
   // model got picture rows whose snippet is the title and which carry no dates.
   const textEngine = (e: SearxngEngine): boolean => e.enabled && e.categories.includes("web") && e.categories.includes("general");
   const safe = safeLevel === "strict" || safeLevel === "moderate" ? new Set(engines.filter((e) => textEngine(e) && e.safesearch).map((e) => e.name)) : null;
-  const pool = engines.filter((e) => textEngine(e) && (!safe || safe.has(e.name))).map((e) => e.name).sort();
+  const pool = engines.filter((e) => textEngine(e) && (!safe || safe.has(e.name)) && (!excludePrivacyFlagged || !isPrivacyFlaggedSearchEngine(e.name))).map((e) => e.name).sort();
   return pool.length > 0 ? pool : null;
 }
 
@@ -1033,8 +1030,9 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
   const { baseUrl } = requireSearxngSettings();
   const isImages = input?.category === "images";
   const safeLevel = opts.safeSearchLevel ?? "off";
-  const safeEngines = safeLevel === "strict" || safeLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general", opts) : null;
-  const rotationPool = !isImages && input?.category !== "videos" ? await webRotationPool(baseUrl, safeLevel, opts) : null;
+  const minorRequest = opts.speakerBand === "child" || opts.speakerBand === "teen" || opts.minorBand === "child" || opts.minorBand === "teen";
+  const safeEngines = safeLevel === "strict" || safeLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general", opts, minorRequest) : null;
+  const rotationPool = !isImages && input?.category !== "videos" ? await webRotationPool(baseUrl, safeLevel, opts, minorRequest) : null;
   const rotated = rotationPool ? pickSearchEngines(rotationPool) : null;
   const wikipedia = rotationPool?.includes("wikipedia") ? ["wikipedia"] : [];
   const requestEngines = rotated && rotated.length > 0 ? [...rotated, ...wikipedia] : rotated;

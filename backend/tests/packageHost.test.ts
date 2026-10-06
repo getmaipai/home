@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
+import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
@@ -2078,6 +2078,74 @@ describe("searxng search rotation", () => {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await searxngSearch({ query: "child" }, { safeSearchLevel: "strict" });
       expect(seen[0]).toBe("safe,safe-two");
+    } finally { server.stop(true); }
+  });
+
+  test("children and teens never name Yandex or Baidu in web or image requests, at either safe-search level", async () => {
+    const seen: URL[] = [];
+    const config = { engines: [
+      { name: "baidu", enabled: true, safesearch: true, categories: ["general", "web", "images"] },
+      { name: "brave", enabled: true, safesearch: true, categories: ["general", "web", "images"] },
+      { name: "wikipedia", enabled: true, safesearch: true, categories: ["general", "web"] },
+      { name: "yandex", enabled: true, safesearch: true, categories: ["general", "web", "images"] },
+    ] };
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/config") return Response.json(config);
+      seen.push(url);
+      return Response.json({ results: [{ title: "Result", url: "https://example.com/result", image: "https://example.com/image.jpg", content: "content" }] });
+    } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      for (const [band, level] of [["child", "strict"], ["teen", "moderate"]] as const) {
+        __resetRateLimiterForTests();
+        __resetSearxngEnginesCacheForTests();
+        await searxngSearch({ query: `web ${band}` }, { safeSearchLevel: level, speakerBand: band, minorBand: band });
+        const actor = { ...(await owner()), role: band };
+        __resetRateLimiterForTests();
+        __resetSearxngEnginesCacheForTests();
+        await answerImageSearch(`image ${band}`, actor, band);
+      }
+      expect(seen).toHaveLength(4);
+      for (const url of seen) {
+        const asked = url.searchParams.get("engines")?.split(",") ?? [];
+        expect(asked.length).toBeGreaterThan(0);
+        expect(asked).not.toContain("yandex");
+        expect(asked).not.toContain("baidu");
+      }
+    } finally { server.stop(true); }
+  });
+
+  test("adult web requests keep privacy-flagged engines available", async () => {
+    let asked = "";
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/config") return Response.json({ engines: [
+        { name: "brave", enabled: true, safesearch: true, categories: ["general", "web"] },
+        { name: "yandex", enabled: true, safesearch: true, categories: ["general", "web"] },
+      ] });
+      asked = url.searchParams.get("engines") ?? "";
+      return Response.json({ results: [{ title: "Result", url: "https://example.com/result", content: "content" }] });
+    } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await searxngSearch({ query: "adult" }, { safeSearchLevel: "moderate", speakerBand: "adult" });
+      expect(asked).toContain("yandex");
+    } finally { server.stop(true); }
+  });
+
+  test("a failed /config read does not block a minor web search", async () => {
+    let searchRequests = 0;
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
+      if (new URL(request.url).pathname === "/config") return new Response("unavailable", { status: 503 });
+      searchRequests++;
+      return Response.json({ results: [{ title: "Result", url: "https://example.com/result", content: "content" }] });
+    } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const result = await searxngSearch({ query: "child" }, { safeSearchLevel: "strict", speakerBand: "child", minorBand: "child" });
+      expect(searchRequests).toBe(1);
+      expect(result.rows).toHaveLength(1);
     } finally { server.stop(true); }
   });
 });
