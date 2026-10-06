@@ -53,6 +53,7 @@ type StubServerModule = typeof import("../../commons/spec/llm/ts/stubServer");
 import AxeBuilder from "@axe-core/playwright";
 import { rmSync, mkdirSync, existsSync, writeFileSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
@@ -284,6 +285,7 @@ const nextPerformanceReview = process.argv.includes("--next-performance-review")
 const nextStorageReview = process.argv.includes("--next-storage-review");
 const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
+const nextChatHistoryReview = process.argv.includes("--next-chat-history-review");
 const showcaseScrollReview = process.argv.includes("--showcase-scroll-review");
 const nextChatScrollReview = process.argv.includes("--next-chat-scroll-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
@@ -300,7 +302,7 @@ const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audi
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || nextChatQueueReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatComposerReview || nextChatQueueReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -2203,6 +2205,39 @@ async function captureShellRail(browser: Browser, sessionValue: string, theme: "
   }
 }
 
+/** Opens a stored conversation and waits until the chat page has really
+ * switched to it. `/chat?conversation=<id>` first renders the composer of
+ * a fresh new-chat thread, then switches to the stored one once the
+ * thread list answers; the switch swaps in that thread's own (empty)
+ * composer. Text typed before the switch is dropped and Send stays
+ * disabled (found 2026-10-06: `--next-chat-review` timed out on a
+ * disabled Send whenever the list answered after the fill; reproduced on
+ * demand by delaying `/api/conversations`). The active history row is the
+ * thread runtime's own signal that the switch has happened. */
+async function openStoredConversation(page: Page, conversationId: string, title: string): Promise<void> {
+  await page.goto(`${BASE_URL}/chat?conversation=${conversationId}`);
+  await page.getByRole("textbox", { name: "Message input" }).waitFor();
+  // Attached, not visible: on phone the history column stays in the DOM
+  // but hidden until "Show threads" opens its sheet.
+  await page.locator('[data-slot="aui_thread-list-item"][data-active="true"]').filter({ hasText: title }).first().waitFor({ state: "attached" });
+}
+
+/** Types `text` and sends it, failing fast with the composer's own state
+ * if Send never enables, instead of a bare 30 s click timeout. */
+async function sendChatMessage(page: Page, text: string): Promise<void> {
+  const composer = page.getByRole("textbox", { name: "Message input" });
+  const send = page.getByRole("button", { name: "Send message", exact: true });
+  await composer.fill(text);
+  const deadline = Date.now() + 5000;
+  while (!(await send.isEnabled())) {
+    if (Date.now() > deadline) {
+      throw new Error(`sendChatMessage: Send stayed disabled after typing; the composer holds ${JSON.stringify(await composer.inputValue())} (empty means the page swapped threads after the text was typed)`);
+    }
+    await page.waitForTimeout(100);
+  }
+  await send.click();
+}
+
 /** A real conversation with a real title, the recipe every capture
  * needing one uses: POST then PATCH, no fabricated fixture shape.
  * Throws with the capture's own name in the message on either call
@@ -3153,10 +3188,8 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   try {
     const page = await seedContext.newPage();
     page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-    await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
-    await page.getByRole("textbox", { name: "Message input" }).waitFor();
-    await page.getByRole("textbox", { name: "Message input" }).fill("Show me a short demo reply.");
-    await page.getByRole("button", { name: "Send message", exact: true }).click();
+    await openStoredConversation(page, conversation.id, "A few questions for today");
+    await sendChatMessage(page, "Show me a short demo reply.");
     await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
     await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
     await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor({ timeout: 15000 });
@@ -3267,12 +3300,9 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   const wideTenContext = await newContext(browser, wideViewport, "dark", sessionValue);
   try {
     const page = await wideTenContext.newPage();
-    await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
-    const composer = page.getByRole("textbox", { name: "Message input" });
-    await composer.waitFor();
+    await openStoredConversation(page, conversation.id, "A few questions for today");
     for (let turn = 2; turn <= 5; turn += 1) {
-      await composer.fill(`Demo question ${turn}.`);
-      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      await sendChatMessage(page, `Demo question ${turn}.`);
       await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
       await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
       await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).nth(turn - 1).waitFor({ timeout: 15000 });
@@ -3292,6 +3322,109 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
     await page.close();
   } finally {
     await wideTenContext.close();
+  }
+}
+
+/** CHAT-SIDEBAR-FINISH-01: chat's own history list with ten threads spread
+ * over Today, Yesterday and Earlier, one of them open with a real scripted
+ * turn, at 1440 and 390 in both themes. The conversations are created
+ * through the API like every other capture; only their `created_at` is
+ * moved back in this run's throwaway demo database, because no route
+ * takes a creation date and the list groups threads with no turns by it.
+ * Logs each row's measured height, active state and fill, the group
+ * labels and any icon inside a row, so the review judges numbers, not
+ * only pixels. `UI_EVIDENCE_TAG` (default "after") names the set, so a
+ * before run at the previous pin does not overwrite it. */
+async function captureNextChatHistoryReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const evidenceTag = process.env.UI_EVIDENCE_TAG ?? "after";
+  const activeTitle = "A few questions for today";
+  const day = 24 * 60 * 60 * 1000;
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const seeds: Array<{ title: string; createdAt?: number }> = [
+    { title: "Earth science homework", createdAt: startOfToday - 9 * day },
+    { title: "Packing list for the beach", createdAt: startOfToday - 6 * day },
+    { title: "Easy weeknight dinners", createdAt: startOfToday - 3 * day },
+    { title: "Bike tune-up checklist", createdAt: startOfToday - day + 9 * 60 * 60 * 1000 },
+    { title: "Library books to borrow", createdAt: startOfToday - day + 14 * 60 * 60 * 1000 },
+    { title: "Birthday party games", createdAt: startOfToday - day + 19 * 60 * 60 * 1000 },
+    { title: "Weekend garden plans" },
+    { title: "Spelling practice words" },
+    { title: "Pizza night toppings" },
+  ];
+  const created: Array<{ id: string; createdAt?: number }> = [];
+  for (const seed of seeds) {
+    const row = await seedTitledConversation("captureNextChatHistoryReview", cookie, seed.title);
+    created.push({ id: row.id, createdAt: seed.createdAt });
+  }
+  const db = new Database(join(DATA_DIR, "hub.db"));
+  try {
+    db.exec("PRAGMA busy_timeout = 5000");
+    const move = db.prepare("UPDATE conversations SET created_at = ? WHERE id = ?");
+    for (const row of created) {
+      if (row.createdAt !== undefined) move.run(new Date(row.createdAt).toISOString(), row.id);
+    }
+  } finally {
+    db.close();
+  }
+  const active = await seedTitledConversation("captureNextChatHistoryReview", cookie, activeTitle);
+  const seedContext = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "dark", sessionValue);
+  try {
+    const page = await seedContext.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await openStoredConversation(page, active.id, activeTitle);
+    await sendChatMessage(page, "Show me a short demo reply.");
+    await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor({ timeout: 30000 });
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+  } finally {
+    await seedContext.close();
+  }
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await openStoredConversation(page, active.id, activeTitle);
+        await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor();
+        let scope: Page | Locator = page;
+        if (slug === "phone") {
+          await page.getByRole("button", { name: "Show threads" }).click();
+          scope = page.getByRole("dialog");
+        }
+        const rows = scope.locator('[data-slot="aui_thread-list-item"]');
+        await rows.filter({ hasText: seeds[0]!.title }).first().waitFor();
+        await settleAnimations(page);
+        const report = await rows.evaluateAll((items) => items.map((item) => {
+          const trigger = item.querySelector<HTMLElement>('[data-slot="aui_thread-list-item-trigger"]');
+          const rowIcons = trigger ? [...trigger.querySelectorAll("svg")].filter((svg) => !svg.closest('[data-slot="aui_thread-list-item-pinned"], [data-slot="aui_thread-list-item-running"]')).length : -1;
+          return {
+            title: item.querySelector('[data-slot="aui_thread-list-item-title"]')?.textContent ?? "",
+            height: Math.round(item.getBoundingClientRect().height * 10) / 10,
+            triggerHeight: trigger ? Math.round(trigger.getBoundingClientRect().height * 10) / 10 : null,
+            active: item.getAttribute("data-active"),
+            fill: getComputedStyle(item).backgroundColor,
+            rowIcons,
+          };
+        }));
+        const groups = await scope.locator('[data-slot="aui_thread-list-group-label"]').allTextContents();
+        console.log(`captureNextChatHistoryReview ${evidenceTag} ${slug}/${theme}: ${JSON.stringify({ groups, rows: report })}`);
+        if (report.length !== seeds.length + 1) throw new Error(`captureNextChatHistoryReview: expected ${seeds.length + 1} history rows on ${slug}/${theme}, found ${report.length}`);
+        const activeRows = report.filter((row) => row.active === "true");
+        if (activeRows.length !== 1 || activeRows[0]!.title !== activeTitle) throw new Error(`captureNextChatHistoryReview: expected exactly one active row, "${activeTitle}", on ${slug}/${theme}`);
+        const file = `next-chat-history-${evidenceTag}-${viewport.width}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file) });
+        console.log(`Wrote ${join(outDir, file)}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
   }
 }
 
@@ -4897,11 +5030,9 @@ async function captureNextChatRichReview(browser: Browser, sessionValue: string)
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-        await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
-        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        await openStoredConversation(page, conversation.id, "Homework helper");
         if (slug === "desktop" && theme === THEMES[0]) {
-          await page.getByRole("textbox", { name: "Message input" }).fill(RICH_REPLY_PROMPT);
-          await page.getByRole("button", { name: "Send message", exact: true }).click();
+          await sendChatMessage(page, RICH_REPLY_PROMPT);
           await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
           await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
         }
@@ -7141,6 +7272,12 @@ async function main() {
     if (nextChatRichReview) {
       await captureNextChatRichReview(browser, sessionValue);
       console.log("completed named review: --next-chat-rich-review");
+      return;
+    }
+
+    if (nextChatHistoryReview) {
+      await captureNextChatHistoryReview(browser, sessionValue);
+      console.log("completed named review: --next-chat-history-review");
       return;
     }
 
