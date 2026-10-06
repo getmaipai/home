@@ -600,6 +600,22 @@
       "realTurnToday": true
     },
     {
+      "file": "error-state.test.tsx",
+      "name": "error-state-test",
+      "group": "errors/states",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": 4,
+      "replacesHandBuilt": [],
+      "realTurnToday": true
+    },
+    {
       "file": "feedback-dialog.tsx",
       "name": "feedback-dialog",
       "group": "message",

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T08:35:54.433Z",
-  "kitTag": "ui-v0.5.102",
+  "generatedAt": "2026-10-06T09:06:38.357Z",
+  "kitTag": "ui-v0.5.103",
   "items": [
     {
       "file": "activity-graph.tsx",
@@ -247,6 +247,13 @@
       "name": "empty-state",
       "group": "settings/onboarding",
       "verdict": "wire-now",
+      "implemented": false
+    },
+    {
+      "file": "error-state.test.tsx",
+      "name": "error-state-test",
+      "group": "errors/states",
+      "verdict": "support",
       "implemented": false
     },
     {
