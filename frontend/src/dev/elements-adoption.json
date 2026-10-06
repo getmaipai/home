@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T22:38:16.302Z",
-  "kitTag": "ui-v0.5.131",
+  "generatedAt": "2026-10-06T22:59:50.030Z",
+  "kitTag": "ui-v0.5.134",
   "items": [
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
@@ -664,9 +664,9 @@
       "file": "number-ticker.tsx",
       "name": "number-ticker",
       "group": "other",
-      "verdict": "later",
-      "verdictReason": "Deferred until a Home feature requiring this Element is planned.",
-      "implemented": false
+      "verdict": "wire-now",
+      "verdictReason": "ELT-T1-01 is owner-approved to replace the plain numeric StatCard value with the shipped NumberTicker.",
+      "implemented": true
     },
     {
       "file": "onboarding.tsx",
