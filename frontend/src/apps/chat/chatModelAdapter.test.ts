@@ -1,4 +1,5 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
+import { takeCarry } from "@/apps/chat/chatCarry";
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, PendingAttachment, ThreadMessage } from "@assistant-ui/react";
 import { createChatModelAdapter, stripThinking } from "@/apps/chat/chatModelAdapter";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
@@ -1501,6 +1502,22 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
       const { yields } = await collect([fakeUserMessage("hi")]);
       const last = yields[yields.length - 1];
       expect(last?.metadata?.custom?.turnId).toBe("turn-live456");
+    } finally {
+      env.restore();
+    }
+  });
+
+  // THIN-3G: a reply that offers a new chat carrying the summary marks its
+  // chat for the next New chat; the offer is the reply's own text.
+  test("a done event with carry_offer marks the chat the next new chat carries from", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([{ type: "done", value: { reply: { text: "This chat has grown too long." }, source: "model", safety: SAFETY, turn_id: "turn-carry1", conversation_id: "conv-carry1", carry_offer: true } }]),
+    );
+    try {
+      const { yields } = await collect([fakeUserMessage("a long paste")]);
+      expect(lastText(yields)).toBe("This chat has grown too long.");
+      expect(takeCarry()).toBe("conv-carry1");
+      expect(takeCarry()).toBeNull();
     } finally {
       env.restore();
     }

@@ -4134,6 +4134,7 @@ sqlite.close();`;
   });
   await showcase("failed-tool", "tool-error-admin");
   await showcase("failure-safety", "guardrail-refusal");
+  await showcase("carry-offer", "carry-offer-reply");
   await showcase("search", "sources-reply");
   await showcase("search", "sources-reply", phone, "dark");
   await showcase("table", "table-reply");

@@ -122,10 +122,12 @@ conversationsRoutes.get("/export", requireAuth, async (c) => {
 
 conversationsRoutes.post("/", requireAuth, async (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { surface?: Surface; companion_id?: string | null; mode?: Conversation["mode"] };
+  const body = (await c.req.json().catch(() => ({}))) as { surface?: Surface; companion_id?: string | null; mode?: Conversation["mode"]; carry_from?: unknown };
   const mode = body.mode === undefined ? undefined : Conversation.shape.mode.safeParse(body.mode);
   if (mode && !mode.success) return c.json({ error: "invalid conversation mode" }, 400);
-  const result = createConversation(actor, { surface: body.surface, companionId: body.companion_id, mode: mode?.data });
+  if (body.carry_from !== undefined && body.carry_from !== null && typeof body.carry_from !== "string") return c.json({ error: "carry_from must be a conversation id" }, 400);
+  // THIN-3G: carry_from seeds the new chat with that chat's summary.
+  const result = createConversation(actor, { surface: body.surface, companionId: body.companion_id, mode: mode?.data, carryFrom: body.carry_from ?? null });
   if (!result.ok) return fail(c, result);
   return c.json(result.value, 201);
 });

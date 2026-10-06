@@ -142,6 +142,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     reply: { text, speech },
     source,
     ...(state.failedGenerationReply ? { failed_generation: true as const } : {}),
+    ...(state.promptLimit === "carry_offer" ? { carry_offer: true } : {}),
     safety: outputFlag ?? state.safety,
     conversation_id: state.conversationId,
     turn_id: state.turnId,

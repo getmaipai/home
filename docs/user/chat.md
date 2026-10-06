@@ -102,6 +102,10 @@ Did MaiPai save something you said? A **Memory updated** chip shows up under its
 
 Tap **New chat** beside the chat list to start fresh. A new chat is saved when you send its first message.
 
+## Long chats
+
+A chat never stops working because it got long. As it grows, MaiPai keeps short notes about the earlier part and keeps the newest messages word for word. Rarely, a very long message will not fit beside those notes. MaiPai then says so and offers a fresh start: tap **New chat**, and the new chat brings the notes along. It uses them from your next message there. Talking to MaiPai out loud never gets this offer; it just answers.
+
 ## Your conversation history
 
 Use the chat list beside the conversation to find a chat. Type in **Search chats** to search the list. On a narrow screen, open the chat list from its button. Use the collapse button to hide the list and make more room for the conversation. Reopen it from the same button.

@@ -1350,10 +1350,20 @@ const VALID_MODES = new Set(modeEnum.options);
 
 export function createConversation(
   actor: PersonRow,
-  opts: { surface?: Surface; companionId?: string | null; mode?: Conversation["mode"] } = {},
+  opts: { surface?: Surface; companionId?: string | null; mode?: Conversation["mode"]; carryFrom?: string | null } = {},
 ): ConversationOpResult<Conversation> {
   const surface = opts.surface ?? "chat";
   const mode = opts.mode ?? "chat";
+  // THIN-3G (rule 4): a new chat that carries an earlier chat's summary
+  // forward. The person's own chat only; a temporary chat's summary goes
+  // only into another temporary chat (it must never become a stored row).
+  let carried: string | null = null;
+  if (opts.carryFrom) {
+    const source = getConversation(actor, opts.carryFrom);
+    if (!source.ok || source.value.person !== actor.id) return { ok: false, status: 404, error: "conversation not found" };
+    if (source.value.mode === "temporary" && mode !== "temporary") return { ok: false, status: 400, error: "a temporary chat's summary can only carry into another temporary chat" };
+    carried = source.value.summary;
+  }
   // A code review (2026-09-05) found no validation here at all: a bogus
   // surface reached insertNewConversation()'s Conversation.parse() and
   // threw an uncaught ZodError (an unhandled 500) instead of the clean
@@ -1388,7 +1398,19 @@ export function createConversation(
   // turn-level `temporary` flag uses, so there is one way to get a
   // temporary conversation, not two designs that happen to agree today
   // and drift apart later.
-  const value = mode === "temporary" ? createTemporaryConversation(actor, surface, opts.companionId) : insertNewConversation(actor, surface, opts.companionId, mode);
+  let value = mode === "temporary" ? createTemporaryConversation(actor, surface, opts.companionId) : insertNewConversation(actor, surface, opts.companionId, mode);
+  if (carried) {
+    // Seeded, never anchored: the summary covers no turn of this chat, and
+    // the window carries it from the first turn (held out of that first
+    // prompt only when the first message would not fit beside it).
+    if (mode === "temporary") {
+      const session = temporarySessions.get(value.id);
+      if (session) session.conversation = { ...session.conversation, summary: carried };
+    } else {
+      db.update(conversations).set({ summary: carried, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(conversations.id, value.id)).run();
+    }
+    value = { ...value, summary: carried };
+  }
   return { ok: true, value };
 }
 
@@ -2171,7 +2193,7 @@ function nonModelWindowNote(t: ConversationTurnRow): string {
  * getmaipai/home#131: only finished rows ("done"), never a running one.
  * TEMP-CHAT-01: a temporary conversation's turns live in its session, read
  * through the same code. */
-function windowRows(conversation: Pick<Conversation, "id" | "mode" | "summary_through_turn">, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null } = {}, order: "newest" | "oldest" = "newest") {
+function windowRows(conversation: Pick<Conversation, "id" | "mode" | "summary" | "summary_through_turn">, opts: { supersedes?: string | null; excludeTurnId?: string | null; beforeCreatedAt?: string | null } = {}, order: "newest" | "oldest" = "newest") {
   // Only the turns from the anchor on are read (a review: an anchor that
   // trails more than WINDOW_ROW_FETCH_LIMIT turns behind must not lose the
   // turns between it and the newest rows). The window reads the newest of
@@ -2199,7 +2221,9 @@ function windowRows(conversation: Pick<Conversation, "id" | "mode" | "summary_th
   // boundary, and same-millisecond turns make a timestamp inexact).
   const anchorIndex = conversation.summary_through_turn ? scoped.findIndex((t) => t.id === conversation.summary_through_turn) : -1;
   const uncovered = anchorIndex === -1 ? liveRows : liveRows.filter((t) => scoped.indexOf(t) > anchorIndex);
-  return { liveRows, uncovered, anchored: conversation.summary_through_turn !== null };
+  // A summary rides whenever one is stored: an anchored one covers the
+  // turns before the anchor; a seeded one (THIN-3G) covers an earlier chat.
+  return { liveRows, uncovered, anchored: conversation.summary_through_turn !== null || conversation.summary !== null };
 }
 
 /** THIN-3F step 3: the summary enters the prompt as labelled data, never
@@ -2347,10 +2371,10 @@ export async function buildConversationWindow(conversation: Conversation, opts: 
 
   // Past the budget before the fold landed: never fail the turn.
   let withReplay = replayCounts;
-  let kept = await newestThatFit(uncovered, 1, budget, (run) => render(run, withReplay));
+  let kept = await newestThatFit(uncovered, 0, budget, (run) => render(run, withReplay));
   if (withReplay && kept !== null && !uncovered.slice(uncovered.length - kept).some((t) => t.id === replayTurn!.id)) {
     withReplay = false;
-    kept = await newestThatFit(uncovered, 1, budget, (run) => render(run, false));
+    kept = await newestThatFit(uncovered, 0, budget, (run) => render(run, false));
   }
   if (kept === null) return done(uncovered.slice(-MINIMUM_WINDOW_MAX_TURNS), false, null);
   const run = uncovered.slice(uncovered.length - kept);

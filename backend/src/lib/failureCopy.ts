@@ -97,3 +97,23 @@ export function partialReplyNote(kind: FailureKind, minor: boolean): string {
   if (minor) return "I had to stop there. Ask me again if you want the rest.";
   return kind === "slow" ? "I had to stop there because the AI stopped answering. Ask me to continue if you want the rest." : "I had to stop there because the AI stopped working. Ask me to continue if you want the rest.";
 }
+
+/** THIN-3G (rule 4's last sentence): written chat only, never a spoken
+ * turn. `carry_offer` when the stable prefix, the summary and the message
+ * cannot fit together: the new chat brings the summary along. `too_big`
+ * when the message cannot fit even alone. Neither asks the person to
+ * shorten anything. */
+const PROMPT_LIMIT_COPY: Record<"carry_offer" | "too_big", FailureCopy> = {
+  carry_offer: {
+    adult: "This chat has grown too long for me to keep in mind alongside that message. Start a new chat with New chat: I'll bring a summary of this one along, and I'll use it from your next message there.",
+    minor: "This chat is really long now. Tap New chat and I'll bring along what we talked about.",
+  },
+  too_big: {
+    adult: "That message is more than I can read in one go on this computer, so I couldn't answer it.",
+    minor: "That message is too big for me to read all at once.",
+  },
+};
+
+export function promptLimitLine(kind: "carry_offer" | "too_big", minor: boolean): string {
+  return minor ? PROMPT_LIMIT_COPY[kind].minor : PROMPT_LIMIT_COPY[kind].adult;
+}

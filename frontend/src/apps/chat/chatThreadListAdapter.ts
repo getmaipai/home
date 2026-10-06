@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { openedChat, takeCarry } from "./chatCarry";
 import { useAui, type RemoteThreadListAdapter } from "@assistant-ui/react";
 import { createAssistantStream } from "assistant-stream";
 import { toast } from "sonner";
@@ -127,13 +128,20 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       // `{ incognito: temporaryNext }`); reading it here is the fix -
       // the in-memory session the backend's own createConversation()
       // already builds for `mode: "temporary"`, now actually asked for.
-      const row = await api.createConversation(incognito ? "temporary" : undefined);
+      // THIN-3G: a new chat started after a carry offer brings that chat's
+      // summary along. A carry the hub refuses (a temporary chat's summary
+      // into a saved chat) starts a plain new chat instead.
+      const carryFrom = takeCarry();
+      const row = carryFrom
+        ? await api.createConversation(incognito ? "temporary" : undefined, carryFrom).catch(() => api.createConversation(incognito ? "temporary" : undefined))
+        : await api.createConversation(incognito ? "temporary" : undefined);
       // A stored row for a temporary request is a leak: refuse it, never adopt it as the Incognito thread.
       if (incognito && row.mode !== "temporary") throw new Error("Incognito could not start a private chat.");
       if (incognito) incognitoThreadIds.add(row.id);
       return { remoteId: row.id };
     },
     async fetch(remoteId) {
+      openedChat(remoteId);
       // Incognito opens only its own live threads, never a stored chat.
       if (incognito && !incognitoThreadIds.has(remoteId)) throw new Error("This chat is not part of Incognito.");
       const row = await api.conversation(remoteId);

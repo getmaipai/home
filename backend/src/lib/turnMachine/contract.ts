@@ -249,6 +249,13 @@ export interface TurnState {
    * once per non-phrasing round in `nodes/model.ts`, read once on the
    * phrasing round that follows it - never touched by any other node. */
   lastTools: ToolSpec[];
+  /** THIN-3G (rule 4): set by the context node when the prompt would not
+   * fit even with no history. `core_only`: memory, episodes and tools
+   * were dropped and the turn answers from the core. `carry_offer`
+   * (written chat only): the reply offers a new chat that carries the
+   * summary forward. `too_big` (written chat only): the message cannot
+   * fit even alone, and the reply says so. Absent on an ordinary turn. */
+  promptLimit?: "core_only" | "carry_offer" | "too_big";
   generations: GenerationInput[];
   nodes: NodeExecution[];
   reply: { text: string; speech?: string; sources: Source[] } | null;

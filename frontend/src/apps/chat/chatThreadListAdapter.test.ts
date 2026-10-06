@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { toast } from "sonner";
 import { createChatThreadListAdapter, discardIncognitoThreads, needsTitleCatchUp } from "@/apps/chat/chatThreadListAdapter";
 import { api } from "@/lib/api";
+import { offerCarry, withdrawCarry } from "@/apps/chat/chatCarry";
 import type { ThreadMessage } from "@assistant-ui/react";
 
 async function readTextDeltas(stream: ReadableStream<{ type: string; textDelta?: string }>, into: string[]): Promise<void> {
@@ -227,6 +228,55 @@ describe("HOME-UI-02e: restored Conversations functions", () => {
     const { remoteId } = await createChatThreadListAdapter("Nova", { incognito: true }).initialize("local-temp");
     expect(requestedBody).toEqual({ surface: "chat", mode: "temporary" });
     expect(remoteId).toBe("conv-temp-1");
+  });
+
+  // THIN-3G: after a reply offers a new chat carrying the summary, the next
+  // new chat (the kit's own New chat action) is created with carry_from,
+  // once; a later reply in that chat without the offer withdraws it.
+  test("the new chat after a carry offer is created with carry_from, once", async () => {
+    const bodies: unknown[] = [];
+    globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return Response.json({ id: `conv-carry-${bodies.length}`, title: null, surface: "chat", mode: "chat", created_at: "2026-10-06T00:00:00Z", pinned: false }, { status: 201 });
+    }) as unknown as typeof fetch;
+    offerCarry("conv-long");
+    const adapter = createChatThreadListAdapter("Nova");
+    await adapter.initialize("local-carry");
+    await adapter.initialize("local-next");
+    expect(bodies).toEqual([{ surface: "chat", carry_from: "conv-long" }, { surface: "chat" }]);
+    offerCarry("conv-long");
+    withdrawCarry();
+    await adapter.initialize("local-after-withdraw");
+    expect(bodies.at(-1)).toEqual({ surface: "chat" });
+  });
+
+  test("opening a different saved chat after an offer withdraws it; New chat then starts plain", async () => {
+    const bodies: unknown[] = [];
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "GET") return Response.json({ id: String(input).split("/").pop(), title: null, surface: "chat", mode: "chat", created_at: "2026-10-06T00:00:00Z", pinned: false });
+      bodies.push(JSON.parse(String(init?.body)));
+      return Response.json({ id: "conv-fresh", title: null, surface: "chat", mode: "chat", created_at: "2026-10-06T00:00:00Z", pinned: false }, { status: 201 });
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova");
+    offerCarry("conv-long");
+    await adapter.fetch("conv-long");
+    await adapter.fetch("conv-other");
+    await adapter.initialize("local-unrelated");
+    expect(bodies).toEqual([{ surface: "chat" }]);
+  });
+
+  test("a carry the hub refuses starts a plain new chat instead", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      bodies.push(body);
+      if (body.carry_from) return Response.json({ error: "a temporary chat's summary can only carry into another temporary chat" }, { status: 400 });
+      return Response.json({ id: "conv-plain", title: null, surface: "chat", mode: "chat", created_at: "2026-10-06T00:00:00Z", pinned: false }, { status: 201 });
+    }) as unknown as typeof fetch;
+    offerCarry("conv-temp");
+    const { remoteId } = await createChatThreadListAdapter("Nova").initialize("local-refused");
+    expect(remoteId).toBe("conv-plain");
+    expect(bodies).toEqual([{ surface: "chat", carry_from: "conv-temp" }, { surface: "chat" }]);
   });
 
   test("an ordinary adapter's initialize() sends no mode at all", async () => {

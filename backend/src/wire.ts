@@ -324,6 +324,9 @@ export interface TurnValue {
   failed_generation?: true;
   /** COMP-01: whether a validated details document is available for this turn. */
   document_available?: boolean;
+  /** THIN-3G: this reply offers a new chat that carries this chat's summary
+   * forward (POST /api/conversations with carry_from). Written chat only. */
+  carry_offer?: boolean;
   /** The generative-UI contract (chat program record, "The chat's wiring
    * table"): a tool's result with structure renders as the shipped
    * Element's own part, never narrated prose and never drawn by Home.

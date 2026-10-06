@@ -20,7 +20,8 @@ import { createBenchPeople, type BenchPeople } from "../../scripts/bench/convers
 import { buildConversationWindow, getConversation, logTurn, maybeRefreshConversationSummary, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { contextNode } from "@/lib/turnMachine/nodes/context";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
-import { stubRenderTemplate, stubTokenize, startStubLlmServer, type StubLlmServerHandle } from "@maipai/spec/llm/ts/stubServer.js";
+import { stubRenderTemplate, stubTokenize } from "@maipai/spec/llm/ts/stubServer.js";
+import { startContextEngine, type ContextEngine } from "./contextEngineFixture";
 import { db } from "@/db";
 import { conversationTurns, conversations } from "@/db/schema";
 import type { TurnValue } from "@/wire";
@@ -31,43 +32,16 @@ import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 const SAFE: TurnValue["safety"] = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() };
 
 let people: BenchPeople;
+let engine: ContextEngine | null = null;
+let refused: number[] = [];
+let summaryPrompts: string[] = [];
 let fixture: StackFixture | null = null;
-let engine: StubLlmServerHandle | null = null;
-const refused: number[] = [];
-const summaryPrompts: string[] = [];
 
-/** A Stack whose chat engine holds `contextTokens` (per slot) and refuses a
- * prompt that does not fit beside its max_tokens, as llama-server does;
- * the count route uses the same stub template and tokenizer; a fold
- * request (model "judge") is answered with a short summary. */
 function engineWithContext(contextTokens: number): void {
-  engine = startStubLlmServer(0, { scriptedChatReply: () => "A reply of a few words." });
-  const sizeOf = (body: { messages?: Array<{ role?: unknown; content?: unknown }>; tools?: unknown[] }) => stubTokenize(stubRenderTemplate(body.messages ?? [], body.tools)).length;
-  fixture = startStackFixture({
-    "POST /v1/tokenize": async (req) => Response.json({ count: sizeOf(await req.json() as Parameters<typeof sizeOf>[0]) }, { headers: IDENTITY_HEADERS }),
-    "POST /v1/chat/completions": async (req) => {
-      const body = await req.json() as Parameters<typeof sizeOf>[0] & { model?: string; max_tokens?: number; stream?: boolean };
-      if (body.model === "judge") {
-        summaryPrompts.push(JSON.stringify(body.messages));
-        return Response.json({ choices: [{ index: 0, message: { role: "assistant", content: `Summary ${summaryPrompts.length}: they talked about the garden.` }, finish_reason: "stop" }] }, { headers: IDENTITY_HEADERS });
-      }
-      const prompt = sizeOf(body);
-      if (prompt + (body.max_tokens ?? 0) > contextTokens) {
-        refused.push(prompt);
-        return Response.json({ error: { code: 400, type: "exceed_context_size_error", message: `the request (${prompt} tokens) exceeds the available context size (${contextTokens} tokens), try increasing it`, n_prompt_tokens: prompt, n_ctx: contextTokens } }, { status: 400, headers: IDENTITY_HEADERS });
-      }
-      const upstream = await fetch(`${engine!.url}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      const headers = new Headers(upstream.headers);
-      for (const [k, v] of Object.entries(IDENTITY_HEADERS)) headers.set(k, v);
-      return new Response(upstream.body, { status: upstream.status, headers });
-    },
-    "POST /v1/embeddings": async (req) => fetch(`${engine!.url}/v1/embeddings`, { method: "POST", headers: { "content-type": "application/json" }, body: await req.text() }),
-    "GET /stack/v1/roles": async () => Response.json({ roles: ["chat", "embed", "judge"].map((id) => ({ id, state: { state: "ready", since: "scripted-test" }, reason: null })) }),
-    "GET /stack/v1/health": async () => Response.json({ health: [] }),
-  });
-  __setStackClientForTests(fixture.client);
-  setHouseholdSettingValue("engines.stack.url", fixture.url);
-  __setChatWindowContextForTests(contextTokens);
+  engine = startContextEngine(contextTokens);
+  fixture = engine.fixture;
+  refused = engine.refused;
+  summaryPrompts = engine.summaryPrompts;
 }
 
 beforeEach(async () => {
@@ -81,8 +55,8 @@ beforeEach(async () => {
   __resetRateLimiterForTests();
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
-  refused.length = 0;
-  summaryPrompts.length = 0;
+  refused = [];
+  summaryPrompts = [];
 });
 
 afterEach(async () => {
@@ -91,10 +65,10 @@ afterEach(async () => {
   await __drainBackgroundWorkForTests();
   __setSummaryRefreshDelayForTests(null);
   __setChatWindowContextForTests();
-  fixture?.stop();
-  fixture = null;
+  if (fixture && fixture !== engine?.fixture) fixture.stop();
   await engine?.stop();
   engine = null;
+  fixture = null;
   __resetStackEngineForTests();
   useDefaultScriptedStack();
 });
@@ -218,7 +192,6 @@ describe("the compaction ladder's checkpoint (THIN-3C, THIN-3F)", () => {
     if (!conv.ok) throw new Error(conv.error);
     for (let i = 0; i < 12; i++) logTurn(people.owner, "chat", `message ${i} ${"about the garden ".repeat(20)}`, { reply: { text: `reply ${i} ${"water early ".repeat(20)}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-size-${i}` });
     const run = async (context: number) => {
-      fixture?.stop();
       await engine?.stop();
       engineWithContext(context);
       const state = withTurnDefaults({ actor: people.owner, surface: "chat", conversationId: conv.value.id, budget: { ...(await import("@/lib/turnMachine/budget")).resolveTurnBudget(undefined, "adult"), context_tokens: context, context_window_tokens: context } } as TurnState);

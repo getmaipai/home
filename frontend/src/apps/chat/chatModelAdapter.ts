@@ -1,4 +1,5 @@
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, ThreadAssistantMessagePart } from "@assistant-ui/react";
+import { offerCarry, withdrawCarry } from "./chatCarry";
 import { api, ApiError } from "@/lib/api";
 import { readAssistantTurnStream } from "@/lib/assistantTurnStream";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
@@ -498,6 +499,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // thread.
             if (event.value.crisis_resources) deps.onCrisisResources(event.value.crisis_resources);
             if (event.value.document_available === true) deps.onResearchDocument?.(event.value.turn_id);
+            // THIN-3G: the offer of a new chat that carries the summary.
+            if (event.value.carry_offer === true) offerCarry(event.value.conversation_id);
+            else withdrawCarry();
             // REASONING-02: a tool-calling reply never streams a live
             // `reasoning` event (its reasoning never rides a visible
             // span to split out of), so `reasoningText` is still "" here

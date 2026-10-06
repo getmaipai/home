@@ -21,6 +21,7 @@ import { planLineForTurnMachine } from "@/lib/register";
 import { askAppendFor, NO_ASK_APPEND } from "@/lib/askNames";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages, bareMessages, continuationMessages } from "../messages";
+import { promptLimitLine } from "@/lib/failureCopy";
 import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryInstruction, retryTools, isRepeatOfFailed } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
@@ -586,7 +587,8 @@ async function recoveredMissingCall(state: TurnState, messages: LlmMessage[], ut
  * crisis state offers none either (the old path's SAFETY-01 rule; the policy
  * node's crisis_state refusal stays as the second lock). */
 function noToolsTurn(state: TurnState): boolean {
-  return state.bare === true || state.continuation !== undefined || state.crisis === true;
+  // THIN-3G: a turn answering from the core alone has no room for a tools block.
+  return state.bare === true || state.continuation !== undefined || state.crisis === true || state.promptLimit !== undefined;
 }
 
 /** T5 / THIN-2G: the retry round's own floors around what the model chose: a
@@ -604,6 +606,14 @@ export const modelNode: Node<ModelInput, ModelOutput> = async (state, input, sig
 };
 
 const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) => {
+  // THIN-3G (rule 4, written chat only, set by the context node): the
+  // prompt cannot fit, so the reply is the plain offer of a new chat that
+  // carries the summary forward, or says the message is too big to read.
+  // Never a spoken turn (the context node sets neither for one).
+  if (state.promptLimit === "carry_offer" || state.promptLimit === "too_big") {
+    state.streamGate?.reset();
+    return { outcome: { ok: true }, output: { kind: "text", text: promptLimitLine(state.promptLimit, state.plan.age_band !== "adult"), thinking: false } };
+  }
   // PHRASE-01 (dev.md "The written prompt on tier 1, decided"'s own
   // follow-up): a phrasing round is the model round that runs after at
   // least one tool round already completed this turn (`state.outcomes`

@@ -1407,7 +1407,7 @@ describe("buildConversationWindow() (step 3)", () => {
     }
   });
 
-  test("with nothing fallen out of the window yet, there's no summary line even if a summary exists", async () => {
+  test("a summary with no anchor (a chat seeded from another, THIN-3G) rides from the first turn", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
     if (!conv.ok) throw new Error(conv.error);
@@ -1417,7 +1417,8 @@ describe("buildConversationWindow() (step 3)", () => {
     const refreshed = getConversation(actor, conv.value.id);
     if (!refreshed.ok) throw new Error(refreshed.error);
     const window = await buildConversationWindow(refreshed.value);
-    expect(window.summaryLine).toBeUndefined();
+    expect(window.summaryLine).toContain("a prior summary");
+    expect(window.turnIds).toEqual(["turn-onlyone"]);
   });
 
   test("a summary line rides whenever a stored summary covers turns before the anchor, and the window starts after it", async () => {

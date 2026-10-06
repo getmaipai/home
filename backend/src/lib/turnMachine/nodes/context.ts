@@ -86,6 +86,8 @@ export interface ContextOutput {
   /** THIN-7E (ASK-01): the turn's subjects and the unknown name the reply asks about. */
   subjects?: SubjectRef[];
   unknownAsk?: string | null;
+  /** THIN-3G: the prompt did not fit with no history (TurnState.promptLimit). */
+  promptLimit?: TurnState["promptLimit"];
 }
 
 let windowItemSeq = 0;
@@ -345,11 +347,59 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // left for the round's own messages (the call and its results, which
   // the composer sizes to the context), so history at its high-water mark
   // still leaves a search room to land (a review).
-  const left = measured ? Math.max(0, state.budget.context_tokens - replyMaxTokensFor(state, thinking) - rest) : null;
-  const historyBudgetTokens = left === null ? null : Math.floor(tools.length > 0 ? left * (1 - TOOL_ROUND_SHARE) : left);
+  const reply = replyMaxTokensFor(state, thinking);
+  const context = state.budget.context_tokens;
+  let left = measured ? context - reply - rest : null;
+  let toolRound = tools.length > 0;
+  let promptLimit: TurnState["promptLimit"];
+  let holdSummary = false;
+  if (left !== null && left <= 0) {
+    // THIN-3G (rule 4's last sentence): the prompt does not fit even with
+    // no history. The core is the stable prefix (persona, profile, roster),
+    // the summary and the message; memory, episodes, the clock and the
+    // tools block drop first. Only when the core itself cannot fit does a
+    // written chat offer a new chat carrying the summary; a spoken turn
+    // never hears it and answers from the message alone.
+    const core = items.filter((item) => item.source === "utterance" || item.source === "profile" || item.source === "roster");
+    const countCore = (withSummary: boolean) => countTokens(contextToMessages([...core, ...(withSummary ? summaryItem : [])], input.utterance, state.persona, state.plan, state.signal, surfaceClass));
+    const withSummary = await countCore(true);
+    const alone = withSummary !== null && withSummary + reply <= context ? withSummary : await countCore(false);
+    const written = surfaceClass === "written";
+    // A chat seeded with a summary and no turn of its own yet holds the
+    // summary out of this first prompt instead (no loop for a big paste);
+    // it joins from the next message.
+    const seededFirstTurn = preview.userTexts.length === 0 && summaryItem.length > 0;
+    if (withSummary === null || alone === null) {
+      // A count that failed here is unmeasured, never "does not fit" (a
+      // review): the window takes its named minimum and the turn runs.
+      left = null;
+    } else if (withSummary + reply <= context) {
+      items.splice(0, items.length, ...core);
+      toolRound = false;
+      promptLimit = "core_only";
+      left = context - reply - withSummary;
+    } else {
+      items.splice(0, items.length, ...core);
+      toolRound = false;
+      promptLimit = "core_only";
+      if (alone + reply > context) {
+        // The message cannot fit even alone: written chat says so plainly.
+        if (written) promptLimit = "too_big";
+        holdSummary = true;
+        left = 0;
+      } else if (written && !seededFirstTurn) {
+        promptLimit = "carry_offer";
+        left = 0;
+      } else {
+        holdSummary = true;
+        left = context - reply - alone;
+      }
+    }
+  }
+  const historyBudgetTokens = left === null ? null : Math.floor(toolRound ? Math.max(0, left) * (1 - TOOL_ROUND_SHARE) : Math.max(0, left));
   const window = await buildConversationWindow(conversation, { ...windowOpts, historyBudgetTokens });
-  pushWindow(window);
-  if (recallEarlier) {
+  pushWindow(holdSummary ? { ...window, summaryLine: undefined } : window);
+  if (recallEarlier && promptLimit === undefined) {
     // RECALL-03's block joins after the window is sized, so it is counted
     // here and left out when it does not fit beside the window (a review).
     const before = items.length;
@@ -361,7 +411,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     }
   }
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning, disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk } };
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning, disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}) } };
 };
 
 /** Applies the node's output onto TurnState, the same small
@@ -375,6 +425,7 @@ export function applyContext(state: import("../contract").TurnState, output: Con
   state.reasoning = output.reasoning;
   if (output.subjects) state.subjects = output.subjects;
   state.unknownAsk = output.unknownAsk ?? null;
+  if (output.promptLimit) state.promptLimit = output.promptLimit;
   if (output.disclosureWithheld) {
     // THIN-0B: the plan's inputs, recomputed once with the withheld flag,
     // and the trusted-adult move when a child or teen asked a question
