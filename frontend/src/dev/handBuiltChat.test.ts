@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { elementsReplacing, handBuiltChatComponents, wireNowElements, type HandBuiltBaseline } from "./handBuiltChat";
+import { chatSourceFiles, elementsReplacing, handBuiltChatComponents, wireNowElements, type HandBuiltBaseline } from "./handBuiltChat";
 
 // ELEMENTS-LINT-01 (RULES.md rule 9): the list of chat components that draw
 // their own markup may only shrink. Mirrors backend/scripts/lint/rule-budget.ts:
@@ -24,6 +24,12 @@ function baselineAtHead(): HandBuiltBaseline | null {
 const count = (b: HandBuiltBaseline) => Object.values(b).reduce((sum, names) => sum + names.length, 0);
 
 describe("hand-built chat components (ELEMENTS-LINT-01)", () => {
+  test("generic kit Elements do not classify non-chat pages as chat source", () => {
+    const files = chatSourceFiles(SRC);
+    expect(files).not.toContain("next/pages/NextDashboardPage.tsx");
+    expect(files).not.toContain("next/pages/NextStatusPage.tsx");
+  });
+
   test("no chat component draws its own markup unless it is in the shrinking baseline", () => {
     const found = handBuiltChatComponents(SRC);
     const added = Object.entries(found).flatMap(([file, names]) =>

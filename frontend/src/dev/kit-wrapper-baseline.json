@@ -269,12 +269,6 @@
       "reason": "Hand-built admin detail popover; tool-error ships with optional counts from ui-v0.5.116; ADOPT-02."
     }
   },
-  "next/pages/dashboard/RecentActivityTable.tsx": {
-    "RecentActivityTable": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "next/pages/dashboard/StatCard.tsx": {
     "StatCard": {
       "ed": "ED-038",
@@ -383,10 +377,6 @@
   },
   "next/pages/status/StatusIncident.tsx": {
     "StatusIncident": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "RecentProblems": {
       "ed": "ED-038",
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }

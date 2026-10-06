@@ -29,10 +29,11 @@ function makePerson(): Roster {
   };
 }
 
-function mockDashboardFetch(body: Dashboard) {
+function mockDashboardFetch(body: Dashboard, onPath?: (path: string) => void) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
+    onPath?.(url.split("?")[0] ?? url);
     if (url.includes("/api/dashboard")) return Promise.resolve(Response.json(body));
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
@@ -145,12 +146,13 @@ describe("NextDashboardPage", () => {
   });
 
   test("recent activity: renders real rows, and the empty state when there are none", async () => {
+    const paths: string[] = [];
     const restore = mockDashboardFetch({
       people_count: 1,
       updates_available: false,
       recent_activity: [{ turn_id: "turn-1", person_id: "person-abc123", display_name: "Nova", created_at: "2026-09-21T12:00:00.000Z", surface: "chat", source: "model" }],
       turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
-    });
+    }, (path) => paths.push(path));
     try {
       renderWithQueryClient(
         <MemoryRouter>
@@ -158,8 +160,12 @@ describe("NextDashboardPage", () => {
         </MemoryRouter>,
       );
       await waitFor(() => expect(document.body.textContent).toContain("Recent activity"));
+      expect(document.querySelector('[data-slot="timeline"]')).not.toBeNull();
+      expect(document.querySelector("table")).toBeNull();
       expect(document.body.textContent).toContain("chat");
+      expect(document.body.textContent).toContain("Nova");
       expect(document.body.textContent).not.toContain("Nothing yet");
+      expect(paths).toEqual(["/api/dashboard"]);
     } finally {
       restore();
     }
@@ -179,6 +185,8 @@ describe("NextDashboardPage", () => {
         </MemoryRouter>,
       );
       await waitFor(() => expect(document.body.textContent).toContain("Nothing yet"));
+      expect(document.querySelector('[data-slot="timeline"]')).not.toBeNull();
+      expect(document.querySelector("table")).toBeNull();
     } finally {
       restore();
     }
