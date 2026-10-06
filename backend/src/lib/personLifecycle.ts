@@ -46,6 +46,7 @@ import { clonedVoicesDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { TOMBSTONE_TEXT } from "@/lib/memory";
 import { deleteEpisodesForPerson } from "@/lib/episodes";
+import { deleteArtifactsForTurns } from "@/lib/artifacts";
 import { invalidateScopeCache } from "@/lib/settings";
 import { deleteReceivedBackupsForDevice } from "@/lib/receivedBackups";
 import { releaseFilesOfDeletedPerson } from "@/lib/storage/personFiles";
@@ -358,6 +359,16 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
   const feedback = sqlite
     .query("DELETE FROM reply_feedback WHERE person_id = ? OR turn_id IN (SELECT id FROM conversation_turns WHERE person_id = ?)")
     .run(personId, personId).changes;
+  // getmaipai/home#214: artifacts made in their chats and jobs tied to
+  // their conversations hold foreign keys to the turns and conversations
+  // deleted below; left in place, those deletes fail and the whole removal
+  // rolls back. Every version of an artifact goes (each names its turn),
+  // and a job about a conversation that no longer exists has nothing to
+  // report into. The test that walks every foreign key to a turn or a
+  // conversation (people.test.ts) keeps this list whole.
+  deleteArtifactsForTurns((sqlite.query("SELECT id FROM conversation_turns WHERE person_id = ?").all(personId) as { id: string }[]).map((t) => t.id));
+  sqlite.query("DELETE FROM artifacts WHERE conversation_id IN (SELECT id FROM conversations WHERE person_id = ?)").run(personId);
+  sqlite.query("DELETE FROM jobs WHERE conversation_id IN (SELECT id FROM conversations WHERE person_id = ?)").run(personId);
   // Counted BEFORE the delete, not from `.changes` (SHELL-SEARCH-03,
   // found live): conversation_turns_fts's own sync triggers turn one
   // logical row delete into several more writes against its shadow

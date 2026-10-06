@@ -10,6 +10,8 @@ import { remember } from "@/lib/memory";
 import { logTurn, resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { setValue } from "@/lib/settings";
 import { scheduleJob } from "@/lib/scheduler";
+import { createArtifact } from "@/lib/artifacts";
+import { createJob } from "@/lib/jobs";
 import { compareHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 
@@ -790,6 +792,37 @@ describe("deleting a person erases what the household held about them", () => {
     expect(countRows("scheduled_jobs", "person_id", person.id)).toBe(0);
     expect(countRows("person_credentials", "person_id", person.id)).toBe(0);
     expect(countRows("episodes", "person_id", person.id)).toBe(0); // episodes deleted with turns
+  });
+
+  // getmaipai/home#214: an artifact on one of their turns, or a job tied to
+  // one of their conversations, held a foreign key the turn and
+  // conversation deletes broke, so the whole removal rolled back and the
+  // person stayed in the household.
+  test("someone with an artifact in a chat and a job tied to a conversation can be removed, and both go with them", async () => {
+    const owner = await ownerSession();
+    const person = await addPerson(owner, "Pippa", "teen", "theirpin1");
+    const conversation = resolveOrCreateConversation(toPersonRow(person.id), "chat");
+    if (!conversation.ok) throw new Error(conversation.error);
+    logTurn(toPersonRow(person.id), "chat", "write me a packing list", {
+      reply: { text: "Here is your packing list." },
+      source: "model",
+      safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
+      conversation_id: conversation.value.id,
+      turn_id: "turn-artifact214",
+    });
+    createArtifact({ conversationId: conversation.value.id, turnId: "turn-artifact214", kind: "markdown", title: "Packing list", body: "Socks", createdBy: person.id, provenance: "{}" });
+    createJob({ id: "job-214", kind: "image", startedBy: person.id, forPerson: person.id, title: "A picture", state: "running", conversationId: conversation.value.id, provenance: { producer: "test" } });
+    createJob({ id: "job-household-214", kind: "model_download", startedBy: "system", forPerson: null, title: "A model", state: "running", provenance: { producer: "test" } });
+
+    const res = await owner.request(`/api/people/${person.id}`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+    const roster = (await (await owner.get("/api/people")).json()) as Array<{ id: string }>;
+    expect(roster.some((p) => p.id === person.id)).toBe(false);
+    expect(countRows("conversation_turns", "person_id", person.id)).toBe(0);
+    expect(countRows("artifacts", "conversation_id", conversation.value.id)).toBe(0);
+    expect(countRows("jobs", "conversation_id", conversation.value.id)).toBe(0);
+    // A household job tied to no conversation is not theirs to take.
+    expect(countRows("jobs", "id", "job-household-214")).toBe(1);
   });
 
   // Their session dies with them: a deleted person holding a live cookie

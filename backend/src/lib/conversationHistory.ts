@@ -56,7 +56,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { remember } from "@/lib/memory";
 import { recordEpisodes, deleteEpisodesForTurns, contentTerms } from "@/lib/episodes";
 import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
-import { artifactsByTurn } from "@/lib/artifacts";
+import { artifactsByTurn, deleteArtifactsForTurns } from "@/lib/artifacts";
 import { projectsByTurn } from "@/lib/projects/store";
 import { nextHlc, compareHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
@@ -1961,6 +1961,7 @@ export function deleteConversationById(actor: PersonRow, id: string): Conversati
   const turns = db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.conversationId, id)).all();
   deleteAttachmentsForTurns(turns.map((t) => t.id));
   deleteEpisodesForTurns(turns.map((t) => t.id));
+  deleteArtifactsForTurns(turns.map((t) => t.id));
   const now = new Date().toISOString();
   db.update(conversations)
     .set({ status: "deleted", title: null, summary: null, summaryThroughTurn: null, updatedAt: now, hlc: nextHlc() })
@@ -2977,6 +2978,7 @@ export function runRetention(): { deleted: number } {
   // Delete episodes for expiring turns before deleting the turns themselves.
   deleteAttachmentsForTurns(expiring.map((t) => t.id));
   deleteEpisodesForTurns(expiring.map((t) => t.id));
+  deleteArtifactsForTurns(expiring.map((t) => t.id));
 
   // Two statements, not one with an OR, so each cutoff date only ever
   // applies to the rows it's meant for. `.changes` is NOT the row count

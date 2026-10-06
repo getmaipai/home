@@ -133,6 +133,16 @@ export function currentArtifactRow(artifactKey: string): ArtifactRow | null {
  * `conversationHistory.ts`'s own `memoryIdsByTurn()` is - the one
  * caller, `listConversationTurns()`, already avoids an N+1 query for
  * memory ids and shouldn't grow one here. */
+/** getmaipai/home#214: an artifact version names the turn it was made in
+ * (a required foreign key), so every path that deletes turns (a chat
+ * deleted, history past retention, a person removed) deletes the artifact
+ * versions on those turns first; left in place, the turn delete fails and
+ * rolls back. */
+export function deleteArtifactsForTurns(turnIds: readonly string[]): void {
+  if (turnIds.length === 0) return;
+  db.delete(artifacts).where(inArray(artifacts.turnId, [...turnIds])).run();
+}
+
 export function artifactsByTurn(turnIds: readonly string[]): Map<string, { id: string; version: number }> {
   const rows = turnIds.length > 0 ? db.select().from(artifacts).where(inArray(artifacts.turnId, turnIds)).all() : [];
   return new Map(rows.map((row) => [row.turnId, { id: row.id, version: row.version }]));
