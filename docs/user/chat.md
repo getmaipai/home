@@ -70,11 +70,11 @@ Each of MaiPai's replies has a few small buttons under it:
 - **Listen**, to have MaiPai read the answer out loud
 - **More**, for extra options like remembering or forgetting that exchange
 
-![The five reason chips that open under a reply after a thumbs down.](../assets/screens/chat-feedback-reasons-desktop-light.png)
+![The "What went wrong?" form that opens under a reply after a thumbs down.](../assets/screens/chat-feedback-reasons-desktop-light.png)
 
 ## Rate a reply
 
-Under each of MaiPai's replies, tap the **thumbs up** or **thumbs down** button. A thumbs down opens a row of five reasons. Pick the one that fits, or tap elsewhere to close it.
+Under each of MaiPai's replies, tap the **thumbs up** or **thumbs down** button. A thumbs down opens a small **What went wrong?** form. Pick any reasons that fit, add a note if you like, and tap **Send feedback**. It is optional: your thumbs down counts even if you skip it. Your note is private. Only you can read it back, and it is deleted with the chat. Children rate with the thumbs only.
 
 A rating only labels the reply for the household. It does not change the answer or start a new one. MaiPai and the hub use those labels to see which kinds of replies land well.
 

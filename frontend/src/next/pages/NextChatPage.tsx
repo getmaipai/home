@@ -59,7 +59,7 @@ import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognito
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { ChatShortcutReference } from "@/next/pages/ChatShortcutReference";
-import { ArtifactOpenContext, AdminContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, MODEL_EFFORTS, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
@@ -1207,6 +1207,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <ReloadMainThreadProvider>
       <ConfirmAskAnswerProvider askAnswerRef={askAnswerRef}>
       <AdminContext.Provider value={isOwnerOrAdminRole(person.role)}>
+      <ChatAgeBandContext.Provider value={person.age_band ?? "child"}>
       <CompareOpenContext.Provider value={setCompareTarget}>
       <SourcesOpenContext.Provider value={sourcesOpenValue}>
       <DetailsOpenContext.Provider value={detailsOpenValue}>
@@ -1493,6 +1494,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </DetailsOpenContext.Provider>
       </SourcesOpenContext.Provider>
       </CompareOpenContext.Provider>
+      </ChatAgeBandContext.Provider>
       </AdminContext.Provider>
       </ConfirmAskAnswerProvider>
       </ReloadMainThreadProvider>

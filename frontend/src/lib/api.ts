@@ -721,10 +721,10 @@ export const api = {
   project: (id: string) => request<ProjectView>(`/api/projects/${encodeURIComponent(id)}`),
   cancelProject: (id: string) => request<Project>(`/api/projects/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   conversationFeedback: (id: string) => request<ReplyFeedback | null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`),
-  submitConversationFeedback: (id: string, verdict: ReplyFeedback["verdict"], reason: ReplyFeedback["reason"] = null) =>
+  submitConversationFeedback: (id: string, verdict: ReplyFeedback["verdict"], reason: ReplyFeedback["reason"] = null, details?: { reasons: NonNullable<ReplyFeedback["reasons"]>; note: string | null }) =>
     request<ReplyFeedback>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`, {
       method: "POST",
-      body: JSON.stringify({ verdict, reason }),
+      body: JSON.stringify(details ? { verdict, reason, reasons: details.reasons, note: details.note } : { verdict, reason }),
     }),
   renameConversation: (id: string, title: string | null, pinned?: boolean) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {

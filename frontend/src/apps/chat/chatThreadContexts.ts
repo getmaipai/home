@@ -70,6 +70,11 @@ export const ConfirmAskAnswerContext = createContext<(turnId: string, approved: 
 // own) - `AdminContext` for the one gate this whole action needs, so it
 // never shows for anyone who'd just get a 403 from the route.
 export const AdminContext = createContext(false);
+/** ELEMENTS-ADOPT-02: the signed-in person's age band, for the reply
+ * controls that differ by band (the "What went wrong?" form is never shown
+ * to a child). The default is the strictest band, so a mount without the
+ * chat page's provider never shows an adult-only control. */
+export const ChatAgeBandContext = createContext<"child" | "teen" | "adult">("child");
 export type CompareTarget = { turnId: string; conversationId: string; ourText: string };
 export const CompareOpenContext = createContext<(target: CompareTarget) => void>(() => {});
 

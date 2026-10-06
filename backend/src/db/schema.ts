@@ -756,6 +756,12 @@ export const replyFeedback = sqliteTable("reply_feedback", {
     .references(() => people.id),
   verdict: text("verdict").notNull(),
   reason: text("reason"),
+  // ELEMENTS-ADOPT-02: every reason picked in the "What went wrong?" form
+  // (a JSON array of the spec's five values) and the person's own note.
+  // The note is private to its writer and leaves with the row: every
+  // DELETE FROM reply_feedback (conversation, retention, person) takes it.
+  reasons: text("reasons").notNull().default("[]"),
+  note: text("note"),
   source: text("source").notNull(),
   createdAt: text("created_at").notNull(),
   hlc: text("hlc").notNull(),

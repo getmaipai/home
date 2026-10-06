@@ -182,7 +182,24 @@ const SearchQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(5).describe("Results to return"),
 });
 
-const FeedbackBodySchema = ReplyFeedback.pick({ verdict: true, reason: true });
+// ELEMENTS-ADOPT-02: `reasons` and `note` are the "What went wrong?" form
+// (the kit's feedback-dialog). Both optional, so an older client's
+// one-tap body is unchanged.
+// Their spec defaults are dropped here so an absent field stays absent and
+// a plain one-tap down can keep the details already saved.
+const FeedbackBodySchema = ReplyFeedback.pick({ verdict: true, reason: true }).extend({
+  reasons: ReplyFeedback.shape.reasons.unwrap().optional(),
+  note: ReplyFeedback.shape.note.unwrap().optional(),
+});
+
+function storedReasons(raw: string): NonNullable<ReplyFeedback["reasons"]> {
+  try {
+    const parsed = ReplyFeedback.shape.reasons.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
+}
 
 function toReplyFeedback(row: typeof replyFeedback.$inferSelect) {
   return ReplyFeedback.parse({
@@ -191,6 +208,8 @@ function toReplyFeedback(row: typeof replyFeedback.$inferSelect) {
     person_id: row.personId,
     verdict: row.verdict,
     reason: row.reason,
+    reasons: storedReasons(row.reasons),
+    note: row.note,
     source: row.source,
     created_at: row.createdAt,
     hlc: row.hlc,
@@ -204,7 +223,7 @@ const feedbackRouteRequest = {
 
 const feedbackResponses = {
   200: { content: { "application/json": { schema: ReplyFeedback.nullable() } }, description: "The current person's label, or null when this turn has not been rated." },
-  ...errorResponses({ 400: "Invalid feedback, or a child supplied a reason", 401: "Sign in first", 404: "Turn not found or not visible" }),
+  ...errorResponses({ 400: "Invalid feedback, or a child supplied a reason or a note", 401: "Sign in first", 404: "Turn not found or not visible" }),
 };
 
 const getFeedbackRoute = createRoute({
@@ -264,21 +283,40 @@ conversationsRoutes.openapi(postFeedbackRoute, (c) => {
   const turn = visibleTurn(actor, id);
   if (!turn) return c.json({ error: "turn not found" }, 404);
   const body = c.req.valid("json");
-  if (actor.role === "child" && body.reason !== null) {
-    return c.json({ error: "child-band feedback cannot include a reason" }, 400);
+  const reasons = body.reasons ?? [];
+  // A note that is only whitespace is no note.
+  const note = body.note?.trim() ? body.note.trim() : null;
+  // The child band never exposes or stores a reason or a note (FEED-01,
+  // ELEMENTS-ADOPT-02). The band is the stricter of role and birthdate
+  // (speakerAgeBand), so a person whose birthdate makes them a child is
+  // refused too, whatever their role.
+  if (speakerAgeBand(actor, new Date()) === "child" && (body.reason !== null || reasons.length > 0 || note !== null)) {
+    return c.json({ error: "child-band feedback cannot include a reason or a note" }, 400);
   }
+  // Reasons and a note only explain a down rating; an up rating clears them.
+  const down = body.verdict === "down";
   const existing = db
-    .select({ id: replyFeedback.id })
+    .select()
     .from(replyFeedback)
     .where(and(eq(replyFeedback.turnId, id), eq(replyFeedback.personId, actor.id)))
     .get();
+  // A plain one-tap down (the thumbs again, or an older client) carries no
+  // details: it keeps the reasons and note already saved for this reply
+  // rather than wiping them. Only an up rating or details sent explicitly
+  // replace them.
+  const keepDetails = down && body.reasons === undefined && body.note === undefined && body.reason === null && existing?.verdict === "down";
+  const keptReasons = keepDetails && existing ? storedReasons(existing.reasons) : reasons;
+  const keptNote = keepDetails && existing ? existing.note : note;
+  const keptReason = keepDetails && existing ? existing.reason : (body.reason ?? reasons[0] ?? null);
   const now = new Date().toISOString();
   const parsed = ReplyFeedback.parse({
     id: existing?.id ?? newReplyFeedbackId(),
     turn_id: id,
     person_id: actor.id,
     verdict: body.verdict,
-    reason: body.reason,
+    reason: down ? keptReason : null,
+    reasons: down ? keptReasons : [],
+    note: down ? keptNote : null,
     source: `api:${actor.id}`,
     created_at: now,
     hlc: nextHlc(),
@@ -290,6 +328,8 @@ conversationsRoutes.openapi(postFeedbackRoute, (c) => {
       personId: parsed.person_id,
       verdict: parsed.verdict,
       reason: parsed.reason,
+      reasons: JSON.stringify(parsed.reasons),
+      note: parsed.note,
       source: parsed.source,
       createdAt: parsed.created_at,
       hlc: parsed.hlc,
@@ -299,6 +339,8 @@ conversationsRoutes.openapi(postFeedbackRoute, (c) => {
       set: {
         verdict: parsed.verdict,
         reason: parsed.reason,
+        reasons: JSON.stringify(parsed.reasons),
+        note: parsed.note,
         source: parsed.source,
         createdAt: parsed.created_at,
         hlc: parsed.hlc,

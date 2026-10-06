@@ -28,8 +28,8 @@ async function owner(): Promise<{ client: TestClient; actor: PersonRow }> {
   return { client, actor };
 }
 
-async function childOf(client: TestClient): Promise<{ client: TestClient; actor: PersonRow }> {
-  const response = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+async function childOf(client: TestClient, role: "child" | "teen" = "child", displayName = "Bramble"): Promise<{ client: TestClient; actor: PersonRow }> {
+  const response = await client.post("/api/people", { displayName, role });
   const { id } = (await response.json()) as { id: string };
   const actor = db.select().from(people).where(eq(people.id, id)).get()!;
   const childClient = new TestClient();
@@ -57,7 +57,7 @@ describe("reply feedback migration and schema", () => {
     const indexes = sqlite.query("PRAGMA index_list(reply_feedback)").all() as Array<{ name: string; unique: number }>;
     expect(indexes.some((index) => index.name === "reply_feedback_turn_person_unique" && index.unique === 1)).toBe(true);
     expect((sqlite.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(CURRENT_SCHEMA_VERSION);
-    expect(CURRENT_SCHEMA_VERSION).toBe(47);
+    expect(CURRENT_SCHEMA_VERSION).toBe(48);
   });
 });
 
@@ -107,6 +107,102 @@ describe("POST/GET /api/conversations/turns/:id/feedback", () => {
     const response = await childClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reason: "wrong" });
     expect(response.status).toBe(400);
     expect(db.select().from(replyFeedback).where(eq(replyFeedback.turnId, id)).all()).toHaveLength(0);
+  });
+
+  test("ELEMENTS-ADOPT-02: a down rating stores several reasons and a trimmed note, and GET reads them back", async () => {
+    const { client, actor } = await owner();
+    const id = turnFor(actor, "turn-feedbackreasons");
+    const response = await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reasons: ["wrong", "too_long"], note: "  The hours were for another branch.  " });
+    expect(response.status).toBe(200);
+    const body = ReplyFeedback.parse(await response.json());
+    expect(body).toMatchObject({ verdict: "down", reason: "wrong", reasons: ["wrong", "too_long"], note: "The hours were for another branch." });
+    const read = ReplyFeedback.parse(await (await client.get(`/api/conversations/turns/${id}/feedback`)).json());
+    expect(read.reasons).toEqual(["wrong", "too_long"]);
+    expect(read.note).toBe("The hours were for another branch.");
+  });
+
+  test("ELEMENTS-ADOPT-02: an older one-tap body still works and reads back empty reasons and no note", async () => {
+    const { client, actor } = await owner();
+    const id = turnFor(actor, "turn-feedbackolder");
+    const body = ReplyFeedback.parse(await (await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reason: "off" })).json());
+    expect(body).toMatchObject({ reason: "off", reasons: [], note: null });
+  });
+
+  test("ELEMENTS-ADOPT-02: an up rating clears earlier reasons and note", async () => {
+    const { client, actor } = await owner();
+    const id = turnFor(actor, "turn-feedbackclears");
+    await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reasons: ["unsafe"], note: "Not for us." });
+    const up = ReplyFeedback.parse(await (await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "up" })).json());
+    expect(up).toMatchObject({ verdict: "up", reason: null, reasons: [], note: null });
+    const row = db.select().from(replyFeedback).where(eq(replyFeedback.turnId, id)).get()!;
+    expect(row.note).toBeNull();
+    expect(row.reasons).toBe("[]");
+  });
+
+  test("ELEMENTS-ADOPT-02: a child's reasons or note are refused and nothing is stored", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: childClient, actor: child } = await childOf(ownerClient);
+    const id = turnFor(child, "turn-feedbackchildnote");
+    expect((await childClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reasons: ["wrong"] })).status).toBe(400);
+    expect((await childClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", note: "bad" })).status).toBe(400);
+    expect(db.select().from(replyFeedback).where(eq(replyFeedback.turnId, id)).all()).toHaveLength(0);
+    // The plain thumbs still work for a child.
+    expect((await childClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down" })).status).toBe(200);
+  });
+
+  test("ELEMENTS-ADOPT-02: a teen-role person whose birthdate makes them a child is refused reasons and a note", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: youngClient, actor: young } = await childOf(ownerClient, "teen", "Pippa");
+    const birthdate = new Date(Date.now() - 9 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    sqlite.query("UPDATE people SET birthdate = ? WHERE id = ?").run(birthdate, young.id);
+    const id = turnFor(young, "turn-feedbackbirthdate");
+    expect((await youngClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", note: "bad" })).status).toBe(400);
+    expect((await youngClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reasons: ["wrong"] })).status).toBe(400);
+    expect(db.select().from(replyFeedback).where(eq(replyFeedback.turnId, id)).all()).toHaveLength(0);
+  });
+
+  test("ELEMENTS-ADOPT-02: a plain thumbs-down again keeps the reasons and note already saved", async () => {
+    const { client, actor } = await owner();
+    const id = turnFor(actor, "turn-feedbackkeeps");
+    await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reasons: ["off"], note: "Kept words." });
+    const again = ReplyFeedback.parse(await (await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down" })).json());
+    expect(again).toMatchObject({ verdict: "down", reason: "off", reasons: ["off"], note: "Kept words." });
+    const replaced = ReplyFeedback.parse(await (await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reasons: ["wrong"], note: null })).json());
+    expect(replaced).toMatchObject({ reasons: ["wrong"], note: null });
+  });
+
+  test("ELEMENTS-ADOPT-02: a teen's note stays private; the owner reading the same turn sees only their own label", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: teenClient, actor: teen } = await childOf(ownerClient, "teen", "Juniper");
+    const id = turnFor(teen, "turn-feedbackteen");
+    expect((await teenClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reasons: ["did_not_listen"], note: "It ignored my question." })).status).toBe(200);
+    const ownerRead = await ownerClient.get(`/api/conversations/turns/${id}/feedback`);
+    expect(ownerRead.status === 404 || (await ownerRead.json()) === null).toBe(true);
+    const teenRead = ReplyFeedback.parse(await (await teenClient.get(`/api/conversations/turns/${id}/feedback`)).json());
+    expect(teenRead.note).toBe("It ignored my question.");
+  });
+
+  test("ELEMENTS-ADOPT-02: a repeated reason or an over-long note is refused", async () => {
+    const { client, actor } = await owner();
+    const id = turnFor(actor, "turn-feedbackinvalid");
+    expect((await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reasons: ["wrong", "wrong"] })).status).toBe(400);
+    expect((await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", note: "x".repeat(1001) })).status).toBe(400);
+  });
+
+  test("ELEMENTS-ADOPT-02: deleting the conversation and the retention window take the note with the rating", async () => {
+    const { client, actor } = await owner();
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error(conversation.error);
+    const id = turnFor(actor, "turn-feedbacknotedelete");
+    await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", note: "Private words." });
+    expect((await client.request(`/api/conversations/${conversation.value.id}`, { method: "DELETE" })).status).toBe(200);
+    expect(sqlite.query("SELECT count(*) AS n FROM reply_feedback WHERE note IS NOT NULL").get()).toEqual({ n: 0 });
+
+    const aged = turnFor(actor, "turn-feedbacknoteaged");
+    await client.post(`/api/conversations/turns/${aged}/feedback`, { verdict: "down", note: "Older words." });
+    sqlite.query("UPDATE conversation_turns SET created_at = ? WHERE id = ?").run(new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString(), aged);
+    runRetention();
+    expect(sqlite.query("SELECT count(*) AS n FROM reply_feedback WHERE note IS NOT NULL").get()).toEqual({ n: 0 });
   });
 
   test("deleting a person erases their labels and labels about their turns", async () => {

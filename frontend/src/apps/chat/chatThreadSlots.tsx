@@ -2,6 +2,8 @@
 // thinking indicator, welcome, reasoning group, sources and message footer),
 // moved verbatim out of NextChatPage.tsx (SHARED-THREAD-01). ChatThread.tsx
 // hands them to the kit Thread.
+import { useReplyFeedbackForm } from "@/apps/chat/chatFeedbackDialog";
+import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
 import { useContext, useEffect, useState, type PropsWithChildren } from "react";
 import { ActionBarMorePrimitive, ComposerPrimitive, useAui, useAuiState, type ThreadAssistantMessagePart, type ThreadMessage } from "@assistant-ui/react";
 import { type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
@@ -673,16 +675,19 @@ export function BareModelBadge() {
   );
 }
 
-// One `AssistantMessageFooterExtra` slot, three independent reveals
-// (the bare-model badge, sources, Details) - each keyed by its own
+// One `AssistantMessageFooterExtra` slot, four independent reveals
+// (the bare-model badge, sources, Details, the "What went wrong?" form) - each keyed by its own
 // state and rendering (or not) on its own, so this wrapper is pure
 // composition, no shared logic between them.
 export function MessageFooterExtra() {
+  // ELEMENTS-ADOPT-02: the kit feedback-dialog as it ships, fed by a hook.
+  const feedbackForm = useReplyFeedbackForm();
   return (
     <>
       <BareModelBadge />
       <SourcesFooterContent />
       <MessageDetailsReveal />
+      {feedbackForm ? <FeedbackDialog {...feedbackForm} /> : null}
     </>
   );
 }

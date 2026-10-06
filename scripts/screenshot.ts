@@ -164,6 +164,11 @@ const chatResearchReview = process.argv.includes("--chat-research-review");
 const chatAcceptanceReview = process.argv.includes("--chat-acceptance-review");
 const shellRailReview = process.argv.includes("--shell-rail-review");
 const chatThreadActionsReview = process.argv.includes("--chat-thread-actions-review");
+// ELEMENTS-ADOPT-02: the Elements wired to new data (feedback form, memory
+// chips, follow-ups, safety notice, approval card), per band, both themes,
+// 1440 and 390. `--elements-wave2-review=<part>` picks one part.
+const elementsWave2Arg = process.argv.find((arg) => arg.startsWith("--elements-wave2-review"));
+const elementsWave2Part = elementsWave2Arg?.split("=")[1] ?? "feedback";
 const chatMissingStatesReview = process.argv.includes("--chat-missing-states-review");
 // ACTIVITY-01d/e (owner, 2026-10-06): no header button; the one calm card
 // above the composer for waiting, running and just-finished work, plus the
@@ -539,7 +544,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview) {
+  if (chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg)) {
     for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -3046,6 +3051,80 @@ async function captureElementsReview(browser: Browser, sessionValue: string): Pr
  * show real content, not a placeholder. Written to data-scratch/ like
  * this file's other named review captures - a verification shot for
  * the coordinator to judge, not a permanent docs asset. */
+/** ELEMENTS-ADOPT-02 review captures. Each persona sends one real turn
+ * through the stub engine (POST /api/turn), then the shot opens that
+ * conversation and drives the reply's own controls the way a person would. */
+async function sessionFor(sessionValue: string, displayName: string | null): Promise<string> {
+  if (!displayName) return sessionValue;
+  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
+  const person = people.find((p) => p.display_name === displayName);
+  if (!person) throw new Error(`elements wave 2: seedHousehold() didn't create ${displayName}`);
+  const select = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: person.id }) });
+  const session = select.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!select.ok || !session) throw new Error(`elements wave 2: signing in as ${displayName} failed: ${select.status}`);
+  return session;
+}
+
+async function seedTurnFor(session: string, text: string): Promise<{ conversation_id: string; turn_id: string }> {
+  const turn = await fetch(`${BASE_URL}/api/turn`, { method: "POST", headers: { "Content-Type": "application/json", Cookie: `session=${session}` }, body: JSON.stringify({ surface: "chat", text }) });
+  if (!turn.ok) throw new Error(`elements wave 2: seeding a turn failed: ${turn.status} ${await turn.text()}`);
+  return (await turn.json()) as { conversation_id: string; turn_id: string };
+}
+
+type Wave2Shot = { band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
+
+const ALL_COMBOS = [["desktop", "light"], ["desktop", "dark"], ["phone", "light"], ["phone", "dark"]] as const;
+const TWO_COMBOS = [["desktop", "light"], ["phone", "dark"]] as const;
+
+function wave2Shots(part: string): Wave2Shot[] {
+  if (part === "feedback") {
+    const drive = async (page: Page, band: "adult" | "teen" | "child") => {
+      await page.getByRole("button", { name: "Not helpful" }).last().click();
+      if (band === "child") {
+        await page.waitForTimeout(500);
+        if (await page.locator('[data-slot="feedback-dialog"]').count()) throw new Error("elements wave 2: a child's thumbs-down drew the reasons form");
+        return;
+      }
+      await page.locator('[data-slot="feedback-dialog"]').waitFor();
+      await page.getByRole("button", { name: "Wrong" }).click();
+      await page.getByRole("button", { name: "Too long" }).click();
+      await page.getByLabel("Anything else?").fill("The opening hours were for another branch.");
+    };
+    return [
+      { band: "adult", person: null, prompt: "When does the library open on Saturday?", combos: ALL_COMBOS, drive },
+      { band: "teen", person: "Marlow", prompt: "When does the library open on Saturday?", combos: TWO_COMBOS, drive },
+      { band: "child", person: "Nova", prompt: "When does the library open on Saturday?", combos: TWO_COMBOS, drive },
+    ];
+  }
+  throw new Error(`elements wave 2: unknown part ${part}`);
+}
+
+async function captureElementsWave2Review(browser: Browser, sessionValue: string, part: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "queue", "reports", "elements-wave2-shots");
+  mkdirSync(outDir, { recursive: true });
+  for (const shot of wave2Shots(part)) {
+    const session = await sessionFor(sessionValue, shot.person);
+    for (const [slug, theme] of shot.combos) {
+      const seeded = await seedTurnFor(session, shot.prompt);
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      const context = await newContext(browser, viewport, theme, session);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/chat?conversation=${seeded.conversation_id}`);
+        await page.getByRole("button", { name: "Not helpful" }).last().waitFor({ timeout: 20000 });
+        await shot.drive(page, shot.band);
+        await settleAnimations(page);
+        const file = `${part}-${shot.band}-${viewport.width}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file) });
+        console.log(`Wrote ${join(outDir, file)}`);
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureChatThreadActionsReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -8381,7 +8460,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview ? startScreenshotStack(chatModel.url) : undefined;
+  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg) ? startScreenshotStack(chatModel.url) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -8398,7 +8477,7 @@ async function main() {
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
       // This matrix never calls speech; all speech requests go to the Stack.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", ...(!chatIncognitoAudit ? { MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1" } : {}), MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", ...(!chatIncognitoAudit ? { MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1" } : {}), MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg) ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
       stdout: "pipe",
       stderr: "inherit",
     });
@@ -8888,6 +8967,12 @@ async function main() {
     if (!a11yOnly && shellRailReview) {
       await captureShellRail(browser, sessionValue, "light");
       await captureShellRail(browser, sessionValue, "dark");
+    }
+
+    if (!a11yOnly && elementsWave2Arg) {
+      await captureElementsWave2Review(browser, sessionValue, elementsWave2Part);
+      console.log("completed named review: --elements-wave2-review");
+      return;
     }
 
     if (!a11yOnly && chatThreadActionsReview) {
