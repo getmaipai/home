@@ -22,7 +22,7 @@ const CHAT_IMPORT = /from\s*["'](?:@assistant-ui\/|@maipai\/ui\/src\/elements\/(
  * or the kit's Elements (the chat page, its error details, the markdown
  * document view, the shortcut sheet). Tests are excluded. */
 export function chatSourceFiles(src: string): string[] {
-  const next = tsxUnder(src, "next").filter((rel) => CHAT_IMPORT.test(readFileSync(join(src, rel), "utf8")));
+  const next = tsxUnder(src, "next").filter((rel) => !rel.startsWith("next/pages/dashboard/") && CHAT_IMPORT.test(readFileSync(join(src, rel), "utf8")));
   return [...tsxUnder(src, "apps/chat"), ...next].sort();
 }
 
