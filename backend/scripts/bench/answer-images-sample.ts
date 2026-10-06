@@ -54,7 +54,7 @@ mkdirSync(PICS, { recursive: true });
 const BAND = (arg("--band") ?? "adult") as "adult" | "teen";
 const ONLY = arg("--only") ? new Set(arg("--only")!.split(",")) : null;
 // A person's pace: a pause after every subject (THIRD-PARTY-SERVICES.md).
-const PACE_MS = 15_000;
+const PACE_MS = Number(process.env.MAIPAI_IMG05_PACE_MS ?? 15_000);
 
 // Every outbound request is tapped; a 429, or a 403 from a Wikimedia host,
 // stops the run (back off on the first signal).
@@ -87,7 +87,7 @@ for (const [n, row] of rows.entries()) {
   if (blockSignal) break;
   if (n > 0) await new Promise((r) => setTimeout(r, PACE_MS));
   const started = performance.now();
-  const result = await selectAnswerImages({ subject: row.subject, actor, band: BAND, roster: [], deadlineAt: Date.now() + 3_000 });
+  const result = await selectAnswerImages({ subject: row.subject, kind: row.kind, actor, band: BAND, roster: [], deadlineAt: Date.now() + 3_000 });
   const ms = Math.round(performance.now() - started);
   const items = result.set?.items ?? [];
   const tiles: Tile[] = [];

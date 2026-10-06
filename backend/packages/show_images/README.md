@@ -19,8 +19,10 @@ SearXNG instance when web search is set up.
 
 ## What it uses
 
-Home looks the thing up on Wikipedia and Wikidata by its name, then fetches a
-few pictures itself and checks each one. Your browser never talks to the
+Home looks the thing up on Wikipedia and Wikidata by its name and what kind
+of thing it is, then fetches a few pictures itself and checks each one. If a
+name could mean several things and the chat does not make clear which, no
+pictures are shown. Your browser never talks to the
 picture's site. Only the thing's name leaves the house, never anything about
 you or your question.
 

@@ -19,15 +19,29 @@
   },
   "args": {
     "type": "object",
-    "required": ["subject"],
+    "required": [
+      "subject",
+      "kind"
+    ],
     "properties": {
-      "subject": { "type": "string", "minLength": 1, "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Use this when they ask what something looks like, ask who or what a well-known thing is, or are chatting about a thing whose look matters (artwork too), for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\", \"I just watched Jaws again\" means subject \"Jaws\" and \"what is the PlayStation 5\" means subject \"PlayStation 5\"; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. Call it in short, casual replies too. The app shows the photos itself; never mention them." }
+      "subject": {
+        "type": "string",
+        "minLength": 1,
+        "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Use this when they ask what something looks like, ask who or what a well-known thing is, or are chatting about a thing whose look matters (artwork too), for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\", \"I just watched Jaws again\" means subject \"Jaws\" and \"what is the PlayStation 5\" means subject \"PlayStation 5\"; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. Call it in short, casual replies too. The app shows the photos itself; never mention them."
+      },
+      "kind": {
+        "type": "string",
+        "minLength": 1,
+        "description": "What kind of thing it is, in one to three words, from the conversation: for example \"animal\", \"TV series\", \"car\", \"planet\", \"snake\", \"programming language\"."
+      }
     }
   },
   "incognito": "unaffected",
   "requires": [],
   "optional": [],
-  "platforms": ["home"],
+  "platforms": [
+    "home"
+  ],
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
@@ -69,5 +83,8 @@
   "min_app": "0.1.0",
   "tier": 0,
   "quality_scale": "bronze",
-  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
 }

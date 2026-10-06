@@ -22,6 +22,8 @@
 // - "red panda" (teen): "a virtual desktop red panda "sleeps" on an
 //   application window", a desktop screenshot.
 
+import { isAdultOnlyImageEngine } from "@/lib/searchEngines";
+
 /** Why a candidate is left out: a fixed key, or `caption:<word>` and
  * `category:<stem>` for the closed word lists (one counter per word). */
 export type RelevanceDrop = string;
@@ -46,6 +48,8 @@ export type RelevanceInput = {
   format?: string;
   /** Wikidata names this file as the subject's logo, flag, map and so on. */
   nonPhoto?: boolean;
+  /** Open-web rows: the search engines that returned it. */
+  engines?: readonly string[];
 };
 
 export type RelevanceContext = {
@@ -61,7 +65,39 @@ export type RelevanceContext = {
   commonsCategory?: string;
   /** The subject's official website (P856), if any. */
   officialSite?: string;
+  /** Words from the descriptions of other things with the same name
+   * (image-search accuracy study R4, built from Wikidata per subject). */
+  otherSenseWords?: readonly string[];
 };
+
+/** Image-search accuracy study (data-scratch/research/
+ * image-search-accuracy-study.md, 2026-10-06), R3: an engine's own weight
+ * replaces SearXNG's merged order, which rewarded the keyword engines'
+ * first rows (Bing's own top 6 was right 83% of the time; Flickr and
+ * Openverse 37 to 43%). Yandex measured as accurate as Bing (an optional,
+ * adult-only engine the household may enable in its own SearXNG). Engines
+ * the study could not measure (they refused the instance) count 1: never
+ * enough alone. */
+const ENGINE_WEIGHTS: Record<string, number> = {
+  "bing images": 2, "bing": 2, "yandex images": 2, "yandex": 2,
+  "pinterest": 1, "duckduckgo images": 1, "google images": 1, "google cse images": 1, "brave.images": 1, "brave images": 1, "qwant images": 1,
+  "wikicommons.images": 0, "wikimedia commons": 0, "wikicommons": 0,
+  "flickr": -1, "openverse": -1,
+};
+/** R5: the score a row needs (in practice: a Bing or Yandex row whose title
+ * names the subject and carries no other sense's word). */
+export const SEARCH_KEEP_SCORE = 2.5;
+
+/** R3 to R4: an open-web row's score. */
+export function searchScore(c: Pick<RelevanceInput, "engines" | "title" | "page" | "image">, ctx: Pick<RelevanceContext, "names" | "searchNames" | "otherSenseWords">): { score: number; wrongSense: boolean } {
+  const engines = (c.engines ?? []).map((e) => e.toLowerCase().trim());
+  const weight = engines.length ? Math.max(...engines.map((e) => ENGINE_WEIGHTS[e] ?? 0)) : 0;
+  const english = ctx.searchNames ?? ctx.names;
+  const titleNames = namesSubject(c.title, english) ? 0.5 : 0;
+  const text = `${normalizeForMatch(c.title)} ${normalizeForMatch(pathWords(c.page))} ${normalizeForMatch(pathWords(c.image))}`;
+  const wrongSense = (ctx.otherSenseWords ?? []).some((w) => w.length >= 3 && text.includes(` ${w} `));
+  return { score: weight + titleNames - (wrongSense ? 1 : 0), wrongSense };
+}
 
 /** Hosts where pictures are mostly people's own snapshots and posts. A
  * thing's row is never built from them (owner, 2026-10-06: general image
@@ -81,7 +117,7 @@ const PERSONAL_WORDS = /\b(cosplay|cosplayer|cosplayers|cosplaying|fan art|fanar
  * person) such a picture is a photo of someone with the thing, often a
  * private person or a child ("Child plays video game on Nintendo Switch
  * while sitting on a couch", a Commons category member). */
-const PEOPLE_WORDS = /\b(child|children|kid|kids|boy|boys|girl|girls|baby|toddler|teen|teenager|woman|women|people|family|crowd|visitors|tourists|couple|friend|friends|daughter|wife|husband|mom|mum|dad|mother|father|grandma|grandpa|students|shopper|shoppers|queue)\b/;
+const PEOPLE_WORDS = /\b(child|children|kid|kids|boy|boys|girl|girls|baby|toddler|teen|teenager|woman|women|people|family|crowd|visitors|tourists|couple|friend|friends|daughter|wife|husband|mom|mum|dad|mother|father|grandma|grandpa|students|shopper|shoppers|queue)(s|es)?\b|\b(her|his) (device|phone|tablet|camera)\b|\b(booth|expo|gamescom)\b/;
 
 /** Words a caption uses for a screen capture, not a photo. */
 const SCREENSHOT_WORDS = /\b(screenshot|screenshots|screen shot|screen capture|screencap|virtual desktop|desktop pet|application window|user interface|taskbar)\b|скриншот|スクリーンショット/;
@@ -99,7 +135,8 @@ const NOT_STILL = /\.(svg|gif|tiff?|pdf|djvu|webm|mp4|ogv)(\?|$)/i;
 const NOT_STILL_FORMATS = new Set(["svg", "gif", "tif", "tiff", "pdf", "djvu", "webm", "mp4"]);
 
 /** Stock-photo preview hosts (watermarked previews). */
-const STOCK_HOSTS = ["shutterstock.com", "gettyimages.com", "istockphoto.com", "adobestock.com", "stock.adobe.com", "alamy.com", "123rf.com", "dreamstime.com", "depositphotos.com"];
+// Study R6: an Etsy print was a held-out miss next to an Alamy preview.
+const STOCK_HOSTS = ["etsy.com", "etsystatic.com", "shutterstock.com", "gettyimages.com", "istockphoto.com", "adobestock.com", "stock.adobe.com", "alamy.com", "123rf.com", "dreamstime.com", "depositphotos.com"];
 
 /** Lowercase, accents off, camelCase (unless `splitCamel` is false) and
  * file separators split, every run of non-letters and non-digits one space,
@@ -189,6 +226,7 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
   if (c.source === "search") {
     if (onHost(hostOf(c.page), PERSONAL_HOSTS) || onHost(hostOf(c.image), PERSONAL_HOSTS)) return "personal_host";
     if (onHost(hostOf(c.page), STOCK_HOSTS) || onHost(hostOf(c.image), STOCK_HOSTS)) return "stock_preview";
+    if (ctx.band !== "adult" && (c.engines ?? []).some(isAdultOnlyImageEngine)) return "adult_only_engine";
   }
   // The lead image is the article's own choice: the caption lists (English
   // words, and a lead's description is often in another language) never
@@ -220,14 +258,12 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
     if (inCategory) signals++;
     if (namesSubject(words, names)) signals++;
   } else {
-    // A4: the title names it; A5: the page or picture address names it;
-    // A6: the page is the subject's official site or a Wikimedia page.
-    const english = ctx.searchNames ?? names;
-    if (namesSubject(c.title, english)) signals++;
-    if (namesSubject(pathWords(c.page), english) || namesSubject(pathWords(c.image), english)) signals++;
-    const host = hostOf(c.page);
-    const official = ctx.officialSite ? hostOf(ctx.officialSite) : "";
-    if ((official && (host === official || host.endsWith(`.${official}`))) || /(^|\.)(wikipedia|wikimedia)\.org$/.test(host)) signals++;
+    // Study R3 to R5 (replacing the path signal, which the study found adds
+    // nothing once the engine is weighted): engine weight, the title naming
+    // the subject, no other sense's words.
+    const { score, wrongSense } = searchScore(c, ctx);
+    if (score >= SEARCH_KEEP_SCORE) return null;
+    return wrongSense ? "wrong_sense" : "below_search_score";
   }
   if (signals === 0) return "no_subject_match";
   if (signals < 2) return "one_signal";

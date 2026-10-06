@@ -61,7 +61,7 @@ export function answerImagesAllowed(input: { actor: PersonRow; band: AgeBand; su
 
 /** Starts the pipeline for this turn's first `show_images` call; a second
  * call in the same turn reuses the first. */
-export function startAnswerImages(state: TurnState, subject: string): AnswerImageTurnState {
+export function startAnswerImages(state: TurnState, subject: string, kind = ""): AnswerImageTurnState {
   if (state.answerImages) return state.answerImages;
   const roster = state.context.filter((c) => c.source === "roster").map((c) => c.text);
   const band = state.planBasis?.band ?? state.plan.age_band;
@@ -71,7 +71,7 @@ export function startAnswerImages(state: TurnState, subject: string): AnswerImag
     timer = setTimeout(() => resolve({ set: null, trace: { subject, skipped: "error" } }), ANSWER_IMAGES_BUDGET_MS);
   });
   const deadlineAt = Date.now() + ANSWER_IMAGES_BUDGET_MS - ANSWER_IMAGES_FINISH_MS;
-  entry.done = Promise.race([selectAnswerImages({ subject, actor: state.actor, band, roster, deadlineAt }), budget])
+  entry.done = Promise.race([selectAnswerImages({ subject, kind, actor: state.actor, band, roster, deadlineAt }), budget])
     .catch((): AnswerImageSelection => ({ set: null, trace: { subject, skipped: "error" } }))
     .then((selection) => {
       clearTimeout(timer);

@@ -13,7 +13,7 @@ import { filterAnswerImages } from "@/lib/answerImages/quality";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { fixtureWorld, pictureUrl, syntheticPhoto, type FixtureSubject } from "./answerImagesFixture";
 
-type Extra = Partial<Pick<RelevanceInput, "objectName" | "categories" | "restrictions" | "width" | "format" | "nonPhoto" | "lead">>;
+type Extra = Partial<Pick<RelevanceInput, "objectName" | "categories" | "restrictions" | "width" | "format" | "nonPhoto" | "lead" | "engines">>;
 const commons = (title: string, description = "", extra: Extra = {}): RelevanceInput => ({ source: "wikimedia", lead: false, title, description, page: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(title)}.jpg`, image: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${encodeURIComponent(title)}.jpg/1280px-x.jpg`, ...extra });
 const search = (title: string, page: string, image: string, extra: Extra = {}): RelevanceInput => ({ source: "search", lead: false, title, description: "", page, image, ...extra });
 const thing = (names: string[], commonsCategory?: string, band: RelevanceContext["band"] = "adult"): RelevanceContext => ({ names: subjectNames(names), subjectIsPerson: false, band, ...(commonsCategory ? { commonsCategory } : {}) });
@@ -64,7 +64,7 @@ describe("IMGQ-04: a picture is of its subject (two signals agree)", () => {
   // reviewer's exact inputs.
   test("a camelCase name matches its lowercase spellings ('PlayStation 5' in '/playstation-5-review')", () => {
     const ps5 = thing(["PlayStation 5"]);
-    expect(judgeRelevance(search("Sony Playstation 5 console review", "https://www.theverge.com/playstation-5-review", "https://cdn.example.com/ps5.jpg"), ps5)).toBeNull();
+    expect(judgeRelevance(search("Sony Playstation 5 console review", "https://www.theverge.com/playstation-5-review", "https://cdn.example.com/ps5.jpg", { engines: ["bing images"] }), ps5)).toBeNull();
   });
 
   test("a short subject name like 'BMW' still names its pictures", () => {
@@ -80,7 +80,7 @@ describe("IMGQ-04: a picture is of its subject (two signals agree)", () => {
 
   test("another language's label names a Commons file but never an open-web row ('Tiburón' for Jaws)", () => {
     const jaws: RelevanceContext = { names: subjectNames(["Jaws"], ["Tiburón", "Lo squalo"]), searchNames: subjectNames(["Jaws"]), subjectIsPerson: false, band: "adult", commonsCategory: "Jaws (film)" };
-    expect(judgeRelevance(search("Tiburón blanco", "https://example.com/tiburon-blanco/", "https://example.com/tiburon-blanco.jpg"), jaws)).toBe("no_subject_match");
+    expect(judgeRelevance(search("Tiburón blanco", "https://example.com/tiburon-blanco/", "https://example.com/tiburon-blanco.jpg", { engines: ["bing images"] }), jaws)).toBe("below_search_score");
     expect(judgeRelevance(commons("Tiburón (película) cartel", "", { categories: ["Jaws (film)"] }), jaws)).toBeNull();
   });
 });
@@ -105,16 +105,33 @@ describe("IMGQ-04: a thing's row is not private people's snapshots", () => {
     expect(judgeRelevance({ ...portrait, categories: ["David Blaine", "Crowds in New York City"] }, person(["David Blaine"], "David Blaine", "teen"))).toBe("personality_rights");
   });
 
-  test("Stranger Things: a Flickr fan build is a personal host; a row naming it once is one signal; a page naming it in title and address stays", () => {
-    expect(judgeRelevance(search("LEGO® TBB Stranger Things Contest: Hawkins Lab", "https://www.flickr.com/photos/someone/5123456789", "https://live.staticflickr.com/65535/5123456789_abc.jpg"), st)).toBe("personal_host");
-    expect(judgeRelevance(search("Eleven - Stranger Things", "https://example.com/gallery/8812", "https://cdn.example.com/i/8812.jpg"), st)).toBe("one_signal");
-    expect(judgeRelevance(search("Stranger Things' Upside Down Timeline & Origin Explained", "https://screenrant.com/stranger-things-upside-down-timeline-origin-explained/", "https://static1.srcdn.com/wordpress/wp-content/uploads/2022/upside-down.jpg"), st)).toBeNull();
-    expect(judgeRelevance(search("Stranger Things key art", "https://www.shutterstock.com/stranger-things-123", "https://image.shutterstock.com/stranger-things.jpg"), st)).toBe("stock_preview");
+  // Image-search accuracy study (2026-10-06): exact rows from its labelled
+  // data (data-scratch/research/image-search-study-data/results.json).
+  test("Stranger Things: Bing's row naming it is kept; the Flickr, Openverse and Pinterest rows are not", () => {
+    expect(judgeRelevance(search("Stranger Things Trailer", "http://www.slashfilm.com/stranger-things-trailer/", "http://www.slashfilm.com/wp/wp-content/images/stranger-things-1.jpg", { engines: ["bing images"] }), st)).toBeNull();
+    expect(judgeRelevance(search("LEGO® TBB Stranger Things Contest: Hawkins Lab", "https://www.flickr.com/photos/67167663@N02/48361581366", "https://live.staticflickr.com/65535/48361581366_5ffb8fc0c2_b.jpg", { engines: ["openverse"] }), st)).toBe("personal_host");
+    expect(judgeRelevance(search("Aesthetic Stranger Things Poster", "https://www.example.com/pin/8796161770901982/", "https://cdn.example.com/originals/91/17/75.jpg", { engines: ["pinterest"] }), st)).toBe("below_search_score");
+    expect(judgeRelevance(search("First Look at Stranger Things Season 2!", "https://openverse.example/31878225093", "https://openverse.example/31878225093_b.jpg", { engines: ["openverse"] }), st)).toBe("below_search_score");
   });
 
-  test("the subject's official site agrees: its own picture with the name in the title is kept", () => {
-    const ctx = { ...sw, officialSite: "http://www.nintendo.com/switch/" };
-    expect(judgeRelevance(search("Nintendo Switch system", "https://www.nintendo.com/us/switch/system/", "https://assets.nintendo.com/image/upload/hero.jpg"), ctx)).toBeNull();
+  test("a word from another thing with the same name sinks a Bing row (the Jaguar F-Type for the animal); Yandex never reaches a minor", () => {
+    const jaguar: RelevanceContext = { ...thing(["Jaguar"]), otherSenseWords: ["car", "marque", "company", "torpedo", "boat", "destroyer", "console", "sculpture"] };
+    expect(judgeRelevance(search("New Jaguar F-Type limited edition celebrates E-Type before it dies", "https://www.topgear.com/car-news/british/new-jaguar-f-type-limited-edition", "https://www.topgear.com/sites/default/files/2023/10/007_Jag_F-TYPE.jpg", { engines: ["bing images"] }), jaguar)).toBe("wrong_sense");
+    const row = search("Jaguar resting on a branch", "https://www.example.com/jaguar-resting", "https://cdn.example.com/jaguar.jpg", { engines: ["yandex images"] });
+    expect(judgeRelevance(row, jaguar)).toBeNull();
+    expect(judgeRelevance(row, { ...jaguar, band: "teen" })).toBe("adult_only_engine");
+  });
+
+  test("an Etsy print is a stock preview (study R6)", () => {
+    expect(judgeRelevance(search("Resting Jaguar Wall Art, Calm Wildlife Portrait", "https://www.etsy.com/listing/4579955423/resting-jaguar-wall-art", "https://i.example.com/originals/37/83.jpg", { engines: ["bing images"] }), thing(["Jaguar"]))).toBe("stock_preview");
+  });
+
+  test("the judged sample's people captions: 'entertains the crowds', 'shown how to use her device', a booth", () => {
+    const bluey = thing(["Bluey"], "Bluey (TV series)");
+    expect(judgeRelevance(commons("Bluey entertains the crowds at Under 5s Day", "", { categories: ["Bluey (TV series)"] }), bluey)).toBe("caption:crowds");
+    const kindle = thing(["Amazon Kindle"], "Amazon Kindle");
+    expect(judgeRelevance(commons("A recipient of an Amazon Kindle Fire Tablet is shown how to use her device. Newry, 2016", "", { categories: ["Amazon Kindle"] }), kindle)).toBe("caption:her device");
+    expect(judgeRelevance(commons("Stranger Things booth at Gamescom 2023", "", { categories: ["Stranger Things"] }), thing(["Stranger Things"], "Stranger Things"))).toBe("caption:booth");
   });
 
   test("a snapshot captioned as someone's own is dropped even when it names the subject", () => {
@@ -179,26 +196,26 @@ describe("IMGQ-04: the pipeline keeps only the subject's pictures", () => {
     expect(result.set?.items.length).toBe(3);
   });
 
-  test("an adult's image-search rows from a personal host or naming the subject once are left out", async () => {
+  test("an adult's image-search rows from a personal host or a weak engine are left out; Bing's row naming it stays", async () => {
     const show: FixtureSubject = { id: "Q1011", label: "Stranger Things", enwiki: "Stranger Things", description: "television series" };
     use(show, () => [
-      { title: "LEGO® TBB Stranger Things Contest: Hawkins Lab", url: "https://www.flickr.com/photos/someone/5123456789", image: pictureUrl(60) },
-      { title: "Eleven - Stranger Things", url: "https://example.com/gallery/8812", image: pictureUrl(61) },
-      { title: "Stranger Things season 4 key art", url: "https://press.example.com/stranger-things-season-4", image: pictureUrl(62) },
+      { title: "LEGO® TBB Stranger Things Contest: Hawkins Lab", url: "https://www.flickr.com/photos/someone/5123456789", image: pictureUrl(60), engines: ["openverse"] },
+      { title: "Eleven - Stranger Things", url: "https://example.com/gallery/8812", image: pictureUrl(61), engines: ["openverse"] },
+      { title: "Stranger Things season 4 key art", url: "https://press.example.com/stranger-things-season-4", image: pictureUrl(62), engines: ["bing images"] },
     ]);
     const result = await selectAnswerImages({ subject: "Stranger Things", actor: people.owner, band: "adult", roster: [] });
-    expect(result.trace.dropped_by_relevance).toEqual({ personal_host: 1, one_signal: 1 });
+    expect(result.trace.dropped_by_relevance).toEqual({ personal_host: 1, below_search_score: 1 });
     expect(result.set?.items.map((i) => i.source.url)).toEqual(["https://press.example.com/stranger-things-season-4"]);
   });
 
   test("the open web only fills a row: with three good Commons pictures, an adult's search pictures are not used", async () => {
     const tower: FixtureSubject = { id: "Q243", label: "Eiffel Tower", category: "Eiffel Tower", image: "Eiffel Tower lead.jpg", files: ["Eiffel Tower lead.jpg", "Eiffel Tower night.jpg", "Eiffel Tower river.jpg"] };
-    use(tower, () => [{ title: "Eiffel Tower at dusk", url: "https://travel.example.com/eiffel-tower-dusk", image: pictureUrl(70) }]);
+    use(tower, () => [{ title: "Eiffel Tower at dusk", url: "https://travel.example.com/eiffel-tower-dusk", image: pictureUrl(70), engines: ["bing images"] }]);
     const full = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
     expect(full.trace.search_not_needed).toBe(1);
     expect(full.set?.items.every((i) => i.source.site === "commons.wikimedia.org")).toBe(true);
     const thin: FixtureSubject = { ...tower, files: ["Eiffel Tower lead.jpg", "Eiffel Tower night.jpg"] };
-    use(thin, () => [{ title: "Eiffel Tower at dusk", url: "https://travel.example.com/eiffel-tower-dusk", image: pictureUrl(70) }]);
+    use(thin, () => [{ title: "Eiffel Tower at dusk", url: "https://travel.example.com/eiffel-tower-dusk", image: pictureUrl(70), engines: ["bing images"] }]);
     const filled = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
     expect(filled.trace.search_not_needed).toBeUndefined();
     expect(filled.set?.items.map((i) => i.source.site)).toEqual(["commons.wikimedia.org", "commons.wikimedia.org", "travel.example.com"]);
@@ -207,14 +224,24 @@ describe("IMGQ-04: the pipeline keeps only the subject's pictures", () => {
   test("with Commons enough to fill the row twice over, the open web's pictures are never fetched", async () => {
     const files = Array.from({ length: 7 }, (_, i) => `Eiffel Tower view ${i + 1}.jpg`);
     const tower: FixtureSubject = { id: "Q243", label: "Eiffel Tower", category: "Eiffel Tower", image: files[0], files };
-    const world = fixtureWorld([tower], { searchRows: () => [{ title: "Eiffel Tower at dusk", url: "https://travel.example.com/eiffel-tower-dusk", image: pictureUrl(70) }] });
+    const world = fixtureWorld([tower], { searchRows: () => [{ title: "Eiffel Tower at dusk", url: "https://travel.example.com/eiffel-tower-dusk", image: pictureUrl(70), engines: ["bing images"] }] });
     __setAnswerImageDepsForTests(world.deps);
     const result = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
     expect(world.log.pictures).not.toContain(pictureUrl(70));
     expect(result.trace.search_held_back).toBe(1);
   });
 
-  function use(subject: FixtureSubject, rows: () => { title: string; url: string; image: string }[]) {
+  // Judged sample (IMGQ-05, 2026-10-06): Star Wars and Jurassic Park showed
+  // Commons props, a logo and a cinema marquee; for a film the open web leads.
+  test("for a film the open web's pictures lead and Commons only fills", async () => {
+    const film: FixtureSubject = { id: "Q1012", label: "Velvet Harbour", film: true, category: "Velvet Harbour", files: ["Velvet Harbour prop.jpg", "Velvet Harbour premiere.jpg", "Velvet Harbour set.jpg"], image: "Velvet Harbour prop.jpg" };
+    use(film, () => [1, 2, 3].map((n) => ({ title: `Velvet Harbour still ${n}`, url: `https://press.example.com/velvet-harbour-still-${n}`, image: pictureUrl(80 + n), engines: ["bing images"] })));
+    const result = await selectAnswerImages({ subject: "Velvet Harbour", kind: "film", actor: people.owner, band: "adult", roster: [] });
+    expect(result.trace.leading_source).toBe("search");
+    expect(result.set?.items.slice(0, 3).every((i) => i.source.site === "press.example.com")).toBe(true);
+  });
+
+  function use(subject: FixtureSubject, rows: () => { title: string; url: string; image: string; engines?: string[] }[]) {
     const world = fixtureWorld([subject], { searchRows: rows });
     __setAnswerImageDepsForTests(world.deps);
   }

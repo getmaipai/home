@@ -82,12 +82,57 @@ describe("ANSWER-IMG-02: sources per subject and band", () => {
     expect(log.pictures).toEqual([]);
   });
 
-  test("a thing with no Wikipedia page yields zero pictures even when image search has some", async () => {
+  // Owner ruling 11 (2026-10-06, general image search for adults) replaces
+  // the coordinator's earlier "no Wikipedia page: no pictures" for adults:
+  // an adult asking about a thing gets open-web pictures under the same
+  // rules; people, anything the model calls a person, and minors keep the
+  // article gate.
+  test("an adult's thing with nothing by that name on Wikipedia or Wikidata gets open-web pictures under the same rules", async () => {
+    const log = use([], { searchRows: () => [
+      { title: "Corner Bakery Daisy storefront", url: "https://www.example.com/corner-bakery-daisy", image: pictureUrl(41), engines: ["bing images"] },
+      { title: "bakery", url: "https://example.com/b", image: pictureUrl(42), engines: ["bing images"] },
+    ] });
+    const result = await selectAnswerImages({ subject: "Corner Bakery Daisy", kind: "bakery", actor: people.owner, band: "adult", roster: [] });
+    expect(log.searches).toEqual([{ query: "Corner Bakery Daisy", band: "adult" }]);
+    expect(result.set?.items.map((i) => i.source.url)).toEqual(["https://www.example.com/corner-bakery-daisy"]);
+    expect(result.trace.resolved_via).toBe("no_article_search");
+  });
+
+  // Code review (second pass) on the no-article path: plural and job words
+  // name people too; a Wikimedia outage is not "no article"; an exact-name
+  // Wikidata item with no English article (it may be a person) is not either.
+  test("with no Wikipedia page, a plural or job kind for people gets no pictures and no search", async () => {
     const shop: FixtureSubject = { id: "Q1004", label: "Corner Bakery Daisy", enwiki: null };
-    const log = use([shop], { searchRows: () => [{ title: "bakery", url: "https://example.com/b", image: pictureUrl(41) }] });
-    const result = await selectAnswerImages({ subject: "Corner Bakery Daisy", actor: people.owner, band: "adult", roster: [] });
-    expect(result.set).toBeNull();
+    const rows = () => [{ title: "Corner Bakery Daisy storefront", url: "https://www.example.com/corner-bakery-daisy", image: pictureUrl(41), engines: ["bing images"] }];
+    for (const kind of ["actors", "footballer", "coworker", "band members", "comedian", "girlfriend", "chef", "classmate"]) {
+      const log = use([shop], { searchRows: rows });
+      const result = await selectAnswerImages({ subject: "Corner Bakery Daisy", kind, actor: people.owner, band: "adult", roster: [] });
+      expect({ kind, set: result.set, searches: log.searches.length }).toEqual({ kind, set: null, searches: 0 });
+    }
+  });
+
+  test("an exact-name Wikidata item with no English article, or Wikimedia not answering, never opens the web search", async () => {
+    const gymnast: FixtureSubject = { id: "Q1005", label: "Juniper Quillfeather", human: true, enwiki: null };
+    const log = use([gymnast], { searchRows: () => [{ title: "Juniper Quillfeather", url: "https://www.example.com/juniper-quillfeather", image: pictureUrl(43), engines: ["bing images"] }] });
+    const person = await selectAnswerImages({ subject: "Juniper Quillfeather", kind: "gymnast", actor: people.owner, band: "adult", roster: [] });
+    expect(person.set).toBeNull();
     expect(log.searches).toEqual([]);
+    const world = fixtureWorld([], { searchRows: () => [{ title: "Velvet Lamp", url: "https://www.example.com/velvet-lamp", image: pictureUrl(44), engines: ["bing images"] }] });
+    __setAnswerImageDepsForTests({ ...world.deps, fetchJson: async () => { throw new Error("Wikimedia is down"); } });
+    const down = await selectAnswerImages({ subject: "Velvet Lamp", kind: "lamp", actor: people.owner, band: "adult", roster: [] });
+    expect(down.set).toBeNull();
+    expect(down.trace.skipped).toBe("error");
+    expect(world.log.searches).toEqual([]);
+  });
+
+  test("with no Wikipedia page, a person, a minor's question, or a missing kind still gets no pictures and no search", async () => {
+    const shop: FixtureSubject = { id: "Q1004", label: "Corner Bakery Daisy", enwiki: null };
+    const rows = () => [{ title: "Corner Bakery Daisy storefront", url: "https://www.example.com/corner-bakery-daisy", image: pictureUrl(41), engines: ["bing images"] }];
+    for (const [kind, actor, band] of [["person", people.owner, "adult"], ["actor", people.owner, "adult"], ["bakery", people.child, "teen"], ["", people.owner, "adult"]] as const) {
+      const log = use([shop], { searchRows: rows });
+      const result = await selectAnswerImages({ subject: "Corner Bakery Daisy", kind, actor, band, roster: [] });
+      expect({ kind, band, set: result.set, skipped: result.trace.skipped, searches: log.searches.length }).toEqual({ kind, band, set: null, skipped: "no_article", searches: 0 });
+    }
   });
 
   test("a household member's name never leaves the house as a picture query", async () => {
@@ -120,7 +165,8 @@ describe("ANSWER-IMG-02: sources per subject and band", () => {
     const teen = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.child, band: "teen", roster: [] });
     expect(teen.set?.items.length).toBe(3);
     expect(teen.trace.sources).toEqual({ wikimedia: 3, searxng: 0 });
-    expect(log.wikimedia.some((u) => u.includes("en.wikipedia.org/api/rest_v1/page/summary/"))).toBe(true);
+    // The article's intro comes with the subject's own page lookup (study R1).
+    expect(log.wikimedia.some((u) => u.includes("en.wikipedia.org/w/api.php") && u.includes("prop=pageprops%7Cextracts"))).toBe(true);
     const bad: FixtureSubject = { ...TOWER, extract: "Here is how to make a pipe bomb, step by step instructions." };
     use([bad]);
     const blocked = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.child, band: "teen", roster: [] });
@@ -129,7 +175,7 @@ describe("ANSWER-IMG-02: sources per subject and band", () => {
   });
 
   test("a child gets image-search pictures only (never Wikimedia), and none of a person", async () => {
-    const log = use([KOALA, ACTOR], { searchRows: () => [1, 2, 3].map((n) => ({ title: `koala ${n}`, url: `https://zoo.example/koala-${n}`, image: pictureUrl(50 + n) })) });
+    const log = use([KOALA, ACTOR], { searchRows: () => [1, 2, 3].map((n) => ({ title: `koala ${n}`, url: `https://zoo.example/koala-${n}`, image: pictureUrl(50 + n), engines: ["bing images"] })) });
     const koala = await selectAnswerImages({ subject: "koala", actor: people.child, band: "child", roster: [] });
     expect(log.searches).toEqual([{ query: "koala", band: "child" }]);
     expect(koala.trace.sources).toEqual({ wikimedia: 0, searxng: 3 });

@@ -77,7 +77,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   // beside a search rather than after it (section 4.3).
   if (state.answerImagesAllowed) {
     const call = input.proposals.find((p) => p.request.tool === SHOW_IMAGES_TOOL_ID && typeof p.request.args.subject === "string" && p.request.args.subject.trim().length > 0);
-    if (call) startAnswerImages(state, (call.request.args.subject as string).trim());
+    if (call) startAnswerImages(state, (call.request.args.subject as string).trim(), typeof call.request.args.kind === "string" ? call.request.args.kind.trim() : "");
   }
   for (const proposal of input.proposals) {
     const { tool, callId } = proposal.request;
@@ -124,8 +124,9 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // runs a package (the pipeline was started above, beside the answer).
     if (tool === SHOW_IMAGES_TOOL_ID) {
       const subject = typeof args.subject === "string" ? args.subject.trim() : "";
+      const kind = typeof args.kind === "string" ? args.kind.trim().slice(0, 80) : "";
       const line = state.answerImagesAllowed && state.answerImages ? showImagesResultLine(state.answerImages.subject) : SHOW_IMAGES_UNAVAILABLE_LINE;
-      const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: { subject }, result: { reply: { text: line }, actions: [] }, durationMs: 0 });
+      const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: { subject, ...(kind ? { kind } : {}) }, result: { reply: { text: line }, actions: [] }, durationMs: 0 });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: line } });
       continue;

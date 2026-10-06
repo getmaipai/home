@@ -1,45 +1,210 @@
 {
-  "description": "IMGQ-05: 40 well-known subjects across kinds for the judged live sample of pictures in answers (design: data-scratch/research/image-quality-design.md section 13). Public figures, places and things only; no private names.",
+  "description": "IMGQ-05: 40 well-known subjects across kinds for the judged live sample of pictures in answers (design: data-scratch/research/image-quality-design.md section 13). Public figures, places and things only; no private names. Each carries the kind of thing a model would name (the show_images tool's `kind` argument).",
   "subjects": [
-    { "id": "p-blaine", "subject": "David Blaine", "kind": "person", "person": true },
-    { "id": "p-feldman", "subject": "Corey Feldman", "kind": "person", "person": true },
-    { "id": "p-curie", "subject": "Marie Curie", "kind": "person", "person": true },
-    { "id": "p-obama", "subject": "Barack Obama", "kind": "person", "person": true },
-    { "id": "p-serena", "subject": "Serena Williams", "kind": "person", "person": true },
-    { "id": "pl-eiffel", "subject": "Eiffel Tower", "kind": "place" },
-    { "id": "pl-grandcanyon", "subject": "Grand Canyon", "kind": "place" },
-    { "id": "pl-machu", "subject": "Machu Picchu", "kind": "place" },
-    { "id": "pl-goldengate", "subject": "Golden Gate Bridge", "kind": "place" },
-    { "id": "pl-yellowstone", "subject": "Yellowstone National Park", "kind": "place" },
-    { "id": "pl-kyoto", "subject": "Kinkaku-ji", "kind": "place" },
-    { "id": "a-koala", "subject": "koala", "kind": "animal" },
-    { "id": "a-redpanda", "subject": "red panda", "kind": "animal" },
-    { "id": "a-axolotl", "subject": "axolotl", "kind": "animal" },
-    { "id": "a-snowleopard", "subject": "snow leopard", "kind": "animal" },
-    { "id": "a-trex", "subject": "Tyrannosaurus", "kind": "animal" },
-    { "id": "a-monarch", "subject": "monarch butterfly", "kind": "animal" },
-    { "id": "c-fiero", "subject": "Pontiac Fiero", "kind": "car" },
-    { "id": "c-mustang", "subject": "Ford Mustang", "kind": "car" },
-    { "id": "c-beetle", "subject": "Volkswagen Beetle", "kind": "car" },
-    { "id": "pr-switch", "subject": "Nintendo Switch", "kind": "product" },
-    { "id": "pr-ps5", "subject": "PlayStation 5", "kind": "product" },
-    { "id": "pr-iphone", "subject": "iPhone", "kind": "product" },
-    { "id": "pr-kindle", "subject": "Amazon Kindle", "kind": "product" },
-    { "id": "s-stranger", "subject": "Stranger Things", "kind": "show" },
-    { "id": "s-jurassic", "subject": "Jurassic Park", "kind": "film" },
-    { "id": "s-bluey", "subject": "Bluey", "kind": "show" },
-    { "id": "s-starwars", "subject": "Star Wars", "kind": "film" },
-    { "id": "s-office", "subject": "The Office", "kind": "show" },
-    { "id": "f-croissant", "subject": "croissant", "kind": "food" },
-    { "id": "f-ramen", "subject": "ramen", "kind": "food" },
-    { "id": "f-paella", "subject": "paella", "kind": "food" },
-    { "id": "b-sydneyopera", "subject": "Sydney Opera House", "kind": "building" },
-    { "id": "b-tajmahal", "subject": "Taj Mahal", "kind": "building" },
-    { "id": "b-burj", "subject": "Burj Khalifa", "kind": "building" },
-    { "id": "w-monalisa", "subject": "Mona Lisa", "kind": "artwork" },
-    { "id": "w-starrynight", "subject": "The Starry Night", "kind": "artwork" },
-    { "id": "w-thinker", "subject": "The Thinker", "kind": "artwork" },
-    { "id": "t-lakers", "subject": "Los Angeles Lakers", "kind": "team" },
-    { "id": "t-manutd", "subject": "Manchester United F.C.", "kind": "team" }
+    {
+      "id": "p-blaine",
+      "subject": "David Blaine",
+      "kind": "magician",
+      "person": true
+    },
+    {
+      "id": "p-feldman",
+      "subject": "Corey Feldman",
+      "kind": "actor",
+      "person": true
+    },
+    {
+      "id": "p-curie",
+      "subject": "Marie Curie",
+      "kind": "scientist",
+      "person": true
+    },
+    {
+      "id": "p-obama",
+      "subject": "Barack Obama",
+      "kind": "politician",
+      "person": true
+    },
+    {
+      "id": "p-serena",
+      "subject": "Serena Williams",
+      "kind": "tennis player",
+      "person": true
+    },
+    {
+      "id": "pl-eiffel",
+      "subject": "Eiffel Tower",
+      "kind": "tower"
+    },
+    {
+      "id": "pl-grandcanyon",
+      "subject": "Grand Canyon",
+      "kind": "canyon"
+    },
+    {
+      "id": "pl-machu",
+      "subject": "Machu Picchu",
+      "kind": "ruins"
+    },
+    {
+      "id": "pl-goldengate",
+      "subject": "Golden Gate Bridge",
+      "kind": "bridge"
+    },
+    {
+      "id": "pl-yellowstone",
+      "subject": "Yellowstone National Park",
+      "kind": "national park"
+    },
+    {
+      "id": "pl-kyoto",
+      "subject": "Kinkaku-ji",
+      "kind": "temple"
+    },
+    {
+      "id": "a-koala",
+      "subject": "koala",
+      "kind": "animal"
+    },
+    {
+      "id": "a-redpanda",
+      "subject": "red panda",
+      "kind": "animal"
+    },
+    {
+      "id": "a-axolotl",
+      "subject": "axolotl",
+      "kind": "salamander"
+    },
+    {
+      "id": "a-snowleopard",
+      "subject": "snow leopard",
+      "kind": "animal"
+    },
+    {
+      "id": "a-trex",
+      "subject": "Tyrannosaurus",
+      "kind": "dinosaur"
+    },
+    {
+      "id": "a-monarch",
+      "subject": "monarch butterfly",
+      "kind": "butterfly"
+    },
+    {
+      "id": "c-fiero",
+      "subject": "Pontiac Fiero",
+      "kind": "car"
+    },
+    {
+      "id": "c-mustang",
+      "subject": "Ford Mustang",
+      "kind": "car"
+    },
+    {
+      "id": "c-beetle",
+      "subject": "Volkswagen Beetle",
+      "kind": "car"
+    },
+    {
+      "id": "pr-switch",
+      "subject": "Nintendo Switch",
+      "kind": "game console"
+    },
+    {
+      "id": "pr-ps5",
+      "subject": "PlayStation 5",
+      "kind": "game console"
+    },
+    {
+      "id": "pr-iphone",
+      "subject": "iPhone",
+      "kind": "phone"
+    },
+    {
+      "id": "pr-kindle",
+      "subject": "Amazon Kindle",
+      "kind": "e-reader"
+    },
+    {
+      "id": "s-stranger",
+      "subject": "Stranger Things",
+      "kind": "TV series"
+    },
+    {
+      "id": "s-jurassic",
+      "subject": "Jurassic Park",
+      "kind": "film"
+    },
+    {
+      "id": "s-bluey",
+      "subject": "Bluey",
+      "kind": "TV series"
+    },
+    {
+      "id": "s-starwars",
+      "subject": "Star Wars",
+      "kind": "film"
+    },
+    {
+      "id": "s-office",
+      "subject": "The Office",
+      "kind": "TV series"
+    },
+    {
+      "id": "f-croissant",
+      "subject": "croissant",
+      "kind": "pastry"
+    },
+    {
+      "id": "f-ramen",
+      "subject": "ramen",
+      "kind": "dish"
+    },
+    {
+      "id": "f-paella",
+      "subject": "paella",
+      "kind": "dish"
+    },
+    {
+      "id": "b-sydneyopera",
+      "subject": "Sydney Opera House",
+      "kind": "building"
+    },
+    {
+      "id": "b-tajmahal",
+      "subject": "Taj Mahal",
+      "kind": "mausoleum"
+    },
+    {
+      "id": "b-burj",
+      "subject": "Burj Khalifa",
+      "kind": "skyscraper"
+    },
+    {
+      "id": "w-monalisa",
+      "subject": "Mona Lisa",
+      "kind": "painting"
+    },
+    {
+      "id": "w-starrynight",
+      "subject": "The Starry Night",
+      "kind": "painting"
+    },
+    {
+      "id": "w-thinker",
+      "subject": "The Thinker",
+      "kind": "sculpture"
+    },
+    {
+      "id": "t-lakers",
+      "subject": "Los Angeles Lakers",
+      "kind": "basketball team"
+    },
+    {
+      "id": "t-manutd",
+      "subject": "Manchester United F.C.",
+      "kind": "football club"
+    }
   ]
 }

@@ -52,6 +52,7 @@
 // other real method here already follows. See spec/llm/README.md and
 // docs/dev.md's Package Host section for everything else deferred and
 // why.
+import { isAdultOnlyImageEngine } from "@/lib/searchEngines";
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -617,16 +618,18 @@ type SearxngRow = { title: string; url: string | null; snippet: string | null; i
  * argument was removed from websearch's manifest (rule 12, port first). */
 /** IMGQ-03: `resolution` ("1920x1080") and `img_format` ("png") as the
  * engine states them, when it does, for the picture rules' pre-fetch checks. */
-export type SearxngImageRow = { title: string; url: string; image: string; resolution?: string; format?: string };
+export type SearxngImageRow = { title: string; url: string; image: string; resolution?: string; format?: string; engines?: string[] };
 export function imageRowsFromResponse(value: unknown): SearxngImageRow[] {
   const data = value as { results?: unknown[] };
   return (Array.isArray(data.results) ? data.results : []).flatMap((raw) => {
     const row = resultToRow(raw, true);
     if (!row?.url || !row.image) return [];
-    const extra = raw as { resolution?: unknown; img_format?: unknown };
+    const extra = raw as { resolution?: unknown; img_format?: unknown; engines?: unknown; engine?: unknown };
     const resolution = typeof extra.resolution === "string" && extra.resolution.length <= 40 ? extra.resolution : undefined;
     const format = typeof extra.img_format === "string" && extra.img_format.length <= 20 ? extra.img_format.toLowerCase() : undefined;
-    return [{ title: row.title, url: row.url, image: row.image, ...(resolution ? { resolution } : {}), ...(format ? { format } : {}) }];
+    // Which engines returned it (the accuracy study's strongest signal).
+    const engines = (Array.isArray(extra.engines) ? extra.engines : typeof extra.engine === "string" ? [extra.engine] : []).filter((e): e is string => typeof e === "string" && e.length <= 40).slice(0, 8);
+    return [{ title: row.title, url: row.url, image: row.image, ...(resolution ? { resolution } : {}), ...(format ? { format } : {}), ...(engines.length ? { engines } : {}) }];
   });
 }
 
@@ -640,7 +643,10 @@ export async function answerImageSearch(query: string, actor: PersonRow, band: A
   if (!baseUrl) return [];
   try {
     const level = band === "child" ? "strict" : resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
-    const safeEngines = band === "adult" ? undefined : await safesearchEnginesFor(baseUrl, "images", { signal, deadlineAt: Date.now() + 1_500 });
+    // Yandex, when the household enables it in its own SearXNG, is for adults
+    // only (owner, 2026-10-06): a minor's engine list never names it (a copy:
+    // the cached list is shared).
+    const safeEngines = band === "adult" ? undefined : (await safesearchEnginesFor(baseUrl, "images", { signal, deadlineAt: Date.now() + 1_500 }))?.filter((e) => !isAdultOnlyImageEngine(e));
     if (band !== "adult" && (!safeEngines || safeEngines.length === 0)) return [];
     const engines = safeEngines ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
     const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json&categories=images&safesearch=${safeSearchNumericLevel(level)}${engines}`;

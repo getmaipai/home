@@ -415,7 +415,9 @@ describe("what the model is told about the websearch arguments", () => {
     // the argument does not exist, so the model cannot set it at all.
     expect(tool().parameters.properties.category).toBeUndefined();
     const showImages = loadAllManifests().find((l) => l.id === "show_images")!;
-    expect(showImages.manifest.args).toMatchObject({ required: ["subject"] });
+    // IMGSEARCH-01 (owner, 2026-10-06): the model also names what kind of
+    // thing it is, so a name with several meanings shows the right one.
+    expect(showImages.manifest.args).toMatchObject({ required: ["subject", "kind"] });
   });
 
   test("read_page says Home does it, so the model leaves it out", () => {

@@ -6,6 +6,12 @@ All notable changes to the Show Pictures package, in [Keep a Changelog](https://
 
 ### Changed
 
+- IMGSEARCH-01: a required `kind` argument says what kind of thing to show
+  ("animal", "TV series", "car"), so a name with several meanings shows the
+  one the conversation is about, or nothing. Pictures from the open web are
+  ranked by how often each engine was right in a measured study (Bing first),
+  must name the thing, and must not carry words of another thing with the
+  same name.
 - ANSWER-IMG-05b: the description names games, and the `subject` argument
   names artwork, says to show photos in short, casual replies too and carries
   a film remark example ("I just watched Jaws again"). The tool's answer to the

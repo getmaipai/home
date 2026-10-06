@@ -36255,4 +36255,45 @@ Measured (`scripts/bench/image-similarity.ts`, synthetic overlays on real Common
 
 Per variant, merged (tuning, hold-out): corner watermark 15, 11; tiled watermark 14, 10; scribbles 3, 2; arrows and circles 15, 11; sticker 15, 11; meme text 15, 11; speech bubble 15, 11; logo bug 15, 11; colour border 15, 11; crop and rescale 15, 11; caption bar 15, 9; top banner 15, 11; blurred copy 15, 11. Still escaping: handwriting-like scribbles across the whole frame (every tile is cut), one heavy tiled watermark per set, two caption bars in the hold-out. A wider pre-filter radius (24, 28) found none of them and cost 3 to 5 times more.
 
-Cost: features about 10 to 30 ms per picture, a verified pair about 15 to 80 ms (knnMatch dominates), opencv-js about 200 ms to load once per process and about 180 MB resident; a 15-picture call 90 to 380 ms. Most real pairs never reach stage 2 (6 of 105 different-photo pairs did). In a chat turn opencv-js starts loading when the picture lookup starts, and verification stops 400 ms after the fetch deadline; pairs left unverified stay apart, so a busy machine can show one picture too many, never merge two.
+Cost: features about 10 to 30 ms per picture, a verified pair about 15 to 80 ms (knnMatch dominates), opencv-js about 200 ms to load once per process and about 180 MB resident; a 15-picture call 90 to 380 ms. Most real pairs never reach stage 2 (6 of 105 different-photo pairs did). In a chat turn opencv-js starts loading when the picture lookup starts, and verification stops 700 ms after the fetch deadline in a chat turn (150 ms for a caller with no deadline of its own); pairs left unverified stay apart, so a busy machine can show one picture too many, never merge two.
+
+## IMGSEARCH-01: the open web's pictures are of the intended thing (2026-10-06)
+
+Study: `data-scratch/research/image-search-accuracy-study.md` (82 subjects, every top-12 opened and labelled, 20 held out). Its finding: the household SearXNG's merged order is the problem, not the engines (merged top 12 right 59% of the time; Bing's own top 6, 83%; Flickr, Openverse and the Commons keyword engine 37 to 46%, and they sit at the top); and the Wikidata label search picks the wrong item for 24 of 82 subjects. Owner decisions the same day: Yandex only as an optional adult engine the household enables in its own SearXNG (a captcha is engine-down, handled by SearXNG's own back-off, never bypassed); keep the household's SearXNG and show fewer pictures when Bing has nothing good; no paid key; a name with several meanings gets pictures only when the conversation makes the meaning clear.
+
+Built:
+- `show_images` takes `kind` ("animal", "TV series", "car") beside `subject`. The model decides both; nothing reads the person's message.
+- Resolver (study R1): the subject's own Wikipedia page (redirects followed) and the Wikidata search are asked side by side; one entity call then fetches the page's item and the senses whose descriptions fit the kind. Another sense wins only when it fits the kind, the page's item does not, and it has an English article (a museum object or a zoo enclosure whose description says "instrument" or "animal" never wins). A disambiguation page with no fitting sense shows nothing. Wikimedia calls stay at most four.
+- Query (R2): the subject as given, or the chosen item's own title when the subject's page is another thing ("Mercury (planet)", "Ford Mustang", "Patagonia, Inc."); never a suffix.
+- Ranking (R3 to R5, replacing IMGQ-04's path signal for open-web rows): engine weight (Bing 2, Yandex 2 for adults only, Pinterest 1, Commons keyword 0, Flickr and Openverse -1, engines the study could not measure 1), +0.5 when the title names the thing, -1 for a word from another sense's Wikidata description, kept at 2.5 or more. R6: Etsy prints join the stock-preview veto; larger pictures first on a tie.
+
+Measured offline, replaying the study's recorded pages, senses and labelled rows through Home's own code (`scripts/bench/image-search-replay.ts`, the study's type word standing in for the model's kind):
+
+| | resolver right | P@3 | P@6 | P@6 lenient | wrong | private | shown of 6 | at least 3 |
+|---|---|---|---|---|---|---|---|---|
+| today (study, held-out 20) | 58 / 82 | 55% | 55% | 75% | 9% | 2% | 6.0 | 100% |
+| study's R1 to R6 (held-out 20) | 68 / 82 | 87% | 81% | 87% | 1% | 1% | 5.1 | 100% |
+| Home now (held-out, 18 with pictures) | 75 / 82 | 85% | 86% | 97% | 0% | 0% | 3.8 | 72% |
+| Home now (tuning subjects, 57 with pictures) | | 89% | 89% | 93% | 4% | 0% | 4.4 | 84% |
+
+Reuse check: `wikibase-sdk` 11.6.6 was considered (the library scout): it only builds Wikidata URLs and its repository is archived, so the resolver stays hand-built on the existing calls. A teen whose item was chosen by kind (not the subject's own page) gets no Commons pictures: the page's intro, which a teen's Commons pictures must pass first, came with the page lookup, and fetching the chosen item's intro would be a fifth Wikimedia call; the teen's open-web pictures still come only through safe-search engines.
+
+Fewer pictures than the study's selector: Home also drops rows whose full-size fetch failed, personal hosts and caption-listed snapshots. Seven subjects get no pictures: three whose page item the study never recorded (a replay gap, not a Home result), two with no Wikipedia page (as in the study), and Python and Blaine, whose disambiguation pages have no sense fitting the study's type word ("animal", "character"): the owner's rule.
+
+## IMGQ-05: the judged live sample, two iterations (2026-10-06)
+
+`backend/scripts/bench/answer-images-sample.ts`: 40 well-known subjects (5 people, 6 places, 6 animals, 3 cars, 4 products, 5 shows and films, 3 foods, 3 buildings, 3 artworks, 2 teams), each with the `kind` a model would name, through the real picture pipeline for an adult, one subject every 30 seconds against the household's SearXNG; every tile opened and judged by eye on contact sheets (`data-scratch/chat-ab/imgq05-sample-1/`, `-2/`). Bars (the coordinator's decision on the design's recommended option): 0 broken, placeholder or duplicate tiles; at most 1 of 40 questions with a wrong-subject visible tile; 0 private people in a thing's visible row.
+
+| | subjects with pictures | broken or placeholder | duplicates | wrong subject (visible) | private people in a thing's visible row |
+|---|---|---|---|---|---|
+| iteration 1 | 39 / 40 | 0 | Mona Lisa (3 in the row), Switch (1 photo twice), croissant extras | 2 (Star Wars, Jurassic Park) | 5 (Kinkaku-ji, Kindle, Stranger Things, Bluey, The Starry Night) |
+| iteration 2 | 39 / 40 | 0 | Mona Lisa (3 colour-graded reproductions in the row) | 1 (Jurassic Park) | 3 (Kinkaku-ji, Kindle, The Starry Night) |
+
+Between the iterations: the duplicate check gets 700 ms past the fetch deadline in a turn (the first run left 19 close Mona Lisa pairs unverified at 150 ms); for a film, show, game, franchise or character the open web leads (Stranger Things, Bluey and Star Wars went from fan events, a marquee and a mascot crowd to the shows' own art); people captions accept plurals and booth or expo photos.
+
+Bars not met after two iterations, so `show_images` stays out of `tools_offered`. What still fails, exactly:
+- Duplicates: Mona Lisa has 26 close pairs; in 700 ms the matcher verified 9 (8 merged) and left 17 unverified. Verifying more needs either more time in the turn or cheaper pairs (fewer ORB features for near pairs).
+- Private people: Commons files whose own text names no person ("Kinkaku-ji" over a tourist crowd; "The Starry Night as it appears in the Museum of Modern Art" with visitors; a staff member holding a Kindle, captioned by her name and job). No metadata rule catches them; the owner ruled out a face detector for now (IMGQ-06 shadow run stays held). The Commons depicts search (IMGQ-03's open part) and a `depicts: human` veto are the next metadata step.
+- Wrong subject: Jurassic Park got no open-web rows in that run (SearXNG answered nothing for it), so Commons props and a logo led.
+
+Recall and first text with the new `kind` argument were not measured: the Stack's chat engine was refused for memory throughout (another session's engine held it).
