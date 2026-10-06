@@ -5,13 +5,6 @@ import { toast } from "sonner";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { MarkdownDocument } from "@/next/pages/MarkdownDocument";
-// APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
-// default `ToolFallback` renders (its own `import { ToolFallback } from
-// "@maipai/ui/src/assistant-ui/tool-fallback.aui"`) - used here directly
-// so a "confirm" card renders through `ToolFallback.Approval` exactly as
-// it ships, never a hand-built card (the kit's own `approval-card.tsx`
-// is built for a terminal command and can't be relabeled, per the org's
-// "no hand-built UI" rule).
 import { type ModelOption } from "@maipai/ui/src/elements/model-selector";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
