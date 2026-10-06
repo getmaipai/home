@@ -189,7 +189,15 @@ describe("VISION-02d: the thinking control follows the model's record (rule 8)",
   });
 
   test("a model without a measured record keeps the no-tools fail-safe for a minor (rule 8)", () => {
-    expect(resolveTurnBudget("qwen3-vl-8b-instruct-q4-k-m", "child").tools_offered).toEqual([]);
-    expect(resolveTurnBudget("qwen3-vl-8b-instruct-q4-k-m", "teen").tools_offered).toEqual([]);
+    expect(resolveTurnBudget("some-unmeasured-model", "child").tools_offered).toEqual([]);
+    expect(resolveTurnBudget("some-unmeasured-model", "teen").tools_offered).toEqual([]);
+  });
+
+  test("VISION-02e: the VL-8B record carries its own measured tool budget, thinking zero", () => {
+    const budget = resolveTurnBudget("qwen3-vl-8b-instruct-q4-k-m", "child");
+    expect(budget.tools_offered).toContain("websearch");
+    expect(budget.measured.on).toContain("Qwen3VL-8B-Instruct");
+    expect(budget.measured.false_call_rate).toBe(0);
+    expect(budget.thinking_budget_tokens_toggled).toBe(0);
   });
 });

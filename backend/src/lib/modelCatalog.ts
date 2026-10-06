@@ -150,8 +150,8 @@ export const CATALOG: ModelCapabilities[] = [
   // The Instruct edition has no thinking mode (its template has no switch
   // and never opens a reasoning block; measured on b10797, VISION-02d), so
   // the record says so and the composer offers no thinking control for it.
-  // No turn_budget until its tool bench is recorded: a child or teen keeps
-  // the no-tools fail-safe on it (rule 8), and the p16 flip waits for it.
+  // VISION-02e: its turn budget is Qwen3-8B's shape (the same tools, rounds
+  // and ceiling), thinking zero, with its own measured line.
   ModelCapabilities.parse({
     id: "qwen3-vl-8b-instruct-q4-k-m",
     role: "chat",
@@ -179,6 +179,25 @@ export const CATALOG: ModelCapabilities[] = [
       },
     },
     thinking_mode: "none",
+    turn_budget: {
+      rounds: 1,
+      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "start_project", "timer", "weather", "websearch"],
+      always_search: true,
+      model_transitions: true,
+      context_tokens: 2048,
+      // No thinking mode: both budgets are zero, whatever the toggle says.
+      thinking_budget_tokens: 0,
+      thinking_budget_tokens_toggled: 0,
+      thinking_for_minors: false,
+      reply_ceiling_tokens: 1536,
+      deadlines_ms: { model: 20000, tool: 10000, total: 45000 },
+      measured: {
+        false_call_rate: 0,
+        inverse_miss_rate: 0,
+        rewrite_pass_rate: 0,
+        on: "ARCH-MEASURE-01 tool-calling bench, budget-offered pass, 2026-10-06, 50 repeats, llama-server b10797, Qwen3VL-8B-Instruct-Q4_K_M at 8,192 without its projector (0 false calls in 300 negative runs, 50 fitting searches in 50, math 169/200, almanac-time 50/50, almanac-date 50/50, convert 50/50); rewrite_pass_rate not yet measured for this model, recorded 0 pending the query-rewrite bench",
+      },
+    },
     sizing: {
       kind: "transformer_gguf",
       param_count_billion: 8.8,
