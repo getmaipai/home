@@ -2754,6 +2754,66 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
     }
   }
 
+  // COLUMN-02 hover peek: hidden column, the pointer rests on the left edge.
+  for (const theme of THEMES) {
+    const context = await newContext(browser, desktop, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.addInitScript(() => localStorage.setItem("maipai.chat.rail-collapsed", "1"));
+      await openStoredConversation(page, conversation.id, "Homework helper notes");
+      await page.getByRole("heading", { name: "Homework helper" }).waitFor();
+      await page.mouse.move(900, 450);
+      await page.waitForTimeout(300);
+      const before = await measure(page);
+      const zone = await page.locator('[data-slot="chat-column-hover-zone"]').boundingBox();
+      if (!zone) throw new Error("COLUMN-02: no hover zone while the column is hidden");
+      log(`hover zone 1440/${theme}`, zone);
+      // Passing the pointer over the zone and away does not open it.
+      await page.mouse.move(zone.x + 2, 450);
+      await page.mouse.move(900, 450);
+      await page.waitForTimeout(350);
+      if (await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').count()) throw new Error("COLUMN-02: a pass over the zone opened the peek");
+      // Resting on it does.
+      await page.mouse.move(zone.x + 2, 450);
+      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor();
+      await page.waitForTimeout(300);
+      await shoot(page, `column-peek-1440-${theme}`);
+      const during = await measure(page);
+      const peekBox = await page.locator('[data-slot="next-chat-rail"][data-state="peek"] [data-slot="chat-column-inner"]').boundingBox();
+      log(`peek 1440/${theme}`, { peekBox, composerBefore: before.composer, composerDuring: during.composer, headerToggleBefore: before.headerToggle, headerToggleDuring: during.headerToggle });
+      if (!peekBox || Math.round(peekBox.width) !== 288) throw new Error("COLUMN-02: the peek is not 288 wide");
+      if (JSON.stringify(before.composer) !== JSON.stringify(during.composer)) throw new Error("COLUMN-02: the peek moved the conversation");
+      // Stays while the pointer is inside; closes a moment after it leaves.
+      await page.mouse.move(peekBox.x + 140, 300);
+      await page.waitForTimeout(500);
+      if (!(await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').count())) throw new Error("COLUMN-02: the peek closed with the pointer inside it");
+      await page.mouse.move(900, 450);
+      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor({ state: "detached" });
+      // Keyboard focus never opens it; Escape closes it.
+      await page.getByRole("button", { name: "Show conversations" }).focus();
+      await page.waitForTimeout(300);
+      if (await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').count()) throw new Error("COLUMN-02: keyboard focus opened the peek");
+      await page.mouse.move(zone.x + 2, 450);
+      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor();
+      await page.keyboard.press("Escape");
+      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor({ state: "detached" });
+      // The pin control docks the column (the pointer leaves and returns,
+      // since a pointer that never moved raises no new enter).
+      await page.mouse.move(900, 450);
+      await page.waitForTimeout(200);
+      await page.mouse.move(zone.x + 2, 450);
+      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor();
+      await page.getByRole("button", { name: "Keep conversations open" }).click();
+      await page.waitForTimeout(500);
+      const docked = await measure(page);
+      log(`pinned 1440/${theme}`, docked.column);
+      if (!docked.column || docked.column.width < 280) throw new Error("COLUMN-02: pinning did not dock the column");
+    } finally {
+      await context.close();
+    }
+  }
+
   // COLUMN-02 chat settings: the gear opens Settings, Me, Chat.
   for (const theme of THEMES) {
     const context = await newContext(browser, desktop, theme, sessionValue);

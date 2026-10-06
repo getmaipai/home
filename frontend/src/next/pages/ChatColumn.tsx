@@ -11,13 +11,19 @@ import { readRailCollapsePreference, writeRailCollapsePreference } from "@/next/
 
 // COLUMN-01 (owner, 2026-10-06: "the show/hide column is quirky, layout is
 // busy, buttons are ugly"): the chat history column, rebuilt calm and
-// ChatGPT-shaped. One hide/show control, no hover peek, a width transition
+// ChatGPT-shaped. One hide/show control, a hover peek (COLUMN-02) that overlays, a width transition
 // whose content never re-wraps, and quiet 36px rows.
 
 export const CHAT_COLUMN_ID = "next-chat-rail";
 /** Below this width the column starts hidden (a default, never a lock). */
 export const CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH = 1024;
 
+/** COLUMN-02: the hidden column's hover peek. The pointer must rest on the
+ * thin zone at the workspace's left edge this long before it opens (so
+ * passing across does nothing); it closes this long after the pointer
+ * leaves the zone and the peek. */
+export const PEEK_OPEN_DELAY_MS = 120;
+export const PEEK_CLOSE_GRACE_MS = 150;
 /** Where "Chat settings" goes: Settings, Me tab, Chat section. */
 export const CHAT_SETTINGS_PATH = "/settings?tab=me&section=chat";
 
@@ -28,6 +34,7 @@ const SearchIcon = getIcon("search");
 const CloseIcon = getIcon("x");
 const CustomizeIcon = getIcon("sliders-horizontal");
 const ChatSettingsIcon = getIcon("settings");
+const PinIcon = getIcon("pin");
 
 // Focus this page moves on a person's behalf (handing focus between the two
 // toggles, back to the search button) must not pop a tooltip open: a
@@ -74,6 +81,8 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
     return typeof window !== "undefined" && window.matchMedia(`(max-width: ${CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH}px)`).matches;
   });
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [peek, setPeek] = useState(false);
+  const peekTimerRef = useRef<number | null>(null);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFocusKey, setSearchFocusKey] = useState(0);
@@ -111,6 +120,84 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
     focusQuietly((target === "header" ? headerToggleRef : columnToggleRef).current);
   }, [collapsed]);
 
+  const clearPeekTimer = useCallback(() => {
+    if (peekTimerRef.current !== null) window.clearTimeout(peekTimerRef.current);
+    peekTimerRef.current = null;
+  }, []);
+  /** Pointer rested on the edge zone: open after a short delay. */
+  const schedulePeekOpen = useCallback(() => {
+    clearPeekTimer();
+    peekTimerRef.current = window.setTimeout(() => { peekTimerRef.current = null; setPeek(true); }, PEEK_OPEN_DELAY_MS);
+  }, [clearPeekTimer]);
+  const closePeek = useCallback((restoreFocus = false) => {
+    clearPeekTimer();
+    setPeek(false);
+    // Only a keyboard or click close hands focus back; a pointer drifting
+    // away never moves focus.
+    if (restoreFocus) focusAfterRef.current = "header";
+  }, [clearPeekTimer]);
+  /** Pointer left the zone or the peek: close after the grace, unless a
+   * row's menu is open (its popup lives outside the peek). */
+  const schedulePeekClose = useCallback(() => {
+    clearPeekTimer();
+    peekTimerRef.current = window.setTimeout(() => {
+      peekTimerRef.current = null;
+      // A row menu is open: look again shortly, so the peek still closes
+      // once the menu is gone and the pointer is still outside.
+      if (document.querySelector('[data-slot="next-chat-rail"][data-state="peek"] [aria-expanded="true"][aria-haspopup]')) { schedulePeekClose(); return; }
+      closePeek();
+    }, PEEK_CLOSE_GRACE_MS);
+  }, [clearPeekTimer, closePeek]);
+  // The peek only exists while the column is hidden on a desktop screen.
+  useEffect(() => {
+    if (!collapsed || !isDesktop) { clearPeekTimer(); setPeek(false); }
+  }, [collapsed, isDesktop, clearPeekTimer]);
+  useEffect(() => clearPeekTimer, [clearPeekTimer]);
+  useEffect(() => {
+    if (!peek) return;
+    // Not `defaultPrevented`: an open tooltip's own Escape handler (capture
+    // phase) marks the key handled before this runs. The one Escape that is
+    // not ours is the thread search clearing a typed query.
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (event.target instanceof HTMLInputElement && event.target.value !== "") return;
+      // An open row menu takes this Escape first.
+      if (document.querySelector('[data-slot="next-chat-rail"][data-state="peek"] [aria-expanded="true"][aria-haspopup]')) return;
+      closePeek(true);
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [peek, closePeek]);
+  // Focus the peek's close hands back (the header's show control) once the
+  // peek has unmounted.
+  useEffect(() => {
+    if (peek || focusAfterRef.current !== "header" || !collapsedRef.current) return;
+    focusAfterRef.current = null;
+    focusQuietly(headerToggleRef.current);
+  }, [peek]);
+  /** The pin control inside the peek: dock the column again. */
+  const pinPeek = useCallback(() => {
+    clearPeekTimer();
+    setPeek(false);
+    setColumnCollapsed(false, true);
+  }, [clearPeekTimer, setColumnCollapsed]);
+
+  /** Pointer handlers for the hover zone and for the column node while it is
+   * peeking (plain props, spread by the page: no extra component). */
+  const peekZoneHandlers = {
+    onPointerEnter: (event: { pointerType: string }) => { if (event.pointerType !== "touch") schedulePeekOpen(); },
+    onPointerLeave: clearPeekTimer,
+  };
+  const peekColumnHandlers = {
+    onPointerEnter: clearPeekTimer,
+    onPointerLeave: (event: { pointerType: string }) => { if (event.pointerType !== "touch") schedulePeekClose(); },
+    // A click that navigates (a row, New chat, a link) closes the peek.
+    onClick: (event: { target: EventTarget }) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('[data-slot="aui_thread-list-item-trigger"], [data-slot="aui_thread-list-new"], a[href]')) closePeek(true);
+    },
+  };
+
   const toggleFromButton = useCallback(() => setColumnCollapsed(!collapsedRef.current, true), [setColumnCollapsed]);
 
   const control = useMemo<ChatColumnControl>(() => ({
@@ -128,6 +215,10 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
 
   return {
     collapsed,
+    peek,
+    peekZoneHandlers,
+    peekColumnHandlers,
+    pinPeek,
     sheetOpen,
     setSheetOpen,
     search,
@@ -149,9 +240,10 @@ export type ChatColumnState = ReturnType<typeof useChatColumn>;
 
 /** The one hide/show control. It sits at the top of the open column and,
  * while the column is hidden, at the left edge of the conversation header. */
-export function ChatColumnToggle({ collapsed, onToggle, buttonRef }: { collapsed: boolean; onToggle: () => void; buttonRef: RefObject<HTMLButtonElement | null> }) {
-  const label = collapsed ? "Show conversations" : "Hide conversations";
-  const Icon = collapsed ? ColumnOpenIcon : ColumnCloseIcon;
+export function ChatColumnToggle({ collapsed, onToggle, buttonRef, pin = false }: { collapsed: boolean; onToggle: () => void; buttonRef: RefObject<HTMLButtonElement | null>; pin?: boolean }) {
+  // In the hover peek the control pins the column open (docks it again).
+  const label = pin ? "Keep conversations open" : collapsed ? "Show conversations" : "Hide conversations";
+  const Icon = pin ? PinIcon : collapsed ? ColumnOpenIcon : ColumnCloseIcon;
   return (
     <Tooltip>
       <TooltipTrigger asChild onFocus={skipTooltipOnQuietFocus}>
@@ -161,8 +253,8 @@ export function ChatColumnToggle({ collapsed, onToggle, buttonRef }: { collapsed
           size="icon-sm"
           data-slot="chat-column-toggle"
           aria-label={label}
-          aria-expanded={!collapsed}
-          aria-controls={CHAT_COLUMN_ID}
+          aria-expanded={pin ? undefined : !collapsed}
+          aria-controls={pin ? undefined : CHAT_COLUMN_ID}
           aria-keyshortcuts="Meta+B Control+B"
           onClick={onToggle}
         >
@@ -170,7 +262,7 @@ export function ChatColumnToggle({ collapsed, onToggle, buttonRef }: { collapsed
         </Button>
       </TooltipTrigger>
       <TooltipContent side="bottom">
-        {label} <span className="ms-1 opacity-60">{chatColumnShortcutLabel()}</span>
+        {label} {pin ? null : <span className="ms-1 opacity-60">{chatColumnShortcutLabel()}</span>}
       </TooltipContent>
     </Tooltip>
   );

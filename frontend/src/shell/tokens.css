@@ -350,6 +350,20 @@ html.dark body {
 [data-slot="chat-column-inner"] {
   border-inline-end: 1px solid var(--shell-divider, var(--border));
 }
+/* COLUMN-02 hover peek: the same 288px panel, out of flow over the
+ * conversation, on the column's own tone with a soft edge shadow. */
+[data-slot="next-chat-rail"][data-state="peek"] {
+  background: var(--shell-history);
+  box-shadow: 8px 0 24px -12px color-mix(in oklab, var(--foreground) 35%, transparent);
+  animation: chat-column-peek-in 160ms ease-out;
+}
+@keyframes chat-column-peek-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="next-chat-rail"][data-state="peek"] { animation: none; }
+}
 [data-slot="chat-column-panel"] {
   --column-hover: color-mix(in oklab, var(--foreground) 5%, transparent);
   --column-selected: color-mix(in oklab, var(--foreground) 8%, transparent);

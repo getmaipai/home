@@ -1260,26 +1260,34 @@ export function NextChatPage({ person }: { person: Roster }) {
             </Button>
             <ChatHeaderBar phoneRow />
           </div>
-          <div className="flex min-h-0 flex-1">
+          <div className="relative flex min-h-0 flex-1">
+            {/* COLUMN-02: while the column is hidden, a thin hover zone at
+                this edge turns the column node itself into an overlay peek. */}
+            {column.collapsed && !column.peek ? (
+              <div aria-hidden data-slot="chat-column-hover-zone" className="absolute inset-y-0 start-0 z-20 hidden w-1.5 lg:block" {...column.peekZoneHandlers} />
+            ) : null}
             {/* COLUMN-01: the history column. The outer box animates its
                 width; the inner box keeps its full width and is pinned to
                 the outer box's right edge, so the column's contents slide
                 under the app rail without ever re-wrapping. Hidden, it is
                 zero wide and `inert` (out of the Tab order and the
                 accessibility tree) but stays mounted, so `aria-controls`
-                always names a real node. No hover peek: the one control
-                shows and hides it. */}
+                always names a real node. A hover peek (COLUMN-02) overlays
+                the conversation while it is hidden. */}
             <div
               id={CHAT_COLUMN_ID}
               data-slot="next-chat-rail"
-              data-state={column.collapsed ? "closed" : "open"}
+              data-state={column.collapsed ? (column.peek ? "peek" : "closed") : "open"}
               aria-label="Conversations"
               role="region"
-              inert={column.collapsed}
+              inert={column.collapsed && !column.peek}
+              {...(column.peek ? column.peekColumnHandlers : {})}
               className={cn(
                 // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate the column's width
                 "hidden shrink-0 justify-end overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none lg:flex",
-                column.collapsed ? "w-0" : "w-72",
+                // Peeking: the same node, out of flow over the conversation
+                // (nothing moves), with no width transition.
+                column.peek ? "absolute inset-y-0 start-0 z-30 w-72 transition-none" : column.collapsed ? "w-0" : "w-72",
               )}
             >
               <div data-slot="chat-column-inner" className="flex h-full w-72 shrink-0 flex-col">
@@ -1289,7 +1297,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   onNewThread={() => setSheetOpen(false)}
                   newChatDisabled={chatAvailability === "unavailable"}
                   pinnable={!temporaryNext}
-                  toggle={<ChatColumnToggle collapsed={false} onToggle={column.toggleFromButton} buttonRef={column.columnToggleRef} />}
+                  toggle={<ChatColumnToggle collapsed={false} pin={column.peek} onToggle={column.peek ? column.pinPeek : column.toggleFromButton} buttonRef={column.columnToggleRef} />}
                 />
               </div>
             </div>

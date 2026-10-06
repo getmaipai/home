@@ -2270,6 +2270,63 @@ describe("NextChatPage (COLUMN-01: one hide/show control for the history column)
     }
   });
 
+  test("COLUMN-02 hover peek: resting on the edge zone opens an overlay peek; leaving closes it after a grace; the docked column stays hidden", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderChat();
+      await view.findByLabelText("Message input");
+      expect(document.querySelector('[data-slot="chat-column-hover-zone"]')).toBeNull();
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      const zone = document.querySelector('[data-slot="chat-column-hover-zone"]')!;
+      // Passing over the zone does nothing.
+      fireEvent.pointerEnter(zone);
+      fireEvent.pointerLeave(zone);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(true);
+      // Resting on it opens the peek: the same column node, out of flow over the conversation.
+      fireEvent.pointerEnter(zone);
+      const peek = await waitFor(() => { const found = document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]'); expect(found === null).toBe(false); return found as HTMLElement; });
+      expect(peek).toBeTruthy();
+      expect(peek).toBe(column());
+      expect(peek.className).toContain("absolute");
+      expect(within(peek as HTMLElement).getByRole("link", { name: "Chat settings" })).toBeTruthy();
+      // Leaving and coming back inside the grace keeps it.
+      fireEvent.pointerLeave(peek);
+      fireEvent.pointerEnter(peek);
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(false);
+      // Leaving for good closes it.
+      fireEvent.pointerLeave(peek);
+      await waitFor(() => expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(true));
+      expect(column()).toHaveAttribute("data-state", "closed");
+    } finally {
+      restore();
+    }
+  });
+
+  test("COLUMN-02 hover peek: Escape closes it and focus returns to the header's control; the pin control docks the column", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderChat();
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      fireEvent.pointerEnter(document.querySelector('[data-slot="chat-column-hover-zone"]')!);
+      const peek = await waitFor(() => { const found = document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]'); expect(found === null).toBe(false); return found as HTMLElement; });
+      within(peek).getByRole("button", { name: "New chat" }).focus();
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(true));
+      await waitFor(() => expect(document.activeElement).toBe(view.getByRole("button", { name: "Show conversations" })));
+
+      fireEvent.pointerEnter(document.querySelector('[data-slot="chat-column-hover-zone"]')!);
+      const again = await waitFor(() => { const found = document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]'); expect(found === null).toBe(false); return found as HTMLElement; });
+      fireEvent.click(within(again).getByRole("button", { name: "Keep conversations open" }));
+      expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(true);
+      expect(column()).toHaveAttribute("data-state", "open");
+    } finally {
+      restore();
+    }
+  });
+
   test("COLUMN-02 chat settings: an icon link left of search opens Settings, Me, Chat", async () => {
     const restore = stubFetch();
     try {
