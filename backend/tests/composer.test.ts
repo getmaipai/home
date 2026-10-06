@@ -10,6 +10,7 @@ import {
   constraintsLine,
   compositionInstruction,
   phrasingInstruction,
+  picturesOnlyInstruction,
   toolResultContent,
   needsComposition,
   questionOf,
@@ -608,5 +609,15 @@ describe("artifactForOutcomes", () => {
   test("the first known producer wins when several outcomes succeeded", () => {
     const result = artifactForOutcomes([searchOutcome(), writeDocumentOutcome({ artifact_id: "art-first01", artifact_version: 1 }), writeDocumentOutcome({ artifact_id: "art-second1", artifact_version: 2 })]);
     expect(result).toEqual({ id: "art-first01", version: 1 });
+  });
+});
+
+// ANSWER-IMG-05b, a code review finding: the pictures-only answering round
+// keeps phrasingInstruction's guard against citing earlier search results.
+describe("picturesOnlyInstruction", () => {
+  test("is one line naming the message, with the earlier-results citation guard only when earlier searches are in a written history", () => {
+    expect(picturesOnlyInstruction("written", "what does it look like")).toBe('Answer this message of mine from what you know, structured where it helps: "what does it look like".');
+    expect(picturesOnlyInstruction("written", "what does it look like", 2)).toContain("don't use [n] citations");
+    expect(picturesOnlyInstruction("spoken", "what does it look like", 2)).not.toContain("citations");
   });
 });

@@ -93,7 +93,8 @@ globalThis.fetch = (async (input: Parameters<typeof fetch>[0], init?: Parameters
 }) as typeof fetch;
 
 // ---- the Stack stand-in: forwards everything, records chat requests ----
-interface EngineRequest { offered: string[]; toolChoice: unknown; called: { name: string; args: string }[]; contentToolText: boolean; cachedTokens: number | null; promptTokens: number | null }
+interface EngineTimings { promptN: number | null; promptMs: number | null; predictedN: number | null; predictedMs: number | null; cacheN: number | null }
+interface EngineRequest { offered: string[]; toolChoice: unknown; called: { name: string; args: string }[]; contentToolText: boolean; cachedTokens: number | null; promptTokens: number | null; startAt: number; firstByteAt: number | null; endAt: number | null; timings: EngineTimings | null }
 const requests: EngineRequest[] = [];
 let engineHeaders = { engine: "unknown", model: "unknown" };
 
@@ -117,6 +118,9 @@ function parseCompletion(raw: string, record: EngineRequest): void {
       record.cachedTokens = usage.prompt_tokens_details?.cached_tokens ?? record.cachedTokens;
     }
     if (obj?.timings?.cache_n !== undefined) record.cachedTokens = obj.timings.cache_n;
+    // ANSWER-IMG-05b: the engine's own split of each request's time (prompt
+    // evaluation against decoding), to find where a called round's extra goes.
+    if (obj?.timings) record.timings = { promptN: obj.timings.prompt_n ?? null, promptMs: obj.timings.prompt_ms ?? null, predictedN: obj.timings.predicted_n ?? null, predictedMs: obj.timings.predicted_ms ?? null, cacheN: obj.timings.cache_n ?? null };
   };
   const trimmed = raw.trim();
   if (trimmed.startsWith("{")) {
@@ -143,17 +147,31 @@ const standIn = Bun.serve({
     const body = req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer();
     const upstream = await realFetch(`${STACK_URL}${url.pathname}${url.search}`, { method: req.method, headers: req.headers, body, signal: req.signal });
     if (req.method === "POST" && url.pathname === "/v1/chat/completions" && body) {
-      const record: EngineRequest = { offered: [], toolChoice: undefined, called: [], contentToolText: false, cachedTokens: null, promptTokens: null };
+      const record: EngineRequest = { offered: [], toolChoice: undefined, called: [], contentToolText: false, cachedTokens: null, promptTokens: null, startAt: performance.now(), firstByteAt: null, endAt: null, timings: null };
       try {
         const parsed = JSON.parse(new TextDecoder().decode(body)) as { tools?: { function?: { name?: string } }[]; tool_choice?: unknown };
         record.offered = (parsed.tools ?? []).map((t) => t.function?.name ?? "?");
         record.toolChoice = parsed.tool_choice;
       } catch { /* not JSON */ }
       requests.push(record);
+      // MAIPAI_IMG05_DUMP=1: every engine request body to disk, to read the
+      // exact prompt and tool block each band sends.
+      if (process.env.MAIPAI_IMG05_DUMP === "1") writeFileSync(join(OUT, `request-${String(requests.length).padStart(4, "0")}.json`), new TextDecoder().decode(body));
       engineHeaders = { engine: upstream.headers.get("x-maipai-engine") ?? engineHeaders.engine, model: upstream.headers.get("x-maipai-model") ?? engineHeaders.model };
       if (!upstream.body) return upstream;
       const [mine, theirs] = upstream.body.tee();
-      void new Response(mine).text().then((raw) => parseCompletion(raw, record)).catch(() => undefined);
+      void (async () => {
+        const reader = mine.getReader();
+        const chunks: Uint8Array[] = [];
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (record.firstByteAt === null) record.firstByteAt = performance.now();
+          chunks.push(value);
+        }
+        record.endAt = performance.now();
+        parseCompletion(new TextDecoder().decode(Buffer.concat(chunks)), record);
+      })().catch(() => undefined);
       return new Response(theirs, { status: upstream.status, headers: upstream.headers });
     }
     return new Response(upstream.body, { status: upstream.status, headers: upstream.headers });
@@ -236,6 +254,10 @@ interface Run {
   images: { visible: number; items: number; afterParagraph: number; badge: number; near: [number, number, number][]; pictures: Picture[]; sheet: string | null } | null;
   skipped: string | null; outbound: Record<string, number>; cachedTokens: number | null; promptTokens: number | null;
   outsideTouched: boolean;
+  /** The picture pipeline's own admin-only trace for the call. */
+  trace: unknown;
+  /** Each engine request of the turn, times relative to the turn's start. */
+  engine: { startMs: number; firstByteMs: number | null; endMs: number | null; called: string[]; timings: EngineTimings | null }[];
 }
 const runs: Run[] = [];
 const conversationRuns: Run[] = [];
@@ -339,8 +361,9 @@ async function turn(arm: Arm, row: Row, rep: number, conversationId: string | nu
   ];
   const showOutcome = outcomes.find((o) => o.packageId === SHOW);
   let skipped: string | null = null;
+  let trace: unknown = null;
   if (showOutcome && typeof (showOutcome as { detail?: unknown }).detail === "string") {
-    try { skipped = JSON.parse((showOutcome as { detail: string }).detail).skipped ?? null; } catch { /* not JSON */ }
+    try { trace = JSON.parse((showOutcome as { detail: string }).detail); skipped = (trace as { skipped?: string }).skipped ?? null; } catch { /* not JSON */ }
   }
   const out: Record<string, number> = {};
   for (const o of outbound.slice(outMark)) out[`${o.host} ${o.status ?? "-"}`] = (out[`${o.host} ${o.status ?? "-"}`] ?? 0) + 1;
@@ -361,6 +384,8 @@ async function turn(arm: Arm, row: Row, rep: number, conversationId: string | nu
     firstTextMs, totalMs, reply, error, images, skipped, outbound: out,
     cachedTokens: mine[0]?.cachedTokens ?? null, promptTokens: mine[0]?.promptTokens ?? null,
     outsideTouched: searches > searchMark || outbound.length > outMark,
+    trace,
+    engine: mine.map((r) => ({ startMs: r.startAt - t0, firstByteMs: r.firstByteAt === null ? null : r.firstByteAt - t0, endMs: r.endAt === null ? null : r.endAt - t0, called: r.called.map((c) => c.name), timings: r.timings })),
   };
   return { run, conversationId: convo };
 }

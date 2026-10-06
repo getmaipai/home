@@ -6,6 +6,14 @@ All notable changes to the Show Pictures package, in [Keep a Changelog](https://
 
 ### Changed
 
+- ANSWER-IMG-05b: the description names games, and the `subject` argument
+  names artwork, says to show photos in short, casual replies too and carries
+  a film remark example ("I just watched Jaws again"). The tool's answer to the
+  model is about half as long and lets it describe the thing from what it
+  knows, never the photos. Pictures must now be of the thing: a picture needs
+  two signs that it shows the subject, and Commons' own labels for costumes,
+  fan art, crowds, screenshots and personality rights keep strangers and
+  screen captures out of a thing's row.
 - ANSWER-IMG-05: the description asks for photos whenever someone asks about
   or mentions a famous person, place, film, show, animal, car or product, and
   the `subject` argument carries two short examples; measured on the real

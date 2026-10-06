@@ -1083,6 +1083,20 @@ export function phrasingInstruction(surfaceClass: SurfaceClass, utterance: strin
   return lines.join(" ");
 }
 
+/** ANSWER-IMG-05b: the answering round after a round whose only call was
+ * `show_images`. There are no results to weigh, so phrasingInstruction's
+ * search lines (results as support, current facts from results, citations)
+ * are noise, and they were most of the new prompt the round had to read
+ * before its first word. "Message", not "question": the call often follows
+ * a remark ("the Pontiac Fiero was a great-looking car"). */
+export function picturesOnlyInstruction(surfaceClass: SurfaceClass, utterance: string, replayedSearchCount = 0): string {
+  const lengthClause = surfaceClass === "written" ? "structured where it helps" : "in one to three sentences";
+  const line = `Answer this message of mine from what you know, ${lengthClause}: "${quoteForPrompt(utterance)}".`;
+  // The same guard phrasingInstruction carries: earlier search results in
+  // the history have no source list in this reply.
+  return replayedSearchCount > 0 && surfaceClass === "written" ? `${line} Earlier search results are context only; don't use [n] citations for them because this reply has no current source list.` : line;
+}
+
 /** The decision. Pure: no model call, no clock. */
 export function planComposition(input: ComposerInput): ComposePlan {
   const outcomes = input.outcomes.filter((o) => o.status !== "rejected");

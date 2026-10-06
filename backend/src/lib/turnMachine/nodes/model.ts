@@ -16,7 +16,8 @@ import { streamWatchdog, replyIsUncapped } from "../deadline";
 import type { StackFailureFacts } from "@/lib/stackEngine";
 import { classifyGenerationFailure, partialReplyNote, RETRY_BACKOFF_MS, stackRefusalKind, type FailureKind } from "@/lib/generationFailure";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
-import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, searchEvidenceMaxChars } from "@/lib/composer";
+import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, picturesOnlyInstruction, searchEvidenceMaxChars } from "@/lib/composer";
+import { SHOW_IMAGES_TOOL_ID } from "@/lib/answerImages/turn";
 import { planLineForTurnMachine } from "@/lib/register";
 import { askAppendFor, NO_ASK_APPEND } from "@/lib/askNames";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
@@ -714,7 +715,12 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     );
     const searchResultCount = searchRows.count;
     const replayedSearchCount = state.messages.reduce((count, message) => count + (message.role === "tool" && message.tool_call_id ? 1 : 0), 0);
-    const phrasing = phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount, searchResultCount > 0 && searchRows.allEmpty, replayedSearchCount);
+    // ANSWER-IMG-05b: a round whose only call showed pictures has no results to
+    // phrase; its answering round gets the short instruction.
+    const picturesOnly = phrasedOutcomes.length > 0 && phrasedOutcomes.every((o) => o.packageId === SHOW_IMAGES_TOOL_ID);
+    const phrasing = picturesOnly
+      ? picturesOnlyInstruction(promptSurfaceClass, input.utterance, replayedSearchCount)
+      : phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount, searchResultCount > 0 && searchRows.allEmpty, replayedSearchCount);
     const missedKinds = state.outcomes.filter(lookupMissed).map(lookupFailureKind);
     const answering =
       phrasedOutcomes.length === 0

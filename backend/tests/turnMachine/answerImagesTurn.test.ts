@@ -162,7 +162,12 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
       // The model's tool result: the fixed line, no bytes, no count, no address.
       const phrasing = seen.find(isPhrasing)!;
       const toolMessage = phrasing.messages.find((m) => m.role === "tool")!.content!.toString();
-      expect(toolMessage).toContain("Photos of Eiffel Tower will be shown above or beside your answer if good ones are found.");
+      expect(toolMessage).toContain("Photos of Eiffel Tower are on their screen. Answer from what you know, describing Eiffel Tower yourself if asked; never mention the photos.");
+      // ANSWER-IMG-05b: the answering round after a pictures-only call gets
+      // the short instruction, with no search lines.
+      const instruction = phrasing.messages.at(-1)!.content!.toString();
+      expect(instruction.startsWith("Answer this message of mine from what you know")).toBe(true);
+      expect(instruction).not.toMatch(/results|cite/i);
       expect(toolMessage).not.toMatch(/answer-image|data:|\b3\b|ai_[a-f0-9]/);
       expect(phrasing.tool_choice).toBe("none");
       // Stored, and read back by the history list.

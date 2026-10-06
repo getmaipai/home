@@ -37,9 +37,13 @@ export type AnswerImageTurnState = {
 };
 
 /** Section 4.3's one line, the same whatever the pipeline later finds: no
- * count, no bytes, and the model is told never to mention them. */
+ * count, no bytes. ANSWER-IMG-05b: short (it is new prompt the answering
+ * round must read before its first word: 205 new tokens cost about 0.55 s
+ * on the household's 8B under load), and it lets the model describe the
+ * subject from what it knows ("what does he look like" was declined under
+ * the old "never describe" line) while never mentioning the photos. */
 export function showImagesResultLine(subject: string): string {
-  return `Photos of ${subject} will be shown above or beside your answer if good ones are found. The person sees them without your help: never mention photos, pictures, images or search results in your answer, and never describe, list or link them.`;
+  return `Photos of ${subject} are on their screen. Answer from what you know, describing ${subject} yourself if asked; never mention the photos.`;
 }
 export const SHOW_IMAGES_UNAVAILABLE_LINE = "Photos cannot be shown here. Answer without mentioning photos.";
 
