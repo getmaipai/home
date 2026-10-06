@@ -31,7 +31,8 @@ import { Button as ElementsButton } from "@maipai/ui/src/elements/ui/button";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { getIcon } from "@maipai/ui/src/icons";
-import type { TurnStats } from "@/lib/api";
+import { api, type TurnErrorDetail, type TurnStats } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
@@ -40,7 +41,7 @@ import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
-import { TurnErrorDetails } from "@/next/pages/TurnErrorDetails";
+import { TurnErrorDetails, hasErrorFacts } from "@/next/pages/TurnErrorDetails";
 
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
 // specifically - grid-2x2 (a two-pane split) is the closest already-
@@ -429,17 +430,33 @@ export function SourcesActionBarTrigger() {
 }
 
 /** Failed-turn diagnostics are appended by the shipped action-bar slot, so
- * they stay in the same row as Copy, feedback and Refresh. */
+ * they stay in the same row as Copy, feedback and Refresh. CHAT-CALM-ERRORS-01c:
+ * the one details control per failed reply, drawn only for an admin and only
+ * when there is something to show: the detail the turn's error event carried,
+ * a stored reply marked failed (a failed generation or tool call), or, for a
+ * reply that errored with neither, a stored row the hub reports with facts
+ * (read ahead, so an empty control is never drawn). */
 export function FailedTurnErrorDetailsAction() {
   const isAdmin = useContext(AdminContext);
-  const failed = useAuiState((s) =>
-    s.message.metadata?.custom?.failedGeneration === true ||
-    s.message.metadata?.custom?.failedTool === true ||
-    (s.message.status?.type === "incomplete" && s.message.status.reason === "error"),
-  );
-  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
-  if (!isAdmin || !failed || !turnId) return null;
-  return <TurnErrorDetails turnId={turnId} />;
+  // An errored live reply carries its id on the thrown ChatTurnError, not in metadata.
+  const turnId = useAuiState((s) => {
+    const fromMetadata = s.message.metadata?.custom?.turnId as string | undefined;
+    if (fromMetadata) return fromMetadata;
+    const status = s.message.status;
+    const error = status?.type === "incomplete" && status.reason === "error" ? status.error : undefined;
+    return error && typeof error === "object" && "turnId" in error && typeof error.turnId === "string" ? error.turnId : undefined;
+  });
+  const streamed = useAuiState((s) => s.message.metadata?.custom?.failureDetail as TurnErrorDetail | undefined);
+  const failed = useAuiState((s) => s.message.metadata?.custom?.failedGeneration === true || s.message.metadata?.custom?.failedTool === true);
+  const errored = useAuiState((s) => s.message.status?.type === "incomplete" && s.message.status.reason === "error");
+  const live = streamed && hasErrorFacts(streamed) ? streamed : undefined;
+  const lookAhead = isAdmin && !live && !failed && errored && Boolean(turnId);
+  const stored = useQuery<TurnErrorDetail>({ queryKey: ["turn-error-detail", turnId], queryFn: () => api.turnErrorDetail(turnId!), enabled: lookAhead, retry: false });
+  if (!isAdmin) return null;
+  if (live) return <TurnErrorDetails turnId={turnId} streamed={live} />;
+  if (failed && turnId) return <TurnErrorDetails turnId={turnId} />;
+  if (lookAhead && stored.data && hasErrorFacts(stored.data)) return <TurnErrorDetails turnId={turnId} streamed={stored.data} />;
+  return null;
 }
 
 /** Compose both controls in the kit's single action-bar append point. */

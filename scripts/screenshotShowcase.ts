@@ -68,10 +68,10 @@ try {
         await page.waitForTimeout(1500);
         await page.screenshot({ path: join(outDir, `showcase-${scenario.id}-${viewport.name}.png`) });
         console.log(`captured ${scenario.id} @ ${viewport.name}`);
-        if (captureFailureRoles && (scenario.id === "failure-admin-details" || scenario.id === "failure-too-much-text")) {
+        if (captureFailureRoles && (scenario.id === "failure-admin-details" || scenario.id === "failure-too-much-text" || scenario.id === "failure-engine-stopped")) {
           const details = page.getByRole("button", { name: "Error details" });
           await details.click();
-          const detailText = scenario.id === "failure-too-much-text" ? "exceed_context_size_error" : "The scripted screenshot engine returned a connection timeout.";
+          const detailText = scenario.id === "failure-too-much-text" ? "exceed_context_size_error" : scenario.id === "failure-engine-stopped" ? "The chat engine was stopped, so the reply never started." : "The scripted screenshot engine returned a connection timeout.";
           await page.getByText(detailText, { exact: false }).waitFor({ state: "visible" });
           await page.waitForTimeout(500);
           await page.screenshot({ path: join(outDir, `showcase-${scenario.id}-${viewport.name}-admin-open.png`) });

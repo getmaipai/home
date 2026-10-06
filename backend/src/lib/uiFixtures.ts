@@ -1,5 +1,5 @@
 import type { TurnStreamEvent, TurnValue } from "../wire";
-import { failureLine, partialReplyNote } from "./failureCopy";
+import { FAILURE_ADVICE, failureLine, partialReplyNote } from "./failureCopy";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
 // UI-SHOWCASE: canned turns for the admin's Chat showcase (/dev/ui). A fixture
@@ -157,6 +157,15 @@ const SOURCES = [
 
 const CRISIS = "If you are thinking about hurting yourself, you are not alone. In the US you can call or text 988 at any time to reach the Suicide & Crisis Lifeline.";
 
+const STOPPED_BODY = { error: "No engine is ready for role 'chat'.", role: "chat", state: "installed", offline_reason: "The chat engine was stopped." };
+const STOPPED_DETAIL = {
+  turn_id: "showcase-failure-engine-stopped",
+  found: true,
+  advice: FAILURE_ADVICE.stopped,
+  tools: [],
+  generations: [{ reason: "model", error: STOPPED_BODY.error, request_sent_ms: 41, offline_reason: STOPPED_BODY.offline_reason, http_status: 503, state: STOPPED_BODY.state, raw_body: JSON.stringify(STOPPED_BODY), engine_id: "local b10797", model_id: "qwen3-8b-instruct-q4_k_m.gguf", failed_ms: 44, failed_at: "2026-10-06T06:00:00.000Z" }],
+};
+
 function failureAdminDetails(): Event[] {
   const id = "showcase-failure-admin-details";
   return [
@@ -203,6 +212,10 @@ export const UI_FIXTURES: UiFixture[] = [
     }),
   },
   { id: "failure-engine-down", title: "Failure: engine down (chat)", description: "The chat engine is not running: the plain line an adult sees, code engine_unavailable.", events: failing("failure-engine-down", "", { type: "error", error: failureLine("unreachable", false), code: "engine_unavailable" }) },
+  // CHAT-CALM-ERRORS-01c: the owner's stopped-engine report. The error event
+  // carries the admin detail the hub sends an owner (backend
+  // tests/chatCalmErrors.test.ts); this route is owner/admin only.
+  { id: "failure-engine-stopped", title: "Failure: chat engine stopped (admin details)", description: "The Stack refused the chat role because its engine was stopped: the stopped line, and the admin details with the cause, the next step and the raw facts.", events: failing("failure-engine-stopped", "", { type: "error", error: failureLine("stopped", false), code: "engine_unavailable", detail: STOPPED_DETAIL }) },
   { id: "failure-admin-details", title: "Failure: admin generation details", description: "A successful lookup followed by a failed generation: the plain reply for everyone and the admin-only raw detail popover.", storedStats: { generations: [{ reason: "phrasing", error: "The scripted screenshot engine returned a connection timeout.", request_sent_ms: 245, offline_reason: "scripted timeout" }] }, events: failureAdminDetails() },
   { id: "failure-too-much-text", title: "Failure: too much text for the model", description: "A successful lookup followed by a generation failure: the person gets a short next step and admins can open the raw detail.", storedStats: { generations: [{ reason: "phrasing", error: "exceed_context_size_error: request exceeds the available context size", request_sent_ms: 245 }] }, events: [{ type: "turn_meta", conversation_id: "showcase", turn_id: "showcase-failure-too-much-text" }, { type: "status", stage: "lookup", text: "Looking that up" }, { t: "tool_call", call_id: "call-failure-too-much-text", package_id: "websearch", args: { q: "saturday market hours" }, label: "Searching the web" }, { t: "tool_result", call_id: "call-failure-too-much-text", package_id: "websearch", outcome: { text: "3 pages read", sites: [{ host: "example.com", url: "https://example.com/market" }] } }, { type: "done", value: { reply: { text: failureLine("context_too_large", false) }, source: "plugin", safety: SAFE, conversation_id: "showcase", turn_id: "showcase-failure-too-much-text", failed_generation: true } as TurnValue }] },
   { id: "failure-engine-down-spoken", title: "Failure: engine down (spoken or child)", description: "The engine is down on a spoken or non-chat surface: the short grown-ups line, code engine_unavailable.", events: failing("failure-engine-down-spoken", "", { type: "error", error: failureLine("unreachable", true), code: "engine_unavailable" }) },

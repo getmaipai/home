@@ -3,10 +3,8 @@
 import { MessagePrimitive, useAui, useAuiState } from "@assistant-ui/react";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { GuardrailNotice } from "@maipai/ui/src/elements/guardrail-notice";
-import { useContext, useEffect, useRef, useState } from "react";
-import { AdminContext } from "@/apps/chat/chatThreadContexts";
+import { useEffect, useRef, useState } from "react";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
-import { TurnErrorDetails } from "@/next/pages/TurnErrorDetails";
 
 type MessageErrorValue = {
   message: string;
@@ -18,7 +16,6 @@ export function ChatMessageError() {
   const status = useAuiState((s) => s.message.status);
   const isRunning = useAuiState((s) => s.thread.isRunning);
   const aui = useAui();
-  const isAdmin = useContext(AdminContext);
   const [retrying, setRetrying] = useState(false);
   const previousStatus = useRef(status);
 
@@ -41,7 +38,6 @@ export function ChatMessageError() {
     );
   }
 
-  const turnId = error instanceof ChatTurnError ? error.turnId : undefined;
   const retry = () => {
     setRetrying(true);
     void aui.message().reload();
@@ -50,7 +46,6 @@ export function ChatMessageError() {
   return (
     <MessagePrimitive.Error>
       <ErrorState title="Couldn't finish that reply" detail={error.message} retrying={retrying} onRetry={retry} />
-      {isAdmin && turnId ? <TurnErrorDetails turnId={turnId} /> : null}
     </MessagePrimitive.Error>
   );
 }

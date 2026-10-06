@@ -988,6 +988,7 @@ describe("createChatModelAdapter tool timeline (TOOL-EVENTS-01, frontend half)",
         { type: "tool-call", toolCallId: "turn-err1-tools", toolName: "tool_timeline", args: {}, argsText: "", result: [{ callId: "call-1", packageId: "websearch", state: "error", failureKind: "timed out" }] },
         { type: "text", text: "Something went wrong." },
       ]);
+      expect(last?.metadata?.custom).toMatchObject({ failedTool: true, turnId: "turn-err1" });
     } finally {
       env.restore();
     }

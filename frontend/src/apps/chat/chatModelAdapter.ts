@@ -697,6 +697,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // SAFETY-01 (#85): a streamed refusal's crisis resources ride
             // on the error event; shown the same way a done value's are.
             if (event.crisis_resources) deps.onCrisisResources(event.crisis_resources);
+            // CHAT-CALM-ERRORS-01c: the admin-only detail the hub sent with
+            // this error (it never reaches anyone else's stream) is kept in
+            // the message metadata, so the details control reads it before a
+            // reload and in a temporary chat, where nothing is stored.
+            if (event.detail) yield { metadata: { custom: { turnId: resumeTurnId, failureDetail: event.detail } } };
             // Pass event.code through (e.g., "safety_refused" from backend)
             // so error handling can distinguish coded errors from generic ones.
             throw new ApiError(event.error, 503, event.code || "unavailable");

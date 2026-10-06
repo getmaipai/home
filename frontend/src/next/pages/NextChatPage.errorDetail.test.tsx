@@ -26,8 +26,10 @@ afterEach(() => {
 const SAFETY = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" };
 const DETAIL = {
   turn_id: "turn-failed123",
+  found: true,
+  advice: { cause: "The websearch tool could not reach its service.", next_step: "Retry once the service is back. If it stays down, check Repairs.", repairs: true },
   tools: [{ tool_id: "websearch", call_id: "call-1", kind: "unavailable", error_code: "search_unavailable", error_text: "SearXNG answered 502", at: "2026-10-04T10:00:00.000Z", duration_ms: 812 }],
-  generations: [{ reason: "answer", error: "chat model unavailable: slot crashed", request_sent_ms: 40, offline_reason: "The chat engine waited 15 s for memory and gave up." }],
+  generations: [{ reason: "answer", error: "chat model unavailable: slot crashed", request_sent_ms: 40, offline_reason: "The chat engine waited 15 s for memory and gave up.", http_status: 503, state: "offline", engine_id: "local b10797", model_id: "qwen3-8b" }],
 };
 
 function renderPage(ui: ReactElement) {
@@ -51,10 +53,11 @@ function stubFailedTurn(failed: boolean): { urls: string[]; restore: () => void 
     if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     if (url.includes("/api/turn/stream")) {
       return Promise.resolve(new Response(ndjsonStream([
+        { type: "turn_meta", conversation_id: "conv-failed123", turn_id: "turn-failed123", resume_token: "resume-failed123" },
         { t: "tool_call", package_id: "websearch", args: { query: "weather" }, call_id: "call-1" },
         failed ? { t: "tool_error", call_id: "call-1", package_id: "websearch", error: "unavailable" } : { t: "tool_result", call_id: "call-1", package_id: "websearch", outcome: { text: "3 results" } },
         { type: "delta", text: "I could not look that up." },
-        { type: "done", value: { turn_id: "turn-failed123", reply: { text: "I could not look that up." }, source: "model", safety: SAFETY } },
+        { type: "done", value: { turn_id: "turn-failed123", reply: { text: "I could not look that up." }, source: "model", failed_generation: failed, safety: SAFETY } },
       ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
     }
     return Promise.resolve(new Response("{}", { status: 200 }));
@@ -77,12 +80,18 @@ describe("the admin tool error card on a failed tool call", () => {
   test("an admin sees the tool error card with the tool, kind and raw message from the stored row", async () => {
     const { view, restore } = await runTurn("owner");
     try {
-      const card = await view.findByText("SearXNG answered 502");
-      expect(card.closest('[data-slot="tool-error"]')).toBeVisible();
       const details = await view.findByRole("button", { name: "Error details" });
       expect(details.closest(".aui-assistant-action-bar-root")).toBeTruthy();
-      expect(view.getByText("websearch")).toBeVisible();
-      expect(view.getByText("unavailable")).toBeVisible();
+      expect(view.container.querySelector('[data-slot="tool-error"]')).toBeNull();
+      fireEvent.click(details);
+      expect(await view.findByText("SearXNG answered 502")).toBeVisible();
+      expect(view.getAllByText("What failed").map((label) => label.parentElement?.textContent)).toContain("What failedwebsearch");
+      expect(view.getByText("unavailable (search_unavailable)")).toBeVisible();
+      expect(await view.findByText("The chat engine waited 15 s for memory and gave up.")).toBeVisible();
+      expect(view.getByText("HTTP status").parentElement?.textContent).toContain("503");
+      expect(view.getByText("Model and engine").parentElement?.textContent).toContain("qwen3-8b on local b10797");
+      expect(view.getByText("The websearch tool could not reach its service.")).toBeVisible();
+      expect(view.getByRole("button", { name: "Copy details" })).toBeVisible();
     } finally {
       restore();
     }
@@ -92,6 +101,7 @@ describe("the admin tool error card on a failed tool call", () => {
     const { view, urls, restore } = await runTurn("adult");
     try {
       await view.findByText("I could not look that up.");
+      fireEvent.mouseEnter(view.container.querySelector('[data-role="assistant"]')!);
       expect(view.queryByText("SearXNG answered 502")).toBeNull();
       expect(view.container.querySelector('[data-slot="tool-error"]')).toBeNull();
       expect(urls.some((u) => u.includes("/api/turn-error-detail/"))).toBe(false);
@@ -121,12 +131,11 @@ describe("the admin tool error card on a failed tool call", () => {
     }
   });
 
-  test("Retry on the tool error card reruns the reply", async () => {
-    const { view, urls, restore } = await runTurn("owner");
+  test("details control is available without duplicating an inline tool error card", async () => {
+    const { view, restore } = await runTurn("owner");
     try {
-      const before = urls.filter((url) => url.includes("/api/turn/stream")).length;
-      fireEvent.click(await view.findByRole("button", { name: "Retry" }));
-      await waitFor(() => expect(urls.filter((url) => url.includes("/api/turn/stream")).length).toBeGreaterThan(before));
+      expect(await view.findByRole("button", { name: "Error details" })).toBeTruthy();
+      expect(view.container.querySelector('[data-slot="tool-error"]')).toBeNull();
     } finally {
       restore();
     }
@@ -137,6 +146,76 @@ describe("the admin tool error card on a failed tool call", () => {
       const { view, urls, restore } = await runTurn(role);
       try {
         expect(view.container.querySelector('[data-slot="tool-error"]')).toBeNull();
+        expect(urls.some((u) => u.includes("/api/turn-error-detail/"))).toBe(false);
+      } finally {
+        restore();
+        cleanup();
+      }
+    }
+  });
+});
+
+// CHAT-CALM-ERRORS-01c: the stopped engine, end to end through the page's
+// own stream adapter. The hub sends `detail` on the error event to an adult
+// owner or admin only (backend tests/chatCalmErrors.test.ts), so the stubs
+// below send it for the owner and leave it off for everyone else.
+const STOPPED_DETAIL = {
+  turn_id: "turn-stopped123",
+  found: true,
+  advice: { cause: "The chat engine was stopped, so the reply never started.", next_step: "Start the chat engine in Repairs.", repairs: true },
+  tools: [],
+  generations: [{ reason: "model", error: "No engine is ready for role 'chat'.", request_sent_ms: 41, offline_reason: "The chat engine was stopped.", http_status: 503, state: "installed", engine_id: "local b10797", model_id: "qwen3-8b", failed_ms: 44, failed_at: "2026-10-06T06:00:00.000Z" }],
+};
+
+async function runStoppedTurn(role: Roster["role"]) {
+  const original = globalThis.fetch;
+  const urls: string[] = [];
+  (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    urls.push(url);
+    if (url.includes("/api/conversations") && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-stopped123", status: "open", surface: "chat" }));
+    if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    if (url.includes("/api/turn/stream")) {
+      const error = { type: "error", error: "The AI was stopped, so that reply didn't finish. Send it again once chat is back.", code: "engine_unavailable", ...(role === "owner" ? { detail: STOPPED_DETAIL } : {}) };
+      return Promise.resolve(new Response(ndjsonStream([{ type: "turn_meta", conversation_id: "conv-stopped123", turn_id: "turn-stopped123", resume_token: "resume-stopped123" }, error]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
+    }
+    return Promise.resolve(new Response("{}", { status: 200 }));
+  }) as unknown as typeof fetch;
+  const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson(role)} /></MemoryRouter>);
+  fireEvent.change(await view.findByLabelText("Message input"), { target: { value: "hi" } });
+  const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+  await waitFor(() => expect(send.disabled).toBe(false));
+  fireEvent.click(send);
+  await view.findByText("The AI was stopped, so that reply didn't finish. Send it again once chat is back.");
+  return { view, urls, restore: () => { globalThis.fetch = original; } };
+}
+
+describe("the details control on a reply the stopped engine never started", () => {
+  test("an owner gets exactly one control, read from the error event without asking the hub, naming the stopped engine", async () => {
+    const { view, urls, restore } = await runStoppedTurn("owner");
+    try {
+      const controls = await view.findAllByRole("button", { name: "Error details" });
+      expect(controls).toHaveLength(1);
+      expect(view.queryByText("Stack said")).toBeNull();
+      fireEvent.click(controls[0]!);
+      expect(await view.findByText("The chat engine was stopped, so the reply never started.")).toBeVisible();
+      expect(view.getByText("Start the chat engine in Repairs.")).toBeVisible();
+      expect(view.getByText("HTTP status").parentElement?.textContent).toContain("503");
+      expect(view.getByText("Model and engine").parentElement?.textContent).toContain("qwen3-8b on local b10797");
+      expect(urls.some((u) => u.includes("/api/turn-error-detail/"))).toBe(false);
+      expect(view.queryByText(/could not be read/)).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a non-admin adult, a teen and a child see the line and no control", async () => {
+    for (const role of ["adult", "teen", "child"] as const) {
+      const { view, urls, restore } = await runStoppedTurn(role);
+      try {
+        fireEvent.mouseEnter(view.container.querySelector('[data-role="assistant"]') ?? view.container);
+        expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
         expect(urls.some((u) => u.includes("/api/turn-error-detail/"))).toBe(false);
       } finally {
         restore();

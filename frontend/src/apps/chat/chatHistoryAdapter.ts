@@ -103,6 +103,17 @@ export function chosenBranchHeadId(rows: ConversationTurnWithMemoryIds[]): strin
  * same anchor as the first two, and the running chain always advances to
  * the newest row either way: whichever version was sent most recently is
  * the conversation's real current path, edit or not. */
+/** Whether a stored row's outcomes (an admin's listing only) hold a failed tool call. */
+function storedToolFailed(outcomes: unknown): boolean {
+  if (typeof outcomes !== "string") return false;
+  try {
+    const parsed = JSON.parse(outcomes) as unknown;
+    return Array.isArray(parsed) && parsed.some((o) => (o as { status?: unknown } | null)?.status === "failed");
+  } catch {
+    return false;
+  }
+}
+
 export function rowsToBranchableMessages(
   rows: ConversationTurnWithMemoryIds[],
   selfName: string,
@@ -226,6 +237,11 @@ export function rowsToBranchableMessages(
           media_items: row.media_items,
           stats: row.stats,
           bare: row.bare,
+          // CHAT-CALM-ERRORS-01c: the reload twin of the live flags the
+          // details control reads. Only an admin's rows carry the raw
+          // generation errors and outcomes, so for anyone else both are false.
+          failedGeneration: row.status === "failed" || Boolean(row.stats?.generations.some((g) => g.error || g.stack_error)),
+          failedTool: storedToolFailed(row.outcomes),
         },
       },
     };

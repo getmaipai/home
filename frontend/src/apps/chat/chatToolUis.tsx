@@ -25,10 +25,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 // the dashboard Button belongs to the surrounding page chrome, not this
 // row.
 import { Button } from "@maipai/ui/src/ui/button";
-import { AdminToolError } from "@/apps/chat/chatToolError";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type StructuredPart, type TurnStats, type ProjectView } from "@/lib/api";
-import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext, AdminContext } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext } from "@/apps/chat/chatThreadContexts";
 import { faviconUrl } from "@/apps/chat/chatThreadSlots";
 
 // SHELL-02 slice 3, the wiring table's "spec-sheet" row: weather's and
@@ -383,20 +382,16 @@ export function toolTimelineRestingLabel(stepCount: number, stats: TurnStats | u
 export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string, never>, TimelineCall[]> = ({ result }) => {
   const [open, setOpen] = useState(false);
   const stats = useAuiState((s) => s.message.metadata?.custom?.stats as TurnStats | undefined);
-  const isAdmin = useContext(AdminContext);
-  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   if (!result?.length) return null;
   const running = result.some((call) => call.state === "running");
-  const failed = isAdmin && !!turnId && result.some((call) => call.state === "error");
+  // CHAT-CALM-ERRORS-01c (design section 10): a failed call's raw details
+  // live in the action bar's one details control (chatThreadSlots.tsx),
+  // never in a box under the timeline.
   return (
-    <div className="flex flex-col items-start gap-2">
-      <div className="flex items-start gap-1">
     <ToolTimeline
       steps={result.map((call) => ({ verb: TIMELINE_VERB[call.state], chip: call.label ?? call.packageId, icon: ToolTimelineIcon, sites: call.sites }))}
       visibleSteps={result.length}
       streaming={running}
-      // `w-auto`: the indicator below sits beside the timeline, not at the end of its full-width box.
-      className={failed ? "w-auto" : undefined}
       open={open}
       onOpenChange={setOpen}
       activeLabel="Working…"
@@ -409,9 +404,6 @@ export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string,
       // function `SourcesFooterContent` below already passes to `SourceIcon`.
       faviconUrl={faviconUrl}
     />
-      </div>
-      {failed ? <AdminToolError turnId={turnId} /> : null}
-    </div>
   );
 };
 

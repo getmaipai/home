@@ -72,6 +72,7 @@ import type {
   PerformanceDisk,
   PersonStorageRow,
   StorageUsageOverview,
+  TurnErrorDetail,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@maipai/home-backend/src/wire";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
@@ -125,13 +126,7 @@ export type ProjectView = Project & { posted_artifact: { id: string; version: nu
 // depends on @maipai/home-backend as a workspace package for this;
 // re-export the types here so the rest of the frontend imports from one
 // place.
-// THIN-1E: mirrors backend/src/lib/turnErrorDetail.ts (hand-copied, like the other admin read shapes: the backend file has "@/"-aliased imports).
-export interface TurnErrorDetail {
-  turn_id: string;
-  tools: { tool_id: string; call_id: string; kind: "unavailable" | "timed_out" | "found_nothing" | "errored" | "bad_arguments"; error_code?: string; error_text?: string; at?: string; duration_ms?: number }[];
-  generations: { reason: string; error: string; request_sent_ms: number; offline_reason?: string }[];
-}
-
+export type { TurnErrorDetail };
 export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
 export type { ReplyFeedback };
 export type { MemoryRecord };

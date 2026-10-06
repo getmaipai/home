@@ -49,6 +49,19 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.metadata!.custom!.turnId).toBe("row-1");
   });
 
+  // CHAT-CALM-ERRORS-01c: a reloaded failed reply is flagged for the one
+  // details control, from what the row itself says (its `failed` status, or
+  // an admin's raw generation error or failed outcome); a clean row is not.
+  test("a reloaded failed row is flagged for the details control; a clean row is not", () => {
+    const failedRow = { ...makeRow("row-1", "The AI was stopped."), status: "failed" } as ConversationTurnWithMemoryIds;
+    const toolRow = { ...makeRow("row-2", "I could not look that up."), outcomes: JSON.stringify([{ callId: "c1", packageId: "websearch", status: "failed" }]) } as unknown as ConversationTurnWithMemoryIds;
+    const cleanRow = { ...makeRow("row-3", "Hello."), status: "done", outcomes: null } as unknown as ConversationTurnWithMemoryIds;
+    const items = flatten(rowsToBranchableMessages([failedRow, toolRow, cleanRow], "Nova", "conv-example123"));
+    expect(items[1]!.message.metadata!.custom).toMatchObject({ failedGeneration: true, failedTool: false });
+    expect(items[3]!.message.metadata!.custom).toMatchObject({ failedGeneration: false, failedTool: true });
+    expect(items[5]!.message.metadata!.custom).toMatchObject({ failedGeneration: false, failedTool: false });
+  });
+
   // Lane 10 item 1: ConversationTurnRow doesn't have `sources` yet
   // (CHAT-16/Session A adds the column) - proves the reload path already
   // carries it forward the moment a row has one, same key

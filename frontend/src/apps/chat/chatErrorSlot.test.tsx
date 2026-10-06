@@ -4,6 +4,10 @@ import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
+import { MemoryRouter } from "react-router-dom";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import type { TurnErrorDetail } from "@/lib/api";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 
@@ -21,12 +25,47 @@ afterEach(() => {
 function Harness({ adapter, admin = false }: { adapter: ChatModelAdapter; admin?: boolean }) {
   const runtime = useLocalRuntime(adapter);
   return (
-    <AssistantRuntimeProvider runtime={runtime}>
-      <AdminContext.Provider value={admin}>
-        <ChatThread />
-      </AdminContext.Provider>
-    </AssistantRuntimeProvider>
+    <MemoryRouter>
+      <AssistantRuntimeProvider runtime={runtime}>
+        <AdminContext.Provider value={admin}>
+          <ChatThread />
+        </AdminContext.Provider>
+      </AssistantRuntimeProvider>
+    </MemoryRouter>
   );
+}
+
+// CHAT-CALM-ERRORS-01c: the detail the hub sends an admin with the stopped
+// engine's error event (backend tests/chatCalmErrors.test.ts proves the hub side).
+const STOPPED_DETAIL: TurnErrorDetail = {
+  turn_id: "turn-stopped1",
+  found: true,
+  advice: { cause: "The chat engine was stopped, so the reply never started.", next_step: "Start the chat engine in Repairs.", repairs: true },
+  tools: [],
+  generations: [{
+    reason: "model",
+    error: "No engine is ready for role 'chat'.",
+    request_sent_ms: 41,
+    offline_reason: "The chat engine was stopped.",
+    http_status: 503,
+    state: "installed",
+    raw_body: '{"error":"No engine is ready for role \'chat\'.","role":"chat","state":"installed","offline_reason":"The chat engine was stopped."}',
+    engine_id: "local b10797",
+    model_id: "qwen3-8b-instruct-q4_k_m.gguf",
+    failed_ms: 44,
+    failed_at: "2026-10-06T06:00:00.000Z",
+  }],
+};
+
+/** The live adapter's shape for an admin's failed turn: the detail lands in
+ * the message metadata, then the error is thrown. */
+function detailThenErrorAdapter(): ChatModelAdapter {
+  return {
+    async *run() {
+      yield { metadata: { custom: { turnId: "turn-stopped1", failureDetail: STOPPED_DETAIL } } };
+      throw new ChatTurnError("The AI was stopped, so that reply didn't finish. Send it again once chat is back.", "engine_unavailable", "turn-stopped1");
+    },
+  };
 }
 
 function failingAdapter(error: Error, onRun = () => {}): ChatModelAdapter {
@@ -62,13 +101,15 @@ async function sendRefusedMessage(view: ReturnType<typeof renderWithQueryClient>
 }
 
 describe("ChatMessageError", () => {
-  test("a completed failed-generation reply shows red error details in its action bar only for admins", async () => {
+  test("a completed failed-generation reply shows a muted error-details control in its action bar only for admins", async () => {
     const adminView = renderWithQueryClient(<Harness adapter={failedDoneAdapter()} admin />);
     fireEvent.change(adminView.getByRole("textbox", { name: "Message input" }), { target: { value: "find all of these" } });
     fireEvent.click(adminView.getByRole("button", { name: "Send message" }));
     const control = await adminView.findByRole("button", { name: "Error details" });
     expect(control).toBeTruthy();
-    expect(control.className).toContain("text-destructive");
+    // CHAT-CALM-ERRORS-01c: muted, never red.
+    expect(control.className).toContain("text-muted-foreground");
+    expect(control.className).not.toContain("text-destructive");
     expect(control.closest(".aui-assistant-action-bar-root")).toBeTruthy();
     expect(control.parentElement?.closest('[data-slot="aui-assistant-message-footer-extra"]')).toBeNull();
     adminView.unmount();
@@ -138,16 +179,114 @@ describe("ChatMessageError", () => {
     await waitFor(() => expect(view.container.textContent).toContain("Recovered."));
   });
 
-  test("an admin sees the error-details control and a non-admin does not", async () => {
-    const error = new ChatTurnError("The reply failed.", "engine_unavailable", "turn-test123");
-    const adminView = renderWithQueryClient(<Harness adapter={failingAdapter(error)} admin />);
+  test("an admin sees one error-details control for an error that carried detail, and a non-admin sees none", async () => {
+    const adminView = renderWithQueryClient(<Harness adapter={detailThenErrorAdapter()} admin />);
     await sendFailingMessage(adminView);
-    expect(adminView.getByRole("button", { name: "Error details" })).toBeTruthy();
+    await waitFor(() => expect(adminView.getAllByRole("button", { name: "Error details" })).toHaveLength(1));
     adminView.unmount();
 
-    const memberView = renderWithQueryClient(<Harness adapter={failingAdapter(error)} />);
+    const memberView = renderWithQueryClient(<Harness adapter={detailThenErrorAdapter()} />);
     await sendFailingMessage(memberView);
     expect(memberView.queryByRole("button", { name: "Error details" })).toBeNull();
+  });
+
+  function stubDetailRoute(body: unknown): { urls: string[]; restore: () => void } {
+    const original = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      urls.push(url);
+      return Promise.resolve(Response.json(body));
+    }) as unknown as typeof fetch;
+    return { urls, restore: () => { globalThis.fetch = original; } };
+  }
+
+  test("an error with nothing to show draws no details control", async () => {
+    const stub = stubDetailRoute({ turn_id: "turn-test123", found: false, tools: [], generations: [] });
+    try {
+      const view = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError("The reply failed.", "engine_unavailable", "turn-test123"))} admin />);
+      await sendFailingMessage(view);
+      await waitFor(() => expect(stub.urls.some((u) => u.includes("/api/turn-error-detail/turn-test123"))).toBe(true));
+      expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
+    } finally {
+      stub.restore();
+    }
+  });
+
+  test("an error with no streamed detail still gets the control when the stored row has facts; a non-admin never asks", async () => {
+    const stub = stubDetailRoute(STOPPED_DETAIL);
+    try {
+      const adminView = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError("The reply failed.", "unavailable", "turn-stopped1"))} admin />);
+      await sendFailingMessage(adminView);
+      expect(await adminView.findAllByRole("button", { name: "Error details" })).toHaveLength(1);
+      adminView.unmount();
+      stub.urls.length = 0;
+      const memberView = renderWithQueryClient(<Harness adapter={failingAdapter(new ChatTurnError("The reply failed.", "unavailable", "turn-stopped1"))} />);
+      await sendFailingMessage(memberView);
+      expect(memberView.queryByRole("button", { name: "Error details" })).toBeNull();
+      expect(stub.urls.some((u) => u.includes("/api/turn-error-detail/"))).toBe(false);
+    } finally {
+      stub.restore();
+    }
+  });
+
+  test("no details box renders until the control is clicked; then it shows the cause, the next step and the raw facts, and Copy takes every row", async () => {
+    const written: string[] = [];
+    const originalClipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: (text: string) => { written.push(text); return Promise.resolve(); } } });
+    try {
+      const view = renderWithQueryClient(<Harness adapter={detailThenErrorAdapter()} admin />);
+      await sendFailingMessage(view);
+      const control = await view.findByRole("button", { name: "Error details" });
+      expect(view.queryByText("Stack said")).toBeNull();
+      expect(view.queryByText("The chat engine was stopped, so the reply never started.")).toBeNull();
+      fireEvent.click(control);
+      expect(await view.findByText("The chat engine was stopped, so the reply never started.")).toBeTruthy();
+      expect(view.getByRole("link", { name: "Start the chat engine in Repairs." }).getAttribute("href")).toBe("/repairs");
+      const row = (label: string) => view.getByText(label).parentElement?.textContent;
+      expect(row("Stack said")).toContain("No engine is ready for role 'chat'.");
+      expect(row("Stack state")).toContain("installed");
+      expect(row("Stack reason")).toContain("The chat engine was stopped.");
+      expect(row("HTTP status")).toContain("503");
+      expect(row("Timing")).toContain("+41 ms");
+      expect(row("Timing")).toContain("+44 ms");
+      expect(row("Model and engine")).toContain("qwen3-8b-instruct-q4_k_m.gguf on local b10797");
+      expect(row("Raw body")).toContain('"state":"installed"');
+      fireEvent.click(view.getByRole("button", { name: "Copy details" }));
+      await waitFor(() => expect(written).toHaveLength(1));
+      for (const line of [
+        "Cause: The chat engine was stopped, so the reply never started.",
+        "Next step: Start the chat engine in Repairs.",
+        "What failed: engine",
+        "Stack said: No engine is ready for role 'chat'.",
+        "Stack state: installed",
+        "Stack reason: The chat engine was stopped.",
+        "HTTP status: 503",
+        "Timing: request sent at +41 ms, failed at +44 ms, 2026-10-06T06:00:00.000Z",
+        "Model and engine: qwen3-8b-instruct-q4_k_m.gguf on local b10797",
+      ]) expect(written[0]).toContain(line);
+      expect(written[0]).toContain("Raw body: {");
+    } finally {
+      if (originalClipboard) Object.defineProperty(navigator, "clipboard", originalClipboard);
+      else delete (navigator as unknown as { clipboard?: unknown }).clipboard;
+    }
+  });
+
+  test("the old 'could not be read' strings are gone from the frontend", () => {
+    const root = join(import.meta.dir, "../..");
+    const hits: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) walk(path);
+        else if (/\.(ts|tsx)$/.test(name) && !name.includes(".test.")) {
+          const text = readFileSync(path, "utf8");
+          if (text.includes("could not be read")) hits.push(path);
+        }
+      }
+    };
+    walk(root);
+    expect(hits).toEqual([]);
   });
 
   test("the error panel never shows the code or the engine's raw text", async () => {
