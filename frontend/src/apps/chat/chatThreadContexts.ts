@@ -120,6 +120,7 @@ export const ModelPickerContext = createContext<{
   value: string | undefined;
   setValue: (model: string) => void;
 }>({ models: [], value: undefined, setValue: () => {} });
+export const ModelChoiceAllowedContext = createContext(false);
 
 /** ADMIN-COMPARE-01 (b): the compare-with-bare-model switch, a
  * conversation-wide sibling to feature (a)'s one-message

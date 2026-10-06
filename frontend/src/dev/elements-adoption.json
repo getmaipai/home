@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T20:46:34.984Z",
+  "generatedAt": "2026-10-06T20:53:50.623Z",
   "kitTag": "ui-v0.5.119",
   "items": [
     {
@@ -930,7 +930,7 @@
       "group": "message",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "research-report.tsx",
