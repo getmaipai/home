@@ -1,11 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import { THREAD_SLOTS } from "@/apps/chat/elementBindings";
 import { holdCitationTail, preprocessChatMarkdown } from "@/apps/chat/chatStreamingMarkdown";
+import { STREAMING_TEXT_ANIMATION } from "@maipai/ui/src/elements/markdown-text";
 
 describe("chat streaming markdown", () => {
   test("the Home slot delegates link completion to Streamdown through the kit", () => {
     expect(THREAD_SLOTS.markdown.remend).toEqual({ links: false, linkMode: "text-only" });
     expect(THREAD_SLOTS.markdown.preprocess).toBe(preprocessChatMarkdown);
+  });
+
+  test("the chat reply streams with the kit's streaming-text look, not the old 150 ms fade", () => {
+    // STREAMING-TEXT-01: the pinned kit names the Element-look keyframe; Home
+    // passes no animation of its own through the markdown slot.
+    expect(STREAMING_TEXT_ANIMATION).toEqual({ animation: "streamingText", duration: 500 });
+    expect(Object.keys(THREAD_SLOTS.markdown).sort()).toEqual(["components", "preprocess", "remend"]);
   });
 
   test("only a trailing partial numeric citation is held", () => {

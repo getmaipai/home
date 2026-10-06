@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T19:32:10.797Z",
-  "kitTag": "ui-v0.5.110",
+  "generatedAt": "2026-10-06T19:48:19.862Z",
+  "kitTag": "ui-v0.5.112",
   "items": [
     {
       "file": "activity-graph.tsx",
@@ -842,9 +842,10 @@
       "file": "streaming-text.tsx",
       "name": "streaming-text",
       "group": "message",
-      "verdict": "no-fit",
+      "verdict": "support",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": false
+      "implemented": false,
+      "reading": "STREAMING-TEXT-01: its look (word fades in blue over 500 ms, settles to ink over 700 ms, pulsing blue caret) is the chat reply's streaming animation, drawn by CSS transitions in markdown-text.css on Streamdown's word spans and caret prop inside MarkdownText (ui-v0.5.112). The Element itself renders one plain <p> that drops line breaks and has no markdown, so it cannot be the reply renderer and Home never imports it; the scan reads it as not implemented. It tints the newest two words by position; here a word is tinted until the next delta restamps it."
     },
     {
       "file": "subagent-list.tsx",
