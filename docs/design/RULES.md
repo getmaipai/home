@@ -173,15 +173,22 @@ wins.
 
 Record: the owner's rule of 2026-10-04 (his words are the record: "that
 column collapses to a rail; everything to the right of it should look and
-feel like the native app we are emulating").
+feel like the native app we are emulating"), and his chat shell layout spec of
+2026-10-06, which makes the rail a permanent 56 px icon rail that never
+expands (S1 below).
 
 Governs: frontend/src/next/**, frontend/src/apps/**
 
 S1. **The main navigation is permanent.** The column that lists the apps
-    (Home, Chat, Library, Family, Settings and Help today; more apps later)
-    is present on every page at every width and collapses to an icon rail.
-    It is never removed, hidden or merged into an app, and app content
-    (thread lists, filters, sub-navigation) never lives inside it.
+    (Home, Chat, Library, Family today; more apps later) is present on
+    every page at every width as a fixed 56 px icon rail. It never
+    expands, has no labels or fold control, and names each icon through
+    its accessible name and a tooltip. It holds the brand, global Search,
+    the app icons and, pinned at its bottom, the profile control whose
+    menu holds Notifications, System status, Incognito, Settings, Help and
+    Log out (owner-approved 2026-10-06). It is never removed, hidden or
+    merged into an app, and app content (thread lists, filters,
+    sub-navigation) never lives inside it.
 S2. **Each app area emulates its native app.** Everything to the right of
     the rail looks and feels like the app it copies, with that app's own
     layout intact: chat is ChatGPT's layout, including its own history
