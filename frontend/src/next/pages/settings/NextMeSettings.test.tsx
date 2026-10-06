@@ -31,8 +31,10 @@ function setup(role: Roster["role"], initialUrl = "/settings", telegramChatId = 
   const values: ResolvedSetting[] = registry.map((key) => ({ key: key.key, value: key.key === "notifications.telegram.chat_id" ? telegramChatId : key.default ?? "sample", source: "default", label: key.label, help: key.help, level: key.level, secret: key.secret }));
   const originalFetch = globalThis.fetch;
   const patches: unknown[] = [];
+  const settingWrites: string[] = [];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/settings") && init?.method && init.method !== "GET") settingWrites.push(`${init.method} ${url}`);
     if (url.endsWith(`/api/people/${makePerson(role).id}`) && init?.method === "PATCH") { const body = JSON.parse(String(init.body)); patches.push(body); return Promise.resolve(Response.json({ ...makePerson(role), display_name: body.displayName ?? "Nova" })); }
     if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
@@ -41,7 +43,7 @@ function setup(role: Roster["role"], initialUrl = "/settings", telegramChatId = 
   }) as unknown as typeof fetch;
   function Location() { const [params] = useSearchParams(); return <output data-testid="section-param">{params.get("section") ?? ""}</output>; }
   const view = renderWithQueryClient(<MemoryRouter initialEntries={[initialUrl]}><NextMeSettings person={makePerson(role)} /><Location /></MemoryRouter>);
-  return { ...view, patches, restore: () => { globalThis.fetch = originalFetch; } };
+  return { ...view, patches, settingWrites, restore: () => { globalThis.fetch = originalFetch; } };
 }
 
 describe("NextMeSettings", () => {
@@ -82,6 +84,15 @@ describe("NextMeSettings", () => {
         }
         await waitFor(() => expect(document.getElementById(`settings-${group}`)).not.toBeNull());
       }
+    } finally { restore(); }
+  });
+
+  test("Appearance offers a device-only override and reset without writing the setting", async () => {
+    const { restore, getByRole, getByText, settingWrites } = setup("adult", "/settings?section=appearance");
+    try {
+      await waitFor(() => expect(getByText("On this device only")).toBeTruthy());
+      fireEvent.click(getByRole("button", { name: "Reset device appearance" }));
+      expect(settingWrites).toEqual([]);
     } finally { restore(); }
   });
 

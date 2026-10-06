@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTheme } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
 import { api, type ResolvedSetting } from "@/lib/api";
 import { readShellNextCache, writeShellNextCache } from "@/next/shellNextCache";
-import { pickAppearance, resolveDark, type Appearance } from "@/next/appearanceResolve";
+import { pickAppearance, resolveAppearance, resolveDark, type Appearance } from "@/next/appearanceResolve";
+import { readDeviceAppearancePreference, subscribeDeviceAppearancePreference } from "@/next/deviceAppearancePreference";
 
 /** `ui.appearance` (person scope, backend/src/settings/uiKeys.ts) fed
  * into the vendored template's own ThemeProvider on `/`
@@ -56,6 +57,9 @@ export function useNextAppearance(personId: string): void {
   // that simply hadn't landed yet, and PUT that stale value over the
   // real setting before ever reading it.
   const appearance: Appearance | undefined = pickAppearance(query.data);
+  const [deviceAppearance, setDeviceAppearance] = useState<Appearance | null>(() => readDeviceAppearancePreference());
+  useEffect(() => subscribeDeviceAppearancePreference(() => setDeviceAppearance(readDeviceAppearancePreference())), []);
+  const effectiveAppearance = appearance === undefined ? undefined : resolveAppearance(appearance, deviceAppearance);
 
   const { theme, setTheme } = useTheme();
   // The last setting value this hook itself synced the provider to -
@@ -71,14 +75,14 @@ export function useNextAppearance(personId: string): void {
   const syncedTo = useRef<Appearance | undefined>(undefined);
 
   useEffect(() => {
-    if (appearance === undefined) return;
+    if (effectiveAppearance === undefined) return;
 
-    if (appearance !== syncedTo.current) {
+    if (effectiveAppearance !== syncedTo.current) {
       // The setting moved (first load, a change elsewhere, or our own
       // write echoing back through the cache) - seed the provider,
       // never treat this pass as a toggle to write back.
-      syncedTo.current = appearance;
-      if (theme !== appearance) setTheme(appearance);
+      syncedTo.current = effectiveAppearance;
+      if (theme !== effectiveAppearance) setTheme(effectiveAppearance);
       return;
     }
 
@@ -89,7 +93,7 @@ export function useNextAppearance(personId: string): void {
     // cache the same way SettingsRenderer's own successful writes do
     // (ui/src/settings/SettingsRenderer.tsx) so this effect sees its
     // own write on the next pass instead of racing a refetch.
-    if (theme === appearance) return;
+    if (deviceAppearance !== null || theme === effectiveAppearance) return;
     api
       .setSetting(scopeValue, "ui.appearance", theme)
       .then((updated: ResolvedSetting) => {
@@ -101,16 +105,16 @@ export function useNextAppearance(personId: string): void {
         // The provider's own class change already applied optimistically;
         // a failed write just means it doesn't persist past this session.
       });
-  }, [theme, appearance, scopeValue, queryClient, setTheme]);
+  }, [theme, effectiveAppearance, scopeValue, queryClient, setTheme]);
 
   // Paint the resolved appearance on the document and cache it so the
   // root shell's palette is correct before React mounts on reload.
   const cached = readShellNextCache();
   useEffect(() => {
-    if (appearance === undefined) return;
-    const dark = resolveDark(appearance, window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (effectiveAppearance === undefined) return;
+    const dark = resolveDark(effectiveAppearance, window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
     document.documentElement.classList.toggle("light", !dark);
     writeShellNextCache({ look: cached?.look ?? "neutral", dark });
-  }, [appearance, cached?.look]);
+  }, [effectiveAppearance, cached?.look]);
 }

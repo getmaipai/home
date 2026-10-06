@@ -37,3 +37,8 @@ export function pickAppearance(values: { key: string; value: unknown }[] | undef
   const found = values.find((v) => v.key === "ui.appearance")?.value;
   return isAppearance(found) ? found : "system";
 }
+
+/** Device preference wins when present; `null` means use the person's setting. */
+export function resolveAppearance(person: Appearance, device: Appearance | null): Appearance {
+  return device ?? person;
+}

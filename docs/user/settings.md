@@ -18,6 +18,7 @@ Switch to the **Me** tab for your own personal preferences:
 
 - **Appearance**, **Personality**, **Voice**: how MaiPai looks and sounds when it talks to you.
 - **Look**: pick the color scheme of the whole app. Neutral is the standard look, black and white, the same as the design it comes from. Navy is MaiPai's own blue-black set. The other six are ready-made color sets (Stone, Zinc, Mauve, Olive, Mist, Taupe). Light and dark mode both follow whichever one you pick.
+- **On this device only**: choose a light, dark, or system appearance for this browser. This device choice takes precedence over your personal Appearance setting; reset it to use your personal setting again. It is stored only in this browser and is not synced.
 - **My notifications**: how you're notified. This includes linking your own Telegram chat.
 - **Voices**: browse and pick a speaking voice, or clone your own.
 - **PIN / password**: change how you sign in.

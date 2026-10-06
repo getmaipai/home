@@ -6,8 +6,13 @@ import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer
 import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { api, type PersonRosterEntry, type Roster } from "@/lib/api";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SettingsSectionFrame, type SettingsSection } from "@/next/pages/settings/SettingsSectionFrame";
+import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
+import { readDeviceAppearancePreference, writeDeviceAppearancePreference } from "@/next/deviceAppearancePreference";
+import { isAppearance, type Appearance } from "@/next/appearanceResolve";
 
 const telegramNotificationKeys = ["notifications.telegram.chat_id", ...["approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available", "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated", "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available"].map((key) => `notifications.${key}.telegram`)];
 
@@ -28,6 +33,7 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
     if (id === "appearance") {
       return <>
         <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.appearance", "ui.look"]} />
+        <DeviceAppearanceControl />
         <Collapsible>
           <Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Advanced<span aria-hidden>⌄</span></CollapsibleTrigger></CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.show_turn_stats"]} /></CardContent></CollapsibleContent></Card>
         </Collapsible>
@@ -48,6 +54,20 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
     render: renderSection(item.id),
   }));
   return <SettingsSectionFrame sections={content} defaultSection="profile" />;
+}
+
+function DeviceAppearanceControl() {
+  const [value, setValue] = useState<Appearance | null>(() => readDeviceAppearancePreference());
+  const registry = useQuery<SettingsKey[]>({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry(), staleTime: Infinity });
+  const declaration = registry.data?.find((item) => item.key === "ui.appearance");
+  const options = ((declaration?.range as { options?: string[] } | undefined)?.options ?? []).filter(isAppearance);
+  return <Card><CardHeader><CardTitle>On this device only</CardTitle><CardDescription>Choose a look for this browser. It does not change your personal setting.</CardDescription></CardHeader><CardContent className="flex flex-wrap items-center gap-3">
+    <Select value={value ?? "inherit"} onValueChange={(next) => { const appearance = next === "inherit" ? null : isAppearance(next) ? next : null; setValue(appearance); writeDeviceAppearancePreference(appearance); }}>
+      <SelectTrigger className="min-h-12 w-48" aria-label="On this device only"><SelectValue /></SelectTrigger>
+      <SelectContent><SelectItem value="inherit">Use my setting</SelectItem>{options.map((option) => <SelectItem key={option} value={option}>{option[0]!.toUpperCase() + option.slice(1)}</SelectItem>)}</SelectContent>
+    </Select>
+    <Button type="button" variant="outline" className="min-h-12" aria-label="Reset device appearance" onClick={() => { setValue(null); writeDeviceAppearancePreference(null); }}>Reset</Button>
+  </CardContent></Card>;
 }
 
 function NotificationSettings({ person }: { person: Roster }) {
