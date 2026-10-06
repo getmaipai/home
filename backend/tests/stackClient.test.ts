@@ -157,6 +157,8 @@ const ROUTES: Array<[string, string, (body: unknown, form: FormData | null) => {
       },
     }),
   ],
+  ["/stack/v1/search/preview", "GET", () => ({ status: 200, body: { diff: ["search.formats: [html, json]"] } })],
+  ["/stack/v1/search/revert", "POST", () => ({ status: 200, body: { reverted: true } })],
   [
     "/stack/v1/settings/apply",
     "POST",
@@ -478,6 +480,8 @@ describe("createStackClient", () => {
     expect(((await client.healthFix("engine.crashed.chat")) as { ok: boolean }).ok).toBe(true);
     expect((await client.settings()).settings[0]!.key).toBe("stack.jobs.max");
     expect(((await client.applySettings({ "stack.jobs.max": 2 })) as { settings: Array<{ in_effect: unknown }> }).settings[0]!.in_effect).toBe(2);
+    expect((await client.searchPreview()).diff).toEqual(["search.formats: [html, json]"]);
+    expect(await client.searchRevert()).toEqual({ reverted: true });
     expect((await client.budget()).pressure).toBe("normal");
     expect(((await client.hardware()) as { hardware: { isAppleSilicon: boolean } }).hardware.isAppleSilicon).toBe(true);
     expect(((await client.updates()) as { checksEnabled: boolean }).checksEnabled).toBe(true);
