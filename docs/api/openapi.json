@@ -12281,7 +12281,7 @@
             }
           },
           "409": {
-            "description": "The model is not verified",
+            "description": "The Stack rejected an unverified setting",
             "content": {
               "application/json": {
                 "schema": {
@@ -12365,7 +12365,7 @@
             }
           },
           "409": {
-            "description": "The model is not verified",
+            "description": "The Stack rejected an unverified setting",
             "content": {
               "application/json": {
                 "schema": {
@@ -12449,7 +12449,7 @@
             }
           },
           "409": {
-            "description": "The model is not verified",
+            "description": "The Stack rejected an unverified setting",
             "content": {
               "application/json": {
                 "schema": {
@@ -12567,7 +12567,7 @@
             }
           },
           "409": {
-            "description": "The model is not verified",
+            "description": "The Stack rejected an unverified setting",
             "content": {
               "application/json": {
                 "schema": {
@@ -12719,7 +12719,7 @@
             }
           },
           "409": {
-            "description": "The model is not verified",
+            "description": "The Stack rejected an unverified setting",
             "content": {
               "application/json": {
                 "schema": {
@@ -12814,7 +12814,7 @@
             }
           },
           "409": {
-            "description": "The model is not verified",
+            "description": "The Stack rejected an unverified setting",
             "content": {
               "application/json": {
                 "schema": {
@@ -13441,7 +13441,7 @@
             }
           },
           "409": {
-            "description": "The model is not verified",
+            "description": "The Stack rejected an unverified setting",
             "content": {
               "application/json": {
                 "schema": {
@@ -13704,7 +13704,7 @@
             }
           },
           "409": {
-            "description": "The model is not verified",
+            "description": "The Stack rejected an unverified setting",
             "content": {
               "application/json": {
                 "schema": {
@@ -13813,7 +13813,7 @@
             }
           },
           "409": {
-            "description": "The model is not verified",
+            "description": "The Stack rejected an unverified setting",
             "content": {
               "application/json": {
                 "schema": {
@@ -24134,6 +24134,523 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/instance": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Check the household SearXNG configuration",
+        "description": "Owner/admin only. The address, engine list and check details are household operational information.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "required": false,
+            "name": "refresh",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The latest check results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "off",
+                        "owner",
+                        "stack"
+                      ]
+                    },
+                    "checkedAt": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "pass",
+                              "warn",
+                              "fail",
+                              "unknown"
+                            ]
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "fix": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "state",
+                          "detail",
+                          "fix"
+                        ]
+                      }
+                    },
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "enabledEngines": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "pass",
+                              "warn",
+                              "fail",
+                              "unknown"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "enabledEngines",
+                          "state"
+                        ]
+                      }
+                    },
+                    "engineErrors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "percentage": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "percentage"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "checkedAt",
+                    "version",
+                    "checks",
+                    "groups",
+                    "engineErrors"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin may check SearXNG",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "A manual refresh was requested during its cooldown.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "retryAfterSeconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "retryAfterSeconds"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/instance/snippet": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Get the SearXNG settings snippet for the failing checks",
+        "description": "Owner/admin only. Returns only recommended settings for an owner-run SearXNG; never includes its address or secret key.",
+        "responses": {
+          "200": {
+            "description": "Recommended changes for settings.yml and, when needed, limiter.toml.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "settingsYml": {
+                      "type": "string"
+                    },
+                    "limiterToml": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "settingsYml",
+                    "limiterToml"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin may view the snippet",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No owner-run SearXNG is configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/instance/preview": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Preview pending Stack-owned SearXNG settings",
+        "responses": {
+          "200": {
+            "description": "The Stack search settings operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin may change Stack search settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Stack-owned search is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Stack rejected an unverified setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/instance/apply": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Apply pending Stack-owned SearXNG settings",
+        "responses": {
+          "200": {
+            "description": "The Stack search settings operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin may change Stack search settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Stack-owned search is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Stack rejected an unverified setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/instance/revert": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Undo applied Stack-owned SearXNG settings",
+        "responses": {
+          "200": {
+            "description": "The Stack search settings operation result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin may change Stack search settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Stack-owned search is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Stack rejected an unverified setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
             "content": {
               "application/json": {
                 "schema": {

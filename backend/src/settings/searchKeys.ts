@@ -23,10 +23,10 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     scope: "household",
     selector: "text",
     default: "",
-    label: "SearXNG URL",
-    help: "The address of a SearXNG instance you run, e.g. http://localhost:8080. Web search is off until this is set - MaiPai never scrapes a search engine directly.",
+    label: "Your own SearXNG (optional)",
+    help: "Your own SearXNG (optional). Leave empty to use the search service MaiPai runs for you.",
     level: "advanced",
-    lives_in: "household.integrations",
+    lives_in: "household.search",
     honoured_by: ["home"],
   }),
   // SEARCH-FALLBACK-01 (docs/plans/search-resilience-2026-09-24.md):
@@ -45,7 +45,7 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     label: "Ask Wikipedia when web search fails or finds nothing",
     help: "When your SearXNG instance is down or a search comes back empty, MaiPai asks Wikipedia's own official API instead - covers people, shows, places, products and history. On by default whenever web search is set up; turn it off here if you don't want it.",
     level: "advanced",
-    lives_in: "household.integrations",
+    lives_in: "household.search",
     honoured_by: ["home"],
   }),
   // SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): a real per-person
