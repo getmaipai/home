@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T18:41:02.605Z",
-  "kitTag": "ui-v0.5.109",
+  "generatedAt": "2026-10-06T18:45:59.050Z",
+  "kitTag": "ui-v0.5.110",
   "items": [
     {
       "file": "activity-graph.tsx",
@@ -192,6 +192,13 @@
       "name": "data-table",
       "group": "charts/data",
       "verdict": "wire-after",
+      "implemented": false
+    },
+    {
+      "file": "day-separator.test.tsx",
+      "name": "day-separator.test",
+      "group": "day",
+      "verdict": "support",
       "implemented": false
     },
     {

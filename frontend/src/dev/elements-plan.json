@@ -453,6 +453,22 @@
       "realTurnToday": true
     },
     {
+      "file": "day-separator.test.tsx",
+      "name": "day-separator.test",
+      "group": "day",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
+    },
+    {
       "file": "day-separator.tsx",
       "name": "day-separator",
       "group": "message",
