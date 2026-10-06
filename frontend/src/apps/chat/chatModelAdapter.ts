@@ -77,6 +77,8 @@ export interface ChatModelAdapterDeps {
   /** Session-local model selected in /next/chat; read once so a reconnect
    * retries the same model even if the composer changes meanwhile. */
   getModel?(): string | undefined;
+  /** Age band for the signed-in person; per-message model choice is adults-only. */
+  getAgeBand?(): "adult" | "teen" | "child" | undefined;
   // ADMIN-COMPARE-01 (b): a plain read, never consumed/reset - unlike
   // `consumeThinking()`, bare mode is meant to stay on across every send
   // in the conversation until the admin turns it off themselves
@@ -194,7 +196,7 @@ function isStoredPicture(attachment: { file?: File; content?: readonly { type: s
 
 export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAdapter {
   return {
-    async *run({ messages, abortSignal }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
+    async *run({ messages, abortSignal, runConfig }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
       deps.onDraftSent?.();
       const lastMessage = messages[messages.length - 1];
       // UPLOAD-IMG-02: only a picture picked in this session (it still holds
@@ -348,9 +350,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // conversation setting; the old ChatPage fallback consumes its
           // one-message action.
           const thinking = deps.getThinking ? deps.getThinking() : deps.consumeThinking?.();
+          const perRunModel = (runConfig as { custom?: { model?: unknown } } | undefined)?.custom?.model;
+          const runModel = deps.getAgeBand?.() === "adult" && typeof perRunModel === "string" ? perRunModel : undefined;
           const response = await (deps.openStream?.(text ?? "", abortSignal) ?? api.streamTurn(text ?? (imageAttached ? "Please look at the attached picture." : "Please read the attached document."), abortSignal, {
             thinking: reconnectAttempts === 0 && !bare ? thinking : undefined,
-            model: !bare ? selectedModel : undefined,
+            model: !bare ? (runModel ?? selectedModel) : undefined,
             // `undefined`, not `false`, when a surface has no bare-mode
             // concept at all (ChatPage.tsx's own adapter never sets
             // isBareMode) - `false` would still ride the request body

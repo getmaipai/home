@@ -100,6 +100,35 @@ function lastText(yields: ChatModelRunResult[]): string | undefined {
 
 const SAFETY = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: "2026-09-04T00:00:00.000Z" };
 
+describe("regenerate model override", () => {
+  async function runWithBand(ageBand: "adult" | "child" | "teen") {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "done", value: { turn_id: "turn-regen", reply: { text: "Again." }, source: "model", safety: SAFETY } },
+    ]));
+    try {
+      const adapter = createChatModelAdapter({
+        consumeThinking: () => false,
+        consumeSupersedes: () => undefined,
+        onCrisisResources: () => {},
+        turnSchedulerRef: { current: null },
+        getModel: () => "composer-model",
+        getAgeBand: () => ageBand,
+      });
+      const messages = [fakeUserMessage("hi")];
+      const options = { messages, runConfig: { custom: { model: "regenerated-model" } }, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0] } as unknown as ChatModelRunOptions;
+      for await (const _ of runAdapter(adapter, options)) { /* drain */ }
+      return env.turnBodies[0] as { model?: string };
+    } finally { env.restore(); }
+  }
+
+  test("uses the regenerate Element's per-run model for an adult", async () => {
+    expect(await runWithBand("adult")).toMatchObject({ model: "regenerated-model" });
+  });
+  test.each(["child", "teen"] as const)("ignores per-run model choice for a %s", async (band) => {
+    expect(await runWithBand(band)).toMatchObject({ model: "composer-model" });
+  });
+});
+
 describe("stripThinking", () => {
   test("removes a <think> block ahead of the real answer", () => {
     expect(stripThinking("<think>let me work this out</think>The answer is 42.")).toBe("The answer is 42.");

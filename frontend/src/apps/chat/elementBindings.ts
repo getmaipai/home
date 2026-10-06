@@ -32,6 +32,7 @@ import {
   MessageFooterExtra,
   NextChatWelcome,
   NextReasoningGroup,
+  RegenerateAction,
   FailedTurnActionBarExtras,
 } from "@/apps/chat/chatThreadSlots";
 import { ChatMessageError } from "@/apps/chat/chatErrorSlot";
