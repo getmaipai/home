@@ -1054,6 +1054,8 @@ export const deviceStates = sqliteTable("device_states", {
   daemonVersion: text("daemon_version"),
   // ROBOT-UPDATES-01: the MaiPai app version the robot runs (spec-v0.1.57).
   appVersion: text("app_version"),
+  motion: text("motion"),
+  putDownCount: integer("put_down_count"),
   reportedAt: text("reported_at").notNull(),
 });
 

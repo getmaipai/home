@@ -1,6 +1,7 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { DevicesSection } from "@/apps/settings/DevicesSection";
+import { didPutDownCountIncrease } from "@/apps/settings/RobotCard";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { DeviceInfo, SessionInfo } from "@/lib/api";
 
@@ -65,6 +66,12 @@ function stubFetch(
 }
 
 describe("DevicesSection", () => {
+  test("put-down change detection requires an increase between two reads", () => {
+    expect(didPutDownCountIncrease(undefined, 1)).toBe(false);
+    expect(didPutDownCountIncrease(1, 1)).toBe(false);
+    expect(didPutDownCountIncrease(2, 1)).toBe(false);
+    expect(didPutDownCountIncrease(1, 2)).toBe(true);
+  });
   test("empty devices and sessions say so, not a blank page", async () => {
     const restore = stubFetch([], []);
     try {
@@ -190,6 +197,22 @@ describe("DevicesSection", () => {
       const { findByText } = renderSection();
       await findByText("Reconnecting");
       await findByText("Sleeping");
+    } finally {
+      restore();
+    }
+  });
+
+  test("held robots show a plain carrying label", async () => {
+    const restore = stubFetch([device({
+      kind: "robot",
+      name: "Reachy",
+      state: { activity: "idle", muted: false, tracking: true, motion: "held", put_down_count: 1, reachable: true, unreachableSince: null },
+    })], []);
+    try {
+      const { findByText, findByTestId } = renderSection();
+      await findByText("Being carried");
+      const card = await findByTestId("robot-card");
+      expect(card.textContent).not.toContain("Reachy was moved.");
     } finally {
       restore();
     }

@@ -32,6 +32,10 @@ export class TestClient {
     return this.request(path, { method: "POST", body: body ?? {}, headers });
   }
 
+  put(path: string, body?: unknown, headers?: Record<string, string>) {
+    return this.request(path, { method: "PUT", body: body ?? {}, headers });
+  }
+
   // For multipart uploads (voice.test.ts's cloned-voice tests): the plain
   // request() above always JSON-encodes `body`, which would turn a real
   // FormData into "{}". fetch sets its own multipart boundary header from

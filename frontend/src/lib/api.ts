@@ -208,6 +208,8 @@ export interface RobotDeviceState {
   battery_level?: number | null;
   daemon_version?: string | null;
   app_version?: string | null;
+  motion?: RobotState["motion"];
+  put_down_count?: number;
   reachable: boolean;
   unreachableSince: string | null;
 }

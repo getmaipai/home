@@ -36,6 +36,8 @@ const DeviceSchema = z.object({
     battery_level: z.number().nullable(),
     daemon_version: z.string().nullable(),
     app_version: z.string().nullable(),
+    motion: RobotState.shape.motion,
+    put_down_count: RobotState.shape.put_down_count,
     reachable: z.boolean(),
     unreachableSince: z.string().nullable(),
   }).nullable(),

@@ -37,6 +37,8 @@ export function upsertDeviceState(deviceId: string, frame: RobotStateFrame): voi
     batteryLevel: parsed.battery_level ?? null,
     daemonVersion: parsed.daemon_version ?? null,
     appVersion: parsed.app_version ?? null,
+    motion: parsed.motion ?? null,
+    putDownCount: parsed.put_down_count ?? null,
     reportedAt: now,
   };
   db.insert(deviceStates).values(values).onConflictDoUpdate({
@@ -49,6 +51,8 @@ export function upsertDeviceState(deviceId: string, frame: RobotStateFrame): voi
       batteryLevel: values.batteryLevel,
       daemonVersion: values.daemonVersion,
       appVersion: values.appVersion,
+      motion: values.motion,
+      putDownCount: values.putDownCount,
       reportedAt: values.reportedAt,
     },
   }).run();
@@ -75,6 +79,8 @@ export function getDeviceState(deviceId: string): DeviceState | null {
     battery_level: row.batteryLevel,
     daemon_version: row.daemonVersion,
     app_version: row.appVersion,
+    motion: (row.motion as RobotStateFrame["motion"]) ?? null,
+    put_down_count: row.putDownCount ?? undefined,
     reachable,
     unreachableSince: reachable ? null : row.reportedAt,
   };

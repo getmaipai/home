@@ -14535,6 +14535,38 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "motion": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "resting"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "held"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
+                          },
+                          "put_down_count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "How many times the robot has been put down since it started, a non-negative running count the hub can compare between frames. Omission means the producer does not yet report this field."
+                          },
                           "reachable": {
                             "type": "boolean"
                           },
@@ -14663,6 +14695,38 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "motion": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "resting"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "held"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
+                          },
+                          "put_down_count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "How many times the robot has been put down since it started, a non-negative running count the hub can compare between frames. Omission means the producer does not yet report this field."
+                          },
                           "reachable": {
                             "type": "boolean"
                           },
@@ -14784,6 +14848,38 @@
                       }
                     ],
                     "description": "The robot daemon version, when available, so the hub can display which software is running. Null means no version is currently known; omission means the producer does not yet report this field."
+                  },
+                  "motion": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "resting"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "held"
+                        ]
+                      },
+                      {
+                        "type": "object",
+                        "nullable": true,
+                        "enum": [
+                          null
+                        ]
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
+                  },
+                  "put_down_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "How many times the robot has been put down since it started, a non-negative running count the hub can compare between frames. Omission means the producer does not yet report this field."
                   },
                   "app_version": {
                     "anyOf": [

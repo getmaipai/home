@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -25,6 +26,10 @@ function batteryText(state: RobotDeviceState): string {
   if (state.on_battery === true) return "On battery, level unknown";
   if (state.on_battery === false) return "Plugged in";
   return "Level unknown";
+}
+
+export function didPutDownCountIncrease(previous: number | undefined, next: number | undefined): boolean {
+  return previous !== undefined && next !== undefined && next > previous;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -56,8 +61,18 @@ export function RobotCard({
   busy: boolean;
 }) {
   const state = device.state ?? null;
+  const lastPutDownCount = useRef<number | undefined>(state?.put_down_count);
+  const [putDownChanged, setPutDownChanged] = useState(false);
+  useEffect(() => {
+    const nextCount = state?.put_down_count;
+    if (didPutDownCountIncrease(lastPutDownCount.current, nextCount)) {
+      setPutDownChanged(true);
+    }
+    if (nextCount !== undefined) lastPutDownCount.current = nextCount;
+  }, [state?.put_down_count]);
   const unreachable = state !== null && !state.reachable;
   const status = state === null ? "Waiting for first report" : unreachable ? "Not responding" : ACTIVITY_LABELS[state.activity];
+  const motion = state?.motion ?? null;
   const battery = state?.battery_level;
   return (
     <Card data-testid="robot-card">
@@ -80,6 +95,12 @@ export function RobotCard({
             ) : null}
             <Row label="Microphone">{state.muted ? "Muted" : "On"}</Row>
             <Row label="Tracking">{state.tracking ? "On" : "Off"}</Row>
+            {motion === "held" ? <p className="text-sm font-medium">Being carried</p> : null}
+            {putDownChanged ? (
+              <p className="text-sm text-muted-foreground">
+                {device.area ? `${device.name} was moved: is it still in ${device.area}?` : `${device.name} was moved.`}
+              </p>
+            ) : null}
             <Row label="Battery">{batteryText(state)}</Row>
             {battery !== null && battery !== undefined ? (
               <Progress value={Math.round(battery * 100)} aria-label="Battery level" />

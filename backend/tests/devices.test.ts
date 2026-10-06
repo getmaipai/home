@@ -3,7 +3,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { startFakeSshd } from "./fixtures/fakeSshd";
 import { issueDeviceToken } from "@/lib/deviceTokens";
-import { hasRotatedRobotCredential, getRobotCredential } from "@/lib/robotCredentials";
+import { hasRotatedRobotCredential, getRobotCredential, storeRobotCredential } from "@/lib/robotCredentials";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -34,6 +34,38 @@ describe("GET /api/devices", () => {
     expect(body).toHaveLength(1);
     expect(body[0]!.name).toBe("Living room TV");
     expect(body[0]!.kind).toBe("tv");
+  });
+});
+
+describe("PUT /api/devices/me/state", () => {
+  test("accepts spec motion fields and returns them from the device projection", async () => {
+    const { client, personId } = await owner();
+    const { deviceId, token } = issueDeviceToken(personId, "robot", "Reachy");
+    storeRobotCredential(deviceId, "test-host", "pollen", "rotated-test-password");
+    const robot = new TestClient();
+    await robot.post("/api/auth/devices/redeem", { token });
+    const response = await robot.put("/api/devices/me/state", {
+      activity: "idle", muted: false, tracking: true, motion: "held", put_down_count: 3,
+    });
+    expect(response.status).toBe(204);
+    const state = (await client.get("/api/devices").then((r) => r.json()) as Array<{ id: string; state: { motion: string | null; put_down_count?: number } }>).find((d) => d.id === deviceId)?.state;
+    expect(state?.motion).toBe("held");
+    expect(state?.put_down_count).toBe(3);
+  });
+
+  test("accepts null motion and frames that omit both new fields", async () => {
+    const { personId } = await owner();
+    const { deviceId, token } = issueDeviceToken(personId, "robot", "Reachy");
+    storeRobotCredential(deviceId, "test-host", "pollen", "rotated-test-password");
+    const robot = new TestClient();
+    const redeemed = await robot.post("/api/auth/devices/redeem", { token });
+    expect(redeemed.status).toBe(200);
+    for (const frame of [
+      { activity: "idle", muted: false, tracking: true, motion: null },
+      { activity: "idle", muted: false, tracking: true },
+    ]) {
+      expect((await robot.put("/api/devices/me/state", frame)).status).toBe(204);
+    }
   });
 });
 
