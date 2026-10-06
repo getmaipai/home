@@ -18,15 +18,18 @@ export const REFERENCE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.reference",
     honoured_by: ["home"],
   }),
+  // IMG-SPEC-KEYS (spec-v0.1.80): declared in the spec by the images lane;
+  // registered here so the pinned registry matches. Its readers land with
+  // ANSWER-IMG; until then nothing reads it.
+  SettingsKey.parse({
+    key: "reference.images",
+    scope: "person",
+    selector: "boolean",
+    default: true,
+    label: "Show pictures in answers",
+    help: "Adults and teens are on by default; children are off until a parent enables this. Teens control their own setting.",
+    level: "basic",
+    lives_in: "household.reference",
+    honoured_by: ["home"],
+  }),
 ];
-
-// NOT added in this pass, deliberately (docs/dev.md's REFERENCE-LIBRARY-01
-// entry has the full account): "Person/child rules" (owner's call 5)
-// wants a person-scope `reference.images` setting, same shape as
-// search.safe_search. Declaring it here would need a commons spec-pin
-// cut and regeneration to actually be writable (SOURCE-SPEC-01's own
-// hard-won lesson: a settings key that isn't in the real generated
-// keys.json 400s on every write) - real work, but nothing in this repo
-// reads the setting yet either (REFERENCE-APP-01/LOOKUP-FED-01 are its
-// first callers), so it is left as a named follow-up rather than landed
-// half-wired under this item's own credit-pressure deadline.

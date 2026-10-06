@@ -84,7 +84,7 @@ turnBareRoutes.post("/", requireAuth, async (c) => {
   // alone only drops the named row by id, leaving every turn logged
   // since it (if this isn't the conversation's newest) right in the
   // window alongside it.
-  const window = buildConversationWindow(conversation, { excludeTurnId: turnId, beforeCreatedAt: turnRow.createdAt });
+  const window = await buildConversationWindow(conversation, { excludeTurnId: turnId, beforeCreatedAt: turnRow.createdAt });
   // startBareCompare() streams through the default path's own output gate
   // (StreamGate), age-banded off `speakerRow` (the original turn's own
   // speaker, not the admin doing the comparing); nothing it returns is ungated.

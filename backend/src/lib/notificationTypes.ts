@@ -50,6 +50,9 @@ export interface NotificationType {
 }
 
 export type NotificationChannel = "in_app" | "telegram";
+function isDeliveredChannel(channel: string): channel is NotificationChannel {
+  return channel === "in_app" || channel === "telegram";
+}
 
 // `in_app` (the pending list / thirty-day center) is deliberately never
 // gated by a per-type toggle: it is also the audit record ("visible
@@ -425,7 +428,9 @@ interface ManifestNotificationType {
   audience: NotificationAudience;
   template: string;
   configurable: boolean;
-  default_channels: readonly NotificationChannel[];
+  /** The spec's channel list (spec-v0.1.79 added `robot`); only the
+   * channels Home delivers today are registered. */
+  default_channels: readonly string[];
   /** Present only when the manifest schema carries it (the schema does
    * not yet - a package that doesn't declare one is treated as `true`). */
   toast?: boolean;
@@ -447,7 +452,7 @@ export function registerPackageNotificationTypes(manifest: {
     if (NOTIFICATION_TYPES.some((t) => t.id === declared.id)) continue;
     if (packageNotificationTypes.has(declared.id)) continue;
     const { default_channels, toast, ...rest } = declared;
-    packageNotificationTypes.set(declared.id, { ...rest, defaultChannels: default_channels, toast: toast ?? true });
+    packageNotificationTypes.set(declared.id, { ...rest, defaultChannels: default_channels.filter(isDeliveredChannel), toast: toast ?? true });
   }
 }
 

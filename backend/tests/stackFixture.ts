@@ -99,6 +99,9 @@ export function startDefaultScriptedStack(): StackFixture {
       return withIdentity("/v1/chat/completions", req);
     },
     "POST /v1/embeddings": (req) => withIdentity("/v1/embeddings", req),
+    // THIN-3B: the Stack's token count, answered by the spec stub's own
+    // deterministic template and tokenizer.
+    "POST /v1/tokenize": (req) => withIdentity("/v1/tokenize", req),
     "GET /stack/v1/roles": async () => Response.json({ roles: ["chat", "embed", "judge", "stt", "tts"].map((id) => ({ id, state: { state: "ready", since: "scripted-test" }, reason: null })) }),
     "GET /stack/v1/health": async () => Response.json({ health: [] }),
   });

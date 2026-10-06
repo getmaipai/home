@@ -127,6 +127,20 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.notifications",
     honoured_by: ["home"],
   }),
+  // SPEC-ROBOT-01 (spec-v0.1.79): the robot channel's person preference,
+  // declared in the spec by the robot lane; registered here so the pinned
+  // registry matches. Home delivers no robot channel yet.
+  SettingsKey.parse({
+    key: "notifications.time_sensitive.robot",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Send time-sensitive notifications to a robot",
+    help: "Deliver time-sensitive notifications through a robot channel when one is configured. Private notification content is never spoken.",
+    level: "basic",
+    lives_in: "person.notifications",
+    honoured_by: ["home"],
+  }),
   // Step 10: lib/notificationTypes.ts's "updates.available".
   SettingsKey.parse({
     key: "notifications.updates.available.telegram",

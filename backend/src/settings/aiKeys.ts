@@ -64,6 +64,20 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
   // modes; nothing turns the gate off. Household scope: it gives no admin
   // path into a teen's own settings (the 2026-09-30 ruling stands). A child
   // and every spoken turn are per sentence whatever this says.
+  // IMG-SPEC-KEYS (spec-v0.1.80): declared in the spec by the images lane;
+  // registered here so the pinned registry matches. Its reader lands with
+  // UPLOAD-IMG; until then nothing reads it.
+  SettingsKey.parse({
+    key: "chat.photo_uploads",
+    scope: "person",
+    selector: "boolean",
+    default: true,
+    label: "Send photos in chat",
+    help: "Adults and teens are on by default; children are off until a parent enables this. Teens control their own setting.",
+    level: "basic",
+    lives_in: "person.chat",
+    honoured_by: ["home"],
+  }),
   SettingsKey.parse({
     key: "chat.teen_gate_grain",
     scope: "household",

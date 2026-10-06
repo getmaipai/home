@@ -6,6 +6,7 @@
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import { hostLabel, type EngineIdentity } from "../engineIdentity";
 import { StackError, type StackErrorKind } from "./errors";
+import type { TokenCountRequest, TokenCountResponse } from "@maipai/spec/stack/ts/token-count.js";
 import type {
   RoleRequest,
   RoleReplyHeaders,
@@ -44,6 +45,10 @@ export interface StackClient {
     | { stream: ReadableStream<Uint8Array>; headers: Headers }
   >;
   embeddings(request: RoleRequest, opts?: { signal?: AbortSignal }): Promise<{ data: Record<string, unknown>; identity: EngineIdentity }>;
+  /** POST /v1/tokenize (STACK-TOKENIZE-01): the chat engine's own token
+   * count on its own template render; a 501 is an engine that cannot
+   * count, never an estimate. */
+  tokenize(request: TokenCountRequest, opts?: { signal?: AbortSignal }): Promise<{ data: TokenCountResponse; identity: EngineIdentity }>;
   transcribe(form: FormData, opts?: { signal?: AbortSignal }): Promise<{ data: { text: string }; identity: EngineIdentity }>;
   /** POST /v1/audio/speech; returns the streamed WAV Response. */
   speak(form: FormData, opts?: { signal?: AbortSignal }): Promise<Response>;
@@ -237,6 +242,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       return call("/v1/chat/completions", jsonInit(request), rawJson<Record<string, unknown>>, opts);
     },
     embeddings: (request, opts) => call("/v1/embeddings", jsonInit(request), rawJson<Record<string, unknown>>, opts),
+    tokenize: (request, opts) => call("/v1/tokenize", jsonInit(request), rawJson<TokenCountResponse>, opts),
     transcribe: (form, opts) => call("/v1/audio/transcriptions", formInit(form), rawJson<{ text: string }>, opts),
     async speak(form, opts) {
       let res: Response;

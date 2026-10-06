@@ -1191,7 +1191,7 @@ describe("CHAT-03: the window and summary read historical credentials redacted",
     // Written past logTurn()'s redaction, straight into the table, the way a row from before this item sits.
     // The reply repeats it with its label (an unlabeled repeat is the policy's stated limit).
     db.update(conversationTurns).set({ userText: `the wifi password is ${value}`, replyText: `Got it, your wifi password is ${value}.` }).where(eq(conversationTurns.id, "turn-plain")).run();
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(JSON.stringify(window.messages)).not.toContain(value);
     expect(window.messages.some((m) => m.content.includes("[credential redacted]"))).toBe(true);
     expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-plain")).get()?.userText).toContain(value); // not rewritten
@@ -1257,7 +1257,7 @@ describe("CHAT-03 (#89): a stored summary is redacted on every read", () => {
     }
     db.update(conversations).set({ summary: `Earlier they set the wifi password to ${value} and planned a trip.`, summaryThroughTurn: "turn-sum1" }).where(eq(conversations.id, conv.value.id)).run();
     const fresh = db.select().from(conversations).where(eq(conversations.id, conv.value.id)).get()!;
-    const window = buildConversationWindow({ ...conv.value, summary: fresh.summary, summaryThroughTurn: fresh.summaryThroughTurn } as typeof conv.value);
+    const window = await buildConversationWindow({ ...conv.value, summary: fresh.summary, summaryThroughTurn: fresh.summaryThroughTurn } as typeof conv.value);
     expect(window.summaryLine).toBeDefined();
     expect(window.summaryLine).not.toContain(value);
     expect(window.summaryLine).toContain("[credential redacted]");
@@ -1292,12 +1292,12 @@ describe("buildConversationWindow() (step 3)", () => {
     logTurn(actor, "chat", "who is president of brazil", { reply: { text: "The result names the president." }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-history" }, { outcomes: [search] });
     const latestSearch = { ...search, callId: "web-2", args: { expression: "Brazil election" }, sources: [{ ...search.sources[0]!, id: "src-b", title: "Most recent result", snippet: "Snippet marker must not be replayed" }] };
     logTurn(actor, "chat", "who is leading", { reply: { text: "The latest result names the candidates." }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-history-latest" }, { outcomes: [latestSearch] });
-    const before = buildConversationWindow(conv.value);
+    const before = await buildConversationWindow(conv.value);
     expect(before.messages.filter((m) => m.tool_calls?.length).map((m) => m.tool_calls?.[0]?.id)).toEqual(["web-2"]);
     expect(before.messages.some((m) => m.content.includes("Most recent result"))).toBe(true);
     expect(before.messages.some((m) => m.content.includes("Snippet marker must not be replayed"))).toBe(false);
     logTurn(actor, "chat", "who won", { reply: { text: "I need the race." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-followup" });
-    const after = buildConversationWindow(conv.value);
+    const after = await buildConversationWindow(conv.value);
     expect(after.messages.slice(0, before.messages.length)).toEqual(before.messages);
   });
 
@@ -1312,7 +1312,7 @@ describe("buildConversationWindow() (step 3)", () => {
       const long = "x".repeat(400);
       logTurn(actor, "chat", `new turn ${i} ${long}`, { reply: { text: `${long} reply` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-new-${i}` });
     }
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.content.includes("old search question"))).toBe(true);
     expect(window.messages.some((m) => m.tool_calls?.some((call) => call.id === "old-web"))).toBe(false);
     expect(window.messages.some((m) => m.role === "tool" && m.tool_call_id === "old-web")).toBe(false);
@@ -1327,7 +1327,7 @@ describe("buildConversationWindow() (step 3)", () => {
     if (!conv.ok) throw new Error(conv.error);
     const search = { callId: `failed-search-${storedPromptTokens}`, packageId: "websearch", status: "succeeded" as const, via: "tool_call" as const, args: { expression: "services for seniors" }, sources: [{ id: "src-failed", kind: "web" as const, title: "Senior services", url: "https://example.test/seniors", site: "example.test", snippet: "This snippet must not be replayed", source: "websearch", created_at: "2026-10-05T00:00:00.000Z", hlc: "1" }] };
     logTurn(actor, "chat", `stored prompt ${storedPromptTokens}`, { reply: { text: failureReply }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-failed-search-${storedPromptTokens}` }, { outcomes: [search] });
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((message) => message.tool_calls?.some((call) => call.id === search.callId))).toBe(false);
     expect(window.messages.some((message) => message.role === "tool" && message.tool_call_id === search.callId)).toBe(false);
     expect(window.messages.some((message) => message.content.includes(`stored prompt ${storedPromptTokens}`))).toBe(true);
@@ -1344,7 +1344,7 @@ describe("buildConversationWindow() (step 3)", () => {
     const guardedSearch = { callId: "guarded-web", packageId: "websearch", status: "succeeded" as const, via: "tool_call" as const, args: { expression: "film details" }, sources: [{ id: "src-guarded", kind: "web" as const, title: "Film details", url: "https://example.test/film", site: "example.test", snippet: "Film detail snippet", source: "websearch", created_at: "2026-10-05T00:00:00.000Z", hlc: "1" }] };
     logTurn(actor, "chat", "have you seen it", { reply: { text: "I don't actually have that - nobody's told me." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-guarded" }, { guardReasons: ["invention"], outcomes: [guardedSearch] });
     logTurn(actor, "chat", "what's it about", { reply: { text: "A clownfish looking for his son." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-plain" });
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     const assistantLines = window.messages.filter((m) => m.role === "assistant").map((m) => m.content);
     expect(window.messages.some((m) => m.tool_calls?.some((call) => call.id === "guarded-web"))).toBe(false);
     expect(assistantLines).toEqual(["A clownfish looking for his son."]);
@@ -1352,20 +1352,20 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(window.messages.some((m) => m.content.includes("nobody's told me"))).toBe(false);
     // A replaced line that carries a fact the next turn needs becomes a typed note, in nobody's voice.
     logTurn(actor, "chat", "add milk to the list", { reply: { text: "I haven't added anything to your list." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-narrated" }, { guardReasons: ["unsupported_action"] });
-    const again = buildConversationWindow(conv.value);
+    const again = await buildConversationWindow(conv.value);
     expect(again.messages.some((m) => m.role === "system" && m.content === "[Nothing was added to the list.]")).toBe(true);
     expect(again.messages.filter((m) => m.role === "assistant").map((m) => m.content)).toEqual(["A clownfish looking for his son."]);
     // The streaming path can store a spoken sentence beside the honesty
     // line (a later sentence tripped a non-cuttable guard): the spoken
     // sentence is quoted, the line is not (a review).
     logTurn(actor, "chat", "what kind of film is it", { reply: { text: "It's a Pixar film. I don't know, sorry." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-partial" }, { guardReasons: ["example_parrot"] });
-    const partial = buildConversationWindow(conv.value);
+    const partial = await buildConversationWindow(conv.value);
     expect(partial.messages.some((m) => m.role === "system" && m.content === '[The reply given was: "It\'s a Pixar film."]')).toBe(true);
     expect(partial.messages.some((m) => m.content.includes("I don't know, sorry"))).toBe(false);
     // A save-family pending line renders a waiting note in the family's own
     // words, not a "nothing saved" note (a review).
     logTurn(actor, "chat", "remember this recipe", { reply: { text: "That save is waiting on your confirmation." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-pending" }, { guardReasons: ["unsupported_action"] });
-    const pending = buildConversationWindow(conv.value);
+    const pending = await buildConversationWindow(conv.value);
     expect(pending.messages.some((m) => m.role === "system" && m.content === "[The save is waiting on your confirmation.]")).toBe(true);
     expect(pending.messages.some((m) => m.content.includes("No memory was saved"))).toBe(false);
   });
@@ -1388,7 +1388,7 @@ describe("buildConversationWindow() (step 3)", () => {
       });
     }
 
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.length).toBeLessThan(20); // 10 turns * 2 messages each
     expect(window.messages.some((m) => m.content.includes("turn 9"))).toBe(true); // newest, always kept
     for (let i = 6; i <= 9; i++) expect(window.messages.some((m) => m.content.includes(`turn ${i}`))).toBe(true);
@@ -1404,7 +1404,7 @@ describe("buildConversationWindow() (step 3)", () => {
 
     const refreshed = getConversation(actor, conv.value.id);
     if (!refreshed.ok) throw new Error(refreshed.error);
-    const window = buildConversationWindow(refreshed.value);
+    const window = await buildConversationWindow(refreshed.value);
     expect(window.summaryLine).toBeUndefined();
   });
 
@@ -1430,7 +1430,7 @@ describe("buildConversationWindow() (step 3)", () => {
 
     const refreshed = getConversation(actor, conv.value.id);
     if (!refreshed.ok) throw new Error(refreshed.error);
-    const window = buildConversationWindow(refreshed.value);
+    const window = await buildConversationWindow(refreshed.value);
     expect(window.summaryLine).toBeDefined();
     expect(window.summaryLine as string).toContain("Riff asked about the weather earlier.");
   });
@@ -1455,7 +1455,7 @@ describe("buildConversationWindow() (step 3)", () => {
       turn_id: "turn-b3-plugin",
     });
 
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "Playing jazz now.")).toBe(false);
     const note = window.messages.find((m) => m.role === "system" && m.content.includes("Playing jazz now."));
     expect(note).toBeDefined();
@@ -1481,7 +1481,7 @@ describe("buildConversationWindow() (step 3)", () => {
       turn_id: "turn-b3-multitool",
     });
 
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     const note = window.messages.find((m) => m.role === "system" && m.content.includes("answered:"));
     expect(note).toBeDefined();
     expect(note!.content).not.toContain("currency+weather");
@@ -1507,7 +1507,7 @@ describe("buildConversationWindow() (step 3)", () => {
       turn_id: "turn-tool-composed",
     });
 
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "The new Avengers movie, Avengers: Doomsday, is set for December 2026.")).toBe(true);
     expect(window.messages.some((m) => m.content.includes("answered:"))).toBe(false);
   });
@@ -1526,7 +1526,7 @@ describe("buildConversationWindow() (step 3)", () => {
       turn_id: "turn-tool-guarded",
     }, { guardReasons: ["unsupported_claim"] });
     expect(row.guardReason).not.toBeNull();
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant" && m.content.includes("the guard said"))).toBe(false);
   });
 
@@ -1543,7 +1543,7 @@ describe("buildConversationWindow() (step 3)", () => {
       turn_id: "turn-b3-plugin-error",
     });
 
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "Sorry, I couldn't do that.")).toBe(false);
     const note = window.messages.find((m) => m.role === "system" && m.content.includes("could not answer"));
     expect(note).toBeDefined();
@@ -1561,7 +1561,7 @@ describe("buildConversationWindow() (step 3)", () => {
       turn_id: "turn-b3-safety",
     });
 
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant")).toBe(false);
     expect(window.messages.some((m) => m.role === "system" && m.content.includes("safety rules declined"))).toBe(true);
   });
@@ -1608,7 +1608,7 @@ describe("buildConversationWindow() (step 3)", () => {
       conversation_id: conv.value.id,
       turn_id: "turn-4b-forget",
     });
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     const note = window.messages.find((m) => m.role === "system" && m.content.includes("asked to forget"));
     expect(note?.content).toContain("Forgotten: Marlow's birthday is in June.");
     expect(window.messages.some((m) => m.content.includes("unknown"))).toBe(false);
@@ -1629,7 +1629,7 @@ describe("buildConversationWindow() (step 3)", () => {
       turn_id: "turn-b3-command",
     });
 
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "Locking up now.")).toBe(false);
     expect(window.messages.some((m) => m.role === "system" && m.content.includes("good night house"))).toBe(true);
   });
@@ -1640,7 +1640,7 @@ describe("buildConversationWindow() (step 3)", () => {
     if (!conv.ok) throw new Error(conv.error);
     logTurn(actor, "chat", "hi", { reply: { text: "hello there" }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-b3-model" });
 
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "hello there")).toBe(true);
     expect(window.messages.some((m) => m.role === "system")).toBe(false);
   });
@@ -1663,7 +1663,7 @@ describe("buildConversationWindow() (step 3)", () => {
       { supersedes: "turn-original" },
     );
 
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.content.includes("whats the weather") && !m.content.includes("tomorrow"))).toBe(false);
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "sunny")).toBe(false);
     expect(window.messages.some((m) => m.content === "what's the weather tomorrow")).toBe(true);
@@ -1869,7 +1869,7 @@ describe("conversation window feeds the prior exchange into the next turn (step 
 
     const conv = getConversation(actor, first.value.conversation_id);
     if (!conv.ok) throw new Error(conv.error);
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.content.includes("what's the weather like"))).toBe(true);
   });
 });
@@ -2496,7 +2496,7 @@ describe("resume a saved chat explicitly", () => {
     expect(saved.map((turn) => turn.userText)).toEqual(["help me plan a garden", "and some herbs"]);
     const record = getConversation(actor, id);
     if (!record.ok) throw new Error(record.error);
-    expect(buildConversationWindow(record.value).messages.some((message) => message.content.includes("plan a garden"))).toBe(true);
+    expect((await buildConversationWindow(record.value)).messages.some((message) => message.content.includes("plan a garden"))).toBe(true);
   });
 
   test("resuming cannot revive an old pending confirmation and an open chat is idempotent", async () => {

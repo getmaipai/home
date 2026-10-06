@@ -95,6 +95,14 @@ describe("registerPackageNotificationTypes", () => {
     expect(getNotificationType("safety.flagged_turn")?.configurable).toBe(false);
   });
 
+  test("a channel the spec names but Home does not deliver yet (robot, spec-v0.1.79) is left off the registered type", () => {
+    registerPackageNotificationTypes({
+      id: "test-robot-pkg",
+      notifications: [{ id: "test-robot-pkg.arrived", level: "passive", audience: "person", template: "Arrived", configurable: true, default_channels: ["in_app", "robot"] }],
+    });
+    expect(getNotificationType("test-robot-pkg.arrived")?.defaultChannels).toEqual(["in_app"]);
+  });
+
   test("a package with no notifications declared is a no-op", () => {
     expect(() => registerPackageNotificationTypes({ id: "test-quiet-pkg" })).not.toThrow();
   });

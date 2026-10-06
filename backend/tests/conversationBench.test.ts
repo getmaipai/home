@@ -172,7 +172,7 @@ describe("the fixture", () => {
       safe.checked_at = new Date(Date.now() - (20 - i) * 60_000).toISOString();
       logTurn(actor, "chat", t.say, { reply: { text: "Okay." }, source: "model", safety: { ...safe }, conversation_id: conv.value.id, turn_id: `turn-rw-${i}` });
     });
-    const window = buildConversationWindow(conv.value);
+    const window = await buildConversationWindow(conv.value);
     expect(window.droppedOlder).toBe(true);
     expect(window.turnIds).not.toContain("turn-rw-0");
   });
