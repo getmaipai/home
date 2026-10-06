@@ -101,13 +101,11 @@ export function ChatComposerNotice() {
  * assistant-ui runtime and is never written by this slot. */
 export function ChatMessageQueue() {
   const aui = useAui();
-  const running = useAuiState((s) => [...s.thread.messages].reverse().find((message) => message.role === "assistant" && message.status?.type === "running"));
   const queue = useAuiState((s) => s.composer.queue);
-  if (!running && queue.length === 0) return null;
-  const runningText = running ? messageText(running) : "Reply in progress";
+  if (queue.length === 0) return null;
   return (
     <MessageQueue
-      running={runningText || "Reply in progress"}
+      running=""
       queued={queue.map((item) => ({ id: item.id, text: item.prompt }))}
       onCancel={(id) => {
         const item = queue.find((candidate) => candidate.id === id);

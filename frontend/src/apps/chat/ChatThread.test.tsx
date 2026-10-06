@@ -64,6 +64,26 @@ afterEach(() => {
 });
 
 describe("ChatThread", () => {
+  test("does not render a queue row for an empty queue, including while a reply is running", async () => {
+    const idle = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={NOOP} /></MemoryRouter>);
+    expect(idle.container.querySelector('[data-slot="message-queue"]')).toBeNull();
+    idle.unmount();
+
+    let release!: () => void;
+    const waiting = new Promise<void>((resolve) => { release = resolve; });
+    const adapter: ChatModelAdapter = { run: async function* () {
+      await waiting;
+      yield { content: [{ type: "text", text: "Reply finished." }] };
+    } };
+    const running = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} /></MemoryRouter>);
+    act(() => queuedRuntime!.thread.composer.setText("start a reply"));
+    act(() => queuedRuntime!.thread.composer.send());
+    await waitFor(() => expect(running.getByRole("button", { name: "Stop generating" })).toBeTruthy());
+    expect(queuedRuntime!.thread.composer.getState().queue).toHaveLength(0);
+    expect(running.container.querySelector('[data-slot="message-queue"]')).toBeNull();
+    release();
+  });
+
   test("renders the runtime queue above the composer and sends queued turns in order", async () => {
     let releaseFirst!: () => void;
     const firstRun = new Promise<void>((resolve) => { releaseFirst = resolve; });
