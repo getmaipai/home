@@ -50,6 +50,37 @@ export async function discardIncognitoThreads(personId?: string): Promise<void> 
   incognitoThreadIds.clear();
 }
 
+/** PROJECTS-01b: "New chat in project" asks for ONE new chat, the thread it
+ * opened (its local id), to start inside that project. `initialize()` uses
+ * it only for that very thread and drops it either way; the column also
+ * drops it on a plain new chat, a project deleted, Incognito and a
+ * profile change, so a chat never lands in a project by accident. */
+let pendingFolder: { threadId: string; folderId: string } | null = null;
+/** Chats `initialize()` just created inside a project, so the page can put
+ * the project on the thread's own metadata (the list only learns it on its
+ * next load). */
+const createdInFolder = new Map<string, string>();
+
+export function setPendingChatFolder(pending: { threadId: string; folderId: string } | null): void {
+  pendingFolder = pending;
+}
+
+/** The project a pending "New chat in project" names, if any. */
+export function pendingChatFolderId(): string | null {
+  return pendingFolder?.folderId ?? null;
+}
+
+export function takeCreatedChatFolder(remoteId: string): string | null {
+  const folderId = createdInFolder.get(remoteId) ?? null;
+  createdInFolder.delete(remoteId);
+  return folderId;
+}
+
+/** The last metadata the hub reported or accepted per chat, so
+ * `updateCustom` sends only what changed (the kit hands it the whole
+ * object for a pin and for a move alike). */
+const knownCustom = new Map<string, { pinned?: boolean; folder_id?: string | null }>();
+
 /** One bounded poll per conversation, shared by every caller: the runtime's own trigger after a reply and the
  * catch-up for a chat opened or returned to with no title both ask, and the hub only needs asking once. */
 const titlePolls = new Map<string, Promise<string | null>>();
@@ -75,6 +106,11 @@ export function needsTitleCatchUp(item: { remoteId?: string; title?: string; sta
   return !incognito && item.status === "regular" && Boolean(item.remoteId) && !item.title && messageCount > 0 && !isRunning;
 }
 
+function rememberCustom(remoteId: string, custom: { pinned?: boolean; folder_id?: string | null }) {
+  knownCustom.set(remoteId, custom);
+  return { ...custom };
+}
+
 export function createChatThreadListAdapter(selfName: string, options: ChatThreadListOptions = {}): RemoteThreadListAdapter {
   const { personId, query, incognito = false, onArchiveUnavailable, onSettingsLoaded, onOpenFailed, titlePollMs = 3000, titlePollAttempts = 40 } = options;
   return {
@@ -86,7 +122,7 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
         remoteId: row.id,
         title: row.title ?? undefined,
         lastMessageAt: new Date(row.last_turn_at ?? row.created_at),
-        custom: { pinned: row.pinned },
+        custom: rememberCustom(row.id, { pinned: row.pinned, folder_id: row.folder_id ?? null }),
       })) };
     },
     async rename(remoteId, title) { await api.renameConversation(remoteId, title); },
@@ -96,9 +132,19 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
     // reads `custom.pinned` and calls this to toggle it. No `title` in
     // the PATCH body (api.ts's own `setConversationPinned`), so pinning
     // never has to know or resend the conversation's current title.
+    // PROJECTS-01b: `folder_id` travels the same way (the kit's projects
+    // mode sets it to move a chat); only a changed field is sent.
     async updateCustom(remoteId, custom) {
-      if (!custom || typeof custom.pinned !== "boolean") return;
-      await api.setConversationPinned(remoteId, custom.pinned);
+      if (!custom) return;
+      const known = knownCustom.get(remoteId) ?? {};
+      if (typeof custom.pinned === "boolean" && custom.pinned !== known.pinned) {
+        await api.setConversationPinned(remoteId, custom.pinned);
+      }
+      const folderId = custom.folder_id === null || typeof custom.folder_id === "string" ? custom.folder_id : undefined;
+      if (folderId !== undefined && folderId !== (known.folder_id ?? null)) {
+        await api.setConversationFolder(remoteId, folderId);
+      }
+      rememberCustom(remoteId, { pinned: typeof custom.pinned === "boolean" ? custom.pinned : known.pinned, folder_id: folderId !== undefined ? folderId : (known.folder_id ?? null) });
     },
     // CONV-ARCHIVE-01: archive state lives on the hub (PATCH {archived}). A failure rejects so the
     // runtime rolls back its optimistic status; the toast says why nothing moved.
@@ -120,7 +166,7 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       }
     },
     async delete(remoteId) { await api.deleteConversation(remoteId); },
-    async initialize() {
+    async initialize(threadId) {
       // Issue #163 / the persistence-boundary design (docs/plans/
       // privacy-mode-2026-09-24.md, 2026-09-26): this used to mint a
       // durable row unconditionally, before a single message existed -
@@ -135,9 +181,20 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       // summary along. A carry the hub refuses (a temporary chat's summary
       // into a saved chat) starts a plain new chat instead.
       const carryFrom = takeCarry();
-      const row = carryFrom
-        ? await api.createConversation(incognito ? "temporary" : undefined, carryFrom).catch(() => api.createConversation(incognito ? "temporary" : undefined))
-        : await api.createConversation(incognito ? "temporary" : undefined);
+      // PROJECTS-01b: Incognito never starts a chat in a project.
+      const folderId = !incognito && pendingFolder?.threadId === threadId ? pendingFolder.folderId : undefined;
+      pendingFolder = null;
+      const mode = incognito ? "temporary" : undefined;
+      // A chat always starts: a carry or a project the hub refuses (gone,
+      // not this person's) falls back to a plain new chat.
+      const plain = () => api.createConversation(mode);
+      const row = carryFrom || folderId
+        ? await api.createConversation(mode, carryFrom ?? undefined, folderId).catch(() => (carryFrom && folderId ? api.createConversation(mode, undefined, folderId).catch(plain) : plain()))
+        : await plain();
+      if (row.folder_id) {
+        createdInFolder.set(row.id, row.folder_id);
+        rememberCustom(row.id, { pinned: false, folder_id: row.folder_id });
+      }
       // A stored row for a temporary request is a leak: refuse it, never adopt it as the Incognito thread.
       if (incognito && row.mode !== "temporary") throw new Error("Incognito could not start a private chat.");
       if (incognito) incognitoThreadIds.add(row.id);

@@ -1299,6 +1299,8 @@ export function NextChatPage({ person }: { person: Roster }) {
                 <ChatHistoryPanel
                   variant="column"
                   state={column}
+                  person={person}
+                  temporary={temporaryNext}
                   onNewThread={() => setSheetOpen(false)}
                   newChatDisabled={chatAvailability === "unavailable"}
                   pinnable={!temporaryNext}
@@ -1448,6 +1450,8 @@ export function NextChatPage({ person }: { person: Roster }) {
             <ChatHistoryPanel
               variant="sheet"
               state={column}
+              person={person}
+              temporary={temporaryNext}
               onNewThread={() => setSheetOpen(false)}
               newChatDisabled={chatAvailability === "unavailable"}
               pinnable={!temporaryNext}

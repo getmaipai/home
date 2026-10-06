@@ -114,6 +114,10 @@ Tap **New chat** beside the chat list to start fresh. A new chat is saved when y
 
 A chat never stops working because it got long. As it grows, MaiPai keeps short notes about the earlier part and keeps the newest messages word for word. Rarely, a very long message will not fit beside those notes. MaiPai then says so and offers a fresh start: tap **New chat**, and the new chat brings the notes along. It uses them from your next message there. Talking to MaiPai out loud never gets this offer; it just answers.
 
+## Projects
+
+A project keeps chats about one thing together, like a garden plan or a school science fair. In the chat list, choose **+** next to **Projects**, type a name and press Enter. To put a chat in a project, choose **...** on the chat, then **Move to project**, or drag the chat onto the project. Choose a project to open or close it. Its **...** menu starts a **New chat in project**, renames it or deletes it. Deleting a project keeps its chats. A child's projects are made by a parent. Incognito chats are never in a project.
+
 ## Your conversation history
 
 Use the chat list beside the conversation to find a chat. Type in **Search chats** to search the list. On a narrow screen, open the chat list from its button. Use the collapse button to hide the list and make more room for the conversation. Reopen it from the same button.

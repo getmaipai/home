@@ -10,6 +10,7 @@ import type { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { Issue } from "@maipai/spec/gen/ts/issue.js";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
+import type { ChatFolder } from "@maipai/spec/gen/ts/chat-folder.js";
 import type { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
@@ -693,7 +694,17 @@ export const api = {
     const suffix = person ? `?person=${encodeURIComponent(person)}` : "";
     return request<{ discarded: number }>(`/api/conversations/incognito/discard${suffix}`, { method: "POST" });
   },
-  createConversation: (mode?: Conversation["mode"], carryFrom?: string) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}) }) }),
+  // PROJECTS-01a: `folderId` starts the chat inside one of the person's projects.
+  createConversation: (mode?: Conversation["mode"], carryFrom?: string, folderId?: string) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}), ...(folderId ? { folder_id: folderId } : {}) }) }),
+  // PROJECTS-01a: a person's projects (chat folders) in the chat column.
+  chatFolders: (person?: string) => request<ChatFolder[]>(`/api/chat-folders${person ? `?person=${encodeURIComponent(person)}` : ""}`),
+  createChatFolder: (name: string, person?: string) =>
+    request<ChatFolder>("/api/chat-folders", { method: "POST", body: JSON.stringify({ name, ...(person ? { person } : {}) }) }),
+  renameChatFolder: (id: string, name: string) =>
+    request<ChatFolder>(`/api/chat-folders/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+  deleteChatFolder: (id: string) => request<{ ok: true; chats_kept: number }>(`/api/chat-folders/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  setConversationFolder: (id: string, folderId: string | null) =>
+    request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ folder_id: folderId }) }),
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
   conversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`),
   setConversationSettings: (id: string, settings: Record<string, unknown>) =>

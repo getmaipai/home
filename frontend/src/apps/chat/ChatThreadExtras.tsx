@@ -8,6 +8,7 @@ import { ChatExtrasContext } from "@/apps/chat/ChatThread";
 import { buildChatCommands, type ChatCommandAction } from "@/apps/chat/chatCommands";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { useIncognitoContext } from "@/next/incognitoContext";
+import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
 
 const StableConversationMap = memo(ConversationMap);
 
@@ -59,7 +60,11 @@ export function ChatThreadExtras() {
     });
   }, [query, searchable]);
   const actions = useMemo<ChatCommandAction>(() => ({
-    newChat: () => void aui.threads.switchToNewThread(),
+    // PROJECTS-01b: a plain new chat is never inside a project.
+    newChat: () => {
+      setPendingChatFolder(null);
+      void aui.threads.switchToNewThread();
+    },
     focusComposer: () => document.querySelector<HTMLElement>('[aria-label="Message input"]')?.focus(),
     stopReply: () => aui.thread.cancelRun(),
     openPalette: () => setPaletteOpen(true),

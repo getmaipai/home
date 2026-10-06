@@ -7,6 +7,9 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { getIcon } from "@maipai/ui/src/icons";
 import { type ChatColumnControl } from "@/apps/chat/chatColumnControl";
+import { useChatProjects } from "@/apps/chat/chatProjects";
+import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
+import type { Roster } from "@/lib/api";
 import { readRailCollapsePreference, writeRailCollapsePreference } from "@/next/railCollapsePreference";
 
 // COLUMN-01 (owner, 2026-10-06: "the show/hide column is quirky, layout is
@@ -32,7 +35,6 @@ const ColumnOpenIcon = getIcon("panel-left-open");
 const NewChatIcon = getIcon("pencil");
 const SearchIcon = getIcon("search");
 const CloseIcon = getIcon("x");
-const CustomizeIcon = getIcon("sliders-horizontal");
 const ChatSettingsIcon = getIcon("settings");
 const PinIcon = getIcon("pin");
 
@@ -288,9 +290,11 @@ function useSearchableThreads(): SearchableThread[] {
 
 /** The column's contents, shared by the desktop column and the phone
  * sheet: a header row (the app's name, thread search, the hide control),
- * New chat and Customize as quiet rows, then the history. */
+ * New chat as a quiet row, then the history (Pinned, Projects, Recents). */
 export function ChatHistoryPanel({
   state,
+  person,
+  temporary,
   onNewThread,
   newChatDisabled,
   pinnable,
@@ -298,6 +302,9 @@ export function ChatHistoryPanel({
   variant,
 }: {
   state: ChatColumnState;
+  person: Roster;
+  /** Incognito: no projects (a temporary chat never joins one). */
+  temporary: boolean;
   onNewThread: () => void;
   newChatDisabled: boolean;
   pinnable: boolean;
@@ -305,6 +312,8 @@ export function ChatHistoryPanel({
   variant: "column" | "sheet";
 }) {
   const aui = useAui();
+  // PROJECTS-01b: the person's projects in the kit thread list.
+  const projects = useChatProjects({ person, temporary, onNewChatStarted: onNewThread });
   const { search, setSearch, searchOpen, setSearchOpen, searchFocusKey } = state;
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
   const isLoading = useAuiState((s) => s.threads.isLoading);
@@ -424,21 +433,17 @@ export function ChatHistoryPanel({
           </div>
         )}
         <nav aria-label="Chat" data-slot="chat-column-nav" className="flex flex-col">
-          <ThreadListNew onClick={onNewThread} disabled={newChatDisabled}>
+          <ThreadListNew
+            onClick={() => {
+              // A plain new chat is never inside a project.
+              setPendingChatFolder(null);
+              onNewThread();
+            }}
+            disabled={newChatDisabled}
+          >
             <NewChatIcon data-slot="aui_thread-list-new-icon" className="size-4.5 shrink-0" />
             <span data-slot="aui_thread-list-new-label">New chat</span>
           </ThreadListNew>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" asChild data-slot="chat-column-link">
-                <Link to="/settings?tab=me">
-                  <CustomizeIcon className="size-4.5 shrink-0" />
-                  <span>Customize</span>
-                </Link>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Your companion, voice and look</TooltipContent>
-          </Tooltip>
         </nav>
       </div>
       <div
@@ -446,7 +451,7 @@ export function ChatHistoryPanel({
         className="min-h-0 flex-1 overflow-y-auto"
         onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 0)}
       >
-        <ThreadListItems searchQuery={hasThreads ? search : ""} pinnable={pinnable} />
+        <ThreadListItems searchQuery={hasThreads ? search : ""} pinnable={pinnable} projects={projects} />
         {!isLoading && !hasThreads ? (
           <p data-slot="chat-column-empty">Your chats will show up here.</p>
         ) : null}

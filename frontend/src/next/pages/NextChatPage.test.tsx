@@ -424,7 +424,9 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
       await waitFor(() => expect(view.calls.some((call) => call.method === "PATCH" && call.url.endsWith("conv-search-pinned") && call.body === '{"pinned":false}')).toBe(true));
       await waitFor(() => expect(view.queryByText("Pinned", { selector: '[data-slot="aui_thread-list-group-label"]' })).toBeNull());
       const labels = Array.from(view.container.querySelectorAll('[data-slot="aui_thread-list-group-label"]')).map((label) => label.textContent);
-      expect(labels[0]).toBe("Today");
+      // PROJECTS-01b: an adult's (empty) Projects section, with its "+", sits
+      // above the day groups.
+      expect(labels.slice(0, 2)).toEqual(["Projects", "Today"]);
       const rows = Array.from(view.container.querySelectorAll('[data-slot="aui_thread-list-item"]'));
       expect(rows[0]?.querySelector('[data-slot="aui_thread-list-item-title"]')?.textContent?.trim()).toBe("Garden pinned");
     } finally { view.restore(); }
@@ -1105,7 +1107,7 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       await view.findByText("It's 58°F and overcast in Portland.");
       fireEvent.click(view.getByRole("button", { name: /1 tool call/ }));
       expect(await view.findByText("weather")).toBeVisible();
-      // The conversation, not the history column (whose Customize row is a link).
+      // The conversation, not the history column (whose settings gear is a link).
       expect(within(document.querySelector<HTMLElement>('[data-slot="next-chat-pane"]')!).queryByRole("link")).toBeNull();
     } finally {
       restore();
@@ -2355,17 +2357,76 @@ describe("NextChatPage (COLUMN-01: one hide/show control for the history column)
     }
   });
 
-  test("the column's rows: New chat and Customize are quiet rows, Customize opens your own settings", async () => {
+  test("the column's rows: New chat is a quiet row, and there is no Customize row (owner, 2026-10-06)", async () => {
     const restore = stubFetch();
     try {
       const view = renderChat();
       await view.findByLabelText("Message input");
       const nav = within(column()).getByRole("navigation", { name: "Chat" });
       expect(within(nav).getByRole("button", { name: "New chat" })).toBeTruthy();
-      expect(within(nav).getByRole("link", { name: "Customize" })).toHaveAttribute("href", "/settings?tab=me");
+      // Owner's ruling 2026-10-06: Customize leaves the column; skills live under Chat settings (the gear).
+      expect(within(nav).queryByRole("link", { name: "Customize" })).toBeNull();
       expect(within(column()).getByText("Your chats will show up here.")).toBeTruthy();
       // No thread search until there is something to search.
       expect(within(column()).queryByRole("button", { name: "Search chats" })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});
+
+describe("NextChatPage (PROJECTS-01b: projects in the column)", () => {
+  const column = () => document.getElementById("next-chat-rail")!;
+  const stubProjects = (folders: Array<{ id: string; name: string }>, chats: Array<{ id: string; title: string; folder_id: string | null }>) => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/chat-folders")) return Promise.resolve(Response.json(folders.map((folder) => ({ ...folder, person: "person-abc123" }))));
+      if (url.includes("/api/conversations")) {
+        return Promise.resolve(Response.json(chats.map((chat) => ({ ...chat, surface: "chat", pinned: false, archived: false, created_at: new Date().toISOString(), last_turn_at: new Date().toISOString(), turn_count: 2, companion_id: null }))));
+      }
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    return () => {
+      globalThis.fetch = original;
+    };
+  };
+  const renderAs = (overrides: Partial<Roster> = {}) => renderPage(
+    <MemoryRouter initialEntries={["/chat"]}>
+      <NextChatPage person={makePerson(overrides)} />
+    </MemoryRouter>,
+  );
+
+  test("an adult's projects list under Projects with their chats inside, and a + to make one", async () => {
+    const restore = stubProjects([{ id: "folder-garden1", name: "Garden" }], [
+      { id: "conv-inproj01", title: "Raised beds", folder_id: "folder-garden1" },
+      { id: "conv-loose001", title: "Dinner ideas", folder_id: null },
+    ]);
+    try {
+      const view = renderAs();
+      await within(column()).findByText("Dinner ideas");
+      const project = (await within(column()).findByText("Garden")).closest('[data-slot="aui_thread-list-project"]') as HTMLElement;
+      expect(within(column()).getByLabelText("New project")).toBeTruthy();
+      expect(within(column()).queryByText("Raised beds")).toBeNull();
+      fireEvent.click(project.querySelector('[data-slot="aui_thread-list-project-trigger"]')!);
+      expect(await within(column()).findByText("Raised beds")).toBeTruthy();
+      void view;
+    } finally {
+      restore();
+    }
+  });
+
+  test("a child sees a parent's projects but cannot make, rename or delete one", async () => {
+    const restore = stubProjects([{ id: "folder-homework", name: "Homework" }], [{ id: "conv-child001", title: "Spelling", folder_id: null }]);
+    try {
+      renderAs({ role: "child", age_band: "child" });
+      await within(column()).findByText("Homework");
+      expect(within(column()).queryByLabelText("New project")).toBeNull();
+      const project = within(column()).getByText("Homework").closest('[data-slot="aui_thread-list-project"]') as HTMLElement;
+      fireEvent.pointerDown(project.querySelector('[data-slot="aui_thread-list-project-more"]')!, { button: 0, pointerType: "mouse" });
+      expect(await within(document.body).findByRole("menuitem", { name: "New chat in project" })).toBeTruthy();
+      expect(within(document.body).queryByRole("menuitem", { name: "Rename" })).toBeNull();
+      expect(within(document.body).queryByRole("menuitem", { name: "Delete" })).toBeNull();
     } finally {
       restore();
     }

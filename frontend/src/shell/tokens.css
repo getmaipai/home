@@ -220,7 +220,7 @@ html.dark body {
 
 /* COLUMN-01 history column (owner, 2026-10-06: calm, ChatGPT-shaped).
  * No borders or buttons inside it: a 52px header row (the app name, thread
- * search, the hide control), New chat and Customize as quiet 36px rows,
+ * search, the hide control), New chat as a quiet 36px row,
  * 12px subdued section labels, then 36px title-only rows. Hover is a soft
  * fill, the open conversation a slightly stronger one, and a row's "..."
  * shows only on hover or keyboard focus. Shared by the desktop column and
@@ -248,6 +248,12 @@ html.dark body {
   --column-selected: color-mix(in oklab, var(--foreground) 8%, transparent);
   /* Subdued, but at least 4.5:1 on the column's own tone in both themes. */
   --column-subdued: color-mix(in oklab, var(--foreground) 68%, var(--background));
+  /* PROJECTS-01b: the kit's project rows read these tokens, so they match
+   * the chat rows above them (rule 9: tokens only, never shape). */
+  --aui-thread-list-row-hover: var(--column-hover);
+  --aui-thread-list-row-radius: 8px;
+  --aui-thread-list-row-padding-x: 10px;
+  --aui-thread-list-row-font-size: 14px;
   font-size: 14px;
   line-height: 20px;
 }
@@ -282,8 +288,7 @@ html.dark body {
   color: var(--foreground);
   background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
 }
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-new"],
-[data-slot="chat-column-panel"] [data-slot="chat-column-link"] {
+[data-slot="chat-column-panel"] [data-slot="aui_thread-list-new"] {
   position: relative;
   display: flex;
   justify-content: flex-start;
@@ -301,14 +306,12 @@ html.dark body {
   color: var(--foreground);
   transition: background-color 120ms ease-out;
 }
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-new"]:hover,
-[data-slot="chat-column-panel"] [data-slot="chat-column-link"]:hover {
+[data-slot="chat-column-panel"] [data-slot="aui_thread-list-new"]:hover {
   background-color: var(--column-hover);
 }
 /* The 48px touch floor (SHELL-09) on a 36px row: a transparent overhang,
  * the kit's own hitArea() technique. */
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-new"]::before,
-[data-slot="chat-column-panel"] [data-slot="chat-column-link"]::before {
+[data-slot="chat-column-panel"] [data-slot="aui_thread-list-new"]::before {
   content: "";
   position: absolute;
   inset: -6px 0;
@@ -378,6 +381,12 @@ html.dark body {
   padding: 8px 10px;
   font-size: 13px;
   color: var(--column-subdued);
+}
+/* PROJECTS-01b: project rows at the chat rows' 36px on a mouse. */
+@media (pointer: fine) {
+  [data-slot="chat-column-panel"] {
+    --aui-thread-list-row-min-height: 36px;
+  }
 }
 @media (pointer: fine) {
   [data-slot="chat-column-panel"] [data-slot="aui_thread-list-item"],

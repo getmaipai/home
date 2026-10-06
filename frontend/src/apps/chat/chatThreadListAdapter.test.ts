@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { toast } from "sonner";
-import { createChatThreadListAdapter, discardIncognitoThreads, needsTitleCatchUp } from "@/apps/chat/chatThreadListAdapter";
+import { createChatThreadListAdapter, discardIncognitoThreads, needsTitleCatchUp, setPendingChatFolder, takeCreatedChatFolder } from "@/apps/chat/chatThreadListAdapter";
 import { api } from "@/lib/api";
 import { offerCarry, withdrawCarry } from "@/apps/chat/chatCarry";
 import type { ThreadMessage } from "@assistant-ui/react";
@@ -184,7 +184,63 @@ describe("HOME-UI-02e: restored Conversations functions", () => {
     await adapter.updateCustom?.(saved.id, { pinned: true });
     expect(saved.title).toBe("Keep this title");
     const reloaded = await createChatThreadListAdapter("Nova").list();
-    expect(reloaded.threads[0]!.custom).toEqual({ pinned: true });
+    expect(reloaded.threads[0]!.custom).toEqual({ pinned: true, folder_id: null });
+  });
+
+  test("PROJECTS-01b: moving a chat sends only folder_id, and a pin sends only pinned", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      const method = init?.method ?? "GET";
+      if (path === "/api/conversations?archived=include") return Response.json([{ id: "conv-move1", title: "Garden", surface: "chat", created_at: "2026-09-07T00:00:00Z", last_turn_at: null, pinned: false, folder_id: null }]);
+      if (path === "/api/conversations/conv-move1" && method === "PATCH") {
+        bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+        return Response.json({});
+      }
+      throw new Error(`unexpected request: ${method} ${path}`);
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova");
+    const listed = await adapter.list();
+    expect(listed.threads[0]!.custom).toEqual({ pinned: false, folder_id: null });
+    await adapter.updateCustom?.("conv-move1", { pinned: false, folder_id: "folder-garden1" });
+    await adapter.updateCustom?.("conv-move1", { pinned: true, folder_id: "folder-garden1" });
+    await adapter.updateCustom?.("conv-move1", { pinned: true, folder_id: null });
+    // Back into the same project after leaving it is a real move (a review found it was dropped).
+    await adapter.updateCustom?.("conv-move1", { pinned: true, folder_id: "folder-garden1" });
+    expect(bodies).toEqual([{ folder_id: "folder-garden1" }, { pinned: true }, { folder_id: null }, { folder_id: "folder-garden1" }]);
+  });
+
+  test("PROJECTS-01b: New chat in project starts only the chat it opened inside it, once, and never in Incognito", async () => {
+    const created: Array<Record<string, unknown>> = [];
+    let sequence = 0;
+    globalThis.fetch = mock(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      created.push(body);
+      if (body.folder_id === "folder-gone01") return new Response(JSON.stringify({ error: "that project is not one of this person's" }), { status: 400 });
+      const id = `conv-new${++sequence}aa`;
+      return Response.json({ id, mode: body.mode ?? "chat", folder_id: body.folder_id ?? null, surface: "chat" });
+    }) as unknown as typeof fetch;
+    setPendingChatFolder({ threadId: "local-1", folderId: "folder-garden1" });
+    const first = await createChatThreadListAdapter("Nova").initialize("local-1");
+    expect(created[0]!.folder_id).toBe("folder-garden1");
+    expect(takeCreatedChatFolder(first.remoteId)).toBe("folder-garden1");
+    expect(takeCreatedChatFolder(first.remoteId)).toBeNull();
+    await createChatThreadListAdapter("Nova").initialize("local-2");
+    expect("folder_id" in created[1]!).toBe(false);
+    setPendingChatFolder({ threadId: "local-3", folderId: "folder-garden1" });
+    await createChatThreadListAdapter("Nova", { incognito: true }).initialize("local-3");
+    expect("folder_id" in created[2]!).toBe(false);
+    // A pending project for another thread is never used, and is dropped.
+    setPendingChatFolder({ threadId: "local-other", folderId: "folder-garden1" });
+    await createChatThreadListAdapter("Nova").initialize("local-4");
+    expect("folder_id" in created[3]!).toBe(false);
+    // A project the hub refuses (deleted meanwhile) still starts the chat, outside any project.
+    setPendingChatFolder({ threadId: "local-5", folderId: "folder-gone01" });
+    const fallback = await createChatThreadListAdapter("Nova").initialize("local-5");
+    expect(created[4]!.folder_id).toBe("folder-gone01");
+    expect("folder_id" in created[5]!).toBe(false);
+    expect(fallback.remoteId).toBeTruthy();
+    setPendingChatFolder(null);
   });
 
   test("message-body search finds a thread whose title never mentions the query", async () => {

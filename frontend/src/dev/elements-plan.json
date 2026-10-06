@@ -3152,6 +3152,40 @@
       "replacesHandBuilt": [],
       "realTurnToday": null,
       "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists."
+    },
+    {
+      "file": "number-ticker.test.tsx",
+      "name": "number-ticker",
+      "group": "tests/support",
+      "verdict": "no-fit",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists."
+    },
+    {
+      "file": "thread-list.projects.aui.test.tsx",
+      "name": "thread-list.projects",
+      "group": "tests/support",
+      "verdict": "no-fit",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists."
     }
   ]
 }

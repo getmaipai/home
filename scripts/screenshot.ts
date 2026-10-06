@@ -325,7 +325,9 @@ const shellNavReview = process.argv.includes("--shell-nav-review");
 const chatShellReview = process.argv.includes("--chat-shell-review") || shellNavReview;
 // COLUMN-01 (owner, 2026-10-06): the chat history column, every state.
 const elementsReview = process.argv.includes("--elements-review");
-const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview;
+// PROJECTS-01b: projects in the chat column (seeded, open, moving a chat, a child's view).
+const chatProjectsReview = process.argv.includes("--chat-projects-review");
+const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -2551,6 +2553,125 @@ async function captureChatShellReview(browser: Browser, sessionValue: string): P
   }
 }
 
+/** PROJECTS-01b: the chat column's Projects section on the seeded owner
+ * (two projects, chats inside and outside), at 1440 and 390 in both themes:
+ * a project open, the chat menu's project list, the new project field, and
+ * a child's column (a parent's project, no "+"). */
+async function captureChatProjectsReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "projects-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${ownerSession}` };
+  const json = { "Content-Type": "application/json", ...cookie };
+  const makeFolder = async (name: string, person?: string) => {
+    const res = await fetch(`${BASE_URL}/api/chat-folders`, { method: "POST", headers: json, body: JSON.stringify(person ? { name, person } : { name }) });
+    if (!res.ok) throw new Error(`projects review: making ${name} failed: ${res.status} ${await res.text()}`);
+    return (await res.json()) as { id: string };
+  };
+  const moveInto = async (conversationId: string, folderId: string) => {
+    const res = await fetch(`${BASE_URL}/api/conversations/${conversationId}`, { method: "PATCH", headers: json, body: JSON.stringify({ folder_id: folderId }) });
+    if (!res.ok) throw new Error(`projects review: moving a chat failed: ${res.status}`);
+  };
+  const garden = await makeFolder("Garden plans");
+  const fair = await makeFolder("Science fair");
+  for (const title of ["Raised bed layout", "When to plant tomatoes", "Compost basics"]) await moveInto((await seedTitledConversation("captureChatProjectsReview", cookie, title)).id, garden.id);
+  for (const title of ["Volcano model", "Poster ideas"]) await moveInto((await seedTitledConversation("captureChatProjectsReview", cookie, title)).id, fair.id);
+  for (const title of ["Dinner ideas", "Packing for the beach", "Birthday party games", "Fixing the bike chain"]) await seedTitledConversation("captureChatProjectsReview", cookie, title);
+
+  const shoot = async (page: Page, name: string) => {
+    await settleAnimations(page);
+    const file = join(outDir, `${name}.png`);
+    await page.screenshot({ path: file });
+    console.log(`Wrote ${file}`);
+  };
+  const openChat = async (page: Page) => {
+    await page.addInitScript(() => localStorage.setItem("maipai.chat.rail-collapsed", "0"));
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+  };
+  const panel = (page: Page, phone: boolean) => (phone ? page.getByRole("dialog") : page.locator('[data-slot="next-chat-rail"]'));
+  const measure = (page: Page) => page.evaluate(() => {
+    const height = (selector: string) => document.querySelector<HTMLElement>(selector)?.getBoundingClientRect().height ?? null;
+    return {
+      projectRow: height('[data-slot="aui_thread-list-project"]'),
+      chatRow: height('[data-slot="aui_thread-list-item"]'),
+      overflow: document.documentElement.scrollWidth > window.innerWidth,
+    };
+  });
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const phone = slug === "phone";
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, ownerSession);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await openChat(page);
+        if (phone) await page.getByRole("button", { name: "Show threads" }).click();
+        const column = panel(page, phone);
+        await column.getByText("Garden plans").waitFor();
+        await column.locator('[data-slot="aui_thread-list-project-trigger"]', { hasText: "Garden plans" }).click();
+        await column.getByText("Raised bed layout").waitFor();
+        const measured = await measure(page);
+        console.log(`projects ${slug} ${theme}: ${JSON.stringify(measured)}`);
+        if (measured.overflow) throw new Error(`projects review ${slug} ${theme} scrolls sideways`);
+        if (!phone && measured.projectRow !== measured.chatRow) throw new Error(`project row ${measured.projectRow}px differs from chat row ${measured.chatRow}px`);
+        await shoot(page, `projects-open-${viewport.width}-${theme}`);
+        if (!phone) {
+          const row = column.locator('[data-slot="aui_thread-list-item"]', { hasText: "Dinner ideas" });
+          await row.hover();
+          await row.getByRole("button", { name: "More options" }).click();
+          await page.getByRole("menuitem", { name: "Move to project" }).click();
+          await page.getByRole("menuitem", { name: "Science fair" }).waitFor();
+          await shoot(page, `projects-move-menu-${viewport.width}-${theme}`);
+          await page.keyboard.press("Escape");
+          await column.getByRole("button", { name: "New project" }).click();
+          await column.getByPlaceholder("Project name").fill("Recipes");
+          await shoot(page, `projects-new-field-${viewport.width}-${theme}`);
+          await page.keyboard.press("Escape");
+          if (theme === "light") {
+            // New chat in project, end to end: the first message lands the chat in the project.
+            const projectRow = column.locator('[data-slot="aui_thread-list-project"]', { hasText: "Science fair" });
+            await projectRow.hover();
+            await projectRow.getByRole("button", { name: "Project options" }).click();
+            await page.getByRole("menuitem", { name: "New chat in project" }).click();
+            await sendChatMessage(page, "Ideas for a baking soda volcano");
+            await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+            const listed = (await (await fetch(`${BASE_URL}/api/conversations`, { headers: cookie })).json()) as Array<{ id: string; folder_id: string | null; turn_count: number }>;
+            const inFair = listed.filter((row) => row.folder_id === fair.id && row.turn_count > 0);
+            if (inFair.length !== 1) throw new Error(`New chat in project: expected one chat with turns in Science fair, found ${inFair.length}`);
+            await column.locator('[data-slot="aui_thread-list-project-items"] [data-slot="aui_thread-list-item"]').first().waitFor();
+            await shoot(page, `projects-new-chat-in-project-${viewport.width}-${theme}`);
+          }
+        }
+      } finally {
+        await context.close();
+      }
+    }
+  }
+
+  // A child's column: a project a parent made, no "+".
+  const childRes = await fetch(`${BASE_URL}/api/people`, { method: "POST", headers: json, body: JSON.stringify({ displayName: "Pippa", role: "child" }) });
+  if (!childRes.ok) throw new Error(`projects review: child setup failed: ${childRes.status}`);
+  const child = (await childRes.json()) as { id: string };
+  await makeFolder("Homework", child.id);
+  const selected = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
+  const childSession = selected.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("projects review: the child sign-in carried no session cookie");
+  const context = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "light", childSession);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await openChat(page);
+    const column = panel(page, false);
+    await column.getByText("Homework").waitFor();
+    if (await column.getByRole("button", { name: "New project" }).count()) throw new Error("a child's column offers New project");
+    await shoot(page, "projects-child-1440-light");
+  } finally {
+    await context.close();
+  }
+}
+
 /** COLUMN-01 (owner, 2026-10-06): the chat history column, open, hidden,
  * mid-slide, searching, hovered and selected rows, pinned, empty, loading
  * and the phone sheet, in both themes, measured. */
@@ -2671,7 +2792,6 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       title: font('[data-slot="next-chat-rail"] [data-slot="chat-column-title"]'),
       toggle: box('[data-slot="next-chat-rail"] [data-slot="chat-column-toggle"]'),
       newChat: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-new"]'),
-      customize: box('[data-slot="next-chat-rail"] [data-slot="chat-column-link"]'),
       row: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]'),
       rowFont: font('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item-title"]'),
       label: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-group-label"]'),
@@ -8965,6 +9085,12 @@ async function main() {
     if (elementsReview) {
       await captureElementsReview(browser, sessionValue);
       console.log("completed named review: --elements-review");
+      return;
+    }
+
+    if (chatProjectsReview) {
+      await captureChatProjectsReview(browser, sessionValue);
+      console.log("completed named review: --chat-projects-review");
       return;
     }
 
