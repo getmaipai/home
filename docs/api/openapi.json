@@ -14955,6 +14955,152 @@
         }
       }
     },
+    "/api/devices/me/assets": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "The pinned asset manifest for this robot",
+        "responses": {
+          "200": {
+            "description": "Pinned assets the hub serves to robots.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "assets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "file": {
+                            "type": "string"
+                          },
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "bytes": {
+                            "type": "number"
+                          },
+                          "licence": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "available": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "file",
+                          "sha256",
+                          "bytes",
+                          "licence",
+                          "kind",
+                          "available"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "assets"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a robot device session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/me/assets/{id}": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Fetch one verified robot asset from the hub",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified bytes; ETag is the pinned SHA-256."
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a robot device session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown asset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Asset is not installed or failed integrity verification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/{id}": {
       "delete": {
         "tags": [

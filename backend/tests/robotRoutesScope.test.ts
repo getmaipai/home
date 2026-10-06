@@ -58,6 +58,8 @@ describe("ROBOT-ROUTES-01: a robot's session is scoped to its own routes", () =>
       await robot.request("/api/turn/no-such-turn/cancel", { method: "POST" }),
       await robot.request("/api/stt/transcribe", { method: "POST", body: {} }),
       await robot.request("/api/tts", { method: "POST", body: {} }),
+      await robot.get("/api/devices/me/assets"),
+      await robot.get("/api/devices/me/assets/unknown-asset"),
     ];
     for (const res of reached) expect([401, 403]).not.toContain(res.status);
   });
@@ -87,6 +89,8 @@ describe("robotSessionMayReach", () => {
     expect(robotSessionMayReach("POST", "/api/turn/abc/cancel")).toBe(true);
     expect(robotSessionMayReach("POST", "/api/tts")).toBe(true);
     expect(robotSessionMayReach("GET", "/api/stt/stream")).toBe(true);
+    expect(robotSessionMayReach("GET", "/api/devices/me/assets")).toBe(true);
+    expect(robotSessionMayReach("GET", "/api/devices/me/assets/example-model")).toBe(true);
   });
 
   test("refuses lookalikes and siblings", () => {
@@ -95,6 +99,7 @@ describe("robotSessionMayReach", () => {
     expect(robotSessionMayReach("GET", "/api/turn")).toBe(false);
     expect(robotSessionMayReach("POST", "/api/tts/voices")).toBe(false);
     expect(robotSessionMayReach("GET", "/api/people")).toBe(false);
+    expect(robotSessionMayReach("GET", "/api/devices/me/assets/one/two")).toBe(false);
     expect(robotSessionMayReach("PUT", "/api/devices/me/state/../../people")).toBe(false);
   });
 });

@@ -453,6 +453,7 @@ function protocolSignal(input: SignalInput, protocol: ProtocolAnswer): TurnSigna
 // richer expressed label on the turn and project each clause to that
 // stable shared subset for the existing clause record contract.
 function clauseEmotionLabel(emotion: string): "neutral" | "happiness" | "surprise" | "sadness" | "anger" | "disgust" | "fear" {
+  if (emotion === "happiness" || emotion === "surprise" || emotion === "sadness") return emotion;
   if (emotion === "happy" || emotion === "excited" || emotion === "proud" || emotion === "playful") return "happiness";
   if (emotion === "surprised") return "surprise";
   if (emotion === "sad" || emotion === "gentle" || emotion === "tired") return "sadness";

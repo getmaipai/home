@@ -2,6 +2,7 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { privacyConnections, platformConnections, pluginConnections, offlinePluginNames } from "@/lib/privacy";
+import { ROBOT_ASSETS } from "@/lib/robotAssets";
 import { listPackageIds, loadPackage } from "@/lib/plugins";
 import type { PrivacyConnection } from "@/wire";
 
@@ -96,6 +97,13 @@ describe("the hub's own connections", () => {
     expect(row?.destination).toBe("api.github.com");
     expect(row?.what).toContain("MaiPai Bot");
     expect(row?.what).toContain("robot is paired");
+  });
+
+  test("robot asset privacy destinations are generated from the pinned manifest URLs", () => {
+    const expected = [...new Set(ROBOT_ASSETS.map((asset) => new URL(asset.source_url).hostname))].join(", ");
+    const row = platformConnections().find((connection) => connection.id === "platform:robot-assets");
+    expect(row?.destination).toBe(expected);
+    expect(row?.who).toBe(expected);
   });
 
   test("Home declares no downloads for the deleted embedding and background engines", () => {

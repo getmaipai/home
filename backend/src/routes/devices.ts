@@ -13,6 +13,7 @@ import { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import { discoverRobots } from "@/lib/robotDiscovery";
 import { rotateRobotPassword, RobotPasswordRotationError } from "@/lib/robotSsh";
 import { storeRobotCredential, hasRotatedRobotCredential, getRobotCredential, getMostRecentRobotCredentialForHost } from "@/lib/robotCredentials";
+import { ensureRobotAssets, isRobotAssetAvailable, readVerifiedRobotAsset, robotAssetById, ROBOT_ASSETS } from "@/lib/robotAssets";
 
 export const devicesRoutes = apiRouter();
 
@@ -100,6 +101,55 @@ devicesRoutes.openapi(updateMyStateRoute, (c) => {
   if (!device) return c.json({ error: "Not signed in" }, 401);
   upsertDeviceState(device.id, c.req.valid("json"));
   return c.body(null, 204);
+});
+
+const RobotAssetsSchema = z.object({
+  assets: z.array(z.object({
+    id: z.string(), file: z.string(), sha256: z.string(), bytes: z.number(), licence: z.string(), kind: z.string(), available: z.boolean(),
+  })),
+});
+const robotAssetsRoute = createRoute({
+  method: "get",
+  path: "/me/assets",
+  tags: ["Devices"],
+  summary: "The pinned asset manifest for this robot",
+  middleware: [requireDeviceSession("robot")] as const,
+  responses: {
+    200: { content: { "application/json": { schema: RobotAssetsSchema } }, description: "Pinned assets the hub serves to robots." },
+    ...errorResponses({ 401: "Not signed in", 403: "Not a robot device session" }),
+  },
+});
+devicesRoutes.openapi(robotAssetsRoute, async (c) => {
+  if (process.env.MAIPAI_TEST_ALLOW_MULTIPLE_HUBS !== "1" && process.env.NODE_ENV !== "test") void ensureRobotAssets();
+  return c.json({
+    assets: await Promise.all(ROBOT_ASSETS.map(async (asset) => ({
+      id: asset.id, file: asset.file, sha256: asset.sha256, bytes: asset.bytes, licence: asset.licence, kind: asset.kind,
+      available: await isRobotAssetAvailable(asset.id),
+    }))),
+  }, 200);
+});
+
+const robotAssetBytesRoute = createRoute({
+  method: "get",
+  path: "/me/assets/{id}",
+  tags: ["Devices"],
+  summary: "Fetch one verified robot asset from the hub",
+  middleware: [requireDeviceSession("robot")] as const,
+  request: { params: z.object({ id: z.string() }) },
+  responses: {
+    200: { description: "Verified bytes; ETag is the pinned SHA-256." },
+    ...errorResponses({ 401: "Not signed in", 403: "Not a robot device session", 404: "Unknown asset", 503: "Asset is not installed or failed integrity verification" }),
+  },
+});
+devicesRoutes.openapi(robotAssetBytesRoute, async (c) => {
+  const asset = robotAssetById(c.req.valid("param").id);
+  if (!asset) return c.json({ error: "Unknown robot asset" }, 404);
+  const bytes = await readVerifiedRobotAsset(asset);
+  if (!bytes) return c.json({ error: "Robot asset is not ready" }, 503);
+  return new Response(bytes, {
+    status: 200,
+    headers: { "Content-Type": "application/octet-stream", "Content-Length": String(asset.bytes), ETag: `"${asset.sha256}"`, "Cache-Control": "private, max-age=31536000, immutable" },
+  });
 });
 
 const deleteRoute = createRoute({

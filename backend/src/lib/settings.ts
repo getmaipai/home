@@ -198,14 +198,10 @@ export function resolveForResponse(
 export function listValues(actor: PersonRow, scope: string): SettingsOpResult<ResolvedSetting[]> {
   const parsed = parseScope(scope);
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
-  const auth = parsed.kind === "device" && actor.role === "adult"
-    ? (() => {
-        const deviceKeys = getRegistry().filter((keyDef) => keyDef.scope === "device");
-        if (deviceKeys.length > 0 && deviceKeys.every((keyDef) => keyDef.key === WAKEWORD_SETTING_KEY)) {
-          return assertCanAccessWakewordDeviceSetting(actor);
-        }
-        return assertCanAccessScope(actor, parsed, "read");
-      })()
+  const adultWakewordRead = parsed.kind === "device" && actor.role === "adult"
+    && getRegistry().some((keyDef) => keyDef.key === WAKEWORD_SETTING_KEY);
+  const auth = adultWakewordRead
+    ? assertCanAccessWakewordDeviceSetting(actor)
     : assertCanAccessScope(actor, parsed, "read");
   if (!auth.ok) return auth;
 
@@ -213,7 +209,7 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
   const storedByKey = new Map(stored.map((row) => [row.key, row]));
 
   const results: ResolvedSetting[] = getRegistry()
-    .filter((k) => k.scope === parsed.kind)
+    .filter((k) => k.scope === parsed.kind && (!adultWakewordRead || k.key === WAKEWORD_SETTING_KEY))
     .map((k) => {
       const row = storedByKey.get(k.key);
       const rawValue = row ? decodeStoredRow(k, row.value) : k.default;

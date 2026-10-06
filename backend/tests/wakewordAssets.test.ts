@@ -132,7 +132,9 @@ describe("device wake-word setting safety", () => {
     const adultPut = await adult.request("/api/settings", { method: "PUT", body: write });
     expect(adultPut.status).toBe(200);
     const adultRead = await adult.get(`/api/settings?scope=${scope}`);
-    expect((await adultRead.json() as { key: string; value: unknown }[]).find((entry) => entry.key === WAKEWORD_SETTING_KEY)?.value).toBe(true);
+    const adultSettings = await adultRead.json() as { key: string; value: unknown }[];
+    expect(adultSettings.find((entry) => entry.key === WAKEWORD_SETTING_KEY)?.value).toBe(true);
+    expect(adultSettings.map((entry) => entry.key)).toEqual([WAKEWORD_SETTING_KEY]);
   });
 });
 

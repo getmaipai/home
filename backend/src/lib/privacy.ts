@@ -15,6 +15,7 @@ import { KIWIX_BINARIES } from "@/lib/kiwixCatalog";
 import { KIWIX_CATALOG_URL } from "@/lib/referenceLibrary";
 import { WAKEWORD_ALL_ASSETS } from "@/lib/wakewordAssets";
 import { VISION_ALL_ASSETS } from "@/lib/visionAssets";
+import { ROBOT_ASSETS } from "@/lib/robotAssets";
 import { SILERO_VAD_ASSET } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
 import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
@@ -68,6 +69,7 @@ export function platformConnections(): PrivacyConnection[] {
   // about them belongs in a table of connections that really happen.
   const wakewordHosts = hostsOf(WAKEWORD_ALL_ASSETS.map((a) => a.url));
   const visionHosts = hostsOf(VISION_ALL_ASSETS.map((a) => a.url));
+  const robotAssetHosts = hostsOf(ROBOT_ASSETS.map((asset) => asset.source_url));
   const voiceHost = hostsOf([voiceCatalogUrl()]);
   const sttHosts = hostsOf([SILERO_VAD_ASSET.url]);
   const internetProbeOn = getHouseholdSettingValue(INTERNET_PROBE_ENABLED_KEY) !== false;
@@ -83,6 +85,10 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:face-vision-models", visionHosts, {
       when: "once, when someone starts face enrollment in the browser",
       what: DOWNLOAD_CARRIES,
+    }),
+    row("platform:robot-assets", robotAssetHosts, {
+      when: "once, when MaiPai prepares the pinned models a paired robot uses",
+      what: "the file name of each pinned robot model being downloaded, and your home's internet address. Nothing anyone in the house said, asked, or saved.",
     }),
     row("platform:voice-list", voiceHost, {
       when: "when an adult opens the list of voices to pick one",
