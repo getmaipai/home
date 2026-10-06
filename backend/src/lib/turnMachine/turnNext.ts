@@ -45,12 +45,12 @@ import { StatusChannel } from "@/lib/statusChannel";
 import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
 import { scheduleConversationTitle } from "@/lib/conversationTitle";
 import { StreamGate, gateGrainFor } from "./nodes/outputGate";
-import { resolveTurnBudgetWithStack } from "./budget";
+import { resolveTurnBudgetWithStack, withTurnToolGates } from "./budget";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
-import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, answerImagesAllowed, settleAnswerImages } from "@/lib/answerImages/turn";
+import { AnswerImagePlacer, answerImagesAllowed, settleAnswerImages } from "@/lib/answerImages/turn";
 
 export interface RunTurnNextOpts {
   conversationId?: string;
@@ -445,7 +445,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // model's own record offers it AND this turn may show pictures; the
   // record keeps it out until ANSWER-IMG-05's bench passes.
   const answerImagesOk = answerImagesAllowed({ actor, band, surfaceClass, spoken: opts.spoken === true, temporary, bare, ephemeral: opts.ephemeral === true });
-  const budget: TurnBudget = answerImagesOk || !thinkingBudget.tools_offered.includes(SHOW_IMAGES_TOOL_ID) ? thinkingBudget : { ...thinkingBudget, tools_offered: thinkingBudget.tools_offered.filter((id) => id !== SHOW_IMAGES_TOOL_ID) };
+  const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk);
 
   const state: TurnState = {
     turnId,

@@ -9,6 +9,7 @@ import { CATALOG, thinkingModeFor } from "@/lib/modelCatalog";
 import { chatWindowContext, MINIMUM_CHAT_WINDOW_TOKENS } from "@/lib/roleHealth";
 import type { AgeBand } from "@/lib/ageBand";
 import type { TurnBudget } from "./contract";
+import { SHOW_IMAGES_TOOL_ID } from "@/lib/answerImages/turn";
 
 /** DEADLINE-02: the stream watchdog's defaults, used when a model's record
  * (which carries only model, tool and total) names none. */
@@ -94,4 +95,15 @@ export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBan
   const runs = modelId ?? context.modelId;
   const thinking = runs !== undefined && thinkingModeFor(runs) === "none" ? { thinking_budget_tokens: 0, thinking_budget_tokens_toggled: 0 } : {};
   return { ...base, ...thinking, context_tokens: context.tokens, context_window_tokens: context.reported ? context.tokens : null };
+}
+
+/** The per-turn adjustment of the offered tool set, in one place
+ * (SKILLS-PAGE-01): the turn (turnNext.ts) and the Customize page's
+ * "Used in chat" state (routes/plugins.ts) both call it, so the page never
+ * claims a tool the turn would not offer. ANSWER-IMG-02 (rules 0 and 8):
+ * `show_images` stays only when the model's record offers it AND this
+ * turn may show pictures. Never mutates `budget`. */
+export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean): TurnBudget {
+  if (answerImagesOk || !budget.tools_offered.includes(SHOW_IMAGES_TOOL_ID)) return budget;
+  return { ...budget, tools_offered: budget.tools_offered.filter((id) => id !== SHOW_IMAGES_TOOL_ID) };
 }

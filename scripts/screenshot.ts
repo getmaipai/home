@@ -327,6 +327,8 @@ const chatShellReview = process.argv.includes("--chat-shell-review") || shellNav
 const elementsReview = process.argv.includes("--elements-review");
 // PROJECTS-01b: projects in the chat column (seeded, open, moving a chat, a child's view).
 const chatProjectsReview = process.argv.includes("--chat-projects-review");
+// SKILLS-PAGE-01: the Skills section of Chat settings, an adult and a teen, 1440 and 390, both themes.
+const chatSkillsReview = process.argv.includes("--chat-skills-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
@@ -2550,6 +2552,54 @@ async function captureChatShellReview(browser: Browser, sessionValue: string): P
     if (numbers.pageOverflowX) throw new Error("captureChatShellReview: horizontal page overflow at 390");
   } finally {
     await context.close();
+  }
+}
+
+/** SKILLS-PAGE-01: the Skills section of Chat settings for an adult and a
+ * teen, at 1440 and 390, light and dark, with the empty "Added to this home" state. */
+async function captureChatSkillsReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "skills-shots");
+  mkdirSync(outDir, { recursive: true });
+  const ownerHeaders = { "Content-Type": "application/json", Cookie: `session=${ownerSession}` };
+  const created = await fetch(`${BASE_URL}/api/people`, {
+    method: "POST", headers: ownerHeaders,
+    body: JSON.stringify({ displayName: "Skills Reviewer", role: "teen", secret: "review-skills-secret" }),
+  });
+  if (!created.ok) throw new Error(`skills review teen setup failed: ${created.status} ${await created.text()}`);
+  const teen = await created.json() as { id: string };
+  const signedIn = await fetch(`${BASE_URL}/api/auth/verify-secret`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ personId: teen.id, secret: "review-skills-secret" }),
+  });
+  const teenSession = signedIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!teenSession) throw new Error("skills review teen sign-in carried no session cookie");
+  for (const [who, session] of [["adult", ownerSession], ["teen", teenSession]] as const) {
+    for (const slug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          await page.goto(`${BASE_URL}/settings?tab=me&section=skills`);
+          await page.locator("[data-skill-id]").first().waitFor();
+          await page.getByText("No skills added yet").waitFor();
+          const counts = await page.evaluate(() => ({
+            rows: document.querySelectorAll("[data-skill-id]").length,
+            used: [...document.querySelectorAll("[data-skill-id]")].filter((el) => el.textContent?.includes("Used in chat")).length,
+            overflow: document.documentElement.scrollWidth > window.innerWidth,
+          }));
+          console.log(`skills ${who} ${slug} ${theme}: ${JSON.stringify(counts)}`);
+          if (counts.overflow) throw new Error(`skills ${who} ${slug} ${theme} scrolls sideways`);
+          await settleAnimations(page);
+          const file = join(outDir, `skills-${who}-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path: file, fullPage: true });
+          console.log(`Wrote ${file}`);
+        } finally {
+          await context.close();
+        }
+      }
+    }
   }
 }
 
@@ -9085,6 +9135,12 @@ async function main() {
     if (elementsReview) {
       await captureElementsReview(browser, sessionValue);
       console.log("completed named review: --elements-review");
+      return;
+    }
+
+    if (chatSkillsReview) {
+      await captureChatSkillsReview(browser, sessionValue);
+      console.log("completed named review: --chat-skills-review");
       return;
     }
 

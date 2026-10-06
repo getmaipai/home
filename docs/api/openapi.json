@@ -4702,6 +4702,89 @@
         }
       }
     },
+    "/api/plugins/skills": {
+      "get": {
+        "tags": [
+          "Packages"
+        ],
+        "summary": "List the skills this person's chat can use",
+        "responses": {
+          "200": {
+            "description": "Installed plugin, skill and project packages at or below the person's role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "plugin",
+                          "skill",
+                          "project"
+                        ]
+                      },
+                      "name": {
+                        "type": "string",
+                        "description": "The package's display name."
+                      },
+                      "description": {
+                        "type": "string",
+                        "description": "What it does, in one line."
+                      },
+                      "origin": {
+                        "type": "string",
+                        "enum": [
+                          "bundled",
+                          "store"
+                        ],
+                        "description": "bundled: ships with Home. store: added to this home from the catalog."
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "enabled",
+                          "disabled"
+                        ],
+                        "description": "disabled: its last smoke test failed."
+                      },
+                      "used_in_chat": {
+                        "type": "boolean",
+                        "description": "Offered in the asking person's written chat today."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "name",
+                      "description",
+                      "origin",
+                      "status",
+                      "used_in_chat"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands": {
       "get": {
         "tags": [

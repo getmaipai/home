@@ -29,6 +29,10 @@ See the [Privacy](privacy.md) page for what each one sends, and to whom.
 
 Some answers include small numbered markers such as **[1]** in the reply. Tap a marker to open the matching source. Choose **Sources** under the reply to see its source list.
 
+## See what MaiPai can do
+
+Open **Settings**, **Me**, **Chat skills** to see the skills MaiPai has, like the weather, timers and reminders. Each one says **Used in chat** when MaiPai can use it in your chats today. Skills added to your home from the MaiPai Catalog show up under **Added to this home**. Children do not have this section.
+
 ## Save a draft
 
 If you type in a saved chat and leave before sending, Chat keeps your draft on this device. Open that chat again and choose **Restore** to put the text back, or **Discard** to remove it. Sending the message clears the draft. Drafts are not saved in Incognito.

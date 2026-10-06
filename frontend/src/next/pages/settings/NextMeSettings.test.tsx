@@ -54,6 +54,8 @@ describe("NextMeSettings", () => {
       expect((document.querySelector("input#profile-display-name") as HTMLInputElement).value).toBe("Nova");
       expect(document.body.textContent).toContain("Face recognition");
       for (const name of ["Profile", "Appearance", "Chat", "Voice and AI", "Notifications", "Privacy and data"]) expect(document.body.textContent).toContain(name);
+      // SKILLS-PAGE-01: a child has no Chat skills section.
+      expect(document.body.textContent).not.toContain("Chat skills");
       expect(document.body.textContent).not.toContain("Limits");
       expect(document.body.textContent).not.toContain("Allowance");
       expect(document.body.textContent).not.toContain("My storage");
@@ -171,6 +173,19 @@ describe("NextMeSettings", () => {
       expect(card).toContain("search.safe_search");
       expect(card).not.toContain("chat.photo_uploads");
     } finally { restore(); }
+  });
+
+  test("SKILLS-PAGE-01: an adult has a Chat skills section; a child does not", async () => {
+    const adult = setup("owner", "/settings?section=skills");
+    try {
+      await waitFor(() => expect(adult.getByRole("tab", { name: "Chat skills" }).getAttribute("aria-selected")).toBe("true"));
+    } finally { adult.restore(); }
+    cleanup();
+    const kid = setup("child", "/settings?section=skills");
+    try {
+      await waitFor(() => expect(kid.getByRole("tab", { name: "Profile" }).getAttribute("aria-selected")).toBe("true"));
+      expect(kid.queryByRole("tab", { name: "Chat skills" })).toBeNull();
+    } finally { kid.restore(); }
   });
 
   test("profile form saves the person's name and Appearance keeps only reply stats", async () => {

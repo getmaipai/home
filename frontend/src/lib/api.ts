@@ -323,6 +323,19 @@ export interface InstalledPackage extends Omit<PackageManifest, "smoke"> {
   smoke: { last_run_at: string | null; ok: boolean | null; message: string | null };
 }
 
+// GET /api/plugins/skills's row (backend/src/routes/plugins.ts, SKILLS-PAGE-01).
+export interface SkillRow {
+  id: string;
+  kind: "plugin" | "skill" | "project";
+  name: string;
+  description: string;
+  /** Ships with Home, or added to this home from the catalog. */
+  origin: "bundled" | "store";
+  status: "enabled" | "disabled";
+  /** Offered in the signed-in person's written chat today. */
+  used_in_chat: boolean;
+}
+
 // GET /api/store/installs/:id's response (backend/src/routes/store.ts's
 // InstalledPackageSchema): null when the package has no active store
 // install (bundled-only, or never installed through the store) - the
@@ -1060,6 +1073,9 @@ export const api = {
   // state suggested prompts (step 4) are drawn from these rather than
   // invented, so they're always real things MaiPai can actually do.
   plugins: () => request<InstalledPackage[]>("/api/plugins"),
+  // SKILLS-PAGE-01: every installed plugin, skill and project package this
+  // person may use, with whether their written chat offers it today.
+  skills: () => request<SkillRow[]>("/api/plugins/skills"),
   // STORE-SHARE-01: my own Library - files I own, plus files shared with
   // me, each listed once under its real owner (owner_person_id), never
   // the recipient - a shared file's usage counts against the owner only.

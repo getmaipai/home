@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
+import { ChatSkillsSection } from "@/next/pages/settings/ChatSkillsSection";
 import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { api, type PersonRosterEntry, type Roster } from "@/lib/api";
@@ -20,6 +21,9 @@ const sections = [
   { id: "profile", title: "Profile", description: "Your name and profile photo." },
   { id: "appearance", title: "Appearance", description: "Choose how MaiPai looks." },
   { id: "chat", title: "Chat", description: "Choose how chat talks, searches and handles photos." },
+  // SKILLS-PAGE-01: skills live under Chat settings (owner, 2026-10-06), here
+  // until the per-app settings shell (APP-SETTINGS-DESIGN) gives Chat its own.
+  { id: "skills", title: "Chat skills", description: "See what the assistant can do for you in chat." },
   { id: "voice-ai", title: "Voice and AI", description: "Choose how MaiPai speaks." },
   { id: "notifications", title: "Notifications", description: "Choose what you hear about." },
   { id: "privacy-data", title: "Privacy and data", description: "Review your data and signed-in devices." },
@@ -48,6 +52,7 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
       const groups = person.role === "child" ? ["person.persona", "person.search"] : ["person.persona", "person.search", "person.chat"];
       return <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={groups} titleOverrides={Object.fromEntries(groups.map((group) => [group, "Chat"]))} mergeGroups />;
     }
+    if (id === "skills") return <ChatSkillsSection person={person} />;
     if (id === "voice-ai") return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.voice"]} titleOverrides={{ "person.voice": "Voice and AI" }} /><ManagementLinks links={["Voices", "Commands"]} /></>;
     if (id === "notifications") return <NotificationSettings person={person} />;
     return <><ManagementLinks links={["Devices"]} /><div className="grid gap-4 sm:grid-cols-2">
@@ -56,7 +61,8 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
       <LinkCard title="Status" description="See whether the parts of MaiPai are working." to="/status" />
     </div></>;
   }
-  const content: SettingsSection[] = sections.map((item) => ({
+  // A child has no Skills section (CHAT-UI-SPEC section 9).
+  const content: SettingsSection[] = sections.filter((item) => item.id !== "skills" || person.role !== "child").map((item) => ({
     id: item.id,
     label: item.title,
     description: item.description,
