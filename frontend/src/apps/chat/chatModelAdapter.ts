@@ -11,6 +11,8 @@ import { messageText } from "@/apps/chat/chatMessageText";
 import { stagedDocumentPayload, clearStagedImageAttachment } from "@/apps/chat/localImageAttachmentAdapter";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
+import { textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
+import type { AnswerImageSet } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 
@@ -256,6 +258,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // there is no separate sequence field on these events.
       const toolCalls = new Map<string, { packageId: string; state: "running" | "ok" | "error"; failureKind?: string; sites?: { host: string; url: string }[] }>();
       let failedTool = false;
+      // ANSWER-IMG-04: the hub's picture set, once its `images` event arrives;
+      // the reply text is split at its paragraph boundary around it.
+      let answerImages: AnswerImageSet | undefined;
 
       // One definition (a review caught this built twice, copy-pasted,
       // between buildContent() and the done handler below): `turnId`
@@ -284,7 +289,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // opposite of sources' "compact card under the reply."
         const timeline = toolTimelinePart(resumeTurnId);
         if (timeline) parts.push(timeline);
-        if (visible) parts.push({ type: "text", text: visible });
+        if (visible || answerImages) parts.push(...textWithAnswerImages(visible, answerImages, `${resumeTurnId ?? "live"}-images`).filter((part) => part.type !== "text" || part.text));
         return parts;
       }
 
@@ -632,7 +637,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // this never adds a part in the running app until the
                 // backend half lands.
                 ...(timelinePart ? [timelinePart] : []),
-                { type: "text" as const, text: finalText },
+                ...textWithAnswerImages(finalText, event.value.answer_images ?? answerImages, `${event.value.turn_id}-images`),
                 // Slice 5(a): AFTER the text part, not before - spec.md's
                 // own "a compact card UNDER the reply." The "tool parts
                 // before text" rule above was about the structured
@@ -682,8 +687,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               },
             };
           } else if (event.type === "images") {
-            // ANSWER-IMG-02: the hub's picture set (additive, rule 9). Rendered
-            // by ANSWER-IMG-04; until then it is not an error.
+            // ANSWER-IMG-04: the hub's picture set (additive, rule 9), placed
+            // at the end of the text received so far, so nothing above it
+            // moves; resent on a resume, so it is idempotent.
+            answerImages = { layout: event.layout, after_paragraph: event.after_paragraph, visible: event.visible, items: event.items };
+            yield { content: buildContent() };
             continue;
           } else if (event.type === "reasoning") {
             // SHELL-02: rendered by the reasoning Element (thread.aui.tsx)

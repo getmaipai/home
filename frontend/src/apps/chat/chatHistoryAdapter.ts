@@ -2,6 +2,7 @@ import { ExportedMessageRepository, type ThreadHistoryAdapter, type ThreadMessag
 import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
+import { textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
 
 export type FeedbackVerdict = "positive" | "negative";
 
@@ -171,7 +172,7 @@ export function rowsToBranchableMessages(
       // read-side gate, gated on the READING actor, never even stored for
       // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.sources?.length
+        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.sources?.length || row.answer_images
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
               ...(row.structured_part ? [toolCallPart(`${row.id}-structured`, row.structured_part.tool_id, row.structured_part)] : []),
@@ -189,7 +190,8 @@ export function rowsToBranchableMessages(
               // needed here: `open` is already correct by the time it
               // reaches this adapter.
               ...(row.confirm ? [toolCallPart(`${row.id}-confirm`, "confirm", { package_id: row.confirm.package_id, open: row.confirm.open, turn_id: row.id })] : []),
-              { type: "text" as const, text: row.replyText },
+              // ANSWER-IMG-04: the stored picture set, where it was shown live.
+              ...textWithAnswerImages(row.replyText, row.answer_images, `${row.id}-images`),
               // PROJECT-PROGRESS-01: conversationHistory.ts's own
               // projectByTurn lookup already hides this once `row.artifact`
               // is set (the project finished and posted - the design

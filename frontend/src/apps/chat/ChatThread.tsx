@@ -1,7 +1,7 @@
 import { createContext, useCallback, useMemo, useRef, type RefObject } from "react";
-import { useAssistantToolUI } from "@assistant-ui/react";
+import { useAssistantDataUI, useAssistantToolUI } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
-import { MODEL_SELECTOR_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type ToolBinding } from "@/apps/chat/elementBindings";
+import { DATA_BINDINGS, MODEL_SELECTOR_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
 import { ChatThreadExtras } from "@/apps/chat/ChatThreadExtras";
 
@@ -24,6 +24,11 @@ export const ChatExtrasContext = createContext<ChatExtrasContextValue | null>(nu
 
 function ElementBinding({ binding }: { binding: ToolBinding }) {
   useAssistantToolUI({ toolName: binding.toolName, render: binding.render, display: "standalone" });
+  return null;
+}
+
+function DataElementBinding({ binding }: { binding: DataBinding }) {
+  useAssistantDataUI({ name: binding.name, render: binding.render });
   return null;
 }
 
@@ -66,6 +71,7 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
       className="relative flex min-h-0 flex-1 flex-col"
     >
       {TOOL_BINDINGS.map((binding) => <ElementBinding key={binding.toolName} binding={binding} />)}
+      {DATA_BINDINGS.map((binding) => <DataElementBinding key={binding.name} binding={binding} />)}
       <div className="flex justify-center">
         <ChatConnectionBanner />
       </div>

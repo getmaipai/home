@@ -388,6 +388,32 @@ describe("createChatModelAdapter streaming", () => {
 
   // The adapter shows released text exactly as sent; it holds nothing back
   // looking for a tag the wire never carries (rule 9: no client-side parsing).
+  test("ANSWER-IMG-04: the picture set lands after the text already shown, and the reply keeps that order when done", async () => {
+    const pid = `ai_${"1".padStart(32, "0")}`;
+    const set = { layout: "row", after_paragraph: 1, visible: 1, items: [{ id: pid, src: `/api/answer-image/${pid}?v=tile`, full: `/api/answer-image/${pid}?v=full`, width: 640, height: 480, alt: "a tower", caption: "a tower", source: { title: "Tower", site: "commons.wikimedia.org", url: "https://commons.wikimedia.org/wiki/File:Tower.jpg" } }] };
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "turn_meta", conversation_id: "c1", turn_id: "t1" },
+        { type: "delta", text: "The tower is tall.\n\n" },
+        { type: "images", turn_id: "t1", ...set },
+        { type: "delta", text: "It is in Paris." },
+        { type: "done", value: { reply: { text: "The tower is tall.\n\nIt is in Paris." }, source: "model", safety: SAFETY, turn_id: "t1", answer_images: set } },
+      ]),
+    );
+    try {
+      const { yields, error } = await collect([fakeUserMessage("what does the tower look like")]);
+      expect(error).toBeUndefined();
+      const shapes = yields.filter((y) => y.content).map((y) => y.content!.map((p) => p.type === "text" ? `text:${p.text}` : p.type === "data" ? `data:${(p as { name: string }).name}` : p.type));
+      // Every yield after the set arrives keeps the earlier text first, unmoved.
+      expect(shapes).toContainEqual(["text:The tower is tall.", "data:answer-images"]);
+      expect(shapes.at(-1)).toEqual(["text:The tower is tall.", "data:answer-images", "text:It is in Paris."]);
+      const firstWithData = shapes.findIndex((s) => s.includes("data:answer-images"));
+      for (const shape of shapes.slice(firstWithData)) expect(shape[0]).toBe("text:The tower is tall.");
+    } finally {
+      env.restore();
+    }
+  });
+
   test("a released delta is shown as sent, never held back for a possible <think> tag", async () => {
     const env = stubEnvironment(
       ndjsonStream([

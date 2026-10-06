@@ -21,7 +21,7 @@
 // `@maipai/ui/src/elements/...` imports from Home source; test and dev files
 // are excluded. This registry documents which chat renderers compose each
 // Element, while the scanner reports imports mechanically.
-import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
+import type { DataMessagePartComponent, ToolCallMessagePartComponent } from "@assistant-ui/react";
 import {
   AssistantMoreItems,
   ChatMessageQueue,
@@ -39,6 +39,7 @@ import { ArtifactCardToolRender, ConfirmToolRender, ProjectToolRender, SourcesNo
 import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
 import { preprocessChatMarkdown } from "@/apps/chat/chatStreamingMarkdown";
+import { ANSWER_IMAGES_PART, AnswerImagesDataRender } from "@/apps/chat/chatAnswerImages";
 export type ToolBinding = {
   /** The tool-call part's `toolName` on the wire (chatModelAdapter.ts). */
   toolName: string;
@@ -62,6 +63,21 @@ export const TOOL_BINDINGS: readonly ToolBinding[] = [
   { toolName: "project", element: "job-progress", render: ProjectToolRender },
   { toolName: "tool_timeline", element: "tool-timeline", render: ToolTimelineToolRender },
   { toolName: "sources", element: "sources", render: SourcesNoopRender },
+];
+
+export type DataBinding = {
+  /** The data part's `name` on the wire. */
+  name: string;
+  /** The shipped Element the renderer composes, for the adoption audit. */
+  element: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- each renderer types its own data shape
+  render: DataMessagePartComponent<any>;
+};
+
+// ANSWER-IMG-04: named `data` parts render in place, where the hub put them
+// in the reply (between two text parts), through the shipped Element.
+export const DATA_BINDINGS: readonly DataBinding[] = [
+  { name: ANSWER_IMAGES_PART, element: "image-gallery", render: AnswerImagesDataRender },
 ];
 
 // The kit Thread's `components` slots. Per-page behaviour (what a sent edit

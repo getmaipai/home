@@ -286,6 +286,7 @@ const nextStorageReview = process.argv.includes("--next-storage-review");
 const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
 const nextChatHistoryReview = process.argv.includes("--next-chat-history-review");
+const nextChatAnswerImages = process.argv.includes("--next-chat-answer-images");
 const showcaseScrollReview = process.argv.includes("--showcase-scroll-review");
 const nextChatScrollReview = process.argv.includes("--next-chat-scroll-review");
 const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
@@ -302,7 +303,7 @@ const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audi
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatComposerReview || nextChatQueueReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatComposerReview || nextChatQueueReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -3322,6 +3323,125 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
     await page.close();
   } finally {
     await wideTenContext.close();
+  }
+}
+
+/** ANSWER-IMG-04: pictures in a chat answer, the kit image gallery. A real
+ * scripted turn is sent in a demo conversation, then this run's throwaway
+ * demo database gives that stored turn a picture set whose files sit in the
+ * hub's own picture cache (generated here: licence-clean synthetic scenes,
+ * nothing downloaded), because no outside picture host is reachable from a
+ * screenshot run. The thread is reopened, so the tiles are what the history
+ * path renders. Captures the row with its +2 badge, the gallery open, and a
+ * reply with no pictures, at 1440 and 390 in both themes; logs the reply
+ * text's top offset before and after the pictures paint (held back by the
+ * test, then released) so "no layout shift" is a number. */
+async function captureNextChatAnswerImages(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const evidenceTag = process.env.UI_EVIDENCE_TAG ?? "after";
+  const withTitle = "What the tower looks like";
+  const withoutTitle = "A plain question";
+  // Each conversation gets its turn before the next one is created (the
+  // history capture's own order: an empty thread is the one a send lands in).
+  const seedTurn = async (title: string): Promise<{ id: string }> => {
+    const conversation = await seedTitledConversation("captureNextChatAnswerImages", cookie, title);
+    const seedContext = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "dark", sessionValue);
+    try {
+      const page = await seedContext.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await openStoredConversation(page, conversation.id, title);
+      await sendChatMessage(page, "Show me a short demo reply.");
+      await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).waitFor({ timeout: 30000 });
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    } finally {
+      await seedContext.close();
+    }
+    return conversation;
+  };
+  const withPictures = await seedTurn(withTitle);
+  const withoutPictures = await seedTurn(withoutTitle);
+  // The picture files go into the hub's own cache through the cache module
+  // itself, so ids, variants and the index are exactly what a live turn writes.
+  const seedSource = `
+    import sharp from "sharp";
+    import { putAnswerImage } from "./src/lib/answerImages/cache";
+    const scenes = [["#7cb7e8", "#f6c453", "#3f7d4e"], ["#f2a65a", "#ffe08a", "#8a5a44"], ["#2f4a7a", "#e8eef7", "#56606e"], ["#a7d8c9", "#ffffff", "#2e6b5e"], ["#e9c2d4", "#fff4c2", "#6b4a7a"]];
+    const out = [];
+    for (const [i, [sky, sun, land]] of scenes.entries()) {
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + sky + '"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs><rect width="1200" height="900" fill="url(#g)"/><circle cx="' + (300 + i * 150) + '" cy="220" r="110" fill="' + sun + '"/><path d="M0 640 Q300 ' + (480 + i * 20) + ' 600 620 T1200 600 V900 H0Z" fill="' + land + '"/><path d="M560 660 L600 260 L640 660 Z" fill="#3b3b44"/><rect x="520" y="640" width="160" height="22" fill="#3b3b44"/></svg>';
+      const png = await sharp(Buffer.from(svg)).png().toBuffer();
+      const full = await sharp(png).resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 86 }).toBuffer();
+      const tile = await sharp(png).resize({ width: 640, height: 640, fit: "inside" }).webp({ quality: 82 }).toBuffer();
+      const id = await putAnswerImage({ tile: new Uint8Array(tile), full: new Uint8Array(full), band: "adult" });
+      out.push({ id, src: "/api/answer-image/" + id + "?v=tile", full: "/api/answer-image/" + id + "?v=full", width: 1200, height: 900, alt: "Drawing of the iron tower, scene " + (i + 1), caption: "The iron tower, scene " + (i + 1), source: { title: "Iron tower scene " + (i + 1), site: "commons.wikimedia.org", url: "https://commons.wikimedia.org/wiki/Main_Page" }, license: { short: "CC0" } });
+    }
+    console.log(JSON.stringify(out));
+  `;
+  const seeded = Bun.spawnSync({ cmd: ["bun", "-e", seedSource], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "pipe", stderr: "pipe" });
+  if (seeded.exitCode !== 0) throw new Error(`captureNextChatAnswerImages: seeding the picture cache failed: ${seeded.stderr.toString()}`);
+  const items = JSON.parse(seeded.stdout.toString().trim().split("\n").at(-1)!) as unknown[];
+  const db = new Database(join(DATA_DIR, "hub.db"));
+  try {
+    db.exec("PRAGMA busy_timeout = 5000");
+    const turn = db.query("SELECT id FROM conversation_turns WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1").get(withPictures.id) as { id: string } | null;
+    if (!turn) throw new Error("captureNextChatAnswerImages: the scripted turn was not stored");
+    db.prepare("UPDATE conversation_turns SET answer_images = ? WHERE id = ?").run(JSON.stringify({ layout: "row", after_paragraph: 0, visible: 3, items }), turn.id);
+  } finally {
+    db.close();
+  }
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        // Hold the picture bytes back until the text has been measured once.
+        let release!: () => void;
+        const released = new Promise<void>((resolve) => { release = resolve; });
+        let served = 0;
+        await page.route("**/api/answer-image/**", async (route) => { await released; served++; await route.continue(); });
+        await openStoredConversation(page, withPictures.id, withTitle);
+        const reply = page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).first();
+        await reply.waitFor();
+        await page.locator('[data-slot="image-gallery"]').waitFor();
+        const before = await reply.evaluate((el) => el.getBoundingClientRect().top);
+        release();
+        await page.waitForFunction(() => {
+          const imgs = [...document.querySelectorAll<HTMLImageElement>('[data-slot="image-gallery"] img')];
+          return imgs.length > 0 && imgs.every((img) => img.complete && img.naturalWidth > 0);
+        });
+        await settleAnimations(page);
+        const after = await reply.evaluate((el) => el.getBoundingClientRect().top);
+        const tiles = await page.locator('[data-slot="image-gallery"] img').evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src")));
+        console.log(`captureNextChatAnswerImages ${evidenceTag} ${slug}/${theme}: ${JSON.stringify({ textTopBefore: before, textTopAfter: after, shift: after - before, tiles: tiles.length, allFromHub: tiles.every((src) => src?.startsWith("/api/answer-image/")), served, badge: await page.getByText("+2", { exact: true }).count() })}`);
+        if (after !== before) throw new Error(`captureNextChatAnswerImages: the reply text moved ${after - before}px when the pictures painted on ${slug}/${theme}`);
+        await page.screenshot({ path: join(outDir, `next-chat-answer-images-${evidenceTag}-row-${viewport.width}-${theme}.png`) });
+        await page.getByRole("button", { name: "Open image: Drawing of the iron tower, scene 2" }).click();
+        await page.getByRole("dialog").waitFor();
+        await page.getByRole("dialog").locator("img").evaluate((img: HTMLImageElement) => img.complete ? undefined : new Promise((r) => img.addEventListener("load", r, { once: true })));
+        await settleAnimations(page);
+        await page.screenshot({ path: join(outDir, `next-chat-answer-images-${evidenceTag}-gallery-${viewport.width}-${theme}.png`) });
+        await page.keyboard.press("Escape");
+        await page.getByRole("dialog").waitFor({ state: "detached" });
+        const focused = await page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? "");
+        console.log(`captureNextChatAnswerImages ${evidenceTag} ${slug}/${theme}: focus after Escape on ${JSON.stringify(focused)}`);
+        await openStoredConversation(page, withoutPictures.id, withoutTitle);
+        await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).first().waitFor();
+        await settleAnimations(page);
+        const galleries = await page.locator('[data-slot="image-gallery"], [data-slot="answer-images"]').count();
+        console.log(`captureNextChatAnswerImages ${evidenceTag} ${slug}/${theme}: no-picture reply has ${galleries} gallery boxes`);
+        if (galleries !== 0) throw new Error("captureNextChatAnswerImages: a reply with no pictures reserved a gallery box");
+        await page.screenshot({ path: join(outDir, `next-chat-answer-images-${evidenceTag}-none-${viewport.width}-${theme}.png`) });
+        console.log(`Wrote next-chat-answer-images-${evidenceTag}-{row,gallery,none}-${viewport.width}-${theme}.png`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
   }
 }
 
@@ -7272,6 +7392,12 @@ async function main() {
     if (nextChatRichReview) {
       await captureNextChatRichReview(browser, sessionValue);
       console.log("completed named review: --next-chat-rich-review");
+      return;
+    }
+
+    if (nextChatAnswerImages) {
+      await captureNextChatAnswerImages(browser, sessionValue);
+      console.log("completed named review: --next-chat-answer-images");
       return;
     }
 

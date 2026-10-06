@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T09:29:46.727Z",
+  "generatedAt": "2026-10-06T10:34:38.374Z",
   "kitTag": "ui-v0.5.103",
   "items": [
     {
@@ -359,7 +359,7 @@
       "name": "image-gallery",
       "group": "image",
       "verdict": "wire-after",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "image-generation.tsx",
