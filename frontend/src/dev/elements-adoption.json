@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T21:50:30.191Z",
-  "kitTag": "ui-v0.5.124",
+  "generatedAt": "2026-10-06T22:02:33.611Z",
+  "kitTag": "ui-v0.5.130",
   "items": [
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
@@ -155,6 +155,14 @@
       "group": "agent/workflow",
       "verdict": "later",
       "verdictReason": "Deferred until sandbox runtime.",
+      "implemented": false
+    },
+    {
+      "file": "command-palette.test.tsx",
+      "name": "command-palette.test",
+      "group": "command",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -492,6 +500,14 @@
       "group": "other",
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": false
+    },
+    {
+      "file": "guardrail-notice.test.tsx",
+      "name": "guardrail-notice.test",
+      "group": "guardrail",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {

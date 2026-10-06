@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type PrivacyConnection } from "@/lib/api";
 import { joinNames, sourceName } from "@/apps/privacy/privacyCopy";
@@ -53,22 +53,18 @@ export function NextPrivacyPage() {
       <CardHeader className="p-0">
         <CardTitle className="flex items-center gap-2"><PrivacyIcon size={16} className="text-muted-foreground" />Privacy</CardTitle>
       </CardHeader>
-      {query.isPending ? (
-        <div role="status" aria-label="Loading the privacy page" className="flex flex-col gap-4">
-          <Card className="h-24 animate-pulse" />
-          <Card className="h-48 animate-pulse" />
-        </div>
-      ) : query.isError ? (
-        <Card>
-          <CardContent className="flex flex-col items-start gap-3 p-5">
-            <p className="text-sm text-destructive">{query.error instanceof ApiError ? query.error.message : "Could not load the privacy page."}</p>
-            <Button variant="secondary" onClick={() => void query.refetch()}>Try again</Button>
-          </CardContent>
-        </Card>
-      ) : (() => {
-        const outbound = query.data.connections.filter((row) => row.direction === "outbound");
-        const inbound = query.data.connections.filter((row) => row.direction === "inbound");
-        return (
+      <AsyncState
+        data={query.data}
+        error={query.isError}
+        isFetching={query.isFetching}
+        onRetry={() => void query.refetch()}
+        errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load the privacy page."}
+        loadingLabel="Loading the privacy page"
+      >
+        {(data) => {
+          const outbound = data.connections.filter((row) => row.direction === "outbound");
+          const inbound = data.connections.filter((row) => row.direction === "inbound");
+          return (
           <>
             <Card>
               <CardHeader className="border-b border-border"><CardTitle>Can someone outside see what we say to MaiPai?</CardTitle></CardHeader>
@@ -93,11 +89,11 @@ export function NextPrivacyPage() {
               label="Outbound connections"
             />
 
-            {query.data.offlinePlugins.length > 0 ? (
+            {data.offlinePlugins.length > 0 ? (
               <Card>
                 <CardHeader className="border-b border-border"><CardTitle className="flex items-center gap-2"><PrivacyIcon size={16} className="text-muted-foreground" />Never leaves your house</CardTitle></CardHeader>
                 <CardContent className="p-5">
-                  <p className="text-sm">{joinNames(query.data.offlinePlugins)} work entirely on this computer and connect to nothing at all. So does everything MaiPai remembers, every conversation, and every profile in your household.</p>
+                  <p className="text-sm">{joinNames(data.offlinePlugins)} work entirely on this computer and connect to nothing at all. So does everything MaiPai remembers, every conversation, and every profile in your household.</p>
                 </CardContent>
               </Card>
             ) : null}
@@ -114,8 +110,9 @@ export function NextPrivacyPage() {
               </CardContent>
             </Card>
           </>
-        );
-      })()}
+          );
+        }}
+      </AsyncState>
     </div>
   );
 }
