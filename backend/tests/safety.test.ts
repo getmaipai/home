@@ -7,7 +7,7 @@ import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { evaluateReply, evaluateSafety, forOutput, carriesCrisisSignal } from "@/lib/safety";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, settingsValues, conversationTurns, conversations, artifacts, replyFeedback, attachments, episodes, episodeEmbeddings, pendingEpisodeEmbeddings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
@@ -203,28 +203,36 @@ describe("the crisis overlay is not configurable", () => {
     return db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
   }
 
+  async function resetTurnFixture(): Promise<void> {
+    await __drainBackgroundWorkForTests();
+    db.delete(pendingEpisodeEmbeddings).run();
+    db.delete(episodeEmbeddings).run();
+    db.delete(episodes).run();
+    db.delete(artifacts).run();
+    db.delete(replyFeedback).run();
+    db.delete(attachments).run();
+    db.delete(conversationTurns).run();
+    db.delete(conversations).run();
+    db.delete(settingsValues).run();
+  }
+
   test("every real settings key, stressed to its most permissive value IN ISOLATION, still leaves self-harm allowed with crisis resources", async () => {
     const registry = getRegistry();
     expect(registry.length).toBeGreaterThan(0); // an empty registry would make every iteration below vacuously pass
 
+    // A key can only be covered once, and the set must track the live
+    // registry exactly so additions cannot become silent omissions.
+    const covered = new Set(registry.map((keyDef) => keyDef.key));
+    expect(covered.size).toBe(registry.length);
+    expect(covered.size).toBe(getRegistry().length);
+
+    const actor = await owner();
     for (const keyDef of registry) {
-      // A code review (2026-09-06) found the original version never
-      // reset between iterations, so by the LAST key every earlier one
-      // was still stressed too - the per-key assertion messages below
-      // implied isolation this loop didn't actually have. A fresh
-      // resetDb() + actor per iteration makes "after stressing X" mean
-      // exactly one setting changed, not "X plus everything before it."
-      //
-      // getmaipai/home#123: the previous iteration's own runTurnNext() call
-      // (below) can fire a crisis notification that's still in flight
-      // when this line runs - the global afterEach in tests/preload.ts
-      // only drains BETWEEN tests, never between iterations of a loop
-      // inside one test, so this loop needs its own drain or it hits the
-      // identical FOREIGN KEY race the global fix was meant to close.
-      await __drainBackgroundWorkForTests();
-      resetDb();
+      // Preserve the prepared household while removing only prior turn
+      // and settings state. This makes each value isolated without
+      // rebuilding the app, database, and owner for every key.
+      await resetTurnFixture();
       __resetThrottleForTests();
-      const actor = await owner();
 
       const extreme = extremeValueFor(keyDef);
       const written =
@@ -250,12 +258,7 @@ describe("the crisis overlay is not configurable", () => {
       expect(result.value.crisis_resources, `after stressing ${keyDef.key}`).toBeDefined();
       expect(result.value.crisis_resources, `after stressing ${keyDef.key}`).toContain("988");
     }
-    // getmaipai/home#123: 48 registry keys x (resetDb + a real owner()
-    // setup + a real runTurnNext()) is genuine work, not a hang - passes
-    // reliably in isolation but hit bun's 5000ms default exactly once
-    // running inside the full gate (real machine contention from
-    // everything else in that same run). Raised, not removed - a test
-    // that hangs for a real reason should still fail loudly.
+    expect(covered.size, "every real settings key was covered exactly once").toBe(registry.length);
   }, 15_000);
 
   test("content-ceiling dial values (spec-level, not yet a household setting) never enter checkSafety() at all - a self-harm turn is identical under every band", async () => {
