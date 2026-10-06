@@ -39,7 +39,7 @@ import { emptyTimings, outcomeOf } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity, stackRefusal } from "@/lib/stackEngine";
 import { nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
 import { roleHealth } from "@/lib/roleHealth";
-import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
+import { START_PROJECT_TOOL_ID, projectTypeForArgs } from "@/lib/projects/tool";
 import { postProjectResult } from "@/lib/projects/post";
 import { StatusChannel } from "@/lib/statusChannel";
 import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
@@ -51,6 +51,8 @@ import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { AnswerImagePlacer, answerImagesAllowed, settleAnswerImages } from "@/lib/answerImages/turn";
+import { decide } from "@/lib/gate/decide";
+import type { Role } from "@/middleware/auth";
 
 export interface RunTurnNextOpts {
   conversationId?: string;
@@ -373,26 +375,23 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // stored, so a refused request leaves no provisional row or file behind.
   // THIN-7C: an edit never resumes an ask (the old path cleared it first).
   const pendingAsk = temporary || opts.bare === true || supersedes || continuation || opts.ephemeral === true ? null : getPendingAsk(conversation.id);
-  // APPROVE-CARD-01: a tapped card's own `ask_answer` must match the
-  // conversation's CURRENT pending ask by turn id, or it's stale (a
-  // second ask parked since the card was shown, the ask was already
-  // answered, or there was never one) - reported as a real 409, never
-  // silently run through ordinary text processing (resumesAsk()'s own
-  // turn-id check is belt-and-braces, not the primary gate: without
-  // this early return a mismatch would just fall through to routing
-  // whatever "Yes"/"No" text rode along with it, exactly like an
-  // unrelated new statement, with no way for the caller to tell a real
-  // answer from a stale one). The existing pending ask, if any, is for
-  // a DIFFERENT turn than this stale tap named - left untouched, not
-  // cleared: this request doesn't get to answer someone else's live
-  // question by accident.
+  const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
+  const pendingProjectType = pendingAsk?.packageId === "start_project" ? projectTypeForArgs({ type: pendingAsk.args.type }) : undefined;
+  const legacyCapabilities = pendingAsk?.packageId === "lock-doors" ? ["home:lock"] : pendingAsk?.packageId === "websearch" ? ["search.household_subject"] : pendingAsk?.packageId === "start_project" ? ["artifact:write"] : [];
+  const pendingAskDecision = pendingAsk?.kind === "confirm" ? decide({
+    who: { personId: actor.id, role: actor.role as Role, band },
+    what: { capabilities: pendingAsk.capabilities ?? legacyCapabilities, consequential: pendingAsk.consequential ?? true, minRole: pendingProjectType?.minRole ?? (pendingAsk.packageId === "lock-doors" ? "teen" : undefined) },
+  }) : null;
   if (opts.ask_answer && (!pendingAsk || pendingAsk.turnId !== opts.ask_answer.turn_id)) {
     return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This confirmation is no longer waiting for an answer." } };
   }
-  // THIN-7C: the model, the safety check and the signal read the message with
-  // its documents; logResult() is given the typed text, as the old path did.
+  if (pendingAskDecision?.kind === "ask_parent" || (pendingAskDecision?.kind === "deny" && pendingAskDecision.reason === "never_for_band")) {
+    setPendingAsk(conversation.id, null);
+    if (opts.ask_answer || AFFIRMATIVE_RE.test(text)) {
+      return { ok: false, result: { ok: false, status: 403, code: "parent_required", error: "This needs a parent to decide. I haven't asked one." } };
+    }
+  }
   text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary || opts.ephemeral === true);
-  const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
   // old path (the old engine file's own commandOpeners(effectiveLoaded)) - a
   // clause opening with a bundled package's own command verb ("look",
@@ -629,7 +628,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     if (ask) {
       state.outcomes.push(outcomeOf({ callId: `${state.turnId}:confirm`, packageId: ask.packageId, status: "pending", args: ask.args, via: "confirm", userMessage: promptText }));
     }
-    if (ask && !temporary && !state.ephemeral) setPendingAsk(conversationId, { ...ask, turnId: state.turnId });
+    if (ask && !temporary && !state.ephemeral) setPendingAsk(conversationId, { ...ask, turnId: state.turnId, capabilities: ask.capabilities, consequential: ask.consequential });
     value = buildTurnValue(state, startedAt, "confirm", promptText);
     if (ask && !temporary && !state.ephemeral) value.confirm = { package_id: ask.packageId, open: true };
   } else if (finalState === "refused") {

@@ -62,6 +62,8 @@ export interface ActionProposal {
 
 export interface PendingAskInfo {
   prompt: string;
+  capabilities?: string[];
+  consequential?: boolean;
 }
 
 /** GROUND-01 (state record, "1. Split the reason"): the live diagnosis
@@ -91,7 +93,7 @@ export type PolicyDecision =
       // actually have that in this conversation") covers it, the same
       // closed set of named-then-defaulted reasons `ungrounded_args`/
       // `unknown_tool` already are.
-      reason: "min_role" | "consent_needed" | "confirm_needed" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type";
+      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type";
       ask?: PendingAskInfo;
     };
 
