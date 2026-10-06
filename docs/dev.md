@@ -35702,6 +35702,10 @@ needed. The running household hub was read only and was not restarted.
 
 ## SHELL-FOLD-01 alignment and header rule (2026-10-02)
 
+> **Superseded:** Home RULES S1, [permanent rail](design/RULES.md).
+
+> **Superseded by** Home RULES S1: the main navigation is a permanent rail at every width.
+
 The 1440px first-run capture measured the shipped `size-4` sidebar icon token
 at 16x16px. Before the fix, every menu SVG was already that size, but the
 folded rail was 70px wide (center x=35), nav and footer icon centers were x=32,
@@ -36045,6 +36049,8 @@ Conclusion: shortening tool descriptions does not recover reply length; the cost
 
 ## DEADLINE-02 and THIN-DL-02: no clock on an adult's reply, and failures told by kind (2026-10-03)
 
+> **Superseded:** Home RULES rule 5, [adult written chat has no length cap](design/RULES.md).
+
 The model node had one wall-clock deadline (`deadlines_ms.model`, 20 s) for the whole reply, streaming included. A long adult answer needs more than that by itself, a loaded machine can miss the first token, and the first request after the Stack unloads its engine pays an engine load. RULES.md rule 5 allows no length cap on adult written chat, and a time limit on the whole reply is one. DEADLINE-01's reason for the deadlines stands: a hung engine must not hang a turn, and a child's or a spoken turn must fail fast.
 
 For an adult's written turn (the same predicate as the reply ceiling in `nodes/model.ts`), the model node and the turn total carry no wall-clock deadline. Each generation runs under `streamWatchdog()` (`turnMachine/deadline.ts`): `first_token_ms` (90 s) from the request to the first delta of any kind, reasoning included, then `stall_ms` (20 s) of silence, re-armed on every delta. The turn total is not applied to this turn at all (the smaller diff than turning it into a second watchdog): every part of it is bounded, by the node deadlines and the watchdog. A child's, a teen's and every spoken turn keep `model` and `total` as they were; tool nodes keep 10 s. A record that names neither new field (every catalog record today) gets the defaults when the budget resolves, so measured records load unchanged.
@@ -36174,6 +36180,8 @@ The final `bash scripts/check.sh` passed: backend 4,732/4,732, scripts 82/82, fr
 
 ## ANSWER-IMG-05: the picture bench, and why `show_images` stays off (2026-10-06)
 
+> **Superseded by** the adult image-search ruling recorded in this section: general image search is allowed for adults with the quality filter; minor sources remain unchanged.
+
 Measured on the real turn path (`backend/scripts/bench/answer-images.ts`, rows in `scripts/bench/datasets/answer-images.json`, section 13 of the design note) against the resident chat model on the MaiPai Stack: engine `local b10797-832fd6f17`, model file `Qwen3-8B-Q4_K_M.gguf`, Apple M4 Pro with 24 GB unified memory, production sampling, thinking off, 5 repeats per row, real SearXNG and Wikimedia at a person's pace. Two arms alternate by round: OFF is the catalog record as shipped, ON adds `show_images`. Other gates were running on the machine (load 15 to 20), so absolute times are high; the arms share the load. Arm 2 ran after the Stack's restart onto the build with `/v1/tokenize`.
 
 | Bar (design 4.3) | Baseline wording | Arm 1: two examples on `subject`, firmer result line | Arm 2: arm 1 plus a firmer first sentence | Pass |
@@ -36297,3 +36305,41 @@ Bars not met after two iterations, so `show_images` stays out of `tools_offered`
 - Wrong subject: Jurassic Park got no open-web rows in that run (SearXNG answered nothing for it), so Commons props and a logo led.
 
 Recall and first text with the new `kind` argument were not measured: the Stack's chat engine was refused for memory throughout (another session's engine held it).
+
+## DOCS-01: 2026-10-06 owner rulings and documentation reconciliation
+
+The owner’s later ruling controls the earlier Row-Bot activity placement: Running now has no header button and no S2 exception. Chat shows the working dot at the reply tail, step disclosure in the message and the activity card above the composer. Approval waits use the calm card above the composer. The empty new-chat screen has a centered greeting, composer and generic starter suggestions; it has no “Runs on your own hub” line.
+
+Incognito moves to a More menu on the permanent rail. Its on-state keeps the purple content frame, fixed Incognito label with Exit control and avatar ring. RAIL-03 is held until RULES S1 is amended. The Studio profile is p128 with 128 GB memory and a 2 TB internal disk.
+
+Knowledge search is priority 3, designed but not scheduled, with slices recorded in `data-scratch/design/KNOWLEDGE-SEARCH-BUILD-SLICES.md`. The search answers plan includes the reference library, news shelf, Stack Exchange home set and Studio expansion; the optional Stack Overflow set is not chosen.
+
+ACTIVITY-01d’s earlier header-button placement is withdrawn by the owner’s ruling of 2026-10-06. ACTIVITY-01e owns the in-conversation working dot, step disclosure and card above the composer. APPROVE-CALM-01 is the calm approval card above the composer; “Always allow in this chat” is not built.
+
+The adult image-search ruling allows general image search for adults with a deterministic media-quality filter. Teens and children keep their existing safe-search sources and age-band limits. Named people keep Wikipedia/Wikimedia lead images. Yandex is an optional SearXNG engine for adults only, with a plain privacy note and no captcha bypass.
+
+The owner chose light natural hesitations by default, rate limited and excluded from names, numbers, instructions, safety, alarms and child learning. Hosted search redacts household names, phones and emails by default; exact search is an adult-only per-query choice and is logged. Child profanity gets a deterministic softener. The coder tools are approved for the local-coder harness.
+
+The owner’s media decisions preserve photo place at a design-chosen precision, store it in the person’s file record and never include it in outbound requests. Quiet moments may auto-read a person’s own new photos and voice notes on the hub. Adults and teens may use non-destructive background swaps; children need a parent setting. AcoustID and MusicBrainz are request-only, with only fingerprint and duration sent and a household privacy switch.
+
+Empty-chat suggestions are generic only and never come from memory, history or profile; Incognito may use the current visible turn only. The running activity card is above the composer, not in a header.
+
+> **Superseded:** the prior vision readiness note is replaced by the [VISION-02 backlog row](BACKLOG.md#vision-02).
+
+## Additional DOCS-01 history pointers
+
+The 2026-10-06 master design review supersedes the earlier row-bot header-button placement for Running now. The running dot stays at the reply tail, tool steps stay in the message and the activity card sits above the composer. APPROVE-CALM-01 uses that same above-composer placement. The new-chat welcome uses generic starter suggestions and no hub-location line.
+
+The 2026-10-06 owner answers also set the Studio at p128, 128 GB and 2 TB; put Incognito in the rail More menu pending the S1 amendment; set hosted-search redaction on by default with an adult-only exact-search choice; and approve light, rate-limited speech hesitations with the stated exclusions. The full knowledge-search slice order is in `data-scratch/design/KNOWLEDGE-SEARCH-BUILD-SLICES.md` and remains priority 3, designed but not scheduled.
+
+## RAIL-01 and RAIL-02: permanent rail and sampled palette (2026-10-06)
+
+RAIL-01 makes the main navigation a permanent 56 px rail at every width. RAIL-02 records the owner’s first test: the brand mark is Home, chat history is 288 px, and the conversation surface has no divider. The sampled dark palette is rail `#282828`, history `#1e1e1e`, conversation `#181818`, composer `#363636` with a `#424242` outline. These are mixes of the person’s look on the body, not the kit’s navy root tokens. The capture commands and shell behavior are in the RAIL-02 backlog row.
+
+## DOC-EDITS D20 follow-up note
+
+The cross-repository observations from DOC-EDITS section D item 20 are recorded here for their owners. The Stack docs paragraph needs correction because the dry-run call is `supervisor.ts:861`. The bot pin comment remains inaccurate until BOT-PIN-01. The commons checkout was left untouched; it remains detached at `98ab0d7` with a dirty `spec/settings/keys.json`. No stack, bot or commons file was changed or checked out for DOCS-01.
+
+## Image search and settings follow-up
+
+The adult image-search study applies R1 to R6 and uses `{subject, kind}` for the `show_images` query; the package is `show_images`. Yandex is optional in SearXNG, adults only, and drops out with back-off on a captcha. The child defaults for `chat.photo_uploads` and `reference.images` are off until a parent enables them. See `data-scratch/research/image-search-accuracy-study.md` and `data-scratch/research/chat-images-in-answers.md` for the detailed record.

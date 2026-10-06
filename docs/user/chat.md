@@ -57,9 +57,9 @@ Open **Chat status**, then tap **Wake word** to turn on the wake-word listener. 
 
 ## Chat options and status
 
-The message box grows as you type. Open **Chat options** beside it to turn on **Think longer** for your next message.
+The message box grows as you type. Choose **Instant** or **Thinking** when your model supports those modes.
 
-Open **Chat status** to see the Brain, Mouth, Ears, and Eyes indicators. Each shows what is ready and what needs attention. Eyes is marked **Coming soon** until vision is available.
+Open **Chat status** to see the Brain, Mouth, Ears and Eyes indicators. Each shows what is ready and what needs attention. Archived chats are available from the chat history.
 
 ## More on a message
 

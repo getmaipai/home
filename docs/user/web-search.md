@@ -7,7 +7,7 @@ description: How to connect MaiPai to your own SearXNG search server, use it awa
 
 ## What web search needs
 
-MaiPai asks your own search server, called SearXNG. Your questions go to it and not to one big company. You or a techy friend runs SearXNG on a computer at home. Web search stays off until you give MaiPai its address.
+Web search needs the address of a SearXNG server you run today. MaiPai sends your search words to that server. MaiPai’s own search service is coming (STACK-SEARCH-01). Web search stays off until you give MaiPai the address.
 
 The model decides when a question needs a search. You do not have to press a button.
 
