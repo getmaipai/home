@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
+import { Timeline } from "@maipai/ui/src/elements/timeline";
 import { StatusComponents } from "@/next/pages/status/StatusComponents";
 import { StatusBanner } from "@/next/pages/status/StatusBanner";
-import { RecentProblems, StatusIncident } from "@/next/pages/status/StatusIncident";
+import { StatusIncident } from "@/next/pages/status/StatusIncident";
 import { api, isOwnerOrAdminRole, type HealthStatus, type Roster, type StatusHistory } from "@/lib/api";
 import { statusSummary } from "@/shell/statusSummary";
 import { useTabItem } from "@/shell/tabIdentity";
@@ -11,6 +12,7 @@ import { activeMaintenanceParts } from "@/next/pages/status/statusBoardFormat";
 import { StatusApps } from "@/next/pages/status/StatusApps";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { statusAppsSummary } from "@/shell/statusApps";
+import { statusTimelineEvents } from "@/next/pages/status/statusTimelineEvents";
 
 export const StatusIcon = getIcon("activity");
 
@@ -30,6 +32,7 @@ export function NextStatusPage({ person }: { person: Roster }) {
   const boardData = boardQuery.data && Array.isArray(boardQuery.data.maintenance) ? boardQuery.data : undefined;
   const maintenance = activeMaintenanceParts(boardData?.maintenance);
   const apps = appsQuery.data ?? [];
+  const incidentEvents = statusTimelineEvents(historyQuery.data);
   const appSummary = statusAppsSummary(apps);
   const summary = appSummary.level === "online" && maintenance.length > 0
     ? { ...appSummary, level: "maintenance" as const, text: "Maintenance", message: "Scheduled work is underway." }
@@ -37,12 +40,15 @@ export function NextStatusPage({ person }: { person: Roster }) {
   const appReason = appSummary.level === "online" ? undefined : appSummary.message;
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
+      <div className="flex flex-col gap-4">
       {boardData?.note || isOwnerOrAdminRole(person.role) ? <StatusBoardNotes person={person} note={boardData?.note ?? null} /> : null}
       <StatusBanner summary={summary} message={summary.message} maintenanceEndsAt={boardData?.maintenance.find((window) => window.status === "in_progress" && window.components.some((part) => maintenance.includes(part)))?.ends_at} />
       <StatusIncident level={summary.level} problems={summary.problems} history={historyQuery.data} appReason={appReason} />
-      {appsQuery.data ? <StatusApps person={person} apps={apps} behindTheScenes={canSeeParts && healthQuery.data ? <><StatusComponents person={person} health={healthQuery.data} maintenance={maintenance} history={historyQuery.data} /><RecentProblems history={historyQuery.data} /></> : undefined} /> : null}
-      {boardData || isOwnerOrAdminRole(person.role) ? <StatusMaintenanceCard person={person} windows={boardData?.maintenance ?? []} /> : null}
-    </div>
+      {appsQuery.data ? <StatusApps person={person} apps={apps} behindTheScenes={canSeeParts && healthQuery.data ? <StatusComponents person={person} health={healthQuery.data} maintenance={maintenance} history={historyQuery.data} /> : undefined} /> : null}
+      </div>
+      {canSeeParts && incidentEvents.length ? <><h3 className="mt-4 mb-2 text-sm font-semibold">Recent problems</h3><Timeline events={incidentEvents} visibleCount={incidentEvents.length} /></> : null}
+      {boardData || isOwnerOrAdminRole(person.role) ? <div className="mt-4"><StatusMaintenanceCard person={person} windows={boardData?.maintenance ?? []} /></div> : null}
+    </>
   );
 }

@@ -1098,76 +1098,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/dashboard/RecentActivityTable.tsx": {
-    "Card": {
-      "tokens": [
-        "flex",
-        "flex-col",
-        "gap-0!"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardHeader": {
-      "tokens": [
-        "border-b",
-        "border-border"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "px-0!"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "TableRow": {
-      "tokens": [
-        "border-border",
-        "hover:bg-muted/30",
-        "hover:bg-transparent"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "TableHead": {
-      "tokens": [
-        "h-auto",
-        "pl-4!",
-        "pr-4!",
-        "px-4",
-        "py-3",
-        "w-32.5",
-        "w-40"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "TableCell": {
-      "tokens": [
-        "pl-4!",
-        "pr-4!",
-        "px-4",
-        "py-3",
-        "py-6",
-        "w-32.5",
-        "w-40"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "next/pages/dashboard/StatCard.tsx": {
     "CardContent": {
       "tokens": [
@@ -1831,10 +1761,6 @@
     },
     "CardContent": {
       "tokens": [
-        "divide-border",
-        "divide-y",
-        "flex",
-        "flex-col",
         "pl-11"
       ],
       "ed": "ED-038",
