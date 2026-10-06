@@ -153,23 +153,41 @@ describe("NextUpdatesPage", () => {
     }
   });
 
-  test("a failed Bot release check is said out loud under the table", async () => {
-    const { restore } = mockUpdatesFetch(makeProjection({ robots: [robotRow({ latest: null, updateAvailable: false, blockedBy: null })], robotsError: "connection refused" }));
+  test("robot and reference check errors keep their copy without invented retry actions", async () => {
+    const { restore } = mockUpdatesFetch(makeProjection({
+      robots: [robotRow({ latest: null, updateAvailable: false, blockedBy: null })],
+      robotsError: "connection refused",
+      referenceError: "library unavailable",
+    }));
     try {
-      renderWithQueryClient(<NextUpdatesPage person={makePerson()} />);
+      const view = renderWithQueryClient(<NextUpdatesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Couldn't check for robot updates: connection refused"));
+      expect(document.body.textContent).toContain("Couldn't read installed reference sets for updates: library unavailable");
+      expect(view.queryByRole("button", { name: "Retry" })).toBeNull();
     } finally {
       restore();
     }
   });
 
-  test("a failed fetch shows an error and a retry button, never a stuck loading state", async () => {
+  test("a failed fetch shows an error and retry refetches updates", async () => {
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;
+    let updatesCalls = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+      if (url.endsWith("/api/updates")) {
+        updatesCalls += 1;
+        return Promise.resolve(updatesCalls === 1
+          ? new Response(JSON.stringify({ error: "Something broke" }), { status: 500 })
+          : Response.json(makeProjection({ installed: "0.3.0", latest: "0.3.0" })));
+      }
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
     try {
-      renderWithQueryClient(<NextUpdatesPage person={makePerson()} />);
+      const view = renderWithQueryClient(<NextUpdatesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Something broke"));
-      expect(document.body.textContent).toContain("Try again");
+      fireEvent.click(view.getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(document.body.textContent).toContain("MaiPai Home"));
+      expect(updatesCalls).toBe(2);
     } finally {
       globalThis.fetch = originalFetch;
     }
