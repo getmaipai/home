@@ -38,6 +38,7 @@ import { ChatMessageError } from "@/apps/chat/chatErrorSlot";
 import { ChatCitationLink } from "@/apps/chat/chatCitationLink";
 import { ArtifactCardToolRender, ConfirmToolRender, ProjectToolRender, SourcesNoopRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
 import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
+import { ChatDateDivider } from "@/apps/chat/chatDateDivider";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
 import { preprocessChatMarkdown } from "@/apps/chat/chatStreamingMarkdown";
 import { ANSWER_IMAGES_PART, AnswerImagesDataRender } from "@/apps/chat/chatAnswerImages";
@@ -91,6 +92,8 @@ export const THREAD_SLOTS = {
     remend: { links: false, linkMode: "text-only" },
   },
   Welcome: NextChatWelcome,
+  // ELEMENTS-ADOPT-01 E4: the kit DayDivider before a message that opens a new day or follows a long pause.
+  MessageBefore: ChatDateDivider,
   AssistantMoreItems,
   // The kit's append slot accepts one Element; compose both product
   // controls here, with failed-turn diagnostics last in the row.

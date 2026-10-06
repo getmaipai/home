@@ -317,7 +317,8 @@ const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nex
 const shellNavReview = process.argv.includes("--shell-nav-review");
 const chatShellReview = process.argv.includes("--chat-shell-review") || shellNavReview;
 // COLUMN-01 (owner, 2026-10-06): the chat history column, every state.
-const chatColumnReview = process.argv.includes("--chat-column-review");
+const elementsReview = process.argv.includes("--elements-review");
+const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -2817,6 +2818,61 @@ async function seedTitledConversation(callerName: string, cookie: Record<string,
   });
   if (!renamed.ok) throw new Error(`${callerName}: setting the title failed: ${renamed.status}`);
   return row;
+}
+
+/** ELEMENTS-ADOPT-01 acceptance: a conversation with two replies (the action
+ * row under both, the date line above the first message) and the new-chat
+ * empty state, at 1440 and 390 in both themes. Written to
+ * data-scratch/chat-ab/elements-shots like the shell review's captures. */
+async function captureElementsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "elements-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const conversation = await seedTitledConversation("captureElementsReview", cookie, "Homework helper notes");
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const seedContext = await newContext(browser, desktop, "dark", sessionValue);
+  try {
+    const page = await seedContext.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await openStoredConversation(page, conversation.id, "Homework helper notes");
+    await sendChatMessage(page, RICH_REPLY_PROMPT);
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    await page.getByRole("heading", { name: "Homework helper" }).waitFor({ timeout: 30000 });
+    await sendChatMessage(page, "Thanks. Can you say that again in one short sentence?");
+    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+    await page.waitForTimeout(500);
+  } finally {
+    await seedContext.close();
+  }
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await openStoredConversation(page, conversation.id, "Homework helper notes");
+        await page.getByRole("heading", { name: "Homework helper" }).waitFor();
+        await settleAnimations(page);
+        const rows = await page.locator(".aui-assistant-action-bar-root").count();
+        const lines = await page.locator('[data-slot="day-divider"]').count();
+        console.log(`elements-review ${viewport.width}/${theme}: action rows ${rows}, date lines ${lines}`);
+        await page.screenshot({ path: join(outDir, `conversation-${viewport.width}-${theme}.png`) });
+        await page.locator('[data-slot="day-divider"]').first().scrollIntoViewIfNeeded();
+        await page.waitForTimeout(300);
+        await page.locator('[data-slot="day-divider"]').first().scrollIntoViewIfNeeded();
+        await settleAnimations(page);
+        await page.screenshot({ path: join(outDir, `conversation-top-${viewport.width}-${theme}.png`) });
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        await settleAnimations(page);
+        await page.screenshot({ path: join(outDir, `new-chat-${viewport.width}-${theme}.png`) });
+      } finally {
+        await context.close();
+      }
+    }
+  }
+  console.log(`Wrote captures to ${outDir}`);
 }
 
 /** HOME-UI-02e part two's own acceptance (COORDINATOR: "Captures at
@@ -8493,6 +8549,12 @@ async function main() {
         await captureChatStreaming(browser, sessionValue, viewport, combo.theme);
         await captureChatEngineNotReady(browser, sessionValue, viewport, combo.theme);
       }
+    }
+
+    if (elementsReview) {
+      await captureElementsReview(browser, sessionValue);
+      console.log("completed named review: --elements-review");
+      return;
     }
 
     if (chatColumnReview) {
