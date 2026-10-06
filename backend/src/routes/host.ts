@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { detectHardware } from "@/lib/hardware";
-import { recommend, CATALOG } from "@/lib/modelCatalog";
+import { recommend, CATALOG, thinkingModeFor } from "@/lib/modelCatalog";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { getEngineStatsSamples } from "@/lib/engineStats";
@@ -10,6 +10,7 @@ import type { AppEnv } from "@/types";
 import type { ChatCapabilities } from "@/wire";
 import { chatModelReadsPictures, picturePartsAllowed } from "@/lib/chatPictures";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { getHouseholdSettingValue } from "@/lib/settings";
 
 export const hostRoutes = new Hono<AppEnv>();
 
@@ -56,7 +57,11 @@ hostRoutes.get("/chat-models", requireAuth, async (c) => {
 hostRoutes.get("/chat-capabilities", requireAuth, async (c) => {
   const actor = c.get("person");
   const capability = await chatModelReadsPictures();
-  const body: ChatCapabilities = { image_parts: picturePartsAllowed(capability, actor, speakerAgeBand(actor, new Date())) };
+  const stackChat = await readStackChatRole();
+  const minor = speakerAgeBand(actor, new Date()) !== "adult";
+  const current = stackChat?.model?.id ?? (getHouseholdSettingValue("chat.model_id") as string | undefined);
+  const thinking_modes = Object.fromEntries((stackChat?.models ?? []).map((model) => [model.id, minor ? "none" as const : thinkingModeFor(model.id)]));
+  const body: ChatCapabilities = { image_parts: picturePartsAllowed(capability, actor), thinking: minor ? "none" : thinkingModeFor(current), thinking_modes };
   return c.json(body);
 });
 

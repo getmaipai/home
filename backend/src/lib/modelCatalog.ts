@@ -38,6 +38,8 @@ export const CATALOG: ModelCapabilities[] = [
     tags: ["recommended", "fast"],
     pros: ["Runs well on a single 8GB GPU", "Fast replies"],
     cons: ["Less capable than a larger model on hard reasoning tasks"],
+    // VISION-02a: Qwen3's hybrid template takes a per-turn thinking switch.
+    thinking_mode: "switchable",
     // Qwen's own official GGUF repo (not a third-party requant), pinned to
     // one revision so the file this sha256 describes can never change out
     // from under it. sha256 is the repo's real git-lfs oid (HF's own
@@ -141,6 +143,51 @@ export const CATALOG: ModelCapabilities[] = [
         rewrite_pass_rate: 0,
         on: "ARCH-MEASURE-01 tool-calling bench, 2026-09-22, 50 repeats (0 false calls in 50, 19 fitting searches in 50); rewrite_pass_rate not yet measured for this model, recorded 0 pending the query-rewrite bench",
       },
+    },
+  }),
+  // VISION-02: Qwen3-VL-8B-Instruct, the chat model that reads pictures
+  // itself (the Stack's VISION-02b pin, the same revision and hashes).
+  // The Instruct edition has no thinking mode (its template has no switch
+  // and never opens a reasoning block; measured on b10797, VISION-02d), so
+  // the record says so and the composer offers no thinking control for it.
+  // No turn_budget until its tool bench is recorded: a child or teen keeps
+  // the no-tools fail-safe on it (rule 8), and the p16 flip waits for it.
+  ModelCapabilities.parse({
+    id: "qwen3-vl-8b-instruct-q4-k-m",
+    role: "chat",
+    label: "Qwen3 VL 8B Instruct",
+    license: "Apache-2.0",
+    engine: "llama-server",
+    implemented: true,
+    quality_tier: "standard",
+    tags: ["reads-pictures"],
+    pros: ["Reads the pictures you send", "Same size and speed class as Qwen3 8B"],
+    cons: ["No thinking mode", "About 1 GB more memory than Qwen3 8B"],
+    download: {
+      url: "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/f982a07559d4a2f6c8744d840bf6fccab30eea96/Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+      sha256: "67d1659bfe71b89d50b45a4ad1a9e5b997e5bb16ce5da66a6a6167abd569e9e2",
+      approx_bytes: 5_027_784_800,
+    },
+    image_input: {
+      projector: {
+        file: "mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf",
+        download: {
+          url: "https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/f982a07559d4a2f6c8744d840bf6fccab30eea96/mmproj-Qwen3VL-8B-Instruct-Q8_0.gguf",
+          sha256: "c6ba85508d82f42590e6eb77d5340369ab6fecf107a7561d809523d8aa5f3bfd",
+          approx_bytes: 752_289_728,
+        },
+      },
+    },
+    thinking_mode: "none",
+    sizing: {
+      kind: "transformer_gguf",
+      param_count_billion: 8.8,
+      bits_per_weight: 4,
+      gguf_overhead_fraction: 0.1,
+      num_layers: 36,
+      num_kv_heads: 8,
+      head_dim: 128,
+      max_context: 262144,
     },
   }),
   // Not run by anything yet (image role, implemented: false). Recorded so
@@ -267,4 +314,16 @@ export function recommend(role: ModelCapabilities["role"], hw: HardwareInfo, con
       if (a.fits !== b.fits) return a.fits ? -1 : 1;
       return a.requiredBytes - b.requiredBytes;
     });
+}
+
+/** VISION-02a/02d: whether a chat model can reason before it answers, from
+ * its record, never its id (rule 8). A record that predates the field
+ * reads its turn budget (a toggled budget above 0 is switchable); a model
+ * with no record keeps today's adult behaviour (THIN-6B: the reference
+ * record's switch). */
+export function thinkingModeFor(modelId: string | undefined): "switchable" | "none" | "always" {
+  const entry = modelId ? CATALOG.find((model) => model.role === "chat" && model.id === modelId) : undefined;
+  if (!entry) return "switchable";
+  if (entry.thinking_mode) return entry.thinking_mode;
+  return (entry.turn_budget?.thinking_budget_tokens_toggled ?? 0) > 0 ? "switchable" : "none";
 }

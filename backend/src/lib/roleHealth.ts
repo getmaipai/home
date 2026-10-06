@@ -7,7 +7,7 @@ export type HealthRole = "chat" | "embed" | "background" | "voice";
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot" };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; }
 
@@ -49,7 +49,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
     const row = roles.find((item) => item.id === id);
     if (!row) return { availability: "unavailable", reason: "stack_unreachable" };
     const state = row.state.state;
-    const status = role === "chat" ? chatContextStatus(row as typeof row & { context?: { context_length?: number | null; context_per_slot?: number | null; slots?: number | null; reason?: string | null } | null }) : {};
+    const status = role === "chat" ? { ...chatContextStatus(row as typeof row & { context?: { context_length?: number | null; context_per_slot?: number | null; slots?: number | null; reason?: string | null } | null }), ...(row.model?.id ? { modelId: row.model.id } : {}) } : {};
     if (state === "ready" || state === "installed") return { availability: "ready", reason: null, ...status };
     if (state === "loaded") return { availability: row.state.reason === STACK_IDLE_REASON ? "ready" : "starting", reason: null, ...status };
     return { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start" };
@@ -73,11 +73,12 @@ let chatWindowContextForTests: number | undefined;
 export function __setChatWindowContextForTests(value?: number): void { chatWindowContextForTests = value; }
 
 /** STATUS-STACK-01 is the shared source for both the turn window and status view. */
-export async function chatWindowContext(): Promise<{ tokens: number; slots: number | null; reported: boolean }> {
+export async function chatWindowContext(): Promise<{ tokens: number; slots: number | null; reported: boolean; modelId?: string }> {
   if (chatWindowContextForTests !== undefined) return { tokens: chatWindowContextForTests, slots: null, reported: true };
   const health = await roleHealth("chat", { live: true });
-  if (health.contextPerSlot && health.slots) return { tokens: health.contextPerSlot, slots: health.slots, reported: true };
-  return { tokens: MINIMUM_CHAT_WINDOW_TOKENS, slots: health.slots ?? null, reported: false };
+  const model = health.modelId ? { modelId: health.modelId } : {};
+  if (health.contextPerSlot && health.slots) return { tokens: health.contextPerSlot, slots: health.slots, reported: true, ...model };
+  return { tokens: MINIMUM_CHAT_WINDOW_TOKENS, slots: health.slots ?? null, reported: false, ...model };
 }
 
 

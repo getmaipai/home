@@ -93,6 +93,37 @@ describe("GET /api/host/chat-models", () => {
   });
 });
 
+describe("GET /api/host/chat-capabilities (VISION-02c, 02d)", () => {
+  test("follows the Stack's chat row and the model's record, never a model id", async () => {
+    const { __setChatPictureCapabilityForTests } = await import("@/lib/chatPictures");
+    const { __setStackClientForTests } = await import("@/lib/stackEngine");
+    const owner = await ownerClient();
+    __setStackClientForTests({ roles: async () => ({ roles: [{ id: "chat", state: { state: "ready", since: "" }, model: { id: "qwen3-vl-8b-instruct-q4-k-m", imageInput: true }, picture_tokens_max: 2560, models: [{ id: "qwen3-vl-8b-instruct-q4-k-m", name: "vl" }, { id: "qwen3-8b-instruct-q4-k-m", name: "text" }] }] }) } as never);
+    __setChatPictureCapabilityForTests({ imageParts: true, pictureTokensMax: 2560 });
+    try {
+      const res = await owner.get("/api/host/chat-capabilities");
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({ image_parts: true, thinking: "none", thinking_modes: { "qwen3-vl-8b-instruct-q4-k-m": "none", "qwen3-8b-instruct-q4-k-m": "switchable" } });
+      __setChatPictureCapabilityForTests({ imageParts: false, pictureTokensMax: null });
+      expect(((await (await owner.get("/api/host/chat-capabilities")).json()) as { image_parts: boolean }).image_parts).toBe(false);
+    } finally {
+      __setChatPictureCapabilityForTests(null);
+      __setStackClientForTests(null);
+    }
+  });
+
+  test("a child's thinking control reads none, whatever the model", async () => {
+    const owner = await ownerClient();
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: child.id });
+    const body = (await (await childClient.get("/api/host/chat-capabilities")).json()) as { image_parts: boolean; thinking: string };
+    expect(body.thinking).toBe("none");
+    expect(body.image_parts).toBe(false);
+  });
+});
+
 describe("POST /api/host/models/:id/select", () => {
   test("returns 409 because model changes belong to the MaiPai Stack", async () => {
     const owner = await ownerClient();

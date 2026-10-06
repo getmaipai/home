@@ -64,11 +64,17 @@ export function photoUploadsAllowed(actor: PersonRow, now = new Date()): boolean
 }
 
 /** Whether this turn's pictures go to the model as picture parts: the
- * model reads them, the person may send photos, and (until VISION-02d's
- * floor lands for children and teens) the speaker is an adult. */
-export function picturePartsAllowed(capability: ChatPictureCapability, actor: PersonRow, band: AgeBand): boolean {
+ * model reads them and the person may send photos (a child only once a
+ * parent turned photos on; a teen by the same setting). VISION-02d: a
+ * child's or teen's answer about a picture passes the output gate at
+ * their grain like every answer (rule 10); nothing here loosens it, and
+ * no learned image check decides anything (RULES-AND-LEARNED-COMPONENTS). */
+export function picturePartsAllowed(capability: ChatPictureCapability, actor: PersonRow, turn?: { band: AgeBand; anonymous: boolean }): boolean {
   if (!capability.imageParts || capability.pictureTokensMax === null) return false;
-  if (band !== "adult") return false;
+  // A turn by an unidentified speaker, or one whose band is not the
+  // signed-in person's own, sends no picture: the photo setting read below
+  // is that account's, not the speaker's (two reviews).
+  if (turn && (turn.anonymous || turn.band !== speakerAgeBand(actor, new Date()))) return false;
   return photoUploadsAllowed(actor);
 }
 

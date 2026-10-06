@@ -31,6 +31,7 @@ import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
 import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type EnginesOverview, type InstalledPackage, type Roster } from "@/lib/api";
+import { CHAT_CAPABILITIES_QUERY_KEY, chatCapabilitiesFrom, modelThinks, NO_CHAT_PICTURES } from "@/apps/chat/visionCapability";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
@@ -367,10 +368,15 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const photoSetting = photoSettings.find((setting) => setting.key === "chat.photo_uploads");
   const photoUploadsEnabled = photoUploadsEnabledForBand(person.age_band, photoSetting);
   const chatRole = enginesQuery.data?.roles?.find((role) => role.id === "chat");
+  // VISION-02d (rule 8): what each chat model can do, from its record
+  // through the backend. A model with no thinking mode offers no
+  // Instant/Thinking control and its turns never ask for thinking.
+  const capabilitiesQuery = useQuery({ queryKey: CHAT_CAPABILITIES_QUERY_KEY, queryFn: async () => chatCapabilitiesFrom(await api.chatCapabilities().catch(() => undefined)) });
+  const chatCapabilities = capabilitiesQuery.data ?? NO_CHAT_PICTURES;
   const modelOptions = useMemo<ModelOption[]>(() => {
     if (!enginesQuery.data?.configured) return [];
-    return (chatRole?.models ?? []).map((model) => ({ ...model, efforts: MODEL_EFFORTS }));
-  }, [chatRole?.models, enginesQuery.data?.configured]);
+    return (chatRole?.models ?? []).map((model) => ({ ...model, efforts: modelThinks(chatCapabilities, model.id) ? MODEL_EFFORTS : undefined }));
+  }, [chatRole?.models, enginesQuery.data?.configured, chatCapabilities]);
   const ttsAvailable = readyRole(enginesQuery.data, "tts");
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
@@ -527,6 +533,10 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     : undefined;
   const modelPickerAllowed = thinkingAllowed && enginesQuery.data?.configured === true && isOwnerOrAdminRole(person.role) && modelOptions.length >= 2;
   selectedModelRef.current = modelPickerAllowed ? selectedModelValue : undefined;
+  // The model this person's next turn runs on: the picked one, or the
+  // household's current one.
+  const currentModelThinksRef = useRef(true);
+  currentModelThinksRef.current = modelThinks(chatCapabilities, selectedModelRef.current);
   const modelPickerAllowedRef = useRef(false);
   modelPickerAllowedRef.current = modelPickerAllowed;
   // ADMIN-COMPARE-01 (b): bare mode. Deliberately session-local, never
@@ -659,7 +669,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           // per-message opt-in there); RESP-04's control is a mode. Its
           // current value is hydrated from the conversation settings,
           // saved by its setter, and used on every send until changed.
-          getThinking: () => (thinkingAllowed ? thinkingRef.current : undefined),
+          getThinking: () => (thinkingAllowed && currentModelThinksRef.current ? thinkingRef.current : undefined),
           getModel: () => (modelPickerAllowedRef.current ? selectedModelRef.current : undefined),
           consumeSupersedes,
           consumePackageScope: () => {

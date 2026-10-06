@@ -204,7 +204,10 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // refusal and a credential turn are never the judge's
   // (the old engine file's judgeStatusAtInsert, the function the old path calls).
   // THIN-7C: a bare turn is never the judge's (ADMIN-COMPARE-01 b).
-  logTurn(actor, surface, text, value, { ...opts, judgeStatus: state.bare ? "skipped" : judgeStatusAtInsert(value, state.signal) });
+  // VISION-02d (ATT-01's rule): a child's or teen's picture turn never
+  // enters the memory judge; an adult's follows the existing policy.
+  const minorPictureTurn = (state.images?.length ?? 0) > 0 && state.plan.age_band !== "adult";
+  logTurn(actor, surface, text, value, { ...opts, judgeStatus: state.bare || minorPictureTurn ? "skipped" : judgeStatusAtInsert(value, state.signal) });
   // THIN-7E (ASK-01): the question the reply ended with stands as the conversation's pending ask only
   // now that the delivered text is known to carry it (a refusal that lost it commits nothing).
   state.askCommit?.(value.reply.text);

@@ -158,6 +158,13 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const status = getEngineStatus();
   console.log(`Chat engine: ${status.kind}, model ${status.modelId ?? "n/a"}`);
   const engine = `chat ${status.kind} at ${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)}`; // before the reset below
+  // VISION-02d: MAIPAI_BENCH_PASS=budget runs only the budget-offered pass,
+  // the one a model's turn_budget.measured records (a long run on a busy
+  // machine can then finish between memory-pressure stops).
+  if (process.env.MAIPAI_BENCH_PASS === "budget") {
+    const budgetOnly = await budgetOfferedPass();
+    return { executed: budgetOnly, engine };
+  }
   console.log(`Running ${corpus.length} tool-call-corpus rows, ${REPEATS} repeats each...\n`);
 
   let falseCallAttempts = 0; // every repeat of a negative row (expect_calls: [])

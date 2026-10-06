@@ -5,7 +5,7 @@
 // call site. THIN-6B (rule 8) narrows it to a child's or teen's turn: an
 // adult's turn on a model without a record gets tools and thinking.
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { CATALOG } from "@/lib/modelCatalog";
+import { CATALOG, thinkingModeFor } from "@/lib/modelCatalog";
 import { chatWindowContext, MINIMUM_CHAT_WINDOW_TOKENS } from "@/lib/roleHealth";
 import type { AgeBand } from "@/lib/ageBand";
 import type { TurnBudget } from "./contract";
@@ -80,11 +80,18 @@ export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget 
   }
   const entry = id ? CATALOG.find((m) => m.role === "chat" && m.id === id) : undefined;
   const base = entry?.turn_budget ? withStreamDeadlines(entry.turn_budget) : band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
-  return base;
+  // VISION-02d (rule 8): a model whose record declares no thinking mode is
+  // never asked to think, whatever the person's toggle says.
+  return thinkingModeFor(id) === "none" ? { ...base, thinking_budget_tokens: 0, thinking_budget_tokens_toggled: 0 } : base;
 }
 
 export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBand): Promise<TurnBudget> {
   const base = resolveTurnBudget(modelId, band);
   const context = await chatWindowContext();
-  return { ...base, context_tokens: context.tokens, context_window_tokens: context.reported ? context.tokens : null };
+  // VISION-02d (rule 8, a review): the model the Stack actually runs also
+  // decides thinking; a chat model with no thinking mode is never asked to
+  // think, whatever the household setting or the person's toggle says.
+  const runs = modelId ?? context.modelId;
+  const thinking = runs !== undefined && thinkingModeFor(runs) === "none" ? { thinking_budget_tokens: 0, thinking_budget_tokens_toggled: 0 } : {};
+  return { ...base, ...thinking, context_tokens: context.tokens, context_window_tokens: context.reported ? context.tokens : null };
 }

@@ -127,7 +127,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   let pictureParts: LlmImagePart[] = [];
   if (state.images?.length && !state.bare) {
     const capability = await chatModelReadsPictures();
-    if (picturePartsAllowed(capability, state.actor, turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()))) {
+    if (picturePartsAllowed(capability, state.actor, { band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()), anonymous: speakerIsAnonymous(state) })) {
       const loaded = loadPictureParts(state.actor, conversation.id, temporary, state.images, capability.pictureTokensMax!);
       pictureParts = loaded.parts;
       if (loaded.unread.length > 0) items.push({ id: "attachment-pictures", text: picturesNotReadNote(loaded.unread, "the stored picture could not be opened"), source: "attachment", subjects: [], disclosure: "child_ok" });

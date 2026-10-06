@@ -577,6 +577,13 @@ export interface ChatModelOption {
  * decides it from a model id (rule 8). */
 export interface ChatCapabilities {
   image_parts: boolean;
+  /** VISION-02d: whether the chat model this person's turn runs on can
+   * think before it answers, from its record (rule 8): "switchable" shows
+   * the Instant/Thinking control, "none" and "always" show none (there is
+   * nothing to switch). A minor's turn never thinks, so it reads "none". */
+  thinking: "switchable" | "none" | "always";
+  /** The same, per chat model the Stack can start (the model picker). */
+  thinking_modes: Record<string, "switchable" | "none" | "always">;
 }
 
 export interface ChatModelsResponse {

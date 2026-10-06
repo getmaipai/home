@@ -110,17 +110,18 @@ describe("VISION-02c: picture parts for a chat model that reads pictures", () =>
     });
   });
 
-  test("a child or teen gets no picture parts until VISION-02d's floor lands, whatever the Stack says", async () => {
-    expect(picturePartsAllowed(ON, people.child, "child")).toBe(false);
-    expect(picturePartsAllowed(ON, people.owner, "teen")).toBe(false);
-    expect(picturePartsAllowed(ON, people.owner, "adult")).toBe(true);
-    expect(picturePartsAllowed({ imageParts: false, pictureTokensMax: null }, people.owner, "adult")).toBe(false);
+  test("VISION-02d: a child sends picture parts only once a parent turned photos on; an adult by the same setting", async () => {
+    expect(picturePartsAllowed(ON, people.child)).toBe(false);
+    expect(setValue(people.owner, `person:${people.child.id}`, "chat.photo_uploads", true).ok).toBe(true);
+    expect(picturePartsAllowed(ON, people.child)).toBe(true);
+    expect(picturePartsAllowed(ON, people.owner)).toBe(true);
+    expect(picturePartsAllowed({ imageParts: false, pictureTokensMax: null }, people.owner)).toBe(false);
   });
 
   test("an adult with photo uploads turned off sends no picture parts", () => {
     const set = setValue(people.owner, `person:${people.owner.id}`, "chat.photo_uploads", false);
     expect(set.ok).toBe(true);
-    expect(picturePartsAllowed(ON, people.owner, "adult")).toBe(false);
+    expect(picturePartsAllowed(ON, people.owner)).toBe(false);
   });
 
   test("a picture turn makes no request off this machine (network blocked)", async () => {
