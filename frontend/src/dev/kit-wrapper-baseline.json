@@ -110,9 +110,6 @@
   "next/pages/TurnErrorDetails.tsx": {
     "TurnErrorDetails": "returns <Popover> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); Elements audit set C D8: hand-built admin detail popover; tool-error ships."
   },
-  "next/pages/dashboard/RecentActivityTable.tsx": {
-    "RecentActivityTable": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
-  },
   "next/pages/dashboard/StatCard.tsx": {
     "StatCard": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
   },
@@ -163,8 +160,7 @@
     "OverallBanner": "returns <Alert> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
   },
   "next/pages/status/StatusIncident.tsx": {
-    "StatusIncident": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program.",
-    "RecentProblems": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
+    "StatusIncident": "returns <Card> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."
   },
   "shell/ThemeToggle.tsx": {
     "ThemeToggle": "returns <Button> as its root. Present when ELEMENTS-LINT-03 landed (2026-10-06); retire in the Elements program."

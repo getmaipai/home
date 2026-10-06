@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup } from "@testing-library/react";
 import { NextStatusPage } from "@/next/pages/NextStatusPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { Roster, StatusAppsResponse } from "@/lib/api";
+import type { Roster, StatusAppsResponse, StatusHistory } from "@/lib/api";
 
 afterEach(cleanup);
 
@@ -15,7 +15,7 @@ const apps: StatusAppsResponse = [
   ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational" as const, reason: null, needs: [{ kind: "engine" as const, id: "chat", name: "Brain", purpose: "Chat model", state: "operational" as const, required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: "operational" as const, uptime: 100, minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } })), uptimePercent: 100 })),
 ];
 
-function mockStatus(includeNeeds: boolean) {
+function mockStatus(includeNeeds: boolean, history: StatusHistory = { generated_at: new Date().toISOString(), days: 90, components: [], incidents: [] }) {
   const original = globalThis.fetch;
   const paths: string[] = [];
   globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -26,7 +26,7 @@ function mockStatus(includeNeeds: boolean) {
       brain: "selection", voice: "spawned", ok: true, uptimeSeconds: 60,
       engines: { chat: { kind: "selection", pid: null, alive: true }, embed: { kind: "spawned", pid: null, alive: true }, background: { kind: "spawned", pid: null, alive: true }, voice: { kind: "spawned", pid: null, alive: true } }, sidecars: [],
     }));
-    if (url.includes("/api/status/history")) return Promise.resolve(Response.json({ generated_at: new Date().toISOString(), days: 90, components: [], incidents: [] }));
+    if (url.includes("/api/status/history")) return Promise.resolve(Response.json(history));
     if (url.includes("/api/status/board")) return Promise.resolve(Response.json({ note: null, maintenance: [] }));
     return Promise.resolve(Response.json({}));
   }) as unknown as typeof fetch;
@@ -67,6 +67,27 @@ describe("NextStatusPage app-first view", () => {
       const appsCard = view.getByText("Apps").closest("[data-slot='card']");
       const scenesHeading = view.getByText("Behind the scenes");
       expect(appsCard !== null && Boolean(appsCard?.compareDocumentPosition(scenesHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+    } finally { restore(); }
+  });
+
+  test("admin incident timeline uses only the existing status-history response", async () => {
+    const history = { generated_at: "2026-09-30T12:00:00.000Z", days: 90, components: [], incidents: [
+      { component: "chat", started_at: "2026-09-29T10:00:00.000Z", ended_at: null, minutes: 120, ongoing: true },
+      { component: "voice", started_at: "2026-09-27T08:00:00.000Z", ended_at: "2026-09-27T08:35:00.000Z", minutes: 35, ongoing: false },
+    ] } satisfies StatusHistory;
+    const { paths, restore } = mockStatus(true, history);
+    try {
+      const view = renderWithQueryClient(<NextStatusPage person={makePerson("admin")} />);
+      expect(await view.findByText("Recent problems")).toBeTruthy();
+      expect(view.container.querySelectorAll('[data-slot="timeline"]')).toHaveLength(1);
+      const timeline = view.container.querySelector('[data-slot="timeline"]')!;
+      expect(timeline.textContent).toContain("Ongoing since");
+      expect(timeline.textContent).toContain("2 h");
+      expect(timeline.textContent).toContain("Ended");
+      expect(timeline.textContent).toContain("35 min");
+      expect(timeline.textContent).toContain("Brain");
+      expect(timeline.textContent).toContain("Voice");
+      expect(paths.filter((path) => path === "/api/status/history")).toHaveLength(1);
     } finally { restore(); }
   });
 });

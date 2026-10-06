@@ -652,48 +652,6 @@
       "items-center"
     ]
   },
-  "next/pages/dashboard/RecentActivityTable.tsx": {
-    "Card": [
-      "flex",
-      "flex-col",
-      "gap-0!"
-    ],
-    "CardHeader": [
-      "border-b",
-      "border-border"
-    ],
-    "CardTitle": [
-      "flex",
-      "gap-2",
-      "items-center"
-    ],
-    "CardContent": [
-      "px-0!"
-    ],
-    "TableRow": [
-      "border-border",
-      "hover:bg-muted/30",
-      "hover:bg-transparent"
-    ],
-    "TableHead": [
-      "h-auto",
-      "pl-4!",
-      "pr-4!",
-      "px-4",
-      "py-3",
-      "w-32.5",
-      "w-40"
-    ],
-    "TableCell": [
-      "pl-4!",
-      "pr-4!",
-      "px-4",
-      "py-3",
-      "py-6",
-      "w-32.5",
-      "w-40"
-    ]
-  },
   "next/pages/dashboard/StatCard.tsx": {
     "CardContent": [
       "flex",
@@ -1080,10 +1038,6 @@
       "pb-2"
     ],
     "CardContent": [
-      "divide-border",
-      "divide-y",
-      "flex",
-      "flex-col",
       "pl-11"
     ]
   },

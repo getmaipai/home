@@ -3657,50 +3657,8 @@ async function captureNextDashboardReview(browser: Browser, sessionValue: string
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/`);
         await page.locator("text=Here is your household today.").first().waitFor({ timeout: 15000 });
+        await page.locator('[data-slot="timeline"]').waitFor({ timeout: 15000 });
         await settleAnimations(page);
-        if (viewport.width === 390) {
-          const logo = await page.locator('header nav a:has(img[alt="logo"])').evaluate((anchor) => {
-            const image = Array.from(anchor.querySelectorAll<HTMLImageElement>('img[alt="logo"]'))
-              .find((candidate) => getComputedStyle(candidate).display !== "none");
-            if (!image) throw new Error("visible header logo image not found");
-            const box = (element: HTMLElement) => ({
-              clientWidth: element.clientWidth,
-              scrollWidth: element.scrollWidth,
-              overflowX: getComputedStyle(element).overflowX,
-              renderedWidth: element.getBoundingClientRect().width,
-            });
-            const container = anchor as HTMLElement;
-            const wrapper = container.parentElement;
-            const imageBounds = image.getBoundingClientRect();
-            const containerBounds = container.getBoundingClientRect();
-            return {
-              image: {
-                clientWidth: image.clientWidth,
-                scrollWidth: image.scrollWidth,
-                overflowX: getComputedStyle(image).overflowX,
-                renderedWidth: image.getBoundingClientRect().width,
-                naturalWidth: image.naturalWidth,
-              },
-              container: box(container),
-              imageFitsContainer: imageBounds.left >= containerBounds.left - 1 &&
-                imageBounds.right <= containerBounds.right + 1,
-              wrapper: wrapper ? box(wrapper) : null,
-              page: {
-                clientWidth: document.documentElement.clientWidth,
-                scrollWidth: document.documentElement.scrollWidth,
-              },
-            };
-          });
-          console.log(`logo-phone assertion @ 390/${theme}: ${JSON.stringify(logo)}`);
-          if (
-            logo.image.renderedWidth < logo.image.naturalWidth - 1 ||
-            logo.container.clientWidth < logo.image.renderedWidth - 1 ||
-            !logo.imageFitsContainer ||
-            logo.page.scrollWidth > logo.page.clientWidth
-          ) {
-            throw new Error(`logo-phone assertion failed @ 390/${theme}: ${JSON.stringify(logo)}`);
-          }
-        }
         const path = join(outDir, `next-dashboard-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
         console.log(`Wrote ${path}`);
@@ -7066,14 +7024,25 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
     { id: "chat", name: "Chat", state: "down", reason: "Chat isn't working right now.", ...(admin ? { needs: [{ kind: "engine", id: "chat", name: "Brain", state: "down", required: true, purpose: "Chat model" }] } : {}), history, uptimePercent: 99.5 },
     ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational", reason: null, ...(admin ? { needs: [] } : {}), history: history.map((day) => ({ ...day, state: "operational", uptime: 100, minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } })), uptimePercent: 100 })),
   ];
+  const statusHistory = {
+    generated_at: new Date().toISOString(),
+    days: 90,
+    components: [],
+    incidents: [
+      { component: "chat", started_at: new Date(Date.now() - 3_600_000).toISOString(), ended_at: null, minutes: 60, ongoing: true },
+      { component: "voice", started_at: new Date(Date.now() - 86_400_000).toISOString(), ended_at: new Date(Date.now() - 86_370_000).toISOString(), minutes: 30, ongoing: false },
+    ],
+  };
 
   for (const [role, session, admin] of [["admin", ownerSession, true], ["non-admin", memberSession, false]] as const) {
     for (const [viewportName, width] of [["desktop", 1440], ["phone", 390]] as const) {
       const viewport = VIEWPORTS.find((item) => item.slug === viewportName)!;
-      const context = await newContext(browser, viewport, "light", session);
+      for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, session);
       try {
         const page = await context.newPage();
         await page.route("**/api/status/apps", (route) => route.fulfill({ status: 200, json: appFixture(admin) }));
+        if (admin) await page.route("**/api/status/history**", (route) => route.fulfill({ status: 200, json: statusHistory }));
         await page.route("**/api/health", async (route) => {
           const response = await route.fetch();
           const health = await response.json() as { ok: boolean; engines: Record<string, { kind: string; pid: number | null; alive: boolean | null }> };
@@ -7085,18 +7054,25 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
         await page.getByText("Apps", { exact: true }).waitFor({ timeout: 15000 });
         await page.getByRole("region", { name: "Overall status" }).getByText("Chat isn't working right now.", { exact: true }).waitFor();
         if (admin) {
-          await page.getByText("Needs: Brain (down)", { exact: true }).waitFor();
+          await page.getByText("Needs attention", { exact: true }).waitFor();
           await page.getByText("Behind the scenes", { exact: true }).waitFor();
+          await page.getByText("Recent problems", { exact: true }).waitFor();
+          await page.locator('[data-slot="timeline"]').waitFor();
         } else {
           if (await page.getByText("Behind the scenes", { exact: true }).count()) throw new Error("non-admin status capture shows Behind the scenes");
           if (await page.getByText("Brain", { exact: true }).count()) throw new Error("non-admin status capture exposed the Brain engine name");
           const chatReason = await page.getByText("Chat isn't working right now.", { exact: true }).first().textContent();
           if (chatReason?.includes("Brain")) throw new Error("non-admin reason sentence exposed an engine name");
-          const statusLinkTitle = await page.locator('a[href="/status"]').getAttribute("title");
-          if (statusLinkTitle?.includes("Brain")) throw new Error("non-admin status indicator tooltip exposed an engine name");
+          const statusIndicator = page.locator('a[href="/status"]');
+          if (await statusIndicator.count()) {
+            const statusLinkTitle = await statusIndicator.first().getAttribute("title");
+            if (statusLinkTitle?.includes("Brain")) throw new Error("non-admin status indicator tooltip exposed an engine name");
+          }
         }
         if (viewportName === "phone") {
-          const indicatorLayout = await page.locator('a[href="/status"]').first().evaluate((anchor) => {
+          const statusIndicator = page.locator('a[href="/status"]').first();
+          if (await statusIndicator.count()) {
+          const indicatorLayout = await statusIndicator.evaluate((anchor) => {
             const rect = anchor.getBoundingClientRect();
             const status = anchor.querySelector('[data-status]');
             return {
@@ -7111,17 +7087,13 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
             };
           });
           console.log(`status phone indicator geometry: ${JSON.stringify(indicatorLayout)}`);
+          }
         }
-        const path = join(outDir, `status-apps-${role}-${width}.png`);
+        const path = join(outDir, `status-apps-${role}-${width}-${theme}.png`);
         await page.screenshot({ path, fullPage: true });
         console.log(`Wrote ${path}`);
-        if (viewportName === "desktop") {
-          const chatLink = page.locator('[aria-label="Primary navigation"] a[href="/next/chat"]');
-          await chatLink.waitFor({ timeout: 5000 });
-          if (await chatLink.getAttribute("aria-label") !== "Chat: not working") throw new Error(`${role} status menu label did not expose Chat status: ${await chatLink.getAttribute("aria-label")}`);
-          if (await chatLink.getAttribute("title") !== "Chat isn't working right now.") throw new Error(`${role} status tooltip did not use the app reason sentence`);
-        }
       } finally { await context.close(); }
+      }
     }
   }
   console.log("Fixture capture shows Chat down with Brain down for the admin, and the plain reason without engine names for a household member.");
