@@ -1,0 +1,69 @@
+{
+  "apps/chat/ChatActivityCard.tsx": [
+    "ChatActivityCard"
+  ],
+  "apps/chat/ChatThread.tsx": [
+    "ChatThread"
+  ],
+  "apps/chat/ChatThreadExtras.tsx": [
+    "ChatThreadExtras"
+  ],
+  "apps/chat/HomeTooltipIconButton.tsx": [
+    "HomeTooltipIconButton"
+  ],
+  "apps/chat/WakeWordIndicator.tsx": [
+    "WakeWordIndicator"
+  ],
+  "apps/chat/chatActionBar.tsx": [
+    "FeedbackReasonRow"
+  ],
+  "apps/chat/chatAnswerImages.tsx": [
+    "AnswerImagesDataRender"
+  ],
+  "apps/chat/chatCitationLink.tsx": [
+    "ChatCitationLink"
+  ],
+  "apps/chat/chatHeaderBar.tsx": [
+    "ChatHeaderBar"
+  ],
+  "apps/chat/chatThreadSlots.tsx": [
+    "ChatComposerNotice",
+    "NextChatWelcome",
+    "SourcesActionBarTrigger",
+    "SourcesFooterContent",
+    "MessageDetailsReveal"
+  ],
+  "apps/chat/chatToolUis.tsx": [
+    "ProducedArtifactCard",
+    "ProjectToolRender"
+  ],
+  "apps/chat/composerAddMenu.tsx": [
+    "ComposerAddMenuItem",
+    "GroupLabel",
+    "AppsGroup"
+  ],
+  "apps/chat/composerDictationWaveform.tsx": [
+    "ComposerDictationWaveform"
+  ],
+  "apps/chat/liveVoiceSession.tsx": [
+    "LiveVoiceSession"
+  ],
+  "next/pages/ChatColumn.tsx": [
+    "ChatColumnToggle",
+    "ChatHistoryPanel"
+  ],
+  "next/pages/ChatShortcutReference.tsx": [
+    "ChatShortcutReference"
+  ],
+  "next/pages/NextChatPage.tsx": [
+    "NextChatPage"
+  ],
+  "next/pages/NextUiShowcasePage.tsx": [
+    "ShowcaseWorkspace",
+    "NextUiShowcasePage"
+  ],
+  "next/pages/TurnErrorDetails.tsx": [
+    "DetailBody",
+    "StoredDetail"
+  ]
+}
