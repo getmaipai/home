@@ -28,6 +28,7 @@ import {
   idSequences,
   settingsValues,
   notificationHolds,
+  safetyAlarms,
   scheduledJobs,
   jobs,
   modelDownloadJobs,
@@ -164,6 +165,7 @@ export function resetDb(): void {
   db.delete(pendingMemoryWork).run();
   db.delete(memoryRecords).run();
   db.delete(notificationHolds).run();
+  db.delete(safetyAlarms).run();
   db.delete(settingsValues).run();
   // lib/settings.ts's own resolveStoredValue() cache (added in a latency
   // pass, 2026-09-06): the same "cleared here too" fix idSequences got

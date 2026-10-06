@@ -17,6 +17,11 @@ export const DEVICE_HEARTBEAT_MS = 15_000;
 
 type DeviceCommandKind = DeviceCommandShape["kind"];
 type DeviceCommandPayload = Record<string, unknown>;
+type AlarmAction = "acknowledge" | "quiet_here" | "false_alarm";
+type AlarmActionResult = { ok: true; state: string } | { ok: false; status?: number; error: string };
+let alarmActionHandler: ((deviceId: string, alarmId: string, action: AlarmAction, evidence: unknown) => AlarmActionResult) | undefined;
+
+export function registerDeviceAlarmActionHandler(handler: typeof alarmActionHandler): void { alarmActionHandler = handler; }
 
 interface CommandRow {
   id: string;
@@ -209,6 +214,13 @@ function isDeviceAck(value: unknown): value is { type: "ack"; id: string; state?
   return state.muted === undefined || typeof state.muted === "boolean";
 }
 
+function parseAlarmAction(value: unknown): { alarm_id: string; action: AlarmAction; evidence: unknown } | null {
+  if (!value || typeof value !== "object") return null;
+  const message = value as Record<string, unknown>;
+  if (message.type !== "alarm_action" || typeof message.alarm_id !== "string" || !["acknowledge", "quiet_here", "false_alarm"].includes(String(message.action))) return null;
+  return { alarm_id: message.alarm_id, action: message.action as AlarmAction, evidence: message.speaker_evidence };
+}
+
 function disposeConnection(connection: ActiveConnection, code?: number, reason?: string): void {
   if (connection.timer) clearInterval(connection.timer);
   connection.timer = undefined;
@@ -274,6 +286,12 @@ export function deviceCommandWebSocket(deviceId: string, lastEventId?: string): 
           return;
         }
         connection.lastEventId = message.id;
+        return;
+      }
+      const alarmAction = parseAlarmAction(message);
+      if (alarmAction) {
+        const result = alarmActionHandler?.(deviceId, alarmAction.alarm_id, alarmAction.action, alarmAction.evidence) ?? { ok: false as const, error: "Alarm actions are unavailable" };
+        sendControl(connection, { type: result.ok ? "alarm_action_accepted" : "alarm_action_rejected", alarm_id: alarmAction.alarm_id, ...(result.ok ? { state: result.state } : { message: result.error }) });
         return;
       }
       if (typeof message === "object" && message !== null && (message as Record<string, unknown>).kind === "offer_answer") {

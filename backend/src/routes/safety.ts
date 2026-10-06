@@ -5,6 +5,7 @@ import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { AppEnv } from "@/types";
 import { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
+import { applyAlarmAction, listActiveSafetyAlarms, type SafetyAlarmAction } from "@/lib/safetyAlarm";
 
 export const safetyRoutes = apiRouter();
 
@@ -49,4 +50,23 @@ safetyRoutes.openapi(checkRoute, async (c) => {
   }
   const result = evaluateSafety(body.text, speakerAgeBand(person, new Date()));
   return c.json(result, 200);
+});
+
+const activeAlarmsRoute = createRoute({
+  method: "get", path: "/alarms", tags: ["Safety"], summary: "List active household safety alarms",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.array(z.object({ id: z.string(), sensorId: z.string(), area: z.string().nullable(), kind: z.string(), state: z.string(), startedAt: z.string() })) } }, description: "Current active safety alarms." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+safetyRoutes.openapi(activeAlarmsRoute, (c) => c.json(listActiveSafetyAlarms(), 200));
+
+const alarmActionRoute = createRoute({
+  method: "post", path: "/alarms/{id}/actions", tags: ["Safety"], summary: "Acknowledge or mark an active alarm false",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string() }), body: { content: { "application/json": { schema: z.object({ action: z.enum(["acknowledge", "false_alarm"]) }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ state: z.string() }) } }, description: "Alarm action applied." }, ...errorResponses({ 400: "Action is invalid in this context", 401: "Not signed in", 403: "Only an adult may act; only an admin may mark a false alarm", 404: "No active alarm" }) },
+});
+safetyRoutes.openapi(alarmActionRoute, (c) => {
+  const result = applyAlarmAction(c.get("person").id, c.req.valid("param").id, c.req.valid("json").action as SafetyAlarmAction);
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json({ state: result.state }, 200);
 });

@@ -7,6 +7,7 @@ import { issueApiToken, revokeApiToken } from "@/lib/apiToken";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
+import { refreshSafetyAlarmSensors } from "@/lib/safetyAlarm";
 
 export const settingsRoutes = apiRouter();
 
@@ -102,6 +103,7 @@ settingsRoutes.openapi(putRoute, (c) => {
   }
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
+  if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
   return c.json(result.value, 200);
 });
 
@@ -138,6 +140,7 @@ settingsRoutes.openapi(resetRoute, (c) => {
   }
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
+  if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
   return c.json({ ...result.value, success: true as const }, 200);
 });
 

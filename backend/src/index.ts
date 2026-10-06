@@ -32,8 +32,10 @@ import { KeystoreProtectionFailedError } from "@/lib/keystore";
 import { recordBootGap, recordStatusSample, pruneStatusEvents } from "@/lib/statusHistory";
 import { runConfiguredInternetProbe } from "@/lib/internetProbe";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
+import { initSafetyAlarm } from "@/lib/safetyAlarm";
 
 const configuredPort = Number(process.env.PORT ?? 8787);
+initSafetyAlarm();
 installConsoleFileMirror();
 installFatalErrorHandlers(shutdownEngines);
 
