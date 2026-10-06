@@ -705,21 +705,25 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
  * untouched (the old path's sentence-case opener is not ported: an
  * adult's written reply stays exactly as generated). An authored speech
  * text that differs from the visible text is kept as authored, the old
- * path's own rule.
+ * path's own rule, and on a spoken turn passes the one normalizer.
  *
  * THIN-0J (rule 12): a spoken-class turn (robot, pod, phone, or a chat
  * turn the client flags as spoken) also gets the old path's server-side
  * speech text, through the same speechTextFor() the old engine file uses: the
  * varied text normalized for speaking, or the robot's first-sentence
- * projection. A written or glance turn keeps whatever speech its own
+ * projection normalized the same way. A written or glance turn keeps whatever speech its own
  * node authored (none for the model's text), so a written adult reply
  * is exactly what it was before this port. */
 function finalizeNextReply(state: TurnState, value: TurnValue): TurnValue {
   const { text, speech } = value.reply;
-  if (speech !== undefined && speech !== text) return value;
+  const spokenTurn = surfaceClassOf(state.surface, state.spoken) === "spoken";
+  // An authored speech text is kept as authored, and on a spoken turn it
+  // is normalized like every other spoken text (one normalizer).
+  if (speech !== undefined && speech !== text) return spokenTurn ? { ...value, reply: { ...value.reply, speech: speechTextFor(state.surface, text, speech) } } : value;
   const variedText = variedConstantReply(state.actor.id, value.source, text, state.persona.id);
-  if (surfaceClassOf(state.surface, state.spoken) === "spoken") {
-    return { ...value, reply: { ...value.reply, text: variedText, speech: speechTextFor(state.surface, variedText, speech) } };
+  if (spokenTurn) {
+    // A speech that only repeated the text follows the varied text (a review).
+    return { ...value, reply: { ...value.reply, text: variedText, speech: speechTextFor(state.surface, variedText, speech === undefined ? undefined : variedText) } };
   }
   if (variedText === text) return value;
   return { ...value, reply: { ...value.reply, text: variedText, ...(speech === undefined ? {} : { speech: variedText }) } };

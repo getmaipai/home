@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
+import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
@@ -558,7 +559,7 @@ export async function* streamTurnEvents(
       race = await Promise.race([firstStep, pendingStatus, timer.promise]);
     }
     timer.cancel();
-    if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: cue }; }
+    if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; } // SPEECH-ROBOT-01: every spoken text passes the one normalizer
     // THIN-5B: while the first answer piece is still coming, side events
     // (live reasoning, status lines) keep going out as they are emitted, so
     // an adult's reasoning is shown while the model is still thinking

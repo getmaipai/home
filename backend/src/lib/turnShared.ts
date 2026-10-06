@@ -504,17 +504,20 @@ export function variedConstantReply(personId: string, source: TurnValue["source"
   return text;
 }
 
-/** The server-side speech text for a reply whose authored speech, if
- * any, repeats its visible text: the robot with no authored speech gets
- * the first sentence alone, links dropped (the projection its speaker
- * reads), every other surface gets the whole text normalized for
- * speaking (numbers, times, units, abbreviations and markdown read the
- * way a person says them). finalizeReply() above and the default path's
- * turnMachine/turnNext.ts call this same function (THIN-0J, rule 12:
- * ported, not copied). The output is for TTS only; the visible text is
- * never replaced by it. */
+/** The server-side speech text of a spoken reply, and the one way any
+ * of it reaches a speaker: every spoken surface, the robot included,
+ * goes through normalizeForSpeech() (numbers, times, units,
+ * abbreviations and markdown read the way a person says them). An
+ * authored speech text that differs from the visible text is what is
+ * spoken; otherwise the robot speaks the first sentence alone, links
+ * dropped (its length rule, never a way around the normalizer), and
+ * every other surface the whole text. The default path's
+ * turnMachine/turnNext.ts calls this function (THIN-0J, rule 12). The
+ * output is for TTS only; the visible text is never replaced by it. */
 export function speechTextFor(surface: Surface, text: string, authoredSpeech: string | undefined): string {
-  return surface === "robot" && authoredSpeech === undefined ? splitIntoSentences(text)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : normalizeForSpeech(text);
+  if (authoredSpeech !== undefined && authoredSpeech !== text) return normalizeForSpeech(authoredSpeech);
+  const spoken = surface === "robot" && authoredSpeech === undefined ? splitIntoSentences(text)[0]?.replace(/https?:\/\/\S+|www\.\S+/g, "").replace(/\s+/g, " ").trim() ?? "" : text;
+  return normalizeForSpeech(spoken);
 }
 
 /** FAST-04: what a turn's token stream resolves to once its deltas are

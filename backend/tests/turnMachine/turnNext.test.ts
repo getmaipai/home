@@ -3710,6 +3710,45 @@ describe("turnNext.ts: THIN-0J, server-side speech text for spoken turns on the 
     expect(result.value.reply.speech).not.toContain("http");
   });
 
+  test("a robot turn's first sentence is normalized for speaking like every other spoken surface", async () => {
+    // Architecture review 2026-10-06, 1.7: the robot, where numbers are
+    // spoken most, got the first sentence raw. The projection is its
+    // length rule, never a way around the one normalizer.
+    const reply = "It is 72°F at 10:04 am. See https://example.com for the rest.";
+    const result = await withStub({ reply: () => reply }, () => runTurnNext(people.owner, "robot", "how do I make a paper airplane"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe(reply);
+    expect(result.value.reply.speech).toBe("It is seventy-two degrees Fahrenheit at ten oh four in the morning.");
+  });
+
+  test("a varied constant reply is spoken as varied, not as the line it replaced", async () => {
+    // A review: a package's speech that only repeats its text must follow
+    // the companion's varied line, or the speaker reads one line while the
+    // screen shows another.
+    const { normalizeForSpeech } = await import("@maipai/spec/voice/ts/normalizeForSpeech.js");
+    for (const fact of ["pizza night is Friday", "movie night is Saturday", "the dog is called Bruno"]) {
+      const result = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", `remember that ${fact}`, { spoken: true }));
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.source).toBe("plugin");
+      expect(result.value.reply.speech).toBe(normalizeForSpeech(result.value.reply.text));
+    }
+  });
+
+  test("an authored speech text on a spoken turn goes through the same normalizer", async () => {
+    const { createCommand } = await import("@/lib/commands");
+    const created = createCommand(people.owner, "movie night", "child", { kind: "reply", text: "Starting movie night mode.", speech: "Movie night starts at 7:30 pm." });
+    if (!created.ok) throw new Error(created.error);
+    for (const [surface, spoken] of [["chat", true], ["robot", false]] as const) {
+      const result = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, surface, "movie night", spoken ? { spoken } : {}));
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.source).toBe("command");
+      expect(result.value.reply.text).toBe("Starting movie night mode.");
+      expect(result.value.reply.speech).toBe("Movie night starts at seven thirty in the evening.");
+    }
+  });
+
   test("a written adult turn is unchanged: no speech text, the text exactly as generated", async () => {
     const result = await withStub({ reply: () => WRITTEN }, () => runTurnNext(people.owner, "chat", "how do I make a paper airplane"));
     expect(result.ok).toBe(true);
