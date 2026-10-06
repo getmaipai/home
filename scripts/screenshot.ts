@@ -7307,14 +7307,44 @@ async function captureNextPersonalManagementReview(browser: Browser, sessionValu
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
+        if (viewport.width === 390) await page.setViewportSize({ width: 390, height: 1180 });
         for (const [name, path, readyText] of [
           ["voices", "/voices", "Cloned voices"],
           ["commands", "/commands", "Commands"],
           ["devices", "/devices", "Signed-in sessions"],
-          ["settings-me", "/settings?tab=me", "Voices"],
+          ["settings-me", "/settings?tab=me", "Me"],
         ] as const) {
+          if (name === "devices") {
+            await page.route("**/api/devices*", async (route) => {
+              const request = route.request();
+              const url = new URL(request.url());
+              if (request.method() === "GET" && url.pathname === "/api/devices") {
+                await route.fulfill({ json: [{
+                  id: "elt-t1-06-robot",
+                  kind: "robot",
+                  name: "Riff",
+                  area: "Living room",
+                  lastSeenAt: "2026-10-06T12:00:00.000Z",
+                  createdAt: "2026-10-01T12:00:00.000Z",
+                  capabilities: ["mute"],
+                  state: { activity: "idle", muted: false, tracking: true, reachable: true, unreachableSince: null, battery_level: 0.82, app_version: "0.1.0", daemon_version: "1.4.2" },
+                }] });
+                return;
+              }
+              if (request.method() === "POST" && url.pathname === "/api/devices/elt-t1-06-robot/commands") {
+                await route.fulfill({ status: 503, json: { error: "The robot did not respond." } });
+                return;
+              }
+              await route.continue();
+            });
+          }
           await page.goto(`${BASE_URL}${path}`);
           await page.getByText(readyText, { exact: false }).first().waitFor({ timeout: 15000 });
+          if (name === "devices") {
+            await page.getByTestId("robot-card").waitFor({ timeout: 15000 });
+            await page.getByRole("button", { name: "Mute microphone" }).click();
+            await page.getByRole("alert").filter({ hasText: "Could not send that to Riff." }).waitFor({ timeout: 15000 });
+          }
           await settleAnimations(page);
           const screenshotPath = join(outDir, `next-${name}-${viewport.width}-${theme}.png`);
           await page.screenshot({ path: screenshotPath, fullPage: slug === "phone" });
@@ -9083,7 +9113,8 @@ async function main() {
           try {
             const page = await context.newPage();
             await page.goto(`${BASE_URL}/status`);
-            await page.getByText("Components", { exact: true }).waitFor();
+            await page.getByRole("heading", { name: "Behind the scenes" }).waitFor();
+            await page.getByRole("button", { name: "About Brain" }).waitFor();
             const path = join(outDir, `status-${viewport.slug}-${theme}-admin.png`);
             await page.screenshot({ path, fullPage: true });
             console.log(`Wrote ${path}`);
@@ -9093,6 +9124,11 @@ async function main() {
       console.log("The seeded screenshot setup signs in as its seeded owner; it does not create a member session.");
       console.log("The seeded backend has no registered kiwix-serve sidecar, so the conditional Library row is absent.");
       console.log("A degraded or down state is not seeded by this capture.");
+      return;
+    }
+    if (nextUpdatesReview) {
+      await captureNextUpdatesReview(browser, sessionValue);
+      console.log("completed named review: --next-updates-review");
       return;
     }
     if (nextTableRolloutReview) {
@@ -9210,6 +9246,8 @@ async function main() {
 
     if (nextUpdatesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview) {
       await captureNextUpdatesReview(browser, sessionValue);
+      console.log("completed named review: --next-updates-review");
+      return;
     }
 
     if (nextRepairsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview) {

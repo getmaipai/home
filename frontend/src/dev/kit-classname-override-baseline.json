@@ -870,20 +870,8 @@
       "ed": "ED-038",
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     },
-    "Card": {
-      "tokens": [
-        "h-24",
-        "h-48"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
     "CardContent": {
       "tokens": [
-        "flex",
-        "flex-col",
-        "gap-3",
-        "items-start",
         "p-5"
       ],
       "ed": "ED-038",
