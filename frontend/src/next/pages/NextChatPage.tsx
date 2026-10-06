@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type MouseEvent, type PointerEvent, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -12,8 +12,6 @@ import { MarkdownDocument } from "@/next/pages/MarkdownDocument";
 // it ships, never a hand-built card (the kit's own `approval-card.tsx`
 // is built for a terminal command and can't be relabeled, per the org's
 // "no hand-built UI" rule).
-import { ThreadListItems, ThreadListNew, ThreadListRoot } from "@maipai/ui/src/elements/thread-list.aui";
-import { ThreadSearch, type SearchableThread } from "@maipai/ui/src/elements/thread-search";
 import { type ModelOption } from "@maipai/ui/src/elements/model-selector";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
@@ -25,7 +23,6 @@ import { CanvasSplit, CanvasSplitBody, CanvasSplitDocument, CanvasSplitHeader, C
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -56,7 +53,8 @@ import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assistant-ui/core";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
-import { readRailCollapsePreference, writeRailCollapsePreference } from "@/next/railCollapsePreference";
+import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
+import { CHAT_COLUMN_ID, ChatColumnToggle, ChatHistoryPanel, useChatColumn } from "@/next/pages/ChatColumn";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { readyRole } from "@/apps/chat/engineRoles";
@@ -66,21 +64,10 @@ import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/
 import { CompareIcon, MODEL_EFFORTS, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
 
-const HistoryIcon = getIcon("history");
-// CHAT-UI-03 (3): the app rail's own toggle (sidebar.tsx's
-// SidebarTrigger) already uses `panel-left` - the chat column's own
-// toggle read as a mistake sharing the identical glyph in a different
-// row/alignment. A distinct pair here, never touching the app rail's
-// own (that one stays exactly where the template puts it).
-// CHAT-FIND-0923-02: `message-square` never read as a column toggle at
-// all (Jesse's own live finding). `panel-left-close`/`panel-left-open`
-// (commons ui-v0.5.44) are the closest already-in-the-library state-
-// aware pair - still distinct from the outer trigger's plain, static
-// `panel-left` (no directional chevron), while actually showing which
-// way the click goes, the same idiom the "Show conversations"/"Hide
-// conversations" label pair already uses for the same two states.
-const RailCloseIcon = getIcon("panel-left-close");
-const RailOpenIcon = getIcon("panel-left-open");
+// CHAT-FIND-0923-02: `panel-left-open` shows which way the click goes;
+// the phone row's sheet control uses the same glyph as the desktop
+// column's show control (ChatColumn.tsx).
+const ColumnOpenIcon = getIcon("panel-left-open");
 
 /** canvas-split's own acceptance: opens beside the thread, closing
  * keeps the thread, a later turn's update to the same artifact
@@ -286,68 +273,6 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
  * Suggestions and attachments are each their own follow-up slice (the
  * wiring table's remaining rows). `speakReplies: false` still holds -
  * no "stop speaking" control on screen yet. */
-// The shipped `<ThreadList>` (thread-list.aui.tsx's own default export)
-// hardcodes its own `<ThreadListNew>` with no way to hand it a click
-// handler - composed here instead from that same file's other exported
-// pieces (its own implementation, mirrored exactly) so New Thread can
-// also close the phone/tablet Sheet, the same way selecting an
-// existing thread already does. `ThreadListPrimitive.New`'s own onClick
-// is composed with (not replaced by) the one passed here
-// (radix-ui's composeEventHandlers, confirmed in the installed
-// package) - both fire, so this changes nothing about starting a new
-// thread itself.
-// CHAT-UI-02: the desktop rail-collapse toggle rides in this row,
-// beside New Thread, rather than a row of its own above the column.
-// Jesse's own literal spec (22:22, after 22:04's "no floating placement"
-// landed the column itself but left the toggle floating and oversized):
-// in the open and peeked states the toggle is an INLINE element of this
-// row, in normal flow, the same size as the row's other icon buttons -
-// never absolutely positioned, never painted over New Thread or
-// anything else. Only the collapsed state (this row isn't rendered at
-// all - the column is `hidden`) gets a second, identically-sized
-// floating button at the row's own former top-left, since there's
-// nothing left in flow to place it inline with. The mobile Sheet's own
-// instance passes no `collapseToggle` (it has no collapse of its own),
-// so nothing renders there.
-function NextThreadList({
-  onNewThread,
-  collapseToggle,
-  pinnable,
-}: {
-  onNewThread: () => void;
-  collapseToggle?: ReactNode;
-  pinnable: boolean;
-}) {
-  const [search, setSearch] = useState("");
-  const aui = useAui();
-  const availability = useContext(ChatAvailabilityContext);
-  const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
-  const threadIds = useAuiState((s) => s.threads.threadIds);
-  const threadItems = useAuiState((s) => s.threads.threadItems);
-  const searchableThreads = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const yesterday = today.getTime() - 86_400_000;
-    const byId = new Map(threadItems.map((item) => [item.id, item]));
-    return threadIds.flatMap((id): SearchableThread[] => {
-      const item = byId.get(id);
-      if (!item || item.status === "archived") return [];
-      const time = item.lastMessageAt?.getTime();
-      const group = time === undefined || time >= today.getTime() ? "Today" : time >= yesterday ? "Yesterday" : "Earlier";
-      return [{ id, title: item.title || "New Chat", group, pinned: Boolean(item.custom?.pinned) }];
-    });
-  }, [threadIds, threadItems]);
-  return (
-    <ThreadListRoot>
-      <div className="flex items-center gap-1">
-        {collapseToggle}
-        <ThreadListNew label="New chat" className="min-h-12" onClick={onNewThread} disabled={availability === "unavailable"} />
-      </div>
-      {hasThreads && <ThreadSearch threads={searchableThreads} query={search} activeId={aui.threadListItem().getState().id ?? ""} onQueryChange={setSearch} onSelect={(id) => void aui.threads.switchToThread(id)} inputOnly aria-label="Search chats" className="-ms-0.5" />}
-      <ThreadListItems searchQuery={hasThreads ? search : ""} pinnable={pinnable} />
-    </ThreadListRoot>
-  );
-}
 
 function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void) {
   const temporaryNextRef = useRef(temporaryNext);
@@ -1111,7 +1036,12 @@ export function NextChatPage({ person }: { person: Roster }) {
   // it) and LiveVoiceSession itself (a direct prop, mounted below) read
   // the identical state.
   const [voiceOpen, setVoiceOpen] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  // COLUMN-01: the history column's open/hidden state (remembered per
+  // browser), its thread search, and the phone sheet. lg (960px) is where
+  // the column stops being a sheet.
+  const chatColumnBreakpoint = useBreakpoint();
+  const column = useChatColumn({ isDesktop: chatColumnBreakpoint.atLeast(960) });
+  const { sheetOpen, setSheetOpen } = column;
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
   // Jesse's own standing rule (2026-09-27): every expand/collapse
   // surface animates open and closed, never snaps - the desktop canvas
@@ -1169,7 +1099,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // surfaces mutually exclusive: the Sheet is never actually open at
   // desktop width, so there is no overlay and no outside-click handler
   // to misfire.
-  const isDesktopCanvas = useBreakpoint().atLeast(1024);
+  const isDesktopCanvas = chatColumnBreakpoint.atLeast(1024);
   // ADMIN-COMPARE-01: the identical desktop-pane/mobile-sheet split
   // openArtifactId already has, one state slot instead of a whole second
   // "which panel is open" enum - only ever one of the two is non-null in
@@ -1238,161 +1168,12 @@ export function NextChatPage({ person }: { person: Roster }) {
     }),
     [openDetailsIds, toggleDetailsOpen],
   );
-  // CHAT-UI-01 finding 4 / CHAT-UI-02: a ChatGPT-style collapse for the
-  // desktop thread-list column. The shipped Sidebar primitive's own
-  // collapsible modes (threadlist-sidebar.aui.tsx's own composition)
-  // render `position: fixed` against the viewport's own left edge -
-  // built for being the page's ONE top-level sidebar, not a second
-  // column nested beside one that's already there (it would render
-  // under or over the app rail, not after it). Nothing here forks that
-  // primitive or hand-builds a new one: this toggles the same plain
-  // column this file already had, the identical pattern `sheetOpen`
-  // already uses for the phone/tablet Sheet.
-  //
-  // Jesse's literal spec for the peek (22:04), after floating-placement
-  // attempts against the kit's HoverCard (Base UI's PreviewCard, whose
-  // own floating-ui portal never lands on a DIFFERENT sibling element's
-  // box in general - tried side/align/offset math against the trigger,
-  // then overriding the portal's own Positioner element directly, both
-  // measured live and wrong): no floating placement at all. The column
-  // is one node that always lives in this page's own layout at its own
-  // slot - open is normal flow, collapsed is `hidden` (width 0, out of
-  // the accessibility tree, same as before CHAT-UI-02), peeked is the
-  // SAME node repositioned with `position: absolute; inset-y-0; left-0`
-  // inside the row below (`relative`, sitting below the app header, so
-  // the overlay can never leave the chat area), at its normal open
-  // width, layered above the thread. No JS-measured rect, no portal, no
-  // effect: plain Tailwind classes keyed off two booleans, so the peeked
-  // box is pixel-identical to the open box by construction rather than
-  // by measurement.
-  //
-  // The toggle itself, refined again (22:22): a first pass floated one
-  // button over the column's own top-left in every state, which read as
-  // an oversized control painted on top of New Thread instead of
-  // belonging to the row. Open and peeked now render an INLINE toggle
-  // (`NextThreadList`'s own `collapseToggle` slot, first cell of its
-  // header row, the same icon-button size as its other controls) - true
-  // flow, not absolute, so it never floats over anything. Only the
-  // collapsed state has no row to be inline WITH (the column is
-  // `hidden`), so that state alone gets a second, identically-styled
-  // button positioned at the row's own former top-left. Exactly one of
-  // the two is ever mounted. Closing the peek keys off pointer-leave of
-  // the column itself (`next-chat-rail`): the inline toggle is now a
-  // real DESCENDANT of it (not a `display: contents` sibling, the
-  // approach a review on an earlier draft found never received the
-  // browser's own pointerleave - `display: contents` drops an element
-  // from the rendered box tree Chromium's own hover-tracking hit-tests
-  // against), so the ancestor-chain firing native pointerleave already
-  // does works with no dead zone and no manual relatedTarget check
-  // needed for this pair.
-  // CHAT-UI-03 (6): Jesse's own side-by-side at a narrow window -
-  // ChatGPT never lets the sidebar cover the conversation, collapsing
-  // it below the width where the rail, the column, and a usable pane
-  // no longer all fit; ours kept both open and let the column cover the
-  // greeting and composer. Below this width the column now starts
-  // collapsed instead of open - a DEFAULT, not a lock: hover-to-peek
-  // and click-to-pin-open still work exactly as at any width, so a
-  // person who wants it open at 768px can still have it. A lazy
-  // initializer, not a resize-reactive effect: this sets where the
-  // column STARTS, once, not an ongoing constraint that would snap a
-  // deliberately-reopened column shut again on a later resize.
-  const RAIL_AUTO_COLLAPSE_MAX_WIDTH = 1024;
-  // CHAT-FIND-0923-01: a deliberate click on the toggle is a real
-  // preference, not a one-time layout default - the stored value (once
-  // a person has ever clicked it) wins over the width-based default
-  // below, the same way `readMicDevicePreference()` already wins over
-  // "no preference." `null` (never clicked, or storage blocked) falls
-  // through to the existing matchMedia default unchanged.
-  const [railCollapsed, setRailCollapsed] = useState(() => {
-    const stored = readRailCollapsePreference();
-    if (stored !== null) return stored;
-    return typeof window !== "undefined" && window.matchMedia(`(max-width: ${RAIL_AUTO_COLLAPSE_MAX_WIDTH}px)`).matches;
-  });
-  const [railPeeked, setRailPeeked] = useState(false);
-  const closeRailPeek = (relatedTarget: EventTarget | null) => {
-    if (!railCollapsed) return;
-    const rail = document.getElementById("next-chat-rail");
-    if (relatedTarget instanceof Node && rail?.contains(relatedTarget)) return;
-    setRailPeeked(false);
-  };
-  // A review caught this: since the inline and collapsed toggles are two
-  // separate `Button` instances (never both mounted at once), a keyboard
-  // user who Tabs onto whichever one is visible and triggers the state
-  // change that swaps them (focus opens the peek, same as hover) loses
-  // focus outright when the DOM node they were on unmounts - the browser
-  // has nothing to transfer it to on its own, so it reverts to `<body>`,
-  // and the next Tab restarts from the top of the document instead of
-  // continuing into the now-visible column.
-  // A first fix (`document.activeElement === document.body` as the
-  // signal that focus was just lost) went back on re-review: that check
-  // can't tell "a focused node just unmounted" apart from "nothing has
-  // ever been focused," true for both the initial mount and every
-  // mouse-only interaction (`onPointerEnter` shares the same
-  // peek-opening logic as `onFocus`) - a mouse user hovering the
-  // collapsed toggle to peek, then moving the pointer away, would have
-  // had keyboard focus silently forced onto them, and the very first
-  // render would have stolen it on load. Fixed with an explicit intent
-  // flag instead of inferring one: only `onFocus` and `onClick` (real
-  // interactions with the toggle itself, never the passive
-  // `onPointerEnter` a hover also fires) set it, so the effect only ever
-  // follows focus after a person actually interacted with the specific
-  // node that's about to unmount.
-  // A second bug, found only by actually running this: the effect's own
-  // `target.focus()` call fires that button's real `onFocus` handler
-  // too (a programmatic `.focus()` dispatches the same event a person
-  // tabbing in would), so `handleToggleFocus` immediately re-armed
-  // `pendingToggleFocusRef` and re-ran `handleToggleEnter()` - on a
-  // COLLAPSED toggle, that opened the peek as a side effect of merely
-  // restoring focus to it, which flipped `railPeeked` again, which
-  // re-ran this same effect: a real cascade, live and in the test suite
-  // both. A transient boolean guard around the `.focus()` call was tried
-  // first and dropped: it assumes the resulting `focus` event dispatches
-  // synchronously, which happy-dom doesn't do, so the guard was already
-  // cleared by the time the handler ran. Fixed with identity instead of
-  // timing: `programmaticFocusTargetRef` records WHICH node the effect
-  // is about to focus, and `handleToggleFocus` ignores an event whose
-  // `currentTarget` is that exact node - correct no matter when the
-  // event actually fires, since nothing else in this component calls
-  // `.focus()` in between.
-  // A re-review caught one more gap: if `target.focus()` never actually
-  // moves focus (below the `lg` breakpoint, `collapsedToggle` is
-  // `hidden`, so calling `.focus()` on it is a no-op in every real
-  // browser - no `focus` event ever fires), nothing ever clears
-  // `programmaticFocusTargetRef`, so a LATER genuine Tab onto that same
-  // node (the viewport grown back past `lg`) would be silently
-  // swallowed as "my own doing." A `requestAnimationFrame` fallback
-  // clears it a frame later if the real focus event hasn't already done
-  // so first - long enough for any real dispatch (sync or the next
-  // microtask, either one lands well within a frame), short enough that
-  // a node that was never actually focusable doesn't stay masked.
-  // `target` itself is never null in practice: it's read from the same
-  // conditional this effect's own dependencies mirror, and React
-  // attaches refs during commit, strictly before effects run in that
-  // same pass - by the time this runs, whichever toggle the condition
-  // names has already mounted.
-  const inlineToggleRef = useRef<HTMLButtonElement>(null);
-  const collapsedToggleRef = useRef<HTMLButtonElement>(null);
-  const pendingToggleFocusRef = useRef(false);
-  const programmaticFocusTargetRef = useRef<HTMLButtonElement | null>(null);
-  useEffect(() => {
-    if (!pendingToggleFocusRef.current) return;
-    pendingToggleFocusRef.current = false;
-    const target = railCollapsed && !railPeeked ? collapsedToggleRef.current : inlineToggleRef.current;
-    if (!target) return;
-    programmaticFocusTargetRef.current = target;
-    target.focus();
-    const raf = requestAnimationFrame(() => {
-      if (programmaticFocusTargetRef.current === target) programmaticFocusTargetRef.current = null;
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [railCollapsed, railPeeked]);
   // A code review caught this: switching threads (onThreadIdChange,
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
   const { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
-    setRailPeeked(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
   }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId);
@@ -1415,215 +1196,8 @@ export function NextChatPage({ person }: { person: Roster }) {
   const bareModeValue = useMemo(() => ({ on: bareMode, toggle: () => setBareMode((value) => !value) }), [bareMode, setBareMode]);
   const packageScopeValue = useMemo(() => ({ scope: packageScope, setScope: setPackageScope }), [packageScope, setPackageScope]);
   const temporaryChatValue = useMemo(() => ({ on: temporaryNext }), [temporaryNext]);
-  // One base element, rendered at the phone/tablet Sheet and the
-  // collapsed rail's own peek overlay - ChatPage.tsx's own fix for
-  // exactly this (a code review caught two call sites drifting once one
-  // grew props the other didn't). The persistent desktop rail gets its
-  // own instance below, since it alone carries the collapse toggle.
-  const threadList = <NextThreadList onNewThread={() => setSheetOpen(false)} pinnable={!temporaryNext} />;
   const closeArtifact = () => setOpenArtifactId(null);
   const closeCompare = () => setCompareTarget(null);
-  // The toggle (see the CHAT-UI-02 comment above the state
-  // declarations): open and peeked render it inline, in
-  // `NextThreadList`'s own header row; collapsed alone falls back to a
-  // second, identically-styled instance positioned at that row's own
-  // former top-left, since there's no row left to be inline with. Same
-  // aria-label/expanded/handlers either way. Hover/focus opens the peek
-  // while collapsed; the click always pins the rail fully open
-  // (independent of hover) and clears `railPeeked` so a later collapse
-  // never mounts already "peeked" from a stale hover.
-  // Swapping the inline and collapsed buttons under a stationary pointer
-  // can synthesize pointerenter on the newly mounted button. Keep hover
-  // peeking suppressed until the pointer actually moves away from the
-  // click point. A same-coordinate leave/enter is the browser's hit-test
-  // recomputation during the DOM swap, not a person leaving the control.
-  const justToggledRailRef = useRef(false);
-  const toggleClickPointRef = useRef<{ x: number; y: number } | null>(null);
-  // Jesse's third report of this exact pane-jitter: `transition-[width]`
-  // used to sit unconditionally on the rail's own base className, so
-  // *any* width change animated - including closing the peek, which
-  // flips the node from `absolute w-64` (out of flow, harmless) to
-  // `static w-0` (in flow, so the chat pane gets squeezed for the
-  // animation's own 300ms). Only a real click should ever ease the
-  // width; hover opening or closing the peek must jump instantly. The
-  // transition classes now ride this flag instead of the base string,
-  // true only across a click-driven width change - `cn()` drops a
-  // falsy entry, so when it's false the transition property is
-  // genuinely absent from the rail's className, not merely overridden.
-  // Must match the rail's own `duration-300` Tailwind class in its
-  // className below - Tailwind's JIT needs that class as a literal
-  // string there, so this can't be interpolated in; a change to one
-  // needs the other updated by hand. Jesse found the original 200ms
-  // linear timing too fast to read as a real slide, both here and on
-  // the canvas wrapper below (2026-09-27) - 300ms with `ease-out` (a
-  // standard scale step and a standard easing keyword, no arbitrary
-  // value needed for either) reads as a deliberate motion instead of a
-  // snap, matching ChatGPT's own panel feel.
-  const RAIL_WIDTH_TRANSITION_MS = 300;
-  // A hard, rAF-independent ceiling - found live on 8787 (2026-09-22),
-  // not by either review pass: this session's own automation tab is
-  // genuinely backgrounded (`document.visibilityState === "hidden"`,
-  // `document.hasFocus() === false`), and `requestAnimationFrame`
-  // confirmed NOT firing within 1000ms there - the spec's own throttle
-  // for a tab that isn't actively painting. The rAF-deferred fallback
-  // below would never run in that state, leaving `railWidthAnimating`
-  // stuck true (silently reintroducing the original bug for hover on
-  // that tab) until the next real click's own transitionend happened to
-  // clear it. A plain `setTimeout`, scheduled with no rAF in between,
-  // always eventually fires regardless of tab visibility - padded well
-  // past the transition's real ~300ms so it never wins the race in the
-  // normal foregrounded case.
-  const RAIL_WIDTH_ANIMATION_BACKSTOP_MS = 900;
-  const [railWidthAnimating, setRailWidthAnimating] = useState(false);
-  const railWidthAnimatingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const railWidthAnimatingRafRef = useRef<number | null>(null);
-  const railWidthAnimatingBackstopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearRailWidthAnimationTimers = () => {
-    if (railWidthAnimatingRafRef.current !== null) {
-      cancelAnimationFrame(railWidthAnimatingRafRef.current);
-      railWidthAnimatingRafRef.current = null;
-    }
-    if (railWidthAnimatingTimeoutRef.current !== null) {
-      clearTimeout(railWidthAnimatingTimeoutRef.current);
-      railWidthAnimatingTimeoutRef.current = null;
-    }
-    if (railWidthAnimatingBackstopRef.current !== null) {
-      clearTimeout(railWidthAnimatingBackstopRef.current);
-      railWidthAnimatingBackstopRef.current = null;
-    }
-  };
-  const stopRailWidthAnimation = () => {
-    clearRailWidthAnimationTimers();
-    setRailWidthAnimating(false);
-  };
-  const startRailWidthAnimation = () => {
-    setRailWidthAnimating(true);
-    clearRailWidthAnimationTimers();
-    // `onTransitionEnd` below is the normal clear path; this is the net
-    // for a transition that never fires - `motion-reduce` drops it, and
-    // a peeked-then-click-to-open goes absolute-w-64 -> static-w-64 (no
-    // width VALUE change at all, so no "width" transitionend either).
-    // A code review caught this racing ahead of the real transition
-    // when it started here synchronously: a CSS transition's own clock
-    // begins at the next paint, not the moment this class flips in JS,
-    // so a plain `setTimeout(200)` fired a few ms before the genuine
-    // transitionend and truncated the animation early on every click,
-    // not just the no-value-change case this fallback exists for.
-    // Deferred one rAF (the same "wait for the committed frame" pattern
-    // this file's own toggle-focus effect above already uses) so the
-    // fallback's own clock starts close to when the real one does.
-    railWidthAnimatingRafRef.current = requestAnimationFrame(() => {
-      railWidthAnimatingRafRef.current = null;
-      railWidthAnimatingTimeoutRef.current = setTimeout(() => {
-        railWidthAnimatingTimeoutRef.current = null;
-        setRailWidthAnimating(false);
-      }, RAIL_WIDTH_TRANSITION_MS);
-    });
-    railWidthAnimatingBackstopRef.current = setTimeout(() => {
-      railWidthAnimatingBackstopRef.current = null;
-      setRailWidthAnimating(false);
-    }, RAIL_WIDTH_ANIMATION_BACKSTOP_MS);
-  };
-  useEffect(() => {
-    return () => clearRailWidthAnimationTimers();
-  }, []);
-  const openPeekIfCollapsed = () => {
-    if (railCollapsed) setRailPeeked(true);
-  };
-  const handleToggleEnter = () => {
-    if (justToggledRailRef.current) return;
-    openPeekIfCollapsed();
-  };
-  const handleToggleLeave = (e: PointerEvent<HTMLButtonElement>) => {
-    const point = toggleClickPointRef.current;
-    if (!point || e.clientX !== point.x || e.clientY !== point.y) {
-      justToggledRailRef.current = false;
-      toggleClickPointRef.current = null;
-    }
-  };
-  // Only a genuine interaction with the toggle itself - focusing it or
-  // clicking it - ever sets the pending-focus flag the effect above
-  // reads; `onPointerEnter` (a passive hover) shares `openPeekIfCollapsed`
-  // for opening the peek but never touches the flag, exactly the
-  // distinction the re-review's two false-positive cases needed.
-  const handleToggleFocus = (e: FocusEvent<HTMLButtonElement>) => {
-    if (programmaticFocusTargetRef.current === e.currentTarget) {
-      programmaticFocusTargetRef.current = null;
-      return;
-    }
-    pendingToggleFocusRef.current = true;
-    openPeekIfCollapsed();
-  };
-  const handleToggleClick = (e: MouseEvent<HTMLButtonElement>) => {
-    justToggledRailRef.current = true;
-    toggleClickPointRef.current = e.detail === 0 ? null : { x: e.clientX, y: e.clientY };
-    startRailWidthAnimation();
-    pendingToggleFocusRef.current = true;
-    if (railCollapsed) {
-      setRailCollapsed(false);
-      setRailPeeked(false);
-      writeRailCollapsePreference(false);
-    } else {
-      setRailCollapsed(true);
-      writeRailCollapsePreference(true);
-    }
-  };
-  const toggleLabel = railCollapsed ? "Show conversations" : "Hide conversations";
-  const toggleExpanded = !railCollapsed || railPeeked;
-  const inlineToggle = (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          ref={inlineToggleRef}
-          variant="ghost"
-          size="icon"
-          aria-label={toggleLabel}
-          aria-expanded={toggleExpanded}
-          aria-controls="next-chat-rail"
-          onPointerEnter={handleToggleEnter}
-          onPointerLeave={handleToggleLeave}
-          onFocus={handleToggleFocus}
-          onClick={handleToggleClick}
-        >
-          {/* A review caught this: this instance stays mounted even
-              truly collapsed (it's `NextThreadList`'s own
-              `collapseToggle` prop, always passed - the "collapsed:
-              the rail is hidden and out of flow" test above proves the
-              node itself survives, CSS-hidden/`inert`, exactly so
-              `aria-controls` stays valid). Only ever VISIBLE when open
-              or peeked, never truly collapsed - the icon that reads as
-              "click to close." */}
-          <RailCloseIcon className="size-4" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Conversations</TooltipContent>
-    </Tooltip>
-  );
-  const collapsedToggle = (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          ref={collapsedToggleRef}
-          variant="ghost"
-          size="icon"
-          aria-label={toggleLabel}
-          aria-expanded={toggleExpanded}
-          aria-controls="next-chat-rail"
-          // eslint-disable-next-line shadcn/no-restyle -- positioning classes for the rail toggle button are intentional layout, not restyling of the button's own shape
-          className="absolute top-2 left-2 z-20 hidden lg:flex"
-          onPointerEnter={handleToggleEnter}
-          onPointerLeave={handleToggleLeave}
-          onFocus={handleToggleFocus}
-          onClick={handleToggleClick}
-        >
-          {/* This instance only ever renders truly collapsed (never
-              peeked) - the icon that reads as "click to open." */}
-          <RailOpenIcon className="size-4" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Conversations</TooltipContent>
-    </Tooltip>
-  );
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
@@ -1646,6 +1220,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <VoiceSessionProvider value={{ open: voiceOpen, setOpen: setVoiceOpen }}>
       <WakeWordPersonContext.Provider value={person}>
       <DictationLevelMeterProvider value={dictationLevelMeter}>
+      <ChatColumnControlContext.Provider value={column.control}>
         <ChatShortcutReference />
         <WakeWordController person={person} />
         <ArtifactCacheInvalidator />
@@ -1678,123 +1253,46 @@ export function NextChatPage({ person }: { person: Roster }) {
             height, so this just reads it off that chain instead of
             re-deriving the same number a second, guessable way. */}
         <div data-slot="next-chat-shell" className="flex h-full flex-col overflow-hidden">
-          {/* CHAT-UI-02: the desktop collapse toggle used to live in this
-              row on its own, above the column, wasting a full row that
-              only ever showed one button (this row's OTHER button, the
-              mobile Sheet trigger, is `lg:hidden` - nothing here has ever
-              been visible on desktop). It now floats over the column's own
-              first cell at a fixed spot in every state (`railToggle`,
-              below), so this row is mobile-only. */}
+          {/* Below lg the column is a sheet, opened from this row. */}
           <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
             <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
-              <HistoryIcon className="size-4" />
+              <ColumnOpenIcon className="size-4.5" />
             </Button>
             <ChatHeaderBar phoneRow />
           </div>
-          <div className="relative flex min-h-0 flex-1">
-            {/* `lg:` not `sm:` - tokens.css's own --breakpoint-lg note
-                (the kit's 960px default reopens a squeeze at tablet
-                width), the same reason ChatPage.tsx's own persistent
-                column uses it. This row is `relative`: the peeked
-                rail's own `absolute inset-y-0 left-0` (below) resolves
-                against IT, not the chat area, so the peeked box starts
-                at this row's own left edge - exactly where the open
-                rail sits - by construction, with nothing measured. */}
-            {/* A code review caught this: `railCollapsed ? null : ...`
-                unmounted the div entirely, so the toggle button's own
-                `aria-controls="next-chat-rail"` pointed at an id absent
-                from the DOM the moment it mattered most - the instant a
-                screen reader announces the new collapsed state. Hidden
-                via CSS instead (the same `hidden`/`lg:block` pattern
-                already used for the phone/tablet breakpoint split), so
-                the id always exists.
-                Peeked: the SAME node, repositioned in place (Jesse's
-                literal spec, 22:04) - `absolute inset-y-0 left-0` at its
-                normal open width, inside this row's own `relative` box,
-                above the thread (`z-20`). No portal, no measured rect:
-                the peeked box is the open box's own CSS, so it's
-                pixel-identical by construction. The toggle inside its
-                header row is a real descendant now (22:22's inline
-                fix), so `onPointerLeave`/`onBlur` here need no dead-zone
-                handling beyond checking that the pointer/focus actually
-                left this element altogether. */}
+          <div className="flex min-h-0 flex-1">
+            {/* COLUMN-01: the history column. The outer box animates its
+                width; the inner box keeps its full width and is pinned to
+                the outer box's right edge, so the column's contents slide
+                under the app rail without ever re-wrapping. Hidden, it is
+                zero wide and `inert` (out of the Tab order and the
+                accessibility tree) but stays mounted, so `aria-controls`
+                always names a real node. No hover peek: the one control
+                shows and hides it. */}
             <div
-              id="next-chat-rail"
+              id={CHAT_COLUMN_ID}
               data-slot="next-chat-rail"
-              // CHAT-UI-03 (1): ChatGPT eases both the column and the
-              // chat pane during collapse/expand; this used to jump-cut
-              // (`hidden` <-> `block`, a `display` swap CSS can't
-              // transition). Collapsed-not-peeked is now `w-0
-              // overflow-hidden` instead of `hidden` at the `lg`
-              // breakpoint - still zero width, but a real box a
-              // `transition-[width]` can animate to and from - the
-              // app rail's own duration and curve (`sidebar.tsx`:
-              // `transition-[width] duration-200 ease-linear`), reduced
-              // motion honoured via `motion-reduce:transition-none`.
-              // `inert` (not `aria-hidden` alone) while collapsed-not-
-              // peeked: a zero-width box is still visually reachable by
-              // Tab without it, since `overflow-hidden` doesn't remove
-              // its children from focus order the way `display: none`
-              // used to.
-              inert={railCollapsed && !railPeeked}
-              // A review caught this: `border-r`/`pr-2` used to sit on
-              // this same element unconditionally, alongside the
-              // animated `w-0` - `box-sizing: border-box` can't shrink
-              // a box's own padding/border below 0 along with its
-              // content, so the collapsed-not-peeked state rendered a
-              // persistent ~9px strip with a visible border instead of
-              // truly vanishing (invisible while it was `display: none`,
-              // real once it became a genuine zero-width box). Border
-              // and padding now ride the SAME conditional as the width
-              // itself, present only in the two states that actually
-              // have width to put them in.
+              data-state={column.collapsed ? "closed" : "open"}
+              aria-label="Conversations"
+              role="region"
+              inert={column.collapsed}
               className={cn(
-                "overflow-y-auto",
-                // Only a click (`startRailWidthAnimation`) ever puts this
-                // back on the element - see that function's own comment.
-                // Hovering the peek open or closed must jump, never ease.
-                // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate a dynamic rail width
-                railWidthAnimating && "transition-[width] duration-300 ease-out motion-reduce:transition-none",
-                // RAIL-01: one flat 288px column (ChatGPT's, measured from the
-                // owner's reference, 2026-10-06), a single 1px divider on
-                // its right edge, its own tone (`--shell-history`, tokens.css).
-                railCollapsed
-                  ? railPeeked
-                    ? "absolute inset-y-0 left-0 z-20 block w-72 border-r border-border px-2.5 pt-2.5 shadow-lg animate-in slide-in-from-left-4 fade-in motion-reduce:animate-none"
-                    : "hidden w-0 lg:block lg:overflow-hidden"
-                  : "hidden w-72 shrink-0 border-r border-border px-2.5 pt-2.5 lg:block",
+                // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate the column's width
+                "hidden shrink-0 justify-end overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none lg:flex",
+                column.collapsed ? "w-0" : "w-72",
               )}
-              onPointerLeave={(e) => {
-                closeRailPeek(e.relatedTarget);
-              }}
-              onBlur={(e) => closeRailPeek(e.relatedTarget)}
-              onTransitionEnd={(e) => {
-                if (e.target === e.currentTarget && e.propertyName === "width") stopRailWidthAnimation();
-              }}
             >
-              <NextThreadList
-                onNewThread={() => { setSheetOpen(false); setRailPeeked(false); }}
-                collapseToggle={inlineToggle}
-                pinnable={!temporaryNext}
-              />
+              <div data-slot="chat-column-inner" className="flex h-full w-72 shrink-0 flex-col">
+                <ChatHistoryPanel
+                  variant="column"
+                  state={column}
+                  onNewThread={() => setSheetOpen(false)}
+                  newChatDisabled={chatAvailability === "unavailable"}
+                  pinnable={!temporaryNext}
+                  toggle={<ChatColumnToggle collapsed={false} onToggle={column.toggleFromButton} buttonRef={column.columnToggleRef} />}
+                />
+              </div>
             </div>
-            {railCollapsed && !railPeeked ? collapsedToggle : null}
-            {/* Jesse found this: the row's own `gap-4` (removed above)
-                used to space the pane off the rail, but `gap` only
-                applies to a FLOW sibling - the rail is flow when open
-                or collapsed-not-peeked (`w-0`, still a real flex
-                participant even at zero width) but `position: absolute`
-                when peeked (removed from flow entirely, so it stops
-                claiming a gap). That flow/absolute swap fired on every
-                hover, not just a click, so the pane's own left edge
-                bumped right on peek-in and back on peek-out even though
-                nothing about the pane itself should move for a pure
-                overlay. Spacing now lives on the pane directly, keyed
-                on `railCollapsed` alone (never `railPeeked`): identical
-                whether collapsed-not-peeked or peeked, and animated in
-                step with the rail's own `transition-[width]` so a real
-                click (the only thing that changes `railCollapsed`)
-                still slides smoothly. */}
             <div
               data-slot="next-chat-pane"
               className="min-w-0 flex-1"
@@ -1806,8 +1304,10 @@ export function NextChatPage({ person }: { person: Roster }) {
                   phone row above carries the same bar below lg. It is
                   the conversation's own surface with no divider, the
                   way Claude's is (owner, 2026-10-06): the controls just
-                  sit at the top. */}
-              <header data-slot="next-chat-header" className={cn("hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex", railCollapsed && "ps-14")}>
+                  sit at the top. While the history column is hidden, its
+                  show control sits at this header's left edge, in flow. */}
+              <header data-slot="next-chat-header" data-column={column.collapsed ? "closed" : "open"} className={cn("hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex", column.collapsed && "ps-3")}>
+                {column.collapsed ? <ChatColumnToggle collapsed onToggle={column.toggleFromButton} buttonRef={column.headerToggleRef} /> : null}
                 <ChatHeaderBar />
               </header>
           {bareMode ? (
@@ -1910,13 +1410,35 @@ export function NextChatPage({ person }: { person: Roster }) {
         </div>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- sheet width and responsive visibility are intentional layout for the mobile thread list; max-w-[calc(100vw-2rem)] has no scale-token equivalent since Sheet has no max-width prop of its own (commons/ui/docs/dashboard-upstream.md) */}
-          <SheetContent id="next-chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 px-4 pb-4 pt-6 [&_[data-slot='sheet-close']]:right-4 lg:hidden">
+          <SheetContent id="next-chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-0 [&_[data-slot='sheet-close']]:right-3 [&_[data-slot='sheet-close']]:top-3.5 lg:hidden"
+            // The sheet takes focus itself rather than its first button,
+            // so opening it never pops that button's tooltip.
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              (event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true });
+            }}
+            // Escape inside thread search clears it, then closes it, the
+            // same as in the desktop column; only then does it close the
+            // sheet (the dialog hears Escape before the field does).
+            onEscapeKeyDown={(event) => {
+              if (!column.searchOpen) return;
+              event.preventDefault();
+              if (column.search !== "") column.setSearch("");
+              else column.closeSearch(true);
+            }}
+          >
             {/* eslint-disable-next-line shadcn/no-restyle -- sr-only hides the header visually while keeping it accessible */}
             <SheetHeader className="sr-only">
               <SheetTitle>Conversations</SheetTitle>
               <SheetDescription>Past conversations</SheetDescription>
             </SheetHeader>
-            {threadList}
+            <ChatHistoryPanel
+              variant="sheet"
+              state={column}
+              onNewThread={() => setSheetOpen(false)}
+              newChatDisabled={chatAvailability === "unavailable"}
+              pinnable={!temporaryNext}
+            />
           </SheetContent>
         </Sheet>
         {/* CANVAS-SHEET-DESKTOP-01 (fixes #183): `open` is gated on
@@ -1949,6 +1471,7 @@ export function NextChatPage({ person }: { person: Roster }) {
             {compareTarget !== null ? <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} /> : null}
           </SheetContent>
         </Sheet>
+      </ChatColumnControlContext.Provider>
       </DictationLevelMeterProvider>
       </WakeWordPersonContext.Provider>
       </VoiceSessionProvider>

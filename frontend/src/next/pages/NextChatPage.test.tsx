@@ -341,6 +341,13 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     return { restore: () => { globalThis.fetch = original; }, calls };
   }
 
+  // COLUMN-01: thread search sits behind the column's search icon (the
+  // owner's "compact row or icon that opens an inline field").
+  function openThreadSearch(view: Pick<ReturnType<typeof renderPage>, "getByRole" | "queryByRole">): HTMLElement {
+    if (!view.queryByRole("textbox", { name: "Search threads" })) fireEvent.click(view.getByRole("button", { name: "Search chats" }));
+    return view.getByRole("textbox", { name: "Search threads" });
+  }
+
   async function searchPage(incognito = false) {
     if (incognito) writeIncognitoCache(true);
     const fetch = stubSearchRows();
@@ -357,7 +364,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   test("typing narrows the chat list to matching titles", async () => {
     const view = await searchPage();
     try {
-      fireEvent.change(view.getByRole("textbox", { name: "Search threads" }), { target: { value: "garden" } });
+      fireEvent.change(openThreadSearch(view), { target: { value: "garden" } });
       await waitFor(() => expect(view.getByText("Garden today")).toBeVisible());
       expect(view.queryByText("Shopping list")).toBeNull();
       expect(view.getByText("Garden earlier")).toBeVisible();
@@ -367,7 +374,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   test("results keep pinned first and day groups", async () => {
     const view = await searchPage();
     try {
-      fireEvent.change(view.getByRole("textbox", { name: "Search threads" }), { target: { value: "garden" } });
+      fireEvent.change(openThreadSearch(view), { target: { value: "garden" } });
       await waitFor(() => expect(view.getByText("Garden earlier")).toBeVisible());
       const list = view.container.querySelector('[data-slot="aui_thread-list-items"]')!;
       const rows = Array.from(list.querySelectorAll('[data-slot="aui_thread-list-item"]'));
@@ -376,7 +383,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
       // The kit's matcher retains pin/day metadata and Enter uses its ordered results.
       const search = view.container.querySelector('[data-slot="thread-search"]')!;
       expect(search).toBeVisible();
-      expect(view.getByRole("textbox", { name: "Search threads" })).toHaveValue("garden");
+      expect(openThreadSearch(view)).toHaveValue("garden");
     } finally { view.restore(); }
   });
 
@@ -433,7 +440,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   test("Enter opens the first result", async () => {
     const view = await searchPage();
     try {
-      const input = view.getByRole("textbox", { name: "Search threads" });
+      const input = openThreadSearch(view);
       fireEvent.change(input, { target: { value: "garden" } });
       await waitFor(() => expect(view.queryByText("Shopping list")).toBeNull());
       fireEvent.keyDown(input, { key: "Enter" });
@@ -444,7 +451,7 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   test("Escape clears the search", async () => {
     const view = await searchPage();
     try {
-      const input = view.getByRole("textbox", { name: "Search threads" }) as HTMLInputElement;
+      const input = openThreadSearch(view) as HTMLInputElement;
       fireEvent.change(input, { target: { value: "garden" } });
       await waitFor(() => expect(view.queryByText("Shopping list")).toBeNull());
       fireEvent.keyDown(input, { key: "Escape" });
@@ -453,10 +460,77 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
     } finally { view.restore(); }
   });
 
+  test("the search icon opens a focused field; Escape on an empty field closes it and returns focus to the icon", async () => {
+    const view = await searchPage();
+    try {
+      const input = openThreadSearch(view);
+      await waitFor(() => expect(document.activeElement).toBe(input));
+      fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(view.queryByRole("textbox", { name: "Search threads" })).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(view.getByRole("button", { name: "Search chats" })));
+    } finally { view.restore(); }
+  });
+
+  test("with a search typed, the hide control stays in the column and focus survives a hide and show", async () => {
+    const view = await searchPage();
+    try {
+      fireEvent.change(openThreadSearch(view), { target: { value: "garden" } });
+      const column = document.getElementById("next-chat-rail")!;
+      expect(within(column).getByRole("button", { name: "Hide conversations" })).toBeTruthy();
+      fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+      const show = view.getByRole("button", { name: "Show conversations" });
+      await waitFor(() => expect(document.activeElement).toBe(show));
+      fireEvent.click(show);
+      await waitFor(() => expect(document.activeElement).toBe(within(column).getByRole("button", { name: "Hide conversations" })));
+    } finally { view.restore(); }
+  });
+
+  test("in the phone sheet, Escape clears the search, then closes it, and only then the sheet", async () => {
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    const fetchStub = stubSearchRows();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Show threads" }));
+      const dialog = (await view.findByRole("heading", { name: "Conversations" })).closest('[role="dialog"]') as HTMLElement;
+      await within(dialog).findByText("Garden pinned");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Search chats" }));
+      const input = within(dialog).getByRole("textbox", { name: "Search threads" });
+      fireEvent.change(input, { target: { value: "garden" } });
+      fireEvent.keyDown(input, { key: "Escape" });
+      await waitFor(() => expect(within(dialog).getByRole("textbox", { name: "Search threads" })).toHaveValue(""));
+      expect(view.getByRole("heading", { name: "Conversations" })).toBeTruthy();
+      fireEvent.keyDown(within(dialog).getByRole("textbox", { name: "Search threads" }), { key: "Escape" });
+      await waitFor(() => expect(within(dialog).queryByRole("textbox", { name: "Search threads" })).toBeNull());
+      expect(view.getByRole("heading", { name: "Conversations" })).toBeTruthy();
+      await waitFor(() => expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Search chats" })));
+    } finally {
+      fetchStub.restore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+    }
+  });
+
+  test("the command palette's Search chats shows a hidden column with search open", async () => {
+    const view = await searchPage();
+    try {
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      expect(document.getElementById("next-chat-rail")).toHaveAttribute("data-state", "closed");
+      fireEvent.keyDown(view.getByLabelText("Message input"), { key: "k", ctrlKey: true });
+      fireEvent.click(await view.findByRole("option", { name: /Search chats/ }));
+      expect(document.getElementById("next-chat-rail")).toHaveAttribute("data-state", "open");
+      await waitFor(() => expect(document.activeElement).toBe(view.getByRole("textbox", { name: "Search threads" })));
+    } finally { view.restore(); }
+  });
+
   test("no match shows the list's empty state", async () => {
     const view = await searchPage();
     try {
-      fireEvent.change(view.getByRole("textbox", { name: "Search threads" }), { target: { value: "nothing matches" } });
+      fireEvent.change(openThreadSearch(view), { target: { value: "nothing matches" } });
       expect(await view.findByText("No threads found")).toBeVisible();
     } finally { view.restore(); }
   });
@@ -1029,7 +1103,8 @@ describe("NextChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       await view.findByText("It's 58°F and overcast in Portland.");
       fireEvent.click(view.getByRole("button", { name: /1 tool call/ }));
       expect(await view.findByText("weather")).toBeVisible();
-      expect(view.queryByRole("link")).toBeNull();
+      // The conversation, not the history column (whose Customize row is a link).
+      expect(within(document.querySelector<HTMLElement>('[data-slot="next-chat-pane"]')!).queryByRole("link")).toBeNull();
     } finally {
       restore();
     }
@@ -2065,617 +2140,161 @@ describe("NextChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
   });
 });
 
-describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail collapse and peek)", () => {
-  // Jesse's literal spec (22:04, refined 22:22): no floating placement
-  // for the column itself - it's one node (`next-chat-rail`) that always
-  // lives in the page's own layout at its own slot: open is normal flow,
-  // collapsed is `hidden`, peeked is the SAME node with `absolute
-  // inset-y-0 left-0` inside the row's own `relative` box, at its normal
-  // open width. happy-dom computes no real box layout, so "the peeked
-  // box equals the open box" is proven structurally here (same node
-  // reference across states, the peeked classes anchoring it to
-  // left-0/inset-y-0 against the same positioned ancestor the open flow
-  // already starts at, the same w-64 sizing class in both) rather than
-  // by a measured rect; the live probe against 8787 is what proves the
-  // actual pixels.
-  // The toggle, per 22:22: open and peeked render it INLINE (true flow,
-  // first cell of the header row, beside New Thread) - only collapsed
-  // (no row left to be inline with) falls back to a second,
-  // identically-styled instance positioned at that row's own former
-  // top-left. Exactly one of the two is ever mounted at a time.
-  const rail = () => document.getElementById("next-chat-rail")!;
-  const pane = () => document.querySelector('[data-slot="next-chat-pane"]')!;
-  const classes = (el: Element) => el.className.split(/\s+/);
+describe("NextChatPage (COLUMN-01: one hide/show control for the history column)", () => {
+  // The owner (2026-10-06): "the show/hide column is quirky". One control,
+  // no hover peek, remembered per browser, a working Cmd/Ctrl+B, and focus
+  // that never falls to <body> when the column hides. happy-dom has no
+  // layout, so state is read from `data-state`, `inert` and where the
+  // toggle lives; the Chromium review (`--chat-column-review`) measures the
+  // pixels and the slide.
+  const column = () => document.getElementById("next-chat-rail")!;
+  const header = () => document.querySelector('[data-slot="next-chat-header"]')!;
+  const renderChat = () => renderPage(
+    <MemoryRouter initialEntries={["/chat"]}>
+      <NextChatPage person={makePerson()} />
+    </MemoryRouter>,
+  );
 
-  test("open: the toggle is inline in the column's own header row, beside New chat, no floating instance", async () => {
+  test("open: the hide control sits in the column's own header row, and the conversation header has none", async () => {
     const restore = stubFetch();
     try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const view = renderChat();
       await view.findByLabelText("Message input");
-      expect(classes(rail())).toContain("w-72");
-      expect(classes(rail())).not.toContain("absolute");
+      expect(column()).toHaveAttribute("data-state", "open");
+      expect(column().hasAttribute("inert")).toBe(false);
       const toggle = view.getByRole("button", { name: "Hide conversations" });
       expect(toggle).toHaveAttribute("aria-controls", "next-chat-rail");
       expect(toggle).toHaveAttribute("aria-expanded", "true");
-      expect(classes(toggle)).not.toContain("absolute");
-      // Inside the rail, in the same header row as New Thread - not a
-      // floating sibling, not a row of its own above the column.
-      expect(rail().contains(toggle)).toBe(true);
-      const newThread = within(rail()).getByRole("button", { name: "New chat" });
-      expect(newThread.parentElement).toBe(toggle.parentElement);
+      expect(column().querySelector('[data-slot="chat-column-header"]')!.contains(toggle)).toBe(true);
+      expect(header().querySelector('[data-slot="chat-column-toggle"]')).toBeNull();
       expect(view.queryByRole("button", { name: "Show conversations" })).toBeNull();
     } finally {
       restore();
     }
   });
 
-  // CHAT-FIND-0923-01: Jesse's own live report on 8787 (`fa85640b`) -
-  // "the bug is back," the toggle that hides the left thread column no
-  // longer hiding it. Not reproducible against this code as checked
-  // (a fresh load on the running 8787, one click correctly collapsed
-  // the rail to width 0/inert, a second click correctly reopened it,
-  // repeated cleanly) - written anyway as a permanent regression test
-  // in Jesse's own words, the round trip the other tests in this block
-  // each only exercise half of. `queryByRole("New chat")` staying
-  // non-null through the "hidden" assertion is deliberate, not a typo:
-  // "collapsed: the rail is hidden..." above already established that
-  // this rail hides via a CSS class, never unmounts (so `aria-controls`
-  // stays valid) - happy-dom applies no real stylesheet, so the class
-  // is what this test (and that one) can actually assert.
-  test("clicking the toggle hides the thread list and clicking again shows it, asserted on the real page component", async () => {
+  test("hiding moves the control to the conversation header and focus with it; showing hands focus back", async () => {
     const restore = stubFetch();
     try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const view = renderChat();
       await view.findByLabelText("Message input");
-      expect(view.getByRole("button", { name: "New chat" })).toBeVisible();
-      expect(classes(rail())).toContain("w-72");
+      const hide = view.getByRole("button", { name: "Hide conversations" });
+      hide.focus();
+      fireEvent.click(hide);
+      expect(column()).toHaveAttribute("data-state", "closed");
+      expect(column().hasAttribute("inert")).toBe(true);
+      const show = view.getByRole("button", { name: "Show conversations" });
+      expect(header().contains(show)).toBe(true);
+      expect(show).toHaveAttribute("aria-expanded", "false");
+      await waitFor(() => expect(document.activeElement).toBe(show));
 
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("hidden");
-      expect(classes(rail())).toContain("w-0");
-
-      const showToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      fireEvent.click(showToggle, { detail: 1 });
-      // "hidden" itself stays in the class list open or collapsed (the
-      // `hidden ... lg:block` responsive pair - `hidden` is the base,
-      // phone-width utility, overridden at `lg:`); `w-64` vs `w-0` is
-      // what actually distinguishes the two states, the same assertion
-      // the "open:" test above this one uses.
-      expect(classes(rail())).toContain("w-72");
-      expect(classes(rail())).not.toContain("w-0");
-      expect(view.getByRole("button", { name: "New chat" })).toBeVisible();
+      fireEvent.click(show);
+      expect(column()).toHaveAttribute("data-state", "open");
+      expect(header().querySelector('[data-slot="chat-column-toggle"]')).toBeNull();
+      await waitFor(() => expect(document.activeElement).toBe(view.getByRole("button", { name: "Hide conversations" })));
     } finally {
       restore();
     }
   });
 
-  // CHAT-FIND-0923-01: hiding the column had never been a stored
-  // preference (checked against this file's whole history, `git log -S`
-  // on "railCollapsed"/"localStorage" - never once combined) - a reload
-  // has always reset it to the width-based default, since nothing ever
-  // wrote it anywhere. From a person's chair that reads the same as
-  // "the toggle doesn't hide it": Jesse's own words for this test, "the
-  // column comes back on its own" after a reload. Fixed with the same
-  // per-browser-preference shape `micDevicePreference.ts` already
-  // established (`railCollapsePreference.ts`, new) - a real remount
-  // (`renderPage` again, not the same running component) is what
-  // actually proves this, the same as a browser reload would.
-  test("hiding the column, then reloading, does not bring the column back on its own", async () => {
+  test("the choice is remembered on this browser: hidden stays hidden after a reload, and shown stays shown", async () => {
     const restore = stubFetch();
     try {
-      const first = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const first = renderChat();
       await first.findByLabelText("Message input");
-      fireEvent.click(first.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-0");
+      fireEvent.click(first.getByRole("button", { name: "Hide conversations" }));
+      expect(localStorage.getItem("maipai.chat.rail-collapsed")).toBe("1");
       cleanup();
 
-      const second = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const second = renderChat();
       await second.findByLabelText("Message input");
-      expect(classes(rail())).toContain("w-0");
-      expect(second.queryByRole("button", { name: "Hide conversations" })).toBeNull();
+      expect(column()).toHaveAttribute("data-state", "closed");
+      fireEvent.click(second.getByRole("button", { name: "Show conversations" }));
+      expect(localStorage.getItem("maipai.chat.rail-collapsed")).toBe("0");
+      cleanup();
+
+      stubMatchMedia(true);
+      const third = renderChat();
+      await third.findByLabelText("Message input");
+      expect(column()).toHaveAttribute("data-state", "open");
     } finally {
       restore();
     }
   });
 
-  test("collapsed: the rail is hidden and out of flow, a second toggle instance takes over at the row's former top-left", async () => {
+  test("Cmd/Ctrl+B hides and shows the column, from either state (it did nothing once the column was hidden)", async () => {
     const restore = stubFetch();
     try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const view = renderChat();
       await view.findByLabelText("Message input");
-      const openToggle = view.getByRole("button", { name: "Hide conversations" });
-      fireEvent.click(openToggle, { detail: 1 });
-      // Hidden via a CSS class (the same `hidden` pattern the
-      // phone/tablet split already used), not unmounted - a code review
-      // on an earlier draft caught `railCollapsed ? null : ...` leaving
-      // `aria-controls` pointing at an id absent from the DOM at the
-      // exact moment it mattered most.
-      expect(classes(rail())).toContain("hidden");
-      expect(classes(rail())).not.toContain("absolute");
-      // The inline instance is still mounted inside the now-hidden rail
-      // (happy-dom applies no real stylesheet, so `hidden`'s `display:
-      // none` isn't actually computed here - the live check on 8787 is
-      // what proves it's actually invisible) - both it and the
-      // collapsed-only instance now share the "Show conversations"
-      // label, so this scopes to the one OUTSIDE the rail, the one a
-      // real pointer would actually be able to reach.
-      const allExpandToggles = view.getAllByRole("button", { name: "Show conversations" });
-      expect(allExpandToggles).toHaveLength(2);
-      const expandToggle = allExpandToggles.find((btn) => !rail().contains(btn))!;
-      expect(expandToggle).toBeDefined();
-      expect(classes(expandToggle)).toContain("absolute");
-      expect(expandToggle).toHaveAttribute("aria-controls", "next-chat-rail");
-      expect(expandToggle).toHaveAttribute("aria-expanded", "false");
-      // The composer is still there - collapsing the rail never touches
-      // the thread itself.
-      expect(view.getByLabelText("Message input")).toBeVisible();
+      fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+      expect(column()).toHaveAttribute("data-state", "closed");
+      fireEvent.keyDown(window, { key: "b", metaKey: true });
+      expect(column()).toHaveAttribute("data-state", "open");
+      fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+      expect(column()).toHaveAttribute("data-state", "closed");
+      fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+      expect(column()).toHaveAttribute("data-state", "open");
     } finally {
       restore();
     }
   });
 
-  test("peeked: hovering the collapsed toggle repositions the rail onto the open box's own left edge, showing the inline toggle again; leaving closes it", async () => {
+  test("hiding the column while focus is inside it moves focus to the header's control, never to <body>", async () => {
     const restore = stubFetch();
     try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const view = renderChat();
       await view.findByLabelText("Message input");
-      const railNode = rail();
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      // Two "Show conversations" toggles exist at this point (the inline
-      // one, inert inside the now-hidden rail, and the collapsed-only
-      // floating one) - the one a real pointer can actually reach is the
-      // one outside the rail.
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
-      // A same-point leave/enter is the browser's swap hit-test, not a
-      // real departure from the control.
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("hidden");
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 0, clientY: 0 });
-      expect(classes(rail())).toContain("hidden");
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
-      fireEvent.pointerEnter(collapsedToggle);
-      // Never remounted, never a second column instance - the exact same
-      // node that was measured "open" a moment ago.
-      expect(rail()).toBe(railNode);
-      expect(classes(rail())).toEqual(expect.arrayContaining(["absolute", "inset-y-0", "left-0", "w-72"]));
-      // The collapsed-only toggle instance is gone; the inline one, now
-      // visible again inside the peeked rail, is what's on screen.
-      expect(view.queryAllByRole("button", { name: "Show conversations" })).toHaveLength(1);
-      const peekedToggle = within(rail()).getByRole("button", { name: "Show conversations" });
-      expect(classes(peekedToggle)).not.toContain("absolute");
-      expect(peekedToggle).toHaveAttribute("aria-expanded", "true");
-      expect(within(rail()).getByRole("button", { name: "New chat" })).toBeVisible();
-      // Leaving the rail (the toggle's own real ancestor now) for
-      // something outside it closes the peek.
-      fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
-      expect(classes(rail())).toContain("hidden");
-      expect(classes(rail())).not.toContain("absolute");
-      // Closing re-mounts the collapsed-only instance alongside the
-      // (again inert) inline one - the reachable one, outside the rail,
-      // is what should report closed.
-      const closedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      expect(closedToggle).toHaveAttribute("aria-expanded", "false");
+      within(column()).getByRole("button", { name: "New chat" }).focus();
+      fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+      await waitFor(() => expect(document.activeElement).toBe(view.getByRole("button", { name: "Show conversations" })));
     } finally {
       restore();
     }
   });
 
-  test("selecting an existing thread from the peeked rail collapses it", async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/conversations/conv-existing/turns")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/conversations/conv-existing")) return Promise.resolve(Response.json({ id: "conv-existing", surface: "chat", title: "Existing conversation", created_at: "2026-09-24T00:00:00.000Z" }));
-      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([{ id: "conv-existing", surface: "chat", title: "Existing conversation", pinned: false, turn_count: 0, last_turn_at: null, created_at: "2026-09-24T00:00:00.000Z" }]));
-      return Promise.resolve(Response.json({}));
-    }) as unknown as typeof fetch;
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await view.findByText("Existing conversation");
-      const railNode = rail();
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-
-      fireEvent.click(within(rail()).getByText("Existing conversation"));
-
-      await waitFor(() => {
-        expect(classes(rail())).toContain("hidden");
-        expect(classes(rail())).not.toContain("absolute");
-        expect(classes(rail())).toContain("w-0");
-      });
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
-
-  test("a click that changes the rail's width animates it", async () => {
+  test("no hover peek: pointing at or focusing the header's control while hidden leaves the column hidden", async () => {
     const restore = stubFetch();
     try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const view = renderChat();
       await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("transition-[width]");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      const show = view.getByRole("button", { name: "Show conversations" });
+      fireEvent.pointerEnter(show);
+      fireEvent.mouseEnter(show);
+      fireEvent.focus(show);
+      expect(column()).toHaveAttribute("data-state", "closed");
+      expect(column().hasAttribute("inert")).toBe(true);
     } finally {
       restore();
     }
   });
 
-  test("hovering the peek open or closed never animates the rail's width - Jesse's third report of this exact bug", async () => {
-    // The report: "when it's collapsed and I mouse out, the right pane
-    // animates when it should just stay still." Starting already
-    // collapsed (no click in this test at all, `stubMatchMedia(true)`
-    // the same way the narrow-viewport tests below do) reproduces that
-    // exactly - `transition-[width]` used to sit on the rail
-    // unconditionally, so leaving the peek (absolute w-64 -> static
-    // w-0, a real in-flow width the chat pane gets squeezed by) animated
-    // too even though nothing about a hover should ever move anything.
+  test("below the auto-hide width the column starts hidden; one click shows it", async () => {
     stubMatchMedia(true);
     const restore = stubFetch();
     try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const view = renderChat();
       await view.findByLabelText("Message input");
-      const railNode = rail();
-      expect(classes(railNode)).toContain("hidden");
-      expect(classes(railNode)).not.toContain("transition-[width]");
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-      expect(classes(rail())).not.toContain("transition-[width]");
-      // The regression itself.
-      fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
-      expect(classes(rail())).toContain("hidden");
-      expect(classes(rail())).not.toContain("transition-[width]");
+      expect(column()).toHaveAttribute("data-state", "closed");
+      fireEvent.click(view.getByRole("button", { name: "Show conversations" }));
+      expect(column()).toHaveAttribute("data-state", "open");
     } finally {
       restore();
     }
   });
 
-  test("the fallback timeout clears the animating flag when no width value actually changes (peeked, then a click that opens it)", async () => {
-    // A code review named this gap: clicking the peeked toggle goes
-    // absolute-w-64 -> static-w-64 - the SAME width value, so no
-    // "width" transitionend ever fires to clear `railWidthAnimating`
-    // the normal way. Only the fallback timeout can, and nothing
-    // exercised that path until now. A real (not fake) timer - no fake-
-    // timer harness is set up in this suite - so this waits for it
-    // rather than asserting instantly; `waitFor`'s own default timeout
-    // comfortably clears the rail's 300ms.
+  test("the column's rows: New chat and Customize are quiet rows, Customize opens your own settings", async () => {
     const restore = stubFetch();
     try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const view = renderChat();
       await view.findByLabelText("Message input");
-      const railNode = rail();
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !railNode.contains(btn))!;
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-72");
-      expect(classes(rail())).not.toContain("absolute");
-      expect(classes(rail())).toContain("transition-[width]");
-      await waitFor(() => expect(classes(rail())).not.toContain("transition-[width]"), { timeout: 1000 });
-    } finally {
-      restore();
-    }
-  });
-
-  test("the chat pane's own spacing is identical collapsed and peeked - only a click (a real width change) moves it", async () => {
-    // Jesse found this: the pane bumped right on hover-in and back on
-    // hover-out, reading as a peek that reflows the layout it's meant
-    // to sit ABOVE, not shift. RAIL-01: the pane carries no margin of its
-    // own in any state, and the conversation header's room for the
-    // floating toggle is keyed on `railCollapsed` alone, so a peek moves
-    // neither; only a click does.
-    const restore = stubFetch();
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await view.findByLabelText("Message input");
-      const header = () => view.container.querySelector<HTMLElement>('[data-slot="next-chat-header"]')!;
-      const openPaneClasses = classes(pane());
-      expect(classes(header())).not.toContain("ps-14");
-      // Owner, 2026-10-06: the header blends into the conversation the
-      // way Claude's does, with no divider line under it.
-      expect(classes(header()).filter((name) => name.startsWith("border"))).toEqual([]);
-      // The history column is ChatGPT's measured 288px.
-      expect(classes(rail())).toContain("w-72");
-
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      expect(classes(pane())).toEqual(openPaneClasses);
-      const collapsedHeaderClasses = classes(header());
-      expect(collapsedHeaderClasses).toContain("ps-14");
-
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-      // Peeked now - neither the pane nor the header moved.
-      expect(classes(pane())).toEqual(openPaneClasses);
-      expect(classes(header())).toEqual(collapsedHeaderClasses);
-
-      fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
-      expect(classes(rail())).toContain("hidden");
-      expect(classes(pane())).toEqual(openPaneClasses);
-      expect(classes(header())).toEqual(collapsedHeaderClasses);
-    } finally {
-      restore();
-    }
-  });
-
-  test("a keyboard-triggered collapse clears hover suppression on the next leave", async () => {
-    const restore = stubFetch();
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await view.findByLabelText("Message input");
-      const openToggle = view.getByRole("button", { name: "Hide conversations" });
-      fireEvent.click(openToggle, { detail: 0 });
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      // A genuine hover a moment later, real (non-zero) coordinates.
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 500, clientY: 500 });
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-    } finally {
-      restore();
-    }
-  });
-
-  test("a click on the toggle still pins the column open, peek or not", async () => {
-    const restore = stubFetch();
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      // A real hover, not the click's own suppressed phantom enter.
-      // clientX/Y differ from the click's own default (0, 0) - a real
-      // leave, not the swap's own incidental one (NextChatPage.tsx's
-      // own comment on why coordinates, not relatedTarget).
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-      // Hovering swapped the collapsed-only instance for the inline one
-      // now visible inside the peeked rail - that's the live instance a
-      // real pointer would be over next, so the click lands on it, not
-      // the (now unmounted) collapsed-only button.
-      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-72");
-      expect(classes(rail())).toContain("lg:block");
-      expect(classes(rail())).not.toContain("absolute");
-      // Pinning open resets the peek - collapsing again later starts
-      // from a real hover, not a stale peek left over from before.
-      expect(view.getByRole("button", { name: "Hide conversations" })).toHaveAttribute("aria-expanded", "true");
-    } finally {
-      restore();
-    }
-  });
-
-  test("clicking to collapse still suppresses peek through same-point outgoing leave", async () => {
-    // A regression Jesse found again after the first fix below: the
-    // outgoing (inline) toggle doesn't just vanish silently when it
-    // becomes `hidden` - a real browser also fires a genuine
-    // `pointerleave` on IT, as part of the very same hit-test
-    // recomputation that fires the phantom `pointerenter` on the
-    // incoming (collapsed) toggle a moment later. `handleToggleLeave`
-    // clears the suppression flag on ANY toggle's pointerleave, so that
-    // genuine-but-incidental leave event cleared the flag before the
-    // phantom enter ever checked it - suppression working exactly as
-    // designed against the phantom enter alone, defeated by an event
-    // the fix's own design didn't account for.
-    const restore = stubFetch();
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await view.findByLabelText("Message input");
-      const openToggle = view.getByRole("button", { name: "Hide conversations" });
-      fireEvent.click(openToggle, { detail: 1 });
-      fireEvent.pointerLeave(openToggle, { clientX: 0, clientY: 0 });
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("hidden");
-      expect(classes(rail())).not.toContain("absolute");
-    } finally {
-      restore();
-    }
-  });
-
-  test("clicking to collapse with the pointer still over the toggle's spot does not immediately re-open the peek", async () => {
-    // A real defect Jesse found (Firefox, hard reload): a browser
-    // recomputes what's under a stationary pointer whenever the DOM
-    // changes there - clicking the open toggle unmounts it and mounts
-    // the collapsed instance at the identical screen position, so the
-    // browser fires a "phantom" pointerenter on the new node with no
-    // real mouse movement. Before the fix, that read as a hover and
-    // immediately re-opened the peek, undoing the collapse's own
-    // visible effect in the same frame - from Jesse's own eyes, the
-    // click did nothing.
-    const restore = stubFetch();
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      // The phantom pointerenter a real browser fires on the freshly-
-      // mounted node, pointer never having actually moved.
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("hidden");
-      expect(classes(rail())).not.toContain("absolute");
-      // Moving away for real, then back, is a genuine hover again - the
-      // peek opens.
-      // clientX/Y differ from the click's own default (0, 0) - a real
-      // leave, not the swap's own incidental one (NextChatPage.tsx's
-      // own comment on why coordinates, not relatedTarget).
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-    } finally {
-      restore();
-    }
-  });
-
-  test("keyboard focus on the collapsed toggle opens the peek and moves onto the now-visible inline toggle, not lost to <body>", async () => {
-    // A review on the two-instance toggle caught this: since the inline
-    // and collapsed toggles are separate `Button`s and never both
-    // mounted at once, focusing the one that's visible and triggering
-    // the state change that swaps them unmounts the very node the
-    // browser had focus on - with nothing to transfer it, focus reverts
-    // to `<body>` and the next Tab restarts from the top of the
-    // document instead of continuing into the now-open column.
-    const restore = stubFetch();
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      collapsedToggle.focus();
-      fireEvent.focus(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-      expect(document.activeElement).not.toBe(document.body);
-      expect(document.activeElement).toBe(within(rail()).getByRole("button", { name: "Show conversations" }));
-    } finally {
-      restore();
-    }
-  });
-
-  test("mouse-only hover never programmatically focuses the toggle", async () => {
-    // A re-review on the fix above caught this: its first version used
-    // `document.activeElement === document.body` as the signal that
-    // focus needed following - a check that can't tell "the toggle a
-    // person was tabbed onto just unmounted" apart from "nothing has
-    // ever been focused," true for every mouse-only visitor
-    // (`onPointerEnter` shares the same peek-opening logic `onFocus`
-    // does). That would have had keyboard focus silently forced onto
-    // the toggle despite never touching a keyboard. Proven directly
-    // here, on the toggle's own `.focus()` method, rather than on
-    // `document.activeElement` globally: this page has an unrelated,
-    // pre-existing element that already holds focus across renders for
-    // reasons of its own (present before this item, confirmed against
-    // the pre-rebuild file too), so the global active element isn't a
-    // stable signal to assert against in this suite - whether THIS
-    // toggle's own `.focus()` was ever called is.
-    const restore = stubFetch();
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await view.findByLabelText("Message input");
-      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      let collapsedFocusCalled = false;
-      collapsedToggle.focus = () => {
-        collapsedFocusCalled = true;
-      };
-      // A real hover, not the click's own suppressed phantom enter.
-      // clientX/Y differ from the click's own default (0, 0) - a real
-      // leave, not the swap's own incidental one (NextChatPage.tsx's
-      // own comment on why coordinates, not relatedTarget).
-      fireEvent.pointerLeave(collapsedToggle, { relatedTarget: document.body, clientX: 999, clientY: 999 });
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-      expect(collapsedFocusCalled).toBe(false);
-      const inlineToggle = within(rail()).getByRole("button", { name: "Show conversations" });
-      let inlineFocusCalled = false;
-      inlineToggle.focus = () => {
-        inlineFocusCalled = true;
-      };
-      fireEvent.pointerLeave(rail(), { relatedTarget: document.body });
-      expect(classes(rail())).toContain("hidden");
-      expect(inlineFocusCalled).toBe(false);
-    } finally {
-      restore();
-    }
-  });
-
-  test("below the auto-collapse width, the column starts collapsed by default - hover-to-peek and click-to-pin still work", async () => {
-    // CHAT-UI-03 (6): Jesse's own side-by-side against ChatGPT at a
-    // narrow window - ChatGPT collapses its sidebar rather than letting
-    // it cover the conversation; ours kept the column open and cut off
-    // the greeting and composer underneath it. This is a DEFAULT, not a
-    // lock - the same hover/click controls the wide-viewport tests
-    // above already exercise still work identically once collapsed.
-    stubMatchMedia(true);
-    const restore = stubFetch();
-    try {
-      const view = renderPage(
-        <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await view.findByLabelText("Message input");
-      expect(classes(rail())).toContain("hidden");
-      expect(classes(rail())).not.toContain("absolute");
-      const collapsedToggle = view.getAllByRole("button", { name: "Show conversations" }).find((btn) => !rail().contains(btn))!;
-      fireEvent.pointerEnter(collapsedToggle);
-      expect(classes(rail())).toContain("absolute");
-      fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-72");
-      expect(classes(rail())).not.toContain("absolute");
+      const nav = within(column()).getByRole("navigation", { name: "Chat" });
+      expect(within(nav).getByRole("button", { name: "New chat" })).toBeTruthy();
+      expect(within(nav).getByRole("link", { name: "Customize" })).toHaveAttribute("href", "/settings?tab=me");
+      expect(within(column()).getByText("Your chats will show up here.")).toBeTruthy();
+      // No thread search until there is something to search.
+      expect(within(column()).queryByRole("button", { name: "Search chats" })).toBeNull();
     } finally {
       restore();
     }

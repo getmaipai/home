@@ -5,6 +5,7 @@ import { DATA_BINDINGS, MODEL_SELECTOR_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type D
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
 import { ChatThreadExtras } from "@/apps/chat/ChatThreadExtras";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
+import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 
 export type ChatExtrasContextValue = {
   rootRef: RefObject<HTMLDivElement | null>;
@@ -52,19 +53,11 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
   openingConversationId?: string;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const focusChatSearch = useCallback(() => {
-    const focus = () => document.querySelector<HTMLInputElement>('[aria-label="Search chats"]')?.focus();
-    const search = document.querySelector<HTMLInputElement>('[aria-label="Search chats"]');
-    if (search?.getClientRects().length) {
-      search.focus();
-      return;
-    }
-    document.querySelector<HTMLButtonElement>('[aria-label="Show conversations"], [aria-label="Show threads"]')?.click();
-    window.setTimeout(focus, 100);
-  }, []);
-  const toggleSidebar = useCallback(() => {
-    document.querySelector<HTMLButtonElement>('[aria-label="Show conversations"], [aria-label="Hide conversations"], [aria-label="Show threads"], [aria-label="Hide threads"]')?.click();
-  }, []);
+  // COLUMN-01: the history column owns these (ChatColumn.tsx); the page
+  // provides them, and a ChatThread shown outside the chat page has none.
+  const chatColumn = useContext(ChatColumnControlContext);
+  const focusChatSearch = useCallback(() => chatColumn?.openSearch(), [chatColumn]);
+  const toggleSidebar = useCallback(() => chatColumn?.toggle(), [chatColumn]);
   // CHAT-CALM-ERRORS-01d (design section 7): while the engine is down or
   // starting, the person can keep typing but Send waits for `ready`.
   const engineHeld = useContext(ChatAvailabilityContext) !== "ready";

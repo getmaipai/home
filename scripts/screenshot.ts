@@ -316,6 +316,8 @@ const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nex
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
 const chatShellReview = process.argv.includes("--chat-shell-review") || shellNavReview;
+// COLUMN-01 (owner, 2026-10-06): the chat history column, every state.
+const chatColumnReview = process.argv.includes("--chat-column-review");
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -535,7 +537,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview) {
+  if (chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview) {
     for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -2538,6 +2540,227 @@ async function captureChatShellReview(browser: Browser, sessionValue: string): P
     if (numbers.pageOverflowX) throw new Error("captureChatShellReview: horizontal page overflow at 390");
   } finally {
     await context.close();
+  }
+}
+
+/** COLUMN-01 (owner, 2026-10-06): the chat history column, open, hidden,
+ * mid-slide, searching, hovered and selected rows, pinned, empty, loading
+ * and the phone sheet, in both themes, measured. */
+async function captureChatColumnReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "column-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
+  const log = (label: string, value: unknown) => console.log(`chat-column ${label}: ${JSON.stringify(value)}`);
+  const shoot = async (page: Page, name: string) => {
+    await settleAnimations(page);
+    const file = join(outDir, `${name}.png`);
+    await page.screenshot({ path: file });
+    console.log(`Wrote ${file}`);
+  };
+  const openChat = async (page: Page, collapsed: "0" | "1") => {
+    await page.addInitScript((value) => localStorage.setItem("maipai.chat.rail-collapsed", value), collapsed);
+    await page.goto(`${BASE_URL}/chat`);
+    await page.getByRole("textbox", { name: "Message input" }).waitFor();
+  };
+
+  // Empty: before any conversation exists for this person.
+  for (const theme of THEMES) {
+    const context = await newContext(browser, desktop, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await openChat(page, "0");
+      await page.getByText("Your chats will show up here.").waitFor();
+      await shoot(page, `column-empty-1440-${theme}`);
+    } finally {
+      await context.close();
+    }
+  }
+
+  const titles = [
+    "Weekend garden plans", "Shopping list ideas", "Science fair volcano", "Bedtime story about a fox", "Packing for the beach",
+    "Birthday party games", "Fixing the bike chain", "Spanish homework help", "Soup recipes for winter", "Cleaning the fish tank",
+    "Board games for four", "Planning a camping trip", "Why the sky is blue", "Piano practice schedule", "Car trip playlist",
+    "Library books to borrow", "Making pancakes", "How volcanoes work", "Thank you note wording", "Chores chart",
+    "A very long conversation title that keeps going well past the column edge",
+  ];
+  for (const title of titles) await seedTitledConversation("captureChatColumnReview", cookie, title);
+  const conversation = await seedTitledConversation("captureChatColumnReview", cookie, "Homework helper notes");
+  {
+    const context = await newContext(browser, desktop, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await openStoredConversation(page, conversation.id, "Homework helper notes");
+      await sendChatMessage(page, RICH_REPLY_PROMPT);
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+      await page.getByRole("heading", { name: "Homework helper" }).waitFor({ timeout: 30000 });
+      // Pin two conversations through the row menu, the way a person does.
+      for (const title of ["Weekend garden plans", "Chores chart"]) {
+        const row = page.locator('[data-slot="aui_thread-list-item"]', { hasText: title });
+        await row.hover();
+        await row.getByRole("button", { name: "More options" }).click();
+        await page.getByRole("menuitem", { name: "Pin" }).click();
+        await page.locator('[data-slot="aui_thread-list-group-label"]', { hasText: "Pinned" }).waitFor();
+      }
+    } finally {
+      await context.close();
+    }
+  }
+
+  const measure = (page: Page) => page.evaluate(() => {
+    const box = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.round(rect.width), height: Math.round(rect.height) };
+    };
+    const font = (selector: string) => {
+      const element = document.querySelector<HTMLElement>(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return `${style.fontSize}/${style.lineHeight} ${style.fontWeight} ${style.color}`;
+    };
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]')];
+    return {
+      column: box('[data-slot="next-chat-rail"]'),
+      inner: box('[data-slot="chat-column-inner"]'),
+      header: box('[data-slot="next-chat-rail"] [data-slot="chat-column-header"]'),
+      title: font('[data-slot="next-chat-rail"] [data-slot="chat-column-title"]'),
+      toggle: box('[data-slot="next-chat-rail"] [data-slot="chat-column-toggle"]'),
+      newChat: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-new"]'),
+      customize: box('[data-slot="next-chat-rail"] [data-slot="chat-column-link"]'),
+      row: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]'),
+      rowFont: font('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item-title"]'),
+      label: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-group-label"]'),
+      labelFont: font('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-group-label"]'),
+      rowsVisible: rows.filter((row) => { const r = row.getBoundingClientRect(); return r.height > 0 && r.bottom <= window.innerHeight; }).length,
+      rows: rows.length,
+      borders: [...document.querySelectorAll<HTMLElement>('[data-slot="chat-column-panel"] *')].filter((el) => { const s = getComputedStyle(el); return ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(s.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0 && s.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none"); }).map((el) => el.getAttribute("data-slot") ?? el.tagName),
+      headerToggle: box('[data-slot="next-chat-header"] [data-slot="chat-column-toggle"]'),
+      composer: box('[data-slot="aui_composer-shell"]'),
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+    };
+  });
+
+  for (const theme of THEMES) {
+    const context = await newContext(browser, desktop, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.addInitScript(() => localStorage.setItem("maipai.chat.rail-collapsed", "0"));
+      await openStoredConversation(page, conversation.id, "Homework helper notes");
+      await page.getByRole("heading", { name: "Homework helper" }).waitFor();
+      await page.mouse.move(900, 450);
+      await shoot(page, `column-open-1440-${theme}`);
+      const open = await measure(page);
+      log(`open 1440/${theme}`, open);
+      if (open.overflowX) throw new Error(`captureChatColumnReview: horizontal overflow at 1440/${theme}`);
+      if (open.borders.length) throw new Error(`captureChatColumnReview: borders inside the column: ${open.borders.join(", ")}`);
+
+      // A hovered row beside the selected one.
+      await page.locator('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]', { hasText: "Science fair volcano" }).hover();
+      await shoot(page, `column-hover-1440-${theme}`);
+
+      // Thread search.
+      await page.mouse.move(900, 450);
+      await page.getByRole("button", { name: "Search chats" }).click();
+      await page.keyboard.type("vol");
+      await shoot(page, `column-search-1440-${theme}`);
+      const focusedInSearch = await page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
+      log(`search focus 1440/${theme}`, focusedInSearch);
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Escape");
+      log(`search closed focus 1440/${theme}`, await page.evaluate(() => document.activeElement?.getAttribute("aria-label")));
+
+      // Hide: frame-sample the slide, then the hidden state.
+      await page.mouse.move(900, 450);
+      const startedAt = await page.evaluate(() => {
+        const samples: Array<[number, number, number, number]> = [];
+        (window as unknown as { __col: typeof samples }).__col = samples;
+        const column = document.querySelector<HTMLElement>('[data-slot="next-chat-rail"]')!;
+        const inner = document.querySelector<HTMLElement>('[data-slot="chat-column-inner"]')!;
+        const start = performance.now();
+        const tick = () => {
+          const composer = document.querySelector<HTMLElement>('[data-slot="aui_composer-shell"]')!;
+          samples.push([Math.round(performance.now() - start), Math.round(column.getBoundingClientRect().width), Math.round(inner.getBoundingClientRect().width), Math.round(composer.getBoundingClientRect().x)]);
+          if (performance.now() - start < 600) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        return start;
+      });
+      void startedAt;
+      await page.getByRole("button", { name: "Hide conversations" }).click();
+      if (theme === "dark") {
+        for (const at of [60, 120]) {
+          await page.waitForTimeout(at === 60 ? 40 : 60);
+          await page.screenshot({ path: join(outDir, `column-collapsing-${at}ms-1440-dark.png`) });
+        }
+      }
+      await page.waitForTimeout(700);
+      const frames = await page.evaluate(() => (window as unknown as { __col: Array<[number, number, number, number]> }).__col);
+      const moving = frames.filter((frame, i) => i > 0 && frame[1] !== frames[i - 1]![1]);
+      log(`collapse frames 1440/${theme}`, frames);
+      log(`collapse duration ms 1440/${theme}`, moving.length ? moving[moving.length - 1]![0] - frames[0]![0] : 0);
+      if (frames.some((frame) => frame[2] !== frames[0]![2])) throw new Error("captureChatColumnReview: the column's content changed width while it slid");
+      await shoot(page, `column-collapsed-1440-${theme}`);
+      const collapsed = await measure(page);
+      log(`collapsed 1440/${theme}`, collapsed);
+      log(`collapsed focus 1440/${theme}`, await page.evaluate(() => document.activeElement?.getAttribute("aria-label")));
+      // Keyboard shortcut opens it again.
+      await page.keyboard.press(process.platform === "darwin" ? "Meta+b" : "Control+b");
+      await page.waitForTimeout(500);
+      const reopened = await measure(page);
+      log(`shortcut reopened 1440/${theme}`, reopened.column);
+      if (!reopened.column || reopened.column.width < 200) throw new Error("captureChatColumnReview: the keyboard shortcut did not reopen the column");
+    } finally {
+      await context.close();
+    }
+  }
+
+  // Loading: hold the conversation list so the skeleton rows show.
+  {
+    const context = await newContext(browser, desktop, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      let release: () => void = () => {};
+      const held = new Promise<void>((resolve) => { release = resolve; });
+      await page.route("**/api/conversations?**", async (route) => { await held; await route.continue(); });
+      await page.route("**/api/conversations", async (route) => { if (route.request().method() === "GET") await held; await route.continue(); });
+      await page.addInitScript(() => localStorage.setItem("maipai.chat.rail-collapsed", "0"));
+      await page.goto(`${BASE_URL}/chat`);
+      await page.locator('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-skeleton"]').first().waitFor();
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: join(outDir, "column-loading-1440-dark.png") });
+      console.log(`Wrote ${join(outDir, "column-loading-1440-dark.png")}`);
+      release();
+    } finally {
+      await context.close();
+    }
+  }
+
+  // Phone: the same rows in the sheet behind the header's toggle.
+  for (const theme of THEMES) {
+    const context = await newContext(browser, phone, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await openStoredConversation(page, conversation.id, "Homework helper notes");
+      await page.getByRole("button", { name: "Show threads" }).click();
+      await page.getByRole("dialog").locator('[data-slot="aui_thread-list-item"]').first().waitFor();
+      await shoot(page, `column-phone-sheet-390-${theme}`);
+      const sheet = await page.evaluate(() => {
+        const dialog = document.querySelector<HTMLElement>('[role="dialog"]')!;
+        const row = dialog.querySelector<HTMLElement>('[data-slot="aui_thread-list-item"]')!.getBoundingClientRect();
+        return { width: Math.round(dialog.getBoundingClientRect().width), row: Math.round(row.height), overflowX: document.documentElement.scrollWidth > window.innerWidth };
+      });
+      log(`phone sheet 390/${theme}`, sheet);
+    } finally {
+      await context.close();
+    }
   }
 }
 
@@ -7797,7 +8020,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview ? startScreenshotStack(chatModel.url) : undefined;
+  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview ? startScreenshotStack(chatModel.url) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -7814,7 +8037,7 @@ async function main() {
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
       // This matrix never calls speech; all speech requests go to the Stack.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", ...(!chatIncognitoAudit ? { MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1" } : {}), MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", ...(!chatIncognitoAudit ? { MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1" } : {}), MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
       stdout: "pipe",
       stderr: "inherit",
     });
@@ -8270,6 +8493,12 @@ async function main() {
         await captureChatStreaming(browser, sessionValue, viewport, combo.theme);
         await captureChatEngineNotReady(browser, sessionValue, viewport, combo.theme);
       }
+    }
+
+    if (chatColumnReview) {
+      await captureChatColumnReview(browser, sessionValue);
+      console.log("completed named review: --chat-column-review");
+      return;
     }
 
     if (chatShellReview) {

@@ -3,16 +3,18 @@ import { useAui, useAuiState } from "@assistant-ui/react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
 import { CHAT_SHORTCUTS, registerChatShortcuts } from "@/next/pages/chatShortcuts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
+import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 
 export function ChatShortcutReference() {
   const aui = useAui();
   const isRunning = useAuiState((state) => state.thread.isRunning);
   const availability = useContext(ChatAvailabilityContext);
   const [open, setOpen] = useState(false);
+  const chatColumn = useContext(ChatColumnControlContext);
 
   useEffect(() => {
-    return registerChatShortcuts({ aui, isRunning, unavailable: availability === "unavailable", setReferenceOpen: setOpen });
-  }, [aui, availability, isRunning]);
+    return registerChatShortcuts({ aui, isRunning, unavailable: availability === "unavailable", setReferenceOpen: setOpen, toggleSidebar: chatColumn?.toggle });
+  }, [aui, availability, isRunning, chatColumn]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

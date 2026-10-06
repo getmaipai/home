@@ -8,11 +8,14 @@ export function registerChatShortcuts({
   isRunning,
   unavailable,
   setReferenceOpen,
+  toggleSidebar,
 }: {
   aui: AssistantClient;
   isRunning: boolean;
   unavailable: boolean;
   setReferenceOpen: (open: boolean) => void;
+  /** COLUMN-01: the history column's own toggle (ChatColumnControl). */
+  toggleSidebar?: () => void;
 }): () => void {
   function onKeyDown(event: KeyboardEvent) {
     const key = event.key.toLowerCase();
@@ -44,7 +47,7 @@ export function registerChatShortcuts({
       aui.thread.cancelRun();
     } else if (matches("toggle-sidebar")) {
       event.preventDefault();
-      document.querySelector<HTMLButtonElement>('[aria-label="Show conversations"], [aria-label="Hide conversations"], [aria-label="Show threads"], [aria-label="Hide threads"]')?.click();
+      toggleSidebar?.();
     }
   }
   window.addEventListener("keydown", onKeyDown);
