@@ -66,6 +66,35 @@ describe("POST /api/biometric-prints", () => {
     expect(ownerId).not.toBe(child.id);
   });
 
+  test("an admin cannot enroll a teen without the teen's agreement", async () => {
+    const owner = await ownerSession();
+    const adminRes = await owner.post("/api/people", { displayName: "Admin", role: "admin", secret: "adminpin1" });
+    expect(adminRes.status).toBe(201);
+    const admin = (await adminRes.json()) as { id: string };
+    const adminClient = await sessionFor(admin.id, "adminpin1");
+    const teen = await addPerson(owner, "River", "teen");
+
+    const res = await adminClient.post("/api/biometric-prints", { person_id: teen.id, model_id: "sface-2021dec", embedding: SFACE_EMBEDDING });
+    expect(res.status).toBe(403);
+  });
+
+  test("a guest cannot enroll their own face without their agreement", async () => {
+    const owner = await ownerSession();
+    const guest = await addPerson(owner, "Marlow", "guest");
+    const guestClient = await sessionFor(guest.id);
+
+    const res = await guestClient.post("/api/biometric-prints", { person_id: guest.id, model_id: "sface-2021dec", embedding: SFACE_EMBEDDING });
+    expect(res.status).toBe(403);
+  });
+
+  test("an owner cannot enroll a guest's face", async () => {
+    const owner = await ownerSession();
+    const guest = await addPerson(owner, "Marlow", "guest");
+
+    const res = await owner.post("/api/biometric-prints", { person_id: guest.id, model_id: "sface-2021dec", embedding: SFACE_EMBEDDING });
+    expect(res.status).toBe(403);
+  });
+
   test("a child can never consent to their own enrollment, even signed in as themself", async () => {
     const owner = await ownerSession();
     const child = await addPerson(owner, "Bramble", "child");
@@ -314,6 +343,19 @@ describe("GET /api/biometric-prints/sync", () => {
     expect(body.prints.every((p) => p.modality === "face")).toBe(true);
   });
 
+  test("legacy teen and guest face prints are excluded from robot sync", async () => {
+    const { owner, personId } = await ownerPersonId();
+    const teen = await addPerson(owner, "River", "teen");
+    const guest = await addPerson(owner, "Marlow", "guest");
+    insertRawPrint(personId, "face");
+    insertRawPrint(teen.id, "face");
+    insertRawPrint(guest.id, "face");
+    const robot = await deviceSession(personId, "robot", ["camera"]);
+
+    const body = (await (await robot.get("/api/biometric-prints/sync")).json()) as { prints: Array<{ person_id: string }> };
+    expect(body.prints.map((print) => print.person_id)).toEqual([personId]);
+  });
+
   test("a deleted/tombstoned face print never appears", async () => {
     const { personId } = await ownerPersonId();
     const liveId = insertRawPrint(personId, "face");
@@ -469,6 +511,37 @@ describe("POST /api/biometric-prints/enrollments", () => {
     const res = await aClient.post("/api/biometric-prints/enrollments", body(b.id, [sample(1)]));
     expect(res.status).toBe(403);
     expect(liveIds(b.id)).toEqual([existing]);
+  });
+
+  test("an admin cannot batch-enroll a teen without the teen's agreement", async () => {
+    const owner = await ownerSession();
+    const adminRes = await owner.post("/api/people", { displayName: "Admin", role: "admin", secret: "adminpin1" });
+    const admin = (await adminRes.json()) as { id: string };
+    const adminClient = await sessionFor(admin.id, "adminpin1");
+    const teen = await addPerson(owner, "River", "teen");
+
+    const res = await adminClient.post("/api/biometric-prints/enrollments", body(teen.id, [sample(1)]));
+    expect(res.status).toBe(403);
+    expect(liveIds(teen.id)).toEqual([]);
+  });
+
+  test("a guest cannot batch-enroll themself without their agreement", async () => {
+    const owner = await ownerSession();
+    const guest = await addPerson(owner, "Marlow", "guest");
+    const guestClient = await sessionFor(guest.id);
+
+    const res = await guestClient.post("/api/biometric-prints/enrollments", body(guest.id, [sample(1)]));
+    expect(res.status).toBe(403);
+    expect(liveIds(guest.id)).toEqual([]);
+  });
+
+  test("an owner cannot batch-enroll a guest", async () => {
+    const owner = await ownerSession();
+    const guest = await addPerson(owner, "Marlow", "guest");
+
+    const res = await owner.post("/api/biometric-prints/enrollments", body(guest.id, [sample(1)]));
+    expect(res.status).toBe(403);
+    expect(liveIds(guest.id)).toEqual([]);
   });
 
   test("a child cannot replace their own set, and an unauthenticated call is 401", async () => {

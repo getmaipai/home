@@ -18,12 +18,10 @@
 // read it. Everywhere else, only a matcher running server-side ever calls
 // decryptSecret() on it.
 //
-// Consent: a child never consents for themself (the design's own
-// invariant). Self-enrollment is open to anyone else on the ladder;
-// enrolling someone ELSE - including a child - needs the same
-// owner/admin authority personLifecycle.ts's MANAGEABLE_BY already uses
-// for editing or deleting that person, so this reuses that table rather
-// than inventing a second ladder.
+// Consent: a child never consents for themself. Teen consent must come
+// directly from that teen, not an administrator acting on their behalf.
+// Guests are not eligible for enrollment. Adults may enroll themselves,
+// while enrolling another person needs the usual owner/admin authority.
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { biometricPrints, people } from "@/db/schema";
@@ -79,10 +77,16 @@ function toSummary(row: PrintRow): BiometricPrintSummary {
 // grows its own carve-outs (its own comment notes birthdate/localOnly
 // already needed one).
 function canConsentFor(actor: PersonRow, target: { id: string; role: string }): boolean {
-  // The one absolute in the design on top of canManage()'s ordinary
-  // self-case: a child never consents for themself, full stop.
   if (target.role === "child" && actor.id === target.id) return false;
+  if (target.role === "teen" && actor.id !== target.id) return false;
+  if (target.role === "guest") return false;
   return canManage(actor, target);
+}
+
+function eligibleForRobotSync(role: string): boolean {
+  // Teen and guest face records may predate the consent gate. They remain
+  // stored for revocation/audit purposes but must never reach robot sync.
+  return role !== "teen" && role !== "guest";
 }
 
 export interface BiometricPrintCreate {
@@ -314,12 +318,13 @@ export function deleteBiometricPrint(actor: PersonRow, printId: string): OpResul
  * guaranteed to still have an embedding to decrypt. */
 export function listPrintsForSync(): BiometricPrintT[] {
   const rows = db
-    .select()
+    .select({ print: biometricPrints, personRole: people.role })
     .from(biometricPrints)
-    .where(and(eq(biometricPrints.modality, "face"), isNull(biometricPrints.deletedAt)))
-    .all() as PrintRow[];
+    .innerJoin(people, eq(biometricPrints.personId, people.id))
+    .where(and(eq(biometricPrints.modality, "face"), isNull(biometricPrints.deletedAt), isNull(people.deletedAt)))
+    .all();
 
-  return rows.map((row) => ({
+  return rows.filter(({ personRole }) => eligibleForRobotSync(personRole)).map(({ print: row }) => ({
     ...toSummary(row),
     // Safe: a live (deletedAt IS NULL) row always still has its embedding -
     // only the tombstone path (above) ever nulls embeddingEncrypted, and

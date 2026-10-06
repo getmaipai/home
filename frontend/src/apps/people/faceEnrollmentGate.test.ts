@@ -12,6 +12,24 @@ describe("canEnrollFace", () => {
     expect(canEnrollFace(adult, adult)).toBe(true);
   });
 
+  test("a teen can directly consent to their own enrollment", () => {
+    const teen = { id: "person-teen", role: "teen" as const };
+    expect(canEnrollFace(teen, teen)).toBe(true);
+  });
+
+  test("an admin cannot enroll a teen on their behalf", () => {
+    const admin = { id: "person-admin", role: "admin" as const };
+    const teen = { id: "person-teen", role: "teen" as const };
+    expect(canEnrollFace(admin, teen)).toBe(false);
+  });
+
+  test("a guest cannot enroll", () => {
+    const guest = { id: "person-guest", role: "guest" as const };
+    expect(canEnrollFace(guest, guest)).toBe(false);
+    const owner = { id: "person-owner", role: "owner" as const };
+    expect(canEnrollFace(owner, guest)).toBe(false);
+  });
+
   test("an owner can enroll a child", () => {
     const owner = { id: "person-owner", role: "owner" as const };
     const child = { id: "person-child", role: "child" as const };

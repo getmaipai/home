@@ -8,9 +8,10 @@ export interface EnrollTarget {
 
 /**
  * Frontend mirror of backend/src/lib/biometricPrints.ts's own
- * canConsentFor(): a child never consents for themself, full stop, on
- * top of the same self-or-MANAGEABLE_BY authority canManagePerson
- * already gives the "Use a real photo"/edit-profile gate. The backend
+ * canConsentFor(): a child never consents for themself, teen consent
+ * comes directly from the teen, and guests cannot enroll, on top
+ * of the same self-or-MANAGEABLE_BY authority canManagePerson already
+ * gives the "Use a real photo"/edit-profile gate. The backend
  * re-checks this on every POST /api/biometric-prints - the worst a wrong
  * answer here can do is show or hide the Enroll button, the same
  * acknowledged-duplication risk roles.ts's own canManagePerson already
@@ -24,5 +25,7 @@ export interface EnrollTarget {
  */
 export function canEnrollFace(viewer: { id: string; role: Role }, target: EnrollTarget): boolean {
   if (target.role === "child" && viewer.id === target.id) return false;
+  if (target.role === "teen" && viewer.id !== target.id) return false;
+  if (target.role === "guest") return false;
   return canManagePerson(viewer.role, viewer.id, target);
 }
