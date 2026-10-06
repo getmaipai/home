@@ -58,8 +58,8 @@ export interface ComposerNotice {
 
 const COMPOSER_NOTICE: Record<"paused" | "starting", ComposerNotice> = {
   paused: {
-    adult: "Chat is paused. You can type now and send when it's back.",
-    teen: "Chat is paused right now. You can type and send when it's back.",
+    adult: "Chat is paused. Your message stays here; press Send once it's back.",
+    teen: "Chat is paused right now. Your message stays here; press Send once it's back.",
     child: "I'm taking a break. Ask a grown-up, or try again soon.",
     repairs_link: "Open Repairs",
   },

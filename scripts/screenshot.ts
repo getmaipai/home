@@ -2850,8 +2850,8 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
             const response = await route.fetch();
             const body = await response.json();
             body.engines = { ...(body.engines ?? {}), chat: { kind: "stopped", pid: null, alive: false, availability: "unavailable", reason: "stopped", notice: {
-              adult: "Chat is paused. You can type now and send when it's back.",
-              teen: "Chat is paused right now. You can type and send when it's back.",
+              adult: "Chat is paused. Your message stays here; press Send once it's back.",
+              teen: "Chat is paused right now. Your message stays here; press Send once it's back.",
               child: "I'm taking a break. Ask a grown-up, or try again soon.",
               repairs_link: "Open Repairs",
             } } };
@@ -5331,7 +5331,7 @@ async function captureComposerLayoutReview(browser: Browser, sessionValue: strin
         await paused.route("**/api/health", async (route) => {
           const response = await route.fetch();
           const body = await response.json() as { engines: { chat: Record<string, unknown> } };
-          const line = "Chat is paused. You can type now and send when it's back.";
+          const line = "Chat is paused. Your message stays here; press Send once it's back.";
           body.engines.chat = { ...body.engines.chat, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", notice: { adult: line, teen: line, child: line, repairs_link: "Open Repairs" } };
           await route.fulfill({ response, json: body });
         });

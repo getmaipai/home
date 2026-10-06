@@ -261,7 +261,7 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.endsWith("/api/health")) {
-        return Promise.resolve(Response.json({ engines: { chat: { kind: "blocked", pid: 1, alive: true, notice: { adult: "Chat is paused. You can type now and send when it's back.", teen: "Chat is paused right now. You can type and send when it's back.", child: "I'm taking a break. Ask a grown-up, or try again soon.", repairs_link: "Open Repairs" } } } }));
+        return Promise.resolve(Response.json({ engines: { chat: { kind: "blocked", pid: 1, alive: true, notice: { adult: "Chat is paused. Your message stays here; press Send once it's back.", teen: "Chat is paused right now. Your message stays here; press Send once it's back.", child: "I'm taking a break. Ask a grown-up, or try again soon.", repairs_link: "Open Repairs" } } } }));
       }
       if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
       return Promise.resolve(Response.json({}));
@@ -272,7 +272,7 @@ describe("NextChatPage (SHELL-02's first slice)", () => {
           <NextChatPage person={makePerson()} />
         </MemoryRouter>,
       );
-      expect(await findByText(/Chat is paused\. You can type now and send when it's back\./)).toBeVisible();
+      expect(await findByText(/Chat is paused\. Your message stays here; press Send once it's back\./)).toBeVisible();
       expect(await findByRole("link", { name: "Open Repairs" })).toHaveAttribute("href", "/repairs");
     } finally {
       globalThis.fetch = original;
