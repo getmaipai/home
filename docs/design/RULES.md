@@ -34,7 +34,11 @@ wins.
    among them. The turn signal is kept for the plan line, memory-judge
    eligibility, the wire `signal` event and spoken-cue suppression; it
    no longer decides a search. Memory reaches the model as injected
-   context, never as a tool.
+   context, never as a tool. The offered tool set is a measured budget:
+   the base set is the ten on the record; a conditional set (pictures,
+   a link reader, media tools on a file turn) is offered only on the
+   turn that earns it, each with its own bench row, never more than 16
+   on a turn.
 2. **The engine's native feature is the implementation.** Chat
    templates, the reasoning split, tool-call parsing, JSON-schema
    output and token counts come from the engine. Home never re-wraps,
@@ -88,6 +92,10 @@ wins.
    the model. Policy refusals (consent, crisis, temporary mode,
    ungrounded arguments) are not tool failures and keep their own
    replies. A robot with no hub and no network answers the same way.
+   Fixed clips that play when no model can speak (an engine outage line,
+   a robot's alarm, carry or pairing line) are not replies; each is
+   reviewed by a person against the child floor when written and listed
+   on the privacy page.
 7. **Search gives the model pages, not snippets.** Result pages are
    fetched and their text is given with numbered sources; the
    instruction is to ground the answer in them and cite by number. Page
@@ -160,16 +168,53 @@ wins.
    handlers and copy; Home provides routes, data and copy. The only
    allowed exceptions are the entries of the shrink-only allowlist
    `frontend/src/dev/kit-wrapper-baseline.json`, each with its reason;
-   an entry is never added, only removed.
+   an entry is never added, only removed. One exception (owner-approved
+   2026-10-06): a function registered as a render in `TOOL_BINDINGS` or
+   `DATA_BINDINGS` of `elementBindings.ts` that returns only the kit
+   Element (or null), draws no DOM of its own, passes no className, and
+   only maps the part's data and Home's handlers and copy to the
+   Element's props is the Element's use site, not a wrapper; an inline
+   anonymous arrow function written to avoid the lint is forbidden.
    (c) A prop, slot or variant an Element lacks is a kit change first,
    landed in `commons` before the Home change that uses it.
    ELEMENTS-LINT-02 (`kit-classname-override-baseline.json` for
    `className`, `kit-css-override-baseline.json` for Home CSS) and
    ELEMENTS-LINT-03 (`kit-wrapper-baseline.json`), run by the frontend
    suite in `scripts/check.sh`, fail on each new override or wrapper they
-   can detect statically; they are a floor, and review and the architect
+   can detect statically (ELEMENTS-LINT-03 also fails an inline function
+   registered as a render in `elementBindings.ts`); they are a floor, and review and the architect
    catch the rest. Both baselines only shrink, and the Elements slices
    empty them.
+9b. **Outside chat, shadcn/ui is the only component source (owner's rule,
+    2026-10-06).** Every non-chat surface is built from the kit's one
+    primitive set, `@maipai/ui/src/ui/*` (shadcn/ui's own registry, Base UI
+    flavor, `base-nova` style, pinned by shadcn version), and the kit
+    blocks in `@maipai/ui/src/blocks/*` and `src/dashboard/*` that compose
+    it. Chat stays rule 9 (assistant-ui Elements). Nothing else renders UI
+    in Home: no other component library, no direct import of `@base-ui/*`,
+    `radix-ui`, `sonner`, `cmdk`, `vaul` or `recharts`, no raw `<button>`,
+    `<input>`, `<select>`, `<textarea>`, `<table>` or `<dialog>`, and no
+    Home element that draws its own border, radius, shadow or background.
+    A part the set lacks is added to the kit from the shadcn registry
+    first, or from Kibo UI for a named gap, with a row in
+    `docs/design/UI-DECISIONS.md`; anything else needs a ledger row before
+    a line is written. The lints UI-LINT-01 to 03 enforce this with
+    shrink-only baselines when the consolidation lands.
+    **Changing the look and feel** (owner, 2026-10-06), for shadcn/ui
+    parts and the chat Elements alike, in this order. First, design
+    tokens: set a token value (colour, radius, spacing, type size) the part
+    already reads; Home sets token values in one place and never touches
+    the part. Second, a kit variant or prop: when tokens cannot reach the
+    look, add an additive variant, size or slot to the part in the
+    `commons` kit (default unchanged, tested, new kit tag, Home pin bump);
+    never edit a copied registry file by hand outside this path. Third, a
+    slot: content Home supplies fills the slot the part already exposes.
+    Not allowed: className or CSS in Home that sets shape, size, spacing,
+    border, shadow, background or layout on a kit part; wrapper
+    components; a second copy of a part. Anything that cannot follow this
+    needs a row in `docs/design/ELEMENTS-DECISIONS.md` with its reason,
+    who decided and the slice that removes it. Upstream upgrades are taken
+    only in the monthly sweep (`shadcn add --diff`).
 10. **The safety gate stays, and its strictness follows the person.**
     The output gate is the safety floor and is not a formatting step.
     For a child, and for every spoken turn, every sentence is checked
@@ -177,6 +222,8 @@ wins.
     written chat, text streams as it is generated and the gate checks it
     as it arrives; released text is never retracted. For a teen, an
     admin setting picks one of those two (owner's ruling, 2026-10-02).
+    Those fixed clips (rule 6) are gated at authoring time, not at
+    playback.
 11. **Only our own tested Stack components run the models.** Home
     talks to the engines the Stack installs, pins and tests, and to
     nothing else. No LM Studio, Open WebUI, Ollama or other outside
@@ -218,26 +265,56 @@ Record: the owner's rule of 2026-10-04 (his words are the record: "that
 column collapses to a rail; everything to the right of it should look and
 feel like the native app we are emulating"), and his chat shell layout spec of
 2026-10-06, which makes the rail a permanent 56 px icon rail that never
-expands (S1 below).
+expands (S1 below). Owner-approved 2026-10-06: the app settings design
+(S1 profile menu and More menu, S4) and the mobile design pass (S1 phone
+drawer, S2 phone layout, S3 widths); they supersede the earlier S1
+profile-menu list and the "every width" wording.
 
 Governs: frontend/src/next/**, frontend/src/apps/**
 
 S1. **The main navigation is permanent.** The column that lists the apps
     (Home, Chat, Library, Family today; more apps later) is present on
-    every page at every width as a fixed 56 px icon rail. It never
+    every page from 640 px wide as a fixed 56 px icon rail. It never
     expands, has no labels or fold control, and names each icon through
-    its accessible name and a tooltip. It holds the brand, global Search,
-    the app icons and, pinned at its bottom, the profile control whose
-    menu holds Notifications, System status, Incognito, Settings, Help and
-    Log out (owner-approved 2026-10-06). It is never removed, hidden or
-    merged into an app, and app content (thread lists, filters,
-    sub-navigation) never lives inside it.
+    its accessible name and a tooltip. On a phone (narrower than 640, or
+    a touch screen under 500 tall) there is no rail. The same entries
+    live in one slide-over drawer, the kit's sidebar in its off-canvas
+    mode, drawn from the same app list as the rail. A round menu button
+    floating at the top left of every app's root screen opens it (and a
+    swipe from the left edge in the installed app). Top to bottom the
+    drawer holds the brand and Search, the apps with their status dots,
+    the selected app's own sections, and at its foot the profile control
+    and the selected app's Settings gear. The menu button and the edge
+    swipe step aside only while an immersive screen is open, and that
+    screen carries its own Close. The rail holds the brand, global
+    Search, the app icons, a More button above the profile control, and,
+    pinned at its bottom, the profile control whose menu holds
+    Notifications, System status, Settings, Home settings (owner and
+    admin only), Help and Log out; Incognito is in the rail's More menu
+    (owner-approved 2026-10-06). It is never removed, hidden or merged
+    into an app, and app content (thread lists, filters, sub-navigation)
+    never lives inside it. On a phone the drawer holds the selected app's
+    own sections below the apps; that is the only place app content meets
+    the main navigation, and it never holds another app's.
 S2. **Each app area emulates its native app.** Everything to the right of
     the rail looks and feels like the app it copies, with that app's own
     layout intact: chat is ChatGPT's layout, including its own history
     sidebar, slim title bar, centered message column and compact composer;
     video is YouTube's; and so on. Only the rail is ours. Parts are kit
     Elements and shipped primitives, restyled by tokens only (rule 9).
+    On every width, the selected app owns the screen beside the main
+    navigation and copies its native app's phone layout and behaviour as
+    well as its desktop one: its own top controls, tabs, composer and
+    player stay where that app puts them. Global things (switching apps,
+    Home, Search everywhere, profile, settings, notifications, status)
+    live only in the main navigation, and an app never draws a second
+    copy of them.
 S3. **A test holds the rail.** A test fails when the main navigation does
-    not render on an app page at desktop and mobile widths, as the full
-    column or as the rail with accessible labels.
+    not render on an app page: the rail at 640 and up, the menu button and
+    its drawer below 640, with accessible names, at 360, 402, 874 x 402,
+    744 and 1440.
+S4. **Every settings screen is the one kit settings shell.** An app's
+    settings, Account and Home settings are settings areas declared as
+    data (spec `areas.json` or a package's `contributes.settings_area`)
+    and drawn by the kit's `SettingsShell`; Home writes no settings
+    layout, and each registry group is placed in exactly one card.

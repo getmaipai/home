@@ -92,19 +92,11 @@
     }
   },
   "apps/chat/chatToolUis.tsx": {
-    "SpecSheetToolRender": {
-      "ed": "ED-034",
-      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
-    },
     "ProducedArtifactCard": {
       "ed": "ED-025",
       "reason": "Kit artifact-card lacked an actions slot (added in ui-v0.5.116); ADOPT-02."
     },
     "ProjectToolRender": {
-      "ed": "ED-034",
-      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
-    },
-    "ToolTimelineToolRender": {
       "ed": "ED-034",
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
     }

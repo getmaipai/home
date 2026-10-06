@@ -252,6 +252,42 @@ describe("Home wrappers around kit Elements (ELEMENTS-LINT-03)", () => {
   });
 });
 
+describe("registered renders are the Element's use site (RULES.md rule 9(b) exception)", () => {
+  const REGISTRY = `
+    import { PlainRender, BoxedRender, ClassRender } from "@/apps/chat/seededRenders";
+    export const TOOL_BINDINGS = [
+      { toolName: "a", element: "x", render: PlainRender },
+      { toolName: "b", element: "x", render: BoxedRender },
+      { toolName: "c", element: "x", render: ClassRender },
+    ];
+    export const DATA_BINDINGS = [{ name: "d", element: "x", render: (p: unknown) => <Thing {...p} /> }];
+  `;
+  const RENDERS = `
+    import { Gallery } from "@maipai/ui/src/elements/image-gallery";
+    export function PlainRender({ result }: { result?: { images: string[] } }) {
+      if (!result) return null;
+      return <Gallery images={result.images} />;
+    }
+    export function BoxedRender({ result }: { result?: { images: string[] } }) {
+      return <div><Gallery images={result?.images ?? []} /></div>;
+    }
+    export function ClassRender({ result }: { result?: { images: string[] } }) {
+      return <Gallery className="p-4" images={result?.images ?? []} />;
+    }
+    export function NotRegistered() { return <Gallery images={[]} />; }
+  `;
+
+  test("a registered render that returns only the Element passes; a box, a className, an unregistered one and an inline arrow are flagged", () => {
+    const findings = wrapperFindings(SRC, { "apps/chat/elementBindings.ts": REGISTRY, "apps/chat/seededRenders.tsx": RENDERS });
+    expect(findings.map((f) => [f.component, f.why])).toEqual([
+      ["BoxedRender", "draws its own <div> box around <Gallery>"],
+      ["ClassRender", "returns <Gallery> as its root"],
+      ["NotRegistered", "returns <Gallery> as its root"],
+      ["inline render for \"d\"" , "an inline function registered as a render; register a named function that returns only the Element"],
+    ]);
+  });
+});
+
 describe("Elements decisions ledger (ELEMENTS-DECISIONS-01)", () => {
   const ledger = ledgerRows(readFileSync(LEDGER_PATH, "utf8"));
   const entries = (): [string, unknown][] => [

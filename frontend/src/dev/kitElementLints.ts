@@ -20,6 +20,13 @@
 // wrapper (*Panel, *Card, *Wrapper, by its own name or its file's) in a file
 // that imports a kit Element.
 //
+// One exception (RULES.md rule 9(b), owner-approved 2026-10-06): a function
+// registered as a `render` in TOOL_BINDINGS or DATA_BINDINGS of
+// apps/chat/elementBindings.ts that returns only the kit Element (or null),
+// draws no DOM of its own and passes no className is the Element's use site,
+// not a wrapper. An inline anonymous function as a `render` there is a
+// finding, so the exception cannot be used to dodge the lint.
+//
 // The baselines and tests live beside this file in kitElementLints.test.ts.
 import ts from "typescript";
 import { readFileSync, readdirSync } from "node:fs";
@@ -388,7 +395,80 @@ function isExported(n: ts.Node): boolean {
   return ts.canHaveModifiers(stmt) && (ts.getModifiers(stmt) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 }
 
-function wrappersIn(rel: string, source: string): WrapperFinding[] {
+/** True when a component returns only a kit Element (or null): no intrinsic
+ * DOM tag and no `className` / `class` anywhere in what it returns. */
+function returnsOnlyKitElement(fn: { body?: ts.Node }, kit: Set<string>): boolean {
+  if (!fn.body) return false;
+  const roots = returnedRoots(fn.body);
+  if (!roots.length) return false;
+  const clean = (n: ts.Node): boolean => {
+    if (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) {
+      if (ts.isIdentifier(n.tagName) && /^[a-z]/.test(n.tagName.text)) return false;
+    }
+    if (ts.isJsxFragment(n)) return false;
+    if (ts.isJsxAttribute(n) && /^(?:className|class)$/.test(n.name.getText())) return false;
+    let ok = true;
+    ts.forEachChild(n, (c) => {
+      if (ok && !clean(c)) ok = false;
+    });
+    return ok;
+  };
+  return roots.every((r) => {
+    if (r.kind === ts.SyntaxKind.NullKeyword) return true;
+    const tag = ts.isJsxElement(r) ? r.openingElement.tagName : ts.isJsxSelfClosingElement(r) ? r.tagName : undefined;
+    return Boolean(tag && kitTag(tag, kit) && clean(r));
+  });
+}
+
+/** Where the chat's element registry lives, relative to `src`. */
+export const ELEMENT_BINDINGS_FILE = "apps/chat/elementBindings.ts";
+
+type Registry = { registered: Map<string, Set<string>>; inline: WrapperFinding[] };
+
+/** The renders registered in TOOL_BINDINGS / DATA_BINDINGS: per source file
+ * (relative to `src`, `.tsx`), the component names the registry imports and
+ * binds as a `render`; plus every inline function written as a `render`. */
+function readRegistry(source: string): Registry {
+  const file = parse(ELEMENT_BINDINGS_FILE, source);
+  const imported = new Map<string, { from: string; name: string }>();
+  for (const stmt of file.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier) || !stmt.importClause?.namedBindings) continue;
+    const from = stmt.moduleSpecifier.text;
+    if (!from.startsWith("@/") || !ts.isNamedImports(stmt.importClause.namedBindings)) continue;
+    for (const el of stmt.importClause.namedBindings.elements) {
+      imported.set(el.name.text, { from: `${from.slice(2)}.tsx`, name: (el.propertyName ?? el.name).text });
+    }
+  }
+  const registered = new Map<string, Set<string>>();
+  const inline: WrapperFinding[] = [];
+  const visit = (n: ts.Node) => {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && /^(?:TOOL|DATA)_BINDINGS$/.test(n.name.text) && n.initializer) {
+      let init: ts.Node = n.initializer;
+      while (ts.isAsExpression(init) || ts.isSatisfiesExpression(init) || ts.isParenthesizedExpression(init)) init = init.expression;
+      if (ts.isArrayLiteralExpression(init)) {
+        for (const item of init.elements) {
+          if (!ts.isObjectLiteralExpression(item)) continue;
+          const prop = (key: string) => item.properties.find((p): p is ts.PropertyAssignment => ts.isPropertyAssignment(p) && p.name.getText() === key);
+          const render = prop("render")?.initializer;
+          if (!render) continue;
+          if (ts.isIdentifier(render)) {
+            const src = imported.get(render.text);
+            if (src) registered.set(src.from, (registered.get(src.from) ?? new Set()).add(src.name));
+          } else if (ts.isArrowFunction(render) || ts.isFunctionExpression(render)) {
+            const id = prop("toolName")?.initializer ?? prop("name")?.initializer;
+            const line = file.getLineAndCharacterOfPosition(render.getStart()).line + 1;
+            inline.push({ file: ELEMENT_BINDINGS_FILE, component: `inline render for ${id ? id.getText() : "a binding"}`, line, why: "an inline function registered as a render; register a named function that returns only the Element" });
+          }
+        }
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(file);
+  return { registered, inline };
+}
+
+function wrappersIn(rel: string, source: string, registered: Set<string> = new Set()): WrapperFinding[] {
   const file = parse(rel, source);
   const kit = kitBindings(file);
   if (!kit.size) return [];
@@ -405,7 +485,9 @@ function wrappersIn(rel: string, source: string): WrapperFinding[] {
       name = n.name.text;
       fn = componentFunction(n.initializer);
     }
-    if (name && fn?.body) {
+    if (name && fn?.body && registered.has(name) && returnsOnlyKitElement(fn, kit)) {
+      // A registered render that only maps data to the Element: its use site.
+    } else if (name && fn?.body) {
       const line = file.getLineAndCharacterOfPosition(n.getStart()).line + 1;
       const roots = returnedRoots(fn.body);
       const rootTags = roots
@@ -429,7 +511,10 @@ function wrappersIn(rel: string, source: string): WrapperFinding[] {
  * path to source text, for tests. */
 export function wrapperFindings(src: string, overrides?: Record<string, string>): WrapperFinding[] {
   const files = overrides ? Object.keys(overrides) : frontendSourceFiles(src);
-  return files.flatMap((rel) => wrappersIn(rel, overrides?.[rel] ?? readFileSync(join(src, rel), "utf8")));
+  const registrySource = overrides ? overrides[ELEMENT_BINDINGS_FILE] : readFileSync(join(src, ELEMENT_BINDINGS_FILE), "utf8");
+  const registry = registrySource ? readRegistry(registrySource) : { registered: new Map<string, Set<string>>(), inline: [] };
+  const found = files.flatMap((rel) => wrappersIn(rel, overrides?.[rel] ?? readFileSync(join(src, rel), "utf8"), registry.registered.get(rel)));
+  return [...found, ...registry.inline];
 }
 
 // ------------------------------------------------------- LINT-02, CSS leg
