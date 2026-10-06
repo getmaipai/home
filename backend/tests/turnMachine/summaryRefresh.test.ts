@@ -21,7 +21,7 @@ import { getConversation, logTurn, resolveOrCreateConversation } from "@/lib/con
 import type { TurnValue } from "@/wire";
 import type { PersonRow } from "@/types";
 import { db } from "@/db";
-import { conversationTurns } from "@/db/schema";
+import { conversationTurns, conversations as conversationsTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 const SAFE: TurnValue["safety"] = { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() };
@@ -56,7 +56,7 @@ async function withEngines<T>(fn: (summaryPrompts: string[]) => Promise<T>): Pro
   const stub = startStubLlmServer(0, {
     scriptedChatReply: (request: ChatCompletionRequest) => {
       const joined = JSON.stringify(request.messages);
-      if (joined.includes("Update the summary of this conversation")) {
+      if (joined.includes("You keep notes on a conversation")) {
         summaryPrompts.push(joined);
         return "They talked about the garden and the dentist.";
       }
@@ -113,18 +113,18 @@ describe("THIN-0G: the default path schedules the rolling summary refresh", () =
     }
   });
 
-  test("a temporary turn schedules no refresh", async () => {
-    const refresh = spyOn(history, "maybeRefreshConversationSummary");
-    try {
-      await withEngines(async () => {
-        const result = await runTurnNext(people.owner, "chat", "hello there", { temporary: true });
-        expect(result.ok).toBe(true);
-        await new Promise((r) => setTimeout(r, DELAY_MS * 3));
-        expect(refresh).toHaveBeenCalledTimes(0);
-      });
-    } finally {
-      refresh.mockRestore();
-    }
+  // THIN-3F (THIN-INC row 3 as amended): a temporary turn schedules the
+  // same fold, which works in its session only; a short one sends nothing
+  // and writes nothing (temporarySummary.test.ts covers a long one).
+  test("a temporary turn's refresh writes no row and, below the fold mark, asks nothing", async () => {
+    await withEngines(async (summaryPrompts) => {
+      const result = await runTurnNext(people.owner, "chat", "hello there", { temporary: true });
+      expect(result.ok).toBe(true);
+      await new Promise((r) => setTimeout(r, DELAY_MS * 3));
+      expect(summaryPrompts).toHaveLength(0);
+      if (!result.ok) return;
+      expect(db.select().from(conversationsTable).where(eq(conversationsTable.id, result.value.conversation_id)).get()).toBeUndefined();
+    });
   });
 
   test("credential text in the older turns never reaches the summary prompt", async () => {

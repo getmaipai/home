@@ -187,6 +187,10 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).
     appendTemporaryTurn(actor, surface, text, value, { ...opts, judgeStatus: "skipped" });
+    // THIN-3F (THIN-INC row 3 as amended): a temporary chat folds too, in
+    // its session only; nothing is stored or logged, and the fold goes
+    // with the session.
+    scheduleSummaryRefresh(value.conversation_id);
     // THIN-7E: a temporary chat asks about an unknown name and stores nothing (the commit is a no-op there).
     state.askCommit?.(value.reply.text);
     return;

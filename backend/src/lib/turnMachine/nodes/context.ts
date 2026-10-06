@@ -117,6 +117,12 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const windowOpts = { supersedes: state.supersedes, excludeTurnId: state.continuation?.fromTurnId };
   const preview = windowPreview(conversation, windowOpts);
   const pushWindow = (window: ConversationWindow) => {
+    // THIN-3F step 3: the summary (labelled data) sits right after the
+    // stable prefix, ahead of the verbatim window; it changes only at a
+    // checkpoint, so the prefix the cache reuses holds between them.
+    if (window.summaryLine) {
+      items.push({ id: `window-system-summary`, text: window.summaryLine, source: "window", subjects: [], disclosure: "child_ok" });
+    }
     for (const message of window.messages) {
       // ContextItem has no role field (the contract's own shape); the
       // window's real user/assistant/tool ordering is real signal
@@ -125,9 +131,6 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
       // widening the contract for every other source. Parsed back out by
       // windowRoleFromId() in messages.ts - the two stay paired on purpose.
       items.push({ id: `window-${message.role}-${++windowItemSeq}`, text: typeof message.content === "string" ? message.content : JSON.stringify(message.content), ...(message.tool_calls ? { toolCalls: message.tool_calls } : {}), ...(message.tool_call_id ? { toolCallId: message.tool_call_id } : {}), source: "window", subjects: [], disclosure: "child_ok" });
-    }
-    if (window.summaryLine) {
-      items.push({ id: `window-system-summary`, text: window.summaryLine, source: "window", subjects: [], disclosure: "child_ok" });
     }
   };
 

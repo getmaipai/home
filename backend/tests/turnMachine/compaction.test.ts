@@ -86,6 +86,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  // This test's own background work (episode embeddings, a fold) lands
+  // against its own engine before the engine stops.
+  await __drainBackgroundWorkForTests();
   __setSummaryRefreshDelayForTests(null);
   __setChatWindowContextForTests();
   fixture?.stop();
@@ -188,10 +191,8 @@ describe("the compaction ladder's checkpoint (THIN-3C, THIN-3F)", () => {
     await maybeRefreshConversationSummary(conv.value.id);
     // The first fold starts right after the old anchor, never at the
     // oldest of the newest 200 rows.
-    expect(summaryPrompts[0]).toContain("User: short 1\\n");
-    expect(summaryPrompts[0]).not.toContain("User: short 0\\n");
-    // 230 turns queue their episode embeddings; let them land here.
-    await __drainBackgroundWorkForTests();
+    expect(summaryPrompts[0]).toContain("Person: short 1\\n");
+    expect(summaryPrompts[0]).not.toContain("Person: short 0\\n");
   }, 30_000);
 
   test("a fold that fails leaves the block verbatim and the anchor where it was", async () => {
