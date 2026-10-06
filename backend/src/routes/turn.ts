@@ -331,6 +331,9 @@ function shouldDeliver(stored: StoredStreamEvent, resumeFrom: number | null): bo
   // consumer (chatModelAdapter.ts's own toolCalls Map just re-sets the
   // same call's state), so an already-seen resend costs nothing.
   if (!("type" in stored.event)) return true;
+  // ANSWER-IMG-02: the picture set is idempotent on the client (one per
+  // turn), so a resuming client always gets it again, like a tool line.
+  if (stored.event.type === "images") return true;
   if (stored.sequence !== null) return stored.sequence > resumeFrom;
   return stored.afterSequence > resumeFrom;
 }
@@ -589,8 +592,20 @@ export async function* streamTurnEvents(
     // `TurnStreamResult` there ever sets `toolEvents`).
     for (const event of result.toolEvents ?? []) yield event as unknown as TurnStreamEvent;
 
+    // ANSWER-IMG-02 (rule 9): the picture set goes out exactly where the
+    // placer put it, between two released pieces at a paragraph boundary,
+    // so it never lands above text already sent; one placed after the
+    // whole answer goes after the last piece.
+    let imagesSent = false;
+    function* imagesAt(length: number): Generator<TurnStreamEvent, void, void> {
+      const placed = result.answerImages?.();
+      if (!placed || imagesSent || length < placed.offset) return;
+      imagesSent = true;
+      yield { type: "images", turn_id: result.turnId, ...placed.set };
+    }
     while (!current.done) {
       yield* sideEvents();
+      yield* imagesAt(fullText.length);
       fullText += current.value;
       yield* splitEvents(current.value);
       const nextToken = iterator.next();
@@ -613,6 +628,7 @@ export async function* streamTurnEvents(
       if (result.status.closed) break;
       await result.status.wait();
     }
+    yield* imagesAt(Number.POSITIVE_INFINITY);
     // `current.value` here is the generator's own RETURN value (step 9),
     // not a yielded delta: a StreamOutcome (the retired turn engine). Either the
     // most recently flagged, non-refuse SafetyResult gateOutputSafety()

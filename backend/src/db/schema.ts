@@ -408,6 +408,9 @@ export const conversationTurns = sqliteTable(
     // Contains only attachment ids and display metadata, never image bytes.
     images: text("images"),
     replyText: text("reply_text").notNull(),
+    // ANSWER-IMG-02: the pictures shown with the reply (wire.ts's
+    // AnswerImageSet as JSON): hub cache ids and display data, never bytes.
+    answerImages: text("answer_images"),
     source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model" | "confirm" | "policy" (wire.ts's TurnValue.source)
     pluginId: text("plugin_id"),
     commandId: text("command_id"),

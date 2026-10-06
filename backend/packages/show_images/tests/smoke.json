@@ -1,0 +1,12 @@
+{
+  "description": "Smoke fixture for the bundled show_images package: the recipe answers with the fixed line the chat turn gives the model. In a chat turn the hub answers the call itself and fetches the pictures beside the answer (backend/src/lib/answerImages/turn.ts); that path is covered by backend/tests/answerImagesTurn.test.ts, not this emulator.",
+  "inputs": { "subject": "Eiffel Tower" },
+  "host_setup": {},
+  "expected": {
+    "reply": { "text": "Photos of Eiffel Tower will be shown above or beside your answer if good ones are found. Do not mention, describe, list or link them.", "speech": "Photos of Eiffel Tower will be shown above or beside your answer if good ones are found. Do not mention, describe, list or link them." },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

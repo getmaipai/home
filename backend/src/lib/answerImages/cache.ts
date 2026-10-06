@@ -9,7 +9,7 @@ const INDEX = () => join(answerImagesCacheDir, "index.json");
 const CACHE_CAP = 300 * 1024 * 1024;
 let cacheCap = CACHE_CAP;
 const MEMORY = new Map<string, CacheEntry>();
-type CacheEntry = { band: AgeBand; tile: string; full: string; bytes: number; lastUsedAt: string; originalUrl?: string; leadImage?: boolean; evicted?: boolean; temporaryChatId?: string; memory?: { tile: Uint8Array; full: Uint8Array } };
+type CacheEntry = { band: AgeBand; /** ANSWER-IMG-02: every band this picture was approved for (content-addressed ids are shared across askers). */ bands?: AgeBand[]; tile: string; full: string; bytes: number; lastUsedAt: string; originalUrl?: string; leadImage?: boolean; evicted?: boolean; temporaryChatId?: string; memory?: { tile: Uint8Array; full: Uint8Array } };
 type PutInput = { tile: Uint8Array; full: Uint8Array; band: AgeBand; temporary?: boolean; temporaryChatId?: string; originalUrl?: string; leadImage?: boolean };
 type CacheIndex = Record<string, CacheEntry>;
 
@@ -33,16 +33,29 @@ function sweep(index: CacheIndex): void {
   for (const [id] of evicted.slice(0, Math.max(0, evicted.length - 5_000))) delete index[id];
 }
 
+/** The same picture approved for a teen and later for an adult stays
+ * readable by the teen: approvals add up, they never replace each other. */
+function mergedBands(prior: CacheEntry | undefined, band: AgeBand): AgeBand[] {
+  const bands = new Set<AgeBand>(prior ? (prior.bands ?? [prior.band]) : []);
+  bands.add(band);
+  return [...bands];
+}
+function approvedFor(entry: CacheEntry, band: AgeBand): boolean {
+  return band === "adult" || (entry.bands ?? [entry.band]).includes(band);
+}
+
 export async function putAnswerImage(input: PutInput): Promise<string> {
   if (input.temporary && !input.temporaryChatId) throw new Error("temporary answer pictures need a chat id");
   const digest = createHash("sha256").update(input.tile).update(input.full).digest("hex");
   const id = `ai_${digest.slice(0, 32)}`;
   const entry: CacheEntry = { band: input.band, tile: `${id}-tile.webp`, full: `${id}-full.webp`, bytes: input.tile.byteLength + input.full.byteLength, lastUsedAt: new Date().toISOString(), originalUrl: input.originalUrl, leadImage: input.leadImage };
-  if (input.temporary) MEMORY.set(id, { ...entry, temporaryChatId: input.temporaryChatId, memory: { tile: new Uint8Array(input.tile), full: new Uint8Array(input.full) } });
-  else {
+  if (input.temporary) {
+    const prior = MEMORY.get(id);
+    MEMORY.set(id, { ...entry, bands: mergedBands(prior, input.band), temporaryChatId: input.temporaryChatId, memory: { tile: new Uint8Array(input.tile), full: new Uint8Array(input.full) } });
+  } else {
     mkdirSync(answerImagesCacheDir, { recursive: true });
     writeFileSync(file(id, "tile"), input.tile); writeFileSync(file(id, "full"), input.full);
-    const index = readIndex(); index[id] = entry; sweep(index); writeIndex(index);
+    const index = readIndex(); index[id] = { ...entry, bands: mergedBands(index[id], input.band) }; sweep(index); writeIndex(index);
   }
   return id;
 }
@@ -50,10 +63,10 @@ export async function putAnswerImage(input: PutInput): Promise<string> {
 export async function getAnswerImage(id: string, band: AgeBand, variant: "tile" | "full"): Promise<Uint8Array | null> {
   if (!/^ai_[a-f0-9]{32}$/.test(id)) return null;
   const memory = MEMORY.get(id);
-  if (memory) return band === "adult" || memory.band === band ? new Uint8Array(memory.memory![variant]) : null;
+  if (memory) return approvedFor(memory, band) ? new Uint8Array(memory.memory![variant]) : null;
   const index = readIndex();
   const entry = index[id];
-  if (!entry || (band !== "adult" && entry.band !== band)) return null;
+  if (!entry || !approvedFor(entry, band)) return null;
   const path = file(id, variant);
   if (!existsSync(path) && entry.originalUrl) {
     const { fetchAnswerImages } = await import("./fetch");

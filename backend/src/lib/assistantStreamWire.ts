@@ -21,6 +21,8 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 //   delta and reasoning carry the shared resume sequence in a
 //                  `{ "type": "sequence", "sequence": n }` data chunk
 //                  written immediately before the text frame it numbers
+//   images      -> data(images), the open text part finished, then one
+//                  `answer-images` data part (ANSWER-IMG-02)
 //   done        -> data(done), then message-finish (`d:`), then the stream ends
 //   error       -> data(error: code, crisis_resources), then an error chunk
 //                  (`3:`), then the stream ends; a stream ends in exactly one
@@ -107,6 +109,17 @@ export function createAssistantStreamSink(onCancel: () => void = () => {}): Assi
         return;
       }
       data(event as unknown as Record<string, unknown>);
+      if (event.type === "images") {
+        // ANSWER-IMG-02: the open text part ends at the paragraph break, the
+        // picture set is one `answer-images` data part in place, and the
+        // next delta opens a new text part after it.
+        closeOpen();
+        const { type: _type, turn_id: _turnId, ...set } = event;
+        const index = parts++;
+        controller.enqueue({ type: "part-start", path: [], part: { type: "data", name: "answer-images", data: set as never } });
+        controller.enqueue({ type: "part-finish", path: [index] });
+        return;
+      }
       if (event.type === "done") {
         closeOpen();
         controller.enqueue({ type: "message-finish", path: [], finishReason: "stop", usage: NO_USAGE });

@@ -1,0 +1,7 @@
+{
+  "id": "show_images",
+  "inputs": [{ "name": "subject", "selector": "text" }],
+  "steps": [
+    { "op": "format", "as": "reply", "text": "Photos of {subject} will be shown above or beside your answer if good ones are found. Do not mention, describe, list or link them." }
+  ]
+}

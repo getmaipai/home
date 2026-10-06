@@ -2,6 +2,16 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.6] - 2026-10-06
+
+### Removed
+
+- The `category` argument. The chat turn never used it (it was stripped
+  before the search ran since LIVE-0923-01), so it only cost tool tokens and
+  invited a wrong value. Pictures in answers now come from the separate
+  `show_images` tool (ANSWER-IMG-02), which reads SearXNG's image rows with
+  the same row fields.
+
 ## [0.2.5] - 2026-10-03
 
 ### Changed

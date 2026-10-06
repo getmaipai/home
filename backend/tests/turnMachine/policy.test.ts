@@ -35,7 +35,11 @@ import type { NodeOutcome, TurnState } from "@/lib/turnMachine/contract";
 
 const websearch = loadManifestOnly("websearch");
 if (!websearch.ok) throw new Error("websearch manifest failed to load for policy.test.ts");
-const schema = websearch.value.args as { properties?: Record<string, { type?: string; enum?: readonly unknown[] }> };
+// The enum-typed field these tests exercise is websearch's former `category`
+// (removed from the manifest by ANSWER-IMG-02); the exemption mechanism is
+// unchanged, so the fixture keeps that field's exact shape beside the live args.
+const liveArgs = websearch.value.args as { properties?: Record<string, { type?: string; enum?: readonly unknown[] }> };
+const schema = { ...liveArgs, properties: { ...liveArgs.properties, category: { type: "string", enum: ["images"] as readonly unknown[] } } };
 
 describe("argsGrounded(): term-level, not substring", () => {
   test('"president of Chile 2026" passes against "who is the president of chile" (the year never counts against it)', () => {

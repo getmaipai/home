@@ -15,6 +15,7 @@ import { START_PROJECT_TOOL_ID, projectTypeForArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
 import { speakerIsAnonymous, touchesMemory } from "../speaker";
+import { modelFacingArgs } from "./tool";
 
 export interface PolicyInput {
   calls: readonly ToolCall[];
@@ -333,7 +334,10 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         entries.push({ proposal, decision: { allow: false, reason: "consent_needed", ask: { prompt: `Want me to look that up?` } } });
         continue;
       }
-      const grounding = checkGrounding(args, sourceTexts, manifest.args as ArgSchema | undefined);
+      // Grounded on the arguments the call will actually run with: a stray
+      // model-set field the tool node strips (websearch's retired
+      // `category`, ANSWER-IMG-02) never blocks the call.
+      const grounding = checkGrounding(modelFacingArgs(call.tool, args), sourceTexts, manifest.args as ArgSchema | undefined);
       if (!grounding.ok) {
         noteRefusal("ungrounded_args", grounding.arg);
         entries.push({ proposal, decision: { allow: false, reason: "ungrounded_args" } });

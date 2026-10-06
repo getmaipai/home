@@ -105,6 +105,21 @@ function assertCanSetPhotoUploads(actor: PersonRow, targetId: string): SettingsO
   return { ok: false, status: 403, error: "only a household adult may change a minor's photo setting" };
 }
 
+/** ANSWER-IMG-02's `reference.images`: a child never changes their own (off
+ * until a household adult turns it on); a teen and an adult change only their
+ * own (teens' settings stay private, owner ruling 2026-09-30); an owner or
+ * admin may change a child's. */
+function assertCanSetAnswerPictures(actor: PersonRow, targetId: string): SettingsOpResult<true> {
+  const targetRole = getPersonRole(targetId);
+  if (!targetRole) return { ok: false, status: 403, error: "cannot access another person's settings" };
+  if (actor.id === targetId) {
+    if (targetRole === "child") return { ok: false, status: 403, error: "a household adult must change a child's picture setting" };
+    return { ok: true, value: true };
+  }
+  if (isOwnerOrAdmin(actor) && targetRole === "child") return { ok: true, value: true };
+  return { ok: false, status: 403, error: "only a household adult may change a child's picture setting, and only a teen changes their own" };
+}
+
 function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpResult<true> {
   const range = keyDef.range as Record<string, unknown> | undefined;
   switch (keyDef.selector) {
@@ -417,6 +432,8 @@ export function setValue(
         ? assertCanAccessWakewordDeviceSetting(actor)
         : key === "chat.photo_uploads" && parsed.kind === "person"
           ? assertCanSetPhotoUploads(actor, parsed.id!)
+        : key === "reference.images" && parsed.kind === "person"
+          ? assertCanSetAnswerPictures(actor, parsed.id!)
         : key === PERSON_STORAGE_CAP_KEY
           ? assertCanSetPersonStorageCap(actor, parsed.id!)
           : assertCanAccessScope(actor, parsed, "write");

@@ -164,6 +164,12 @@ export interface TurnState {
   present?: readonly PresentPerson[] | null;
   utterance: string;
   images?: import("@/wire").ChatImagePart[];
+  /** ANSWER-IMG-02: the picture pipeline the `show_images` tool started
+   * beside the answer (answerImages/turn.ts), and where its set landed. */
+  answerImages?: import("@/lib/answerImages/turn").AnswerImageTurnState;
+  /** ANSWER-IMG-02: whether this turn may show pictures at all (rule 0's
+   * gates, decided once in beginTurn); `show_images` is offered only then. */
+  answerImagesAllowed?: boolean;
   modelId?: string;
   signal: TurnSignal;
   budget: TurnBudget;

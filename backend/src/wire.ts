@@ -60,6 +60,25 @@ export interface TurnReply {
   text: string;
   speech?: string;
 }
+/** ANSWER-IMG-02: one validated picture in an answer. `src` and `full` are
+ * always the hub's own `/api/answer-image/` route (the browser never loads a
+ * picture's host); `width`/`height` size the tile before the bytes paint. */
+export interface AnswerImageItem {
+  id: string;
+  src: string;
+  full: string;
+  width: number;
+  height: number;
+  alt: string;
+  caption: string;
+  source: { title: string; site: string; url: string };
+  license?: { short: string; url?: string; artist?: string };
+}
+/** ANSWER-IMG-02: the picture set of one answer, the `images` event's payload
+ * and the stored `answer_images`. `after_paragraph` is how many paragraphs of
+ * released text came before it (0 = before any text); `visible` tiles show
+ * and the badge is `items.length - visible` (never 1: a lone extra is dropped). */
+export interface AnswerImageSet { layout: "row"; after_paragraph: number; visible: number; items: AnswerImageItem[] }
 
 export interface TurnStats {
   prompt_tokens: number | null;
@@ -318,6 +337,8 @@ export interface TurnValue {
   media_items?: Media[];
   /** UPLOAD-IMG-01: the user's cleaned local images, represented by store ids. */
   images?: ChatImagePart[];
+  /** ANSWER-IMG-02: the pictures shown with this answer (additive). */
+  answer_images?: AnswerImageSet;
   /** RVW-1: which rung answered (lib/ruleNames.ts's Rung), additive on
    * the wire and on the turn row. */
   rung?: "typed_source" | "search" | "model_knowledge" | "failed" | "none";
@@ -435,7 +456,7 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
 // listConversationTurns()/list()) drops the raw column entirely for a
 // minor's own turn rather than sending `null`, matching the write-side
 // gate `reasoning`'s own wire event and POST /api/turn already apply.
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; answer_images?: AnswerImageSet; stats?: TurnStats; reasoning?: string; memory_ids: string[]; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own
@@ -474,6 +495,9 @@ export type TurnStreamEvent =
   | { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" | "composing" }
   | { type: "spoken_cue"; text: string }
   | { type: "done"; value: TurnValue }
+  /** ANSWER-IMG-02 (rule 9, additive): at most once per turn, at a paragraph
+   * boundary of the released text, never above text already sent. */
+  | ({ type: "images"; turn_id: string } & AnswerImageSet)
   // `code` (step 9, session-a-intelligence.md: "emit error with the
   // catalogue code") is optional and additive: a spec/errors/errors.json
   // code when the failure maps to one (today, only the output-side

@@ -8,6 +8,7 @@ import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
+import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
 import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
@@ -71,6 +72,13 @@ const MAX_DETAIL_CHARS = 2000;
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   const outcomes: ToolExecutionOutcome[] = [];
   const toolEvents: ToolStreamEvent[] = [];
+  // ANSWER-IMG-02: a round's show_images call starts its picture pipeline
+  // before any other proposal of the round runs, so the pictures are fetched
+  // beside a search rather than after it (section 4.3).
+  if (state.answerImagesAllowed) {
+    const call = input.proposals.find((p) => p.request.tool === SHOW_IMAGES_TOOL_ID && typeof p.request.args.subject === "string" && p.request.args.subject.trim().length > 0);
+    if (call) startAnswerImages(state, (call.request.args.subject as string).trim());
+  }
   for (const proposal of input.proposals) {
     const { tool, callId } = proposal.request;
     // LIVE-0923-01 (home/docs/dev.md): the old path's own forced-search
@@ -112,6 +120,17 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // the call actually resolves, so a client's tool timeline shows the
     // step running, not just its eventual outcome.
     toolEvents.push({ t: "tool_call", package_id: tool, call_id: callId, args });
+    // ANSWER-IMG-02: show_images answers at once with a fixed line and never
+    // runs a package (the pipeline was started above, beside the answer).
+    if (tool === SHOW_IMAGES_TOOL_ID) {
+      const subject = typeof args.subject === "string" ? args.subject.trim() : "";
+      const line = state.answerImagesAllowed && state.answerImages ? showImagesResultLine(state.answerImages.subject) : SHOW_IMAGES_UNAVAILABLE_LINE;
+      const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: { subject }, result: { reply: { text: line }, actions: [] }, durationMs: 0 });
+      outcomes.push(outcome);
+      toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: line } });
+      continue;
+    }
+
     // STREAM-NEXT-01 (a): the identical "On it." status line
     // the old engine file's own runTurnStream() emits before running a tool
     // (the old engine file:6636) - set only by turnNext.ts's own

@@ -410,10 +410,12 @@ describe("what the model is told about the websearch arguments", () => {
     expect(description).toMatch(/read the top pages/i);
   });
 
-  test("category is described as leave-out-by-default, pictures only", () => {
-    const category = tool().parameters.properties.category!.description ?? "";
-    expect(category).toMatch(/leave this out/i);
-    expect(category).toMatch(/only when the person asks to see pictures/i);
+  test("a search has no picture category to set: pictures are show_images's own tool (ANSWER-IMG-02)", () => {
+    // The live failure above was a wrongly set `category`; since ANSWER-IMG-02
+    // the argument does not exist, so the model cannot set it at all.
+    expect(tool().parameters.properties.category).toBeUndefined();
+    const showImages = loadAllManifests().find((l) => l.id === "show_images")!;
+    expect(showImages.manifest.args).toMatchObject({ required: ["subject"] });
   });
 
   test("read_page says Home does it, so the model leaves it out", () => {

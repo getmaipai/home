@@ -202,6 +202,8 @@ function hasAttachedMedia(value: unknown, depth = 0): boolean {
   if ((value as { kind?: unknown }).kind === "image" && typeof (value as { url?: unknown }).url === "string") return true;
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     if (key === "media" && child && typeof child === "object" && typeof (child as { url?: unknown }).url === "string") return true;
+    // ANSWER-IMG-02: the pictures the hub placed with the reply.
+    if (key === "answer_images" && child && typeof child === "object" && Array.isArray((child as { items?: unknown }).items) && (child as { items: unknown[] }).items.length > 0) return true;
     if (key === "media_items" && Array.isArray(child) && child.some((item) => item && typeof item === "object" && typeof (item as { url?: unknown }).url === "string")) return true;
     if (hasAttachedMedia(child, depth + 1)) return true;
   }

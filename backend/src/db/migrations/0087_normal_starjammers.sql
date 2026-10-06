@@ -1,0 +1,1 @@
+ALTER TABLE `conversation_turns` ADD `answer_images` text;

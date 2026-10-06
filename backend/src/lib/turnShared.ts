@@ -574,6 +574,11 @@ export type TurnStreamResult =
        * tool round's single synchronous machine transition and strictly
        * before the phrasing round's first delta. */
       toolEvents?: ToolStreamEvent[];
+      /** ANSWER-IMG-02: the answer's picture set once placed, and the
+       * released-text length it goes after (Infinity: after the whole
+       * reply). Undefined for a turn with no pictures and every other
+       * producer. */
+      answerImages?: () => { set: import("@/wire").AnswerImageSet; offset: number } | undefined;
       /** Builds the final TurnValue once the caller has drained `tokens`
        * to completion and knows the full reply text - also logs the turn
        * (conversationHistory.ts), the same "log once the real reply is

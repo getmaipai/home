@@ -50,6 +50,7 @@ import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
+import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, answerImagesAllowed, settleAnswerImages } from "@/lib/answerImages/turn";
 
 export interface RunTurnNextOpts {
   conversationId?: string;
@@ -186,7 +187,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // used because it also carries the earlier turns' state, which would
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
-  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
+  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(value.answer_images ? { answerImages: value.answer_images } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
   if (state.temporary) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).
@@ -436,7 +437,12 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // belt and braces, by model.ts's own minorThinkingOff regardless of
   // what this resolves to.
   const resolvedBudget = await resolveTurnBudgetWithStack(opts.model, band);
-  const budget: TurnBudget = opts.thinking === true || bare ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
+  const thinkingBudget: TurnBudget = opts.thinking === true || bare ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
+  // ANSWER-IMG-02 (rules 0 and 8): `show_images` is offered only when the
+  // model's own record offers it AND this turn may show pictures; the
+  // record keeps it out until ANSWER-IMG-05's bench passes.
+  const answerImagesOk = answerImagesAllowed({ actor, band, surfaceClass, spoken: opts.spoken === true, temporary, bare, ephemeral: opts.ephemeral === true });
+  const budget: TurnBudget = answerImagesOk || !thinkingBudget.tools_offered.includes(SHOW_IMAGES_TOOL_ID) ? thinkingBudget : { ...thinkingBudget, tools_offered: thinkingBudget.tools_offered.filter((id) => id !== SHOW_IMAGES_TOOL_ID) };
 
   const state: TurnState = {
     turnId,
@@ -446,6 +452,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
     utterance: text,
     ...(opts.images?.length ? { images: opts.images } : {}),
+    ...(answerImagesOk ? { answerImagesAllowed: true } : {}),
     modelId: opts.model,
     signal,
     budget,
@@ -660,6 +667,12 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // THIN-7E: the answer to a who question is a "confirm", as the old engine reported it.
     const source: TurnValue["source"] = state.whoAnswer ? "confirm" : failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources);
+    // ANSWER-IMG-02: the pictures are stored with an answer the gate let
+    // through, where they were placed (or after the text), never with a
+    // refusal. On a stream, a set placed before a later sentence is refused
+    // was already sent, like the text released before it (never retracted).
+    const answerImages = gateOutput?.refused || state.failedGenerationReply ? undefined : await settleAnswerImages(state, value.reply.text);
+    if (answerImages) value.answer_images = answerImages;
     // 2026-10-03: after a successful tool call the reply is the model's
     // own composition, not a package's canned line. The stats stay on
     // source "plugin" (per-package counts), and routing tier "tool"
@@ -841,11 +854,14 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
 
   const queue = new StatusChannel<string>();
   const band = turnAgeBand(surface, actor, state.speakerEvidence, new Date()); // THIN-0N
+  // ANSWER-IMG-02: released text passes the picture placer on its way out,
+  // which marks the paragraph boundary the picture set goes after.
+  const placer = new AnswerImagePlacer(state, (text) => queue.emit(text));
   const gate = new StreamGate(
     band,
     actor,
     state.turnId,
-    (sentence) => queue.emit(sentence),
+    (sentence) => placer.push(sentence),
     // onRefuse fires the instant a sentence refuses, DURING the model's
     // own generation - closing the queue here (not only from onDone,
     // below) is what lets tokens() stop waiting and throw right away,
@@ -920,6 +936,9 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     // every live turn return "stream", so a real search on a live chat
     // never carried a tool_call/tool_result at all until this.
     toolEvents: state.toolEvents,
+    // ANSWER-IMG-02: where the picture set landed, read by the wire as it
+    // relays the released text (routes/turn.ts's streamTurnEvents()).
+    answerImages: () => state.answerImages?.placed,
     // ENGINEERING gap, named rather than silently worked around: the new
     // path has no equivalent of the old engine file's own bannedPhrasesFor()
     // yet, so the thinking-cue filler (streamTurnEvents()'s own

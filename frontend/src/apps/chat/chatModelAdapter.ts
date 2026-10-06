@@ -681,6 +681,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 },
               },
             };
+          } else if (event.type === "images") {
+            // ANSWER-IMG-02: the hub's picture set (additive, rule 9). Rendered
+            // by ANSWER-IMG-04; until then it is not an error.
+            continue;
           } else if (event.type === "reasoning") {
             // SHELL-02: rendered by the reasoning Element (thread.aui.tsx)
             // via buildContent() above - REASONING-01 left this discarded

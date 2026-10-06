@@ -83,13 +83,18 @@ describe("answer image fetch", () => {
   });
 
   test("paces requests to the same host through the shared limiter", async () => {
+    // ANSWER-IMG-02: one answer's set may share a host (upload.wikimedia.org
+    // serves all of Commons), so the burst covers one set; a second set at
+    // the same moment is held back until the bucket refills.
     let calls = 0;
     const fetcher = async () => { calls++; return new Response(new Uint8Array([1]), { status: 200, headers: { "content-type": "image/jpeg" } }); };
-    await fetchAnswerImages([
-      { id: "paced-one", url: "https://paced.example/one" },
-      { id: "paced-two", url: "https://paced.example/two" },
-    ], { fetch: fetcher as unknown as typeof fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }) });
-    expect(calls).toBe(1);
+    const at = Date.now();
+    const opts = { fetch: fetcher as unknown as typeof fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }), now: () => at };
+    const set = (tag: string) => Array.from({ length: 12 }, (_, i) => ({ id: `${tag}-${i}`, url: `https://paced.example/${tag}/${i}` }));
+    await fetchAnswerImages(set("first"), opts);
+    expect(calls).toBe(12);
+    await fetchAnswerImages(set("second"), opts);
+    expect(calls).toBe(12);
   });
 
   test("the whole candidate set stops at its 2.5 second deadline and retries one timeout", async () => {

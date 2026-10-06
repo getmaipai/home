@@ -73,7 +73,7 @@ import { cachedFetch } from "@/lib/packageCache";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { hostedSearch } from "@/lib/hostedSearch";
 import { resolveSafeSearchLevel, safeSearchNumericLevel, type SafeSearchLevel } from "@/lib/safeSearch";
@@ -606,6 +606,40 @@ interface SearxngInfobox {
 // literal, the exact class of drift SEARCH-ROWS-01 fixes between `text`
 // and `rows` in the first place.
 type SearxngRow = { title: string; url: string | null; snippet: string | null; image?: string | null; thumbnail?: string | null };
+/** ANSWER-IMG-02: one SearXNG image result, read by the same resultToRow()
+ * image fields the model-set `category: "images"` search used before that
+ * argument was removed from websearch's manifest (rule 12, port first). */
+export type SearxngImageRow = { title: string; url: string; image: string };
+export function imageRowsFromResponse(value: unknown): SearxngImageRow[] {
+  const data = value as { results?: unknown[] };
+  return (Array.isArray(data.results) ? data.results : []).flatMap((raw) => {
+    const row = resultToRow(raw, true);
+    return row?.url && row.image ? [{ title: row.title, url: row.url, image: row.image }] : [];
+  });
+}
+
+/** ANSWER-IMG-02 (section 3 source 4): the household's own SearXNG `images`
+ * category at the person's own safe-search level. A child or teen gets only
+ * the engines this instance marks safe-search capable, and a child always
+ * strict; when that list cannot be built, a minor gets nothing (never an
+ * unfiltered engine). Any failure is an empty list (rule 6). */
+export async function answerImageSearch(query: string, actor: PersonRow, band: AgeBand, signal?: AbortSignal): Promise<SearxngImageRow[]> {
+  const baseUrl = getHouseholdSettingValue("search.searxng_url") as string | undefined;
+  if (!baseUrl) return [];
+  try {
+    const level = band === "child" ? "strict" : resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
+    const safeEngines = band === "adult" ? undefined : await safesearchEnginesFor(baseUrl, "images", { signal, deadlineAt: Date.now() + 1_500 });
+    if (band !== "adult" && (!safeEngines || safeEngines.length === 0)) return [];
+    const engines = safeEngines ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
+    const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json&categories=images&safesearch=${safeSearchNumericLevel(level)}${engines}`;
+    if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) return [];
+    const result = await attemptHttpFetch(url, "GET", { "user-agent": FETCH_USER_AGENT }, undefined, 2_000, undefined, { signal, connectTimeoutMs: SEARXNG_CONNECT_LIMIT_MS });
+    if (!result.ok) return [];
+    return imageRowsFromResponse(expectJsonObject(result.value, baseUrl, "SearXNG image results were not JSON"));
+  } catch {
+    return [];
+  }
+}
 
 /** Formats SearXNG's own `/search?format=json` response into a single
  * readable string - a numbered list, title/url/snippet per result - not

@@ -1,0 +1,73 @@
+{
+  "id": "show_images",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Show Pictures",
+  "description": "Show a few photos of a real thing they can look at, like a famous person, place, show, animal, car or product.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "what does the Eiffel Tower look like",
+      "what does a koala look like",
+      "show me the Golden Gate Bridge",
+      "what is Stranger Things",
+      "the Pontiac Fiero was a great-looking car"
+    ]
+  },
+  "args": {
+    "type": "object",
+    "required": ["subject"],
+    "properties": {
+      "subject": { "type": "string", "minLength": 1, "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Use this when they ask what something looks like, ask who or what a well-known thing is, or are chatting about a thing whose look matters; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. The app shows the photos itself; never describe, list or link them." }
+    }
+  },
+  "incognito": "unaffected",
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "wikidata",
+      "destination": "Wikidata, Wikipedia and Wikimedia Commons (wikidata.org, en.wikipedia.org, commons.wikimedia.org)",
+      "when": "a written answer is about a well-known thing you can look at and pictures are on for you",
+      "what": "the name of the thing, nothing about you or your question",
+      "who": "the Wikimedia Foundation",
+      "opt_in": false,
+      "retention": "controlled entirely by the Wikimedia Foundation; see their own privacy policy"
+    },
+    {
+      "id": "picture-hosts",
+      "destination": "the sites that host the pictures, through Home itself",
+      "when": "the same answers, to fetch a few pictures and check they are real",
+      "what": "an ordinary picture request from Home, with no cookie and no referrer",
+      "who": "whoever runs each picture's site",
+      "opt_in": false,
+      "retention": "controlled entirely by that site"
+    },
+    {
+      "id": "searxng",
+      "destination": "your own SearXNG instance, for things that are not people",
+      "when": "the same answers, when web search is set up",
+      "what": "the name of the thing, at your own safe-search level",
+      "who": "your household's own SearXNG instance",
+      "opt_in": false,
+      "retention": "whatever your own SearXNG instance keeps"
+    }
+  ],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+}

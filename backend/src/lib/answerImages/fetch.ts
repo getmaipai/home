@@ -6,7 +6,10 @@ export const ANSWER_IMAGE_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/get
 const MAX_BYTES = 8 * 1024 * 1024;
 const SET_DEADLINE_MS = 2_500;
 const MAX_REDIRECTS = 3;
-const HOST_RATE = { capacity: 1, refillPerSecond: 0.2 };
+// A person's pace (THIRD-PARTY-SERVICES.md): one answer's pictures often share
+// a host (upload.wikimedia.org serves every Commons picture), and a person
+// opening that article loads a dozen at once; past the burst, one a second.
+const HOST_RATE = { capacity: 12, refillPerSecond: 1 };
 const QUIET_MS = 60 * 60 * 1000;
 const quietHosts = new Map<string, number>();
 let testDnsLookup: DnsLookup | null = null;

@@ -40,4 +40,13 @@ describe("answer image cache", () => {
       expect(calls).toBe(1);
     } finally { globalThis.fetch = originalFetch; }
   });
+  test("ANSWER-IMG-02: the same picture approved for a teen and then an adult stays readable by the teen, never by a child", async () => {
+    const tile = new Uint8Array([7, 7]), full = new Uint8Array([8, 8]);
+    const id = await putAnswerImage({ tile, full, band: "teen" });
+    expect(await getAnswerImage(id, "teen", "tile")).toEqual(tile);
+    expect(await putAnswerImage({ tile, full, band: "adult" })).toBe(id);
+    expect(await getAnswerImage(id, "teen", "tile")).toEqual(tile);
+    expect(await getAnswerImage(id, "adult", "full")).toEqual(full);
+    expect(await getAnswerImage(id, "child", "tile")).toBeNull();
+  });
 });
