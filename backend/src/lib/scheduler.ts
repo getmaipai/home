@@ -46,6 +46,7 @@ import { isStackConfigured } from "@/lib/stackEngine";
 import { stackUpdatesEnabled, checkStackUpdates, runStackReadinessCheck, sweepStackStorage } from "@/lib/stackUpdates";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { sweepFavicons } from "@/lib/favicons";
+import { sweepAnswerImages } from "@/lib/answerImages/cache";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
@@ -324,6 +325,9 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // needs no tighter check.
   "favicons.sweep": () => {
     sweepFavicons();
+  },
+  "answer_images.sweep": () => {
+    sweepAnswerImages();
   },
   // Step 8: reminders/timers (packageHost.ts's `reminders.set`/
   // `timers.set`, scheduled via scheduleCoreJob above) fire by raising

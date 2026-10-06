@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { DataClass } from "@maipai/spec/gen/ts/data-class.js";
 import { DATA_CLASSES, dataClassById } from "@/lib/dataClasses";
 
-// DATA-LOCATION-00c: Home's twenty-one data classes are declared once
+// DATA-LOCATION-00c: Home's data classes are declared once
 // (lib/dataClasses.ts) and lib/paths.ts derives every path it exports
 // from that list. Design: docs/dev.md, "DATA-LOCATION".
 
@@ -23,6 +23,7 @@ const EXPECTED_IDS = [
   "logs",
   "cache",
   "favicons",
+  "answer-images",
   "runtime",
   "labels",
   "backups",
@@ -30,7 +31,7 @@ const EXPECTED_IDS = [
 ];
 
 describe("Home's class list", () => {
-  test("declares exactly the design record's twenty-one classes, once each", () => {
+  test("declares exactly the design record's classes, once each", () => {
     expect(DATA_CLASSES.map((c) => c.id).sort()).toEqual(
       [...EXPECTED_IDS].sort(),
     );
@@ -69,7 +70,7 @@ describe("Home's class list", () => {
       ].sort(),
     );
     expect(level("expert")).toEqual(
-      ["cache", "favicons", "runtime", "labels"].sort(),
+      ["cache", "favicons", "answer-images", "runtime", "labels"].sort(),
     );
     expect(level("advanced")).toEqual(
       [

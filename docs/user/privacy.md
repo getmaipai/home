@@ -20,6 +20,8 @@ Web search works with no key and no account. An adult can choose to add a Brave 
 
 When a robot is paired, MaiPai downloads its pinned robot models directly from their listed public release hosts. The hub verifies each file against its SHA-256 pin and serves the verified bytes to the robot over your home network. The download sends only the file name and your home's internet address.
 
+When a written answer includes pictures, Home gets a few picture files from the sites that host them. The picture requests do not send your name or what you asked. Home does not send cookies or the page you came from. Wikipedia and Wikidata get the name of the person or thing when Home checks their picture sources. The sites receive your home's internet address. Nothing else anyone in the house said or saved is sent.
+
 An adult can also generate an API token for another app or device. This page shows that too, under its own heading. It is the one thing that goes the other way: an app or device you gave the token to can send text or audio to your hub over your home network and receive a reply. Revoking the token ends that access.
 
 ## What never leaves your house

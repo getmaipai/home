@@ -20255,6 +20255,63 @@
         }
       }
     },
+    "/api/answer-image/{id}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "A checked answer picture served from Home's cache",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^ai_[a-f0-9]{32}$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "tile",
+                "full"
+              ],
+              "default": "tile"
+            },
+            "required": false,
+            "name": "v",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A cached, re-encoded picture.",
+            "content": {
+              "image/webp": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No picture is available for this person."
+          }
+        }
+      }
+    },
     "/api/dashboard": {
       "get": {
         "tags": [

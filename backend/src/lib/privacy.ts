@@ -117,6 +117,18 @@ export function platformConnections(): PrivacyConnection[] {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",
       what: "the words searched, and your home's internet address. Nothing else anyone in the house said or saved.",
     }),
+    {
+      id: "platform:answer-images",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "the sites hosting pictures selected for an answer",
+      when: "when a picture is selected for a written answer",
+      what: "Home fetches the picture file from its host. The request does not include your name, what you asked, cookies, or the page you came from. Wikipedia and Wikidata receive the name of the person or thing shown. Nothing anyone in the house said or saved is sent.",
+      who: "the picture's hosting site; Wikipedia and Wikidata for encyclopedia pictures",
+      optIn: true,
+      retention: THIRD_PARTY_RETENTION,
+      direction: "outbound",
+    },
     // Step 10: the one periodic (not household-triggered) outbound call
     // this hub makes on its own, per this file's own header - checking
     // for a new MaiPai Home release, listed here in the same commit that

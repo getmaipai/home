@@ -89,6 +89,10 @@ describe("the hub's own connections", () => {
     expect(byId.get("platform:face-vision-models")?.destination).toContain("huggingface.co");
     expect(byId.get("platform:face-vision-models")?.destination).toContain("githubusercontent.com");
     expect(byId.has("platform:text-embedding-model")).toBe(false);
+    const answerImages = byId.get("platform:answer-images");
+    expect(answerImages?.when).toContain("written answer");
+    expect(answerImages?.what).toContain("cookies");
+    expect(answerImages?.what).toContain("Wikipedia and Wikidata");
   });
 
   // ROBOT-UPDATES-01: the daily update check also reads MaiPai Bot's
