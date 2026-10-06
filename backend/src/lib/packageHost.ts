@@ -93,7 +93,7 @@ import { ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_
 const FETCH_RATE_LIMIT = { capacity: 5, refillPerSecond: 0.2 };
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
-const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
+export const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
 type PackageFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 let packageFetch: PackageFetch = (input, init) => globalThis.fetch(input, init);
 export function __setPackageFetchForTests(fetcher: PackageFetch | null): void {
@@ -133,6 +133,10 @@ const SEARXNG_RATE_LIMIT_KEY = "searxng";
 // engines. A person asking several things in a row is still a burst of
 // three; nothing beyond that was ever a person's own pace.
 const SEARXNG_RATE_LIMIT = { capacity: 3, refillPerSecond: 1 / 6 };
+/** One choke point for real searches and the settings checker. */
+export function consumeSearxngRequestToken(): boolean {
+  return tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT);
+}
 const SEARXNG_TIMEOUT_MS = SEARXNG_ATTEMPT_LIMIT_MS;
 const SEARXNG_PAGE_TIMEOUT_MS = 10_000;
 // SEARCH-PACE-01: a review (2026-09-24) caught this budget shared with
@@ -638,7 +642,7 @@ export async function answerImageSearch(query: string, actor: PersonRow, band: A
     if (band !== "adult" && (!safeEngines || safeEngines.length === 0)) return [];
     const engines = safeEngines ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
     const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json&categories=images&safesearch=${safeSearchNumericLevel(level)}${engines}`;
-    if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) return [];
+    if (!consumeSearxngRequestToken()) return [];
     const result = await attemptHttpFetch(url, "GET", { "user-agent": FETCH_USER_AGENT }, undefined, 2_000, undefined, { signal, connectTimeoutMs: SEARXNG_CONNECT_LIMIT_MS });
     if (!result.ok) return [];
     return imageRowsFromResponse(expectJsonObject(result.value, baseUrl, "SearXNG image results were not JSON"));
@@ -1205,7 +1209,7 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
   const safeEngines = opts.safeEngines !== undefined ? opts.safeEngines : opts.safeSearchLevel === "strict" || opts.safeSearchLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general", opts) : null;
   const engines = safeEngines && safeEngines.length > 0 ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
   const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}&safesearch=${safesearchLevel}${engines}`;
-  if (!tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT)) {
+  if (!consumeSearxngRequestToken()) {
     throw new HostError("rate_limited", "Web search is rate-limited - try again shortly");
   }
   // No retry, unlike getHomeAssistantState's own GET - a code review

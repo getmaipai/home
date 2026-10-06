@@ -7,6 +7,7 @@ import { issueApiToken, revokeApiToken } from "@/lib/apiToken";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
+import { checkSearchInstance } from "@/lib/searchInstanceCheck";
 
 export const settingsRoutes = apiRouter();
 
@@ -92,7 +93,7 @@ const putRoute = createRoute({
     ...errorResponses({ 400: "Invalid scope/key/value, or a newer value already exists", 401: "Not signed in", 403: "Not allowed to write this scope" }),
   },
 });
-settingsRoutes.openapi(putRoute, (c) => {
+settingsRoutes.openapi(putRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
   if (body.value === undefined) return c.json({ error: "scope, key, and value are required" }, 400);
@@ -100,6 +101,7 @@ settingsRoutes.openapi(putRoute, (c) => {
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
+  if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   return c.json(result.value, 200);
@@ -129,13 +131,14 @@ const resetRoute = createRoute({
     ...errorResponses({ 400: "Invalid scope/key", 401: "Not signed in", 403: "Not allowed to write this scope" }),
   },
 });
-settingsRoutes.openapi(resetRoute, (c) => {
+settingsRoutes.openapi(resetRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
   const result = resetValue(actor, body.scope, body.key);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
+  if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   return c.json({ ...result.value, success: true as const }, 200);

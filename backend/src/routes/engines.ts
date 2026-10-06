@@ -14,7 +14,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
-import { StackError } from "@/lib/stack/errors";
+import { classifyStackError, STACK_ERROR_RESPONSES } from "@/lib/stack/httpErrors";
 import { getStackUpdatesState, checkStackUpdates, applyStackEngineUpdate, rollbackStackEngine } from "@/lib/stackUpdates";
 import { ROLE_IDS } from "@/lib/stack/types";
 
@@ -163,47 +163,6 @@ const ModelActionBodySchema = z.object({ action: z.enum(["load", "unload", "pin"
 // front.
 const SettingsApplyBodySchema = z.record(z.string(), z.unknown());
 const SettingsResponseSchema = z.object({ sections: z.array(z.object({ id: z.string(), label: z.string() })), settings: z.array(StackSettingSchema) });
-
-// ---- Failure mapping, one place --------------------------------------
-
-const StackFailureSchema = z.object({ error: z.string(), reason: z.string().optional() });
-
-type StackFailure =
-  | { status: 400; body: { error: string } }
-  | { status: 409; body: { error: string } }
-  | { status: 503; body: { error: string; reason?: string } }
-  | { status: 504; body: { error: string } };
-
-/** Every StackError kind, mapped to the status and body the Stack's own
- * `failure()` shape carries - never a guessed cause. `offline` and
- * `unreachable` both mean "the Stack didn't answer" (503); `offline`
- * alone carries a real `offline_reason`, folded through as `reason`.
- * `cancelled`/`unexpected` fall back to 503 too, the same "the Stack
- * didn't answer" posture stackEngine.ts's own `stackFailureResult()`
- * already takes for anything outside its five named kinds. */
-function classifyStackError(err: unknown): StackFailure {
-  if (err instanceof StackError) {
-    switch (err.kind) {
-      case "offline":
-      case "unreachable":
-        return { status: 503, body: { error: err.message, reason: err.offline_reason } };
-      case "unverified":
-        return { status: 409, body: { error: err.message } };
-      case "unknown":
-        return { status: 400, body: { error: err.message } };
-      case "timeout":
-        return { status: 504, body: { error: err.message } };
-      default:
-        return { status: 503, body: { error: err.message } };
-    }
-  }
-  return { status: 503, body: { error: err instanceof Error ? err.message : String(err) } };
-}
-
-const STACK_ERROR_RESPONSES = {
-  ...errorResponses({ 400: "The request was bad", 409: "The model is not verified", 504: "The Stack stopped answering" }),
-  503: { content: { "application/json": { schema: StackFailureSchema } }, description: "The Stack is offline or unreachable." },
-};
 
 // ---- Routes ------------------------------------------------------------
 

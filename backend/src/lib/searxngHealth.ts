@@ -40,6 +40,25 @@ const CANARY_QUERY = "Earth";
 // conditional on what the job's last run found).
 const OK_PROBE_INTERVAL_MS = 60 * 60_000;
 let lastProbeAtMs = 0;
+let lastProbeJsonOk: boolean | null = null;
+let lastProbeBaseUrl: string | null = null;
+let lastCompletedProbeAtMs = 0;
+let lastCompletedProbeBaseUrl: string | null = null;
+
+/** The settings checker reuses this recent `format=json` observation so
+ * opening Settings does not add another request to the same instance. */
+export function lastSearxngCanaryResult(baseUrl: string): { checkedAt: string; jsonOk: boolean } | null {
+  if (lastCompletedProbeAtMs === 0 || lastProbeJsonOk === null || lastCompletedProbeBaseUrl !== baseUrl) return null;
+  return { checkedAt: new Date(lastCompletedProbeAtMs).toISOString(), jsonOk: lastProbeJsonOk };
+}
+
+export function __setLastSearxngCanaryResultForTests(baseUrl: string | null, checkedAtMs: number, jsonOk: boolean | null): void {
+  lastProbeBaseUrl = baseUrl;
+  lastProbeAtMs = checkedAtMs;
+  lastProbeJsonOk = jsonOk;
+  lastCompletedProbeBaseUrl = jsonOk === null ? null : baseUrl;
+  lastCompletedProbeAtMs = jsonOk === null ? 0 : checkedAtMs;
+}
 
 // A review (2026-09-24) caught the first cut calling listIssues() with
 // no options, which excludes dismissed rows by default (issues.ts's
@@ -61,6 +80,10 @@ function searchIsCurrentlyUnhealthy(): boolean {
  * skipped probe it didn't ask for. */
 export function __resetSearxngHealthThrottleForTests(): void {
   lastProbeAtMs = 0;
+  lastProbeJsonOk = null;
+  lastProbeBaseUrl = null;
+  lastCompletedProbeAtMs = 0;
+  lastCompletedProbeBaseUrl = null;
 }
 
 // SEARCH-HEALTH-01: raising/resolving the two Repairs rows themselves
@@ -87,6 +110,7 @@ export async function checkSearxngHealth(): Promise<void> {
   const now = Date.now();
   if (!searchIsCurrentlyUnhealthy() && now - lastProbeAtMs < OK_PROBE_INTERVAL_MS) return;
   lastProbeAtMs = now;
+  lastProbeBaseUrl = url;
 
   let result: unknown;
   try {
@@ -100,6 +124,11 @@ export async function checkSearxngHealth(): Promise<void> {
     // SearXNG's own real answer, or its own real failure, unmasked.
     result = (await searxngSearch({ query: CANARY_QUERY }, { allowWikipediaFallback: false, bypassCache: true })).text;
   } catch {
+    // A local refusal (including our own shared rate bucket) is not an
+    // observation of SearXNG's JSON behavior.
+    lastProbeJsonOk = null;
+    lastCompletedProbeAtMs = 0;
+    lastCompletedProbeBaseUrl = null;
     // searxngSearch() itself already recorded this exact outcome for
     // every error it can throw - search_unavailable as "degraded",
     // rate_limited excluded entirely (a self-imposed throttle, never a
@@ -111,12 +140,18 @@ export async function checkSearxngHealth(): Promise<void> {
     return;
   }
 
+  lastProbeJsonOk = true;
+  lastCompletedProbeAtMs = Date.now();
+  lastCompletedProbeBaseUrl = url;
+
   if (result === SEARXNG_NO_RESULTS_TEXT) {
+    lastProbeJsonOk = true;
     await recordSearchHealth({
       kind: "degraded",
       detail: `A test search for "${CANARY_QUERY}" returned no results, which almost never happens on a healthy instance. This usually means SearXNG itself is out of date (its scraping-based engines' parsers no longer match the real sites) or its configured search engines are all blocked - update SearXNG to the latest version and check which engines are enabled.`,
     });
     return;
   }
+  lastProbeJsonOk = true;
   await recordSearchHealth({ kind: "ok" });
 }
