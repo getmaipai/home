@@ -1361,18 +1361,20 @@
       "file": "number-ticker.tsx",
       "name": "number-ticker",
       "group": "other",
-      "verdict": "later",
+      "verdict": "wire-now",
       "backendNeeded": null,
-      "effort": null,
+      "effort": "QUICK",
       "specTagNeeded": false,
       "newDependency": false,
       "bindings": [],
       "size": "S",
-      "showcaseScenario": null,
-      "batch": null,
-      "replacesHandBuilt": [],
+      "showcaseScenario": "Dashboard numeric StatCard count",
+      "batch": 1,
+      "replacesHandBuilt": [
+        "plain number text in StatCard.tsx"
+      ],
       "realTurnToday": true,
-      "verdictReason": "Deferred until a Home feature requiring this Element is planned."
+      "verdictReason": "ELT-T1-01 is owner-approved to replace the plain numeric StatCard value with the shipped NumberTicker."
     },
     {
       "file": "onboarding.tsx",
