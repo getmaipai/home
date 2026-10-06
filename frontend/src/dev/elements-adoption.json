@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T18:19:06.367Z",
+  "generatedAt": "2026-10-06T18:41:02.605Z",
   "kitTag": "ui-v0.5.109",
   "items": [
     {
@@ -926,7 +926,7 @@
       "name": "tooltip-icon-button",
       "group": "other",
       "verdict": "support",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "trace-waterfall.tsx",
