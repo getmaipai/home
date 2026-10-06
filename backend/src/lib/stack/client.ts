@@ -4,6 +4,7 @@
 // of probing a process.
 
 import { withTimeout } from "@maipai/core/src/withTimeout";
+import { StackJob as StackJobSchema } from "@maipai/spec/stack/ts/stack-job.js";
 import { hostLabel, type EngineIdentity } from "../engineIdentity";
 import { StackError, type StackErrorKind } from "./errors";
 import type { TokenCountRequest, TokenCountResponse } from "@maipai/spec/stack/ts/token-count.js";
@@ -271,7 +272,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       }
       if (res.status === 202) {
         const body = await res.json() as { created: number; job: string; data: unknown[] };
-        return {
+        return StackJobSchema.parse({
           id: body.job,
           kind: "image",
           role: "image",
@@ -286,11 +287,11 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
           reason: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-        } satisfies StackJob;
+        });
       }
       if (res.ok) {
         const body = await res.json() as { created: number; job: string; data: unknown[] };
-        return {
+        return StackJobSchema.parse({
           id: body.job,
           kind: "image",
           role: "image",
@@ -305,13 +306,13 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
           reason: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-        } satisfies StackJob;
+        });
       }
       await fail(res);
       throw new Error("unreachable");
     },
-    job: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "GET" }, (res) => json<{ job: StackJob }>(res).then((b) => b.job), opts),
-    cancelJob: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }, (res) => json<{ job: StackJob }>(res).then((b) => b.job), opts),
+    job: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "GET" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
+    cancelJob: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
     roles: (opts) => call("/stack/v1/roles", { method: "GET" }, json<RolesListResponse>, opts),
     engines: (opts) => call("/stack/v1/engines", { method: "GET" }, json<EnginesListResponse>, opts),
     engineAction: (name, action, opts) =>

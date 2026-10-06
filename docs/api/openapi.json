@@ -4884,6 +4884,404 @@
         }
       }
     },
+    "/api/jobs": {
+      "get": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "List background work visible to the signed-in person",
+        "responses": {
+          "200": {
+            "description": "Current visible job snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "startedBy": {
+                        "type": "string"
+                      },
+                      "forPerson": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "progress": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      },
+                      "waitingReason": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "resultRef": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "conversationId": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "errorKind": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "raw": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "provenance": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      },
+                      "durationSeconds": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Register visible state for a producer-owned background job",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "kind": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "startedBy": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "forPerson": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "waiting_for_you",
+                      "paused",
+                      "done",
+                      "failed",
+                      "cancelled"
+                    ]
+                  },
+                  "progress": {
+                    "type": "object",
+                    "nullable": true,
+                    "additionalProperties": {
+                      "nullable": true
+                    },
+                    "default": null
+                  },
+                  "waitingReason": {
+                    "type": "string",
+                    "nullable": true,
+                    "default": null
+                  },
+                  "resultRef": {
+                    "type": "string",
+                    "nullable": true,
+                    "default": null
+                  },
+                  "conversationId": {
+                    "type": "string",
+                    "nullable": true,
+                    "default": null
+                  },
+                  "errorKind": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "down",
+                      "timed_out",
+                      "refused",
+                      "ran_out_of_space",
+                      "interrupted",
+                      "failed",
+                      "unknown",
+                      null
+                    ],
+                    "default": null
+                  },
+                  "raw": {
+                    "type": "string",
+                    "nullable": true,
+                    "default": null
+                  },
+                  "provenance": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "nullable": true
+                    },
+                    "default": {}
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind",
+                  "startedBy",
+                  "forPerson",
+                  "title",
+                  "state"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Job registered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "startedBy": {
+                      "type": "string"
+                    },
+                    "forPerson": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "progress": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      }
+                    },
+                    "waitingReason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "resultRef": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "conversationId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "errorKind": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "raw": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "nullable": true
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "durationSeconds": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cannot register work for another person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job id already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{id}/stop": {
+      "post": {
+        "tags": [
+          "Jobs"
+        ],
+        "summary": "Stop a background job",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stop recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Cannot stop this job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job is not running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/scheduler/jobs": {
       "get": {
         "tags": [

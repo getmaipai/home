@@ -2,7 +2,9 @@
 // stack/backend/src/spec/schemas/. A follow-up swaps them for
 // @maipai/spec once those schemas move into shared/spec.
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
+import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
 export type { StackFitPlan };
+export type { StackJob };
 
 export interface FitPlanRequest {
   source: { url: string } | { path: string } | { repo: string; revision?: string };
@@ -31,33 +33,6 @@ export interface RoleReplyHeaders {
   "x-maipai-engine": string;
   "x-maipai-model": string;
   "x-maipai-revision": string;
-}
-
-// stack-job.schema.json
-export interface StackJob {
-  id: string;
-  /** The runner's kind: a generator role id (`image`), or a Stack task
-   * (`model.install`, `engine.install`, `engine.stage`). */
-  kind: string;
-  /** The role the job serves, when it serves one. */
-  role: string | null;
-  state: "queued" | "running" | "done" | "failed" | "cancelled";
-  percent: number;
-  completedBytes: number;
-  totalBytes: number;
-  /** A short phrase for the current step (`downloading`, `waiting for memory`,
-   * `rendering`). */
-  status: string;
-  /** The job's place in its role's queue while `queued`, null otherwise. */
-  position: number | null;
-  /** What was submitted, as given. */
-  input: Record<string, unknown> | null;
-  /** What the runner returned when `done`. */
-  result: unknown;
-  /** Why the job failed or was cancelled. */
-  reason: string | null;
-  createdAt: string;
-  updatedAt: string;
 }
 
 // health-item.schema.json

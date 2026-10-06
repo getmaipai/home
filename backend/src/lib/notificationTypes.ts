@@ -245,6 +245,15 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
+  {
+    id: "jobs.admin_stopped",
+    level: "time_sensitive",
+    audience: "person",
+    template: "An admin stopped this job.",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
   // Step 8: "a failure raises a Repairs item and two in a row notify
   // admins" (2.5). A single failure only sits on the Repairs list
   // (lib/backup.ts raises it at severity "warning", which - per Issue's

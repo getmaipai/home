@@ -755,6 +755,26 @@ export const modelDownloadJobs = sqliteTable("model_download_jobs", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// ACTIVITY-01b: visible work that has no producer-owned progress table.
+// Execution remains in the producer; this row is only its household view.
+export const jobs = sqliteTable("jobs", {
+  id: text("id").primaryKey(),
+  kind: text("kind").notNull(),
+  startedBy: text("started_by").notNull(),
+  forPerson: text("for_person").references(() => people.id),
+  title: text("title").notNull(),
+  state: text("state").notNull(),
+  progress: text("progress"),
+  waitingReason: text("waiting_reason"),
+  resultRef: text("result_ref"),
+  conversationId: text("conversation_id").references(() => conversations.id),
+  errorKind: text("error_kind"),
+  raw: text("raw"),
+  provenance: text("provenance").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // PROJECT-RUN-01 (docs/plans/harness-turns-and-projects-2026-09-26.md, "The
 // project record and the runner"): a durable row per background project a
 // turn started, the same "flatten the nested spec shape into JSON text
