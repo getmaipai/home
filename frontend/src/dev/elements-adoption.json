@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T20:53:50.623Z",
-  "kitTag": "ui-v0.5.119",
+  "generatedAt": "2026-10-06T21:36:28.650Z",
+  "kitTag": "ui-v0.5.126",
   "items": [
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
@@ -155,6 +155,14 @@
       "group": "agent/workflow",
       "verdict": "later",
       "verdictReason": "Deferred until sandbox runtime.",
+      "implemented": false
+    },
+    {
+      "file": "command-palette.test.tsx",
+      "name": "command-palette.test",
+      "group": "command",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -495,6 +503,14 @@
       "implemented": false
     },
     {
+      "file": "guardrail-notice.test.tsx",
+      "name": "guardrail-notice.test",
+      "group": "guardrail",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "guardrail-notice.tsx",
       "name": "guardrail-notice",
       "group": "errors/states",
@@ -771,6 +787,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "number-ticker.test.tsx",
+      "name": "number-ticker.test",
+      "group": "number",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "number-ticker.tsx",
@@ -1157,6 +1181,14 @@
       "group": "thread/list",
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": false
+    },
+    {
+      "file": "thread-list.projects.aui.test.tsx",
+      "name": "thread-list.projects.aui.test",
+      "group": "thread",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {

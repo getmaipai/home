@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, within } from "@testing-library/react";
+import { cleanup, fireEvent, within } from "@testing-library/react";
 import { NextPrivacyPage } from "@/next/pages/NextPrivacyPage";
 import { joinNames, sourceName } from "@/apps/privacy/privacyCopy";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -120,19 +120,35 @@ describe("NextPrivacyPage", () => {
     } finally { restore(); }
   });
 
-  test("offers retry after a failed request and announces the loading state", async () => {
+  test("retry refetches privacy and the loading state uses the shared loading branch", async () => {
     const original = globalThis.fetch;
-    globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "nope" }), { status: 500 }))) as unknown as typeof fetch;
+    let privacyCalls = 0;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/privacy")) {
+        privacyCalls += 1;
+        return Promise.resolve(privacyCalls === 1
+          ? new Response(JSON.stringify({ error: "nope" }), { status: 500 })
+          : Response.json({ connections: [], offlinePlugins: [] }));
+      }
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<NextPrivacyPage />);
-      expect(await view.findByRole("button", { name: "Try again" })).toBeTruthy();
+      fireEvent.click(await view.findByRole("button", { name: "Try again" }));
+      await view.findByText("What leaves your house (0)");
+      expect(privacyCalls).toBe(2);
     } finally { globalThis.fetch = original; }
 
-    const restore = stubPrivacy({ connections: [], offlinePlugins: [] });
+    globalThis.fetch = mock(() => new Promise<Response>(() => {})) as unknown as typeof fetch;
     try {
       const view = renderWithQueryClient(<NextPrivacyPage />);
-      expect(view.getByRole("status", { name: "Loading the privacy page" })).toBeTruthy();
-    } finally { restore(); }
+      const loading = view.getByRole("status", { name: "Loading the privacy page" });
+      const skeletons = loading.querySelectorAll('[data-slot="skeleton"]');
+      for (const skeleton of skeletons) {
+        expect(skeleton.className).not.toMatch(/\bh-(24|48)\b/);
+      }
+    } finally { globalThis.fetch = original; }
   });
 });
 
