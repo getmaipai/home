@@ -63,8 +63,21 @@ function fail(reason: string): null {
  * Null when the engine cannot count (no route, offline, an error, a
  * timeout, or a recent failure): the caller falls back to its named
  * minimum, never to an estimate. */
-export async function countTokens(messages: readonly LlmMessage[], opts: { tools?: readonly ToolSpec[]; signal?: AbortSignal } = {}): Promise<number | null> {
-  if (messages.length === 0) return 0;
+export async function countTokens(input: readonly LlmMessage[], opts: { tools?: readonly ToolSpec[]; signal?: AbortSignal } = {}): Promise<number | null> {
+  if (input.length === 0) return 0;
+  // VISION-02c: the engine's count route counts a picture as its template
+  // marker only, never the picture's own tokens. A picture is counted as
+  // the most tokens the engine lets it take (its declared
+  // --image-max-tokens, carried on the part), a bound the engine itself
+  // enforces; the rest of the message is the engine's own count, with
+  // each picture's file name line as it is sent.
+  const reserved = input.reduce((sum, message) => sum + (message.images ?? []).reduce((total, image) => total + image.reservedTokens, 0), 0);
+  const messages = reserved === 0 && !input.some((message) => message.images) ? input : input.map(({ images, ...message }) => images && images.length > 0 ? { ...message, content: `${images.map((image) => `Picture: ${image.name}`).join("\n")}\n${message.content}` } : message);
+  const counted = await countTextTokens(messages, opts);
+  return counted === null ? null : counted + reserved;
+}
+
+async function countTextTokens(messages: readonly LlmMessage[], opts: { tools?: readonly ToolSpec[]; signal?: AbortSignal }): Promise<number | null> {
   const key = cacheKey(messages, opts.tools);
   const cached = cache.get(key);
   if (cached !== undefined) {

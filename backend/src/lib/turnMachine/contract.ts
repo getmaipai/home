@@ -164,6 +164,10 @@ export interface TurnState {
   present?: readonly PresentPerson[] | null;
   utterance: string;
   images?: import("@/wire").ChatImagePart[];
+  /** VISION-02c: the turn's pictures as picture parts for a chat model
+   * that reads them (the context node decides, from the Stack's chat row
+   * and the person's settings); absent when they go as a note instead. */
+  pictureParts?: import("@/lib/llm").LlmImagePart[];
   /** ANSWER-IMG-02: the picture pipeline the `show_images` tool started
    * beside the answer (answerImages/turn.ts), and where its set landed. */
   answerImages?: import("@/lib/answerImages/turn").AnswerImageTurnState;

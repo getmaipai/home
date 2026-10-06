@@ -422,7 +422,13 @@ export interface TurnValue {
   reasoning?: string;
 }
 
-export interface ChatImagePart { id: string; name: string; width: number; height: number; media_type: string }
+export interface ChatImagePart {
+  id: string; name: string; width: number; height: number; media_type: string;
+  /** VISION-02c, set by the hub only (never taken from a client): the
+   * picture went to the chat model as a picture part on its turn, so a
+   * later window names it as shown then, not as never seen. */
+  shown_to_model?: true;
+}
 export const MAX_CHAT_IMAGES = 4;
 export const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
 export const CHAT_IMAGE_REFUSAL = "You can add up to 4 pictures, each up to 10 MB.";
@@ -561,6 +567,16 @@ export interface ModelFit {
 export interface ChatModelOption {
   id: string;
   label: string;
+}
+
+/** VISION-02c: what the signed-in person's chat can do right now, one
+ * source for the composer. `image_parts`: the running chat model reads
+ * pictures (the Stack's chat row) and this person's pictures go to it;
+ * false keeps today's behaviour (the picture is kept, the model told it
+ * cannot see it). Derived on the backend only; the frontend never
+ * decides it from a model id (rule 8). */
+export interface ChatCapabilities {
+  image_parts: boolean;
 }
 
 export interface ChatModelsResponse {

@@ -7,6 +7,9 @@ import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { getEngineStatsSamples } from "@/lib/engineStats";
 import { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { AppEnv } from "@/types";
+import type { ChatCapabilities } from "@/wire";
+import { chatModelReadsPictures, picturePartsAllowed } from "@/lib/chatPictures";
+import { speakerAgeBand } from "@/lib/ageBand";
 
 export const hostRoutes = new Hono<AppEnv>();
 
@@ -46,6 +49,15 @@ hostRoutes.get("/chat-models", requireAuth, async (c) => {
     selectedModel: selected ? { id: selected.id, label: selected.name, available: true } : currentId ? { id: currentId, label: stackChat?.model?.id ?? currentId, available: true } : null,
     canSelect: false,
   });
+});
+
+// VISION-02c: the one place the composer learns whether this person's
+// pictures go to the chat model (chatPictures.ts decides; never a model id).
+hostRoutes.get("/chat-capabilities", requireAuth, async (c) => {
+  const actor = c.get("person");
+  const capability = await chatModelReadsPictures();
+  const body: ChatCapabilities = { image_parts: picturePartsAllowed(capability, actor, speakerAgeBand(actor, new Date())) };
+  return c.json(body);
 });
 
 // Additive Stack chat selection and state for Home settings surfaces.

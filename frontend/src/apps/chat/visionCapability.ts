@@ -1,27 +1,19 @@
-/** No cloud vision path exists in Home. This is deliberately separate from
- * chat health: a running text engine is not evidence that it accepts image
- * parts. */
-export interface LocalVisionCapability {
-  imageParts: boolean;
-  engine: "text-only" | "vision";
-  transport: "local";
-}
+// VISION-02c: whether this person's pictures go to the chat model, read
+// from the one backend source (GET /api/host/chat-capabilities, decided
+// in backend/src/lib/chatPictures.ts from the Stack's chat row and the
+// person's settings). The frontend never decides it from a model id or
+// from chat health alone (rule 8): a running text engine is not evidence
+// that it reads pictures. When it is off, a picture is kept and the model
+// is told it cannot see it, exactly as before.
+import type { ChatCapabilities } from "@/lib/api";
 
-export const CURRENT_LOCAL_VISION_CAPABILITY: LocalVisionCapability = {
-  imageParts: false,
-  engine: "text-only",
-  transport: "local",
-};
+export const NO_CHAT_PICTURES: ChatCapabilities = { image_parts: false };
 
-export const IMAGE_VISION_UNAVAILABLE_MESSAGE =
-  "I can keep that image on this device, but MaiPai's selected local engine cannot interpret images yet.";
+/** The query key the chat page and composer share. */
+export const CHAT_CAPABILITIES_QUERY_KEY = ["chatCapabilities"] as const;
 
-/** A model is image-capable only when the selected role explicitly declares
- * a real, implemented local vision engine. A chat model, even when healthy,
- * must never receive an image part by assumption. */
-export function localVisionCapabilityForEngine(engine: { role: string; implemented: boolean } | null | undefined): LocalVisionCapability {
-  if (engine?.role === "vision" && engine.implemented) {
-    return { imageParts: true, engine: "vision", transport: "local" };
-  }
-  return CURRENT_LOCAL_VISION_CAPABILITY;
+/** A response the frontend does not understand reads as "no pictures". */
+export function chatCapabilitiesFrom(value: unknown): ChatCapabilities {
+  const imageParts = (value as { image_parts?: unknown } | null | undefined)?.image_parts;
+  return { image_parts: imageParts === true };
 }

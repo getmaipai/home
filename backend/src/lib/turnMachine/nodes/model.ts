@@ -26,6 +26,8 @@ import { promptLimitLine } from "@/lib/failureCopy";
 import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryInstruction, retryTools, isRepeatOfFailed } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
+import { pictureFailureWords, picturesNotReadNote } from "@/lib/chatImageNote";
+import type { ChatImagePart } from "@/wire";
 
 /** STREAM-PARTIAL-01: `!attempt.ok` covers two different failures this
  * function can't tell apart by its own outcome code alone - a pre-stream
@@ -640,7 +642,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
 
   // THIN-7C: a bare turn and a continuation offer no tool, ever.
   const toolsAllowed = input.toolsAllowed && !noToolsTurn(state);
-  let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken");
+  let messages: LlmMessage[] = state.bare ? bareMessages(state.context, input.utterance) : contextToMessages(state.context, input.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? []);
   if (state.continuation) messages = [...messages, ...continuationMessages(state.continuation.assistantText)];
   let tools: ToolSpec[];
   let tool_choice: "auto" | "none" | undefined;
@@ -814,6 +816,22 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       if (attempt.ok || classifyGenerationFailure(attempt.message).kind !== "context_too_large") break;
     }
   }
+  // VISION-02c (rule 6): a picture the engine would not take (refused,
+  // too large, the projector failing) never fails the answer. The turn
+  // runs once more with the pictures left out and the model told only that
+  // they could not be read and the kind of failure; the first attempt's
+  // raw error stays on the turn's generation record for an admin.
+  // Never once text reached the person (STREAM-PARTIAL-01: no retry
+  // after a release), so a reply is never replaced under them.
+  if (!attempt.ok && pictureRetryAllowed(attempt, signal.aborted, messages)) {
+    const kind = classifyGenerationFailure(attempt.message).kind;
+    console.error(`[model] the engine did not take this turn's pictures (${attempt.message ?? attempt.code}); answering without them`);
+    messages = withoutPictures(messages, state.images ?? [], kind);
+    // A later round of this turn (a tool round) never sends them again (a review).
+    state.pictureParts = undefined;
+    state.messages = messages;
+    attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : "model", signal);
+  }
   // DEADLINE-01: a generation that never finished (the model node's own
   // deadline, a dead engine) gets a real, fixed model_failed line, never
   // the empty string this used to deliver silently through `answer` as if
@@ -827,6 +845,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     }
     return { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: failedOutput(attempt) };
   }
+  if (messagesCarryPictures(messages)) state.images = markPicturesShown(state.images, messages);
 
   // ENVELOPE-NONE-01 (a code review, 2026-09-23): `tool_choice: "none"`
   // stops the engine's own grammar from emitting a native tool call,
@@ -950,3 +969,47 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   gate?.finish();
   return { outcome: { ok: true }, output: { kind: "text", text: attempt.text + ask.append, thinking: attempt.thinking, reasoning } };
 };
+
+/** VISION-02c: whether a failure may be the picture's: not an engine
+ * that is down, stopped, out of memory or busy (the same request without
+ * the picture would fail the same way). */
+export function pictureMayHaveFailed(kind: string): boolean {
+  return kind === "other" || kind === "context_too_large" || kind === "slow";
+}
+
+/** VISION-02c (rule 6): the one retry without the pictures runs only on
+ * a failure that may be the picture's, with nothing yet shown to the
+ * person and the turn not cancelled. */
+export function pictureRetryAllowed(attempt: { ok: boolean; released?: boolean; message?: string }, aborted: boolean, messages: readonly LlmMessage[]): boolean {
+  return !attempt.ok && !attempt.released && !aborted && messagesCarryPictures(messages) && pictureMayHaveFailed(classifyGenerationFailure(attempt.message).kind);
+}
+
+/** VISION-02c: whether a request carries picture parts. */
+export function messagesCarryPictures(messages: readonly LlmMessage[]): boolean {
+  return messages.some((message) => (message.images?.length ?? 0) > 0);
+}
+
+/** VISION-02c (rule 6): the same messages with their pictures left out
+ * and a note, just ahead of the message they were on, that names the
+ * pictures that were on it and the kind of failure only. */
+export function withoutPictures(messages: readonly LlmMessage[], images: readonly ChatImagePart[], kind: string): LlmMessage[] {
+  const out: LlmMessage[] = [];
+  for (const message of messages) {
+    if (!message.images?.length) { out.push(message); continue; }
+    const { images: sent, ...rest } = message;
+    const ids = new Set(sent.map((part) => part.id));
+    const named = images.filter((image) => ids.has(image.id));
+    out.push({ role: "system", content: `[attached] ${picturesNotReadNote(named.length > 0 ? named : sent.map((part) => ({ id: part.id, name: part.name, width: 1, height: 1, media_type: "image/jpeg" })), pictureFailureWords(kind))}` });
+    out.push(rest);
+  }
+  return out;
+}
+
+/** VISION-02c: the pictures that went to the model on a successful
+ * answer are marked on the turn, so a later window says they were shown
+ * then. Only the hub sets the mark. */
+export function markPicturesShown(images: readonly ChatImagePart[] | undefined, messages: readonly LlmMessage[]): ChatImagePart[] | undefined {
+  if (!images) return images;
+  const shown = new Set(messages.flatMap((message) => (message.images ?? []).map((part) => part.id)));
+  return images.map((image) => shown.has(image.id) ? { ...image, shown_to_model: true as const } : image);
+}

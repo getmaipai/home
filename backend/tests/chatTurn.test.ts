@@ -4,7 +4,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { StreamSafetyRefusal, buildStablePrefix, stableSuffixFor, PRIVACY_SENTENCE, matchPattern, capSection, MAX_TURN_TEXT_LENGTH, type TurnStreamResult } from "@/lib/turnShared";
+import { StreamSafetyRefusal, buildStablePrefix, stableSuffixFor, PRIVACY_SENTENCE, PHOTO_IDENTITY_SENTENCE, matchPattern, capSection, MAX_TURN_TEXT_LENGTH, type TurnStreamResult } from "@/lib/turnShared";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { closeDanglingClause } from "@/lib/wellFormed";
 import { STABLE_SYSTEM_SUFFIX_SENTENCES } from "../scripts/bench/oldStableSuffix";
@@ -1182,9 +1182,10 @@ describe("buildSystemPrompt() stable-first order and budgets (step 4)", () => {
   });
 
   describe("stableSuffixFor() (TRUEUP-01)", () => {
-    test("both classes return the privacy sentence alone, byte-identical", () => {
-      expect(stableSuffixFor("spoken")).toBe(PRIVACY_SENTENCE);
-      expect(stableSuffixFor("written")).toBe(PRIVACY_SENTENCE);
+    test("both classes return the privacy sentence and the photo identity line (VISION-02c), byte-identical", () => {
+      expect(stableSuffixFor("spoken")).toBe(`${PRIVACY_SENTENCE} ${PHOTO_IDENTITY_SENTENCE}`);
+      expect(stableSuffixFor("written")).toBe(`${PRIVACY_SENTENCE} ${PHOTO_IDENTITY_SENTENCE}`);
+      expect(PHOTO_IDENTITY_SENTENCE).toBe("You cannot tell who a person in a photo is.");
     });
 
     test("the privacy sentence is exactly the surviving clause of STABLE_SYSTEM_SUFFIX_SENTENCES[0], never the whole sentence", () => {

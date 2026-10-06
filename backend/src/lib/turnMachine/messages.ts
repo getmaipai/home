@@ -21,7 +21,7 @@
 // had nothing but `profile`/`roster` to protect (three tokens on the
 // bench household).
 import type { ContextItem } from "./contract";
-import type { LlmMessage } from "@/lib/llm";
+import type { LlmImagePart, LlmMessage } from "@/lib/llm";
 import type { Persona } from "@/lib/persona";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
@@ -149,7 +149,11 @@ function isStableContext(source: ContextItem["source"]): boolean {
  * prefix NEXT-CACHE-01 needed. `planLine()` closes the volatile
  * message, right before the utterance - "how to answer this one" reads
  * as the turn's own last instruction, not buried among context facts. */
-export function contextToMessages(context: readonly ContextItem[], utterance: string, persona: Persona, plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass): LlmMessage[] {
+export function contextToMessages(context: readonly ContextItem[], utterance: string, persona: Persona, plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass, pictures: readonly LlmImagePart[] = []): LlmMessage[] {
+  // VISION-02c: the turn's own pictures ride on its final user message,
+  // where the message is built (one path, rule 12); everything ahead of
+  // it, the stable prefix above all, is the same with or without them.
+  const userMessage: LlmMessage = pictures.length > 0 ? { role: "user", content: utterance, images: [...pictures] } : { role: "user", content: utterance };
   const windowItems = context.filter((item) => item.source === "window");
   // "utterance" is excluded too: it rides the "utterance" argument
   // below as the final user message, the one place it belongs in the
@@ -206,7 +210,7 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
     if (writtenVolatileParts.length > 0) {
       messages.push({ role: "system", content: writtenVolatileParts.join("\n\n") });
     }
-    messages.push({ role: "user", content: utterance });
+    messages.push(userMessage);
     return messages;
   }
 
@@ -228,7 +232,7 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   // becomes a replay row (TRUEUP-01's own tests), never a line back in
   // the prompt.
   messages.push({ role: "system", content: `${renderMemoryBlock(memoryItems)}\n\n${otherVolatileLines}How to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass)}` });
-  messages.push({ role: "user", content: utterance });
+  messages.push(userMessage);
   return messages;
 }
 

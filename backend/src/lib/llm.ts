@@ -69,9 +69,28 @@ export type LlmRole =
 
 const IMPLEMENTED_ROLES: ReadonlySet<LlmRole> = new Set(["chat"]);
 
+/** VISION-02c: one stored picture sent to a chat model that reads
+ * pictures, as the OpenAI-style data URL the local engine takes. Never
+ * sent to anything but the local chat engine (PRIVACY.md). */
+export interface LlmImagePart {
+  /** The stored picture's attachment id (never sent to the engine). */
+  id: string;
+  /** The file name, cleaned for a prompt; sent as a text part before the picture. */
+  name: string;
+  /** `data:<media type>;base64,...` of the stored, re-encoded picture. */
+  url: string;
+  /** The most tokens the engine lets this picture take (the chat role's
+   * declared --image-max-tokens): what a window count holds for it, since
+   * the engine's token count route counts a picture as a marker only. */
+  reservedTokens: number;
+}
+
 export interface LlmMessage {
   role: ChatRole;
   content: string;
+  /** VISION-02c: pictures that go with this (user) message. The wire
+   * renders them as content parts; every other reader keeps `content`. */
+  images?: LlmImagePart[];
   /** CHAT-16 (K1's wire): a `tool` message names the assistant tool
    * call it answers; the composer sends one per retained outcome. */
   tool_call_id?: string;
@@ -368,13 +387,23 @@ function chatSamplingFor(opts: { temperature?: number; response_format?: unknown
  * - factored out so the two call sites (a local LlamaServerClient, the
  * Stack's own /v1/chat/completions) can never drift on what a completion
  * actually asks for. */
+/** VISION-02c: a message's pictures as OpenAI-style content parts, one
+ * text part naming each file ahead of its image_url part, then the
+ * message's own text. A message without pictures is sent unchanged. */
+export function toWireMessage(message: LlmMessage): Omit<LlmMessage, "images" | "content"> & { content: LlmMessage["content"] | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }> } {
+  const { images, ...rest } = message;
+  if (!images || images.length === 0) return rest;
+  const parts = images.flatMap((image) => [{ type: "text" as const, text: `Picture: ${image.name}` }, { type: "image_url" as const, image_url: { url: image.url } }]);
+  return { ...rest, content: [...parts, { type: "text" as const, text: message.content }] };
+}
+
 function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
   const { thinking, dropReasoning, returnReasoning: _returnReasoning, tools, tool_choice, ...rest } = opts;
   const offering = !!tools && tools.length > 0;
   return {
     offering,
     body: {
-      messages,
+      messages: messages.map(toWireMessage),
       ...rest,
       ...chatSamplingFor(rest),
       ...seedFields(),
@@ -497,7 +526,9 @@ export async function complete(
     // always win, explicitly. Both fixes live in that one shared
     // builder now, not duplicated between this call and the Stack's.
     const { offering, body } = chatRequestBody(messages, opts);
-    const response = await client.chatComplete({ ...body, model: opts.model ?? "chat" });
+    // The spec client types `content` as text; a picture part (VISION-02c)
+    // is the same OpenAI shape llama-server takes, passed through as is.
+    const response = await client.chatComplete({ ...body, model: opts.model ?? "chat" } as ChatCompletionRequest);
     const choice = response.choices[0];
     if (!choice) {
       return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };

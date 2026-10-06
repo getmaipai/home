@@ -124,7 +124,13 @@ export interface RoleInfo {
     measuredFootprintBytes: number | null;
     measuredContextLength: number | null;
     estimated: boolean;
+    /** VISION-02b: the role's process reads pictures (its projector loaded
+     * and read the check picture); absent on an older Stack. */
+    imageInput?: boolean;
   } | null;
+  /** VISION-02b: the most tokens one picture takes in the chat process
+   * (its declared --image-max-tokens); null or absent when it reads none. */
+  picture_tokens_max?: number | null;
   /** STATUS-STACK-01: live context from the running engine. */
   context?: { context_length: number | null; slots: number | null; context_per_slot: number | null; reason: string | null };
   check: {

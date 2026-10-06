@@ -1,15 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { CURRENT_LOCAL_VISION_CAPABILITY, localVisionCapabilityForEngine } from "@/apps/chat/visionCapability";
+import { chatCapabilitiesFrom, NO_CHAT_PICTURES } from "@/apps/chat/visionCapability";
 
-describe("local vision capability", () => {
-  test("the current text engine does not imply image support", () => {
-    expect(CURRENT_LOCAL_VISION_CAPABILITY).toEqual({ imageParts: false, engine: "text-only", transport: "local" });
-    expect(localVisionCapabilityForEngine({ role: "chat", implemented: true })).toEqual(CURRENT_LOCAL_VISION_CAPABILITY);
+describe("chat picture capability (VISION-02c)", () => {
+  test("only the backend's explicit true turns picture parts on", () => {
+    expect(chatCapabilitiesFrom({ image_parts: true })).toEqual({ image_parts: true });
+    expect(chatCapabilitiesFrom({ image_parts: false })).toEqual(NO_CHAT_PICTURES);
   });
 
-  test("only an implemented local vision role enables image parts", () => {
-    expect(localVisionCapabilityForEngine({ role: "vision", implemented: false }).imageParts).toBe(false);
-    expect(localVisionCapabilityForEngine({ role: "vision", implemented: true })).toEqual({ imageParts: true, engine: "vision", transport: "local" });
-    expect(localVisionCapabilityForEngine(undefined).imageParts).toBe(false);
+  test("anything else, a missing route or an older hub, reads as no pictures", () => {
+    expect(chatCapabilitiesFrom(undefined)).toEqual(NO_CHAT_PICTURES);
+    expect(chatCapabilitiesFrom(null)).toEqual(NO_CHAT_PICTURES);
+    expect(chatCapabilitiesFrom({ image_parts: "yes" })).toEqual(NO_CHAT_PICTURES);
+    expect(chatCapabilitiesFrom({ model: "qwen3-vl-8b-instruct-q4-k-m" })).toEqual(NO_CHAT_PICTURES);
   });
 });

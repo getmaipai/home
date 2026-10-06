@@ -424,7 +424,9 @@ function buildTurnRow(
   const images = opts.images?.length
     ? opts.images
     : inheritedImages?.personId === actor.id && inheritedImages.images
-      ? storedImages(inheritedImages.images)
+      // VISION-02c (a review): carried forward without the shown-to-model
+      // mark; this row's own turn did not send them to the model.
+      ? storedImages(inheritedImages.images).map(({ id, name, width, height, media_type }) => ({ id, name, width, height, media_type }))
       : [];
   const branchFrom = resolveSupersedes(opts.branchFrom, value.conversation_id);
   const parentTurnId = branchParentFor(value.conversation_id, supersedes ?? branchFrom);
@@ -2066,7 +2068,10 @@ function turnTextMessages(t: ConversationTurnRow): LlmMessage[] {
   return [
     // UPLOAD-IMG-02: an earlier message's pictures stay a known, unseen
     // fact in the window (chatImageNote.ts), so a follow-up never reads as
-    // if the picture had been described.
+    // if the picture had been described. VISION-02c: a picture the model
+    // was shown on its turn is named as shown then and not again (its own
+    // reply on that turn holds what it saw); the picture itself goes to the
+    // model only on the turn it was sent.
     { role: "user", content: redactCredentials(withPicturesNote(t.userText, storedImages(t.images))) },
     (t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")) && t.guardReason
       ? { role: "system", content: guardedTurnNote(t) }

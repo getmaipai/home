@@ -28,7 +28,9 @@ import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { shapeOf } from "@/lib/turnSignal";
 import { planFor } from "@/lib/register";
 import type { Node, ContextItem, TurnState } from "../contract";
-import { picturesAttachedNote } from "@/lib/chatImageNote";
+import { picturesAttachedNote, picturesNotReadNote } from "@/lib/chatImageNote";
+import { chatModelReadsPictures, loadPictureParts, picturePartsAllowed } from "@/lib/chatPictures";
+import type { LlmImagePart } from "@/lib/llm";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
  * below which a match never becomes a context item, a pinned record
@@ -89,6 +91,8 @@ export interface ContextOutput {
   unknownAsk?: string | null;
   /** THIN-3G: the prompt did not fit with no history (TurnState.promptLimit). */
   promptLimit?: TurnState["promptLimit"];
+  /** VISION-02c: this turn's pictures as picture parts (TurnState.pictureParts). */
+  pictureParts?: LlmImagePart[];
 }
 
 let windowItemSeq = 0;
@@ -113,12 +117,23 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // back proves nothing) and from the prompt's context block in messages.ts
   // (it is already the turn's final user message there, never printed twice).
   items.push({ id: "utterance", text: input.utterance, source: "utterance", subjects: [], disclosure: "child_ok" });
-  // UPLOAD-IMG-02: pictures sent with this message. No vision engine reads
-  // them yet (VISION-01), so the model is told they exist and that it cannot
-  // see them, never left to guess. Not for a bare turn (the route refuses
-  // pictures there).
+  // UPLOAD-IMG-02: pictures sent with this message. Not for a bare turn
+  // (the route refuses pictures there). VISION-02c: when the chat model
+  // reads pictures and this person may send them, they go to the model as
+  // picture parts on the message itself (contextToMessages); a picture
+  // that cannot be read is named in a note with the kind of failure only
+  // (rule 6). Otherwise the model is told they exist and that it cannot
+  // see them, never left to guess, exactly as before.
+  let pictureParts: LlmImagePart[] = [];
   if (state.images?.length && !state.bare) {
-    items.push({ id: "attachment-pictures", text: picturesAttachedNote(state.images), source: "attachment", subjects: [], disclosure: "child_ok" });
+    const capability = await chatModelReadsPictures();
+    if (picturePartsAllowed(capability, state.actor, turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()))) {
+      const loaded = loadPictureParts(state.actor, conversation.id, temporary, state.images, capability.pictureTokensMax!);
+      pictureParts = loaded.parts;
+      if (loaded.unread.length > 0) items.push({ id: "attachment-pictures", text: picturesNotReadNote(loaded.unread, "the stored picture could not be opened"), source: "attachment", subjects: [], disclosure: "child_ok" });
+    } else {
+      items.push({ id: "attachment-pictures", text: picturesAttachedNote(state.images), source: "attachment", subjects: [], disclosure: "child_ok" });
+    }
   }
 
   // The window (THIN-3C): every turn after the summary's anchor, sized by
@@ -346,7 +361,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const thinking = state.budget.thinking_budget_tokens > 0 && reasoning.emit;
   const summaryItem: ContextItem[] = preview.summaryLine ? [{ id: "window-system-summary", text: preview.summaryLine, source: "window", subjects: [], disclosure: "child_ok" }] : [];
   const tools = state.budget.tools_offered.slice().sort().map(toolSpecFor).filter((t): t is NonNullable<typeof t> => t !== null);
-  const rest = await countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass), { tools });
+  const rest = await countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts), { tools });
   // A Stack that reports no context length leaves the window unmeasured
   // too (THIN-3A's named minimum): its 2,048-token stand-in is a floor,
   // not the engine's real size.
@@ -369,7 +384,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     // written chat offer a new chat carrying the summary; a spoken turn
     // never hears it and answers from the message alone.
     const core = items.filter((item) => item.source === "utterance" || item.source === "attachment" || item.source === "profile" || item.source === "roster");
-    const countCore = (withSummary: boolean) => countTokens(contextToMessages([...core, ...(withSummary ? summaryItem : [])], input.utterance, state.persona, state.plan, state.signal, surfaceClass));
+    const countCore = (withSummary: boolean) => countTokens(contextToMessages([...core, ...(withSummary ? summaryItem : [])], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts));
     const withSummary = await countCore(true);
     const alone = withSummary !== null && withSummary + reply <= context ? withSummary : await countCore(false);
     const written = surfaceClass === "written";
@@ -419,7 +434,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     }
   }
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning, disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}) } };
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning, disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}) } };
 };
 
 /** Applies the node's output onto TurnState, the same small
@@ -434,6 +449,7 @@ export function applyContext(state: import("../contract").TurnState, output: Con
   if (output.subjects) state.subjects = output.subjects;
   state.unknownAsk = output.unknownAsk ?? null;
   if (output.promptLimit) state.promptLimit = output.promptLimit;
+  state.pictureParts = output.pictureParts;
   if (output.disclosureWithheld) {
     // THIN-0B: the plan's inputs, recomputed once with the withheld flag,
     // and the trusted-adult move when a child or teen asked a question

@@ -144,8 +144,13 @@ export function identityLine(persona: Persona): string {
 // inlining STABLE_SYSTEM_SUFFIX directly instead), frozen until the old
 // path's own deletion (plan section 2).
 export const PRIVACY_SENTENCE = "Nothing you say leaves this house.";
+/** VISION-02c: the one line the stable prefix gains for pictures, part of
+ * the cached prefix on every turn (never per turn, so a picture turn
+ * leaves the prefix and its cache as they were). Behaviour the bench
+ * measures, never a guarantee (RULES-AND-LEARNED-COMPONENTS.md). */
+export const PHOTO_IDENTITY_SENTENCE = "You cannot tell who a person in a photo is.";
 export function stableSuffixFor(_surfaceClass: SurfaceClass): string {
-  return PRIVACY_SENTENCE;
+  return `${PRIVACY_SENTENCE} ${PHOTO_IDENTITY_SENTENCE}`;
 }
 
 export interface LoadedManifest {

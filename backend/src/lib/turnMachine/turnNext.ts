@@ -451,7 +451,9 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     surface,
     ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
     utterance: text,
-    ...(opts.images?.length ? { images: opts.images } : {}),
+    // VISION-02c: only the five stored fields come from a caller; the
+    // shown-to-model mark is the hub's own (model.ts), never a client's.
+    ...(opts.images?.length ? { images: opts.images.map(({ id, name, width, height, media_type }) => ({ id, name, width, height, media_type })) } : {}),
     ...(answerImagesOk ? { answerImagesAllowed: true } : {}),
     modelId: opts.model,
     signal,

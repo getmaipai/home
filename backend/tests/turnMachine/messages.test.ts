@@ -30,7 +30,7 @@ import { contextToMessages } from "@/lib/turnMachine/messages";
 import type { ContextItem } from "@/lib/turnMachine/contract";
 import { fallbackSignal } from "@/lib/turnSignal";
 import { planFor, type PlanInput } from "@/lib/register";
-import { buildStablePrefix, identityLine, PRIVACY_SENTENCE } from "@/lib/turnShared";
+import { buildStablePrefix, identityLine, PHOTO_IDENTITY_SENTENCE, PRIVACY_SENTENCE } from "@/lib/turnShared";
 import { DEFAULT_PERSONA } from "@/lib/persona";
 import { MEMORY_SECTION_HEADER, MEMORY_TRUST_REMINDER, NOTHING_STORED_LINE } from "@/lib/memoryFraming";
 
@@ -311,10 +311,10 @@ describe("contextToMessages(): U4b, the persona prefix, the reanchor and the pla
 // TRUEUP-01 (docs/plans/chat-trueup-2026-09-23.md): the item's own
 // acceptance tests, in its own words.
 describe("TRUEUP-01: the new path sends the model only designed prose", () => {
-  test("the written adult prompt's stable message is exactly identity, the privacy sentence, and the stable facts - nothing else", () => {
+  test("the written adult prompt's stable message is exactly identity, the privacy sentence, the photo identity line, and the stable facts - nothing else", () => {
     const context: ContextItem[] = [item("profile", "Sage's profile: likes hiking."), item("roster", "Sage", "roster-0")];
     const out = contextToMessages(context, "hi", DEFAULT_PERSONA, plan, signal, "written");
-    expect(out[0]).toEqual({ role: "system", content: `${identityLine(DEFAULT_PERSONA)} ${PRIVACY_SENTENCE}\n\n[profile] Sage's profile: likes hiking.\n[household] Sage` });
+    expect(out[0]).toEqual({ role: "system", content: `${identityLine(DEFAULT_PERSONA)} ${PRIVACY_SENTENCE} ${PHOTO_IDENTITY_SENTENCE}\n\n[profile] Sage's profile: likes hiking.\n[household] Sage` });
   });
 
   test('no prompt on the new path contains "Remember: you are", on either surface class', () => {
