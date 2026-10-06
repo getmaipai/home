@@ -61,7 +61,7 @@ import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { tryConsume } from "@/lib/rateLimiter";
 import { recordSearchHealth } from "@/lib/searchHealthState";
 import { classifyServiceOutcome, recordServiceOutcome } from "@/lib/serviceHealth";
-import { assertNotPrivateHost, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
+import { assertNotPrivateHost, guardedFetch, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
 import * as memory from "@/lib/memory";
 import { deleteAttachmentsForPerson } from "@/lib/attachments";
 import * as settings from "@/lib/settings";
@@ -315,7 +315,9 @@ async function attemptHttpFetch(
       const connectTimer = options.connectTimeoutMs === undefined ? undefined : setTimeout(() => controller.abort(), options.connectTimeoutMs);
       let response: Response;
       try {
-        response = await packageFetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" });
+        response = packageFetch === globalThis.fetch
+          ? await guardedFetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" })
+          : await packageFetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" });
       } finally {
         clearTimeout(connectTimer);
       }
@@ -1576,15 +1578,22 @@ async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSi
   // tokens of a three-token burst and read one page).
   if (countsAgainstPace && !tryConsume(SEARXNG_PAGE_RATE_LIMIT_KEY, SEARXNG_PAGE_RATE_LIMIT)) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
   await validatePublicPageUrl(url);
-  return attemptHttpFetch(
-    url,
-    "GET",
-    { accept: "text/html,application/xhtml+xml" },
-    undefined,
-    SEARXNG_PAGE_TIMEOUT_MS,
-    async (hopUrl) => validatePublicPageUrl(hopUrl),
-    { signal },
-  );
+  try {
+    const response = await guardedFetch(url, {
+      method: "GET",
+      headers: { accept: "text/html,application/xhtml+xml" },
+      signal: signal ?? AbortSignal.timeout(SEARXNG_PAGE_TIMEOUT_MS),
+      redirect: "follow",
+      maxRedirects: MAX_FETCH_REDIRECTS,
+    });
+    if (!response.ok) return { ok: false, status: response.status, error: new HostError("network_unreachable", `${url} returned HTTP ${response.status}`) };
+    const text = await response.text();
+    if (new TextEncoder().encode(text).byteLength > FETCH_MAX_RESPONSE_BYTES) return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url}'s response exceeded the ${FETCH_MAX_RESPONSE_BYTES}-byte limit`) };
+    return { ok: true, value: text, status: response.status };
+  } catch (err) {
+    if (err instanceof SsrfBlockedError) return { ok: false, networkFailure: false, error: new HostError("invalid_input", err.message) };
+    return { ok: false, networkFailure: true, error: new HostError("network_unreachable", `could not reach ${url}: ${(err as Error).message}`) };
+  }
 }
 
 /** A site answered a page request with 403 or 429: the first signal to

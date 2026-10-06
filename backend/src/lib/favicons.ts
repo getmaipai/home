@@ -9,7 +9,7 @@
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { dataDir, ensureDataDir } from "@/lib/paths";
-import { assertNotPrivateHost, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
+import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 
 export const faviconsDir = resolve(dataDir, "favicons");
 const indexPath = (): string => join(faviconsDir, "index.json");
@@ -163,13 +163,16 @@ export type FaviconFetchOutcome =
  * then `/apple-touch-icon.png`, 10s timeout per attempt, only an
  * `image/*` content type accepted, capped at `MAX_ICON_BYTES`. Never
  * thrown - a site with no favicon is the ordinary case, not an error. */
-export async function fetchFaviconBytes(host: string, fetchFn: FaviconFetchFn = (url, init) => fetch(url, init)): Promise<FaviconFetchOutcome> {
+export async function fetchFaviconBytes(host: string, fetchFn?: FaviconFetchFn): Promise<FaviconFetchOutcome> {
   let sawDefiniteAnswer = false;
   for (const path of CANDIDATE_PATHS) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const response = await fetchFn(`https://${host}${path}`, { signal: controller.signal });
+      const url = `https://${host}${path}`;
+      const response = fetchFn
+        ? await fetchFn(url, { signal: controller.signal })
+        : await guardedFetch(url, { signal: controller.signal, redirect: "follow", maxRedirects: 3 });
       if (!response.ok) {
         // 404/410 (packageHost.ts's own identical "not found, not
         // unreachable" line): the server positively confirmed this path

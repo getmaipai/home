@@ -1,4 +1,4 @@
-import { assertNotPrivateHost, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
+import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 import { tryConsume, __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { filterAnswerImages, type ValidatedAnswerImage } from "./quality";
 
@@ -58,7 +58,7 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
   const fetcher = options.fetch ?? fetch;
   const now = options.now ?? Date.now;
   let original: URL;
-  try { original = new URL(source.url); await validateUrl(original, options.dnsLookup); }
+  try { original = new URL(source.url); if (options.fetch) await validateUrl(original, options.dnsLookup); }
   catch (error) { const key = error instanceof SsrfBlockedError ? "ssrf" : "invalid_url"; dropped[key] = (dropped[key] ?? 0) + 1; return null; }
   const host = original.hostname.toLowerCase();
   if ((quietHosts.get(host) ?? 0) > now()) return null;
@@ -79,7 +79,10 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
           if (!tryConsume(`net:${hopHost}`, HOST_RATE, now())) return null;
           pacedHosts.add(hopHost);
         }
-        response = await fetcher(url, {
+        response = fetcher === fetch ? await guardedFetch(url, {
+          method: "GET", redirect: "manual", signal: controller.signal, maxRedirects: MAX_REDIRECTS,
+          headers: { "User-Agent": ANSWER_IMAGE_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
+        }) : await fetcher(url, {
           method: "GET", redirect: "manual", signal: controller.signal,
           headers: { "User-Agent": ANSWER_IMAGE_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
           credentials: "omit", referrerPolicy: "no-referrer",
