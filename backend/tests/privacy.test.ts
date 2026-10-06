@@ -5,6 +5,7 @@ import { privacyConnections, platformConnections, pluginConnections, offlinePlug
 import { ROBOT_ASSETS } from "@/lib/robotAssets";
 import { listPackageIds, loadPackage } from "@/lib/plugins";
 import type { PrivacyConnection } from "@/wire";
+import { setHouseholdSettingValue } from "@/lib/settings";
 
 beforeEach(() => {
   resetDb();
@@ -159,6 +160,14 @@ describe("the hub's own connections", () => {
     expect(row!.destination.toLowerCase()).toContain("nothing leaves the house");
     expect(row!.what).toContain("token");
     expect(row!.what.toLowerCase()).toMatch(/inbound|reverse|reaches in|send text or audio to the hub/);
+  });
+
+  test("the Home Assistant row says mapped sensor changes stay on the LAN", () => {
+    setHouseholdSettingValue("home.base_url", "http://homeassistant.local:8123");
+    setHouseholdSettingValue("home.access_token", "test-token");
+    const row = privacyConnections().find((r) => r.id === "platform:home-assistant-events");
+    expect(row?.what).toContain("sensors or devices you mapped");
+    expect(row?.what).toContain("no sensor state is sent to a third party");
   });
 
   // PrivacyPage.tsx groups inbound rows under its own clearly-labeled

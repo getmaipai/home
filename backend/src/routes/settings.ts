@@ -6,6 +6,7 @@ import { getRegistry } from "@/lib/settingsRegistry";
 import { issueApiToken, revokeApiToken } from "@/lib/apiToken";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { publishSettingsChanged } from "@/lib/deviceCommands";
+import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
 
 export const settingsRoutes = apiRouter();
 
@@ -100,6 +101,7 @@ settingsRoutes.openapi(putRoute, (c) => {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
   publishSettingsChanged(body.scope, body.key, result.value.value);
+  if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   return c.json(result.value, 200);
 });
 
@@ -135,6 +137,7 @@ settingsRoutes.openapi(resetRoute, (c) => {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
   publishSettingsChanged(body.scope, body.key, result.value.value);
+  if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   return c.json({ ...result.value, success: true as const }, 200);
 });
 

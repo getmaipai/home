@@ -100,9 +100,10 @@ export function platformConnections(): PrivacyConnection[] {
       when: "the first time someone uses streaming speech input, when Home downloads its small voice-activity model to cut speech into sentences; speech recognition runs on the Stack",
       what: DOWNLOAD_CARRIES,
     }),
-    // Home Assistant doesn't get a row here (it's the household's own LAN
-    // device, not a third party leaving the house); Telegram genuinely
-    // does, and only appears once an adult has actually set up the bot -
+    // Home Assistant's own-LAN sensor stream gets its row below only when
+    // the household has configured the existing URL and token. Telegram
+    // genuinely reaches a third party, and only appears once an adult has
+    // actually set up the bot -
     // an unconfigured household reaches nothing, and the table should say
     // so by omission, the same "no host, no row" rule every row above
     // already follows.
@@ -153,6 +154,22 @@ export function platformConnections(): PrivacyConnection[] {
       what: "the file name of the book being downloaded, and your home's internet address, sent to Kiwix and to a third-party download mirror Kiwix picks for you. Nothing anyone in the house said, asked, or saved.",
     }),
   ];
+  const homeAssistantUrl = getHouseholdSettingValue("home.base_url");
+  const homeAssistantToken = getHouseholdSettingValue("home.access_token");
+  if (typeof homeAssistantUrl === "string" && homeAssistantUrl && typeof homeAssistantToken === "string" && homeAssistantToken) {
+    rows.push({
+      id: "platform:home-assistant-events",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "your own Home Assistant on your LAN",
+      when: "while Home Assistant sensor updates are configured",
+      what: "Home receives state changes only for Home Assistant sensors or devices you mapped. It reads their current state again after reconnecting. This stays on your LAN; no sensor state is sent to a third party.",
+      who: "your household's own Home Assistant instance",
+      optIn: true,
+      retention: "Home keeps only the current alarm state and its local history; no sensor stream is sent outside the house",
+      direction: "outbound",
+    });
+  }
   return rows.filter((r): r is PrivacyConnection => r !== null);
 }
 
