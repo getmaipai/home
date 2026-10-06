@@ -8,7 +8,7 @@
     "help": "Quiet hours begin at 9:00 pm by default. Safety alarms always override quiet hours.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "household.notifications",
     "honoured_by": [
       "home"
     ]
@@ -22,7 +22,7 @@
     "help": "Quiet hours end at 7:00 am by default.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "household.notifications",
     "honoured_by": [
       "home"
     ]
@@ -36,7 +36,7 @@
     "help": "Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "person.notifications",
     "honoured_by": [
       "home"
     ]
@@ -50,7 +50,7 @@
     "help": "Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own.",
     "level": "basic",
     "secret": false,
-    "lives_in": "robot.settings",
+    "lives_in": "person.notifications",
     "honoured_by": [
       "home"
     ]

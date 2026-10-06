@@ -29,7 +29,7 @@ export const REFERENCE_SETTINGS_KEYS: SettingsKey[] = [
     label: "Show pictures in answers",
     help: "Adults and teens are on by default; children are off until a parent enables this. Teens control their own setting.",
     level: "basic",
-    lives_in: "household.reference",
+    lives_in: "person.chat",
     honoured_by: ["home"],
   }),
 ];

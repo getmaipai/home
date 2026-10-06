@@ -13,7 +13,7 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Show advanced reply stats",
     help: "Show engine timing and token details below your chat replies.",
     level: "advanced",
-    lives_in: "profile.appearance",
+    lives_in: "person.chat",
     honoured_by: ["home"],
   }),
   // FACE-02N: the on/off switch for FACE-02M's face-capture sounds. The
@@ -28,7 +28,7 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
     label: "Enrollment sounds",
     help: "Play soft sounds during face enrollment as the camera finds your face, then a chime when a photo is taken.",
     level: "basic",
-    lives_in: "profile.appearance",
+    lives_in: "person.profile",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({

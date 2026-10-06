@@ -19,7 +19,7 @@ export const HOSTED_SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     help: "Optional. Search works without any key. If you add a Brave Search API key, an adult's web searches go to Brave Search instead of your SearXNG, so the words searched leave your house. A child's or teen's searches never do. The key is stored encrypted and can't be read back. Clear it to go back to keyless search.",
     level: "advanced",
     secret: true,
-    lives_in: "household.integrations",
+    lives_in: "household.search",
     honoured_by: ["home"],
   }),
 ];

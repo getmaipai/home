@@ -177,8 +177,8 @@ describe("NextSettingsPage", () => {
 
   // SETTINGS-S3 keeps enrollment sounds on the face card's shared settings path.
   test("ui.enrollment_sounds is on the Profile face card and writes false", async () => {
-    const sounds = makeKey({ key: "ui.enrollment_sounds", scope: "person", selector: "boolean", default: true, label: "Enrollment sounds", level: "basic", lives_in: "profile.appearance" });
-    const stats = makeKey({ key: "ui.show_turn_stats", scope: "person", selector: "boolean", default: true, label: "Show reply stats", level: "advanced", lives_in: "profile.appearance" });
+    const sounds = makeKey({ key: "ui.enrollment_sounds", scope: "person", selector: "boolean", default: true, label: "Enrollment sounds", level: "basic", lives_in: "person.profile" });
+    const stats = makeKey({ key: "ui.show_turn_stats", scope: "person", selector: "boolean", default: true, label: "Show reply stats", level: "advanced", lives_in: "person.chat" });
     const { restore, puts } = mockSettingsFetch([sounds, stats], { household: [], "person:person-abc123": [makeValue(sounds, true), makeValue(stats, true)] });
     try {
       const prints = Promise.resolve(Response.json([]));

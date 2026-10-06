@@ -22,7 +22,7 @@ export function NextHouseholdSettings() {
 }
 
 function renderSection(id: typeof definitions[number]["id"]) {
-  if (id === "general") return <NextSettingsRenderer scope="household" scopeValue="household" only={["household.system"]} />;
+  if (id === "general") return <NextSettingsRenderer scope="household" scopeValue="household" only={["household.system", "household.status"]} />;
   if (id === "people") return <div className="grid gap-4 sm:grid-cols-2">
     <LinkCard title="Users" description="Add, edit, and remove household accounts." to="/users" />
     <LinkCard title="Family" description="View and manage your family." to="/people" />
@@ -41,7 +41,7 @@ function renderSection(id: typeof definitions[number]["id"]) {
       </Card>
     </Collapsible>
   </>;
-  if (id === "integrations") return <><NextSettingsRenderer scope="household" scopeValue="household" only={["household.integrations", "household.notifications", "household.reference", "robot.settings"]} includeKeysByGroup={{ "robot.settings": ["household.quiet_hours.from", "household.quiet_hours.to"] }} /><p className="text-sm text-muted-foreground">Household quiet hours apply to children. Adults and teens can set their own hours in Profile → Notifications.</p></>;
+  if (id === "integrations") return <><NextSettingsRenderer scope="household" scopeValue="household" only={["household.integrations", "household.search", "household.notifications", "household.reference"]} /><p className="text-sm text-muted-foreground">Household quiet hours apply to children. Adults and teens can set their own hours in Profile → Notifications.</p></>;
   if (id === "storage") return <>
     <NextSettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
     <div className="grid gap-4 sm:grid-cols-2">

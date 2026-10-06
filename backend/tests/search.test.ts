@@ -24,7 +24,8 @@ async function addPerson(ownerClient: TestClient, displayName: string, role: str
   const body = (await created.json()) as { id: string };
   const actor = db.select().from(people).where(eq(people.id, body.id)).get()!;
   const client = new TestClient();
-  await client.post("/api/auth/select", { personId: actor.id });
+  if (needsSecret) await client.post("/api/auth/verify-secret", { personId: actor.id, secret: "0000" });
+  else await client.post("/api/auth/select", { personId: actor.id });
   return { client, actor };
 }
 
@@ -140,22 +141,57 @@ describe("GET /api/search: apps", () => {
 });
 
 describe("GET /api/search: settings", () => {
-  test("a word from a real setting's own label lists it, opening Settings on that section", async () => {
+  // APP-SET-01: a setting result opens its card's own page in the settings
+  // shell, `/settings/<area>/<section>#<key>`, computed from the spec's
+  // areas.json, never from `lives_in`.
+  test("an admin's search for SearXNG links to the Home settings Search section at that key", async () => {
+    const { client } = await owner();
+    const groups = await search(client, "SearXNG");
+    const found = group(groups, "setting")?.results.find((r) => r.id === "search.searxng_url");
+    expect(found?.href).toBe("/settings/home/search#search.searxng_url");
+  });
+
+  test("a word from a household setting's label opens Home settings on that section", async () => {
     const { client } = await owner();
     const groups = await search(client, "teen's replies");
     const found = group(groups, "setting")?.results.find((r) => r.id === "chat.teen_gate_grain");
-    expect(found).toMatchObject({ kind: "setting", title: "How a teen's replies are checked", subtitle: expect.stringContaining("checks every sentence before a teen sees it"), href: "/next/settings?tab=household&section=household.ai" });
+    expect(found).toMatchObject({ kind: "setting", title: "How a teen's replies are checked", subtitle: expect.stringContaining("checks every sentence before a teen sees it"), href: "/settings/home/ai#chat.teen_gate_grain" });
   });
 
-  // A review caught this: NextSettingsPage.tsx renders the Household
-  // tab only for an owner/admin actor (SettingsPage.tsx's own comment:
-  // "household-scope writes 403 for anyone else") - a household-scope
-  // result reaching a non-admin actor would open a tab they can't
-  // select and a section that's never rendered there.
-  test("a non-admin actor never sees a household-scope setting - they have no tab to reach it on", async () => {
+  test("a person-scope setting opens the Account or Chat settings page that draws it", async () => {
+    const { client } = await owner();
+    const alerts = (await search(client, "Show alerts on this device")).find((g) => g.kind === "setting")?.results.find((r) => r.id === "notifications.browser.enabled");
+    expect(alerts?.href).toBe("/settings/account/notifications#notifications.browser.enabled");
+    const stats = (await search(client, "reply stats")).find((g) => g.kind === "setting")?.results.find((r) => r.id === "ui.show_turn_stats");
+    expect(stats?.href).toBe("/settings/chat/general#ui.show_turn_stats");
+  });
+
+  // A non-admin has no Home settings at all: a household-scope result would
+  // open a page they cannot reach.
+  test("a non-admin actor never sees a household-scope setting", async () => {
     const { client: ownerClient } = await owner();
     const { client: childClient } = await addPerson(ownerClient, "Sprout", "child");
     const groups = await search(childClient, "teen's replies");
     expect(group(groups, "setting")).toBeUndefined();
+    const adult = await addPerson(ownerClient, "Marsh", "adult");
+    expect(group(await search(adult.client, "SearXNG"), "setting")?.results.find((r) => r.id === "search.searxng_url")).toBeUndefined();
+  });
+
+  test("a child's search for photos returns no setting, a teen's does", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: childClient } = await addPerson(ownerClient, "Sprout", "child");
+    const { client: teenClient } = await addPerson(ownerClient, "Nova", "teen");
+    const child = group(await search(childClient, "photos"), "setting")?.results ?? [];
+    expect(child.find((r) => r.id === "chat.photo_uploads")).toBeUndefined();
+    const teen = group(await search(teenClient, "photos"), "setting")?.results ?? [];
+    expect(teen.find((r) => r.id === "chat.photo_uploads")?.href).toBe("/settings/chat/general#chat.photo_uploads");
+  });
+
+  test("a teen never gets another person's or an admin's key as a result", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: teenClient } = await addPerson(ownerClient, "Nova", "teen");
+    const results = group(await search(teenClient, "quiet hours"), "setting")?.results ?? [];
+    expect(results.every((r) => r.href.startsWith("/settings/account/") || r.href.startsWith("/settings/chat/"))).toBe(true);
+    expect(results.find((r) => r.id.startsWith("household."))).toBeUndefined();
   });
 });

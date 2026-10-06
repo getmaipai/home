@@ -18,7 +18,7 @@ export const BACKUP_SETTINGS_KEYS: SettingsKey[] = [
     label: "Backup storage limit (GB)",
     help: "Once total backup storage passes this, the oldest backups are deleted first - checked after the normal seven-daily/four-weekly/three-monthly schedule. 0 means no extra limit.",
     level: "advanced",
-    lives_in: "household.system",
+    lives_in: "household.storage",
     honoured_by: ["home"],
   }),
 ];

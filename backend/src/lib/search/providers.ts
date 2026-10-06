@@ -5,9 +5,10 @@
 // the response with a log warning, never a failed request (searchRoute
 // below is what actually enforces that; this file is just the list).
 import { listConversations } from "@/lib/conversationHistory";
-import { listActivePeople, isOwnerOrAdmin } from "@/lib/access";
+import { listActivePeople } from "@/lib/access";
 import { listInstalledManifests } from "@/lib/plugins";
 import { getRegistry } from "@/lib/settingsRegistry";
+import { placeSetting, settingHref, settingsViewerFor } from "@/lib/settingsAreas";
 import type { PersonRow } from "@/types";
 
 export interface SearchResult {
@@ -116,46 +117,36 @@ const appsProvider: SearchProvider = {
 };
 
 // Settings by the registry's own labels - SETTINGS.md's "one
-// definition": reads getRegistry() (spec/settings/keys.json, the exact
-// declaration NextSettingsRenderer.tsx itself renders from), never a
-// second, hand-kept list of setting names. `lives_in` is the same id
-// `groupSettings()` (commons ui) already groups a section's Card by, so
-// linking to `?section=<lives_in>` reaches the real rendered section,
-// not a name this route invents. `expert`-level keys are excluded, the
-// same disclosure NextSettingsRenderer.tsx's own groupSettings() call
-// already applies (SETTINGS.md Rule 4).
+// definition": reads getRegistry() (spec/settings/keys.json), never a
+// second, hand-kept list of setting names. Where a result opens comes from
+// the spec's settings areas (APP-SET-01, lib/settingsAreas.ts): the page,
+// section and key that really draw it, `/settings/<area>/<section>#<key>`.
+// A key is a result only when the viewer's own page would show it, so a
+// child never finds a household key, and a teen never finds an admin's or
+// another person's. `expert`-level keys are excluded (SETTINGS.md Rule 4).
 const settingsProvider: SearchProvider = {
   kind: "setting",
   heading: "Settings",
   async search(query, actor) {
     const normalized = query.trim().toLowerCase();
-    // A review caught this: NextSettingsPage.tsx renders the Household
-    // tab only for isOwnerOrAdminRole() - a non-admin actor has no way
-    // to reach it at all (SettingsPage.tsx's own comment: "household-
-    // scope writes 403 for anyone else"). Surfacing a household-scope
-    // result to them would open a tab they can't select and a section
-    // that's never rendered - excluded here, the same gate the page
-    // itself already enforces, not a stricter one this route invents.
-    const canManageHousehold = isOwnerOrAdmin(actor);
-    return getRegistry()
-      .filter((key) => key.honoured_by.includes("home") && key.level !== "expert" && (key.scope !== "household" || canManageHousehold) && key.label.toLowerCase().includes(normalized))
-      .slice(0, RESULT_CAP)
-      .map((key) => ({
+    const viewer = settingsViewerFor(actor);
+    const results: SearchResult[] = [];
+    for (const key of getRegistry()) {
+      if (results.length >= RESULT_CAP) break;
+      if (!key.honoured_by.includes("home") || key.level === "expert" || !key.label.toLowerCase().includes(normalized)) continue;
+      const place = placeSetting(key, viewer);
+      if (!place) continue;
+      results.push({
         kind: "setting",
         id: key.key,
         title: key.label,
-        // `sectionTitle()` (commons ui's groupSettings.ts) turns
-        // `lives_in` into a friendly heading, but it's a frontend-only
-        // module - the backend has no import path to it, and adding one
-        // means a second copy of SECTION_TITLES, the exact "one
-        // definition" rule SETTINGS.md exists to prevent. `key.help`,
-        // when the key declares one, is a real, already-written
-        // description of the same setting; when it doesn't, the
-        // subtitle is just left off rather than showing the raw
-        // `lives_in` id.
+        // `key.help`, when the key declares one, is a real, already-written
+        // description of the same setting; otherwise the subtitle is left off.
         subtitle: key.help,
-        href: `/next/settings?tab=${key.scope === "household" ? "household" : "me"}&section=${key.lives_in}`,
-      }));
+        href: settingHref(place, key.key),
+      });
+    }
+    return results;
   },
 };
 

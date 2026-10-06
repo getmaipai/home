@@ -18,7 +18,7 @@ import { CORE_SETTINGS_KEYS, INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME
 
 test("internet probe settings are household general controls and default on", () => {
   const keys = new Map(CORE_SETTINGS_KEYS.map((key) => [key.key, key]));
-  expect(keys.get(INTERNET_PROBE_ENABLED_KEY)).toMatchObject({ default: true, lives_in: "household.system" });
+  expect(keys.get(INTERNET_PROBE_ENABLED_KEY)).toMatchObject({ default: true, lives_in: "household.status" });
   expect(keys.get(INTERNET_PROBE_DNS_NAME_KEY)?.default).toBe("example.com");
   expect(keys.get(INTERNET_PROBE_TCP_ADDRESS_KEY)?.default).toBe("1.1.1.1");
   expect(keys.get(INTERNET_PROBE_TCP_PORT_KEY)?.default).toBe(443);
@@ -73,7 +73,7 @@ describe("GET /api/settings/registry", () => {
       default: true,
       label: "Enrollment sounds",
       level: "basic",
-      lives_in: "profile.appearance",
+      lives_in: "person.profile",
       honoured_by: ["home"],
     });
   });

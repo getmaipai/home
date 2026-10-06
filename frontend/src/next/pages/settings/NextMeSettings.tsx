@@ -40,7 +40,7 @@ export function NextMeSettings({ person, onPersonChange = () => {} }: { person: 
         <NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.appearance", "ui.look"]} />
         <DeviceAppearanceControl />
         <Collapsible>
-          <Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Advanced<span aria-hidden>⌄</span></CollapsibleTrigger></CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["profile.appearance"]} includeKeys={["ui.show_turn_stats"]} /></CardContent></CollapsibleContent></Card>
+          <Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Advanced<span aria-hidden>⌄</span></CollapsibleTrigger></CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.chat"]} includeKeys={["ui.show_turn_stats"]} /></CardContent></CollapsibleContent></Card>
         </Collapsible>
       </>;
     }
@@ -88,11 +88,11 @@ function DeviceAppearanceControl() {
 function NotificationSettings({ person }: { person: Roster }) {
   const [chatId, setChatId] = useState<string | null>(null);
   useEffect(() => { let active = true; api.settingsValues(`person:${person.id}`).then((values) => { if (active) setChatId(String(values.find((value) => value.key === "notifications.telegram.chat_id")?.value ?? "").trim() || null); }).catch(() => setChatId(null)); return () => { active = false; }; }, [person.id]);
-  return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.notifications", "robot.settings"]} includeKeys={["person.quiet_hours.from", "person.quiet_hours.to", "notifications.browser.enabled", "notifications.file_shared.muted_senders"]} /><TelegramAdvanced person={person} configured={Boolean(chatId)} /></>;
+  return <><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.notifications"]} includeKeys={["person.quiet_hours.from", "person.quiet_hours.to", "notifications.browser.enabled", "notifications.file_shared.muted_senders"]} /><TelegramAdvanced person={person} configured={Boolean(chatId)} /></>;
 }
 
 function TelegramAdvanced({ person, configured }: { person: Roster; configured: boolean }) {
-  return <Collapsible defaultOpen={false}><Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Telegram options<span aria-hidden>⌄</span></CollapsibleTrigger>{!configured ? <p className="text-sm text-muted-foreground">Set up Telegram first to use these.</p> : null}</CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.notifications"]} includeKeys={telegramNotificationKeys} expandAdvanced /></CardContent></CollapsibleContent></Card></Collapsible>;
+  return <Collapsible defaultOpen={false}><Card><CardHeader className="pb-2"><CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between text-left font-medium">Telegram options<span aria-hidden>⌄</span></CollapsibleTrigger>{!configured ? <p className="text-sm text-muted-foreground">Set up Telegram first to use these.</p> : null}</CardHeader><CollapsibleContent><CardContent className="pt-0"><NextSettingsRenderer scope="person" scopeValue={`person:${person.id}`} only={["person.telegram"]} includeKeys={telegramNotificationKeys} expandAdvanced /></CardContent></CollapsibleContent></Card></Collapsible>;
 }
 
 function ManagementLinks({ links }: { links: readonly ("Voices" | "Commands" | "Devices")[] }) {

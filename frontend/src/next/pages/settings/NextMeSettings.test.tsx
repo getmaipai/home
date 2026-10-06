@@ -19,12 +19,12 @@ function makeKey(key: string, lives_in: string, selector: string = "text", level
 function setup(role: Roster["role"], initialUrl = "/settings", telegramChatId = "chat-123") {
   const registry: SettingsKey[] = [
     makeKey("ui.appearance", "profile.appearance", "select"), makeKey("ui.look", "profile.appearance", "select"),
-    makeKey("ui.enrollment_sounds", "profile.appearance", "boolean", "advanced"), makeKey("ui.show_turn_stats", "profile.appearance", "boolean", "advanced"),
+    makeKey("ui.enrollment_sounds", "person.profile", "boolean", "advanced"), makeKey("ui.show_turn_stats", "person.chat", "boolean", "advanced"),
     ...Array.from({ length: 9 }, (_, i) => makeKey(`allowance.${i}.daily_minutes`, "person.allowance", "number")),
-    makeKey("notifications.telegram.chat_id", "person.notifications"),
+    makeKey("notifications.telegram.chat_id", "person.telegram"),
     makeKey("notifications.browser.enabled", "person.notifications", "boolean"),
-    { ...makeKey("person.quiet_hours.from", "robot.settings", "time"), default: null }, { ...makeKey("person.quiet_hours.to", "robot.settings", "time"), default: null },
-    ...["approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available", "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated", "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available"].map((name) => makeKey(`notifications.${name}.telegram`, "person.notifications", "boolean")),
+    { ...makeKey("person.quiet_hours.from", "person.notifications", "time"), default: null }, { ...makeKey("person.quiet_hours.to", "person.notifications", "time"), default: null },
+    ...["approvals.requested", "backups.target_failing", "engines.problem", "engines.update_applied", "engines.update_available", "engines.update_failed", "file.shared_with_household", "file.shared_with_you", "memory.judge_failed", "memory.updated", "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available"].map((name) => makeKey(`notifications.${name}.telegram`, "person.telegram", "boolean")),
     makeKey("personality.style", "person.persona"), makeKey("search.safe_search", "person.search", "boolean"), makeKey("chat.photo_uploads", "person.chat", "boolean"), makeKey("tts.voice_id", "person.voice", "select"),
     makeKey("storage.cap", "person.storage", "number"), makeKey("storage.cap_warning", "person.storage", "number"),
   ];
@@ -73,7 +73,7 @@ describe("NextMeSettings", () => {
       expect(document.getElementById("settings-person.storage")).toBeNull();
       const sectionsToCheck = [
         { group: "profile.appearance", title: "Appearance" },
-        { group: "person.persona", title: "Chat" },
+        { group: "person.chat", title: "Chat" },
         { group: "person.voice", title: "Voice and AI" },
         { group: "person.notifications", title: "Notifications" },
       ];
@@ -85,7 +85,7 @@ describe("NextMeSettings", () => {
           const disclosure = await waitFor(() => Array.from(document.querySelectorAll('[data-slot="collapsible-trigger"]')).find((trigger) => trigger.textContent?.includes("Telegram options")) as HTMLElement);
           fireEvent.click(disclosure);
         }
-        await waitFor(() => expect(document.getElementById(`settings-${group}`)).not.toBeNull());
+        await waitFor(() => expect([group, document.getElementById(`settings-${group}`) !== null]).toEqual([group, true]));
       }
     } finally { restore(); }
   });

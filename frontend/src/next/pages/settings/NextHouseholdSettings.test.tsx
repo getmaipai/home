@@ -14,7 +14,7 @@ function run(initialUrl = "/settings?tab=household") {
   const registry: SettingsKey[] = [
     ["household.name", "household.system"], ["household.location", "household.system"], ["household.locale", "household.system"],
     ["ai.temperature", "household.ai"], ["integration.example", "household.integrations"], ["notifications.telegram.bot_token", "household.notifications"],
-    ["reference.library_dir", "household.reference"], ["household.quiet_hours.from", "robot.settings"], ["household.quiet_hours.to", "robot.settings"], ["storage.household.cap_bytes", "household.storage"],
+    ["reference.library_dir", "household.reference"], ["household.quiet_hours.from", "household.notifications"], ["household.quiet_hours.to", "household.notifications"], ["storage.household.cap_bytes", "household.storage"],
   ].map(([key, lives_in]) => ({ key, scope: "household", selector: "text", label: key, level: "basic", secret: false, lives_in, honoured_by: ["home"] } as SettingsKey));
   const values: ResolvedSetting[] = registry.map((item) => ({ key: item.key, value: "sample", source: "default", label: item.label, help: item.help, level: item.level, secret: item.secret }));
   const before = globalThis.fetch;

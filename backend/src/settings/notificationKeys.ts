@@ -50,7 +50,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     label: "Your Telegram chat id",
     help: "Message the household bot once, then paste the chat id it replies with, to receive your notifications on Telegram.",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // Key literally embeds the NotificationType id (lib/notificationTypes.ts:
@@ -70,7 +70,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when a model finishes downloading",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -80,7 +80,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when a model download fails",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // Session F, step 1: lib/notificationTypes.ts's "repairs.new".
@@ -91,7 +91,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me about new Repairs items",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // Session F, step 7: lib/notificationTypes.ts's "person.band_changed".
@@ -102,7 +102,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when a child or teen's profile band updates on a birthday",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // Session F, step 7: lib/notificationTypes.ts's "approvals.requested".
@@ -113,7 +113,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when someone is asking for approval",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // Session F, step 8: lib/notificationTypes.ts's "backups.target_failing".
@@ -124,7 +124,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when backups start failing",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // SPEC-ROBOT-01 (spec-v0.1.79): the robot channel's person preference,
@@ -149,7 +149,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when a MaiPai Home update is available",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // HOME-STACK-03: lib/notificationTypes.ts's four "engines.*" types, one
@@ -162,7 +162,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when a Stack engine has an update available",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -172,7 +172,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when a Stack engine updates",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -182,7 +182,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when a Stack engine fails to update",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -192,7 +192,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when a Stack engine reports an open warning or critical problem",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // Memory outcomes: `memory.updated` (lib/notificationTypes.ts) has
@@ -208,7 +208,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when I remember something from our conversation",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -218,7 +218,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when I have trouble remembering something from our conversation",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // NOTIFY-SHARE-01's follow-up: `file.shared_with_you` and
@@ -232,7 +232,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when someone shares a file with me",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
@@ -242,7 +242,7 @@ export const NOTIFICATION_SETTINGS_KEYS: SettingsKey[] = [
     default: false,
     label: "Telegram me when someone shares a file with the household",
     level: "basic",
-    lives_in: "person.notifications",
+    lives_in: "person.telegram",
     honoured_by: ["home"],
   }),
   // NOTIFY-SHARE-02 (docs/plans/people-profile-2026-09-26.md, "Notified
