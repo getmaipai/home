@@ -674,11 +674,9 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
   });
 });
 
-// c-99f5: the tab's title. No conversation open yet -> "Chat"; the open
-// conversation's own title once one is (and the hook restores the prior
-// title when the page unmounts).
+// TAB-01: chat publishes its safe item title into the shell's tab identity.
 describe("NextChatPage (c-99f5: the tab's document title)", () => {
-  test("no conversation open yet, the tab title is Chat", async () => {
+  test("no conversation open yet, the tab title is New chat", async () => {
     const restore = stubFetch();
     const previousTitle = document.title;
     try {
@@ -689,7 +687,7 @@ describe("NextChatPage (c-99f5: the tab's document title)", () => {
         </MemoryRouter>,
       );
       await waitFor(() => {
-        expect(document.title).toBe("Chat · MaiPai Home");
+        expect(document.title).toBe("New chat - MaiPai Home");
       });
     } finally {
       document.title = previousTitle;
@@ -725,7 +723,7 @@ describe("NextChatPage (c-99f5: the tab's document title)", () => {
         </MemoryRouter>,
       );
       await waitFor(() => {
-        expect(document.title).toBe("Garden plans · MaiPai Home");
+        expect(document.title).toBe("Garden plans - MaiPai Home");
       });
       cleanup();
       expect(document.title).toBe("Before");

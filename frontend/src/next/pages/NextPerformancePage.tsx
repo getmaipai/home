@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type Performance } from "@/lib/api";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 import { TurnsChart } from "@/next/pages/performance/TurnsChart";
 import { TurnsByEngineTable } from "@/next/pages/performance/TurnsByEngineTable";
 import { RoutesCard } from "@/next/pages/performance/RoutesCard";
@@ -34,7 +34,7 @@ import { DiskHardwareCard } from "@/next/pages/performance/DiskHardwareCard";
 export const PerformanceIcon = getIcon("gauge");
 
 export function NextPerformancePage() {
-  useDocumentTitle("Performance");
+  useTabItem("Performance");
   const query = useQuery<Performance>({ queryKey: ["performance"], queryFn: () => api.performance() });
 
   return (

@@ -6,7 +6,7 @@ import { PeopleCountCard } from "@/next/pages/dashboard/PeopleCountCard";
 import { UpdatesCard } from "@/next/pages/dashboard/UpdatesCard";
 import { RepairsCard } from "@/next/pages/dashboard/RepairsCard";
 import { RecentActivityTable } from "@/next/pages/dashboard/RecentActivityTable";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 /** /next: SHELL-01's page half (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, the SHELL-01 row's own gap paragraph) - Home's own
@@ -70,7 +70,7 @@ import { useDocumentTitle } from "@/lib/useDocumentTitle";
  * replaces it - the same gutter the stat row and the chart/table row
  * both now sit in, since they share this one grid container. */
 export function NextDashboardPage({ person }: { person: Roster }) {
-  useDocumentTitle("Home");
+  useTabItem("Home");
   const query = useDashboard();
 
   return (

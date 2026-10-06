@@ -14,7 +14,7 @@ import { ACCENT_RING_CLASS, canManagePerson, ROLE_LABELS } from "@/apps/people/r
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
 import { PERSON_LIMIT_GROUP_IDS } from "@/next/pages/settings/personLimits";
 
@@ -29,7 +29,7 @@ function idsFilter(params: URLSearchParams): Set<string> | null {
 /** The /next equivalent of /people/:id. Its tab permission rule is kept
  * identical to PersonProfilePage: self, or owner/admin viewing another. */
 export function NextPersonProfilePage({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
-  useDocumentTitle("Profile");
+  useTabItem("Profile");
   const { id } = useParams<{ id: string }>();
   const [params, setParams] = useSearchParams();
   const rosterQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });

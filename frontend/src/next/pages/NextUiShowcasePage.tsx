@@ -15,7 +15,7 @@ import { ChatThread } from "@/apps/chat/ChatThread";
 import { AdminContext, ChatComposerNoticeContext, SourcesOpenContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { listShowcaseScenarios, openShowcaseStream, type ShowcasePace, type ShowcaseScenario } from "@/lib/uiFixturesApi";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 import type { Roster } from "@/lib/api";
 
 // UI-SHOWCASE (/dev/ui, admin only, not in any menu): deterministic buttons
@@ -127,7 +127,7 @@ function ShowcaseWorkspace({ scenarios, pace, setPace, banner, setScenario, sett
 }
 
 export function NextUiShowcasePage({ person }: { person: Roster }) {
-  useDocumentTitle("Chat showcase");
+  useTabItem("Chat showcase");
   const query = useQuery({ queryKey: ["dev-ui-fixtures"], queryFn: listShowcaseScenarios, retry: false });
   const [pace, setPace] = useState<ShowcasePace>("normal");
   const paceRef = useRef(pace);

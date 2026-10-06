@@ -6,7 +6,7 @@ import { NextDataTable } from "@/next/components/NextDataTable";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type PersonStorageRow } from "@/lib/api";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 // Exported: nextPageHeaderTitle.tsx's own MANAGE_PAGE_ENTRIES imports this
 // directly for the header's left slot, the same "that page's own exported
@@ -89,7 +89,7 @@ function inheritedRow(inherited: { files: number; bytes: number }): PersonUsageR
  * "backend is the one gate" posture NextPerformancePage.tsx's own
  * comment already states for its owner/admin-only case. */
 export function NextStoragePage({ person }: { person: Roster }) {
-  useDocumentTitle("Storage");
+  useTabItem("Storage");
   const query = useQuery<StorageUsageOverview>({ queryKey: ["storage-usage"], queryFn: () => api.storageUsage() });
   const isAdmin = isOwnerOrAdminRole(person.role);
 

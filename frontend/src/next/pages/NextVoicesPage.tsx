@@ -2,7 +2,7 @@ import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/ca
 import { getIcon } from "@maipai/ui/src/icons";
 import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
 import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 import type { Roster } from "@/lib/api";
 
 export const VoicesIcon = getIcon("audio-waveform");
@@ -10,7 +10,7 @@ export const VoicesIcon = getIcon("audio-waveform");
 /** Personal voice choices and recordings, composed from the existing
  * settings sections. Their own APIs enforce the applicable permissions. */
 export function NextVoicesPage({ person }: { person: Roster }) {
-  useDocumentTitle("Voices");
+  useTabItem("Voices");
   return (
     <div className="flex flex-col gap-4">
       <CardHeader className="p-0">

@@ -9321,3 +9321,5 @@ Plain boolean switches and selects in `/next/settings` call the save handler imm
 - [x] **ROBOT-ASSETS-01: hub half of robot assets (landed c691671e) Landed c691671e.** (S; after none; Reuse check: see `data-scratch/design/BUILD-PLAN.md`; Exit: `bash scripts/check.sh`); `data-scratch/architect/ROBOT-ASSETS-01.verdict`
 
 - [x] **UPLOAD-IMG-03: duplicate of VISION-01; model reads pictures through VISION-02c/d** (2026-10-06).
+
+- [x] **TAB-01: tab title identity and temporary-chat privacy** (completed 2026-10-06): the shell owns the tab title, private chats always read “Private chat”, child titles stay generic, locked sessions show “MaiPai Home”, and status text prefixes reuse the existing status summary.

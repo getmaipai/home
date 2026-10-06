@@ -2,12 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { getIcon } from "@maipai/ui/src/icons";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 export const ModelsIcon = getIcon("cpu");
 
 export function NextModelsPage({ person }: { person: Roster }) {
-  useDocumentTitle("AI models");
+  useTabItem("AI models");
   const canManage = isOwnerOrAdminRole(person.role);
 
   return (

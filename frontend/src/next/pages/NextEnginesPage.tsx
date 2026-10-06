@@ -6,7 +6,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError, isOwnerOrAdminRole, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem, type Roster } from "@/lib/api";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 /** /next/engines: SHELL-06's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/engines` and `GET /api/engines/
@@ -92,7 +92,7 @@ function toHealthRow(item: StackHealthItem): HealthRow {
 }
 
 export function NextEnginesPage({ person }: { person: Roster }) {
-  useDocumentTitle("Engines");
+  useTabItem("Engines");
   const canManage = isOwnerOrAdminRole(person.role);
   const overviewQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: canManage });
   const healthQuery = useQuery<EnginesHealth>({ queryKey: ["engines-health"], queryFn: () => api.enginesHealth(), enabled: canManage });

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { createContext, useContext, useState, type FormEvent } from "react";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
@@ -19,6 +19,12 @@ import { api, ApiError, type SignedInPerson } from "@/lib/api";
  * real sign-in flow does (NextSignInPage.tsx's own secret-entry
  * fragment, composed from the same shipped kit primitives) rather than
  * a second, parallel PIN-check implementation. */
+const SessionLockedContext = createContext(false);
+
+export function useSessionLocked() {
+  return useContext(SessionLockedContext);
+}
+
 export function SessionLockGate({ person, children }: { person: SignedInPerson | null; children: React.ReactNode }) {
   const [locked, setLocked] = useState(false);
   const [secret, setSecret] = useState("");
@@ -47,7 +53,7 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
   usePinAutoSubmit({ secret, selected: locked, busy, onSubmit: () => void handleUnlock() });
 
   return (
-    <>
+    <SessionLockedContext.Provider value={locked}>
       {children}
       {locked && person ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background px-4">
@@ -80,6 +86,6 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
           </Card>
         </div>
       ) : null}
-    </>
+    </SessionLockedContext.Provider>
   );
 }

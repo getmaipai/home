@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 /** /next/backups: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/backups` through Home's
@@ -58,7 +58,7 @@ function whenText(iso: string): string {
 }
 
 export function NextBackupsPage({ person }: { person: Roster }) {
-  useDocumentTitle("Backups");
+  useTabItem("Backups");
   const canManage = isOwnerOrAdminRole(person.role);
   const canRestore = person.role === "owner";
   const backupsQuery = useQuery<BackupInfo[]>({ queryKey: ["backups"], queryFn: () => api.backups(), enabled: canManage });

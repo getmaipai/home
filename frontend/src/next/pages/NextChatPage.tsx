@@ -51,7 +51,7 @@ import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assistant-ui/core";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 import { CHAT_COLUMN_ID, ChatColumnToggle, ChatHistoryPanel, useChatColumn } from "@/next/pages/ChatColumn";
@@ -792,9 +792,11 @@ function ArtifactCacheInvalidator() {
  * mount inside the provider. Falls back to "Chat" while no conversation is
  * open yet, and re-renders on thread switch and rename alike (the rename
  * path re-sets the item's own title through the adapter). */
-function ChatDocumentTitle() {
-  const title = useAuiState((s) => s.threadListItem.title) ?? "Chat";
-  useDocumentTitle(title);
+function ChatDocumentTitle({ person }: { person: Roster }) {
+  const title = useAuiState((s) => s.threadListItem.title) ?? undefined;
+  const { on: temporary } = useIncognitoContext();
+  const privateTitle = temporary ? "Private chat" : person.age_band === "child" ? "Chat" : title;
+  useTabItem("Chat", privateTitle);
   return null;
 }
 
@@ -1225,7 +1227,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         <ChatShortcutReference />
         <WakeWordController person={person} />
         <ArtifactCacheInvalidator />
-        <ChatDocumentTitle />
+              <ChatDocumentTitle person={person} />
         <ChatTitleCatchUp incognito={temporaryNext} />
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
         <ProjectResultReload />

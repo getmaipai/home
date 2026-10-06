@@ -4,7 +4,7 @@ import { StatusBanner } from "@/next/pages/status/StatusBanner";
 import { RecentProblems, StatusIncident } from "@/next/pages/status/StatusIncident";
 import { api, isOwnerOrAdminRole, type HealthStatus, type Roster, type StatusHistory } from "@/lib/api";
 import { statusSummary } from "@/shell/statusSummary";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 import { getIcon } from "@maipai/ui/src/icons";
 import { StatusBoardNotes, StatusMaintenanceCard, STATUS_BOARD_QUERY_KEY } from "@/next/pages/status/StatusBoard";
 import { activeMaintenanceParts } from "@/next/pages/status/statusBoardFormat";
@@ -15,7 +15,7 @@ import { statusAppsSummary } from "@/shell/statusApps";
 export const StatusIcon = getIcon("activity");
 
 export function NextStatusPage({ person }: { person: Roster }) {
-  useDocumentTitle("Status");
+  useTabItem("Status");
   const canSeeParts = isOwnerOrAdminRole(person.role);
   const appsQuery = useStatusApps();
   const healthQuery = useQuery<HealthStatus>({

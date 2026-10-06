@@ -37,6 +37,8 @@ import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { sidebarItemStatus } from "@/shell/statusApps";
+import { TabIdentityProvider } from "@/shell/tabIdentity";
+import { useSessionLocked } from "@/shell/sessionLockContext";
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -117,6 +119,7 @@ function NextRoutesInner({ person, onPersonChange, onSignedOut }: { person: Rost
 function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
   const statusAppsQuery = useStatusApps();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
+  const locked = useSessionLocked();
 
   const onIncognitoChange = (on: boolean) => {
     if (on === incognito) return;
@@ -139,6 +142,7 @@ function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { pers
     // per-page one) since FullLayout's own Header - where ChatHeaderBar
     // actually renders (a sibling of this Outlet, not a descendant) -
     // needs the SAME provider instance NextChatPage writes into.
+    <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
       <BrowserAlerts person={person} />
       <Routes>
@@ -191,6 +195,7 @@ function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { pers
         </Route>
       </Routes>
     </ChatHeaderDataProvider>
+    </TabIdentityProvider>
   );
 }
 

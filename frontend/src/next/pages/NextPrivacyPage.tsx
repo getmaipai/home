@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, ApiError, type PrivacyConnection } from "@/lib/api";
 import { joinNames, sourceName } from "@/apps/privacy/privacyCopy";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 export const PrivacyIcon = getIcon("lock");
 
@@ -45,7 +45,7 @@ function ConnectionGroup({ title, intro, rows, label }: { title: string; intro?:
  * from GET /api/privacy, generated from package manifests and hub
  * downloads so network behavior has one source of truth. */
 export function NextPrivacyPage() {
-  useDocumentTitle("Privacy");
+  useTabItem("Privacy");
   const query = useQuery({ queryKey: ["privacy"], queryFn: () => api.privacy() });
 
   return (

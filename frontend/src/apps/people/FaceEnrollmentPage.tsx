@@ -9,7 +9,7 @@ import { getIcon, type IconName } from "@maipai/ui/src/icons";
 import { api, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
 import { submitEnrollment } from "@/apps/people/submitEmbeddings";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 import {
   EnrollmentSession,
   POSES,
@@ -270,7 +270,7 @@ function FaceEnrollmentGate({ operator, target }: { operator: Roster; target: Pr
 }
 
 function FaceEnrollmentFlow({ operator, target, onDone }: { operator: Roster; target: ProfileEntry; onDone: () => void }) {
-  useDocumentTitle(`Enroll ${target.display_name}`);
+  useTabItem("Enroll person");
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);

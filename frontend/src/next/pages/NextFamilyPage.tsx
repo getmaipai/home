@@ -11,7 +11,7 @@ import type { Icon } from "@maipai/ui/src/icons";
 import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
 import { ROLE_LABELS, ACCENT_RING_CLASS } from "@/apps/people/roles";
 import { api, ApiError, isOwnerOrAdminRole, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster } from "@/lib/api";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 const PetIcon = getIcon("box");
 const RobotIcon = getIcon("bot");
@@ -76,7 +76,7 @@ function PersonCard({ entry }: { entry: PersonRosterEntry }) {
  * table, once as a row in it"). Tapping any card, including your own,
  * opens `/people/:id`, the next-shell profile page for any person. */
 export function NextFamilyPage({ person }: { person: Roster }) {
-  useDocumentTitle("Family");
+  useTabItem("Family");
   const [params, setParams] = useSearchParams();
   const requestedTab = params.get("tab");
   const activeTab = requestedTab === "pets" ? "pets" : requestedTab === "bots" && isOwnerOrAdminRole(person.role) ? "bots" : "people";

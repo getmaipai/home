@@ -7,7 +7,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { NextDataTable } from "@/next/components/NextDataTable";
 import { api, ApiError, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 export const FilesIcon = getIcon("folder");
 
@@ -35,7 +35,7 @@ interface FileRow extends Record<string, unknown> {
  * STORE-SHARE-01's real visibility semantics and share management while
  * moving the direct route into the current sidebar. */
 export function NextFilesPage({ person }: { person: Roster }) {
-  useDocumentTitle("Library");
+  useTabItem("Library");
   const [search, setSearch] = useState("");
   const [source, setSource] = useState("all");
   const [kind, setKind] = useState("all");

@@ -1,14 +1,14 @@
 import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { getIcon } from "@maipai/ui/src/icons";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 import type { Roster } from "@/lib/api";
 
 export const CommandsIcon = getIcon("workflow");
 
 /** Household command management; the existing section owns its role checks. */
 export function NextCommandsPage({ person }: { person: Roster }) {
-  useDocumentTitle("Commands");
+  useTabItem("Commands");
   return (
     <div className="flex flex-col gap-4">
       <CardHeader className="p-0">

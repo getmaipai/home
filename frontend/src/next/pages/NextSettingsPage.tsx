@@ -10,7 +10,7 @@ import { NextHouseholdSettings } from "@/next/pages/settings/NextHouseholdSettin
 import { api, isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { meetsMinRole } from "@/apps/people/roles";
 import { getDeviceSettingsScope } from "@/lib/deviceSettingsScope";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 // Exported: CHAT-HEADER-02's own nextPageHeaderTitle.tsx imports this
 // directly for the header's left slot rather than re-declaring the
@@ -38,7 +38,7 @@ export const SettingsIcon = getIcon("settings");
  * cards under Me below. Household's settings and management links are
  * grouped into their own sections. */
 export function NextSettingsPage({ person, onPersonChange }: { person: Roster; onPersonChange?: () => void | Promise<void> }) {
-  useDocumentTitle("Settings");
+  useTabItem("Settings");
   const canManageHousehold = isOwnerOrAdminRole(person.role);
   const canConfigureDevice = meetsMinRole(person.role, "adult");
   const registryQuery = useQuery({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry() });

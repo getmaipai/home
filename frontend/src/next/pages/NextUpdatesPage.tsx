@@ -7,7 +7,7 @@ import { NextDataTable } from "@/next/components/NextDataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { rowsFrom, hasUpdate, type UpdateRow } from "@/apps/settings/updatesData";
 import { api, ApiError, isOwnerOrAdminRole, type UpdateProjection, type Roster } from "@/lib/api";
-import { useDocumentTitle } from "@/lib/useDocumentTitle";
+import { useTabItem } from "@/shell/tabIdentity";
 
 /** /next/updates: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/updates` through Home's
@@ -56,7 +56,7 @@ function toRow(row: UpdateRow): Row {
 }
 
 export function NextUpdatesPage({ person }: { person: Roster }) {
-  useDocumentTitle("Updates");
+  useTabItem("Updates");
   const canManage = isOwnerOrAdminRole(person.role);
   const query = useQuery<UpdateProjection>({ queryKey: ["updates"], queryFn: () => api.updates(), enabled: canManage });
   const queryClient = useQueryClient();
