@@ -58,6 +58,31 @@ export function upsertDeviceState(deviceId: string, frame: RobotStateFrame): voi
   }).run();
 }
 
+/** A mute/unmute ack carries the resulting mute bit so the household card
+ * reflects the robot's applied state immediately, before its next full
+ * 15-second telemetry frame. */
+export function updateMutedFromDeviceCommand(deviceId: string, muted: boolean): void {
+  const row = db.select().from(deviceStates).where(eq(deviceStates.deviceId, deviceId)).get();
+  const reportedAt = new Date().toISOString();
+  if (row) {
+    db.update(deviceStates).set({ muted, reportedAt }).where(eq(deviceStates.deviceId, deviceId)).run();
+    return;
+  }
+  db.insert(deviceStates).values({
+    deviceId,
+    activity: "idle",
+    muted,
+    tracking: false,
+    onBattery: null,
+    batteryLevel: null,
+    daemonVersion: null,
+    appVersion: null,
+    motion: null,
+    putDownCount: null,
+    reportedAt,
+  }).run();
+}
+
 export interface DeviceState extends RobotStateFrame {
   on_battery: boolean | null;
   battery_level: number | null;

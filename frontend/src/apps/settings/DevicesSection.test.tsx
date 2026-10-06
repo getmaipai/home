@@ -39,6 +39,7 @@ function stubFetch(
   devices: DeviceInfo[],
   sessions: SessionInfo[],
   onAction: (kind: "device" | "session", id: string) => void = () => {},
+  onCommand: (id: string, body: unknown) => void = () => {},
 ): () => void {
   let deviceRows = devices;
   let sessionRows = sessions;
@@ -46,6 +47,11 @@ function stubFetch(
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     const method = init?.method ?? "GET";
+    const deviceCommand = url.match(/\/api\/devices\/([^/]+)\/commands$/);
+    if (deviceCommand && method === "POST") {
+      onCommand(deviceCommand[1]!, JSON.parse(String(init?.body)) as unknown);
+      return Promise.resolve(new Response(JSON.stringify({ id: "command-1" }), { status: 202 }));
+    }
     const deviceDelete = url.match(/\/api\/devices\/([^/]+)$/);
     if (deviceDelete && method === "DELETE") {
       onAction("device", deviceDelete[1]!);
@@ -160,9 +166,8 @@ describe("DevicesSection", () => {
       [],
     );
     try {
-      const { findByTestId, findByText } = renderSection();
+      const { findByTestId } = renderSection();
       const card = await findByTestId("robot-card");
-      await findByText("Listening");
       expect(card.textContent).toContain("Muted");
       expect(card.textContent).toContain("Level unknown");
       expect(card.textContent).toContain("MaiPai version");
@@ -268,6 +273,23 @@ describe("DevicesSection", () => {
       fireEvent.click(await findByRole("button", { name: "Remove Riff" }));
       fireEvent.click(await findByRole("button", { name: "Yes, remove it" }));
       await waitFor(() => expect(actions).toEqual([["device", "robot-1"]]));
+    } finally {
+      restore();
+    }
+  });
+
+  test("a robot card sends a mute command to the authenticated hub route", async () => {
+    const commands: Array<[string, unknown]> = [];
+    const restore = stubFetch([device({
+      id: "robot-mute",
+      kind: "robot",
+      name: "Riff",
+      state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null },
+    })], [], () => {}, (id, body) => commands.push([id, body]));
+    try {
+      const { findByRole } = renderSection();
+      fireEvent.click(await findByRole("button", { name: "Mute microphone" }));
+      await waitFor(() => expect(commands).toEqual([["robot-mute", { kind: "mute" }]]));
     } finally {
       restore();
     }

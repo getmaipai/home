@@ -602,6 +602,11 @@ export const api = {
   // device under whichever admin approved the pairing, so a different
   // admin still needs to find it here to rotate its password.
   robotDevices: () => request<DeviceInfo[]>("/api/devices/robots"),
+  setRobotMuted: (id: string, muted: boolean) =>
+    request<{ id: string }>(`/api/devices/${encodeURIComponent(id)}/commands`, {
+      method: "POST",
+      body: JSON.stringify({ kind: muted ? "mute" : "unmute" }),
+    }),
   approveRobotCode: (code: string, totpToken?: string) =>
     request<{ success: true }>("/api/auth/quick-connect/approve", {
       method: "POST",

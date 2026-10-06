@@ -1040,6 +1040,21 @@ export const devices = sqliteTable("devices", {
   hlc: text("hlc").notNull(),
 });
 
+// ROBOT-CHANNEL-01: hub-to-device commands are durable for 24 hours so a
+// disconnected robot can resume from its Last-Event-Id. The wire HLC is
+// encoded in the stable command id; only the spec payload is stored here.
+export const deviceCommands = sqliteTable("device_commands", {
+  id: text("id").primaryKey(),
+  deviceId: text("device_id")
+    .notNull()
+    .references(() => devices.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  payload: text("payload").notNull(),
+  issuedAt: text("issued_at").notNull(),
+  deliveredAt: text("delivered_at"),
+  ackedAt: text("acked_at"),
+});
+
 // ROBOT-CARD-01: the latest robot-reported state is a hub-local
 // projection, deliberately separate from the synced Device record.
 export const deviceStates = sqliteTable("device_states", {

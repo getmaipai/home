@@ -5,6 +5,7 @@
 // describes - not a household-wide admin view (that's a later, undecided
 // feature; nothing in this wave's contract asks for one).
 import { createRoute, z } from "@hono/zod-openapi";
+import { upgradeWebSocket } from "hono/bun";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth, requireRole, requireDeviceSession } from "@/middleware/auth";
 import { listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById } from "@/lib/devices";
@@ -14,8 +15,21 @@ import { discoverRobots } from "@/lib/robotDiscovery";
 import { rotateRobotPassword, RobotPasswordRotationError } from "@/lib/robotSsh";
 import { storeRobotCredential, hasRotatedRobotCredential, getRobotCredential, getMostRecentRobotCredentialForHost } from "@/lib/robotCredentials";
 import { ensureRobotAssets, isRobotAssetAvailable, readVerifiedRobotAsset, robotAssetById, ROBOT_ASSETS } from "@/lib/robotAssets";
+import { closeDeviceCommandChannel, deviceCommandWebSocket, issueDeviceCommand } from "@/lib/deviceCommands";
 
 export const devicesRoutes = apiRouter();
+
+// The only robot-opened hub command channel. Authentication is the same
+// session cookie minted by /api/auth/devices/redeem; no robot credential or
+// transport library is added here.
+devicesRoutes.get(
+  "/me/events",
+  requireDeviceSession("robot"),
+  upgradeWebSocket((c) => {
+    const device = resolveRequestDevice(c);
+    return device ? deviceCommandWebSocket(device.id, c.req.header("last-event-id")) : {};
+  }),
+);
 
 const DeviceSchema = z.object({
   id: z.string(),
@@ -152,6 +166,34 @@ devicesRoutes.openapi(robotAssetBytesRoute, async (c) => {
   });
 });
 
+const sendCommandRoute = createRoute({
+  method: "post",
+  path: "/{id}/commands",
+  tags: ["Devices"],
+  summary: "Ask a paired robot to mute or unmute its microphone",
+  middleware: [requireAuth] as const,
+  request: {
+    params: idParamSchema("id", "device-a1b2c3"),
+    body: { content: { "application/json": { schema: z.object({ kind: z.enum(["mute", "unmute"]) }) } } },
+  },
+  responses: {
+    202: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Persisted for delivery to the robot." },
+    ...errorResponses({ 400: "Not a robot", 401: "Not signed in", 404: "No such device (or it is not yours to control)" }),
+  },
+});
+devicesRoutes.openapi(sendCommandRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const device = getDeviceById(id);
+  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) {
+    return c.json({ error: "No such device" }, 404);
+  }
+  if (device.kind !== "robot") return c.json({ error: "Not a robot" }, 400);
+  const { kind } = c.req.valid("json");
+  const command = issueDeviceCommand(device.id, kind, {});
+  return c.json({ id: command.id }, 202);
+});
+
 const deleteRoute = createRoute({
   method: "delete",
   path: "/{id}",
@@ -168,6 +210,7 @@ devicesRoutes.openapi(deleteRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   if (!deleteDevice(id, actor.id)) return c.json({ error: "No such device" }, 404);
+  closeDeviceCommandChannel(id);
   return c.json({ success: true as const }, 200);
 });
 

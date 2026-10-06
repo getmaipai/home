@@ -83,6 +83,7 @@ export function DevicesSection() {
                   key={r.id}
                   device={r}
                   busy={busy}
+                  onSetMuted={(muted) => api.setRobotMuted(r.id, muted).then(() => undefined)}
                   confirmingRemove={confirming?.kind === "device" && confirming.id === r.id}
                   onRemove={() => setConfirming({ kind: "device", id: r.id, label: r.name })}
                   onConfirmRemove={handleRevoke}

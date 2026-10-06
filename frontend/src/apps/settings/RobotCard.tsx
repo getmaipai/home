@@ -52,6 +52,7 @@ export function RobotCard({
   onConfirmRemove,
   onCancelRemove,
   busy,
+  onSetMuted,
 }: {
   device: DeviceInfo;
   onRemove: () => void;
@@ -59,10 +60,13 @@ export function RobotCard({
   onConfirmRemove: () => void;
   onCancelRemove: () => void;
   busy: boolean;
+  onSetMuted: (muted: boolean) => Promise<void>;
 }) {
   const state = device.state ?? null;
   const lastPutDownCount = useRef<number | undefined>(state?.put_down_count);
   const [putDownChanged, setPutDownChanged] = useState(false);
+  const [askedMuted, setAskedMuted] = useState<boolean | null>(null);
+  const [muteError, setMuteError] = useState(false);
   useEffect(() => {
     const nextCount = state?.put_down_count;
     if (didPutDownCountIncrease(lastPutDownCount.current, nextCount)) {
@@ -70,8 +74,27 @@ export function RobotCard({
     }
     if (nextCount !== undefined) lastPutDownCount.current = nextCount;
   }, [state?.put_down_count]);
+  useEffect(() => {
+    if (askedMuted === null || state?.muted === askedMuted) {
+      if (askedMuted !== null && state?.muted === askedMuted) setAskedMuted(null);
+      return;
+    }
+    const timer = setTimeout(() => setAskedMuted(null), 15_000);
+    return () => clearTimeout(timer);
+  }, [askedMuted, state?.muted]);
+  async function askMute(muted: boolean): Promise<void> {
+    setMuteError(false);
+    setAskedMuted(muted);
+    try {
+      await onSetMuted(muted);
+    } catch {
+      setAskedMuted(null);
+      setMuteError(true);
+    }
+  }
   const unreachable = state !== null && !state.reachable;
-  const status = state === null ? "Waiting for first report" : unreachable ? "Not responding" : ACTIVITY_LABELS[state.activity];
+  const showMuted = state !== null && !unreachable && state.muted && (state.activity === "idle" || state.activity === "listening");
+  const status = state === null ? "Waiting for first report" : unreachable ? "Not responding" : showMuted ? "Muted" : ACTIVITY_LABELS[state.activity];
   const motion = state?.motion ?? null;
   const battery = state?.battery_level;
   return (
@@ -122,9 +145,26 @@ export function RobotCard({
             </Button>
           </>
         ) : (
-          <Button variant="ghost" aria-label={`Remove ${device.name}`} onClick={onRemove}>
-            Remove
-          </Button>
+          <>
+            {state !== null ? (
+              <>
+                {muteError ? <p className="mr-auto text-sm text-destructive">Could not send that to {device.name}.</p> : null}
+                {askedMuted !== null && !muteError ? (
+                  <p className="mr-auto text-sm text-muted-foreground">Asked {device.name} to {askedMuted ? "mute" : "unmute"}, waiting for it.</p>
+                ) : null}
+                <Button
+                  variant="outline"
+                  disabled={busy || unreachable || askedMuted !== null}
+                  onClick={() => void askMute(!state.muted)}
+                >
+                  {state.muted ? "Unmute microphone" : "Mute microphone"}
+                </Button>
+              </>
+            ) : null}
+            <Button variant="ghost" aria-label={`Remove ${device.name}`} onClick={onRemove}>
+              Remove
+            </Button>
+          </>
         )}
       </CardFooter>
     </Card>

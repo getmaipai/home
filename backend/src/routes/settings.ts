@@ -5,6 +5,7 @@ import { listValues, setValue, resetValue } from "@/lib/settings";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { issueApiToken, revokeApiToken } from "@/lib/apiToken";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { publishSettingsChanged } from "@/lib/deviceCommands";
 
 export const settingsRoutes = apiRouter();
 
@@ -98,6 +99,7 @@ settingsRoutes.openapi(putRoute, (c) => {
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
+  publishSettingsChanged(body.scope, body.key, result.value.value);
   return c.json(result.value, 200);
 });
 
@@ -132,6 +134,7 @@ settingsRoutes.openapi(resetRoute, (c) => {
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
+  publishSettingsChanged(body.scope, body.key, result.value.value);
   return c.json({ ...result.value, success: true as const }, 200);
 });
 
