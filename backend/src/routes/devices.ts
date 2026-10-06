@@ -16,6 +16,9 @@ import { rotateRobotPassword, RobotPasswordRotationError } from "@/lib/robotSsh"
 import { storeRobotCredential, hasRotatedRobotCredential, getRobotCredential, getMostRecentRobotCredentialForHost } from "@/lib/robotCredentials";
 import { ensureRobotAssets, isRobotAssetAvailable, readVerifiedRobotAsset, robotAssetById, ROBOT_ASSETS } from "@/lib/robotAssets";
 import { closeDeviceCommandChannel, deviceCommandWebSocket, issueDeviceCommand } from "@/lib/deviceCommands";
+import { listHubEndpoints } from "@/lib/hubEndpoints";
+import { getHubInstanceId } from "@/lib/hubIdentity";
+import { getHouseholdSettingValue } from "@/lib/settings";
 
 export const devicesRoutes = apiRouter();
 
@@ -115,6 +118,30 @@ devicesRoutes.openapi(updateMyStateRoute, (c) => {
   if (!device) return c.json({ error: "Not signed in" }, 401);
   upsertDeviceState(device.id, c.req.valid("json"));
   return c.body(null, 204);
+});
+
+const HubEndpointsSchema = z.array(z.object({
+  id: z.string(), name: z.string(), url: z.string(), kind: z.enum(["lan", "overlay", "public"]),
+  priority: z.number(), enabled: z.boolean(), source: z.enum(["detected", "managed"]), instanceId: z.string(),
+}));
+const hubEndpointsRoute = createRoute({
+  method: "get",
+  path: "/me/hub-endpoints",
+  tags: ["Devices"],
+  summary: "The reachable hub addresses for this robot",
+  middleware: [requireDeviceSession("robot")] as const,
+  responses: {
+    200: { content: { "application/json": { schema: HubEndpointsSchema } }, description: "Hub addresses the robot may use, each bound to this hub's stable instance id." },
+    ...errorResponses({ 401: "Not signed in", 403: "Not a robot device session" }),
+  },
+});
+devicesRoutes.openapi(hubEndpointsRoute, async (c) => {
+  const includeOverlay = getHouseholdSettingValue("robot.offlan.tailnet") === true;
+  const instanceId = getHubInstanceId();
+  const endpoints = await listHubEndpoints();
+  return c.json(endpoints
+    .filter((endpoint) => endpoint.kind !== "overlay" || includeOverlay)
+    .map((endpoint) => ({ ...endpoint, instanceId })), 200);
 });
 
 const RobotAssetsSchema = z.object({

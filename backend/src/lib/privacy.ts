@@ -258,6 +258,18 @@ export function offlinePluginNames(manifests = loadedManifests()): string[] {
 function inboundConnections(): PrivacyConnection[] {
   return [
     {
+      id: "platform:robot-hub-endpoints",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "your own network only - nothing leaves the house for this row",
+      when: "when a paired robot asks Home for the addresses it can use to reconnect",
+      what: "the reverse of every other row here: Home gives that paired robot the hub's LAN addresses and, only when 'Allow robot access over the tailnet' is on, its manually joined tailnet addresses. Each address includes this hub's stable instance id so the robot can reject another hub. No address is sent to a third party.",
+      who: "the paired robot device session",
+      optIn: true,
+      retention: "the robot may cache these addresses to reconnect; Home keeps no separate request record",
+      direction: "inbound",
+    },
+    {
       id: "platform:inbound-api",
       source: "MaiPai Home",
       sourceKind: "platform",

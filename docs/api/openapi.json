@@ -14955,6 +14955,94 @@
         }
       }
     },
+    "/api/devices/me/hub-endpoints": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "The reachable hub addresses for this robot",
+        "responses": {
+          "200": {
+            "description": "Hub addresses the robot may use, each bound to this hub's stable instance id.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "lan",
+                          "overlay",
+                          "public"
+                        ]
+                      },
+                      "priority": {
+                        "type": "number"
+                      },
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "detected",
+                          "managed"
+                        ]
+                      },
+                      "instanceId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "url",
+                      "kind",
+                      "priority",
+                      "enabled",
+                      "source",
+                      "instanceId"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a robot device session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/me/assets": {
       "get": {
         "tags": [

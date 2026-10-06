@@ -7,6 +7,10 @@ import { hasRotatedRobotCredential, getRobotCredential, storeRobotCredential } f
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { privacyConnections } from "@/lib/privacy";
+import { getHubInstanceId } from "@/lib/hubIdentity";
+import { addManagedEndpoint } from "@/lib/hubEndpoints";
 
 beforeEach(() => resetDb());
 
@@ -34,6 +38,56 @@ describe("GET /api/devices", () => {
     expect(body).toHaveLength(1);
     expect(body[0]!.name).toBe("Living room TV");
     expect(body[0]!.kind).toBe("tv");
+  });
+});
+
+describe("GET /api/devices/me/hub-endpoints", () => {
+  test("requires a paired robot device session", async () => {
+    const anon = new TestClient();
+    expect((await anon.get("/api/devices/me/hub-endpoints")).status).toBe(401);
+    const { personId } = await owner();
+    const { token } = issueDeviceToken(personId, "phone", "Phone");
+    const phone = new TestClient();
+    await phone.post("/api/auth/devices/redeem", { token });
+    expect((await phone.get("/api/devices/me/hub-endpoints")).status).toBe(403);
+  });
+
+  test("always returns LAN endpoints and filters every overlay endpoint while opt-in is off", async () => {
+    const { personId } = await owner();
+    addManagedEndpoint("Tailnet", "https://hub.example.ts.net");
+    const { token, deviceId } = issueDeviceToken(personId, "robot", "Reachy");
+    storeRobotCredential(deviceId, "test-host", "pollen", "rotated-test-password");
+    const robot = new TestClient();
+    expect((await robot.post("/api/auth/devices/redeem", { token })).status).toBe(200);
+    setHouseholdSettingValue("robot.offlan.tailnet", false);
+    const response = await robot.get("/api/devices/me/hub-endpoints");
+    expect(response.status).toBe(200);
+    const body = await response.json() as Array<{ kind: string; url: string; instanceId: string }>;
+    expect(body.some((endpoint) => endpoint.kind === "lan")).toBe(true);
+    expect(body.some((endpoint) => endpoint.kind === "overlay" || endpoint.url.includes(".ts.net") || endpoint.url.match(/^https?:\/\/100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./))).toBe(false);
+  });
+
+  test("includes overlay endpoints with the stable hub instance id when opted in", async () => {
+    const { personId } = await owner();
+    addManagedEndpoint("Tailnet", "https://hub.example.ts.net");
+    const { token, deviceId } = issueDeviceToken(personId, "robot", "Reachy");
+    storeRobotCredential(deviceId, "test-host", "pollen", "rotated-test-password");
+    const robot = new TestClient();
+    expect((await robot.post("/api/auth/devices/redeem", { token })).status).toBe(200);
+    setHouseholdSettingValue("robot.offlan.tailnet", true);
+    const response = await robot.get("/api/devices/me/hub-endpoints");
+    expect(response.status).toBe(200);
+    const body = await response.json() as Array<{ kind: string; url: string; instanceId: string }>;
+    expect(body.some((endpoint) => endpoint.kind === "overlay" && endpoint.url === "https://hub.example.ts.net")).toBe(true);
+    expect(body.filter((endpoint) => endpoint.kind === "overlay").every((endpoint) => endpoint.instanceId === getHubInstanceId())).toBe(true);
+  });
+
+  test("the privacy table explains robot endpoint sharing", () => {
+    const row = privacyConnections().find((connection) => connection.id === "platform:robot-hub-endpoints");
+    expect(row?.direction).toBe("inbound");
+    expect(row?.when).toContain("paired robot");
+    expect(row?.what).toContain("LAN addresses");
+    expect(row?.what).toContain("tailnet");
   });
 });
 

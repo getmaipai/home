@@ -195,6 +195,7 @@ const ROBOT_SESSION_ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
   ["PUT", /^\/api\/devices\/me\/state\/?$/],
   ["GET", /^\/api\/devices\/me\/assets\/?$/],
   ["GET", /^\/api\/devices\/me\/assets\/[^/]+\/?$/],
+  ["GET", /^\/api\/devices\/me\/hub-endpoints\/?$/],
   ["GET", /^\/api\/biometric-prints\/sync\/?$/],
 ];
 
