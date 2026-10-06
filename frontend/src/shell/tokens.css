@@ -164,11 +164,11 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
   padding: 4px 10px;
   border-radius: 20px;
   background: var(--shell-composer-bg);
-  border-color: color-mix(in oklab, var(--foreground) 12%, transparent);
+  border-color: var(--shell-composer-border);
 }
 
 [data-slot="next-chat-pane"] [data-slot="aui_composer-shell"]:focus-within {
-  border-color: color-mix(in oklab, var(--foreground) 24%, transparent);
+  border-color: var(--shell-composer-border-focus);
 }
 
 [data-slot="next-chat-pane"] [data-slot="aui_composer-shell"][data-multiline] {
@@ -219,41 +219,66 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
  * `empty:hidden` in the kit, so a composer with nothing attached keeps
  * its single row. */
 
-/* RAIL-01 tones: separation by tone, not borders. Dark: the rail darkest,
- * the history column a step lighter, the header a touch apart from the
- * conversation, which is the main surface. Light keeps the same order. */
-:root {
-    --shell-rail: color-mix(in oklab, var(--background), black 7%);
-  --shell-history: color-mix(in oklab, var(--background), black 3.5%);
-  --shell-header: color-mix(in oklab, var(--background), black 1.5%);
-  --shell-composer-bg: color-mix(in oklab, var(--background), var(--foreground) 3%);
-  --shell-user-bubble: color-mix(in oklab, var(--primary) 14%, var(--background));
+/* SHELL2 tones (owner, 2026-10-06: "change our color scheme to
+ * chatgpt's"). Sampled from his ChatGPT desktop reference (dark, 2x
+ * screenshot): rail #282828, history column #1e1e1e, conversation
+ * #181818, composer fill #363636 with a #424242 outline, dividers
+ * #343434 to #393939: neutral grays, the rail the lightest chrome, then
+ * the history column, then the conversation. Each tone is the person's
+ * own look mixed toward its foreground (sRGB), so the default Neutral
+ * look lands on those exact grays and the other looks keep their tint.
+ * Declared on body, not :root: the look's tokens live on body
+ * (`.style-<look>`), and a tone declared on :root resolved against the
+ * kit's navy root tokens instead, which is why the header and history
+ * column read blue. No light ChatGPT reference was on disk; light mirrors
+ * the same order (conversation white, history a touch darker, the rail a
+ * touch more) with a white composer on a thin outline. */
+body {
+  --shell-main: var(--background);
+  --shell-history: color-mix(in srgb, var(--background), var(--foreground) 2.5%);
+  --shell-rail: color-mix(in srgb, var(--background), var(--foreground) 5%);
+  --shell-divider: color-mix(in srgb, var(--background), var(--foreground) 9%);
+  --shell-composer-bg: var(--background);
+  --shell-composer-border: color-mix(in srgb, var(--background), var(--foreground) 14%);
+  --shell-composer-border-focus: color-mix(in srgb, var(--background), var(--foreground) 26%);
+  --shell-user-bubble: color-mix(in srgb, var(--primary) 4%, color-mix(in srgb, var(--background), var(--foreground) 4%));
+  --app-rail-bg: var(--shell-rail);
 }
-:root.dark {
-  --shell-rail: color-mix(in oklab, var(--background), black 55%);
-  --shell-history: color-mix(in oklab, var(--background), black 30%);
-  --shell-header: color-mix(in oklab, var(--background), white 2%);
-  --shell-composer-bg: color-mix(in oklab, var(--background), white 5%);
-  --shell-user-bubble: color-mix(in oklab, var(--primary) 26%, var(--background));
+html.dark body {
+  --shell-main: color-mix(in srgb, var(--background), var(--foreground) 6%);
+  --shell-history: color-mix(in srgb, var(--background), var(--foreground) 8.3%);
+  --shell-rail: color-mix(in srgb, var(--background), var(--foreground) 12.5%);
+  --shell-divider: color-mix(in srgb, var(--background), var(--foreground) 19%);
+  --shell-composer-bg: color-mix(in srgb, var(--background), var(--foreground) 18.3%);
+  --shell-composer-border: color-mix(in srgb, var(--background), var(--foreground) 23.3%);
+  --shell-composer-border-focus: color-mix(in srgb, var(--background), var(--foreground) 34%);
+  --shell-user-bubble: color-mix(in srgb, var(--primary) 6%, color-mix(in srgb, var(--background), var(--foreground) 12%));
 }
 @media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    --shell-rail: color-mix(in oklab, var(--background), black 55%);
-    --shell-history: color-mix(in oklab, var(--background), black 30%);
-    --shell-header: color-mix(in oklab, var(--background), white 2%);
-    --shell-composer-bg: color-mix(in oklab, var(--background), white 5%);
-    --shell-user-bubble: color-mix(in oklab, var(--primary) 26%, var(--background));
+  html:not(.light) body {
+    --shell-main: color-mix(in srgb, var(--background), var(--foreground) 6%);
+    --shell-history: color-mix(in srgb, var(--background), var(--foreground) 8.3%);
+    --shell-rail: color-mix(in srgb, var(--background), var(--foreground) 12.5%);
+    --shell-divider: color-mix(in srgb, var(--background), var(--foreground) 19%);
+    --shell-composer-bg: color-mix(in srgb, var(--background), var(--foreground) 18.3%);
+    --shell-composer-border: color-mix(in srgb, var(--background), var(--foreground) 23.3%);
+    --shell-composer-border-focus: color-mix(in srgb, var(--background), var(--foreground) 34%);
+    --shell-user-bubble: color-mix(in srgb, var(--primary) 6%, color-mix(in srgb, var(--background), var(--foreground) 12%));
   }
 }
 
-[data-slot="app-rail"] {
-  background: var(--shell-rail);
-}
 [data-slot="next-chat-rail"] {
   background: var(--shell-history);
+  border-color: var(--shell-divider);
 }
-[data-slot="next-chat-header"] {
-  background: var(--shell-header);
+/* The chat's whole workspace (header and conversation) is one surface. */
+[data-slot="rail-workspace"]:has([data-slot="next-chat-shell"]) {
+  background: var(--shell-main) !important;
+}
+[data-slot="next-chat-header"],
+[data-slot="next-chat-pane"] .aui-root.aui-thread-root,
+[data-slot="next-chat-pane"] .aui-thread-viewport-footer {
+  background-color: var(--shell-main);
 }
 /* Other pages sit on --page, so their title bar is a touch apart from it. */
 [data-slot="rail-page-header"] {

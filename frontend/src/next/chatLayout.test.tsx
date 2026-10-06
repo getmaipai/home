@@ -42,7 +42,9 @@ function renderChat(width: number) {
   );
 }
 
-const railLabels = ["MaiPai Home", "Home", "Chat", "Library", "Family"];
+// The brand mark is the Home destination (owner, 2026-10-06), so "Home"
+// is one link at the top of the rail, not a logo plus a second Home icon.
+const railLabels = ["Home", "Chat", "Library", "Family"];
 
 // Design rule S3 (docs/design/RULES.md): the main navigation renders on an
 // app page at desktop and mobile widths, as the permanent icon rail with
@@ -63,6 +65,7 @@ describe("chat shell layout", () => {
         await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
       }
       expect(view.getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
+      expect(view.getAllByRole("link", { name: "Home" })).toHaveLength(1);
       expect(view.getByRole("button", { name: "Search" })).toBeTruthy();
       expect(view.getByRole("button", { name: /Open profile menu for Sage/ })).toBeTruthy();
     });

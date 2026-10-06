@@ -2096,7 +2096,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      expect(classes(rail())).toContain("w-65");
+      expect(classes(rail())).toContain("w-72");
       expect(classes(rail())).not.toContain("absolute");
       const toggle = view.getByRole("button", { name: "Hide conversations" });
       expect(toggle).toHaveAttribute("aria-controls", "next-chat-rail");
@@ -2136,7 +2136,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       );
       await view.findByLabelText("Message input");
       expect(view.getByRole("button", { name: "New chat" })).toBeVisible();
-      expect(classes(rail())).toContain("w-65");
+      expect(classes(rail())).toContain("w-72");
 
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
       expect(classes(rail())).toContain("hidden");
@@ -2149,7 +2149,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // phone-width utility, overridden at `lg:`); `w-64` vs `w-0` is
       // what actually distinguishes the two states, the same assertion
       // the "open:" test above this one uses.
-      expect(classes(rail())).toContain("w-65");
+      expect(classes(rail())).toContain("w-72");
       expect(classes(rail())).not.toContain("w-0");
       expect(view.getByRole("button", { name: "New chat" })).toBeVisible();
     } finally {
@@ -2261,7 +2261,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // Never remounted, never a second column instance - the exact same
       // node that was measured "open" a moment ago.
       expect(rail()).toBe(railNode);
-      expect(classes(rail())).toEqual(expect.arrayContaining(["absolute", "inset-y-0", "left-0", "w-65"]));
+      expect(classes(rail())).toEqual(expect.arrayContaining(["absolute", "inset-y-0", "left-0", "w-72"]));
       // The collapsed-only toggle instance is gone; the inline one, now
       // visible again inside the peeked rail, is what's on screen.
       expect(view.queryAllByRole("button", { name: "Show conversations" })).toHaveLength(1);
@@ -2393,7 +2393,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
       fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-65");
+      expect(classes(rail())).toContain("w-72");
       expect(classes(rail())).not.toContain("absolute");
       expect(classes(rail())).toContain("transition-[width]");
       await waitFor(() => expect(classes(rail())).not.toContain("transition-[width]"), { timeout: 1000 });
@@ -2420,6 +2420,11 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       const header = () => view.container.querySelector<HTMLElement>('[data-slot="next-chat-header"]')!;
       const openPaneClasses = classes(pane());
       expect(classes(header())).not.toContain("ps-14");
+      // Owner, 2026-10-06: the header blends into the conversation the
+      // way Claude's does, with no divider line under it.
+      expect(classes(header()).filter((name) => name.startsWith("border"))).toEqual([]);
+      // The history column is ChatGPT's measured 288px.
+      expect(classes(rail())).toContain("w-72");
 
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }), { detail: 1 });
       expect(classes(pane())).toEqual(openPaneClasses);
@@ -2487,7 +2492,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       // real pointer would be over next, so the click lands on it, not
       // the (now unmounted) collapsed-only button.
       fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-65");
+      expect(classes(rail())).toContain("w-72");
       expect(classes(rail())).toContain("lg:block");
       expect(classes(rail())).not.toContain("absolute");
       // Pinning open resets the peek - collapsing again later starts
@@ -2669,7 +2674,7 @@ describe("NextChatPage (CHAT-UI-01 finding 4 / CHAT-UI-02: the desktop rail coll
       fireEvent.pointerEnter(collapsedToggle);
       expect(classes(rail())).toContain("absolute");
       fireEvent.click(within(rail()).getByRole("button", { name: "Show conversations" }), { detail: 1 });
-      expect(classes(rail())).toContain("w-65");
+      expect(classes(rail())).toContain("w-72");
       expect(classes(rail())).not.toContain("absolute");
     } finally {
       restore();
