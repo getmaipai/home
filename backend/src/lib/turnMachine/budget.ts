@@ -6,6 +6,7 @@
 // adult's turn on a model without a record gets tools and thinking.
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { CATALOG } from "@/lib/modelCatalog";
+import { chatWindowContext, MINIMUM_CHAT_WINDOW_TOKENS } from "@/lib/roleHealth";
 import type { AgeBand } from "@/lib/ageBand";
 import type { TurnBudget } from "./contract";
 
@@ -30,7 +31,7 @@ export const NO_RECORD_BUDGET: TurnBudget = {
   rounds: 0,
   tools_offered: [],
   model_transitions: false,
-  context_tokens: 2000,
+  context_tokens: MINIMUM_CHAT_WINDOW_TOKENS,
   thinking_budget_tokens: 0,
   // THINK-DEFAULT-01: the safest shape stays safest even toggled on -
   // an unmeasured model gets no reasoning either way.
@@ -77,6 +78,12 @@ export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget 
     }
   }
   const entry = id ? CATALOG.find((m) => m.role === "chat" && m.id === id) : undefined;
-  if (entry?.turn_budget) return withStreamDeadlines(entry.turn_budget);
-  return band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
+  const base = entry?.turn_budget ? withStreamDeadlines(entry.turn_budget) : band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
+  return base;
+}
+
+export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBand): Promise<TurnBudget> {
+  const base = resolveTurnBudget(modelId, band);
+  const context = await chatWindowContext();
+  return { ...base, context_tokens: context.tokens };
 }

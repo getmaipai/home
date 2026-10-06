@@ -15,7 +15,7 @@ import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import * as settings from "@/lib/settings";
 import { CATALOG } from "@/lib/modelCatalog";
-import { FIRST_TOKEN_DEADLINE_MS, NO_RECORD_BUDGET, STALL_DEADLINE_MS, resolveTurnBudget } from "@/lib/turnMachine/budget";
+import { FIRST_TOKEN_DEADLINE_MS, NO_RECORD_BUDGET, STALL_DEADLINE_MS, resolveTurnBudget, resolveTurnBudgetWithStack } from "@/lib/turnMachine/budget";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 
 const UNKNOWN_MODEL = "some-other-chat-model-q4";
@@ -105,6 +105,12 @@ describe("resolveTurnBudget: a model with no measured record", () => {
 });
 
 describe("runTurnNext: the model gate on the wire", () => {
+  test("Stack context status becomes the turn window budget", async () => {
+    const { __setChatWindowContextForTests } = await import("@/lib/roleHealth");
+    __setChatWindowContextForTests(20_480);
+    try { expect((await resolveTurnBudgetWithStack(RECORDED_MODEL, "adult")).context_tokens).toBe(20_480); }
+    finally { __setChatWindowContextForTests(undefined); }
+  });
   test("an adult's turn on an unrecorded model offers the tools", async () => {
     const { toolCount } = await seen(people.owner, "hi");
     expect(toolCount).toBeGreaterThan(0);

@@ -150,6 +150,8 @@ export interface RoleInfo {
     measuredContextLength: number | null;
     estimated: boolean;
   } | null;
+  /** STATUS-STACK-01: live context from the running engine. */
+  context?: { context_length: number | null; slots: number | null; context_per_slot: number | null; reason: string | null };
   check: {
     state: "not checked" | "passed" | "failed" | "skipped";
     at: string | null;

@@ -544,6 +544,12 @@ export interface EngineHealthEntry {
    * wording, the same line the chat reply carries. The status page shows
    * it beside the engine's row; absent, the row reads as before. */
   detail?: string | null;
+  /** Live Stack context split across parallel chat slots. */
+  context_length?: number | null;
+  context_slots?: number | null;
+  context_per_slot?: number | null;
+  context_scope?: "total" | "per_slot" | null;
+  context_message?: string | null;
 }
 
 export interface HealthStatus {

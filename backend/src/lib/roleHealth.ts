@@ -7,7 +7,7 @@ export type HealthRole = "chat" | "embed" | "background" | "voice";
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; detail?: string };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot" };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; }
 
@@ -49,20 +49,45 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
     const row = roles.find((item) => item.id === id);
     if (!row) return { availability: "unavailable", reason: "stack_unreachable" };
     const state = row.state.state;
-    if (state === "ready" || state === "installed") return { availability: "ready", reason: null };
-    if (state === "loaded") return row.state.reason === STACK_IDLE_REASON ? { availability: "ready", reason: null } : { availability: "starting", reason: null };
+    const status = role === "chat" ? chatContextStatus(row as typeof row & { context?: { context_length?: number | null; context_per_slot?: number | null; slots?: number | null; reason?: string | null } | null }) : {};
+    if (state === "ready" || state === "installed") return { availability: "ready", reason: null, ...status };
+    if (state === "loaded") return { availability: row.state.reason === STACK_IDLE_REASON ? "ready" : "starting", reason: null, ...status };
     return { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start" };
   } catch {
     return { availability: "unavailable", reason: "stack_unreachable" };
   }
 }
 
+/** Resolve llama-server's launched context to the actual per-request window.
+ * Stack's context_length is the -c total, divided across --parallel slots. */
+export function chatContextStatus(row: { context?: { context_length?: number | null; context_per_slot?: number | null; slots?: number | null; reason?: string | null } | null }) {
+  const context = row.context;
+  const slots = Number.isInteger(context?.slots) && context!.slots! > 0 ? context!.slots! : undefined;
+  const perSlot = Number.isInteger(context?.context_per_slot) && context!.context_per_slot! > 0 ? context!.context_per_slot! : undefined;
+  return perSlot && slots ? { contextLength: context?.context_length ?? undefined, slots, contextPerSlot: perSlot, contextScope: "per_slot" as const } : {};
+}
+
+export const MINIMUM_CHAT_WINDOW_TOKENS = 2048;
+
+let chatWindowContextForTests: number | undefined;
+export function __setChatWindowContextForTests(value?: number): void { chatWindowContextForTests = value; }
+
+/** STATUS-STACK-01 is the shared source for both the turn window and status view. */
+export async function chatWindowContext(): Promise<{ tokens: number; slots: number | null; reported: boolean }> {
+  if (chatWindowContextForTests !== undefined) return { tokens: chatWindowContextForTests, slots: null, reported: true };
+  const health = await roleHealth("chat", { live: true });
+  if (health.contextPerSlot && health.slots) return { tokens: health.contextPerSlot, slots: health.slots, reported: true };
+  return { tokens: MINIMUM_CHAT_WINDOW_TOKENS, slots: health.slots ?? null, reported: false };
+}
+
+
 export function roleHealthEntry(role: HealthRole, local: EngineHealthEntry, state: RoleHealth): EngineHealthEntry {
   // THIN-1C: `detail` rides along only when the state carries one (a
   // remembered Stack refusal, already in household wording) - a raw
   // role-list reason ("model crashed") never reaches the wire here, the
   // same as before.
-  if (state.reason === "stack_unreachable" || state.availability === "unavailable") return { ...local, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", ...(state.detail !== undefined ? { detail: state.detail } : {}) };
-  if (state.availability === "starting") return { ...local, kind: "starting", alive: true, availability: "starting", reason: null };
-  return { ...local, alive: true, availability: "ready", reason: null };
+  const context = role === "chat" ? { context_length: state.contextLength ?? null, context_slots: state.slots ?? null, context_per_slot: state.contextPerSlot ?? null, context_scope: state.contextScope ?? null } : {};
+  if (state.reason === "stack_unreachable" || state.availability === "unavailable") return { ...local, ...context, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", ...(state.detail !== undefined ? { detail: state.detail } : {}) };
+  if (state.availability === "starting") return { ...local, ...context, kind: "starting", alive: true, availability: "starting", reason: null };
+  return { ...local, ...context, alive: true, availability: "ready", reason: null };
 }

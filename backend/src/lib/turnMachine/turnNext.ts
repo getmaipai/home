@@ -43,7 +43,7 @@ import { StatusChannel } from "@/lib/statusChannel";
 import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
 import { scheduleConversationTitle } from "@/lib/conversationTitle";
 import { StreamGate, gateGrainFor } from "./nodes/outputGate";
-import { resolveTurnBudget } from "./budget";
+import { resolveTurnBudgetWithStack } from "./budget";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
@@ -392,7 +392,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // already trusts) - the minor gate is still enforced independently,
   // belt and braces, by model.ts's own minorThinkingOff regardless of
   // what this resolves to.
-  const resolvedBudget = resolveTurnBudget(opts.model, band);
+  const resolvedBudget = await resolveTurnBudgetWithStack(opts.model, band);
   const budget: TurnBudget = opts.thinking === true || bare ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
 
   const state: TurnState = {

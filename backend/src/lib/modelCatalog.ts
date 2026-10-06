@@ -109,7 +109,10 @@ export const CATALOG: ModelCapabilities[] = [
       // which is what recycled the Chile follow-up's hallucinated name
       // in the skeleton run.
       model_transitions: true,
-      context_tokens: 4000,
+      // Replaced per turn by STATUS-STACK-01's launched per-slot context.
+      // This seed is only for catalog schema validation and is never used
+      // as the live chat window.
+      context_tokens: 2048,
       // THINK-DEFAULT-01 (dev.md "U6 rerun ruling" (b) 1, spec-v0.1.27):
       // 0 by default - thinking is the person's per-turn toggle
       // (RunTurnNextOpts.thinking, RESP-04's composer toggle), never

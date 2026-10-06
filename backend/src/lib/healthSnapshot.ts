@@ -12,6 +12,7 @@ export async function collectHealth() {
     Promise.all(roles.map((role) => roleHealth(role))),
   ]);
   const chat = roleHealthEntry("chat", locals[0]!, states[0]!);
+  if (chat.context_per_slot == null) chat.context_message = "I could not read how much the AI can hold, so I am using a safe small window";
   const embed = roleHealthEntry("embed", locals[1]!, states[1]!);
   const background = roleHealthEntry("background", locals[2]!, states[2]!);
   const voice = roleHealthEntry("voice", locals[3]!, states[3]!);

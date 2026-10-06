@@ -102,6 +102,8 @@ export function StatusComponents({ person, health: initialHealth, maintenance = 
   return <Card>
     <CardHeader><CardTitle>Parts</CardTitle><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"><span className="mr-1">Last 90 days</span>{([["fine", "Fine"], ["slow", "Slow"], ["down", "Down"], ["maintenance", "Maintenance"]] as const).map(([status, label]) => <span key={status} className="inline-flex items-center gap-1.5"><span aria-hidden="true" data-status-legend={status} className="size-2 rounded-sm" />{label}</span>)}</div></CardHeader>
     <CardContent className="flex flex-col divide-y divide-border">
+      {health.engines.chat.context_message ? <p className="py-2 text-sm text-muted-foreground">{health.engines.chat.context_message}</p> : null}
+      {health.engines.chat.context_per_slot ? <p className="py-2 text-sm text-muted-foreground">Chat window: {health.engines.chat.context_per_slot.toLocaleString()} tokens per slot ({health.engines.chat.context_slots} {health.engines.chat.context_slots === 1 ? "slot" : "slots"}).</p> : null}
       {rows.map((row) => {
         const Icon = getIcon(row.icon ?? "activity");
         const underMaintenance = maintenance.includes(row.key);
