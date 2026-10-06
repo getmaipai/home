@@ -13,9 +13,11 @@ const HOST_RATE = { capacity: 12, refillPerSecond: 1 };
 const QUIET_MS = 60 * 60 * 1000;
 const quietHosts = new Map<string, number>();
 let testDnsLookup: DnsLookup | null = null;
+let testFetch: typeof fetch | null = null;
 
 export function __setAnswerImageDnsLookupForTests(fn: DnsLookup | null): void { testDnsLookup = fn; }
-export function __resetAnswerImageFetchForTests(): void { quietHosts.clear(); __resetRateLimiterForTests(); }
+export function __setAnswerImageFetchForTests(fn: typeof fetch | null): void { testFetch = fn; }
+export function __resetAnswerImageFetchForTests(): void { quietHosts.clear(); testFetch = null; __resetRateLimiterForTests(); }
 
 function quiet(host: string, until: number, now: number): void {
   for (const [name, expiry] of quietHosts) if (expiry <= now) quietHosts.delete(name);
@@ -55,7 +57,7 @@ async function readLimited(response: Response, limit: number, signal: AbortSigna
 }
 
 async function fetchOne(source: AnswerImageSource, options: Options, deadline: number, dropped: Record<string, number>): Promise<{ id: string; bytes: Uint8Array; contentType: string; host: string } | null> {
-  const fetcher = options.fetch ?? fetch;
+  const fetcher = options.fetch ?? testFetch ?? fetch;
   const now = options.now ?? Date.now;
   let original: URL;
   try { original = new URL(source.url); if (options.fetch) await validateUrl(original, options.dnsLookup); }
