@@ -55,7 +55,9 @@ export interface StackClient {
   speak(form: FormData, opts?: { signal?: AbortSignal }): Promise<Response>;
   /** POST /v1/images/generations; returns the job. */
   imageJob(request: RoleRequest, opts?: { signal?: AbortSignal }): Promise<StackJob>;
+  submitJob(request: { kind: string; role?: string | null; input?: Record<string, unknown> }, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   job(id: string, opts?: { signal?: AbortSignal }): Promise<StackJob>;
+  jobs(opts?: { signal?: AbortSignal }): Promise<StackJob[]>;
   cancelJob(id: string, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   roles(opts?: { signal?: AbortSignal }): Promise<RolesListResponse>;
   engines(opts?: { signal?: AbortSignal }): Promise<EnginesListResponse>;
@@ -311,7 +313,9 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       await fail(res);
       throw new Error("unreachable");
     },
+    submitJob: (request, opts) => call("/stack/v1/jobs", jsonInit(request), async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
     job: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "GET" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
+    jobs: (opts) => call("/stack/v1/jobs", { method: "GET" }, async (res) => { const body = await json<{ jobs: unknown }>(res); return Array.isArray(body.jobs) ? body.jobs.map((job) => StackJobSchema.parse(job)) : []; }, opts),
     cancelJob: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
     roles: (opts) => call("/stack/v1/roles", { method: "GET" }, json<RolesListResponse>, opts),
     engines: (opts) => call("/stack/v1/engines", { method: "GET" }, json<EnginesListResponse>, opts),

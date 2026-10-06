@@ -5,12 +5,13 @@ import { db } from "@/db";
 import { jobs, people, projects, scheduledJobs, approvals } from "@/db/schema";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { listJobs as listModelDownloadJobs } from "@/lib/modelDownloadJobs";
+import { listStackModelDownloadJobs, modelDownloadJobsAsHomeJobs } from "@/lib/jobProducers";
 import type { PersonRow } from "@/types";
 
 export type HomeJob = {
   id: string; kind: string; startedBy: string; forPerson: string | null; title: string;
   state: string; progress?: Record<string, unknown> | null; waitingReason?: string | null;
+  legacyProgress?: Record<string, unknown> | null;
   resultRef?: string | null; conversationId?: string | null; errorKind?: string | null;
   raw?: string | null; provenance?: Record<string, unknown>; createdAt: string; updatedAt: string;
 };
@@ -67,12 +68,10 @@ export function listJobsForViewer(actor: PersonRow): Record<string, unknown>[] {
   const peopleById = new Map(allPeople.map((p) => [p.id, p]));
   const roles = new Map(allPeople.map((p) => [p.id, p.role]));
   const visible = rows.map((row) => visibleJobFor(actor, row, roles)).filter((row): row is Record<string, unknown> => row !== null);
-  for (const row of (isOwnerOrAdmin(actor) ? listModelDownloadJobs() : [])) {
-    const state = row.status === "ready" ? "done" : row.status === "failed" ? "failed" : row.status === "queued" ? "queued" : "running";
-    visible.push({ id: `model:${row.modelId}`, kind: "model_download", startedBy: "system", forPerson: null, title: row.modelId, state, progress: { phase: row.phase, completedBytes: row.completedBytes, totalBytes: row.totalBytes }, errorKind: row.error ? "failed" : null, createdAt: row.createdAt, updatedAt: row.updatedAt });
-  }
+  if (isOwnerOrAdmin(actor)) visible.push(...modelDownloadJobsAsHomeJobs().map((row) => visibleJobFor(actor, row, roles)).filter((row): row is Record<string, unknown> => row !== null));
   const scheduled = db.select().from(scheduledJobs).all();
   for (const row of scheduled) {
+    if (rows.some((job) => job.id === `schedule:${row.id}`)) continue;
     if (row.personId !== actor.id && !(isOwnerOrAdmin(actor) && (row.personId === null || peopleById.has(row.personId)))) continue;
     const updatedAt = row.lastRunAt ?? row.createdAt;
     const state = row.status === "pending" ? "queued" : row.status === "done" ? "done" : row.status;
@@ -95,6 +94,16 @@ export function listJobsForViewer(actor: PersonRow): Record<string, unknown>[] {
   const asks = db.select().from(approvals).all().filter((row) => row.status === "pending" && (row.personId === actor.id || (isOwnerOrAdmin(actor) && peopleById.get(row.personId) && speakerAgeBand(peopleById.get(row.personId)!, new Date()) === "child")));
   for (const row of asks) visible.push({ id: row.id, kind: "approval", startedBy: row.personId, forPerson: row.personId, title: "Waiting for approval", state: "waiting_for_you", createdAt: row.createdAt, updatedAt: row.createdAt });
   return visible.sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
+}
+
+export async function listJobsForViewerLive(actor: PersonRow): Promise<Record<string, unknown>[]> {
+  const local = listJobsForViewer(actor);
+  if (!isOwnerOrAdmin(actor)) return local;
+  const allPeople = db.select().from(people).all();
+  const roles = new Map(allPeople.map((person) => [person.id, person.role]));
+  const stack = await listStackModelDownloadJobs();
+  const projected = stack.map((job) => visibleJobFor(actor, job, roles)).filter((job): job is Record<string, unknown> => job !== null);
+  return [...local.filter((job) => !String(job.id).startsWith("model:")), ...projected].sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
 }
 
 export function canStopJob(actor: PersonRow, ownerId: string | null, startedBy: string): boolean {

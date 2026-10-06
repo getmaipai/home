@@ -10,6 +10,7 @@ import { storeReceivedBackup, listReceivedBackups, deleteReceivedBackup, Receive
 import { generateEmergencyKit } from "@/lib/emergencyKit";
 import { restorePersonFromBackup, PartialRestoreRefused } from "@/lib/partialRestore";
 import { db } from "@/db";
+import { createJob, updateJob } from "@/lib/jobs";
 import { devices as devicesTable, receivedBackups as receivedBackupsTable } from "@/db/schema";
 
 export const backupsRoutes = apiRouter();
@@ -44,8 +45,10 @@ const runRoute = createRoute({
   },
 });
 backupsRoutes.openapi(runRoute, async (c) => {
-  const info = await runBackupAndMirror();
-  return c.json(info, 200);
+  const actor = c.get("person"); const id = `backup:${crypto.randomUUID()}`;
+  createJob({ id, kind: "backup", startedBy: actor.id, forPerson: actor.id, title: "Backup", state: "running", progress: { phase: "starting" }, conversationId: null, resultRef: null, waitingReason: null, errorKind: null, raw: null, provenance: { producer: "backup", legacy: "POST /api/backups/run remains readable through 2026-10-13" } });
+  try { const info = await runBackupAndMirror(); updateJob(id, { state: "done", progress: { phase: "complete" }, resultRef: info.filename }); return c.json(info, 200); }
+  catch (err) { updateJob(id, { state: "failed", progress: { phase: "failed" }, errorKind: "failed" }); throw err; }
 });
 
 // Restore is owner-only, a deliberate step up from the owner/admin gate
@@ -238,21 +241,25 @@ backupsRoutes.openapi(removeSmbTargetRoute, (c) => {
 const MAX_RECEIVED_BACKUP_BYTES = 2 * 1024 * 1024 * 1024;
 backupsRoutes.post("/received", requireAuth, bodyLimit({ maxSize: MAX_RECEIVED_BACKUP_BYTES + 64 * 1024 }), async (c) => {
   const actor = c.get("person");
+  const activityId = `import:${crypto.randomUUID()}`;
+  createJob({ id: activityId, kind: "import", startedBy: actor.id, forPerson: actor.id, title: "Import backup", state: "running", progress: { phase: "receiving" }, conversationId: null, resultRef: null, waitingReason: null, errorKind: null, raw: null, provenance: { producer: "received_backup", legacy: "POST /api/backups/received remains readable through 2026-10-13" } });
   const body = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
   const file = body.file;
   const deviceId = body.deviceId;
-  if (!(file instanceof File)) return c.json({ error: "a file is required" }, 400);
-  if (typeof deviceId !== "string" || !deviceId) return c.json({ error: "deviceId is required" }, 400);
+  if (!(file instanceof File)) { updateJob(activityId, { state: "failed", errorKind: "failed" }); return c.json({ error: "a file is required" }, 400); }
+  if (typeof deviceId !== "string" || !deviceId) { updateJob(activityId, { state: "failed", errorKind: "failed" }); return c.json({ error: "deviceId is required" }, 400); }
 
   const device = db.select({ personId: devicesTable.personId }).from(devicesTable).where(eq(devicesTable.id, deviceId)).get();
-  if (!device || device.personId !== actor.id) return c.json({ error: "no such device (or it isn't yours)" }, 404);
+  if (!device || device.personId !== actor.id) { updateJob(activityId, { state: "failed", errorKind: "failed" }); return c.json({ error: "no such device (or it isn't yours)" }, 404); }
 
   const contents = Buffer.from(await file.arrayBuffer());
   try {
     const info = storeReceivedBackup(deviceId, file.name, contents);
+    updateJob(activityId, { state: "done", progress: { phase: "complete" }, resultRef: info.id });
     return c.json(info, 201);
   } catch (err) {
-    if (err instanceof ReceivedBackupRefused) return c.json({ error: err.message }, 400);
+    if (err instanceof ReceivedBackupRefused) { updateJob(activityId, { state: "failed", errorKind: "failed" }); return c.json({ error: err.message }, 400); }
+    updateJob(activityId, { state: "failed", errorKind: "failed" });
     throw err;
   }
 });

@@ -4930,6 +4930,13 @@
                         "type": "string",
                         "nullable": true
                       },
+                      "legacyProgress": {
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      },
                       "resultRef": {
                         "type": "string",
                         "nullable": true
@@ -5127,6 +5134,13 @@
                     "waitingReason": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "legacyProgress": {
+                      "type": "object",
+                      "nullable": true,
+                      "additionalProperties": {
+                        "nullable": true
+                      }
                     },
                     "resultRef": {
                       "type": "string",

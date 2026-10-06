@@ -27,7 +27,7 @@
 // recipe's own `schedule` step's `inputs` field through for real.
 import { eq, and, lte, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { scheduledJobs, people } from "@/db/schema";
+import { scheduledJobs, people, jobs } from "@/db/schema";
 import { newJobId } from "@/lib/id";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { runMaintenance, drainPendingEmbeddings } from "@/lib/memory";
@@ -35,6 +35,7 @@ import { embedPendingEpisodes } from "@/lib/episodes";
 import { runJudgeBatch, runConsolidation } from "@/lib/memoryJudge";
 import { runRetention } from "@/lib/conversationHistory";
 import { runBackupAndMirror } from "@/lib/backup";
+import { createJob, updateJob } from "@/lib/jobs";
 import { checkLeafExpiry } from "@/lib/householdCa";
 import { checkSearxngHealth } from "@/lib/searxngHealth";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
@@ -454,6 +455,10 @@ async function runDueJobsUnguarded(
     // (source "packages.deno", key <package id>).
     const issueKey = row.kind === "core" ? row.job : `${row.packageId}:${row.job}`;
     let error: string | null = null;
+    const activityId = `schedule:${row.id}`;
+    const priorActivity = db.select({ id: jobs.id }).from(jobs).where(eq(jobs.id, activityId)).get();
+    if (priorActivity) updateJob(activityId, { state: "running", progress: { phase: "running" }, errorKind: null, raw: null });
+    else createJob({ id: activityId, kind: row.kind === "core" && row.job === "backup.run" ? "backup" : "routine", startedBy: row.personId ?? "system", forPerson: row.personId, title: row.job, state: "running", progress: { phase: "running" }, conversationId: null, resultRef: null, waitingReason: null, errorKind: null, raw: null, provenance: { producer: "scheduler", sourceId: row.id } });
     try {
       if (row.kind === "core") {
         const handler = CORE_JOBS[row.job] ?? extraCoreJobs[row.job];
@@ -505,12 +510,13 @@ async function runDueJobsUnguarded(
         })
         .where(eq(scheduledJobs.id, row.id))
         .run();
-    } else {
+      } else {
       db.update(scheduledJobs)
         .set({ status: "done", lastRunAt: now.toISOString(), lastError: error })
         .where(eq(scheduledJobs.id, row.id))
         .run();
-    }
+      }
+    updateJob(activityId, { state: error ? "failed" : "done", progress: { phase: error ? "failed" : "complete" }, errorKind: error ? "failed" : null, raw: null });
   }
   return { ran, errors };
 }

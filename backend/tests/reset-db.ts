@@ -29,6 +29,8 @@ import {
   settingsValues,
   notificationHolds,
   scheduledJobs,
+  jobs,
+  modelDownloadJobs,
   conversationTurns,
   shares,
   attachments,
@@ -145,6 +147,8 @@ export function resetDb(): void {
   db.delete(commands).run();
   __resetCommandsCacheForTests();
   db.delete(scheduledJobs).run();
+  db.delete(jobs).run();
+  db.delete(modelDownloadJobs).run();
   db.delete(clonedVoices).run();
   db.delete(pendingEpisodeEmbeddings).run();
   db.delete(episodeEmbeddings).run();
