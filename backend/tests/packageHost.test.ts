@@ -37,6 +37,17 @@ beforeEach(() => {
   __resetSearchRotationForTests();
 });
 
+const testWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+
+// The suite preload points Wikipedia at a closed loopback port so tests
+// never send real traffic. Some fallback tests delete their override in
+// finally blocks; restore the preload value after every test so later
+// files keep the offline default.
+afterEach(async () => {
+  if (testWikipediaBaseUrl !== undefined) process.env.MAIPAI_WIKIPEDIA_BASE_URL = testWikipediaBaseUrl;
+  await __drainBackgroundWorkForTests();
+});
+
 function manifest(overrides: Partial<PackageManifest> = {}): PackageManifest {
   return PackageManifest.parse({
     id: "test-pkg",
