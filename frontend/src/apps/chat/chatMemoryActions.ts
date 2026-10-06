@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 import { api, type MemoryRecord } from "@/lib/api";
-import { addMemoryId, clearMemoryIds } from "@/apps/chat/chatMemoryState";
+import { addMemoryId, removeMemoryId } from "@/apps/chat/chatMemoryState";
 
 // The current household member's own person id, for "remember this"'s
 // scope:"person" write (below) - the chat action bar (chatActionBar.tsx)
@@ -41,6 +41,8 @@ export function useChatActorId(): string {
 // `memory_ids` has since landed on GET /:id/turns, which is what made
 // that stopgap obsolete: a reload now shows the exact same real data
 // this store was only ever approximating between reloads).
+const MAX_REMEMBER_TEXT = 2000;
+
 export async function rememberMessage(params: {
   text: string;
   turnId: string;
@@ -48,20 +50,25 @@ export async function rememberMessage(params: {
   actorId: string;
 }): Promise<MemoryRecord> {
   const record = await api.remember({
-    text: params.text,
+    // The hub keeps at most 2000 characters of one memory.
+    text: params.text.slice(0, MAX_REMEMBER_TEXT),
     category: "fact",
     tier: "durable",
     scope: "person",
     person: params.actorId,
-    source: params.turnId,
+    // ELEMENTS-ADOPT-02: the hub records this turn as the source (after
+    // checking it is the person's own saved turn), so the reply's memory
+    // chips and a reload both show what was saved from it.
+    turn_id: params.turnId,
     importance: 0.6,
   });
   addMemoryId(params.turnId, params.conversationId, record.id);
   return record;
 }
 
-export async function forgetMessage(turnId: string, memoryIds: readonly string[]): Promise<void> {
-  if (memoryIds.length === 0) return;
-  await Promise.all(memoryIds.map((id) => api.archiveMemory(id)));
-  clearMemoryIds(turnId);
+/** ELEMENTS-ADOPT-02: one memory chip's forget - the memory area's own
+ * archive route, then the chip leaves the reply. */
+export async function forgetOneMemory(turnId: string, memoryId: string): Promise<void> {
+  await api.archiveMemory(memoryId);
+  removeMemoryId(turnId, memoryId);
 }

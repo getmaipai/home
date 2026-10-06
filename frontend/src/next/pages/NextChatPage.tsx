@@ -34,6 +34,8 @@ import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { createChatThreadListAdapter, needsTitleCatchUp } from "@/apps/chat/chatThreadListAdapter";
 import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
+import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
+import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { PackageScopeContext, PhotoUploadsContext } from "@/apps/chat/composerAddMenu";
 import "@/next/pages/nextChatTouchTargets.css";
@@ -806,6 +808,15 @@ function ChatDocumentTitle({ person }: { person: Roster }) {
  * row and the header keep saying "New Chat". This asks once per opened chat (and again on a return, because
  * the page remounts) whenever the open chat has messages and no title; the adapter's bounded poll does the
  * waiting and the runtime applies the result to the list row and the header together. */
+/** ELEMENTS-ADOPT-02: while a reply in the open chat waits for the memory
+ * judge, poll its turns so the reply's memory chips appear when it saves
+ * something. Never in Incognito (nothing is remembered there). */
+function ChatMemoryPoll({ incognito }: { incognito: boolean }) {
+  const remoteId = useAuiState((s) => s.threadListItem.remoteId);
+  useMemoryStatusPoll(incognito ? undefined : remoteId);
+  return null;
+}
+
 function ChatTitleCatchUp({ incognito }: { incognito: boolean }) {
   const aui = useAui();
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
@@ -1211,6 +1222,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <ConfirmAskAnswerProvider askAnswerRef={askAnswerRef}>
       <AdminContext.Provider value={isOwnerOrAdminRole(person.role)}>
       <ChatAgeBandContext.Provider value={person.age_band ?? "child"}>
+      <ChatActorContext.Provider value={person.id}>
       <CompareOpenContext.Provider value={setCompareTarget}>
       <SourcesOpenContext.Provider value={sourcesOpenValue}>
       <DetailsOpenContext.Provider value={detailsOpenValue}>
@@ -1231,6 +1243,7 @@ export function NextChatPage({ person }: { person: Roster }) {
         <ArtifactCacheInvalidator />
               <ChatDocumentTitle person={person} />
         <ChatTitleCatchUp incognito={temporaryNext} />
+        <ChatMemoryPoll incognito={temporaryNext} />
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
         <ProjectResultReload />
         <LiveVoiceSession
@@ -1503,6 +1516,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </DetailsOpenContext.Provider>
       </SourcesOpenContext.Provider>
       </CompareOpenContext.Provider>
+      </ChatActorContext.Provider>
       </ChatAgeBandContext.Provider>
       </AdminContext.Provider>
       </ConfirmAskAnswerProvider>

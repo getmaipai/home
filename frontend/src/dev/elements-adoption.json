@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T22:08:16.785Z",
+  "generatedAt": "2026-10-06T22:23:00.497Z",
   "kitTag": "ui-v0.5.130",
   "items": [
     {
@@ -702,7 +702,7 @@
       "group": "other",
       "verdict": "wire-after",
       "verdictReason": "The dashboard card is separate; chat chips need the additive memory_saved event, and memory remains injected context, never a tool under RULES.md rule 1.",
-      "implemented": false,
+      "implemented": true,
       "reading": "The dashboard card is separate; chat chips need the additive memory_saved event, and memory remains injected context, never a tool under RULES.md rule 1."
     },
     {

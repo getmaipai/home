@@ -1706,16 +1706,29 @@ export function getConversation(actor: PersonRow, id: string): ConversationOpRes
  * computed the identical way regardless of which list a client asked
  * for (getmaipai/home#64: the chat memory chip reads whichever of these
  * a given caller actually fetches). */
+/** ELEMENTS-ADOPT-02: a memory the person saved from a reply ("Remember
+ * this") is filed under that turn as `saved:<turn id>`, so the turn lists it
+ * while the judge's own retirement of an edited turn (archiveByProvenance,
+ * exact turn id) never touches it. */
+export const SAVED_FROM_TURN_PREFIX = "saved:";
+export function savedFromTurnSource(turnId: string): string {
+  return `${SAVED_FROM_TURN_PREFIX}${turnId}`;
+}
+
 function memoryIdsByTurn(turnIds: readonly string[]): Map<string, string[]> {
+  // Only active records: one the person forgot (archived) no longer
+  // belongs to the reply it came from (ELEMENTS-ADOPT-02 review).
+  const sources = [...turnIds, ...turnIds.map(savedFromTurnSource)];
   const memRows =
     turnIds.length > 0
-      ? db.select({ id: memoryRecords.id, source: memoryRecords.source }).from(memoryRecords).where(inArray(memoryRecords.source, turnIds)).all()
+      ? db.select({ id: memoryRecords.id, source: memoryRecords.source }).from(memoryRecords).where(and(inArray(memoryRecords.source, sources), eq(memoryRecords.status, "active"))).all()
       : [];
   const byTurn = new Map<string, string[]>();
   for (const m of memRows) {
-    const ids = byTurn.get(m.source) ?? [];
+    const turnId = m.source.startsWith(SAVED_FROM_TURN_PREFIX) ? m.source.slice(SAVED_FROM_TURN_PREFIX.length) : m.source;
+    const ids = byTurn.get(turnId) ?? [];
     ids.push(m.id);
-    byTurn.set(m.source, ids);
+    byTurn.set(turnId, ids);
   }
   return byTurn;
 }

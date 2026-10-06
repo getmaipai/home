@@ -47,6 +47,10 @@ interface MemoryStateEntry {
    * falsely mark failed" - a client-side timeout state, not a fifth wire
    * status, cleared by `refreshTurnMemoryStatus`'s manual re-check. */
   stalled: boolean;
+  /** ELEMENTS-ADOPT-02: ids saved while this page watched the turn (a
+   * pending turn the judge resolved, or "Remember this"), drawn as "added"
+   * chips; ids a reload already found are "existing". */
+  fresh: string[];
 }
 
 interface MemoryStateStore {
@@ -81,6 +85,7 @@ function applyTurnRow(turnId: string, row: TurnRowLike): void {
           status,
           pendingSince: stillPending ? (wasPendingUnstalled ? prev!.pendingSince : Date.now()) : undefined,
           stalled: false,
+          fresh: prev?.status === "pending" && status === "saved" ? [...row.memoryIds] : (prev?.fresh ?? []).filter((id) => row.memoryIds.includes(id)),
         },
       },
     };
@@ -122,16 +127,19 @@ export function addMemoryId(turnId: string, conversationId: string, memoryId: st
   useMemoryStore.setState((s) => {
     const prev = s.byTurnId[turnId];
     const memoryIds = prev ? [...prev.memoryIds, memoryId] : [memoryId];
-    return { byTurnId: { ...s.byTurnId, [turnId]: { conversationId, memoryIds, status: "saved", pendingSince: undefined, stalled: false } } };
+    const fresh = [...(prev?.fresh ?? []), memoryId];
+    return { byTurnId: { ...s.byTurnId, [turnId]: { conversationId, memoryIds, status: "saved", pendingSince: undefined, stalled: false, fresh } } };
   });
 }
 
-/** "Forget this" archived every memory id this turn had. */
-export function clearMemoryIds(turnId: string): void {
+/** One memory chip was forgotten (archived): it leaves this turn. */
+export function removeMemoryId(turnId: string, memoryId: string): void {
   useMemoryStore.setState((s) => {
     const prev = s.byTurnId[turnId];
     if (!prev) return s;
-    return { byTurnId: { ...s.byTurnId, [turnId]: { ...prev, memoryIds: [], status: "not_saved", pendingSince: undefined, stalled: false } } };
+    const memoryIds = prev.memoryIds.filter((id) => id !== memoryId);
+    const fresh = prev.fresh.filter((id) => id !== memoryId);
+    return { byTurnId: { ...s.byTurnId, [turnId]: { ...prev, memoryIds, fresh, status: memoryIds.length ? prev.status : "not_saved", pendingSince: undefined, stalled: false } } };
   });
 }
 

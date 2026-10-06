@@ -82,6 +82,10 @@ Under each of MaiPai's replies, tap the **thumbs up** or **thumbs down** button.
 
 A rating only labels the reply for the household. It does not change the answer or start a new one. MaiPai and the hub use those labels to see which kinds of replies land well.
 
+## See what MaiPai remembered
+
+When MaiPai saves something from a reply, the saved fact shows as a small chip under that reply. Tap the **x** on a chip to forget it. To save a reply yourself, open **More** under it and tap **Remember this**. Children do not see chips or Remember this, and Incognito never remembers anything.
+
 ## Open the details pane
 
 Some replies come from a lookup, like the weather or a word meaning. Under that reply is a **Details** handle. Tap it and the full answer opens beside the chat, with the sources listed. On a phone the pane slides up from the bottom instead.

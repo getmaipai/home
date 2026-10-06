@@ -4,6 +4,9 @@
 // hands them to the kit Thread.
 import { useReplyFeedbackForm } from "@/apps/chat/chatFeedbackDialog";
 import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
+import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
+import { memoryChipsAllowed, useReplyMemoryChips } from "@/apps/chat/chatMemoryChips";
+import { ChatActorContext, rememberMessage } from "@/apps/chat/chatMemoryActions";
 import { useContext, useEffect, useState, type PropsWithChildren } from "react";
 import { ActionBarMorePrimitive, ComposerPrimitive, useAui, useAuiState, type ThreadAssistantMessagePart, type ThreadMessage } from "@assistant-ui/react";
 import { type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
@@ -51,7 +54,7 @@ import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { ChatActivityCard } from "@/apps/chat/ChatActivityCard";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
-import { AdminContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/next/pages/TurnErrorDetails";
 
@@ -276,10 +279,49 @@ export function BareModeSwitchMenuItem() {
   );
 }
 
+const RememberIcon = getIcon("brain");
+
+/** ELEMENTS-ADOPT-02: "Remember this" in a reply's More menu saves the
+ * reply as one of the person's own memories, filed under this turn so the
+ * reply's memory chips show it. Adults and teens only; never in
+ * Incognito (it never remembers), never before the reply is saved. */
+export function RememberThisMenuItem() {
+  const band = useContext(ChatAgeBandContext);
+  const temporary = useContext(TemporaryChatContext).on;
+  const actorId = useContext(ChatActorContext);
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  const conversationId = useAuiState((s) => s.message.metadata?.custom?.conversationId as string | undefined);
+  const text = useAuiState((s) => messageText(s.message));
+  // "Remembered" only after this item saved the reply: a fact the judge took
+  // from the same reply does not stop the person saving the reply itself.
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const saved = state === "saved";
+  if (!memoryChipsAllowed(band, temporary) || !actorId || !turnId || !conversationId || !text.trim()) return null;
+  return (
+    <ActionBarMorePrimitive.Item
+      // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
+      className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none disabled:pointer-events-none disabled:opacity-50"
+      disabled={saved || state === "saving"}
+      onSelect={(e) => {
+        e.preventDefault();
+        if (saved) return;
+        setState("saving");
+        rememberMessage({ text, turnId, conversationId, actorId })
+          .then(() => setState("saved"))
+          .catch(() => setState("error"));
+      }}
+    >
+      <RememberIcon className="size-4" />
+      {saved ? "Remembered" : state === "error" ? "Couldn't remember - try again" : "Remember this"}
+    </ActionBarMorePrimitive.Item>
+  );
+}
+
 export function AssistantMoreItems() {
   const temporary = useContext(TemporaryChatContext).on;
   return (
     <>
+      <RememberThisMenuItem />
       {temporary ? null : <BranchInNewChatMenuItem />}
       <CompareWithBareModelMenuItem />
       <BareModeSwitchMenuItem />
@@ -693,18 +735,22 @@ export function BareModelBadge() {
   );
 }
 
-// One `AssistantMessageFooterExtra` slot, four independent reveals
-// (the bare-model badge, sources, Details, the "What went wrong?" form) - each keyed by its own
+// One `AssistantMessageFooterExtra` slot, five independent reveals
+// (the bare-model badge, sources, Details, memory chips, the "What went
+// wrong?" form) - each keyed by its own
 // state and rendering (or not) on its own, so this wrapper is pure
 // composition, no shared logic between them.
 export function MessageFooterExtra() {
   // ELEMENTS-ADOPT-02: the kit feedback-dialog as it ships, fed by a hook.
   const feedbackForm = useReplyFeedbackForm();
+  // ELEMENTS-ADOPT-02: the kit memory-chips as it ships, fed by a hook.
+  const memoryChips = useReplyMemoryChips();
   return (
     <>
       <BareModelBadge />
       <SourcesFooterContent />
       <MessageDetailsReveal />
+      {memoryChips ? <MemoryChips {...memoryChips} /> : null}
       {feedbackForm ? <FeedbackDialog {...feedbackForm} /> : null}
     </>
   );

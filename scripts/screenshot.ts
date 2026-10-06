@@ -3242,7 +3242,7 @@ async function seedTurnFor(session: string, text: string): Promise<{ conversatio
   return (await turn.json()) as { conversation_id: string; turn_id: string };
 }
 
-type Wave2Shot = { band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
+type Wave2Shot = { band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
 
 const ALL_COMBOS = [["desktop", "light"], ["desktop", "dark"], ["phone", "light"], ["phone", "dark"]] as const;
 const TWO_COMBOS = [["desktop", "light"], ["phone", "dark"]] as const;
@@ -3267,6 +3267,29 @@ function wave2Shots(part: string): Wave2Shot[] {
       { band: "child", person: "Nova", prompt: "When does the library open on Saturday?", combos: TWO_COMBOS, drive },
     ];
   }
+  if (part === "memory") {
+    // The reply saved one memory, filed under its turn the way "Remember
+    // this" files it (POST /api/memory with turn_id).
+    const seed = async (session: string, seeded: { turn_id: string }) => {
+      const me = (await (await fetch(`${BASE_URL}/api/auth/me`, { headers: { Cookie: `session=${session}` } })).json()) as { id?: string; person?: { id: string } };
+      const personId = me.person?.id ?? me.id;
+      const saved = await fetch(`${BASE_URL}/api/memory`, { method: "POST", headers: { "Content-Type": "application/json", Cookie: `session=${session}` }, body: JSON.stringify({ text: "Going to Boston in July", category: "fact", tier: "durable", scope: "person", person: personId, importance: 0.6, turn_id: seeded.turn_id }) });
+      if (!saved.ok) throw new Error(`elements wave 2: seeding a memory failed: ${saved.status} ${await saved.text()}`);
+    };
+    const drive = async (page: Page, band: "adult" | "teen" | "child") => {
+      if (band === "child") {
+        await page.waitForTimeout(800);
+        if (await page.locator('[data-slot="memory-chips"]').count()) throw new Error("elements wave 2: a child's reply drew memory chips");
+        return;
+      }
+      await page.locator('[data-slot="memory-chips"]').waitFor();
+    };
+    return [
+      { band: "adult", person: null, prompt: "We are going to Boston in July.", combos: ALL_COMBOS, seed, drive },
+      { band: "teen", person: "Marlow", prompt: "We are going to Boston in July.", combos: TWO_COMBOS, seed, drive },
+      { band: "child", person: "Nova", prompt: "We are going to Boston in July.", combos: TWO_COMBOS, seed, drive },
+    ];
+  }
   throw new Error(`elements wave 2: unknown part ${part}`);
 }
 
@@ -3277,6 +3300,7 @@ async function captureElementsWave2Review(browser: Browser, sessionValue: string
     const session = await sessionFor(sessionValue, shot.person);
     for (const [slug, theme] of shot.combos) {
       const seeded = await seedTurnFor(session, shot.prompt);
+      await shot.seed?.(session, seeded);
       const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
       const context = await newContext(browser, viewport, theme, session);
       try {

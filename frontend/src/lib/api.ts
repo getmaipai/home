@@ -1065,7 +1065,9 @@ export const api = {
     tier: MemoryRecord["tier"];
     scope: MemoryRecord["scope"];
     person?: string | null;
-    source: string;
+    /** ELEMENTS-ADOPT-02: the person's own saved turn this memory came
+     * from; the hub verifies it and records it as the source. */
+    turn_id?: string;
     importance: number;
   }) => request<MemoryRecord>("/api/memory", { method: "POST", body: JSON.stringify(input) }),
   // GET /api/plugins (already on main): every installed package's

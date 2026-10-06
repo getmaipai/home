@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, mock } from "bun:test";
-import { forgetMessage, rememberMessage } from "@/apps/chat/chatMemoryActions";
+import { forgetOneMemory, rememberMessage } from "@/apps/chat/chatMemoryActions";
 import { useMemoryState } from "@/apps/chat/chatMemoryState";
 import { renderHook } from "@testing-library/react";
 
@@ -46,7 +46,7 @@ describe("rememberMessage", () => {
         tier: "durable",
         scope: "person",
         person: "person-abc123",
-        source: "turn-1",
+        turn_id: "turn-1",
         importance: 0.6,
       });
     } finally {
@@ -66,17 +66,17 @@ describe("chatMemoryState store, updated by remember/forget", () => {
     try {
       await rememberMessage({ text: "a fact", turnId: "turn-persist", conversationId: "conv-1", actorId: "person-abc123" });
       const state = storedState("turn-persist");
-      expect(state).toMatchObject({ status: "saved", memoryIds: ["mem-1"] });
+      expect(state).toMatchObject({ status: "saved", memoryIds: ["mem-1"], fresh: ["mem-1"] });
     } finally {
       env.restore();
     }
   });
 
-  test("forgetMessage() archives every id it's given and clears the turn back to not_saved", async () => {
+  test("forgetOneMemory() archives the chip's memory and clears the turn back to not_saved when it was the last", async () => {
     const env = stubFetch();
     try {
       await rememberMessage({ text: "a fact", turnId: "turn-persist-2", conversationId: "conv-1", actorId: "person-abc123" });
-      await forgetMessage("turn-persist-2", ["mem-1"]);
+      await forgetOneMemory("turn-persist-2", "mem-1");
       expect(env.calls[1]!.url).toContain("/api/memory/mem-1/archive");
       const state = storedState("turn-persist-2");
       expect(state).toMatchObject({ status: "not_saved", memoryIds: [] });
@@ -86,23 +86,23 @@ describe("chatMemoryState store, updated by remember/forget", () => {
   });
 });
 
-describe("forgetMessage", () => {
+describe("forgetOneMemory", () => {
   test("archives the memory a prior rememberMessage() call for the same turn created", async () => {
     const env = stubFetch();
     try {
       await rememberMessage({ text: "a fact", turnId: "turn-2", conversationId: "conv-1", actorId: "person-abc123" });
-      await forgetMessage("turn-2", ["mem-1"]);
+      await forgetOneMemory("turn-2", "mem-1");
       expect(env.calls[1]!.url).toContain("/api/memory/mem-1/archive");
     } finally {
       env.restore();
     }
   });
 
-  test("does nothing (no request) when given no memory ids", async () => {
+  test("a reply longer than the hub keeps is cut to 2000 characters before it is sent", async () => {
     const env = stubFetch();
     try {
-      await forgetMessage("turn-never-remembered", []);
-      expect(env.calls).toHaveLength(0);
+      await rememberMessage({ text: "x".repeat(2500), turnId: "turn-3", conversationId: "conv-1", actorId: "person-abc123" });
+      expect((env.calls[0]!.body as { text: string }).text).toHaveLength(2000);
     } finally {
       env.restore();
     }

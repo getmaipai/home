@@ -22,6 +22,10 @@ import { MemoryRecord } from "@maipai/spec/gen/ts/memory-record.js";
 import { apiRouter, errorResponses, ErrorSchema } from "@/lib/openapi";
 import { isOwnerOrAdmin } from "@/lib/access";
 import type { AppEnv, PersonRow } from "@/types";
+import { db } from "@/db";
+import { conversationTurns, memoryRecords } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { savedFromTurnSource } from "@/lib/conversationHistory";
 
 // apiRouter()'s OpenAPIHono extends Hono, so every plain `.post()`/`.get()`
 // route below (unconverted, pre-dating getmaipai/.github/CLAUDE.md's
@@ -60,6 +64,9 @@ const RememberBodySchema = z.object({
   record_kind: z.enum(["memory", "entity", "episode"]).optional(),
   valid_from: z.string().nullish(),
   valid_to: z.string().nullish(),
+  // ELEMENTS-ADOPT-02: "Remember this" on a reply names that turn, so the
+  // reply's memory chips show what was saved from it. Verified below.
+  turn_id: z.string().regex(/^turn-[a-z0-9]{6,}$/).optional(),
 });
 
 // Derived from RememberBodySchema (a review, 2026-09-06, found the first
@@ -123,6 +130,30 @@ memoryRoutes.post("/", requireAuth, async (c) => {
   const parsed = RememberBodySchema.safeParse(rawBody);
   if (!parsed.success) return c.json({ error: parsed.error.issues.map((i) => i.message).join("; ") }, 400);
   const body = parsed.data;
+  // A named turn becomes the memory's provenance only when it is this
+  // person's own saved turn. An Incognito turn is never saved, so it can
+  // never be named (Incognito never remembers); a turn an admin can read
+  // but did not say is not theirs to file a memory under.
+  // The memory must be the person's own, too: a turn is never filed under
+  // someone else's memory (an admin writing a child's memory names no turn).
+  if (body.turn_id !== undefined) {
+    if (body.scope !== "person" || (body.person ?? actor.id) !== actor.id) {
+      return c.json({ error: "turn_id is only for a memory of your own" }, 400);
+    }
+    const turn = db.select({ personId: conversationTurns.personId }).from(conversationTurns).where(eq(conversationTurns.id, body.turn_id)).get();
+    if (!turn || turn.personId !== actor.id) return c.json({ error: "turn not found" }, 404);
+    // Saving the same reply twice (a second tap after a reload) returns the
+    // memory already saved from it rather than filing a duplicate.
+    const already = db
+      .select({ id: memoryRecords.id })
+      .from(memoryRecords)
+      .where(and(eq(memoryRecords.source, savedFromTurnSource(body.turn_id)), eq(memoryRecords.person, actor.id), eq(memoryRecords.status, "active"), eq(memoryRecords.text, body.text)))
+      .get();
+    if (already) {
+      const existing = list(actor, { person: actor.id }).find((record) => record.id === already.id);
+      if (existing) return c.json(existing, 200);
+    }
+  }
   const result = remember(actor, {
     text: body.text,
     category: body.category,
@@ -133,8 +164,12 @@ memoryRoutes.post("/", requireAuth, async (c) => {
     sensitive: body.sensitive,
     valid_from: body.valid_from,
     valid_to: body.valid_to,
-    // Never from the client - see this file's own header on why.
-    source: `api:${actor.id}`,
+    // Never from the client - see this file's own header on why. The one
+    // exception is a verified turn of the person's own (above), filed as
+    // `saved:<turn id>` (savedFromTurnSource): the turn's memory_ids list it,
+    // and an edit of that turn, which retires what the judge guessed from it
+    // (archiveByProvenance), never retires what the person chose to keep.
+    source: body.turn_id !== undefined ? savedFromTurnSource(body.turn_id) : `api:${actor.id}`,
     pinned: sanitizedPinned(actor, body.pinned),
     record_kind: sanitizedRecordKind(actor, body.record_kind),
   });
