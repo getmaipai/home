@@ -1361,18 +1361,20 @@
       "file": "number-ticker.tsx",
       "name": "number-ticker",
       "group": "other",
-      "verdict": "later",
+      "verdict": "wire-now",
       "backendNeeded": null,
-      "effort": null,
+      "effort": "QUICK",
       "specTagNeeded": false,
       "newDependency": false,
       "bindings": [],
       "size": "S",
-      "showcaseScenario": null,
-      "batch": null,
-      "replacesHandBuilt": [],
+      "showcaseScenario": "Dashboard numeric StatCard count",
+      "batch": 1,
+      "replacesHandBuilt": [
+        "plain number text in StatCard.tsx"
+      ],
       "realTurnToday": true,
-      "verdictReason": "Deferred until a Home feature requiring this Element is planned."
+      "verdictReason": "ELT-T1-01 is owner-approved to replace the plain numeric StatCard value with the shipped NumberTicker."
     },
     {
       "file": "onboarding.tsx",
@@ -3241,6 +3243,23 @@
     {
       "file": "thread-list.projects.aui.test.tsx",
       "name": "thread-list.projects",
+      "group": "tests/support",
+      "verdict": "no-fit",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists."
+    },
+    {
+      "file": "thread.engine-down.test.tsx",
+      "name": "thread.engine-down.test",
       "group": "tests/support",
       "verdict": "no-fit",
       "backendNeeded": null,

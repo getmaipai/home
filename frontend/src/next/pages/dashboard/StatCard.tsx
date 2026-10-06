@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { Icon } from "@maipai/ui/src/icons";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
+import { NumberTicker } from "@maipai/ui/src/elements/number-ticker";
 
 /** The shared shape `PeopleCountCard.tsx`/`UpdatesCard.tsx`/
  * `RepairsCard.tsx`/`EnginesCard.tsx` all mirror - the vendored KPI-card
@@ -41,8 +42,14 @@ export function StatCard({ label, value, icon: IconComponent, to }: { label: str
     <CardContent className="flex justify-between flex-row px-6">
       <div className="flex items-center justify-between w-full">
         <div className="flex flex-col gap-1">
-          <p className="text-sm font-normal text-foreground">{label}</p>
-          <h3 className="text-2xl font-semibold">{value}</h3>
+          {typeof value === "number" ? (
+            <NumberTicker value={value} label={label} />
+          ) : (
+            <>
+              <p className="text-sm font-normal text-foreground">{label}</p>
+              <h3 className="text-2xl font-semibold">{value}</h3>
+            </>
+          )}
         </div>
         <div className="border border-border p-2.5 w-fit rounded-md">
           <IconComponent size={16} />
