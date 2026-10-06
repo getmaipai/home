@@ -30,7 +30,7 @@ const SERIAL_FILES: Record<string, string[]> = Object.fromEntries(
   Object.entries(flakes.serial).map(([workspace, entries]) => [workspace, entries.map(({ file }) => file)]),
 );
 const SKIPPED_FILES: Record<string, string[]> = Object.fromEntries(
-  Object.entries(flakes.skipped.reduce<Record<string, string[]>>((byWorkspace, entry) => {
+  Object.entries((flakes.skipped as { workspace: string; file: string }[]).reduce<Record<string, string[]>>((byWorkspace, entry) => {
     (byWorkspace[entry.workspace] ??= []).push(entry.file);
     return byWorkspace;
   }, {})).map(([workspace, files]) => [workspace, files]),

@@ -14,11 +14,5 @@
       }
     ]
   },
-  "skipped": [
-    {
-      "workspace": "backend",
-      "file": "tests/answerImageCache.test.ts",
-      "reason": "Known order-dependent failure in the full backend shard; skipped by the gate pending isolation repair."
-    }
-  ]
+  "skipped": []
 }

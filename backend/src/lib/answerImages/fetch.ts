@@ -54,11 +54,17 @@ async function readLimited(response: Response, limit: number, signal: AbortSigna
   return bytes;
 }
 
+/** The platform's own fetch, captured at load. Only when the call would use
+ * it does the pinned guardedFetch (which resolves and connects itself) take
+ * over; any other fetcher, injected or swapped in, is validated per hop. */
+const platformFetch = globalThis.fetch;
+
 async function fetchOne(source: AnswerImageSource, options: Options, deadline: number, dropped: Record<string, number>): Promise<{ id: string; bytes: Uint8Array; contentType: string; host: string } | null> {
   const fetcher = options.fetch ?? fetch;
+  const pinned = fetcher === platformFetch;
   const now = options.now ?? Date.now;
   let original: URL;
-  try { original = new URL(source.url); if (options.fetch) await validateUrl(original, options.dnsLookup); }
+  try { original = new URL(source.url); if (!pinned) await validateUrl(original, options.dnsLookup); }
   catch (error) { const key = error instanceof SsrfBlockedError ? "ssrf" : "invalid_url"; dropped[key] = (dropped[key] ?? 0) + 1; return null; }
   const host = original.hostname.toLowerCase();
   if ((quietHosts.get(host) ?? 0) > now()) return null;
@@ -79,7 +85,7 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
           if (!tryConsume(`net:${hopHost}`, HOST_RATE, now())) return null;
           pacedHosts.add(hopHost);
         }
-        response = fetcher === fetch ? await guardedFetch(url, {
+        response = pinned ? await guardedFetch(url, {
           method: "GET", redirect: "manual", signal: controller.signal, maxRedirects: MAX_REDIRECTS,
           headers: { "User-Agent": ANSWER_IMAGE_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
         }) : await fetcher(url, {
