@@ -129,6 +129,8 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
             ...THREAD_SLOTS,
             onEditSend,
             sendHeld,
+            // CHAT-ACTION-ROW-01: copy, listen, rate, refresh and more sit under every reply, as in ChatGPT, not only the last.
+            assistantActionBarAutohide: "never",
             ThreadViewportExtra: ChatThreadExtras,
             viewport: {
               turnAnchor: "bottom",
