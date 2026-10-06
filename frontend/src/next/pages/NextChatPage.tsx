@@ -1755,13 +1755,14 @@ export function NextChatPage({ person }: { person: Roster }) {
                 // Hovering the peek open or closed must jump, never ease.
                 // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate a dynamic rail width
                 railWidthAnimating && "transition-[width] duration-300 ease-out motion-reduce:transition-none",
-                // RAIL-01: one flat 260px column, a single 1px divider on
+                // RAIL-01: one flat 288px column (ChatGPT's, measured from the
+                // owner's reference, 2026-10-06), a single 1px divider on
                 // its right edge, its own tone (`--shell-history`, tokens.css).
                 railCollapsed
                   ? railPeeked
-                    ? "absolute inset-y-0 left-0 z-20 block w-65 border-r border-border px-2.5 pt-2.5 shadow-lg animate-in slide-in-from-left-4 fade-in motion-reduce:animate-none"
+                    ? "absolute inset-y-0 left-0 z-20 block w-72 border-r border-border px-2.5 pt-2.5 shadow-lg animate-in slide-in-from-left-4 fade-in motion-reduce:animate-none"
                     : "hidden w-0 lg:block lg:overflow-hidden"
-                  : "hidden w-65 shrink-0 border-r border-border px-2.5 pt-2.5 lg:block",
+                  : "hidden w-72 shrink-0 border-r border-border px-2.5 pt-2.5 lg:block",
               )}
               onPointerLeave={(e) => {
                 closeRailPeek(e.relatedTarget);
@@ -1802,8 +1803,11 @@ export function NextChatPage({ person }: { person: Roster }) {
                   workspace only (never the history column): title and
                   conversation actions on the left and right, and a slot
                   on the right for the agent/task activity toggle. The
-                  phone row above carries the same bar below lg. */}
-              <header data-slot="next-chat-header" className={cn("hidden h-13 shrink-0 items-center gap-1 border-b border-border px-5 lg:flex", railCollapsed && "ps-14")}>
+                  phone row above carries the same bar below lg. It is
+                  the conversation's own surface with no divider, the
+                  way Claude's is (owner, 2026-10-06): the controls just
+                  sit at the top. */}
+              <header data-slot="next-chat-header" className={cn("hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex", railCollapsed && "ps-14")}>
                 <ChatHeaderBar />
               </header>
           {bareMode ? (

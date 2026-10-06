@@ -1,13 +1,13 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "@/App";
-import { installReloadOnceOnNewServiceWorker, installStaleChunkRetry, runBootWatchdog } from "@/lib/pwaBoot";
+import { installHiddenReloadOnNewServiceWorker, installStaleChunkRetry, runBootWatchdog } from "@/lib/pwaBoot";
 import "@/shell/tokens.css";
 import { readShellNextCache } from "@/next/shellNextCache";
 
 installStaleChunkRetry(window, sessionStorage);
 if ("serviceWorker" in navigator) {
-  installReloadOnceOnNewServiceWorker(navigator.serviceWorker, window);
+  installHiddenReloadOnNewServiceWorker(navigator.serviceWorker, document, window);
 }
 
 /** Paint the migrated shell's palette before React mounts from the

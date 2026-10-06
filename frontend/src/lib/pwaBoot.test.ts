@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   MAX_BOOT_RETRIES,
   getRetryCount,
-  installReloadOnceOnNewServiceWorker,
+  installHiddenReloadOnNewServiceWorker,
   installStaleChunkRetry,
   runBootWatchdog,
 } from "@/lib/pwaBoot";
@@ -81,43 +81,54 @@ describe("installStaleChunkRetry", () => {
   });
 });
 
-describe("installReloadOnceOnNewServiceWorker", () => {
-  test("reloads on controllerchange when a worker was already controlling this page, but never a second time in the same page life", () => {
-    const listeners = new Map<string, EventListener[]>();
-    let reloads = 0;
-    const container = {
-      controller: {} as ServiceWorker,
-      addEventListener: (type: string, fn: EventListener) => {
-        listeners.set(type, [...(listeners.get(type) ?? []), fn]);
-      },
-    } as unknown as ServiceWorkerContainer;
-    const win = { location: { reload: () => reloads++ } } as unknown as Window;
+// Owner's report, 2026-10-06: "the site reloads twice when I force
+// refresh". The first load after every hub restart found a new worker,
+// which took control and fired `controllerchange`, and the boot code
+// reloaded the page on the spot: two document loads (measured by
+// `scripts/screenshot.ts --shell-nav-review`, "reload-after-deploy").
+function fakeWorkerPage(controlled: boolean, visibility: DocumentVisibilityState) {
+  const listeners = new Map<string, EventListener[]>();
+  const on = (type: string, fn: EventListener) => listeners.set(type, [...(listeners.get(type) ?? []), fn]);
+  const fire = (type: string) => { for (const fn of listeners.get(type) ?? []) fn(new Event(type)); };
+  const state = { reloads: 0, visibility };
+  const container = { controller: controlled ? ({} as ServiceWorker) : null, addEventListener: on } as unknown as ServiceWorkerContainer;
+  const doc = { get visibilityState() { return state.visibility; }, addEventListener: on } as unknown as Document;
+  const win = { location: { reload: () => state.reloads++ } } as unknown as Window;
+  installHiddenReloadOnNewServiceWorker(container, doc, win);
+  return { state, fire };
+}
 
-    installReloadOnceOnNewServiceWorker(container, win);
-    const fire = () => {
-      for (const fn of listeners.get("controllerchange") ?? []) fn(new Event("controllerchange"));
-    };
-    fire();
-    fire();
-
-    expect(reloads).toBe(1);
+describe("a new service worker taking control", () => {
+  test("never reloads a page the person is looking at", () => {
+    const { state, fire } = fakeWorkerPage(true, "visible");
+    fire("controllerchange");
+    expect(state.reloads).toBe(0);
   });
 
-  test("does nothing on a page's first-ever load, with no prior controller (the false-positive a code review found: axe's own scan destroyed mid-navigation on route 1 of every fresh browser context)", () => {
-    const listeners = new Map<string, EventListener[]>();
-    let reloads = 0;
-    const container = {
-      controller: null,
-      addEventListener: (type: string, fn: EventListener) => {
-        listeners.set(type, [...(listeners.get(type) ?? []), fn]);
-      },
-    } as unknown as ServiceWorkerContainer;
-    const win = { location: { reload: () => reloads++ } } as unknown as Window;
+  test("reloads a tab left open across the update once, when it is hidden", () => {
+    const { state, fire } = fakeWorkerPage(true, "visible");
+    fire("controllerchange");
+    state.visibility = "hidden";
+    fire("visibilitychange");
+    fire("visibilitychange");
+    fire("controllerchange");
+    expect(state.reloads).toBe(1);
+  });
 
-    installReloadOnceOnNewServiceWorker(container, win);
-    for (const fn of listeners.get("controllerchange") ?? []) fn(new Event("controllerchange"));
+  test("reloads at once when the update lands while the tab is already hidden", () => {
+    const { state, fire } = fakeWorkerPage(true, "hidden");
+    fire("controllerchange");
+    expect(state.reloads).toBe(1);
+  });
 
-    expect(reloads).toBe(0);
+  test("does nothing without an update, or on a first-ever load with no prior controller", () => {
+    const idle = fakeWorkerPage(true, "visible");
+    idle.state.visibility = "hidden";
+    idle.fire("visibilitychange");
+    expect(idle.state.reloads).toBe(0);
+    const first = fakeWorkerPage(false, "hidden");
+    first.fire("controllerchange");
+    expect(first.state.reloads).toBe(0);
   });
 });
 
