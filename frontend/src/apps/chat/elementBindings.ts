@@ -24,6 +24,7 @@
 import type { ToolCallMessagePartComponent } from "@assistant-ui/react";
 import {
   AssistantMoreItems,
+  ChatMessageQueue,
   ChatThinkingIndicator,
   ComposerExtraControls,
   ComposerModelSelector,
@@ -81,6 +82,7 @@ export const THREAD_SLOTS = {
   Indicator: ChatThinkingIndicator,
   MessageError: ChatMessageError,
   ComposerAddAttachmentOverride: ComposerAddMenu,
+  ComposerQueue: ChatMessageQueue,
   // VOICE-LIVE-01: the trailing-side append point beside Send/dictate;
   // ComposerVoiceControls gates its own render on stt+tts being ready.
   ComposerExtraEnd: ComposerExtraControls,

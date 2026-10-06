@@ -16,6 +16,8 @@ import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
 afterEach(cleanup);
 
+let voiceRuntime: ReturnType<typeof useLocalRuntime> | undefined;
+
 function fakeStartCapture(): (options: MicCaptureOptions) => Promise<MicCaptureHandle> {
   return async (options: MicCaptureOptions) => {
     const fakeAnalyser = { fftSize: 0, smoothingTimeConstant: 0, frequencyBinCount: 8, connect: () => {}, disconnect: () => {}, getByteTimeDomainData: (data: Uint8Array) => data.fill(128) };
@@ -35,7 +37,8 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
       yield { content: [{ type: "text", text: "ok" }] };
     },
   };
-  const runtime = useLocalRuntime(adapter);
+  const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: !open });
+  voiceRuntime = runtime;
   return (
     <MemoryRouter initialEntries={["/next/chat"]}>
       <AssistantRuntimeProvider runtime={runtime}>
@@ -75,6 +78,7 @@ describe("LiveVoiceSession", () => {
       { delayMs: 150, message: { t: "final", v: "what's the weather" } },
     ];
     const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} />);
+    expect(voiceRuntime!.thread.getState().capabilities.queue).toBe(false);
 
     // "Listening" - the mock socket's own "ready" step.
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());

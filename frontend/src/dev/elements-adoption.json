@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T09:06:38.357Z",
+  "generatedAt": "2026-10-06T09:29:46.727Z",
   "kitTag": "ui-v0.5.103",
   "items": [
     {
@@ -494,7 +494,7 @@
       "name": "message-queue",
       "group": "composer",
       "verdict": "wire-after",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "message-timing.tsx",

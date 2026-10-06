@@ -63,6 +63,10 @@ export async function scanElements(options: { root?: string; tag?: string } = {}
 
 if (import.meta.main) {
   const { output, planOnly } = await scanElements();
+  if (process.argv.includes("--status")) {
+    console.log(`Elements implemented: ${output.items.filter((item) => item.implemented).length} / ${output.items.length}`);
+    process.exit(0);
+  }
   await Bun.write(OUTPUT_PATH, `${JSON.stringify(output, null, 2)}\n`);
   if (planOnly.length) console.warn(`Plan files absent from kit (${planOnly.length}): ${planOnly.join(", ")}`);
   const unassessed = output.items.filter((item) => item.verdict === "unassessed");

@@ -349,7 +349,7 @@ function NextThreadList({
   );
 }
 
-function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void) {
+function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void) {
   const temporaryNextRef = useRef(temporaryNext);
   temporaryNextRef.current = temporaryNext;
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
@@ -748,7 +748,17 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
       // eslint-disable-next-line react-hooks/exhaustive-deps -- the rule's own static analysis can't see that dictationAdapter's *own* useMemo deps (sttStatusQuery.data) genuinely change across renders, and calls the dependencies "unnecessary" on that mistaken belief; removing them is exactly the bug named above, verified live by NextChatPage.test.tsx's DICT-01 describe block. The `ttsAvailable` dependency is also essential: it adds/removes the speech adapter so the shipped Speak action follows real TTS readiness.
       [attachmentsAdapter, dictationAdapter, ttsAvailable],
     );
-    return useLocalRuntime(chatModelAdapter, { adapters });
+    return useLocalRuntime(chatModelAdapter, {
+      adapters,
+      // The live voice session sends its transcript directly through the
+      // same runtime. Keep its written-message queue off while it is open.
+      // ComposerVoiceControls only opens while idle and with no queued
+      // messages, so changing this option never drops pending work.
+      unstable_enableMessageQueue: !voiceOpen,
+      // Stop ends the active reply but leaves submitted messages queued for
+      // the next normal send, as CHAT-QUEUE-01 requires.
+      unstable_queueClearOnCancel: false,
+    });
   }
 
   // `onThreadIdChange` fires for two different reasons: a deliberate
@@ -1379,7 +1389,7 @@ export function NextChatPage({ person }: { person: Roster }) {
     setRailPeeked(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
-  }, temporaryNext, setOpenArtifactId, setDraftConversationId);
+  }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId);
   const thinkingModeValue = useMemo(
     () => ({
       mode: (thinking ? "thinking" : "instant") as "instant" | "thinking",

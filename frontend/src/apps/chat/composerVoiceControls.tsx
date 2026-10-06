@@ -61,7 +61,7 @@ function WaveformButton({ onClick }: { onClick: () => void }) {
  * own acceptance: "voice and glance have no controls" without them) -
  * absent, not disabled, the same posture Create image and the composer
  * Attach's other role-gated rows already take. */
-export function ComposerVoiceControls() {
+export function ComposerVoiceControls({ disabled = false }: { disabled?: boolean }) {
   const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
   const overview = enginesQuery.data;
   // VOICE-LIVE-02: `null` here (no VoiceSessionProvider in this tree)
@@ -71,6 +71,6 @@ export function ComposerVoiceControls() {
   // posture the rest of this file already takes for a role that isn't
   // ready.
   const session = useVoiceSession();
-  if (!readyRole(overview, "stt") || !readyRole(overview, "tts")) return null;
+  if (disabled || !readyRole(overview, "stt") || !readyRole(overview, "tts")) return null;
   return <WaveformButton onClick={() => session?.setOpen(true)} />;
 }

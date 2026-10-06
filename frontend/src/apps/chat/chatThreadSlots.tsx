@@ -3,7 +3,7 @@
 // moved verbatim out of NextChatPage.tsx (SHARED-THREAD-01). ChatThread.tsx
 // hands them to the kit Thread.
 import { useContext, useEffect, useState, type PropsWithChildren } from "react";
-import { ActionBarMorePrimitive, useAuiState, type ThreadAssistantMessagePart, type ThreadMessage } from "@assistant-ui/react";
+import { ActionBarMorePrimitive, ComposerPrimitive, useAui, useAuiState, type ThreadAssistantMessagePart, type ThreadMessage } from "@assistant-ui/react";
 import { type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
 // APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
 // default `ToolFallback` renders (its own `import { ToolFallback } from
@@ -19,6 +19,7 @@ import { collapsePanel } from "@maipai/ui/src/elements/surfaces";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { GenerationLoader } from "@maipai/ui/src/elements/loading-state";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
+import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
 import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorSearch, ModelSelectorList, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
@@ -49,14 +50,48 @@ import { TurnErrorDetails, hasErrorFacts } from "@/next/pages/TurnErrorDetails";
 // one kit tag it already needed for the action bars themselves.
 export const CompareIcon = getIcon("grid-2x2");
 export const DetailsIcon = getIcon("gauge");
+const QueueSendIcon = getIcon("arrow-up");
 
 export function ComposerExtraControls() {
   const person = useContext(WakeWordPersonContext);
+  const isRunning = useAuiState((s) => s.thread.isRunning && s.thread.voice === undefined && s.thread.capabilities.queue);
+  const writtenTurnBusy = useAuiState((s) => s.thread.isRunning || s.composer.queue.length > 0);
   return (
     <>
-      <ComposerVoiceControls />
+      <ComposerVoiceControls disabled={writtenTurnBusy} />
       {person ? <ComposerWakeWordControl person={person} /> : null}
+      {isRunning ? (
+        <ComposerPrimitive.Send asChild>
+          <ElementsButton type="button" size="icon" className="size-7 rounded-full" aria-label="Queue message" title="Queue message">
+            <QueueSendIcon className="size-4" />
+          </ElementsButton>
+        </ComposerPrimitive.Send>
+      ) : null}
     </>
+  );
+}
+
+/** The kit MessageQueue Element at Thread's ComposerQueue footer slot.
+ * Removing a queued message places its text back into the kit composer,
+ * where the person can edit and resend it. Queue state lives in the
+ * assistant-ui runtime and is never written by this slot. */
+export function ChatMessageQueue() {
+  const aui = useAui();
+  const running = useAuiState((s) => [...s.thread.messages].reverse().find((message) => message.role === "assistant" && message.status?.type === "running"));
+  const queue = useAuiState((s) => s.composer.queue);
+  if (!running && queue.length === 0) return null;
+  const runningText = running ? messageText(running) : "Reply in progress";
+  return (
+    <MessageQueue
+      running={runningText || "Reply in progress"}
+      queued={queue.map((item) => ({ id: item.id, text: item.prompt }))}
+      onCancel={(id) => {
+        const item = queue.find((candidate) => candidate.id === id);
+        if (!item) return;
+        aui.composer.queueItem({ id }).remove();
+        aui.composer.setText(item.prompt);
+      }}
+    />
   );
 }
 

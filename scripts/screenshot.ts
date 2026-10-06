@@ -293,12 +293,14 @@ const nextShellFoldReview = process.argv.includes("--next-shell-fold-review");
 const nextChatRichReview = process.argv.includes("--next-chat-rich-review");
 const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview || nextChatRichReview;
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
+const nextChatQueueReview = process.argv.includes("--next-chat-queue-review");
+const nextChatQueueBeforeReview = process.argv.includes("--next-chat-queue-before-review");
 const nextChatAuditReview = process.argv.includes("--next-chat-audit-review");
 const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audit");
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatComposerReview || nextChatQueueReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -4002,6 +4004,88 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
   }
 }
 
+/** Capture the real kit MessageQueue above the composer while the scripted
+ * first reply is held open. The fixed prompt is unique to this named review;
+ * the backend fixture delays it long enough for both queued messages to be
+ * visible in every viewport/theme pair. */
+async function captureNextChatQueueReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = process.env.MAIPAI_CHAT_QUEUE_OUT_DIR || join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  for (const theme of ["light", "dark"] as const) {
+    for (const slug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(10000);
+        await page.goto(`${BASE_URL}/chat`);
+        const composer = page.getByRole("textbox", { name: "Message input" });
+        await composer.waitFor();
+        if (!(await composer.isEnabled())) throw new Error(`captureNextChatQueueReview: composer disabled on ${slug}/${theme}`);
+        await composer.fill("CHAT QUEUE screenshot: tell me a little about the day");
+        await page.getByRole("button", { name: "Send message", exact: true }).click();
+        await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor();
+        for (const text of ["Second queued question", "Third queued question"]) {
+          await composer.fill(text);
+          await page.getByRole("button", { name: "Queue message", exact: true }).click();
+        }
+        const queue = page.locator('[data-slot="message-queue"]');
+        await queue.getByText("2 queued", { exact: true }).waitFor();
+        await queue.getByText("Second queued question", { exact: true }).waitFor();
+        await queue.getByText("Third queued question", { exact: true }).waitFor();
+        if (await page.getByRole("alert").count()) throw new Error(`captureNextChatQueueReview: error banner on ${slug}/${theme}`);
+        await settleAnimations(page);
+        const path = join(outDir, `next-chat-queue-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path });
+        console.log(`Wrote ${path}`);
+        await page.locator('[data-role="user"]').filter({ hasText: "Third queued question" }).waitFor({ timeout: 20000 });
+        await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 15000 });
+        await page.waitForTimeout(2000);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
+/** The matched origin/main view: identical reply/viewport/theme, with both
+ * follow-up prompts still in the ordinary composer because main has no queue.
+ * This runs the same fixture and PNG geometry as the after capture. */
+async function captureNextChatQueueBeforeReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = process.env.MAIPAI_CHAT_QUEUE_OUT_DIR || join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  for (const theme of ["light", "dark"] as const) {
+    for (const slug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(10000);
+        await page.goto(`${BASE_URL}/chat`);
+        const composer = page.getByRole("textbox", { name: "Message input" });
+        await composer.waitFor();
+        if (!(await composer.isEnabled())) throw new Error(`captureNextChatQueueBeforeReview: composer disabled on ${slug}/${theme}`);
+        await composer.fill("CHAT QUEUE screenshot: tell me a little about the day");
+        await page.getByRole("button", { name: "Send message", exact: true }).click();
+        await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor();
+        await composer.fill("Second queued question\nThird queued question");
+        await composer.waitFor({ state: "visible" });
+        if (await page.getByRole("alert").count()) throw new Error(`captureNextChatQueueBeforeReview: error banner on ${slug}/${theme}`);
+        await settleAnimations(page);
+        const path = join(outDir, `next-chat-queue-before-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path });
+        console.log(`Wrote ${path}`);
+        await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 15000 });
+        await page.waitForTimeout(2000);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** Capture audit states that use the real /dev/ui scripted event stream or
  * existing chat controls. This is screenshot-only fixture orchestration. */
 async function captureNextChatAuditReview(browser: Browser, sessionValue: string): Promise<void> {
@@ -6713,6 +6797,10 @@ async function main() {
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (chatIncognitoAudit) return "This is a normal chat response.";
+    if (text.includes("CHAT QUEUE screenshot")) {
+      const reply = "A calm day can hold many small details. The morning light crossed the kitchen table, and the afternoon brought a cool breeze through the open window.";
+      return new Promise((resolve) => setTimeout(() => resolve(reply), 6000));
+    }
     if (text.includes("D22 streaming")) return Array.from({ length: SCREENSHOT_STREAM_WORDS }, (_, i) => `Streamed reply word${i + 1}.`).join(" ");
     if (chatPageScreenshotFixture) return SCREENSHOT_CHAT_REPLY;
     if (text.includes(RICH_REPLY_PROMPT)) return RICH_REPLY_MARKDOWN;
@@ -7126,6 +7214,18 @@ async function main() {
     if (laneBTouchTargetsReview) {
       await verifyLaneBTouchTargets(browser, sessionValue);
       console.log("completed named review: --lane-b-touch-targets-review");
+      return;
+    }
+
+    if (nextChatQueueBeforeReview) {
+      await captureNextChatQueueBeforeReview(browser, sessionValue);
+      console.log("completed named review: --next-chat-queue-before-review");
+      return;
+    }
+
+    if (nextChatQueueReview) {
+      await captureNextChatQueueReview(browser, sessionValue);
+      console.log("completed named review: --next-chat-queue-review");
       return;
     }
 

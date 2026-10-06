@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadMessageLike } from "@assistant-ui/react";
+import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { THREAD_SLOTS, TOOL_BINDINGS } from "@/apps/chat/elementBindings";
-import { AdminContext, ConnectionStateContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
+import { AdminContext, ConnectionStateContext, TemporaryChatContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { EngineStartingLoader } from "@/apps/chat/chatThreadSlots";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -46,6 +46,13 @@ function WelcomeHarness({ availability }: { availability: "ready" | "starting" |
   return <AssistantRuntimeProvider runtime={runtime}><ChatAvailabilityContext.Provider value={availability}><ChatThread /></ChatAvailabilityContext.Provider></AssistantRuntimeProvider>;
 }
 
+let queuedRuntime: { thread: { composer: { setText(text: string): void; send(): void; getState(): { text: string; queue: readonly { id: string; prompt: string; parts: readonly { type: string; text?: string }[] }[] } } } } | undefined;
+function QueuedHarness({ adapter, history, temporary = false }: { adapter: ChatModelAdapter; history?: ThreadHistoryAdapter; temporary?: boolean }) {
+  const runtime = useLocalRuntime(adapter, { initialMessages: [], ...(history ? { adapters: { history } } : {}), unstable_enableMessageQueue: true, unstable_queueClearOnCancel: false });
+  queuedRuntime = runtime;
+  return <AssistantRuntimeProvider runtime={runtime}><TemporaryChatContext.Provider value={{ on: temporary }}><ChatThread /></TemporaryChatContext.Provider></AssistantRuntimeProvider>;
+}
+
 const realFetch = globalThis.fetch;
 beforeEach(() => {
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
@@ -57,6 +64,118 @@ afterEach(() => {
 });
 
 describe("ChatThread", () => {
+  test("renders the runtime queue above the composer and sends queued turns in order", async () => {
+    let releaseFirst!: () => void;
+    const firstRun = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const sent: string[] = [];
+    let runs = 0;
+    const adapter: ChatModelAdapter = { run: async function* ({ messages }) {
+      const last = messages.at(-1);
+      const text = last?.content.find((part) => part.type === "text");
+      sent.push(text?.type === "text" ? text.text : "");
+      if (runs++ === 0) await firstRun;
+      yield { content: [{ type: "text", text: "Reply finished." }] };
+    } };
+    const view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} /></MemoryRouter>);
+    expect(queuedRuntime).toBeDefined();
+    queuedRuntime!.thread.composer.setText("first message");
+    act(() => queuedRuntime!.thread.composer.send());
+    await waitFor(() => expect(sent).toEqual(["first message"]));
+    act(() => queuedRuntime!.thread.composer.setText("second message"));
+    act(() => fireEvent.click(view.getByRole("button", { name: "Queue message" })));
+    await waitFor(() => expect(JSON.stringify(queuedRuntime!.thread.composer.getState().queue.map((item) => item.parts.map((part) => part.type === "text" ? part.text : "").join("")))).toBe(JSON.stringify(["second message"])));
+    act(() => queuedRuntime!.thread.composer.setText("third message"));
+    act(() => fireEvent.click(view.getByRole("button", { name: "Queue message" })));
+    await waitFor(() => expect(JSON.stringify(queuedRuntime!.thread.composer.getState().queue.map((item) => item.parts.map((part) => part.type === "text" ? part.text : "").join("")))).toBe(JSON.stringify(["second message", "third message"])));
+    expect(view.container.querySelector('[data-slot="message-queue"]')?.textContent).toContain("second message");
+    expect(view.container.querySelector('[data-slot="message-queue"]')?.textContent).toContain("third message");
+    releaseFirst();
+    await waitFor(() => expect(sent).toEqual(["first message", "second message", "third message"]));
+    expect(view.container.querySelector('[data-slot="message-queue"]')).toBeNull();
+  });
+
+  test("removing a queued message restores it for editing, while removal drops another", async () => {
+    let releaseFirst!: () => void;
+    const firstRun = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    const sent: string[] = [];
+    let runs = 0;
+    const adapter: ChatModelAdapter = { run: async function* ({ messages }) {
+      const last = messages.at(-1);
+      const part = last?.content.find((entry) => entry.type === "text");
+      sent.push(part?.type === "text" ? part.text : "");
+      if (runs++ === 0) await firstRun;
+      yield { content: [{ type: "text", text: "Reply finished." }] };
+    } };
+    const view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} /></MemoryRouter>);
+    act(() => queuedRuntime!.thread.composer.setText("first message"));
+    act(() => queuedRuntime!.thread.composer.send());
+    await waitFor(() => expect(sent).toEqual(["first message"]));
+    act(() => queuedRuntime!.thread.composer.setText("keep and edit"));
+    act(() => fireEvent.click(view.getByRole("button", { name: "Queue message" })));
+    await waitFor(() => expect(view.container.textContent).toContain("keep and edit"));
+    act(() => queuedRuntime!.thread.composer.setText("remove me"));
+    act(() => fireEvent.click(view.getByRole("button", { name: "Queue message" })));
+    await waitFor(() => expect(view.container.textContent).toContain("remove me"));
+
+    act(() => fireEvent.click(view.getByRole("button", { name: 'Remove "remove me" from the queue' })));
+    expect(queuedRuntime!.thread.composer.getState().text).toBe("remove me");
+    act(() => queuedRuntime!.thread.composer.setText("edited message"));
+    act(() => fireEvent.click(view.getByRole("button", { name: "Queue message" })));
+    await waitFor(() => expect(view.container.textContent).toContain("edited message"));
+
+    act(() => fireEvent.click(view.getByRole("button", { name: 'Remove "keep and edit" from the queue' })));
+    expect(queuedRuntime!.thread.composer.getState().text).toBe("keep and edit");
+    releaseFirst();
+    await waitFor(() => expect(sent).toEqual(["first message", "edited message"]));
+    expect(sent).not.toContain("remove me");
+    expect(sent).not.toContain("keep and edit");
+  });
+
+  test("Stop keeps queued turns in the runtime", async () => {
+    let releaseFirst!: () => void;
+    const firstRun = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let runs = 0;
+    const adapter: ChatModelAdapter = { run: async function* () {
+      if (runs++ === 0) await firstRun;
+      yield { content: [{ type: "text", text: "Reply finished." }] };
+    } };
+    const view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} /></MemoryRouter>);
+    act(() => queuedRuntime!.thread.composer.setText("first message"));
+    act(() => queuedRuntime!.thread.composer.send());
+    await waitFor(() => expect(view.getByRole("button", { name: "Stop generating" })).toBeTruthy());
+    act(() => queuedRuntime!.thread.composer.setText("keep after stop"));
+    act(() => fireEvent.click(view.getByRole("button", { name: "Queue message" })));
+    act(() => fireEvent.click(view.getByRole("button", { name: "Stop generating" })));
+    await waitFor(() => expect(queuedRuntime!.thread.composer.getState().queue.map((item) => item.prompt)).toEqual(["keep after stop"]));
+    expect(view.container.textContent).toContain("keep after stop");
+    releaseFirst();
+  });
+
+  test("a temporary chat does not persist a message while it is queued", async () => {
+    let releaseFirst!: () => void;
+    const firstRun = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let runs = 0;
+    const adapter: ChatModelAdapter = { run: async function* () {
+      if (runs++ === 0) await firstRun;
+      yield { content: [{ type: "text", text: "Reply finished." }] };
+    } };
+    const persisted: string[] = [];
+    const history: ThreadHistoryAdapter = {
+      load: async () => ({ messages: [] }),
+      append: async ({ message }) => { persisted.push(JSON.stringify(message)); },
+    };
+    const view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} history={history} temporary /></MemoryRouter>);
+    act(() => queuedRuntime!.thread.composer.setText("first message"));
+    act(() => queuedRuntime!.thread.composer.send());
+    await waitFor(() => expect(runs).toBe(1));
+    act(() => queuedRuntime!.thread.composer.setText("temporary queued secret"));
+    act(() => fireEvent.click(view.getByRole("button", { name: "Queue message" })));
+    await waitFor(() => expect(view.container.textContent).toContain("temporary queued secret"));
+    expect(persisted.join("\n")).not.toContain("temporary queued secret");
+    expect(runs).toBe(1);
+    releaseFirst();
+  });
+
   test("binds every tool id once, each to a renderer", () => {
     const ids = TOOL_BINDINGS.map((binding) => binding.toolName);
     expect(new Set(ids).size).toBe(ids.length);

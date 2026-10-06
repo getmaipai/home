@@ -13,6 +13,7 @@
     "smoke:chat": "bun run --cwd backend scripts/smoke/chat.ts",
     "verify:tokens-cascade": "bun run scripts/verifyTokensCascade.ts",
     "elements:scan": "bun run scripts/elementsAdoption.ts",
+    "elements:status": "bun run scripts/elementsAdoption.ts --status",
     "refresh-bundled-packages": "bun run scripts/refresh-bundled-packages.ts"
   },
   "devDependencies": {
