@@ -53,7 +53,7 @@ describe("STATS-01 turn stats", () => {
       for await (const _delta of started.tokens) {
         // consume the body so the final telemetry frame is observed
       }
-      const stats = buildTurnStats([{ reason: "initial", thinking: true, maxTokens: null, requestSentMs: 0, firstDeltaMs: 50, stats: started.stats }], { ...emptyTimings(), first_token_ms: 120 }, 100, 1_000, { host: "local", build: "b10797-test", model: "family.gguf", healthy: true }, true);
+      const stats = buildTurnStats([{ reason: "initial", thinking: true, maxTokens: null, requestSentMs: 0, firstDeltaMs: 50, stats: started.stats }], { ...emptyTimings(), first_token_ms: 120 }, 100, 1_000, { host: "local", build: "b10797-test", model: "family.gguf", healthy: true }, true, 32_768);
       expect(stats.prompt_tokens).toBe(143);
       expect(stats.predicted_tokens).toBe(37);
       expect(stats.tokens_per_second).toBe(185);
@@ -64,6 +64,8 @@ describe("STATS-01 turn stats", () => {
       expect(stats.engine).toBe("local b10797-test family.gguf");
       expect(stats.stop_reason).toBe("stop");
       expect(stats.thinking).toBe(true);
+      expect(stats.context_window_tokens).toBe(32_768);
+      expect(stats.context_used_percent).toBeCloseTo((143 + 37) / 32_768 * 100);
     } finally {
       engine.stop();
     }
@@ -78,6 +80,8 @@ describe("STATS-01 turn stats", () => {
     expect(stats.total_time_ms).toBeNull();
     expect(stats.cache_reuse_tokens).toBeNull();
     expect(stats.cache_reuse_percent).toBeNull();
+    expect(stats.context_window_tokens).toBeNull();
+    expect(stats.context_used_percent).toBeNull();
     expect(stats.thinking).toBe(false);
     expect(Object.entries(stats).every(([key, value]) => key === "generations" || typeof value !== "number" || Number.isFinite(value))).toBe(true);
   });

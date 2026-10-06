@@ -102,7 +102,7 @@ export interface RunTurnNextOpts {
 }
 
 function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
-  const stats = buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0);
+  const stats = buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0, state.budget.context_window_tokens);
   // A live acceptance run (U2d) caught this omitting plugin_id/
   // command_id/sources entirely - the old engine file's own equivalent
   // builder always carries the package id that ran (plugin_id for a

@@ -68,6 +68,13 @@ export interface TurnStats {
   time_to_first_token_ms: number | null;
   total_time_ms: number | null;
   context_tokens: number | null;
+  /** The Stack's reported per-slot chat context for this turn. Null when
+   * the engine did not report a size; the safe window fallback is not a
+   * measured context size. */
+  context_window_tokens?: number | null;
+  context_used_percent?: number | null;
+  /** THIN-3C may attach measured prompt segments when available. */
+  context_segments?: Partial<Record<"prefix" | "tools" | "memory" | "history" | "reply", number>>;
   cache_reuse_tokens: number | null;
   cache_reuse_percent: number | null;
   engine: string | null;

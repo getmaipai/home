@@ -3,7 +3,6 @@
 // moved verbatim out of NextChatPage.tsx (SHARED-THREAD-01). ChatThread.tsx
 // hands them to the kit Thread.
 import { useContext, useEffect, useState, type PropsWithChildren } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { ActionBarMorePrimitive, useAuiState, type ThreadAssistantMessagePart, type ThreadMessage } from "@assistant-ui/react";
 import { type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
 // APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
@@ -32,7 +31,7 @@ import { Button as ElementsButton } from "@maipai/ui/src/elements/ui/button";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { getIcon } from "@maipai/ui/src/icons";
-import { api, type TurnStats } from "@/lib/api";
+import type { TurnStats } from "@/lib/api";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
@@ -119,8 +118,7 @@ export function CompareWithBareModelMenuItem() {
  * this ONE (unlike Compare above): `TurnStats` (timing, token counts)
  * isn't sensitive the way "compare against the bare model" is, and
  * every household member already sees the reply itself. The reveal's
- * own `ContextDisplay.Bar` piece IS admin-gated further down, since it
- * needs `api.engines()`, an owner/admin-only route. */
+ * context display uses the window saved on this turn's own stats. */
 export function MessageDetailsMenuItem() {
   const { toggle } = useContext(DetailsOpenContext);
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
@@ -503,61 +501,21 @@ export function buildTimingStats(stats: TurnStats): TimingStat[] {
   return list;
 }
 
-/** Slice 5(d): admin-only (`api.engines()` itself is owner/admin-gated) -
- * `modelContextWindow` comes from the currently-loaded chat role's own
- * `measuredContextLength` (the Stack roles API, the wiring table's own
- * "Model choice" row's source), never `TurnStats` - `context_used_percent`
- * was a permanent `null` on the backend (`turnStats.ts` never computed
- * it - `context_tokens` is a bare alias for `prompt_tokens`, not a real
- * percentage-of-window measurement) and STATS-PCT-01 removed the field
- * rather than wire a synchronous per-turn source for it (the Stack's
- * own `measuredContextLength` needs a live, possibly-unconfigured
- * network round trip; a local engine's own context window needs
- * verifying against its real `/props` response, which this codebase
- * has no way to do without a running engine). This panel's own
- * `api.engines()` query is the one place that number is actually
- * fetched. When the Stack isn't configured (`roles` empty, the common
- * case today per `routes/engines.ts`'s own header) or the chat role's
- * own context length hasn't been measured yet, this piece is left out
- * rather than shown with an invented window - CTX-SEG-01
- * (getmaipai/home#133) is the real fix (a segment breakdown that
- * doesn't need a window at all), and `context-breakdown` replaces this
- * piece the day it lands. */
-export function MessageDetailsContextBar({ stats }: { stats: TurnStats }) {
-  const isAdmin = useContext(AdminContext);
-  // `["engines"]`, not a slice-local key: `NextEnginesPage.tsx` already
-  // queries the identical `api.engines()` call under this exact key - a
-  // review caught the first version using its own `["engines-overview"]`,
-  // which meant an admin who'd already loaded Engines got a second,
-  // independently-caching network round trip here instead of reusing
-  // react-query's own cache entry.
-  const enginesQuery = useQuery({
-    queryKey: ["engines"],
-    queryFn: api.engines,
-    enabled: isAdmin,
-    staleTime: 60_000,
+export function buildContextSegmentStats(stats: TurnStats): TimingStat[] {
+  const labels = { prefix: "Prefix", tools: "Tools", memory: "Memory", history: "History", reply: "Reply" } as const;
+  return Object.entries(stats.context_segments ?? {}).flatMap(([key, tokens]) => {
+    if (!(key in labels) || typeof tokens !== "number" || !Number.isFinite(tokens) || tokens < 0) return [];
+    return [{ label: labels[key as keyof typeof labels], value: `${tokens.toLocaleString()} tokens` }];
   });
-  if (!isAdmin) return null;
-  const modelContextWindow = enginesQuery.data?.roles?.find((role) => role.id === "chat")?.model?.measuredContextLength ?? null;
-  if (!modelContextWindow || stats.prompt_tokens === null) return null;
-  // A review caught this: `context_tokens` is a bare alias for
-  // `prompt_tokens` (`turnStats.ts`), not a real total, so using it
-  // alone as `totalTokens` left every turn's own `predicted_tokens`
-  // outside the percent-full reading entirely - the sum of both is
-  // what's actually sitting in context once a reply has generated.
-  // `cachedInputTokens` is left out on purpose: `cache_reuse_tokens` is
-  // ADDITIVE to `prompt_tokens` in this backend's own math
-  // (`turnStats.ts`'s own `cacheDenominator = cacheTokens + promptTokens`),
-  // not a subset of it the way `ContextDisplay`'s own contract assumes a
-  // provider's cached-token count is - mapping it in showed a "Cached
-  // input" segment that could read larger than "Input" itself, a
-  // self-contradictory number for the admin reading it.
-  const usage = {
-    totalTokens: stats.prompt_tokens + (stats.predicted_tokens ?? 0),
-    inputTokens: stats.prompt_tokens,
-    outputTokens: stats.predicted_tokens ?? undefined,
-  };
-  return <ContextDisplay.Bar modelContextWindow={modelContextWindow} usage={usage} />;
+}
+
+/** THIN-3E: use the per-turn context captured by THIN-3A and the
+ * engine's own prompt token count. The safe window fallback is never
+ * presented as a measured engine size. */
+export function MessageDetailsContextBar({ stats }: { stats: TurnStats }) {
+  if (!stats.context_window_tokens || stats.context_tokens === null) return null;
+  const outputTokens = stats.predicted_tokens ?? 0;
+  return <ContextDisplay.Bar modelContextWindow={stats.context_window_tokens} usage={{ totalTokens: stats.context_tokens + outputTokens, inputTokens: stats.context_tokens, outputTokens }} />;
 }
 
 export function MessageDetailsReveal() {
@@ -566,6 +524,7 @@ export function MessageDetailsReveal() {
   const { isOpen } = useContext(DetailsOpenContext);
   if (!turnId || !stats || !isOpen(turnId)) return null;
   const timingStats = buildTimingStats(stats);
+  timingStats.push(...buildContextSegmentStats(stats));
   if (timingStats.length === 0) return null;
   return (
     <div className="ms-2 flex flex-col gap-1.5 pb-2">

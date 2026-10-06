@@ -32,6 +32,7 @@ export const NO_RECORD_BUDGET: TurnBudget = {
   tools_offered: [],
   model_transitions: false,
   context_tokens: MINIMUM_CHAT_WINDOW_TOKENS,
+  context_window_tokens: null,
   thinking_budget_tokens: 0,
   // THINK-DEFAULT-01: the safest shape stays safest even toggled on -
   // an unmeasured model gets no reasoning either way.
@@ -85,5 +86,5 @@ export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget 
 export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBand): Promise<TurnBudget> {
   const base = resolveTurnBudget(modelId, band);
   const context = await chatWindowContext();
-  return { ...base, context_tokens: context.tokens };
+  return { ...base, context_tokens: context.tokens, context_window_tokens: context.reported ? context.tokens : null };
 }

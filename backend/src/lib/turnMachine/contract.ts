@@ -104,6 +104,9 @@ export interface TurnBudget {
   tools_offered: string[];
   model_transitions: boolean;
   context_tokens: number;
+  /** Reported per-slot engine context, distinct from the safe window
+   * minimum used when Stack health has no measurement. */
+  context_window_tokens?: number | null;
   /** THINK-DEFAULT-01 (spec-v0.1.27): the turn's default when the
    * person hasn't toggled thinking on - 0 on every real budget, since
    * reasoning is a second output the person chooses, never the

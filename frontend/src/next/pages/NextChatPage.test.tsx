@@ -2740,11 +2740,11 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
     }
   });
 
-  test("the context bar shows once the Stack reports a measured chat role's context length", async () => {
+  test("the context bar uses the turn's measured window and prompt token count", async () => {
     const restore = stubDetailsFetch(
       ndjsonStream([
         { type: "delta", text: "It's sunny." },
-        { type: "done", value: { turn_id: "turn-ctx123", reply: { text: "It's sunny." }, source: "model", safety: SAFETY, stats: STATS } },
+        { type: "done", value: { turn_id: "turn-ctx123", reply: { text: "It's sunny." }, source: "model", safety: SAFETY, stats: { ...STATS, prompt_tokens: 1024, context_tokens: 1024, context_window_tokens: 32_768, context_used_percent: 1024 / 32_768 * 100, context_segments: { prefix: 120, tools: 180, memory: 90, history: 500, reply: 134 } } } },
       ]),
       {
         configured: true,
@@ -2765,12 +2765,14 @@ describe("NextChatPage (slice 5(d): Details, the stats reveal)", () => {
       fireEvent.click(await view.findByText("Details"));
       await view.findByText("First token");
       expect(await view.findByLabelText("Context usage")).toBeVisible();
+      expect(view.getByText("1.1k (3%)")).toBeVisible();
+      for (const label of ["Prefix", "Tools", "Memory", "History", "Reply"]) expect(view.getByText(label)).toBeVisible();
     } finally {
       restore();
     }
   });
 
-  test("no context bar when the Stack isn't configured - timing stats alone still show", async () => {
+  test("no context bar when the turn has no reported context size", async () => {
     const restore = stubDetailsFetch(
       ndjsonStream([
         { type: "delta", text: "It's sunny." },

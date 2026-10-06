@@ -79,6 +79,7 @@ export function buildTurnStats(
   finishedAt: number,
   identity: EngineIdentity | null | undefined,
   thinking: boolean | undefined,
+  contextWindowTokens: number | null = null,
 ): TurnStats {
   // The summary fields below have always meant "the generation that
   // actually produced what the household heard" - the LAST one a turn
@@ -89,6 +90,7 @@ export function buildTurnStats(
   const stream = generations[generations.length - 1]?.stats;
   const promptTokens = finite(stream?.usage?.prompt_tokens) ?? finite(stream?.timings?.prompt_n);
   const predictedTokens = finite(stream?.usage?.completion_tokens) ?? finite(stream?.timings?.predicted_n);
+  const contextUsedTokens = promptTokens !== null ? promptTokens + (predictedTokens ?? 0) : null;
   const predictedMs = finite(stream?.timings?.predicted_ms);
   const reportedSpeed = finite(stream?.timings?.predicted_per_second);
   const tokensPerSecond = reportedSpeed ?? (predictedTokens !== null && predictedMs !== null && predictedTokens > 0 && predictedMs > 0 ? predictedTokens / predictedMs * 1000 : null);
@@ -111,6 +113,8 @@ export function buildTurnStats(
     time_to_first_token_ms: firstToken,
     total_time_ms: totalTime !== null && totalTime >= 0 ? totalTime : null,
     context_tokens: promptTokens,
+    context_window_tokens: Number.isInteger(contextWindowTokens) && contextWindowTokens! > 0 ? contextWindowTokens : null,
+    context_used_percent: contextUsedTokens !== null && Number.isInteger(contextWindowTokens) && contextWindowTokens! > 0 ? contextUsedTokens / contextWindowTokens! * 100 : null,
     cache_reuse_tokens: cacheTokens,
     cache_reuse_percent: cacheDenominator > 0 ? cacheTokens! / cacheDenominator * 100 : null,
     engine: identity ? formatEngineIdentity(identity) : null,
