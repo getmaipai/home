@@ -1,0 +1,15 @@
+{
+  "engines": [
+    { "name": "brave", "enabled": true, "safesearch": true, "categories": ["general", "web"] },
+    { "name": "duckduckgo", "enabled": true, "safesearch": true, "categories": ["general", "web"] },
+    { "name": "wikipedia", "enabled": true, "safesearch": true, "categories": ["general", "web"] },
+    { "name": "wikidata", "enabled": true, "safesearch": true, "categories": ["general", "web"] },
+    { "name": "wikicommons.images", "enabled": true, "safesearch": true, "categories": ["images"] },
+    { "name": "brave.images", "enabled": true, "safesearch": true, "categories": ["images"] },
+    { "name": "brave.news", "enabled": true, "safesearch": true, "categories": ["news"] },
+    { "name": "brave.videos", "enabled": true, "safesearch": true, "categories": ["videos"] }
+  ],
+  "safe_search": 2,
+  "limiter": { "enabled": true },
+  "version": "2026.10.4"
+}
