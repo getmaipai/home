@@ -113,9 +113,11 @@ self.addEventListener("notificationclick", (event: NotificationEvent) => {
 // is followed by `skipWaiting()` unconditionally, so the build that
 // was just fetched is the one that activates on the next load even
 // when no client posts SKIP_WAITING (an older shell, a tab that
-// never sends it). `pwaBoot.ts`'s reload-once guard then brings the
-// tab onto it. The `message` handshake below stays for the client
-// that does post.
+// never sends it). A page in view is not reloaded when it takes over
+// (pwaBoot.ts's header has why: that reload made every first load
+// after a hub restart load twice); a tab left open reloads once while
+// hidden. The `message` handshake below
+// stays for the client that does post.
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
@@ -123,9 +125,7 @@ self.addEventListener("install", () => {
 // The standard `registerType: "autoUpdate"` handshake (vite.config.ts):
 // the client's registration script posts this the moment a new worker
 // is found waiting, so it activates immediately instead of waiting for
-// every open tab to close - `pwaBoot.ts`'s own `controllerchange`
-// listener then reloads each tab once so it runs the code that matches
-// what just got cached.
+// every open tab to close.
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });

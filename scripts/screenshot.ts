@@ -310,7 +310,8 @@ const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
-const chatShellReview = process.argv.includes("--chat-shell-review");
+const shellNavReview = process.argv.includes("--shell-nav-review");
+const chatShellReview = process.argv.includes("--chat-shell-review") || shellNavReview;
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -2213,7 +2214,130 @@ async function captureShellRail(browser: Browser, sessionValue: string, theme: "
   }
 }
 
-/** RAIL-01 (owner's layout, 2026-10-06): the rail, the 260px history
+/** SHELL2 (owner's feedback, 2026-10-06): "the site reloads twice when I
+ * force refresh" and "clicking anything in the left rail flashes the
+ * entire app". Counts real document loads on a normal and a hard
+ * (cache-bypassing) reload, with a service worker already controlling
+ * the page, and proves the rail and the shell survive a rail click: the
+ * same rail node before and after, no loading screen in between. Throws
+ * on any extra load or shell remount. */
+async function captureShellNavReview(browser: Browser, sessionValue: string): Promise<void> {
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const context = await newContext(browser, desktop, "dark", sessionValue);
+  // A hub restart after a landing ships a new worker script: from the
+  // second pass on, the served sw.js gets a fresh trailing comment before
+  // each reload, so the reload finds a "new deploy" the way the owner's
+  // tab does after a restart. The file is this run's own fresh build and
+  // is restored however the run ends.
+  const swFile = join(ROOT, "frontend", "dist", "sw.js");
+  const swOriginal = readFileSync(swFile, "utf8");
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    let loads = 0;
+    const navigations: string[] = [];
+    page.on("load", () => { loads += 1; });
+    page.on("framenavigated", (frame) => { if (frame === page.mainFrame()) navigations.push(new URL(frame.url()).pathname); });
+    // Every mount and unmount of the rail and every loading screen, in
+    // order, from the document's first byte.
+    await page.addInitScript(() => {
+      const log: string[] = [];
+      (window as unknown as { __shellLog: string[] }).__shellLog = log;
+      const start = performance.now();
+      let rail: Element | null = null;
+      const check = () => {
+        const now = document.querySelector('[data-slot="app-rail"]');
+        if (now !== rail) {
+          log.push(`${Math.round(performance.now() - start)}ms ${now ? (rail ? "rail-replaced" : "rail-mounted") : "rail-unmounted"}`);
+          rail = now;
+        }
+        if (document.querySelector('[role="status"][aria-label="Loading MaiPai Home"], [data-slot="route-skeleton"]')) {
+          if (log[log.length - 1]?.endsWith("loading") !== true) log.push(`${Math.round(performance.now() - start)}ms loading`);
+        }
+      };
+      new MutationObserver(check).observe(document, { childList: true, subtree: true });
+      navigator.serviceWorker?.addEventListener("controllerchange", () => log.push(`${Math.round(performance.now() - start)}ms controllerchange`));
+    });
+    const settle = async () => {
+      await page.locator('[data-slot="app-rail"]').waitFor();
+      await page.waitForTimeout(4000);
+    };
+    await page.goto(`${BASE_URL}/chat`);
+    await settle();
+    // The first visit installs the worker; the next load is controlled by it.
+    await page.evaluate(async () => { await navigator.serviceWorker?.ready; });
+    await page.reload();
+    await settle();
+    const controlled = await page.evaluate(() => Boolean(navigator.serviceWorker?.controller));
+    const results: Record<string, unknown> = { controlled };
+    const failures: string[] = [];
+
+    if (!controlled) failures.push("no service worker controlled the page, so the update case was never exercised");
+    let deploy = 0;
+    for (const [pass, kind] of [[0, "reload"], [0, "hard-reload"], [1, "reload"], [1, "hard-reload"]] as const) {
+      if (pass === 1) {
+        deploy += 1;
+        writeFileSync(swFile, `${swOriginal}\n// deploy ${deploy}\n`);
+      }
+      loads = 0;
+      navigations.length = 0;
+      // Firefox has no CDP session; its reload stands in for both kinds.
+      if (kind === "reload" || useFirefox || useWebkit) await page.reload();
+      else {
+        const cdp = await context.newCDPSession(page);
+        await cdp.send("Page.reload", { ignoreCache: true });
+      }
+      await page.waitForLoadState("load");
+      await settle();
+      const log = await page.evaluate(() => (window as unknown as { __shellLog: string[] }).__shellLog);
+      results[`${kind}${pass ? "-after-deploy" : ""}`] = { loads, navigations: [...navigations], log };
+      if (loads !== 1) failures.push(`a ${kind} loaded the document ${loads} times`);
+      const mounts = log.filter((entry) => entry.includes("rail-mounted") || entry.includes("rail-replaced")).length;
+      if (mounts !== 1) failures.push(`a ${kind} mounted the rail ${mounts} times`);
+      // Prove the update case really swapped workers in view; otherwise a
+      // single load proves nothing.
+      if (pass === 1 && kind === "reload" && !log.some((entry) => entry.endsWith("controllerchange"))) failures.push("the after-deploy reload saw no new worker take control");
+    }
+
+    // Rail clicks: the rail node must be the very same element afterwards,
+    // with no loading screen and no document load in between.
+    const clicks: Record<string, unknown>[] = [];
+    for (const name of ["Chat", "Library", "Family", "Home", "Chat"]) {
+      loads = 0;
+      await page.evaluate(() => {
+        (window as unknown as { __shellLog: string[] }).__shellLog.length = 0;
+        document.querySelector('[data-slot="app-rail"]')?.setAttribute("data-probe", "kept");
+      });
+      const target = page.locator(`[data-slot="app-rail"] a[aria-label^="${name}"]`);
+      const before = page.url();
+      // Frames 50ms apart over the first 400ms after the click.
+      await target.first().click();
+      const frames: string[] = [];
+      for (let i = 0; i < 8; i += 1) {
+        frames.push(await page.evaluate(() => {
+          const rail = document.querySelector('[data-slot="app-rail"]');
+          const loading = document.querySelector('[role="status"][aria-label="Loading MaiPai Home"], [data-slot="route-skeleton"]');
+          return `${rail ? (rail.getAttribute("data-probe") === "kept" ? "rail-kept" : "rail-new") : "no-rail"}${loading ? "+loading" : ""}`;
+        }));
+        await page.waitForTimeout(50);
+      }
+      await page.waitForTimeout(600);
+      const kept = await page.evaluate(() => document.querySelector('[data-slot="app-rail"]')?.getAttribute("data-probe") === "kept");
+      const log = await page.evaluate(() => [...(window as unknown as { __shellLog: string[] }).__shellLog]);
+      const entry = { name, from: new URL(before).pathname, to: new URL(page.url()).pathname, loads, kept, frames, log };
+      clicks.push(entry);
+      if (!kept || loads > 0 || frames.some((frame) => frame !== "rail-kept") || log.length > 0) failures.push(`the ${name} rail click remounted the shell`);
+    }
+    results.clicks = clicks;
+    console.log(`shell-nav measure: ${JSON.stringify(results)}`);
+    if (failures.length) throw new Error(`captureShellNavReview: ${failures.join("; ")}`);
+  } finally {
+    writeFileSync(swFile, swOriginal);
+    await context.close();
+  }
+}
+
+/** RAIL-01 (owner's layout, 2026-10-06): the rail, the 288px history
  * column with many conversations, the conversation header, a real
  * exchange (a user message and a markdown reply), the composer empty and
  * multiline, the profile menu, and the avatar's attention badge, at 1440
@@ -2284,8 +2408,11 @@ async function captureChatShellReview(browser: Browser, sessionValue: string): P
       sendButton: box('[data-slot="aui_composer-shell"] button[aria-label="Send message"]'),
       historyRows: document.querySelectorAll('[data-slot="aui_thread-list-item"]').length,
       historyRowsVisible: [...document.querySelectorAll<HTMLElement>('[data-slot="aui_thread-list-item"]')].filter((row) => { const r = row.getBoundingClientRect(); return r.height > 0 && r.bottom <= window.innerHeight; }).length,
-      tones: { rail: bg('[data-slot="app-rail"]'), history: bg('[data-slot="next-chat-rail"]'), header: bg('[data-slot="next-chat-header"]'), workspace: bg('[data-slot="rail-workspace"]') },
-      vars: Object.fromEntries(["--background", "--page", "--shell-rail", "--shell-history", "--shell-header", "--shell-composer-bg"].map((name) => [name, getComputedStyle(document.documentElement).getPropertyValue(name).trim()])),
+      tones: { rail: bg('[data-slot="app-rail"]'), history: bg('[data-slot="next-chat-rail"]'), header: bg('[data-slot="next-chat-header"]'), workspace: bg('[data-slot="rail-workspace"]'), composer: bg('[data-slot="aui_composer-shell"]'), userBubble: bg('.aui-user-message-content') },
+      composerBorder: (() => { const el = document.querySelector<HTMLElement>('[data-slot="aui_composer-shell"]'); return el ? getComputedStyle(el).borderTopColor : null; })(),
+      historyDivider: (() => { const el = document.querySelector<HTMLElement>('[data-slot="next-chat-rail"]'); return el ? `${getComputedStyle(el).borderRightWidth} ${getComputedStyle(el).borderRightColor}` : null; })(),
+      headerDivider: (() => { const el = document.querySelector<HTMLElement>('[data-slot="next-chat-header"]'); return el ? getComputedStyle(el).borderBottomWidth : null; })(),
+      vars: Object.fromEntries(["--background", "--foreground", "--shell-main", "--shell-rail", "--shell-history", "--shell-composer-bg"].map((name) => [name, getComputedStyle(document.body).getPropertyValue(name).trim()])),
       pageOverflowX: document.documentElement.scrollWidth > window.innerWidth,
     };
   });
@@ -8006,6 +8133,11 @@ async function main() {
     }
 
     if (chatShellReview) {
+      await captureShellNavReview(browser, sessionValue);
+      if (shellNavReview) {
+        console.log("completed named review: --shell-nav-review");
+        return;
+      }
       await captureChatShellReview(browser, sessionValue);
       console.log("completed named review: --chat-shell-review");
       return;

@@ -12,12 +12,15 @@
 //   `import()` 404s. Vite's own runtime fires `vite:preloadError` for
 //   exactly this (https://vite.dev/guide/build.html#load-error-handling);
 //   reload to pick up the new shell.
-// - A new service worker takes control mid-session, on a page a worker
-//   was already controlling (workbox's own `controllerchange` event):
-//   reload once so the tab is running the code that matches what just got
-//   cached. A page's very first load, with no prior controller, is
-//   deliberately excluded - it already has the right content straight
-//   from the network, nothing stale to reload for.
+// - A new service worker taking control (after a hub restart ships a new
+//   build) never reloads a page the person is looking at. It used to
+//   reload at once (workbox's classic "reload on controllerchange"), which
+//   made the first load after every restart load twice (owner's report,
+//   2026-10-06, measured by `scripts/screenshot.ts --shell-nav-review`).
+//   A page that just loaded already has the new build's HTML (navigations
+//   are network-first in sw.ts). A tab that stayed open across the restart
+//   still runs the old bundle, so it reloads once, the next time it is
+//   hidden (the person switched away), where nobody sees it.
 // - The shell itself fails to boot (a corrupt cached asset, a synchronous
 //   render throw): retry via reload, up to the shared cap, so a
 //   permanently broken deploy shows a real error instead of reloading
@@ -73,29 +76,26 @@ export function installStaleChunkRetry(win: Window, storage: Storage): void {
   });
 }
 
-/** The classic workbox "reload on controllerchange" pattern, guarded so a
- * spurious second event in the same page life (there shouldn't be one, but
- * nothing about the browser contract promises there won't be) can't loop.
- *
- * Only wired up when a service worker was ALREADY controlling this page
- * before this call - a real code-review finding (2026-09-06), confirmed
- * live by `scripts/screenshot.ts`'s own axe scan throwing "Execution
- * context was destroyed" on a brand-new browser context's very first
- * page: that page has no prior controller, so its first-ever activation
- * fired `controllerchange` and forced an unconditional reload the doc
- * comment above never actually meant to cover ("a new service worker
- * takes control MID-SESSION" - a page that already has one). A page's
- * first-ever load already has the right content straight from the
- * network; it was never served through the cache this SW is just now
- * starting to build, so there is nothing stale to reload for. */
-export function installReloadOnceOnNewServiceWorker(container: ServiceWorkerContainer, win: Window): void {
+/** A new worker took control (a hub restart shipped a new build): reload
+ * once, but only while the page is hidden, so the person never sees it.
+ * Only wired when a worker was already controlling this page at boot: a
+ * first-ever load has nothing stale (the original code review's finding,
+ * 2026-09-06). Not part of the shared budget: it reloads at most once per
+ * page life and only for a real update. */
+export function installHiddenReloadOnNewServiceWorker(container: ServiceWorkerContainer, doc: Document, win: Window): void {
   if (!container.controller) return;
+  let pending = false;
   let reloaded = false;
-  container.addEventListener("controllerchange", () => {
-    if (reloaded) return;
+  const reloadIfHidden = () => {
+    if (!pending || reloaded || doc.visibilityState !== "hidden") return;
     reloaded = true;
     win.location.reload();
+  };
+  container.addEventListener("controllerchange", () => {
+    pending = true;
+    reloadIfHidden();
   });
+  doc.addEventListener("visibilitychange", reloadIfHidden);
 }
 
 /** Runs `boot`, which must call `confirmBooted()` once the app is actually
