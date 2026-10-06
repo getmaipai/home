@@ -1,6 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { startFakeSshd, type FakeSshd } from "./fixtures/fakeSshd";
+import { utils } from "ssh2";
+import { generateFakeSshHostKey, startFakeSshd, type FakeSshd } from "./fixtures/fakeSshd";
 import { rotateRobotPassword, RobotPasswordRotationError } from "@/lib/robotSsh";
+
+describe("fake sshd host key", () => {
+  // ssh2 1.17.0 writes about 1 in 256 of its own Ed25519 keys malformed (it
+  // strips leading zero bytes from the fixed-width public key), which failed
+  // devices.test.ts at random in the gate. 4096 keys make the old fixture fail
+  // this test with near certainty (1 - (255/256)^4096).
+  test("every host key the fixture makes is one ssh2 can load", () => {
+    for (let i = 0; i < 4096; i += 1) {
+      const parsed = utils.parseKey(generateFakeSshHostKey().private);
+      expect(parsed).not.toBeInstanceOf(Error);
+    }
+  });
+});
 
 describe("rotateRobotPassword()", () => {
   test("authenticates with the current password and sends the new one only over stdin", async () => {

@@ -28,8 +28,17 @@ function safeEqual(input: string, allowed: string): boolean {
   return timingSafeEqual(a, b);
 }
 
+// ECDSA P-256, not Ed25519: ssh2 1.17.0's Ed25519 key writer strips leading
+// zero bytes from the 32-byte public key, so about 1 in 256 of the Ed25519
+// keys it generates cannot be loaded back ("Malformed OpenSSH private key").
+// Its ECDSA writer has no such step. The host key type is not what these
+// tests exercise; the client accepts either.
+export function generateFakeSshHostKey(): { private: string; public: string } {
+  return utils.generateKeyPairSync("ecdsa", { bits: 256 });
+}
+
 export async function startFakeSshd(opts: FakeSshdOptions): Promise<FakeSshd> {
-  const hostKey = utils.generateKeyPairSync("ed25519");
+  const hostKey = generateFakeSshHostKey();
   const expectedCommand = opts.command ?? "sudo chpasswd";
 
   const server = new Server({ hostKeys: [hostKey.private] }, (client) => {
