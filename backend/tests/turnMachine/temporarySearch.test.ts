@@ -39,16 +39,14 @@ beforeEach(async () => {
   __resetSearxngEnginesCacheForTests();
   searxngQueries = [];
   providerQueries = [];
-  searxng = Bun.serve({
-    port: 0,
+  searxng = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch: (req) => {
       const url = new URL(req.url);
       if (url.pathname === "/search") searxngQueries.push(url.searchParams.get("q") ?? "");
       return Response.json({ results: [{ title: "Keyless", url: "https://keyless.example/", content: "from searxng" }] });
     },
   });
-  provider = Bun.serve({
-    port: 0,
+  provider = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch: (req) => {
       providerQueries.push(new URL(req.url).searchParams.get("q") ?? "");
       return Response.json({ web: { results: [{ title: "Hosted", url: "https://hosted.example/", description: "from the provider" }] } });

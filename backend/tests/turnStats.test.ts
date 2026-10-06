@@ -22,8 +22,7 @@ afterEach(() => {
 });
 
 function scriptedEngine() {
-  const server = Bun.serve({
-    port: 0,
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch(request) {
       const path = new URL(request.url).pathname;
       if (path === "/health") return Response.json({ status: "ok" });

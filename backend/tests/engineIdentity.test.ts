@@ -17,8 +17,7 @@ describe("engineIdentity", () => {
   });
 
   test("reads the build and the model file name from /props and the answer from /health, bounded and never throwing", async () => {
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         const path = new URL(req.url).pathname;
         if (path === "/health") return Response.json({ status: "ok" });

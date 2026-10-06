@@ -273,8 +273,7 @@ describe("matchCommand / runCommand", () => {
   // internally) let it through and looked fine.
   test("a mixed-case domain is lowercased before the real Home Assistant call", async () => {
     let seenPath = "";
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         seenPath = new URL(req.url).pathname;
         return Response.json({ context: { id: "abc" } });
@@ -301,8 +300,7 @@ describe("matchCommand / runCommand", () => {
 
   test("runCommand fires the real Home Assistant call for a configured home_call_service command", async () => {
     let seenPath = "";
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         seenPath = new URL(req.url).pathname;
         return Response.json({ context: { id: "abc" } });

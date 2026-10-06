@@ -31,15 +31,13 @@ beforeEach(() => {
   __resetSearxngEnginesCacheForTests();
   searxngHits = 0;
   providerHits = [];
-  searxng = Bun.serve({
-    port: 0,
+  searxng = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch: (req) => {
       if (new URL(req.url).pathname === "/search") searxngHits += 1;
       return Response.json({ results: [{ title: "Keyless", url: "https://keyless.example/", content: "from searxng" }] });
     },
   });
-  provider = Bun.serve({
-    port: 0,
+  provider = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch: (req) => {
       const url = new URL(req.url);
       providerHits.push({ key: req.headers.get("x-subscription-token"), query: url.searchParams.get("q") });
@@ -130,8 +128,7 @@ describe("hosted search key (THIN-4H)", () => {
     const adult = await owner();
     setHouseholdSettingValue(HOSTED_SEARCH_KEY_SETTING, SECRET);
     provider.stop(true);
-    provider = Bun.serve({
-      port: 0,
+    provider = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () => Response.json({ web: { results: [{ title: "Node &amp; <strong>Bun</strong>", url: "https://hosted.example/", description: "a &lt;b&gt; <strong>runtime</strong> &#x27;fast&#x27;" }] } }),
     });
     __setHostedSearchEndpointForTests(`http://127.0.0.1:${provider.port}/res/v1/web/search`);

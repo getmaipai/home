@@ -2266,8 +2266,7 @@ describe("turnNext.ts: #168, a searched question is answered in the shape it cal
 // plainly not to invent detail when every row it got has no snippet.
 describe("turnNext.ts: SEARCH-ROWS-01, an empty-snippet search says so", () => {
   test("a searched reply whose results have no summary text at all is told not to invent detail", async () => {
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ port: 0,
       hostname: "127.0.0.1",
       fetch(req) {
         const url = new URL(req.url);

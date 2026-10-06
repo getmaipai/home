@@ -497,8 +497,7 @@ describe("POST /api/plugins/websearch/run", () => {
   // search or answer quality (that needs a real SearXNG instance and a
   // real model, see this package's own quality_scale.yaml).
   test("runs the recipe end to end: integration.call through to the rows and the synthesis_hint, no reply", async () => {
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () =>
         Response.json({
           results: [{ title: "Mount Everest", url: "https://example.com/everest", content: "The tallest mountain above sea level." }],
@@ -598,8 +597,7 @@ describe("POST /api/plugins/lights-on and lights-off/run", () => {
   test("runs the recipe end to end: a real POST to Home Assistant's own REST shape", async () => {
     let seenPath = "";
     let seenBody: unknown = null;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: async (req) => {
         seenPath = new URL(req.url).pathname;
         seenBody = await req.json();
@@ -633,8 +631,7 @@ describe("POST /api/plugins/lights-on and lights-off/run", () => {
 describe("POST /api/plugins/lock-doors/run", () => {
   test("runs the recipe end to end: a real POST to Home Assistant's own lock.lock service", async () => {
     let seenPath = "";
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: async (req) => {
         seenPath = new URL(req.url).pathname;
         return Response.json({ context: { id: "abc" } });

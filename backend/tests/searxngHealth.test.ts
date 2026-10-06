@@ -44,7 +44,7 @@ describe("checkSearxngHealth", () => {
   // searxngSearch() itself now throws for this shape (packageHost.ts's
   // expectJsonObject), which this reuses rather than re-deriving.
   test("a non-JSON response (e.g. an SSO login page) also raises searxng_unreachable", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("<html><body>Log in</body></html>", { headers: { "content-type": "text/html" } }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("<html><body>Log in</body></html>", { headers: { "content-type": "text/html" } }) });
     try {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await checkSearxngHealth();
@@ -62,7 +62,7 @@ describe("checkSearxngHealth", () => {
   // reachable and JSON, but still broken in a way a household needs to
   // know about.
   test("valid JSON with zero results raises searxng_empty, a different issue than unreachable", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
     try {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await checkSearxngHealth();
@@ -84,8 +84,7 @@ describe("checkSearxngHealth", () => {
   // packageHost.ts throw doing exactly that, by falling into this
   // function's catch-all branch).
   test("engines suspended (unresponsive_engines, zero rows) raises searxng_empty, never searxng_unreachable", async () => {
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () => Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"]] }),
     });
     try {
@@ -105,8 +104,7 @@ describe("checkSearxngHealth", () => {
   // an outage just because some other, unrelated engine also reported
   // itself suspended on the same response.
   test("a real infobox answer alongside an unrelated suspended engine still clears both issues", async () => {
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () =>
         Response.json({
           results: [],
@@ -130,8 +128,7 @@ describe("checkSearxngHealth", () => {
   // second call moments later is always "too soon" while healthy.
   test("while healthy, a second check moments later is throttled to the hourly cadence - the fixture sees only one request", async () => {
     let requests = 0;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () => {
         requests++;
         return Response.json({ results: [{ title: "Earth", url: "https://example.com/earth", content: "The third planet." }] });
@@ -153,8 +150,7 @@ describe("checkSearxngHealth", () => {
   // again" (the design note's own words) actually depends on.
   test("while down, every check probes again - the throttle never applies", async () => {
     let requests = 0;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () => {
         requests++;
         return Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"]] });
@@ -178,8 +174,7 @@ describe("checkSearxngHealth", () => {
   // hourly cadence for as long as it stays dismissed.
   test("a dismissed-but-still-broken issue still gets the 15-minute cadence, not the hourly one", async () => {
     let requests = 0;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () => {
         requests++;
         return Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"]] });
@@ -204,8 +199,7 @@ describe("checkSearxngHealth", () => {
     await checkSearxngHealth();
     expect(listIssues().some((i) => i.source === "websearch" && i.key === "searxng_unreachable")).toBe(true);
 
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () => Response.json({ results: [{ title: "Earth", url: "https://example.com/earth", content: "The third planet." }] }),
     });
     try {
@@ -230,8 +224,7 @@ describe("checkSearxngHealth", () => {
   // real failure, unmasked, even when Wikipedia would gladly help.
   test("SearXNG unreachable is still raised even when Wikipedia would answer 'Earth' - the canary never lets the fallback mask a real outage", async () => {
     const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
-    const wiki = Bun.serve({
-      port: 0,
+    const wiki = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         const url = new URL(req.url);
         if (url.pathname === "/w/rest.php/v1/search/page") return Response.json({ pages: [{ id: 1, key: "Earth" }] });

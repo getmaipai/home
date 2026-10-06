@@ -24,7 +24,7 @@ if (inflateMb > 0) {
   ballast = Buffer.alloc(inflateMb * 1024 * 1024, 1);
 }
 
-Bun.serve({
+Bun.serve({ hostname: "127.0.0.1",
   port,
   fetch(req) {
     // LlamaServerClient.health() (spec/llm/ts/client.ts) requires a JSON

@@ -56,8 +56,12 @@ export type HostValidation = { ok: true; host: string } | { ok: false; error: st
 // (the org's own testing standard) instead of depending on a fake
 // `*.example.com` subdomain actually resolving over the live network.
 let testDnsLookup: DnsLookup | null = null;
+let testFetch: FaviconFetchFn | null = null;
 export function __setFaviconDnsLookupForTests(fn: DnsLookup | null): void {
   testDnsLookup = fn;
+}
+export function __setFaviconFetchForTests(fn: FaviconFetchFn | null): void {
+  testFetch = fn;
 }
 
 export async function validateFaviconHost(raw: string): Promise<HostValidation> {
@@ -231,7 +235,7 @@ export async function getFavicon(host: string, fetchFn?: FaviconFetchFn, now: Da
     }
   }
 
-  const outcome = await fetchFaviconBytes(host, fetchFn);
+  const outcome = await fetchFaviconBytes(host, fetchFn ?? testFetch ?? undefined);
   if (outcome.kind === "network_failure") {
     // Not cached: a transient failure on the hub's own side is never a
     // fact about the site worth remembering for 30 days - the next

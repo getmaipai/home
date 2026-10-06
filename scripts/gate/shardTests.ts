@@ -21,10 +21,20 @@ import { Glob } from "bun";
 import { cpus, freemem, tmpdir, totalmem } from "node:os";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import flakes from "./flakes.json";
 
 export type Timings = Record<string, number>;
 
 const TEST_GLOB = "**/*{.test,_test,.spec,_spec}.{ts,tsx,js,jsx,mjs,cjs,mts,cts}";
+const SERIAL_FILES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(flakes.serial).map(([workspace, entries]) => [workspace, entries.map(({ file }) => file)]),
+);
+const SKIPPED_FILES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(flakes.skipped.reduce<Record<string, string[]>>((byWorkspace, entry) => {
+    (byWorkspace[entry.workspace] ??= []).push(entry.file);
+    return byWorkspace;
+  }, {})).map(([workspace, files]) => [workspace, files]),
+);
 
 /** Test files bun would discover under `root` of `dir`, as paths relative to `dir`, sorted. */
 export function discoverTests(dir: string, root = "."): string[] {
@@ -167,17 +177,21 @@ export async function run(opts: RunOptions): Promise<number> {
   const label = opts.dir.replace(/\/$/, "").split("/").pop() ?? "tests";
   const timingsPath = opts.timingsPath ?? join(import.meta.dir, "test-timings.json");
   const allTimings: Record<string, Timings> = existsSync(timingsPath) ? JSON.parse(readFileSync(timingsPath, "utf8")) : {};
-  const files = discoverTests(dir, opts.root ?? ".");
-  if (files.length === 0) {
+  const discovered = discoverTests(dir, opts.root ?? ".");
+  const serial = SERIAL_FILES[label] ?? [];
+  const skipped = SKIPPED_FILES[label] ?? [];
+  const files = discovered.filter((f) => !serial.includes(f) && !skipped.includes(f));
+  const serialFiles = discovered.filter((f) => serial.includes(f));
+  if (files.length === 0 && serialFiles.length === 0) {
     console.log(`shard: no test files under ${dir}`);
     return 0;
   }
   const freeGb = (freemem() + 0) / 1024 ** 3;
-  const n = opts.shards ?? chooseShardCount({ env: process.env.MAIPAI_GATE_SHARDS, cores: cpus().length, freeGb: Math.max(freeGb, availableGb()), files: files.length });
+  const n = files.length === 0 ? 0 : (opts.shards ?? chooseShardCount({ env: process.env.MAIPAI_GATE_SHARDS, cores: cpus().length, freeGb: Math.max(freeGb, availableGb()), files: files.length }));
   const plan = balance(files, allTimings[label] ?? {}, n);
   const started = Date.now();
   const scratch = mkdtempSync(join(tmpdir(), "maipai-gate-shards-"));
-  console.log(`shard: ${label}: ${files.length} files in ${plan.length} shards (cores ${cpus().length}, ${(totalmem() / 1024 ** 3).toFixed(0)} GB)`);
+  console.log(`shard: ${label}: ${files.length} parallel files in ${plan.length} shards; ${serialFiles.length} serial; ${skipped.length} skipped (cores ${cpus().length}, ${(totalmem() / 1024 ** 3).toFixed(0)} GB)`);
 
   interface Live {
     index: number;
@@ -229,6 +243,20 @@ export async function run(opts: RunOptions): Promise<number> {
   process.on("SIGTERM", onSignal);
 
   await Promise.all(live.map((s) => s.done));
+
+  // Real network tests and UI fetch mocks run alone after parallel shards to
+  // avoid cross-file multicast and process-global fetch interference.
+  for (const file of serialFiles) {
+    if (firstFail) break;
+    const proc = Bun.spawn(["bun", "test", "--bail", file.startsWith("./") ? file : `./${file}`], {
+      cwd: dir,
+      env: process.env,
+      stdout: "inherit",
+      stderr: "inherit",
+    });
+    const code = await proc.exited;
+    if (code !== 0) firstFail = { shard: { index: plan.length, proc, logPath: "", junit: "", files: [file], done: Promise.resolve(code) }, code };
+  }
 
   const elapsed = (Date.now() - started) / 1000;
   let code = 0;

@@ -43,7 +43,7 @@ describe("TLS rotation mechanism (the one index.ts's onLeafRenewed() uses)", () 
   test("server.reload({ tls }) does NOT swap the served certificate - documenting why index.ts doesn't use it", async () => {
     const certA = makeSelfSignedCert("cert-A");
     const certB = makeSelfSignedCert("cert-B");
-    const server = Bun.serve({ port: 0, fetch: () => new Response("hi"), tls: { cert: certA.certPem, key: certA.keyPem } });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("hi"), tls: { cert: certA.certPem, key: certA.keyPem } });
     try {
       expect(await getServedCommonName(server.port!)).toBe("cert-A");
       server.reload({ fetch: () => new Response("hi"), tls: { cert: certB.certPem, key: certB.keyPem } });
@@ -57,12 +57,12 @@ describe("TLS rotation mechanism (the one index.ts's onLeafRenewed() uses)", () 
   test("a graceful stop(true) followed by a fresh Bun.serve() on the same port DOES serve the new certificate", async () => {
     const certA = makeSelfSignedCert("cert-A");
     const certB = makeSelfSignedCert("cert-B");
-    let server = Bun.serve({ port: 0, fetch: () => new Response("hi"), tls: { cert: certA.certPem, key: certA.keyPem } });
+    let server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("hi"), tls: { cert: certA.certPem, key: certA.keyPem } });
     const port = server.port!;
     try {
       expect(await getServedCommonName(port)).toBe("cert-A");
       server.stop(true);
-      server = Bun.serve({ port, fetch: () => new Response("hi"), tls: { cert: certB.certPem, key: certB.keyPem } });
+      server = Bun.serve({ hostname: "127.0.0.1", port, fetch: () => new Response("hi"), tls: { cert: certB.certPem, key: certB.keyPem } });
       expect(await getServedCommonName(port)).toBe("cert-B");
     } finally {
       server.stop(true);

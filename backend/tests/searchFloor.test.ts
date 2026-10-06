@@ -49,8 +49,7 @@ async function searchAs(role: "child" | "teen" | "admin" | "owner") {
   const row = db.select().from(people).where(eq(people.displayName, "Willow")).get()!;
   const actor = role === "owner" ? row : { ...row, role: role as "child" };
   const config = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
-  const server = Bun.serve({
-    port: 0,
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch: (req) =>
       new URL(req.url).pathname === "/config"
         ? Response.json(config)
@@ -142,8 +141,7 @@ describe("the drop is counted on the trace (THIN-4C)", () => {
     await client.post("/api/auth/setup", { displayName: "Willow", secret: "correcthorse" });
     const row = db.select().from(people).where(eq(people.displayName, "Willow")).get()!;
     const config = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) =>
         new URL(req.url).pathname === "/config"
           ? Response.json(config)

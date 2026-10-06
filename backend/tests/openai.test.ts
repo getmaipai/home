@@ -293,8 +293,7 @@ describe("POST /v1/chat/completions", () => {
   test("cancelling the response stream reaches the real underlying connection", async () => {
     let requestReceived = false;
     let sawAbort = false;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch(req) {
         requestReceived = true;
         req.signal.addEventListener("abort", () => {

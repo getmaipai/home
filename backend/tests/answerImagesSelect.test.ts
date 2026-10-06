@@ -202,8 +202,7 @@ describe("ANSWER-IMG-02: sources per subject and band", () => {
 describe("ANSWER-IMG-02: SearXNG image search per band", () => {
   function fakeSearxng(engines: Array<{ name: string; safesearch: boolean }>) {
     const searches: Array<URL["searchParams"]> = [];
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ port: 0,
       hostname: "127.0.0.1",
       fetch(req) {
         const url = new URL(req.url);

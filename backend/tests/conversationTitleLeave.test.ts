@@ -123,7 +123,7 @@ describe("a chat read with no title gets one asked for", () => {
 
 /** An engine that is down: every request is a 503, and each one is counted. */
 function deadEngine() {
-  const server = Bun.serve({ port: 0, fetch: () => { hits++; return new Response("down", { status: 503 }); } });
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => { hits++; return new Response("down", { status: 503 }); } });
   let hits = 0;
   process.env.MAIPAI_LLAMA_SERVER_URL = `http://127.0.0.1:${server.port}`;
   return { hits: () => hits, stop: () => server.stop(true) };

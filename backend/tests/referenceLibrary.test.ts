@@ -36,8 +36,7 @@ function sha256Of(body: string): string {
  * real shape verified live against library.kiwix.org and
  * download.kiwix.org, 2026-09-24 (docs/dev.md). */
 function startFakeKiwixCatalog(entries: Array<{ name: string; flavour: string; zimBody: string; zimFileName?: string }>): ReturnType<typeof Bun.serve> {
-  const server: ReturnType<typeof Bun.serve> = Bun.serve({
-    port: 0,
+  const server: ReturnType<typeof Bun.serve> = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch(req): Response {
       const url = new URL(req.url);
       if (url.pathname === "/catalog/v2/entries") {
@@ -193,8 +192,7 @@ describe("installReferenceFlavour()", () => {
     // the server serves different bytes at the .zim path - the
     // corrupted-byte scenario the work order's own acceptance evidence
     // names, without needing to actually corrupt a byte on the wire.
-    const server: ReturnType<typeof Bun.serve> = Bun.serve({
-      port: 0,
+    const server: ReturnType<typeof Bun.serve> = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch(req): Response {
         const url = new URL(req.url);
         if (url.pathname === "/catalog/v2/entries") {
@@ -237,8 +235,7 @@ describe("installReferenceFlavour(): concurrent installs of the same slot", () =
     setHouseholdSettingValue("reference.library_dir", libraryDir);
     let releaseZim: (() => void) | undefined;
     const zimGate = new Promise<void>((resolve) => (releaseZim = resolve));
-    const server: ReturnType<typeof Bun.serve> = Bun.serve({
-      port: 0,
+    const server: ReturnType<typeof Bun.serve> = Bun.serve({ hostname: "127.0.0.1", port: 0,
       async fetch(req): Promise<Response> {
         const url = new URL(req.url);
         if (url.pathname === "/catalog/v2/entries") {

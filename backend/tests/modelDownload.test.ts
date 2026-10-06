@@ -13,8 +13,7 @@ const SHA256 = createHash("sha256").update(CONTENT).digest("hex");
 // window), which a hand-rolled fetch mock would have to reimplement
 // correctly to be worth anything - a real server proves the actual
 // contract instead of an assumption about it.
-const server = Bun.serve({
-  port: 0,
+const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
   fetch(req) {
     const url = new URL(req.url);
     if (url.pathname === "/flaky-once") {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 describe("backend port-zero startup", () => {
   test("port zero binds an actual port suitable for the reported startup URL", () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("ok") });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("ok") });
     try {
       const startupUrl = `Home URL: http://localhost:${server.port}`;
       const port = Number(startupUrl.match(/localhost:(\d+)/)?.[1]);

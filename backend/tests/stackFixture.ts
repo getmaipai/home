@@ -23,8 +23,7 @@ export interface StackFixture {
 export function startStackFixture(routes: Record<string, StackFixtureHandler>): StackFixture {
   const calls: string[] = [];
   let aborted = 0;
-  const server = Bun.serve({
-    port: 0,
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch: async (req) => {
       req.signal.addEventListener("abort", () => { aborted++; }, { once: true });
       const url = new URL(req.url);

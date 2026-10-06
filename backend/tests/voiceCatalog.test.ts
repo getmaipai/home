@@ -22,8 +22,7 @@ function makeFixtureServer() {
     [{ type: "file", path: "expresso/e1.safetensors" }],
     [{ type: "file", path: "ears/p10/clip.mp3" }],
   ];
-  const server = Bun.serve({
-    port: 0,
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch(req) {
       const url = new URL(req.url);
       const page = Number(url.searchParams.get("page") ?? "0");
@@ -43,8 +42,7 @@ function makeFixtureServer() {
 // catalog in one uninhibited burst - proves the limiter is a real choke
 // point on this fetch, not just present in an import list.
 function makeManyPageFixtureServer(pageCount: number) {
-  const server = Bun.serve({
-    port: 0,
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch(req) {
       const url = new URL(req.url);
       const page = Number(url.searchParams.get("page") ?? "0");
@@ -130,8 +128,7 @@ describe("lib/voiceCatalog.ts getVoiceCatalog()", () => {
 
   test("a second call within the cache window never refetches", async () => {
     let requestCount = 0;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch() {
         requestCount++;
         return new Response(JSON.stringify([{ type: "file", path: "vctk/p1.wav" }]), {

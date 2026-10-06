@@ -108,7 +108,7 @@ describe("WS /api/stt/stream", () => {
     const client = await owner();
     const cookie = client.getCookie();
     if (!cookie) throw new Error("no session cookie captured - did auth/setup run first?");
-    const server = Bun.serve({ port: 0, fetch: app.fetch, websocket });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
     try {
       const ws = new WebSocket(`ws://127.0.0.1:${server.port}/api/stt/stream`, { headers: { cookie } });
       const events: Record<string, unknown>[] = [];

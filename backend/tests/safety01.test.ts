@@ -63,8 +63,7 @@ async function withEngines<T>(reply: string, fn: (seen: { requests: ChatCompleti
     },
   });
   process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
-  const searxng = Bun.serve({
-    port: 0,
+  const searxng = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch: (req) => {
       seen.queries.push(new URL(req.url).searchParams.get("q") ?? "");
       return Response.json({ results: [{ title: "A page", url: "https://example.com/a", content: "A summary." }] });

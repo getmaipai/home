@@ -7,7 +7,7 @@
 import { describe, expect, test, beforeEach, afterEach, mock } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
-import { __clearFaviconCacheForTests, __setFaviconDnsLookupForTests } from "@/lib/favicons";
+import { __clearFaviconCacheForTests, __setFaviconDnsLookupForTests, __setFaviconFetchForTests } from "@/lib/favicons";
 
 beforeEach(() => {
   resetDb();
@@ -23,7 +23,10 @@ beforeEach(() => {
 // real hostnames the same fake address for the rest of this `bun test`
 // run (packageCache.test.ts's own afterEach comment names the identical
 // hazard for its eviction-budget override).
-afterEach(() => __setFaviconDnsLookupForTests(null));
+afterEach(() => {
+  __setFaviconDnsLookupForTests(null);
+  __setFaviconFetchForTests(null);
+});
 
 async function owner(): Promise<TestClient> {
   const client = new TestClient();
@@ -32,13 +35,12 @@ async function owner(): Promise<TestClient> {
 }
 
 function mockImageFetch() {
-  const originalFetch = globalThis.fetch;
   let calls = 0;
-  globalThis.fetch = mock(() => {
+  __setFaviconFetchForTests(mock(() => {
     calls++;
     return Promise.resolve(new Response(new Uint8Array(16), { status: 200, headers: { "content-type": "image/png" } }));
-  }) as unknown as typeof fetch;
-  return { count: () => calls, restore: () => { globalThis.fetch = originalFetch; } };
+  }));
+  return { count: () => calls, restore: () => { __setFaviconFetchForTests(null); } };
 }
 
 describe("GET /api/favicon", () => {
@@ -91,13 +93,12 @@ describe("GET /api/favicon", () => {
 
   test("no icon: 204", async () => {
     const client = await owner();
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(() => Promise.resolve(new Response(null, { status: 404 }))) as unknown as typeof fetch;
+    __setFaviconFetchForTests(mock(() => Promise.resolve(new Response(null, { status: 404 }))));
     try {
       const res = await client.get("/api/favicon?domain=route-no-icon.example.com");
       expect(res.status).toBe(204);
     } finally {
-      globalThis.fetch = originalFetch;
+      __setFaviconFetchForTests(null);
     }
   });
 });

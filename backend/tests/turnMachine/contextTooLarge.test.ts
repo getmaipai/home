@@ -40,7 +40,7 @@ beforeEach(() => {
   __setChatWindowContextForTests(4000);
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
-  searxng = Bun.serve({ port: 0, fetch: (request) => {
+  searxng = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
     const url = new URL(request.url);
     if (url.pathname === "/config") return Response.json({ engines: [{ name: "google cse", enabled: true, safesearch: true, categories: ["general", "web"] }] });
     return Response.json({ results: [1, 2, 3, 4].map((n) => ({ title: `Avengers result ${n}`, url: `https://site${n}.example.com/page`, content: `Snippet ${n}`, engine: "google cse", engines: ["google cse"] })) });

@@ -525,8 +525,7 @@ describe("lib/llm.ts startCompleteStream()", () => {
   // firing once the caller aborts.
   test("aborting the given signal stops the generator and reaches the real underlying connection", async () => {
     let sawAbort = false;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch(req) {
         req.signal.addEventListener("abort", () => {
           sawAbort = true;

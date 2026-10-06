@@ -179,7 +179,7 @@ describe("startSidecar/stopSidecar", () => {
     // briefly rather than asserting on the very next tick.
     function tryBind(): ReturnType<typeof Bun.serve> | null {
       try {
-        return Bun.serve({ port, fetch: () => new Response("new") });
+        return Bun.serve({ hostname: "127.0.0.1", port, fetch: () => new Response("new") });
       } catch {
         return null;
       }
@@ -797,7 +797,7 @@ describe("freePort", () => {
       await expect(fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(1000) })).rejects.toThrow();
       expect(blockedPortReason(port)).toBeUndefined();
 
-      const server = Bun.serve({ port, fetch: () => new Response("new") });
+      const server = Bun.serve({ hostname: "127.0.0.1", port, fetch: () => new Response("new") });
       try {
         const res = await fetch(`http://127.0.0.1:${port}`);
         expect(await res.text()).toBe("new");

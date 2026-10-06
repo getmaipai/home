@@ -33,7 +33,7 @@ function page(url: string, text: string): PageReadResult {
 }
 
 function fakeSearxng(body: unknown) {
-  const server = Bun.serve({ port: 0, fetch: () => Response.json(body) });
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json(body) });
   setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
   return server;
 }

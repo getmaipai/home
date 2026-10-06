@@ -85,7 +85,7 @@ class DeviceSocket {
 describe("GET /api/devices/me/events", () => {
   test("refuses a WebSocket upgrade without a device session", async () => {
     expect((await app.request("/api/devices/me/events")).status).toBe(401);
-    const server = Bun.serve({ port: 0, fetch: app.fetch, websocket });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
     try {
       const socket = new WebSocket(`ws://127.0.0.1:${server.port}/api/devices/me/events`);
       let opened = false;
@@ -104,7 +104,7 @@ describe("GET /api/devices/me/events", () => {
   test("refuses robot offer answers whose declared source is not voice", async () => {
     const { client: owner, personId } = await ownerSession();
     const { client: robot } = await robotSession(personId);
-    const server = Bun.serve({ port: 0, fetch: app.fetch, websocket });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
     const cookie = robot.getCookie();
     if (!cookie) throw new Error("robot session cookie missing");
     try {
@@ -126,7 +126,7 @@ describe("GET /api/devices/me/events", () => {
     expect(accepted.status).toBe(202);
     const { id } = (await accepted.json()) as { id: string };
 
-    const server = Bun.serve({ port: 0, fetch: app.fetch, websocket });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
     const cookie = robot.getCookie();
     if (!cookie) throw new Error("robot session cookie missing");
     try {
@@ -161,7 +161,7 @@ describe("GET /api/devices/me/events", () => {
     installWakewordPlaceholders();
     expect(areWakewordAssetsInstalled()).toBe(true);
     expect(getRegistryKey("voice.wakeword.enabled")).toBeDefined();
-    const server = Bun.serve({ port: 0, fetch: app.fetch, websocket });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
     const cookie = robot.getCookie();
     if (!cookie) throw new Error("robot session cookie missing");
     try {
@@ -195,7 +195,7 @@ describe("GET /api/devices/me/events", () => {
     const cookie = robot.getCookie();
     if (!cookie) throw new Error("robot session cookie missing");
     __setDeviceHeartbeatIntervalForTests(20);
-    const server = Bun.serve({ port: 0, fetch: app.fetch, websocket });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
     try {
       const socket = new DeviceSocket(`ws://127.0.0.1:${server.port}/api/devices/me/events`, { cookie });
       await socket.open();
@@ -223,7 +223,7 @@ describe("GET /api/devices/me/events", () => {
     const { client: robot, deviceId } = await robotSession(personId);
     const cookie = robot.getCookie();
     if (!cookie) throw new Error("robot session cookie missing");
-    const server = Bun.serve({ port: 0, fetch: app.fetch, websocket });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: app.fetch, websocket });
     try {
       const url = `ws://127.0.0.1:${server.port}/api/devices/me/events`;
       const first = new DeviceSocket(url, { cookie });

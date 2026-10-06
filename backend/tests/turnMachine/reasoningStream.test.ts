@@ -194,8 +194,7 @@ describe("THIN-5B: live means live, not buffered until the answer starts", () =>
     const answerGate = new Promise<void>((resolve) => { releaseAnswer = resolve; });
     const encoder = new TextEncoder();
     const sse = (delta: Record<string, unknown>, finish: string | null = null) => encoder.encode(`data: ${JSON.stringify({ id: "gated", model: "gated", choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`);
-    const engine = Bun.serve({
-      port: 0,
+    const engine = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: async (req) => {
         const body = (await req.json()) as { stream?: boolean };
         if (!body.stream) return Response.json({ id: "gated", model: "gated", choices: [{ index: 0, message: { role: "assistant", content: "{}" }, finish_reason: "stop" }] });

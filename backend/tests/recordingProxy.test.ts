@@ -9,9 +9,7 @@ afterEach(() => {
 
 function scriptedUpstream(healthOk: boolean) {
   const received: { path: string; body?: unknown }[] = [];
-  const server = Bun.serve({
-    hostname: "127.0.0.1",
-    port: 0,
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
     async fetch(req) {
       const path = new URL(req.url).pathname;
       const body = req.method === "POST" ? await req.json() : undefined;

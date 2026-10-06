@@ -246,10 +246,14 @@ if [ "$SCOPE" != "docs" ]; then
   # behind each other.
   if [ "$SCOPE" = "frontend" ]; then export GATE_LOCK_NAME=frontend; fi
   GATE_LOCK_LABEL="home-$$"
+  # This lane must remain queued through long concurrent work. Extend the
+  # lock's normal cap for this invocation; load is diagnostic only.
+  export GATE_LOCK_PER_POSITION_SECONDS=86400 GATE_LOCK_MAX_SECONDS=86400
   if ! GATE_LOCK_PID=$$ bash "$GATE_LOCK" acquire "$GATE_LOCK_LABEL" "${GATE_LOCK_ITEM:-}"; then
     echo "== gate-lock: could not take the machine-wide full-gate lock (see above); not running the $SCOPE gate"
     exit 1
   fi
+  echo "== system load: $(sysctl -n vm.loadavg 2>/dev/null || uptime)"
 fi
 
 STANDARDS_REPO="${MAIPAI_STANDARDS_DIR:-../.github}"
@@ -421,6 +425,9 @@ run_backend_suite() {
 
   stage "backend: typecheck"
   (cd backend && bunx tsc --noEmit)
+
+  stage "backend: test server hostname lint"
+  bun scripts/gate/testServersLint.ts
 
   stage "backend: rule-budget lint (U0b, docs/plans/simple-turn-pipeline-2026-09-22.md)"
   (cd backend && bun run scripts/lint/rule-budget.ts)

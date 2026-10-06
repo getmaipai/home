@@ -283,7 +283,7 @@ describe("packageHost fetch", () => {
       throw new Error("should have thrown");
     } catch (err) {
       expect((err as HostError).code).toBe("invalid_input");
-      expect((err as HostError).message).toContain("private");
+      expect((err as HostError).message).toContain("non-public");
     }
   });
 
@@ -343,14 +343,14 @@ describe("packageHost fetch, cache-aware (session-d-packages-and-store.md step 3
       throw new Error("should have thrown");
     } catch (err) {
       expect((err as HostError).code).toBe("invalid_input");
-      expect((err as HostError).message).toContain("private");
+      expect((err as HostError).message).toContain("non-public");
     }
   });
 });
 
 describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-limit concern of its own)", () => {
   test("a successful JSON response is parsed and returned", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => Response.json({ tempF: 72 }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ tempF: 72 }) });
     try {
       const result = await performHttpFetch(`http://127.0.0.1:${server.port}/weather`);
       expect(result).toEqual({ tempF: 72 });
@@ -360,7 +360,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
   });
 
   test("a plain-text response is returned as text, not a JSON-parse failure", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("just plain text") });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("just plain text") });
     try {
       const result = await performHttpFetch(`http://127.0.0.1:${server.port}/`);
       expect(result).toBe("just plain text");
@@ -372,8 +372,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
   test("sends the real user-agent and any caller-supplied headers", async () => {
     let seenUserAgent = "";
     let seenCustom = "";
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         seenUserAgent = req.headers.get("user-agent") ?? "";
         seenCustom = req.headers.get("x-custom") ?? "";
@@ -390,7 +389,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
   });
 
   test("a non-2xx response raises HostError network_unreachable, not a silently-returned error body", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("nope", { status: 503 }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("nope", { status: 503 }) });
     try {
       await expect(performHttpFetch(`http://127.0.0.1:${server.port}/`)).rejects.toThrow(HostError);
     } finally {
@@ -399,7 +398,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
   });
 
   test("a 404 is the typed not_found, never network_unreachable: the host answered and the resource does not exist (#92)", async () => {
-    const server = Bun.serve({ port: 0, fetch: (req) => new Response("nope", { status: new URL(req.url).pathname === "/gone" ? 410 : 404 }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (req) => new Response("nope", { status: new URL(req.url).pathname === "/gone" ? 410 : 404 }) });
     try {
       for (const path of ["/missing", "/gone"]) {
         try {
@@ -417,7 +416,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
 
   test("an oversized response raises HostError rather than being silently truncated", async () => {
     const oversized = "x".repeat(2_100_000);
-    const server = Bun.serve({ port: 0, fetch: () => new Response(oversized) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response(oversized) });
     try {
       try {
         await performHttpFetch(`http://127.0.0.1:${server.port}/`);
@@ -451,7 +450,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
     // its real BYTE count (3,000,000) is over it.
     const codeUnitCount = 1_000_000;
     const oversizedInBytes = "€".repeat(codeUnitCount); // 1,000,000 code units, 3,000,000 real bytes
-    const server = Bun.serve({ port: 0, fetch: () => new Response(oversizedInBytes) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response(oversizedInBytes) });
     try {
       await expect(performHttpFetch(`http://127.0.0.1:${server.port}/`)).rejects.toThrow(HostError);
     } finally {
@@ -462,8 +461,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
   test("a POST with a plain object body is sent as JSON with a content-type header", async () => {
     let seenContentType = "";
     let seenBody = "";
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: async (req) => {
         seenContentType = req.headers.get("content-type") ?? "";
         seenBody = await req.text();
@@ -486,8 +484,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
   // alongside it - two content-type headers on the same request.
   test("a caller-supplied Content-Type header (any casing) is respected, never duplicated", async () => {
     let seenContentType = "";
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         seenContentType = req.headers.get("content-type") ?? "";
         return Response.json({ ok: true });
@@ -517,9 +514,8 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
   // before following it.
   describe("redirects (SEC-3)", () => {
     test("a redirect is still followed end to end when nothing blocks it", async () => {
-      const target = Bun.serve({ port: 0, fetch: () => Response.json({ ok: true }) });
-      const origin = Bun.serve({
-        port: 0,
+      const target = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ ok: true }) });
+      const origin = Bun.serve({ hostname: "127.0.0.1", port: 0,
         fetch: () => new Response(null, { status: 302, headers: { Location: `http://127.0.0.1:${target.port}/` } }),
       });
       try {
@@ -532,9 +528,8 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
     });
 
     test("validateHop is called with the redirect's OWN target url, not the original", async () => {
-      const target = Bun.serve({ port: 0, fetch: () => Response.json({ ok: true }) });
-      const origin = Bun.serve({
-        port: 0,
+      const target = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ ok: true }) });
+      const origin = Bun.serve({ hostname: "127.0.0.1", port: 0,
         fetch: () => new Response(null, { status: 302, headers: { Location: `http://127.0.0.1:${target.port}/secret` } }),
       });
       const seenHops: string[] = [];
@@ -550,8 +545,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
     });
 
     test("a redirect landing on a private/loopback target is refused, never followed", async () => {
-      const origin = Bun.serve({
-        port: 0,
+      const origin = Bun.serve({ hostname: "127.0.0.1", port: 0,
         fetch: () => new Response(null, { status: 302, headers: { Location: "http://127.0.0.1:9/secret" } }),
       });
       const validateHop = async (hopUrl: string): Promise<void> => {
@@ -567,8 +561,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
     });
 
     test("more than the redirect cap is refused, not followed forever", async () => {
-      const origin = Bun.serve({
-        port: 0,
+      const origin = Bun.serve({ hostname: "127.0.0.1", port: 0,
         fetch: (req) => {
           const url = new URL(req.url);
           const hop = Number(url.pathname.slice(1)) || 0;
@@ -700,7 +693,7 @@ describe("home.call_service (2026-09-05, the real Home Assistant integration)", 
   });
 
   test("a security domain (lock) call succeeds once consequential: true is declared", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => Response.json({ context: { id: "abc" } }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ context: { id: "abc" } }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
@@ -744,8 +737,7 @@ describe("home.call_service (2026-09-05, the real Home Assistant integration)", 
     let seenPath = "";
     let seenAuth = "";
     let seenBody: unknown = null;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: async (req) => {
         seenPath = new URL(req.url).pathname;
         seenAuth = req.headers.get("authorization") ?? "";
@@ -768,7 +760,7 @@ describe("home.call_service (2026-09-05, the real Home Assistant integration)", 
   });
 
   test("a non-2xx response raises HostError, not a silently-swallowed failure", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("not found", { status: 404 }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("not found", { status: 404 }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
@@ -782,8 +774,7 @@ describe("home.call_service (2026-09-05, the real Home Assistant integration)", 
 
   test("never retries - a service call is a real action, not an idempotent GET", async () => {
     let calls = 0;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () => {
         calls++;
         return new Response("boom", { status: 500 });
@@ -814,8 +805,7 @@ describe("integration.call (session-d-packages-and-store.md step 4)", () => {
   test("home_assistant get_state: a real GET to /api/states/<entity_id>, parsed as JSON", async () => {
     let seenPath = "";
     let seenAuth = "";
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         seenPath = new URL(req.url).pathname;
         seenAuth = req.headers.get("authorization") ?? "";
@@ -860,7 +850,7 @@ describe("integration.call (session-d-packages-and-store.md step 4)", () => {
   });
 
   test("a 404 from Home Assistant maps to not_found", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("not found", { status: 404 }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("not found", { status: 404 }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
@@ -884,7 +874,7 @@ describe("integration.call (session-d-packages-and-store.md step 4)", () => {
   // HTML would come back as `result` and any recipe reading `state`/
   // `attributes` off it would silently see `undefined`.
   test("a non-JSON response (e.g. an SSO login page) throws instead of returning HTML as if it were state", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("<html><body>Log in</body></html>", { headers: { "content-type": "text/html" } }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("<html><body>Log in</body></html>", { headers: { "content-type": "text/html" } }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
@@ -940,8 +930,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
 
   test("a real GET to /search?q=...&format=json, formatted into a readable numbered list", async () => {
     let seenUrl = new URL("http://placeholder.invalid");
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         seenUrl = new URL(req.url);
         return Response.json({
@@ -983,8 +972,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   // infobox, `rows` never did. Same fixture shape as those tests, this
   // time asserted at the `rows` level a real tool call returns.
   test("a query SearXNG answers through an infobox, with no results at all, still returns a row with the infobox's own title, link and content", async () => {
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () =>
         Response.json({
           results: [],
@@ -1013,8 +1001,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   });
 
   test("an infobox and ordinary results together still respect the 8-row cap, infobox first", async () => {
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () =>
         Response.json({
           infoboxes: [{ infobox: "Japan", id: "https://en.wikipedia.org/wiki/Japan" }],
@@ -1048,8 +1035,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   test("with no override, safesearch follows the speaker's own band: child 2, teen 1, adult 0", async () => {
     for (const [role, expected] of [["child", "2"], ["teen", "1"], ["owner", "0"], ["adult", "0"]] as const) {
       let seenUrl = new URL("http://placeholder.invalid");
-      const server = Bun.serve({
-        port: 0,
+      const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
         fetch: (req) => {
           seenUrl = new URL(req.url);
           return Response.json({ results: [] });
@@ -1074,8 +1060,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
 
   test("an image search carries exactly the person's own level - no floor, an adult's own off stays off", async () => {
     let seenUrl = new URL("http://placeholder.invalid");
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         seenUrl = new URL(req.url);
         return Response.json({ results: [] });
@@ -1099,8 +1084,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   // child down to "moderate", the admin's own call to make.
   test("an explicit override on the person's own setting stands over the band default", async () => {
     let seenUrl = new URL("http://placeholder.invalid");
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         seenUrl = new URL(req.url);
         return Response.json({ results: [] });
@@ -1136,8 +1120,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   test("a child or teen's request names only /config's safesearch-capable engines for the category", async () => {
     const fixture = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
     let seenUrls: URL[] = [];
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         const url = new URL(req.url);
         seenUrls.push(url);
@@ -1161,8 +1144,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   test("an adult's request rotates through the enabled web engines from /config", async () => {
     const fixture = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
     let seenUrls: URL[] = [];
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         const url = new URL(req.url);
         seenUrls.push(url);
@@ -1190,8 +1172,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   test("no safesearch-capable engine for the category: the search still runs, unfiltered by name", async () => {
     const fixture = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
     let seenUrls: URL[] = [];
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         const url = new URL(req.url);
         seenUrls.push(url);
@@ -1215,8 +1196,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
 
   test("a failed /config never blocks the search - the safesearch level alone still applies", async () => {
     let seenUrls: URL[] = [];
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         const url = new URL(req.url);
         seenUrls.push(url);
@@ -1242,8 +1222,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   test("the engines list is cached across calls to the same instance - one /config fetch, not one per search", async () => {
     const fixture = await Bun.file(`${import.meta.dir}/fixtures/searxng-config.json`).json();
     let configFetches = 0;
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         const url = new URL(req.url);
         if (url.pathname === "/config") {
@@ -1277,7 +1256,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   // reported "No web search results were found." - a real misconfiguration
   // with no visible error anywhere.
   test("a non-JSON response (e.g. an SSO login page) throws instead of silently reporting no results", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => new Response("<html><body>Log in</body></html>", { headers: { "content-type": "text/html" } }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response("<html><body>Log in</body></html>", { headers: { "content-type": "text/html" } }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
@@ -1304,8 +1283,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   // (`unresponsive_engines`, an array of `[engine, reason]` pairs) - this
   // is the one choke point that turns that into a real failure.
   test("zero rows with unresponsive_engines throws search_unavailable, never a silent empty success", async () => {
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () =>
         Response.json({
           query: "kevin bacon tv shows",
@@ -1334,7 +1312,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   });
 
   test('zero rows with no unresponsive_engines is a real, silent empty success (a genuine "nothing found", not a failure)', async () => {
-    const server = Bun.serve({ port: 0, fetch: () => Response.json({ query: "no results fixture", results: [] }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ query: "no results fixture", results: [] }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
@@ -1352,8 +1330,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   // minute canary) raises and resolves the same Repairs rows
   // immediately.
   test("a real call that hits search_unavailable raises searxng_empty immediately, not only via the canary", async () => {
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: () => Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"]] }),
     });
     try {
@@ -1385,7 +1362,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     }
     expect(listIssues().find((i) => i.source === "websearch" && i.key === "searxng_unreachable")).toBeDefined();
 
-    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "The Following", url: "https://example.com", content: "A show." }] }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [{ title: "The Following", url: "https://example.com", content: "A show." }] }) });
     try {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
@@ -1396,7 +1373,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   });
 
   test("a genuinely empty real result, with no unresponsive_engines, raises nothing at all", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
@@ -1414,7 +1391,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   // (blocked, non-HTML) got misreported as SearXNG being down. Search
   // itself succeeds here; only the linked page fails.
   test("a failed read_page fetch never misreports SearXNG as down - the search itself succeeded", async () => {
-    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "Unreachable page", url: "http://127.0.0.1:1", content: "c" }] }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [{ title: "Unreachable page", url: "http://127.0.0.1:1", content: "c" }] }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
@@ -1468,7 +1445,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     const { __setPageReaderForTests } = await import("@/lib/packageHost");
     __resetRateLimiterForTests();
     __setPageReaderForTests(async (url) => ({ type: "document", file_id: "file-1", url, title: "T", text: "text", chunks: [], links: [], sections: [] }));
-    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [{ title: "T", url: "https://example.com", content: "c" }] }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [{ title: "T", url: "https://example.com", content: "c" }] }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
@@ -1501,8 +1478,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
 describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
   function startFakeWikipedia(opts: { hasMatch: boolean; requireUserAgent?: string }): { url: string; stop: () => void; requests: { path: string; userAgent: string | null }[] } {
     const requests: { path: string; userAgent: string | null }[] = [];
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         const url = new URL(req.url);
         requests.push({ path: url.pathname, userAgent: req.headers.get("user-agent") });
@@ -1554,7 +1530,7 @@ describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
     const wiki = startFakeWikipedia({ hasMatch: true });
     const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
     process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
-    const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
@@ -1604,7 +1580,7 @@ describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
       // SearXNG recovers but genuinely finds nothing; Wikipedia helps
       // now that the fallback is back on (its own real default).
       setHouseholdSettingValue("search.wikipedia_fallback", true);
-      const server = Bun.serve({ port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
+      const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
       try {
         setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
         const result = (await host.integration.call("searxng", "search", { query: "marlow" })) as { rows: { title: string }[] };
@@ -1710,8 +1686,7 @@ describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
   // cap on page.text, the same bound parseReadablePage() already uses.
   test("the row snippet is Wikipedia's own short description, not a duplicate of the full extract - and both are bounded", async () => {
     const longExtract = "x".repeat(40_000); // well past both the 300-char snippet cap and the 32,000-char page.text cap
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         const url = new URL(req.url);
         if (url.pathname === "/w/rest.php/v1/search/page") return Response.json({ pages: [{ id: 1, key: "Marlow_(topic)" }] });
@@ -1762,8 +1737,7 @@ describe("formatSearxngResults", () => {
 
   test("an image search requests the images category and maps img_src to image", async () => {
     let seenUrl = new URL("http://placeholder.invalid");
-    const server = Bun.serve({
-      port: 0,
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
         seenUrl = new URL(req.url);
         return Response.json({ results: [{ title: "A photo", url: "https://example.com/page", content: "A photo", img_src: "https://cdn.example.com/photo.jpg" }] });
@@ -2000,7 +1974,7 @@ describe("searxng search cache", () => {
   test("caches results, separates safe-search levels, skips empty results, dedupes in-flight calls, and expires after five minutes", async () => {
     let searchRequests = 0;
     let release: (() => void) | undefined;
-    const server = Bun.serve({ port: 0, fetch: async (request) => { const pathname = new URL(request.url).pathname; if (pathname === "/config") return Response.json({ engines: [] }); if (pathname === "/search") { searchRequests++; if (searchRequests === 1) await new Promise<void>((resolve) => { release = resolve; }); } return Response.json({ results: [{ title: "Earth", url: "https://example.com/earth", content: "planet" }] }); } });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: async (request) => { const pathname = new URL(request.url).pathname; if (pathname === "/config") return Response.json({ engines: [] }); if (pathname === "/search") { searchRequests++; if (searchRequests === 1) await new Promise<void>((resolve) => { release = resolve; }); } return Response.json({ results: [{ title: "Earth", url: "https://example.com/earth", content: "planet" }] }); } });
     const previousNow = Date.now;
     let now = 1_000_000;
     Date.now = () => now;
@@ -2027,7 +2001,7 @@ describe("searxng search cache", () => {
 
   test("does not cache a zero-row result", async () => {
     let requests = 0;
-    const server = Bun.serve({ port: 0, fetch: (request) => { const pathname = new URL(request.url).pathname; if (pathname === "/config") return Response.json({ engines: [] }); if (pathname === "/search") requests++; return Response.json({ results: [] }); } });
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => { const pathname = new URL(request.url).pathname; if (pathname === "/config") return Response.json({ engines: [] }); if (pathname === "/search") requests++; return Response.json({ results: [] }); } });
     try {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await searxngSearch({ query: "nothing" });
@@ -2046,7 +2020,7 @@ describe("searxng search rotation", () => {
       { name: "charlie", enabled: true, safesearch: true, categories: ["general", "web"] },
       { name: "wikipedia", enabled: true, safesearch: true, categories: ["general", "web"] },
     ] };
-    const server = Bun.serve({ port: 0, fetch: (request) => {
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
       const url = new URL(request.url);
       if (url.pathname === "/config") return Response.json(config);
       seen.push(url.searchParams.get("engines") ?? "");
@@ -2074,7 +2048,7 @@ describe("searxng search rotation", () => {
       { name: "google cse", enabled: true, safesearch: true, categories: ["general", "web"] },
       { name: "google cse images", enabled: true, safesearch: true, categories: ["images", "web"] },
     ] };
-    const server = Bun.serve({ port: 0, fetch: (request) => {
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
       const url = new URL(request.url);
       if (url.pathname === "/config") return Response.json(config);
       seen.push(url.searchParams.get("engines") ?? "");
@@ -2094,7 +2068,7 @@ describe("searxng search rotation", () => {
       { name: "safe", enabled: true, safesearch: true, categories: ["general", "web"] },
       { name: "safe-two", enabled: true, safesearch: true, categories: ["general", "web"] },
     ] };
-    const server = Bun.serve({ port: 0, fetch: (request) => {
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
       const url = new URL(request.url);
       if (url.pathname === "/config") return Response.json(config);
       seen.push(url.searchParams.get("engines") ?? "");
@@ -2115,7 +2089,7 @@ describe("search engine choice: three engines ranked by recent health (THIN-GROU
   /** A fake SearXNG: /config is the pool above, /search is answered by `reply(asked, call)`. */
   function fakeSearxng(reply: (asked: string[], call: number) => Record<string, unknown>) {
     const asked: string[][] = [];
-    const server = Bun.serve({ port: 0, fetch: (request) => {
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
       const url = new URL(request.url);
       if (url.pathname === "/config") return Response.json(poolConfig);
       asked.push((url.searchParams.get("engines") ?? "").split(",").filter(Boolean));
@@ -2169,7 +2143,7 @@ describe("search engine choice: three engines ranked by recent health (THIN-GROU
   });
 
   test("when benching during the request leaves no engine for a retry, the Wikipedia fallback still runs", async () => {
-    const wiki = Bun.serve({ port: 0, fetch: (request) => {
+    const wiki = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
       const url = new URL(request.url);
       if (url.pathname === "/w/rest.php/v1/search/page") return Response.json({ pages: [{ id: 1, key: "Juniper_(topic)", title: "Juniper (topic)" }] });
       if (url.pathname.startsWith("/api/rest_v1/page/summary/")) return Response.json({ title: "Juniper (topic)", extract: "Juniper is a roster-safe example topic.", content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Juniper_(topic)" } } });

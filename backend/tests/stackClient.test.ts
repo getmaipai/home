@@ -252,8 +252,7 @@ let server: ReturnType<typeof Bun.serve>;
 let baseUrl = "";
 
 beforeAll(() => {
-  server = Bun.serve({
-    port: 0,
+  server = Bun.serve({ hostname: "127.0.0.1", port: 0,
     async fetch(req) {
       const url = new URL(req.url);
       const path = url.pathname;

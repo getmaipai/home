@@ -157,7 +157,7 @@ describe("VISION-02c: picture parts for a chat model that reads pictures", () =>
       // An engine in front of the stub that refuses any picture with a 400,
       // the way a text-only or failing projector answers.
       const upstream = process.env.MAIPAI_LLAMA_SERVER_URL!;
-      const refusing = Bun.serve({ port: 0, async fetch(req) {
+      const refusing = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(req) {
         const url = new URL(req.url);
         const body = req.method === "POST" ? await req.text() : undefined;
         if (url.pathname === "/v1/chat/completions" && body?.includes("image_url")) return Response.json({ error: { code: 400, message: "image input is not supported by this model", type: "invalid_request_error" } }, { status: 400 });
@@ -289,7 +289,7 @@ describe("VISION-02c: review fixes", () => {
     await withEngine(() => "Answered without them.", async (seen) => {
       const upstream = process.env.MAIPAI_LLAMA_SERVER_URL!;
       let pictureRequests = 0;
-      const refusing = Bun.serve({ port: 0, async fetch(req) {
+      const refusing = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(req) {
         const url = new URL(req.url);
         const body = req.method === "POST" ? await req.text() : undefined;
         if (url.pathname === "/v1/chat/completions" && body?.includes("image_url")) { pictureRequests += 1; return Response.json({ error: { code: 400, message: "image input is not supported by this model" } }, { status: 400 }); }

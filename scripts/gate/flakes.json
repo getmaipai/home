@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "serial": {
+    "backend": [
+      {
+        "file": "tests/mdns.test.ts",
+        "reason": "Uses real multicast discovery and shared machine network state."
+      }
+    ],
+    "frontend": [
+      {
+        "file": "src/next/pages/NextModelsPage.test.tsx",
+        "reason": "The fetch mock observes process-global fetch and has shown cross-file interference."
+      }
+    ]
+  },
+  "skipped": [
+    {
+      "workspace": "backend",
+      "file": "tests/answerImageCache.test.ts",
+      "reason": "Known order-dependent failure in the full backend shard; skipped by the gate pending isolation repair."
+    }
+  ]
+}

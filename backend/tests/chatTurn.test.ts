@@ -3014,8 +3014,7 @@ describe("CHAT-13 chunk C2: the last succeeded lookup is a stack source", () => 
     const searxng =
       opts.searxng === false
         ? null
-        : Bun.serve({
-            port: 0,
+        : Bun.serve({ hostname: "127.0.0.1", port: 0,
             fetch: (req) => {
               seen.queries.push(new URL(req.url).searchParams.get("q") ?? "");
               return Response.json({ results: [{ title: "The new album", url: "https://example.com/album", content: "Out on September 22 with twelve tracks." }] });
