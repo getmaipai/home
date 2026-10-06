@@ -129,7 +129,7 @@ describe("ANSWER-IMG-02: sources per subject and band", () => {
   });
 
   test("a child gets image-search pictures only (never Wikimedia), and none of a person", async () => {
-    const log = use([KOALA, ACTOR], { searchRows: () => [1, 2, 3].map((n) => ({ title: `koala ${n}`, url: `https://zoo.example/${n}`, image: pictureUrl(50 + n) })) });
+    const log = use([KOALA, ACTOR], { searchRows: () => [1, 2, 3].map((n) => ({ title: `koala ${n}`, url: `https://zoo.example/koala-${n}`, image: pictureUrl(50 + n) })) });
     const koala = await selectAnswerImages({ subject: "koala", actor: people.child, band: "child", roster: [] });
     expect(log.searches).toEqual([{ query: "koala", band: "child" }]);
     expect(koala.trace.sources).toEqual({ wikimedia: 0, searxng: 3 });

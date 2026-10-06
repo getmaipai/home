@@ -18,6 +18,18 @@ export type WikimediaEntity = {
   commonsCategory?: string;
   wikipediaTitle: string;
   image?: string;
+  /** Other English names (Wikidata aliases, the taxon name): a picture that
+   * uses one of them names the subject (ANSWER-IMG-05b). */
+  aliases?: string[];
+  /** Its labels in other languages ("Tour Eiffel"): they name it in a
+   * Commons title, but on the open web they can be common nouns. */
+  otherLabels?: string[];
+  /** IMGQ-03: the subject's official website (P856), whose own pictures
+   * are pictures of it. */
+  officialSite?: string;
+  /** IMGQ-03: files Wikidata names as the subject's logo, flag, coat of
+   * arms, map, signature, grave, collage or seal: not photos of it. */
+  nonPhotoFiles?: string[];
 };
 
 /** One picture a Wikimedia source offers, before it is fetched. */
@@ -28,11 +40,23 @@ export type WikimediaCandidate = {
   description: string;
   license?: { short: string; url?: string; artist?: string };
   lead: boolean;
+  /** IMGQ-03: what Commons itself says about the file. */
+  objectName?: string;
+  /** Visible (topical) categories, without the "Category:" prefix. */
+  categories?: string[];
+  /** Commons `Restrictions` values: costume, fan-art, personality, ... */
+  restrictions?: string[];
+  /** The original's width, when Commons states it. */
+  width?: number;
 };
 
 export type FetchJson = (url: string) => Promise<unknown>;
 
 const WD = "https://www.wikidata.org/w/api.php";
+/** Commons titles are written in many languages ("La tour Eiffel en 2026"):
+ * the subject's labels and aliases in these languages name it too. English
+ * stays the label shown. */
+const NAME_LANGUAGES = ["en", "fr", "de", "es", "it", "pt", "nl", "ja", "zh", "ru"].join("%7C");
 const COMMONS = "https://commons.wikimedia.org/w/api.php";
 const TIMEOUT_MS = 1_500;
 // A person reading the article loads this much from Wikimedia in a second.
@@ -76,7 +100,7 @@ export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJ
   const wanted = subject.trim().toLowerCase();
   const match = search.search?.find((row) => typeof row.id === "string" && row.label?.toLowerCase() === wanted) ?? search.search?.[0];
   if (!match?.id || !/^Q\d+$/.test(match.id)) return null;
-  const response = await fetchJson(`${WD}?action=wbgetentities&ids=${match.id}&props=claims%7Csitelinks%7Clabels%7Cdescriptions&languages=en&sitefilter=enwiki&format=json`) as { entities?: Record<string, { claims?: Record<string, unknown[]>; sitelinks?: Record<string, { title?: string }>; labels?: Record<string, { value?: string }>; descriptions?: Record<string, { value?: string }> }> };
+  const response = await fetchJson(`${WD}?action=wbgetentities&ids=${match.id}&props=claims%7Csitelinks%7Clabels%7Cdescriptions%7Caliases&languages=${NAME_LANGUAGES}&sitefilter=enwiki&format=json`) as { entities?: Record<string, { claims?: Record<string, unknown[]>; sitelinks?: Record<string, { title?: string }>; labels?: Record<string, { value?: string }>; descriptions?: Record<string, { value?: string }>; aliases?: Record<string, Array<{ value?: string }>> }> };
   const entity = response.entities?.[match.id];
   const title = entity?.sitelinks?.enwiki?.title;
   if (!entity || !title) return null;
@@ -84,6 +108,15 @@ export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJ
   const birthDate = claimText(claims.P569?.[0]);
   const category = claimText(claims.P373?.[0]);
   const image = claimText(claims.P18?.[0]);
+  const taxon = claimText(claims.P225?.[0]);
+  const officialSite = claimText(claims.P856?.[0]);
+  const nonPhotoFiles = NON_PHOTO_PROPERTIES.flatMap((prop) => (claims[prop] ?? []).map(claimText)).filter((f): f is string => typeof f === "string");
+  const otherLabels = Object.entries(entity.labels ?? {}).filter(([lang]) => lang !== "en").map(([, l]) => l.value);
+  // Other languages' aliases are left out: they carry bare words that name
+  // other things too (Russian "панда" for the red panda).
+  const allAliases = (entity.aliases?.en ?? []).map((a) => a.value);
+  const aliases = [...new Set([...allAliases, taxon].filter((a): a is string => typeof a === "string" && a.trim().length > 0))].slice(0, 20);
+  const labels = [...new Set(otherLabels.filter((a): a is string => typeof a === "string" && a.trim().length > 0))].slice(0, 20);
   return {
     id: match.id,
     label: entity.labels?.en?.value ?? match.label ?? subject,
@@ -93,8 +126,17 @@ export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJ
     ...(category ? { commonsCategory: category } : {}),
     wikipediaTitle: title,
     ...(image ? { image } : {}),
+    ...(aliases.length > 0 ? { aliases } : {}),
+    ...(labels.length > 0 ? { otherLabels: labels } : {}),
+    ...(officialSite && /^https?:\/\//.test(officialSite) ? { officialSite } : {}),
+    ...(nonPhotoFiles.length > 0 ? { nonPhotoFiles } : {}),
   };
 }
+
+/** Wikidata properties whose file is a logo, flag, coat of arms, map,
+ * signature, grave, collage or seal (P154, P41, P94, P242, P1943, P109,
+ * P1442, P2716, P158). */
+const NON_PHOTO_PROPERTIES = ["P154", "P41", "P94", "P242", "P1943", "P109", "P1442", "P2716", "P158"];
 
 /** The article's plain summary text (a teen's Wikimedia pictures need it to
  * pass the floor first), or null for a missing or disambiguation page. */
@@ -123,7 +165,11 @@ function plain(html: unknown, max = 200): string {
 const fileKey = (name: string): string => name.replace(/^File:/i, "").replace(/_/g, " ").trim().toLowerCase();
 const PICTURE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-type ImageInfoPage = { title?: string; imageinfo?: Array<{ url?: string; thumburl?: string; descriptionurl?: string; mime?: string; extmetadata?: Record<string, { value?: unknown }> }> };
+type ImageInfoPage = { title?: string; categories?: Array<{ title?: string }>; imageinfo?: Array<{ url?: string; thumburl?: string; descriptionurl?: string; mime?: string; width?: number; extmetadata?: Record<string, { value?: unknown }> }> };
+
+function splitPipes(value: unknown): string[] {
+  return typeof value === "string" ? value.split("|").map((v) => v.trim()).filter(Boolean) : [];
+}
 
 function candidateFromPage(page: ImageInfoPage, leadName: string | undefined): WikimediaCandidate | null {
   const info = page.imageinfo?.[0];
@@ -134,6 +180,10 @@ function candidateFromPage(page: ImageInfoPage, leadName: string | undefined): W
   const short = plain(meta.LicenseShortName?.value, 60);
   const licenseUrl = typeof meta.LicenseUrl?.value === "string" && /^https?:\/\//.test(meta.LicenseUrl.value) ? meta.LicenseUrl.value : undefined;
   const artist = plain(meta.Artist?.value, 80);
+  const visible = (page.categories ?? []).map((c) => (c.title ?? "").replace(/^Category:/i, "")).filter(Boolean);
+  const categories = visible.length > 0 ? visible : splitPipes(meta.Categories?.value);
+  const restrictions = splitPipes(meta.Restrictions?.value).map((r) => r.toLowerCase());
+  const objectName = plain(meta.ObjectName?.value);
   return {
     url,
     page: info.descriptionurl,
@@ -141,10 +191,23 @@ function candidateFromPage(page: ImageInfoPage, leadName: string | undefined): W
     description: plain(meta.ImageDescription?.value),
     ...(short ? { license: { short, ...(licenseUrl ? { url: licenseUrl } : {}), ...(artist ? { artist } : {}) } } : {}),
     lead: leadName !== undefined && fileKey(page.title) === fileKey(leadName),
+    ...(objectName ? { objectName } : {}),
+    ...(categories.length > 0 ? { categories } : {}),
+    ...(restrictions.length > 0 ? { restrictions } : {}),
+    ...(typeof info.width === "number" ? { width: info.width } : {}),
   };
 }
 
-const IMAGEINFO = "prop=imageinfo&iiprop=url%7Cmime%7Cextmetadata&iiurlwidth=1280&iiextmetadatafilter=LicenseShortName%7CLicenseUrl%7CArtist%7CImageDescription&format=json";
+/** Whether a candidate's file is one of the entity's non-photo files. */
+export function isNonPhotoFile(entity: WikimediaEntity, candidate: { page: string }): boolean {
+  if (!entity.nonPhotoFiles?.length) return false;
+  const name = fileKey(decodeURIComponent(candidate.page.split("/File:")[1] ?? ""));
+  return name.length > 0 && entity.nonPhotoFiles.some((f) => fileKey(f) === name);
+}
+
+// IMGQ-03: the same one call also returns what the relevance rules read: the
+// file's own name, its Restrictions, its visible categories and its width.
+const IMAGEINFO = "prop=imageinfo%7Ccategories&clshow=%21hidden&cllimit=max&iiprop=url%7Cmime%7Csize%7Cextmetadata&iiurlwidth=1280&iiextmetadatafilter=LicenseShortName%7CLicenseUrl%7CArtist%7CImageDescription%7CObjectName%7CCategories%7CRestrictions&format=json";
 
 /** The subject's lead image (Wikidata P18) and, unless `leadOnly`, the
  * pictures curated into its Commons category (P373), lead first. One Commons

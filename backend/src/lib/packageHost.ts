@@ -609,12 +609,18 @@ type SearxngRow = { title: string; url: string | null; snippet: string | null; i
 /** ANSWER-IMG-02: one SearXNG image result, read by the same resultToRow()
  * image fields the model-set `category: "images"` search used before that
  * argument was removed from websearch's manifest (rule 12, port first). */
-export type SearxngImageRow = { title: string; url: string; image: string };
+/** IMGQ-03: `resolution` ("1920x1080") and `img_format` ("png") as the
+ * engine states them, when it does, for the picture rules' pre-fetch checks. */
+export type SearxngImageRow = { title: string; url: string; image: string; resolution?: string; format?: string };
 export function imageRowsFromResponse(value: unknown): SearxngImageRow[] {
   const data = value as { results?: unknown[] };
   return (Array.isArray(data.results) ? data.results : []).flatMap((raw) => {
     const row = resultToRow(raw, true);
-    return row?.url && row.image ? [{ title: row.title, url: row.url, image: row.image }] : [];
+    if (!row?.url || !row.image) return [];
+    const extra = raw as { resolution?: unknown; img_format?: unknown };
+    const resolution = typeof extra.resolution === "string" && extra.resolution.length <= 40 ? extra.resolution : undefined;
+    const format = typeof extra.img_format === "string" && extra.img_format.length <= 20 ? extra.img_format.toLowerCase() : undefined;
+    return [{ title: row.title, url: row.url, image: row.image, ...(resolution ? { resolution } : {}), ...(format ? { format } : {}) }];
   });
 }
 
