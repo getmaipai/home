@@ -404,6 +404,9 @@ export const conversationTurns = sqliteTable(
     // real parameter. Only nullable for the backfilled history's sake.
     conversationId: text("conversation_id").references(() => conversations.id),
     userText: text("user_text").notNull(),
+    // UPLOAD-IMG-01: additive structured parts on the person's message.
+    // Contains only attachment ids and display metadata, never image bytes.
+    images: text("images"),
     replyText: text("reply_text").notNull(),
     source: text("source").notNull(), // "safety_refuse" | "plugin" | "plugin_error" | "command" | "command_error" | "model" | "confirm" | "policy" (wire.ts's TurnValue.source)
     pluginId: text("plugin_id"),

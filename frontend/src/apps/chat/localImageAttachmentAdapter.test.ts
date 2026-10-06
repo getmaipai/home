@@ -6,7 +6,6 @@ import {
   stagedImageAttachment,
   type LocalImageAttachmentRecord,
 } from "@/apps/chat/localImageAttachmentAdapter";
-import { IMAGE_VISION_UNAVAILABLE_MESSAGE } from "@/apps/chat/visionCapability";
 
 afterEach(() => clearStagedImageAttachments());
 
@@ -14,7 +13,6 @@ describe("local image attachment adapter", () => {
   test("adds a previewable pending image and records its local digest", async () => {
     const records: LocalImageAttachmentRecord[] = [];
     const adapter = createLocalImageAttachmentAdapter({
-      capability: () => ({ imageParts: true, engine: "vision", transport: "local" }),
       onRecord: (record) => records.push(record),
     });
     const pending = await adapter.add({ file: new File(["hello"], "note.png", { type: "image/png" }) }) as PendingAttachment;
@@ -33,36 +31,30 @@ describe("local image attachment adapter", () => {
     expect(stagedImageAttachment(pending.id)).toEqual(records[0]);
   });
 
-  test("sends a complete local image when the selected engine declares vision", async () => {
-    const adapter = createLocalImageAttachmentAdapter({
-      capability: () => ({ imageParts: true, engine: "vision", transport: "local" }),
-    });
+  test("sends only an empty attachment part while upload happens at the turn boundary", async () => {
+    const adapter = createLocalImageAttachmentAdapter();
     const pending = await adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) }) as PendingAttachment;
     const complete = await adapter.send(pending);
 
     expect(complete.status).toEqual({ type: "complete" });
-    expect(complete.content).toEqual([{ type: "image", image: "data:image/jpeg;base64,aGk=" }]);
+    expect(complete.content).toEqual([]);
   });
 
-  // Live finding 2026-09-22: this used to succeed at add() and only
-  // reject at send() - assistant-ui's own composer.send() rejects the
-  // WHOLE send when any attachment's send() throws, and nothing in
-  // Home's composer catches that, so the person saw nothing happen at
-  // all. Refused at add() instead, the moment the photo is picked - the
-  // one rejection path assistant-ui's runtime already surfaces as the
-  // attachment's own visible error (base-composer-runtime-core.js's
-  // addAttachment(), the same path validateImage()'s existing checks
-  // use), never a dead Send button.
-  test("refuses a photo at attach time for a text-only engine, before it ever becomes sendable", async () => {
-    const adapter = createLocalImageAttachmentAdapter();
+  test("hides image accept types and refuses add when a child's setting is off", async () => {
+    const adapter = createLocalImageAttachmentAdapter({ enabled: () => false });
+    expect(adapter.accept).not.toContain("image/*");
+    await expect(adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) })).rejects.toThrow("Photo uploads are turned off");
+  });
 
-    await expect(adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) })).rejects.toThrow(IMAGE_VISION_UNAVAILABLE_MESSAGE);
+  test("stages images even when the chat engine cannot read them yet", async () => {
+    const adapter = createLocalImageAttachmentAdapter();
+    const pending = await adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) }) as PendingAttachment;
+    expect((await adapter.send(pending)).content).toEqual([]);
   });
 
   test("remove clears the staged local record", async () => {
     const removed: string[] = [];
     const adapter = createLocalImageAttachmentAdapter({
-      capability: () => ({ imageParts: true, engine: "vision", transport: "local" }),
       onRemove: (id) => removed.push(id),
     });
     const pending = await adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) }) as PendingAttachment;
@@ -76,7 +68,7 @@ describe("local image attachment adapter", () => {
     const adapter = createLocalImageAttachmentAdapter();
     await expect(adapter.add({ file: new File(["text"], "note.txt", { type: "text/plain" }) })).rejects.toThrow("image files");
     const oversized = new File([new Uint8Array(10 * 1024 * 1024 + 1)], "large.png", { type: "image/png" });
-    await expect(adapter.add({ file: oversized })).rejects.toThrow("under 10 MB");
+    await expect(adapter.add({ file: oversized })).rejects.toThrow("You can add up to 4 pictures, each up to 10 MB.");
   });
 
   test("stages PDF bytes locally and exposes them only as a send payload", async () => {

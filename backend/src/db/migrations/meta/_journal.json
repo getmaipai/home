@@ -589,6 +589,13 @@
       "when": 1791268403188,
       "tag": "0083_fine_harpoon",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "6",
+      "when": 1791277043125,
+      "tag": "0084_amazing_blue_blade",
+      "breakpoints": true
     }
   ]
 }

@@ -163,6 +163,7 @@ export interface TurnState {
   speakerEvidence?: SpeakerEvidence | null;
   present?: readonly PresentPerson[] | null;
   utterance: string;
+  images?: import("@/wire").ChatImagePart[];
   modelId?: string;
   signal: TurnSignal;
   budget: TurnBudget;

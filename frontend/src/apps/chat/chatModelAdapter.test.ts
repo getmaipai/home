@@ -36,10 +36,15 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   const originalFetch = globalThis.fetch;
   const ttsCalls: string[] = [];
   const turnBodies: unknown[] = [];
+  const imageUploads: FormData[] = [];
   const turnAccepts: (string | null)[] = [];
   let turnCalls = 0;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/attachments/upload")) {
+      imageUploads.push(init?.body as FormData);
+      return Promise.resolve(new Response(JSON.stringify({ conversation_id: "conv-images", turn_id: "turn-image", image: { id: "file-image123", name: "photo.png", width: 12, height: 8, media_type: "image/jpeg" } }), { status: 201, headers: { "content-type": "application/json" } }));
+    }
     if (url.includes("/api/turn/stream")) {
       turnBodies.push(JSON.parse(String(init?.body ?? "{}")));
       turnAccepts.push(new Headers(init?.headers).get("accept"));
@@ -58,6 +63,7 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   return {
     ttsCalls,
     turnBodies,
+    imageUploads,
     turnAccepts,
     restore: () => {
       globalThis.fetch = originalFetch;
@@ -125,23 +131,34 @@ describe("stripThinking", () => {
   });
 });
 
-describe("image capability boundary", () => {
-  test("refuses a complete image before any turn request reaches fetch", async () => {
+describe("sent image transport", () => {
+  test("uploads the image first and sends only additive id metadata in the turn body", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "delta", text: "I can help with the picture." },
+      { type: "done", value: { turn_id: "turn-image", reply: { text: "I can help with the picture." }, source: "model", safety: SAFETY } },
+    ]));
+    const adapter = createLocalImageAttachmentAdapter();
+    const pending = await adapter.add({ file: new File(["image bytes"], "photo.png", { type: "image/png" }) });
+    const complete = await adapter.send(pending as PendingAttachment);
     const message = {
-      ...fakeUserMessage("What is in this?") ,
-      attachments: [{
-        id: "att-local-image",
-        type: "image",
-        name: "photo.png",
-        contentType: "image/png",
-        status: { type: "complete" as const },
-        content: [{ type: "image" as const, image: "data:image/png;base64,aGk=" }],
-      }],
+      ...fakeUserMessage("What is in this?"),
+      attachments: [{ ...complete, type: "image", status: { type: "complete" as const } }],
     };
-    const result = await collect([message]);
-
-    expect(result.error).toBeUndefined();
-    expect(lastText(result.yields)).toContain("cannot interpret images yet");
+    try {
+      const result = await collect([message as unknown as ThreadMessage]);
+      expect(result.error).toBeUndefined();
+      expect(env.imageUploads).toHaveLength(1);
+      expect((env.imageUploads[0]!.get("file") as File).name).toBe("photo.png");
+      expect(env.turnBodies[0]).toMatchObject({
+        conversation_id: "conv-images",
+        turn_id: expect.stringMatching(/^turn-[a-z0-9]{8,40}$/),
+        images: [{ id: "file-image123", name: "photo.png", width: 12, height: 8, media_type: "image/jpeg" }],
+      });
+      expect(JSON.stringify(env.turnBodies[0])).not.toContain("data:");
+    } finally {
+      await adapter.remove(pending as PendingAttachment);
+      env.restore();
+    }
   });
 });
 
@@ -1422,7 +1439,7 @@ describe("getmaipai/home#60: supersedes and live turnId", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/turn/stream")) {
+    if (url.includes("/api/turn/stream")) {
         capturedBody = JSON.parse(String(init?.body ?? "{}"));
         return Promise.resolve(
           new Response(ndjsonStream([{ type: "done", value: { reply: { text: "ok" }, source: "model", safety: SAFETY } }]), {

@@ -53,6 +53,8 @@ import type { Source } from "@maipai/spec/gen/ts/source.js";
 
 export interface RunTurnNextOpts {
   conversationId?: string;
+  turnId?: string;
+  images?: import("@/wire").ChatImagePart[];
   temporary?: boolean;
   signal?: AbortSignal;
   // APPROVE-CARD-01: a tapped approve/deny card, from POST /api/turn or
@@ -146,6 +148,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     safety: outputFlag ?? state.safety,
     conversation_id: state.conversationId,
     turn_id: state.turnId,
+    ...(state.images?.length ? { images: state.images } : {}),
     crisis_resources: crisisResources,
     // "One trace, not a second log" (section 11): every node this turn
     // ran or skipped, beside the generations buildTurnStats() already
@@ -183,7 +186,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // used because it also carries the earlier turns' state, which would
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
-  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
+  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
   if (state.temporary) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).
@@ -354,7 +357,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // THIN-0N: the speaker's effective band (an unidentified robot speaker
   // is the child band), for the signal, the plan and the stream gate,
   // as the old path's prepareTurn() derives it.
-  const turnId = newConversationTurnId();
+  const turnId = opts.turnId ?? newConversationTurnId();
   const supersedes = resolveSupersedes(opts.supersedes, conversation.id) ?? undefined;
   // Old path: a continued turn that does not resolve keeps the id the client
   // sent (it only ever excludes a row from the window); the stored row's own
@@ -442,6 +445,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     surface,
     ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
     utterance: text,
+    ...(opts.images?.length ? { images: opts.images } : {}),
     modelId: opts.model,
     signal,
     budget,

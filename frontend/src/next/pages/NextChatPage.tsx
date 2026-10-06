@@ -52,7 +52,6 @@ import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachm
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
-import { CURRENT_LOCAL_VISION_CAPABILITY } from "@/apps/chat/visionCapability";
 import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assistant-ui/core";
 import { useDocumentTitle } from "@/lib/useDocumentTitle";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
@@ -363,6 +362,12 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const autoReadRepliesRef = useRef(false);
   autoReadRepliesRef.current = autoReadReplies;
   const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: isOwnerOrAdminRole(person.role) });
+  const photoSettingsQuery = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
+  const photoSettings = Array.isArray(photoSettingsQuery.data) ? photoSettingsQuery.data : [];
+  const photoSetting = photoSettings.find((setting) => setting.key === "chat.photo_uploads");
+  const photoUploadsEnabled = person.role === "child"
+    ? photoSetting?.source !== "default" && photoSetting?.value === true
+    : photoSetting?.value === true;
   const chatRole = enginesQuery.data?.roles?.find((role) => role.id === "chat");
   const modelOptions = useMemo<ModelOption[]>(() => {
     if (!enginesQuery.data?.configured) return [];
@@ -568,7 +573,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // exists server-side but nothing wires it to a route or the turn
   // (COMPOSER-DOC-ATTACH-01, docs/BACKLOG.md) - a real gap, not this
   // slice's UI-composition scope.
-  const imageAttachmentAdapter = useMemo(() => createLocalImageAttachmentAdapter({ capability: () => CURRENT_LOCAL_VISION_CAPABILITY }), []);
+  const imageAttachmentAdapter = useMemo(() => createLocalImageAttachmentAdapter({ enabled: () => photoUploadsEnabled }), [photoUploadsEnabled]);
   const attachmentsAdapter = useMemo(() => new CompositeAttachmentAdapter([imageAttachmentAdapter, new SimpleTextAttachmentAdapter()]), [imageAttachmentAdapter]);
   // DICT-01: read fresh (not cached at mount) since an install can finish
   // while this page is already open - `sttInstalled` below reads

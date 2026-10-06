@@ -1,7 +1,7 @@
 import type { AttachmentAdapter, CompleteAttachment, PendingAttachment } from "@assistant-ui/react";
-import { IMAGE_VISION_UNAVAILABLE_MESSAGE, type LocalVisionCapability } from "@/apps/chat/visionCapability";
+import { MAX_CHAT_IMAGES, MAX_CHAT_IMAGE_BYTES, CHAT_IMAGE_REFUSAL } from "@maipai/home-backend/src/wire";
 
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_BYTES = MAX_CHAT_IMAGE_BYTES;
 const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
 const DOCUMENT_TYPES = new Set(["application/pdf", "application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.presentationml.presentation", "application/vnd.oasis.opendocument.text", "application/vnd.oasis.opendocument.spreadsheet", "application/vnd.oasis.opendocument.presentation"]);
 const stagedDocuments = new Map<string, File>();
@@ -19,7 +19,7 @@ export interface LocalImageAttachmentRecord {
 }
 
 export interface LocalImageAttachmentAdapterOptions {
-  capability?: () => LocalVisionCapability;
+  enabled?: () => boolean;
   onRecord?(record: LocalImageAttachmentRecord): void;
   onRemove?(id: string): void;
 }
@@ -53,7 +53,7 @@ function validateImage(file: File): void {
     throw new Error("MaiPai can only add image files here.");
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    throw new Error("That image is too large to keep locally. Choose one under 10 MB.");
+    throw new Error(CHAT_IMAGE_REFUSAL);
   }
 }
 
@@ -71,10 +71,10 @@ function validateImage(file: File): void {
  * the moment it's picked, with the real reason, never a silently dead
  * Send button. */
 export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentAdapterOptions = {}): AttachmentAdapter {
-  const capability = options.capability ?? (() => ({ imageParts: false, engine: "text-only" as const, transport: "local" as const }));
 
+  const imagesEnabled = options.enabled?.() !== false;
   return {
-    accept: "image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp",
+    accept: imagesEnabled ? "image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp" : ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp",
 
     async add({ file }): Promise<PendingAttachment> {
       if (DOCUMENT_TYPES.has(file.type.toLowerCase())) {
@@ -84,7 +84,8 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
         return { id, type: "file", name: file.name, contentType: file.type, file, status: { type: "requires-action", reason: "composer-send" } };
       }
       validateImage(file);
-      if (!capability().imageParts) throw new Error(IMAGE_VISION_UNAVAILABLE_MESSAGE);
+      if (options.enabled?.() === false) throw new Error("Photo uploads are turned off for this profile.");
+      if (stagedRecords.size >= MAX_CHAT_IMAGES) throw new Error(CHAT_IMAGE_REFUSAL);
       const bytes = await file.arrayBuffer();
       const digest = await sha256(bytes);
       const record: LocalImageAttachmentRecord = {
@@ -110,12 +111,14 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
     async send(attachment: PendingAttachment): Promise<CompleteAttachment> {
       const doc = stagedDocuments.get(attachment.id);
       if (doc) return { ...attachment, status: { type: "complete" }, content: [{ type: "text", text: `Document: ${doc.name}` }] };
-      if (!capability().imageParts) throw new Error(IMAGE_VISION_UNAVAILABLE_MESSAGE);
+      if (options.enabled?.() === false) throw new Error("Photo uploads are turned off for this profile.");
       validateImage(attachment.file);
       return {
         ...attachment,
         status: { type: "complete" },
-        content: [{ type: "image", image: await fileDataURL(attachment.file) }],
+        // UPLOAD-IMG-01: bytes are uploaded to the hub before the turn. The
+        // user message carries only the returned id and display metadata.
+        content: [],
       };
     },
 
@@ -129,6 +132,10 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
 
 export function stagedImageAttachment(id: string): LocalImageAttachmentRecord | undefined {
   return stagedRecords.get(id);
+}
+
+export function clearStagedImageAttachment(id: string): void {
+  stagedRecords.delete(id);
 }
 
 export function clearStagedImageAttachments(): void {

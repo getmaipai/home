@@ -16,7 +16,7 @@ import { newFileId, newShareId } from "@/lib/id";
 import { attachmentsDir, dataDir, ensureDataDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { checkStorageCap, kindForMediaType } from "@/lib/storage/usage";
-import { canAccessFile } from "@/lib/access";
+import { canAccessFile, canAccessPerson } from "@/lib/access";
 import type { PersonRow } from "@/types";
 
 export type AttachmentOpResult<T> =
@@ -29,6 +29,7 @@ export interface CreateAttachmentInput {
   mediaType: string;
   bytes: Uint8Array;
   provenance?: string;
+  deduplicate?: boolean;
 }
 
 /** Check whether bytes would fit before an expensive consumer (such as
@@ -194,7 +195,7 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   // (storage/usage.ts) is the sum of `size` over File rows that exist,
   // and a dedupe never adds one, so charging the cap here would refuse a
   // person for bytes that were never going to land on disk a second time.
-  const existing = db.select().from(attachments).where(eq(attachments.sha256, sha256)).get();
+  const existing = input.deduplicate === false ? undefined : db.select().from(attachments).where(eq(attachments.sha256, sha256)).get();
   if (existing) {
     if (existing.ownerPersonId !== actor.id) grantDedupeShare(existing.ownerPersonId, actor.id, existing.id);
     return { ok: true, value: toRecord(existing) };
@@ -273,6 +274,20 @@ export function readAttachment(actor: PersonRow, id: string): AttachmentOpResult
   }
 }
 
+/** Chat images are visible to the people who can read their conversation,
+ * while the general Library keeps its explicit-share rule. */
+export function readAttachmentForConversation(actor: PersonRow, conversationId: string, id: string): AttachmentOpResult<{ record: FileRecord; bytes: Uint8Array }> {
+  const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
+  if (!row || row.conversationId !== conversationId) return { ok: false, status: 404, error: "attachment not found" };
+  const conversation = db.select({ personId: conversations.personId }).from(conversations).where(eq(conversations.id, conversationId)).get();
+  if (!conversation || !canAccessPerson(actor, conversation.personId)) return { ok: false, status: 404, error: "attachment not found" };
+  const filePath = attachmentFilePath(row.storagePath);
+  if (!existsSync(filePath)) return { ok: false, status: 404, error: "attachment bytes not found" };
+  const bytes = readFileSync(filePath);
+  if (bytes.byteLength !== row.size || createHash("sha256").update(bytes).digest("hex") !== row.sha256) return { ok: false, status: 500, error: "attachment integrity check failed" };
+  return { ok: true, value: { record: toRecord(row), bytes: new Uint8Array(bytes) } };
+}
+
 /** Delete records and their files before the owning turn is deleted. */
 export function deleteAttachmentsForTurns(turnIds: string[]): number {
   if (turnIds.length === 0) return 0;
@@ -288,4 +303,45 @@ export function deleteAttachmentsForPerson(personId: string): number {
   for (const row of rows) removeFile(row.storagePath);
   sqlite.query("DELETE FROM attachments WHERE owner_person_id = ?").run(personId);
   return rows.length;
+}
+
+// Temporary-chat images stay process memory only, and are keyed by the
+// temporary conversation capability just like the conversation's turns.
+export interface TemporaryChatImage {
+  id: string;
+  turnId: string;
+  conversationId: string;
+  ownerPersonId: string;
+  name: string;
+  mediaType: string;
+  width: number;
+  height: number;
+  bytes: Uint8Array;
+  createdAt: number;
+}
+const temporaryChatImages = new Map<string, TemporaryChatImage>();
+export function storeTemporaryChatImage(image: Omit<TemporaryChatImage, "createdAt">): void {
+  const now = Date.now();
+  for (const [id, value] of temporaryChatImages) if (now - value.createdAt > 2 * 60 * 60 * 1000) temporaryChatImages.delete(id);
+  temporaryChatImages.set(image.id, { ...image, createdAt: now });
+}
+export function getTemporaryChatImage(actor: PersonRow, conversationId: string, id: string): TemporaryChatImage | undefined {
+  const image = temporaryChatImages.get(id);
+  if (!image || image.ownerPersonId !== actor.id || image.conversationId !== conversationId || Date.now() - image.createdAt > 2 * 60 * 60 * 1000) return undefined;
+  return image;
+}
+export function getTemporaryChatImageForReader(actor: PersonRow, conversationId: string, id: string): TemporaryChatImage | undefined {
+  const image = temporaryChatImages.get(id);
+  if (!image || image.conversationId !== conversationId || Date.now() - image.createdAt > 2 * 60 * 60 * 1000 || !canAccessPerson(actor, image.ownerPersonId)) return undefined;
+  return image;
+}
+export function temporaryChatImagesForTurn(actor: PersonRow, conversationId: string, turnId: string): TemporaryChatImage[] {
+  return [...temporaryChatImages.values()].filter((image) => image.ownerPersonId === actor.id && image.conversationId === conversationId && image.turnId === turnId);
+}
+export function removeTemporaryChatImages(conversationId: string): void {
+  for (const [id, image] of temporaryChatImages) if (image.conversationId === conversationId) temporaryChatImages.delete(id);
+}
+
+export function pruneTemporaryChatImages(liveConversationIds: ReadonlySet<string>): void {
+  for (const [id, image] of temporaryChatImages) if (!liveConversationIds.has(image.conversationId)) temporaryChatImages.delete(id);
 }

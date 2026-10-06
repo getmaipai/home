@@ -94,6 +94,17 @@ function assertCanAccessWakewordDeviceSetting(actor: PersonRow): SettingsOpResul
   return { ok: false, status: 403, error: "only a household adult may access the wakeword setting" };
 }
 
+function assertCanSetPhotoUploads(actor: PersonRow, targetId: string): SettingsOpResult<true> {
+  const targetRole = getPersonRole(targetId);
+  if (!targetRole) return { ok: false, status: 403, error: "cannot access another person's settings" };
+  if (actor.id === targetId) {
+    if (targetRole === "child") return { ok: false, status: 403, error: "a household adult must change a child's photo setting" };
+    return { ok: true, value: true };
+  }
+  if (isOwnerOrAdmin(actor) && (targetRole === "child" || targetRole === "teen")) return { ok: true, value: true };
+  return { ok: false, status: 403, error: "only a household adult may change a minor's photo setting" };
+}
+
 function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpResult<true> {
   const range = keyDef.range as Record<string, unknown> | undefined;
   switch (keyDef.selector) {
@@ -404,6 +415,8 @@ export function setValue(
         ? assertCanSetSessionLock(actor, parsed.id!)
       : key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
         ? assertCanAccessWakewordDeviceSetting(actor)
+        : key === "chat.photo_uploads" && parsed.kind === "person"
+          ? assertCanSetPhotoUploads(actor, parsed.id!)
         : key === PERSON_STORAGE_CAP_KEY
           ? assertCanSetPersonStorageCap(actor, parsed.id!)
           : assertCanAccessScope(actor, parsed, "write");
@@ -475,6 +488,13 @@ export function getSettingValueForPerson(personId: string, key: string): unknown
   const keyDef = getRegistryKey(key);
   if (!keyDef || keyDef.scope !== "person") return undefined;
   return resolveStoredValue(`person:${personId}`, keyDef);
+}
+
+/** Whether a person setting was explicitly saved. Used for age-band defaults
+ * whose safe default differs from the shared schema default. */
+export function getPersonSettingSource(personId: string, key: string): string | undefined {
+  return db.select({ source: settingsValues.source }).from(settingsValues)
+    .where(and(eq(settingsValues.scope, `person:${personId}`), eq(settingsValues.key, key))).get()?.source;
 }
 
 /** Sets the signed-in actor's own `tts.voice_id` to an arbitrary value

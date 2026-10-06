@@ -2,6 +2,8 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import type { MiddlewareHandler } from "hono";
 import { randomBytes } from "node:crypto";
+import sharp from "sharp";
+import { eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
@@ -11,12 +13,15 @@ import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } f
 import { speakerAgeBand } from "@/lib/ageBand";
 import { personWithinTurnBudget, personWithinEphemeralBudget } from "@/lib/llm";
 import { isFixedHomeCardQuery } from "@/lib/homeCardQueries";
-import type { TurnStreamEvent, TurnValue } from "@/wire";
+import { MAX_CHAT_IMAGES, type TurnStreamEvent, type TurnValue } from "@/wire";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { turnOwnerId } from "@/lib/conversationHistory";
+import { turnOwnerId, isTemporaryConversation } from "@/lib/conversationHistory";
+import { attachments } from "@/db/schema";
+import { db } from "@/db";
+import { readAttachment, getTemporaryChatImage } from "@/lib/attachments";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 
@@ -729,6 +734,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     spoken?: boolean;
     ask_answer?: unknown;
     document_attachments?: { name: string; media_type: string; data: string }[];
+    images?: { id: string; name: string; width: number; height: number; media_type: string }[];
   };
   if (body.resume_token !== undefined) {
     const session = typeof body.resume_token === "string" ? resumeSessions.get(body.resume_token) : undefined;
@@ -745,6 +751,32 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   )) return c.json({ error: "Invalid document attachment" }, 400);
   if (documentAttachments.length > 0 && body.bare === true) {
     return c.json({ error: "Document attachments are not available in bare mode", code: "document_attachments_unavailable" }, 400);
+  }
+  const imageParts = body.images ?? [];
+  if (!Array.isArray(imageParts) || imageParts.length > MAX_CHAT_IMAGES || imageParts.some((item) =>
+    !item || typeof item.id !== "string" || !/^file-[a-z0-9]{6,}$/.test(item.id) || typeof item.name !== "string" || item.name.length > 255 ||
+    !Number.isInteger(item.width) || item.width < 1 || !Number.isInteger(item.height) || item.height < 1 || item.media_type !== "image/jpeg"
+  )) return c.json({ error: "Invalid image attachment." }, 400);
+  if (imageParts.length > 0) {
+    if (!body.turn_id || !body.conversation_id || body.surface && body.surface !== "chat" || body.spoken === true || body.bare === true) return c.json({ error: "Images are available on written chat turns only." }, 400);
+    const temporaryImages = isTemporaryConversation(body.conversation_id);
+    for (const part of imageParts) {
+      let bytes: Uint8Array | undefined;
+      if (temporaryImages) {
+        const stored = getTemporaryChatImage(actor, body.conversation_id, part.id);
+        if (!stored || stored.turnId !== body.turn_id) return c.json({ error: "Picture unavailable." }, 404);
+        bytes = stored.bytes;
+        if (stored.name !== part.name || stored.width !== part.width || stored.height !== part.height || stored.mediaType !== part.media_type) return c.json({ error: "Picture metadata did not match its stored copy." }, 400);
+      } else {
+        const row = db.select().from(attachments).where(eq(attachments.id, part.id)).get();
+        if (!row || row.ownerPersonId !== actor.id || row.conversationId !== body.conversation_id || row.turnId !== body.turn_id || row.mediaType !== part.media_type) return c.json({ error: "Picture unavailable." }, 404);
+        const read = readAttachment(actor, part.id);
+        if (!read.ok) return c.json({ error: "Picture unavailable." }, 404);
+        bytes = read.value.bytes;
+      }
+      const metadata = await sharp(bytes).metadata().catch(() => null);
+      if (!metadata || metadata.width !== part.width || metadata.height !== part.height) return c.json({ error: "Picture metadata did not match its stored copy." }, 400);
+    }
   }
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
@@ -828,6 +860,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
       // (getmaipai/home BACKLOG, found 2026-09-11).
       ephemeral,
       documentAttachments: documentAttachments.map((item) => ({ name: item.name, mediaType: item.media_type, data: item.data })),
+      ...(imageParts.length ? { turnId: body.turn_id, images: imageParts } : {}),
       ...(surface === "robot" && !bare ? { speakerEvidence: parsedEvidence.data.speaker_evidence ?? null, present: parsedEvidence.data.present ?? null } : {}), // Evidence is only honored on the robot surface.
     });
   } catch (err) {

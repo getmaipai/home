@@ -316,6 +316,8 @@ export interface TurnValue {
   media?: Media;
   /** Finding 60 part two: the bounded image set behind `media`, in result order. */
   media_items?: Media[];
+  /** UPLOAD-IMG-01: the user's cleaned local images, represented by store ids. */
+  images?: ChatImagePart[];
   /** RVW-1: which rung answered (lib/ruleNames.ts's Rung), additive on
    * the wire and on the turn row. */
   rung?: "typed_source" | "search" | "model_knowledge" | "failed" | "none";
@@ -399,6 +401,11 @@ export interface TurnValue {
   reasoning?: string;
 }
 
+export interface ChatImagePart { id: string; name: string; width: number; height: number; media_type: string }
+export const MAX_CHAT_IMAGES = 4;
+export const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024;
+export const CHAT_IMAGE_REFUSAL = "You can add up to 4 pictures, each up to 10 MB.";
+
 export type ConversationTurnRow = typeof conversationTurns.$inferSelect;
 
 export type ConversationRow = typeof conversations.$inferSelect;
@@ -428,7 +435,7 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
 // listConversationTurns()/list()) drops the raw column entirely for a
 // minor's own turn rather than sending `null`, matching the write-side
 // gate `reasoning`'s own wire event and POST /api/turn already apply.
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

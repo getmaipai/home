@@ -185,6 +185,21 @@ describe("logTurn's supersedes option (getmaipai/home#60)", () => {
     expect(row.branchChosen).toBe(true);
   });
 
+  test("stores additive chat image parts on the user's turn row and returns them as structured metadata", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const images = [{ id: "file-photo123", name: "robot.png", width: 640, height: 480, media_type: "image/jpeg" }];
+    const value: TurnValue = { reply: { text: "I can help with that." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-image123", images };
+    logTurn(actor, "chat", "What is this?", value, { images });
+    const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, "turn-image123")).get()!;
+    expect(JSON.parse(row.images!)).toEqual(images);
+    const history = listConversationTurns(actor, conv.value.id);
+    expect(history.ok).toBe(true);
+    if (history.ok) expect(history.value[0]!.images).toEqual(images);
+    expect(value.images).toEqual(images);
+  });
+
   test("an edit-and-resend writes a new row carrying the old turn's id, leaving the old row untouched", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");

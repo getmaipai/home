@@ -25377,6 +25377,193 @@
         }
       }
     },
+    "/api/attachments/upload": {
+      "post": {
+        "tags": [
+          "Attachments"
+        ],
+        "summary": "Store one cleaned chat picture locally",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "nullable": true
+                  },
+                  "conversation_id": {
+                    "type": "string"
+                  },
+                  "turn_id": {
+                    "type": "string"
+                  },
+                  "temporary": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "turn_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored cleaned image.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "conversation_id": {
+                      "type": "string"
+                    },
+                    "turn_id": {
+                      "type": "string"
+                    },
+                    "image": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "width": {
+                          "type": "number"
+                        },
+                        "height": {
+                          "type": "number"
+                        },
+                        "media_type": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "width",
+                        "height",
+                        "media_type"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "conversation_id",
+                    "turn_id",
+                    "image"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Photo uploads disabled or storage cap reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/attachments/{id}": {
+      "get": {
+        "tags": [
+          "Attachments"
+        ],
+        "summary": "Read a cleaned chat picture",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "file-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "thumb",
+                "full"
+              ]
+            },
+            "required": true,
+            "name": "v",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "conversation_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cleaned local picture.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Picture unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/shares/{id}": {
       "delete": {
         "tags": [

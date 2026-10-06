@@ -1,5 +1,6 @@
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, ThreadAssistantMessagePart } from "@assistant-ui/react";
 import { offerCarry, withdrawCarry } from "./chatCarry";
+import { MAX_CHAT_IMAGES, CHAT_IMAGE_REFUSAL } from "@maipai/home-backend/src/wire";
 import { api, ApiError } from "@/lib/api";
 import { readAssistantTurnStream } from "@/lib/assistantTurnStream";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
@@ -7,10 +8,9 @@ import { splitReadyChunks } from "@/lib/sentenceChunker";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { messageText } from "@/apps/chat/chatMessageText";
-import { stagedDocumentPayload } from "@/apps/chat/localImageAttachmentAdapter";
+import { stagedDocumentPayload, clearStagedImageAttachment } from "@/apps/chat/localImageAttachmentAdapter";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
-import { CURRENT_LOCAL_VISION_CAPABILITY, IMAGE_VISION_UNAVAILABLE_MESSAGE, type LocalVisionCapability } from "@/apps/chat/visionCapability";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 
@@ -142,8 +142,6 @@ export interface ChatModelAdapterDeps {
   // the scheduler's own onFirstAudio/onEnded so ChatPage.tsx can show a
   // dedicated “stop speaking” control for exactly that window.
   onSpeakingChange?(speaking: boolean): void;
-  /** The selected local engine must opt into image parts explicitly. */
-  canUseVision?(): LocalVisionCapability;
   onResearchDocument?(turnId: string): void;
   // Jesse, live-found 2026-09-27: "this should be the default when
   // generating an artifact that requires the canvas" - a synchronous
@@ -195,16 +193,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const typedText = lastUserText(messages);
       const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : undefined);
       if (!text && !imageAttached && documentPayloads.length === 0) return;
-      // A complete attachment can arrive here from a restored or custom
-      // runtime even when the composer adapter was bypassed. Refuse before
-      // conversation resolution or fetch so a text-only engine never sees
-      // an image and no external vision path can be reached accidentally.
-      if (imageAttached && !(deps.canUseVision?.() ?? CURRENT_LOCAL_VISION_CAPABILITY).imageParts) {
-        deps.onReplyState?.("ready");
-        yield { content: [{ type: "text", text: IMAGE_VISION_UNAVAILABLE_MESSAGE }] };
-        return;
-      }
-      if (!text && documentPayloads.length === 0) return;
 
       // Stop whatever an earlier live reply was still speaking - never two
       // voices at once. A manual "Listen" replay (chatListen.ts) stops
@@ -311,6 +299,27 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       deps.onReplyState?.("waiting");
       try {
         let conversationId = await deps.getConversationId?.();
+        const temporary = deps.consumeTemporary?.();
+        const imageParts: { id: string; name: string; width: number; height: number; media_type: string }[] = [];
+        const photoTurnId = imageAttached ? `turn-${crypto.randomUUID().replaceAll("-", "").toLowerCase()}` : undefined;
+        if (imageAttached && lastMessage?.role === "user") {
+          const photos = lastMessage.attachments.filter((attachment) => attachment.type === "image");
+          if (photos.length > MAX_CHAT_IMAGES) throw new Error(CHAT_IMAGE_REFUSAL);
+          for (const attachment of photos) {
+            if (!attachment.file) throw new Error("The selected picture is no longer available. Please attach it again.");
+            const form = new FormData();
+            form.append("file", attachment.file, attachment.name ?? "picture");
+            form.append("turn_id", photoTurnId!);
+            form.append("temporary", temporary ? "true" : "false");
+            if (conversationId) form.append("conversation_id", conversationId);
+            const response = await fetch("/api/attachments/upload", { method: "POST", credentials: "include", body: form, signal: abortSignal });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.error ?? "Could not upload this picture.");
+            conversationId = payload.conversation_id as string;
+            imageParts.push(payload.image as (typeof imageParts)[number]);
+            clearStagedImageAttachment(attachment.id);
+          }
+        }
         const selectedModel = deps.getModel?.();
         abortSignal.throwIfAborted();
         while (!sawTerminalEvent) {
@@ -321,7 +330,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // conversation setting; the old ChatPage fallback consumes its
           // one-message action.
           const thinking = deps.getThinking ? deps.getThinking() : deps.consumeThinking?.();
-          const response = await (deps.openStream?.(text ?? "", abortSignal) ?? api.streamTurn(text ?? "Please read the attached document.", abortSignal, {
+          const response = await (deps.openStream?.(text ?? "", abortSignal) ?? api.streamTurn(text ?? (imageAttached ? "Please look at the attached picture." : "Please read the attached document."), abortSignal, {
             thinking: reconnectAttempts === 0 && !bare ? thinking : undefined,
             model: !bare ? selectedModel : undefined,
             // `undefined`, not `false`, when a surface has no bare-mode
@@ -336,10 +345,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             supersedes,
             continuation,
             resumeToken,
-            turnId: resumeTurnId,
+            turnId: resumeTurnId ?? photoTurnId,
             resumeFrom: resumeToken ? lastAcknowledgedSequence : undefined,
             packageScope: reconnectAttempts === 0 ? deps.consumePackageScope?.() : undefined,
-            temporary: reconnectAttempts === 0 ? deps.consumeTemporary?.() : undefined,
+            temporary: reconnectAttempts === 0 ? temporary : undefined,
             spoken: reconnectAttempts === 0 ? deps.consumeSpoken?.() : undefined,
             // APPROVE-CARD-01: the same reconnectAttempts===0 gate as
             // packageScope/temporary/spoken above - a single-shot field
@@ -347,6 +356,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // never resent on a reconnect retry within the same send.
             askAnswer: reconnectAttempts === 0 ? deps.consumeAskAnswer?.() : undefined,
             documentAttachments: reconnectAttempts === 0 && documentPayloads.length > 0 ? documentPayloads : undefined,
+            images: imageParts.length > 0 ? imageParts : undefined,
           }));
           for await (const event of readAssistantTurnStream(response)) {
           // A review caught this: `safeParse` ran on every event
