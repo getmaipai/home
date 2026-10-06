@@ -72,6 +72,9 @@ function gatePidsByCwd(): Map<number, string> {
  * operator sets it per invocation, for the worktree named that turn. */
 export function runningGates(): [number, string][] {
   const ignore = (process.env.MAIPAI_BENCH_IGNORE_GATE_CWD ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  // "*": the coordinator ruled that this run goes on beside every gate
+  // (its timed numbers are then labelled contended), per invocation only.
+  if (ignore.includes("*")) return [];
   return [...gatePidsByCwd()].filter(([, cwd]) => !ignore.some((substr) => cwd.includes(substr)));
 }
 
