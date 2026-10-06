@@ -26,6 +26,11 @@ export interface ChatHeaderData {
   onAutoReadRepliesChange: (enabled: boolean) => void;
   onRename: (title: string) => Promise<void>;
   onDelete: () => Promise<void>;
+  /** ACTIVITY-01d: whether a reply is streaming on the open chat, and how
+   * to stop it. The header's Running now panel shows the reply with a Stop
+   * control; the row above the composer no longer does. */
+  replyRunning?: boolean;
+  onStopReply?: () => void;
 }
 
 const ChatHeaderDataContext = createContext<{
@@ -74,9 +79,10 @@ export function useSetChatHeaderData(data: ChatHeaderData | null): void {
   const title = data?.title;
   const ttsAvailable = data?.ttsAvailable;
   const autoReadReplies = data?.autoReadReplies;
+  const replyRunning = data?.replyRunning;
   useEffect(() => {
     setData(dataRef.current);
     return () => setData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately narrower than `data` itself; see this function's own comment above.
-  }, [data === null, title, ttsAvailable, autoReadReplies, setData]);
+  }, [data === null, title, ttsAvailable, autoReadReplies, replyRunning, setData]);
 }

@@ -5457,6 +5457,15 @@
                       },
                       "durationSeconds": {
                         "type": "number"
+                      },
+                      "actions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "forPersonName": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -5662,6 +5671,15 @@
                     },
                     "durationSeconds": {
                       "type": "number"
+                    },
+                    "actions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "forPersonName": {
+                      "type": "string"
                     }
                   },
                   "required": [

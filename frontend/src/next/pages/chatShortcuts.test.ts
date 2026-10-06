@@ -91,3 +91,25 @@ test("Cmd+/ opens the shortcut reference with all five entries", () => {
     ["Toggle sidebar", "⌘/Ctrl+B"],
   ]);
 });
+
+// ACTIVITY-01d, found capturing the Running now panel: Esc that closed an
+// open panel or menu (Radix prevents the default when it dismisses one)
+// also reached this window listener and stopped the reply underneath.
+test("Esc that already closed a panel or menu does not also stop the reply", () => {
+  const cancelRun = mock(() => {});
+  const cleanup = registerChatShortcuts({
+    aui: { thread: { cancelRun } } as unknown as AssistantClient,
+    isRunning: true,
+    unavailable: false,
+    setReferenceOpen: () => {},
+  });
+  const dismissLayer = (event: KeyboardEvent) => { if (event.key === "Escape") event.preventDefault(); };
+  document.addEventListener("keydown", dismissLayer, { capture: true });
+  try {
+    document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+  } finally {
+    document.removeEventListener("keydown", dismissLayer, { capture: true });
+    cleanup();
+  }
+  expect(cancelRun).not.toHaveBeenCalled();
+});

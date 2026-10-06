@@ -641,7 +641,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 ...(finalReasoning ? [{ type: "reasoning" as const, text: finalReasoning }] : []),
                 ...(structuredPart ? [toolCallPart(`${event.value.turn_id}-structured`, structuredPart.tool_id, structuredPart)] : []),
                 ...(artifact ? [toolCallPart(`${event.value.turn_id}-artifact`, "write_document", artifact)] : []),
-                ...(confirm ? [toolCallPart(`${event.value.turn_id}-confirm`, "confirm", { package_id: confirm.package_id, open: confirm.open, turn_id: event.value.turn_id })] : []),
                 // TOOL-EVENTS-01: same "before text" placement as the
                 // structured/artifact cards above - a trace of what ran
                 // while this reply was produced reads above its own
@@ -651,6 +650,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // backend half lands.
                 ...(timelinePart ? [timelinePart] : []),
                 ...textWithAnswerImages(finalText, event.value.answer_images ?? answerImages, `${event.value.turn_id}-images`),
+                // APPROVE-CALM-01 (owner's Row-Bot reference, 2026-10-06): the
+                // approval card sits UNDER the reply that asks, the way the
+                // reference reads ("...so it waits for your approval", then
+                // the card), and the same place on reload (chatHistoryAdapter.ts).
+                ...(confirm ? [toolCallPart(`${event.value.turn_id}-confirm`, "confirm", { package_id: confirm.package_id, open: confirm.open, turn_id: event.value.turn_id })] : []),
                 // Slice 5(a): AFTER the text part, not before - spec.md's
                 // own "a compact card UNDER the reply." The "tool parts
                 // before text" rule above was about the structured

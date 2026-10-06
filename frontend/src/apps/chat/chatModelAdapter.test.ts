@@ -730,7 +730,7 @@ describe("createChatModelAdapter structured results (SHELL-02 slice 3)", () => {
 // (ConfirmTool's own registration, NextChatPage.tsx), card before the
 // prose that carries the actual question text.
 describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
-  test("confirm on the done event becomes a real tool-call part, card before prose", async () => {
+  test("confirm on the done event becomes a real tool-call part, under the prose that asks (APPROVE-CALM-01)", async () => {
     const env = stubEnvironment(
       ndjsonStream([
         { type: "delta", text: "Go ahead and lock the doors?" },
@@ -741,8 +741,8 @@ describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
       const { yields } = await collect([fakeUserMessage("lock the doors")]);
       const last = yields[yields.length - 1];
       expect(last?.content).toEqual([
-        { type: "tool-call", toolCallId: "turn-confirm123-confirm", toolName: "confirm", args: {}, argsText: "", result: { package_id: "lock-doors", open: true, turn_id: "turn-confirm123" } },
         { type: "text", text: "Go ahead and lock the doors?" },
+        { type: "tool-call", toolCallId: "turn-confirm123-confirm", toolName: "confirm", args: {}, argsText: "", result: { package_id: "lock-doors", open: true, turn_id: "turn-confirm123" } },
       ]);
     } finally {
       env.restore();

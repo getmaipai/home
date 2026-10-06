@@ -1473,7 +1473,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     fireEvent.click(send);
   }
 
-  test("an open confirm card renders ToolFallback.Approval's Yes/No options", async () => {
+  test("an open confirm card renders ToolFallback.Approval's Approve/Deny options under a short question", async () => {
     const restore = stubConfirmTurnFetch([
       ndjsonStream([
         { type: "delta", text: "Go ahead and lock the doors?" },
@@ -1488,14 +1488,17 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
       );
       await sendMessage(view, "lock the doors");
       expect(await view.findByText("Go ahead and lock the doors?")).toBeVisible();
-      expect(await view.findByRole("button", { name: "Yes" })).toBeVisible();
-      expect(await view.findByRole("button", { name: "No" })).toBeVisible();
+      expect(await view.findByRole("button", { name: /^Approve/ })).toBeVisible();
+      expect(await view.findByRole("button", { name: "Deny" })).toBeVisible();
+      // APPROVE-CALM-01: the card's own question, then plain detail lines.
+      const prompt = view.container.querySelector(".aui-tool-fallback-approval-prompt");
+      expect(prompt?.textContent).toMatch(/^Go ahead\?\nNothing happens until you choose\.\nWaiting since /);
     } finally {
       restore();
     }
   });
 
-  test("tapping Yes sends a new turn with the matching ask_answer and the tapped label as its text, then clears the one-shot field", async () => {
+  test("tapping Approve sends a new turn with the matching ask_answer and the tapped label as its text, then clears the one-shot field", async () => {
     const restore = stubConfirmTurnFetch([
       ndjsonStream([
         { type: "delta", text: "Go ahead and lock the doors?" },
@@ -1517,7 +1520,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
         </MemoryRouter>,
       );
       await sendMessage(view, "lock the doors");
-      const yesButton = await view.findByRole("button", { name: "Yes" });
+      const yesButton = await view.findByRole("button", { name: /^Approve/ });
       fireEvent.click(yesButton);
       expect(await view.findByText("Sure, locking the doors.")).toBeVisible();
       const bodies = turnRequestBodies();
@@ -1533,7 +1536,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     }
   });
 
-  test("tapping No sends a new turn with ask_answer approved: false", async () => {
+  test("tapping Deny sends a new turn with ask_answer approved: false", async () => {
     const restore = stubConfirmTurnFetch([
       ndjsonStream([
         { type: "delta", text: "Go ahead and lock the doors?" },
@@ -1551,11 +1554,45 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
         </MemoryRouter>,
       );
       await sendMessage(view, "lock the doors");
-      const noButton = await view.findByRole("button", { name: "No" });
+      const noButton = await view.findByRole("button", { name: "Deny" });
       fireEvent.click(noButton);
       expect(await view.findByText("Okay, no action taken.")).toBeVisible();
       const bodies = turnRequestBodies();
       expect(bodies[1]).toMatchObject({ text: "No", ask_answer: { turn_id: "turn-confirm3", approved: false } });
+    } finally {
+      restore();
+    }
+  });
+
+  test("Ctrl+Enter approves the open ask, but not while typing in the composer", async () => {
+    const restore = stubConfirmTurnFetch([
+      ndjsonStream([
+        { type: "delta", text: "Go ahead and lock the doors?" },
+        { type: "done", value: { turn_id: "turn-confirm4", reply: { text: "Go ahead and lock the doors?" }, source: "confirm", safety: SAFETY, confirm: { package_id: "lock-doors", open: true } } },
+      ]),
+      ndjsonStream([
+        { type: "delta", text: "Sure, locking the doors." },
+        { type: "done", value: { turn_id: "turn-confirm4-resumed", reply: { text: "Sure, locking the doors." }, source: "plugin", plugin_id: "lock-doors", safety: SAFETY } },
+      ]),
+    ]);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "lock the doors");
+      await view.findByRole("button", { name: /^Approve/ });
+      fireEvent.keyDown(view.getByLabelText("Message input"), { key: "Enter", ctrlKey: true });
+      expect(turnRequestBodies()).toHaveLength(1);
+      fireEvent.keyDown(document.body, { key: "Enter", ctrlKey: true });
+      expect(await view.findByText("Sure, locking the doors.")).toBeVisible();
+      expect(turnRequestBodies()[1]).toMatchObject({ ask_answer: { turn_id: "turn-confirm4", approved: true } });
+      // Answered: the card is gone and the shortcut no longer answers it again.
+      await waitFor(() => expect(view.queryByRole("button", { name: /^Approve/ })).toBeNull());
+      fireEvent.keyDown(document.body, { key: "Enter", ctrlKey: true });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(turnRequestBodies()).toHaveLength(2);
     } finally {
       restore();
     }
@@ -1569,7 +1606,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
   // path (GET /api/conversations/:id/turns), the same shape
   // "the open conversation's title is the tab title" (above) already
   // uses to open an existing conversation.
-  test("a closed (open: false) confirm card on reload renders no Yes/No buttons - already answered, non-interactive", async () => {
+  test("a closed (open: false) confirm card on reload renders no Approve/Deny buttons - already answered, non-interactive", async () => {
     const conversation = { id: "conv-confirm-closed", title: "Locks", surface: "chat", created_at: "2026-09-27T00:00:00Z", pinned: false };
     const row = {
       id: "turn-confirm-closed",
@@ -1605,8 +1642,8 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
         </MemoryRouter>,
       );
       expect(await view.findByText("Go ahead and lock the doors?")).toBeVisible();
-      expect(view.queryByRole("button", { name: "Yes" })).toBeNull();
-      expect(view.queryByRole("button", { name: "No" })).toBeNull();
+      expect(view.queryByRole("button", { name: /^Approve/ })).toBeNull();
+      expect(view.queryByRole("button", { name: "Deny" })).toBeNull();
     } finally {
       globalThis.fetch = original;
     }

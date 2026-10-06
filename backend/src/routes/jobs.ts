@@ -17,6 +17,9 @@ const HomeJobSchema = z.object({
   resultRef: z.string().nullable().optional(), conversationId: z.string().nullable().optional(), errorKind: z.string().nullable().optional(),
   raw: z.string().nullable().optional(), provenance: z.record(z.string(), z.unknown()).optional(), createdAt: z.string().optional(), updatedAt: z.string().optional(),
   durationSeconds: z.number().optional(),
+  // ACTIVITY-01d: what this viewer may do with the row (stop, approve, deny); the UI offers only these.
+  actions: z.array(z.string()).optional(),
+  forPersonName: z.string().optional(),
 });
 
 const listRoute = createRoute({ method: "get", path: "/", tags: ["Jobs"], summary: "List background work visible to the signed-in person", middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: z.array(HomeJobSchema) } }, description: "Current visible job snapshot." }, ...errorResponses({ 401: "Sign in first" }) } });

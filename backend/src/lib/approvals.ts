@@ -22,7 +22,7 @@ export type ApprovalRow = typeof approvals.$inferSelect;
 // relationship-types.json give for their own closed vocabularies): a
 // free-text `kind` would let any client invent a request type nothing
 // downstream knows how to render, summarize, or act on once approved.
-// Extend this list (and summarize() below) when a package actually needs
+// Extend this list (and summarizeApproval() below) when a package actually needs
 // a new kind of ask.
 const KNOWN_KINDS = ["install_package", "browse_url"] as const;
 export type ApprovalKind = (typeof KNOWN_KINDS)[number];
@@ -51,7 +51,7 @@ function toView(row: ApprovalRow): ApprovalView {
   };
 }
 
-function summarize(kind: string, details: Record<string, unknown>): string {
+export function summarizeApproval(kind: string, details: Record<string, unknown>): string {
   if (kind === "install_package") return `install "${String(details.packageName ?? details.id ?? "a package")}"`;
   if (kind === "browse_url") return `browse ${String(details.url ?? "a website")}`;
   return kind;
@@ -80,7 +80,7 @@ export async function requestApproval(
   // "its declared notification type to the parent audience" (this
   // step's own plan text) - notificationTypes.ts's approvals.requested,
   // audience: "adults", already reaches every adult+ in the house.
-  await trigger("approvals.requested", { displayName: actor.displayName, summary: summarize(kind, details) });
+  await trigger("approvals.requested", { displayName: actor.displayName, summary: summarizeApproval(kind, details) });
   return { ok: true, status: 201, value: toView(row) };
 }
 

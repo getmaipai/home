@@ -26,6 +26,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 // row.
 import { Button } from "@maipai/ui/src/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
+import { Kbd } from "@maipai/ui/src/dashboard/components/ui/kbd";
+import { useSurface } from "@maipai/ui/src/useSurface";
 import { api, type StructuredPart, type TurnStats, type ProjectView } from "@/lib/api";
 import { ArtifactOpenContext, ReloadMainThreadContext, ConfirmAskAnswerContext } from "@/apps/chat/chatThreadContexts";
 import { faviconUrl } from "@/apps/chat/chatThreadSlots";
@@ -93,9 +95,28 @@ export function ProducedArtifactCard({ id, title, meta, generating, onOpen }: { 
 
 
 export const CONFIRM_APPROVAL_OPTIONS: readonly ToolApprovalOption[] = [
-  { id: "yes", kind: "allow-once", label: "Yes" },
-  { id: "no", kind: "reject-once", label: "No" },
+  { id: "yes", kind: "allow-once", label: "Approve" },
+  { id: "no", kind: "reject-once", label: "Deny" },
 ];
+
+/** APPROVE-CALM-01: the card's text. The first line is the question (the
+ * kit paints it bold), the rest are plain detail lines (muted). The reply
+ * above already says what the action is; the card asks, reassures and
+ * says how long it has waited. */
+export function confirmPrompt(createdAt: Date | undefined): string {
+  const lines = ["Go ahead?", "Nothing happens until you choose."];
+  if (createdAt && !Number.isNaN(createdAt.getTime())) {
+    lines.push(`Waiting since ${createdAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
+  }
+  return lines.join("\n");
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.tagName === "SELECT";
+}
+
+const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
 // APPROVE-CARD-01: a package's own confirm_needed/consent_needed ask
 // (turnNext.ts's finishTurn() "asked" branch), rendered through the
@@ -115,11 +136,39 @@ export const CONFIRM_APPROVAL_OPTIONS: readonly ToolApprovalOption[] = [
 // only ever valid while a real `part.approval` is set - ours never is).
 export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, never>, { package_id: string; open: boolean; turn_id: string }> = ({ result }) => {
   const respond = useContext(ConfirmAskAnswerContext);
+  const createdAt = useAuiState((state) => state.message.createdAt);
+  // A reply after this one means the ask was answered or passed over: the
+  // hub clears a parked ask on the next turn, and a reload reads it closed
+  // (conversationHistory.ts). Live, `open` stays true on this stored
+  // result, so the card closes itself once it is no longer the last message.
+  const isLast = useAuiState((state) => state.message.isLast);
+  const pointer = useSurface().pointer;
+  const open = result?.open === true && isLast;
+  const turnId = result?.turn_id;
+  // APPROVE-CALM-01: Ctrl (or Cmd) and Enter approve the one open ask,
+  // except while the person is typing somewhere (the composer's own keys).
+  useEffect(() => {
+    if (!open || !turnId) return;
+    let answered = false;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (answered || event.key !== "Enter" || !(event.ctrlKey || event.metaKey) || event.defaultPrevented || isTypingTarget(event.target)) return;
+      event.preventDefault();
+      answered = true;
+      respond(turnId, true);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, turnId, respond]);
   if (!result) return null;
   return (
     <ToolFallback.Approval
+      // confirmPrompt() writes a short question, a line break, then detail.
+      data-titled-prompt=""
+      // The hint shows only where a keyboard is the likely input.
+      primaryHint={pointer === "fine" ? <Kbd aria-hidden className="ms-1 bg-primary-foreground/20 text-primary-foreground">{IS_MAC ? "⌘ ↵" : "Ctrl ↵"}</Kbd> : null}
       approval={{
         id: result.turn_id,
+        prompt: confirmPrompt(createdAt instanceof Date ? createdAt : createdAt ? new Date(createdAt) : undefined),
         options: CONFIRM_APPROVAL_OPTIONS,
         // The component's own source (tool-fallback.aui.tsx): a
         // `resolution` set at all - "cancelled" or "expired" - suppresses
@@ -128,7 +177,7 @@ export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, neve
         // superseded, or reload-stale ask - conversationHistory.ts's own
         // read-time derivation) is exactly a "no longer waiting for an
         // answer" case, so "expired" is the honest value here.
-        resolution: result.open ? undefined : "expired",
+        resolution: open ? undefined : "expired",
       }}
       respondToApproval={async (response) => {
         // Our own two options are both known kinds with no `confirm`

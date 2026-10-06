@@ -195,12 +195,12 @@ describe("rowsToBranchableMessages", () => {
   // stored at write time), so `row.confirm.open` here is already
   // correct by the time it reaches this adapter - no additional
   // freshness handling needed.
-  test("a row carrying an open confirm becomes a real tool-call part before the reply text", () => {
+  test("a row carrying an open confirm becomes a real tool-call part under the reply text (APPROVE-CALM-01)", () => {
     const row = { ...makeRow("row-1", "Go ahead and lock the doors?"), confirm: { package_id: "lock-doors", open: true } };
     const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
     expect(items[1]!.message.content).toEqual([
-      { type: "tool-call", toolCallId: "row-1-confirm", toolName: "confirm", args: {}, argsText: "", result: { package_id: "lock-doors", open: true, turn_id: "row-1" } },
       { type: "text", text: "Go ahead and lock the doors?" },
+      { type: "tool-call", toolCallId: "row-1-confirm", toolName: "confirm", args: {}, argsText: "", result: { package_id: "lock-doors", open: true, turn_id: "row-1" } },
     ]);
   });
 
@@ -208,8 +208,8 @@ describe("rowsToBranchableMessages", () => {
     const row = { ...makeRow("row-1", "Go ahead and lock the doors?"), confirm: { package_id: "lock-doors", open: false } };
     const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
     expect(items[1]!.message.content).toEqual([
-      { type: "tool-call", toolCallId: "row-1-confirm", toolName: "confirm", args: {}, argsText: "", result: { package_id: "lock-doors", open: false, turn_id: "row-1" } },
       { type: "text", text: "Go ahead and lock the doors?" },
+      { type: "tool-call", toolCallId: "row-1-confirm", toolName: "confirm", args: {}, argsText: "", result: { package_id: "lock-doors", open: false, turn_id: "row-1" } },
     ]);
   });
 

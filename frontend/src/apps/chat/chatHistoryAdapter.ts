@@ -207,9 +207,10 @@ export function rowsToBranchableMessages(
               // at write time), so no additional freshness handling is
               // needed here: `open` is already correct by the time it
               // reaches this adapter.
-              ...(row.confirm ? [toolCallPart(`${row.id}-confirm`, "confirm", { package_id: row.confirm.package_id, open: row.confirm.open, turn_id: row.id })] : []),
               // ANSWER-IMG-04: the stored picture set, where it was shown live.
               ...textWithAnswerImages(row.replyText, row.answer_images, `${row.id}-images`),
+              // APPROVE-CALM-01: under the reply that asks, as live.
+              ...(row.confirm ? [toolCallPart(`${row.id}-confirm`, "confirm", { package_id: row.confirm.package_id, open: row.confirm.open, turn_id: row.id })] : []),
               // PROJECT-PROGRESS-01: conversationHistory.ts's own
               // projectByTurn lookup already hides this once `row.artifact`
               // is set (the project finished and posted - the design

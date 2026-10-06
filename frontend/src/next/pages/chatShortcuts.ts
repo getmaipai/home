@@ -37,7 +37,9 @@ export function registerChatShortcuts({
     } else if (matches("focus-composer")) {
       event.preventDefault();
       document.querySelector<HTMLElement>('[aria-label="Message input"]')?.focus();
-    } else if (matches("stop-reply") && isRunning) {
+    } else if (matches("stop-reply") && isRunning && !event.defaultPrevented) {
+      // ACTIVITY-01d: an Esc an open panel or menu already used to close
+      // itself (Radix prevents its default) is not also a stop.
       event.preventDefault();
       aui.thread.cancelRun();
     } else if (matches("toggle-sidebar")) {

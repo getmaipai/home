@@ -896,7 +896,8 @@
       "showcaseScenario": "NEW: job-progress",
       "batch": 2,
       "replacesHandBuilt": [],
-      "realTurnToday": true
+      "realTurnToday": true,
+      "reading": "ACTIVITY-01d: stays the inline project card in chat; not used for the header's Running now panel, which needs no looping spinner (verdict C3), Approve, Deny, Open and Details, and the 16 px floor. That panel is the kit's RunningNow primitive (ui-v0.5.106, named gap in commons ui docs/spec.md)."
     },
     {
       "file": "launcher-bubble.tsx",

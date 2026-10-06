@@ -570,6 +570,31 @@ export type StatusApp = StatusAppsResponse[number];
 export type StatusAppNeed = NonNullable<StatusApp["needs"]>[number];
 export type StatusAppState = StatusApp["state"];
 
+/** ACTIVITY-01d: one row of GET /api/jobs (backend/src/routes/jobs.ts's
+ * HomeJobSchema). A row about another adult carries only id, kind,
+ * forPerson and durationSeconds. */
+export interface HomeJobView {
+  id: string;
+  kind: string;
+  state?: string;
+  startedBy?: string;
+  forPerson?: string | null;
+  title?: string;
+  progress?: Record<string, unknown> | null;
+  waitingReason?: string | null;
+  resultRef?: string | null;
+  conversationId?: string | null;
+  errorKind?: string | null;
+  raw?: string | null;
+  provenance?: Record<string, unknown>;
+  createdAt?: string;
+  updatedAt?: string;
+  durationSeconds?: number;
+  actions?: string[];
+  /** Set when the row is about someone other than the viewer. */
+  forPersonName?: string;
+}
+
 export const api = {
   profiles: () => request<Roster[]>("/api/auth/profiles"),
   setup: (displayName: string, secret: string) =>
@@ -914,6 +939,12 @@ export const api = {
   confirmRelationship: (id: string) =>
     request<Relationship>(`/api/relationships/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ confirm: true }) }),
   notifications: () => request<NotificationDeliveryView[]>("/api/notifications"),
+  // ACTIVITY-01d: the Running now panel. One list per viewer (the service
+  // already filters by age band); stop, approve and deny act on one row.
+  jobs: () => request<HomeJobView[]>("/api/jobs"),
+  stopJob: (id: string) => request<{ ok: true }>(`/api/jobs/${encodeURIComponent(id)}/stop`, { method: "POST" }),
+  decideApproval: (id: string, decision: "approve" | "deny") =>
+    request<{ id: string }>(`/api/approvals/${encodeURIComponent(id)}/${decision}`, { method: "POST" }),
   notificationHistory: () => request<NotificationDeliveryView[]>("/api/notifications/history"),
   markNotificationRead: (id: string) =>
     request<NotificationDeliveryView>(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "POST" }),
