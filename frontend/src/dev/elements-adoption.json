@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T20:46:34.984Z",
-  "kitTag": "ui-v0.5.119",
+  "generatedAt": "2026-10-06T20:59:53.460Z",
+  "kitTag": "ui-v0.5.122",
   "items": [
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
@@ -773,6 +773,14 @@
       "implemented": true
     },
     {
+      "file": "number-ticker.test.tsx",
+      "name": "number-ticker.test",
+      "group": "number",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "number-ticker.tsx",
       "name": "number-ticker",
       "group": "other",
@@ -1160,6 +1168,14 @@
       "implemented": false
     },
     {
+      "file": "thread-list.projects.aui.test.tsx",
+      "name": "thread-list.projects.aui.test",
+      "group": "thread",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
       "file": "thread-list.tsx",
       "name": "thread-list",
       "group": "thread/list",
@@ -1221,7 +1237,7 @@
       "group": "agent/workflow",
       "verdict": "wire-after",
       "verdictReason": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline.",
-      "implemented": false,
+      "implemented": true,
       "reading": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline."
     },
     {
