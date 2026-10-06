@@ -39,6 +39,12 @@ export function newConversationId(): string {
   return `conv-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/chat-folder.schema.json's `^folder-[a-z0-9]{6,}$`
+ * (PROJECTS-01a: a chat folder, shown as a Project). */
+export function newChatFolderId(): string {
+  return `folder-${randomSuffix(10)}`;
+}
+
 // Not a spec-shaped id either. Longer than the other ids here (16 chars,
 // ~83 bits, vs. their 10/~52) on purpose: this one doubles as a bearer
 // capability for routes/voice.ts's unauthenticated `GET /cloned/:id/file`

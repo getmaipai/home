@@ -448,6 +448,8 @@ export interface ConversationSummary {
   pinned: boolean;
   /** CONV-ARCHIVE-01: shelved chats leave the default list. */
   archived: boolean;
+  /** PROJECTS-01a: the project (chat folder) this chat sits in, or null. */
+  folder_id: string | null;
   turn_count: number;
   last_turn_at: string | null;
   created_at: string;

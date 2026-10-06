@@ -33,6 +33,7 @@ export const HLC_BEARING_TABLES = [
   "episode_embeddings",
   "settings_values",
   "conversations",
+  "chat_folders",
   "conversation_turns",
   "issues",
   "status_events",

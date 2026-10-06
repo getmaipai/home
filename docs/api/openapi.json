@@ -6305,6 +6305,287 @@
         }
       }
     },
+    "/api/conversations": {
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Start a conversation",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "surface": {
+                    "type": "string",
+                    "description": "Where the chat happens; defaults to chat."
+                  },
+                  "companion_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "The companion for this chat."
+                  },
+                  "mode": {
+                    "nullable": true,
+                    "description": "chat, research or temporary."
+                  },
+                  "carry_from": {
+                    "nullable": true,
+                    "description": "A conversation id whose summary seeds this chat (THIN-3G)."
+                  },
+                  "folder_id": {
+                    "nullable": true,
+                    "description": "A project (chat folder) id to start the chat inside (PROJECTS-01a). Never for a temporary chat."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new conversation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^conv-[a-z0-9]{6,}$"
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Whose conversation this is. A conversation is never shared across people."
+                    },
+                    "surface": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "overlay",
+                        "pod",
+                        "robot",
+                        "tv",
+                        "phone"
+                      ],
+                      "description": "Matches turnEngine.ts's Surface (4.5): a person may hold one open conversation per surface at a time."
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "research",
+                        "temporary"
+                      ],
+                      "default": "chat",
+                      "description": "How this conversation presents answers: chat keeps the ordinary reply; research keeps the details pane open after a short line; temporary keeps turns out of normal history and durable memory."
+                    },
+                    "companion_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+                    },
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 200,
+                          "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+                    },
+                    "pinned": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Whether this conversation stays at the top of its person's list."
+                    },
+                    "folder_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^folder-[a-z0-9]{6,}$",
+                          "description": "The chat folder (chat-folder.schema.json, shown as a Project) this conversation sits in, or null. The folder belongs to the same person. A temporary conversation never has one; the host enforces that, since a cross-field rule here would be lost in codegen (see README on allOf/if/then) (CHAT-PROJECT-01a)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The chat folder (chat-folder.schema.json, shown as a Project) this conversation sits in, or null. The folder belongs to the same person. A temporary conversation never has one; the host enforces that, since a cross-field rule here would be lost in codegen (see README on allOf/if/then) (CHAT-PROJECT-01a)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The chat folder (chat-folder.schema.json, shown as a Project) this conversation sits in, or null. The folder belongs to the same person. A temporary conversation never has one; the host enforces that, since a cross-field rule here would be lost in codegen (see README on allOf/if/then) (CHAT-PROJECT-01a)."
+                    },
+                    "settings": {
+                      "type": "object",
+                      "properties": {
+                        "thinking": {
+                          "type": "boolean",
+                          "description": "Whether turns in this conversation use extended reasoning. Absent means the default (Instant)."
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Optional model id selected for turns in this conversation. Absent means the role default."
+                        },
+                        "read_aloud": {
+                          "type": "boolean",
+                          "description": "Whether assistant replies are read aloud automatically in this conversation. Absent means off."
+                        }
+                      },
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Optional settings remembered with this conversation. Unknown keys are preserved for additive cross-client evolution."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "open",
+                        "closed",
+                        "deleted"
+                      ],
+                      "default": "open",
+                      "description": "Open is active for this person and surface. Closed is inactive and requires an explicit resume before another turn. Deleted is terminal. Resuming closes other open conversations on that surface and clears stale pending confirmations; reading never resumes."
+                    },
+                    "summary": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+                    },
+                    "summary_through_turn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: begun on a robot, not yet synced (4.14: 'a chat begun on the robot appears on the phone through the hub... robot turns sync as conversation records'). Mirrors person.schema.json's own source field."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "surface",
+                    "source",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One chat thread, per person and per surface (platform plan 4.14). Its turns live separately (hub-internal, conversation_turns); this record is the thread itself: title, rolling summary, and lifecycle. See session-a-intelligence.md step 3."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad surface, mode, carry_from or folder_id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Temporary chat is not available for minors",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "carry_from not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/turns/{id}/feedback": {
       "get": {
         "tags": [
@@ -6978,6 +7259,301 @@
         }
       }
     },
+    "/api/conversations/{id}": {
+      "patch": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Change a conversation",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "conv-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "nullable": true,
+                    "description": "A new title, or null to let the model name it."
+                  },
+                  "pinned": {
+                    "nullable": true,
+                    "description": "Keep it at the top of the list."
+                  },
+                  "archived": {
+                    "nullable": true,
+                    "description": "Shelve or restore the chat (CONV-ARCHIVE-01)."
+                  },
+                  "mode": {
+                    "nullable": true,
+                    "description": "chat, research or temporary."
+                  },
+                  "settings": {
+                    "nullable": true,
+                    "description": "A key-wise settings patch; null removes a key."
+                  },
+                  "folder_id": {
+                    "nullable": true,
+                    "description": "Move the chat into a project (chat folder) id, or out with null (PROJECTS-01a)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The changed conversation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^conv-[a-z0-9]{6,}$"
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Whose conversation this is. A conversation is never shared across people."
+                    },
+                    "surface": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "overlay",
+                        "pod",
+                        "robot",
+                        "tv",
+                        "phone"
+                      ],
+                      "description": "Matches turnEngine.ts's Surface (4.5): a person may hold one open conversation per surface at a time."
+                    },
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "chat",
+                        "research",
+                        "temporary"
+                      ],
+                      "default": "chat",
+                      "description": "How this conversation presents answers: chat keeps the ordinary reply; research keeps the details pane open after a short line; temporary keeps turns out of normal history and durable memory."
+                    },
+                    "companion_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The companion persona active when this conversation was created (5.4); null before companions exist as packages (step 8)."
+                    },
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "maxLength": 200,
+                          "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Household-editable; null until set (PATCH /api/conversations/:id)."
+                    },
+                    "pinned": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Whether this conversation stays at the top of its person's list."
+                    },
+                    "folder_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^folder-[a-z0-9]{6,}$",
+                          "description": "The chat folder (chat-folder.schema.json, shown as a Project) this conversation sits in, or null. The folder belongs to the same person. A temporary conversation never has one; the host enforces that, since a cross-field rule here would be lost in codegen (see README on allOf/if/then) (CHAT-PROJECT-01a)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The chat folder (chat-folder.schema.json, shown as a Project) this conversation sits in, or null. The folder belongs to the same person. A temporary conversation never has one; the host enforces that, since a cross-field rule here would be lost in codegen (see README on allOf/if/then) (CHAT-PROJECT-01a)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The chat folder (chat-folder.schema.json, shown as a Project) this conversation sits in, or null. The folder belongs to the same person. A temporary conversation never has one; the host enforces that, since a cross-field rule here would be lost in codegen (see README on allOf/if/then) (CHAT-PROJECT-01a)."
+                    },
+                    "settings": {
+                      "type": "object",
+                      "properties": {
+                        "thinking": {
+                          "type": "boolean",
+                          "description": "Whether turns in this conversation use extended reasoning. Absent means the default (Instant)."
+                        },
+                        "model": {
+                          "type": "string",
+                          "description": "Optional model id selected for turns in this conversation. Absent means the role default."
+                        },
+                        "read_aloud": {
+                          "type": "boolean",
+                          "description": "Whether assistant replies are read aloud automatically in this conversation. Absent means off."
+                        }
+                      },
+                      "additionalProperties": {
+                        "nullable": true
+                      },
+                      "description": "Optional settings remembered with this conversation. Unknown keys are preserved for additive cross-client evolution."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "open",
+                        "closed",
+                        "deleted"
+                      ],
+                      "default": "open",
+                      "description": "Open is active for this person and surface. Closed is inactive and requires an explicit resume before another turn. Deleted is terminal. Resuming closes other open conversations on that surface and clears stale pending confirmations; reading never resumes."
+                    },
+                    "summary": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The rolling summary of turns that have fallen out of the prompt window (step 3's window/summary rule)."
+                    },
+                    "summary_through_turn": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The last conversation_turns id folded into `summary`, so the refresh job knows what's new since then."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: begun on a robot, not yet synced (4.14: 'a chat begun on the robot appears on the phone through the hub... robot turns sync as conversation records'). Mirrors person.schema.json's own source field."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "surface",
+                    "source",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "One chat thread, per person and per surface (platform plan 4.14). Its turns live separately (hub-internal, conversation_turns); this record is the thread itself: title, rolling summary, and lifecycle. See session-a-intelligence.md step 3."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad value",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/{id}/resume": {
       "post": {
         "tags": [
@@ -7073,6 +7649,24 @@
                       "type": "boolean",
                       "default": false,
                       "description": "Whether this conversation stays at the top of its person's list."
+                    },
+                    "folder_id": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^folder-[a-z0-9]{6,}$",
+                          "description": "The chat folder (chat-folder.schema.json, shown as a Project) this conversation sits in, or null. The folder belongs to the same person. A temporary conversation never has one; the host enforces that, since a cross-field rule here would be lost in codegen (see README on allOf/if/then) (CHAT-PROJECT-01a)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The chat folder (chat-folder.schema.json, shown as a Project) this conversation sits in, or null. The folder belongs to the same person. A temporary conversation never has one; the host enforces that, since a cross-field rule here would be lost in codegen (see README on allOf/if/then) (CHAT-PROJECT-01a)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The chat folder (chat-folder.schema.json, shown as a Project) this conversation sits in, or null. The folder belongs to the same person. A temporary conversation never has one; the host enforces that, since a cross-field rule here would be lost in codegen (see README on allOf/if/then) (CHAT-PROJECT-01a)."
                     },
                     "settings": {
                       "type": "object",
@@ -7188,6 +7782,537 @@
           },
           "404": {
             "description": "Conversation not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat-folders": {
+      "get": {
+        "tags": [
+          "Chat projects"
+        ],
+        "summary": "List a person's chat projects",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "Whose projects; defaults to you. An owner or admin may name a child."
+            },
+            "required": false,
+            "description": "Whose projects; defaults to you. An owner or admin may name a child.",
+            "name": "person",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person's live projects, in their order. Empty for a person you cannot see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^folder-[a-z0-9]{6,}$",
+                        "description": "Stable id, never reused."
+                      },
+                      "person": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$",
+                        "description": "Whose folder this is. Only this person's conversations may join it."
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "description": "What the person calls the project. Trimmed; not unique."
+                      },
+                      "sort_order": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0,
+                        "description": "Position among the person's folders, lowest first. Ties sort newest first."
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "hub",
+                          "local"
+                        ],
+                        "description": "hub: authoritative on the hub. local: made on a robot, not yet synced. Mirrors conversation.schema.json's own source field."
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Free text naming who made the folder, for example 'person-a1b2c3 (self)' or 'person-d4e5f6 (parent)'."
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "person",
+                      "name",
+                      "source",
+                      "provenance",
+                      "hlc",
+                      "created_at",
+                      "updated_at"
+                    ],
+                    "additionalProperties": false,
+                    "description": "A named group of one person's chat conversations, shown to people as a Project in the chat history column (CHAT-PROJECT-01a). It belongs to one person; a parent may make one for a child. A conversation joins it through Conversation.folder_id. Deleting a folder keeps its conversations (their folder_id goes back to null). Named 'chat folder' on the wire so it is never mistaken for the background-work Project record (project.schema.json). This version carries no instructions or files: a folder only groups conversations."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Chat projects"
+        ],
+        "summary": "Make a chat project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "What to call the project (1 to 80 characters)."
+                  },
+                  "person": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Whose project; defaults to you. An owner or admin may make one for a child."
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^folder-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Whose folder this is. Only this person's conversations may join it."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "description": "What the person calls the project. Trimmed; not unique."
+                    },
+                    "sort_order": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0,
+                      "description": "Position among the person's folders, lowest first. Ties sort newest first."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced. Mirrors conversation.schema.json's own source field."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the folder, for example 'person-a1b2c3 (self)' or 'person-d4e5f6 (parent)'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "name",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A named group of one person's chat conversations, shown to people as a Project in the chat history column (CHAT-PROJECT-01a). It belongs to one person; a parent may make one for a child. A conversation joins it through Conversation.folder_id. Deleting a folder keeps its conversations (their folder_id goes back to null). Named 'chat folder' on the wire so it is never mistaken for the background-work Project record (project.schema.json). This version carries no instructions or files: a folder only groups conversations."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or too long name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A child's projects are made by a parent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Person not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat-folders/{id}": {
+      "patch": {
+        "tags": [
+          "Chat projects"
+        ],
+        "summary": "Rename or reorder a chat project",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "folder-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "A new name (1 to 80 characters)."
+                  },
+                  "sort_order": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "A new position, lowest first."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The changed project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^folder-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Whose folder this is. Only this person's conversations may join it."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "description": "What the person calls the project. Trimmed; not unique."
+                    },
+                    "sort_order": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0,
+                      "description": "Position among the person's folders, lowest first. Ties sort newest first."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced. Mirrors conversation.schema.json's own source field."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the folder, for example 'person-a1b2c3 (self)' or 'person-d4e5f6 (parent)'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "name",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A named group of one person's chat conversations, shown to people as a Project in the chat history column (CHAT-PROJECT-01a). It belongs to one person; a parent may make one for a child. A conversation joins it through Conversation.folder_id. Deleting a folder keeps its conversations (their folder_id goes back to null). Named 'chat folder' on the wire so it is never mistaken for the background-work Project record (project.schema.json). This version carries no instructions or files: a folder only groups conversations."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Nothing to change, or a bad value",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A child's projects are changed by a parent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Chat projects"
+        ],
+        "summary": "Delete a chat project and keep its chats",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "folder-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted. Its chats are kept and are no longer in a project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "chats_kept": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "chats_kept"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A child's projects are changed by a parent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
             "content": {
               "application/json": {
                 "schema": {

@@ -333,6 +333,31 @@ export const settingsValues = sqliteTable(
 // lib/conversationHistory.ts's resolveOrCreateConversation(), not a DB
 // constraint here (a closed or deleted conversation for the same pair
 // may coexist, same as any append-only history).
+// CHAT-PROJECT-01 (PROJECTS-01a): a chat folder, shown to people as a
+// Project in the chat column. Spec-shaped (spec/schemas/chat-folder.
+// schema.json, spec-v0.1.87); every read and write crosses the generated
+// ChatFolder validator in lib/chatFolders.ts. One person's own; a parent
+// may make a child's. Deleting one is a tombstone (deleted_at) and sets
+// its conversations' folder_id back to null, so the chats stay.
+export const chatFolders = sqliteTable(
+  "chat_folders",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    name: text("name").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    source: text("source").notNull().default("hub"), // hub|local
+    provenance: text("provenance").notNull(),
+    hlc: text("hlc").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    deletedAt: text("deleted_at"),
+  },
+  (table) => [index("chat_folders_person_idx").on(table.personId)],
+);
+
 export const conversations = sqliteTable(
   "conversations",
   {
@@ -345,6 +370,8 @@ export const conversations = sqliteTable(
     companionId: text("companion_id"),
     title: text("title"),
     pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    // PROJECTS-01a: the chat folder (a Project on screen) this chat sits in.
+    folderId: text("folder_id").references(() => chatFolders.id),
     // CONV-ARCHIVE-01: a shelved chat leaves the default list but keeps its turns. Hub-internal
     // (not on the spec Conversation record), surfaced on ConversationSummary only.
     archived: integer("archived", { mode: "boolean" }).notNull().default(false),

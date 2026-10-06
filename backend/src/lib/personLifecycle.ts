@@ -240,6 +240,8 @@ export interface ErasureCounts {
    * rather than renamed, so nothing that reads erased.conversations
    * today silently starts meaning something else). */
   conversationThreads: number;
+  /** PROJECTS-01a: the person's projects (chat folders). */
+  chatFolders: number;
   settings: number;
   clonedVoices: number;
   scheduledJobs: number;
@@ -384,6 +386,9 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
   // holding rows about a deleted person forever (caught by the schema-
   // walking test below).
   const conversationThreads = sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(personId).changes;
+  // PROJECTS-01a: their projects (chat folders) go with their chats. After
+  // the conversations above, which reference them.
+  const chatFolderRows = sqlite.query("DELETE FROM chat_folders WHERE person_id = ?").run(personId).changes;
   // Person-scope settings hold the spec's full scope string
   // ("person:<id>"), so they are matched by that, not by a person_id
   // column this table does not have.
@@ -453,6 +458,7 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
     feedback,
     conversations,
     conversationThreads,
+    chatFolders: chatFolderRows,
     settings,
     clonedVoices: clonedVoiceRows,
     scheduledJobs: jobs,

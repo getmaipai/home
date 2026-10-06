@@ -1,6 +1,6 @@
 import { type Context } from "hono";
 import { createRoute, z } from "@hono/zod-openapi";
-import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { apiRouter, emptyJsonBodyAsObject, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
 import { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
@@ -25,6 +25,7 @@ import {
   listConversationTurns,
   updateConversationTitle,
   updateConversationArchived,
+  updateConversationFolder,
   updateConversationMode,
   updateConversationSettings,
   deleteConversationById,
@@ -120,15 +121,41 @@ conversationsRoutes.get("/export", requireAuth, async (c) => {
   return c.json(result.value);
 });
 
-conversationsRoutes.post("/", requireAuth, async (c) => {
+// PROJECTS-01a: converted to @hono/zod-openapi when touched. The body
+// fields stay loosely typed here so each keeps its own, already tested,
+// error message from the checks below.
+const CreateConversationBody = z.object({
+  surface: z.string().optional().describe("Where the chat happens; defaults to chat."),
+  companion_id: z.string().nullable().optional().describe("The companion for this chat."),
+  mode: z.unknown().optional().describe("chat, research or temporary."),
+  carry_from: z.unknown().optional().describe("A conversation id whose summary seeds this chat (THIN-3G)."),
+  folder_id: z.unknown().optional().describe("A project (chat folder) id to start the chat inside (PROJECTS-01a). Never for a temporary chat."),
+});
+
+const createConversationRoute = createRoute({
+  method: "post",
+  path: "/",
+  tags: ["Conversations"],
+  summary: "Start a conversation",
+  middleware: [requireAuth, emptyJsonBodyAsObject] as const,
+  request: { body: { required: false, content: { "application/json": { schema: CreateConversationBody } } } },
+  responses: {
+    201: { content: { "application/json": { schema: Conversation } }, description: "The new conversation." },
+    ...errorResponses({ 400: "Bad surface, mode, carry_from or folder_id", 401: "Sign in first", 403: "Temporary chat is not available for minors", 404: "carry_from not found" }),
+  },
+});
+
+conversationsRoutes.openapi(createConversationRoute, (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { surface?: Surface; companion_id?: string | null; mode?: Conversation["mode"]; carry_from?: unknown };
+  const body = (c.req.valid("json") ?? {}) as { surface?: Surface; companion_id?: string | null; mode?: unknown; carry_from?: unknown; folder_id?: unknown };
   const mode = body.mode === undefined ? undefined : Conversation.shape.mode.safeParse(body.mode);
   if (mode && !mode.success) return c.json({ error: "invalid conversation mode" }, 400);
   if (body.carry_from !== undefined && body.carry_from !== null && typeof body.carry_from !== "string") return c.json({ error: "carry_from must be a conversation id" }, 400);
+  if (body.folder_id !== undefined && body.folder_id !== null && typeof body.folder_id !== "string") return c.json({ error: "folder_id must be a project id" }, 400);
   // THIN-3G: carry_from seeds the new chat with that chat's summary.
-  const result = createConversation(actor, { surface: body.surface, companionId: body.companion_id, mode: mode?.data, carryFrom: body.carry_from ?? null });
-  if (!result.ok) return fail(c, result);
+  // PROJECTS-01a: folder_id starts the chat inside one of the person's projects.
+  const result = createConversation(actor, { surface: body.surface, companionId: body.companion_id, mode: mode?.data, carryFrom: (body.carry_from as string | null | undefined) ?? null, folderId: (body.folder_id as string | null | undefined) ?? null });
+  if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
   return c.json(result.value, 201);
 });
 
@@ -370,29 +397,60 @@ conversationsRoutes.get("/:id/turns", requireAuth, async (c) => {
   return c.json(result.value);
 });
 
-conversationsRoutes.patch("/:id", requireAuth, async (c) => {
+// PROJECTS-01a: converted to @hono/zod-openapi when touched; one field
+// per request, each branch keeping its own checks and messages.
+const PatchConversationBody = z.object({
+  title: z.unknown().optional().describe("A new title, or null to let the model name it."),
+  pinned: z.unknown().optional().describe("Keep it at the top of the list."),
+  archived: z.unknown().optional().describe("Shelve or restore the chat (CONV-ARCHIVE-01)."),
+  mode: z.unknown().optional().describe("chat, research or temporary."),
+  settings: z.unknown().optional().describe("A key-wise settings patch; null removes a key."),
+  folder_id: z.unknown().optional().describe("Move the chat into a project (chat folder) id, or out with null (PROJECTS-01a)."),
+});
+
+const patchConversationRoute = createRoute({
+  method: "patch",
+  path: "/{id}",
+  tags: ["Conversations"],
+  summary: "Change a conversation",
+  middleware: [requireAuth, emptyJsonBodyAsObject] as const,
+  request: { params: idParamSchema("id", "conv-example123"), body: { required: false, content: { "application/json": { schema: PatchConversationBody } } } },
+  responses: {
+    200: { content: { "application/json": { schema: Conversation } }, description: "The changed conversation." },
+    ...errorResponses({ 400: "A bad value", 401: "Sign in first", 403: "Not allowed for this person", 404: "Conversation not found" }),
+  },
+});
+
+conversationsRoutes.openapi(patchConversationRoute, (c) => {
   const actor = c.get("person");
-  const body = (await c.req.json().catch(() => ({}))) as { title?: string | null; pinned?: boolean; archived?: boolean; mode?: Conversation["mode"]; settings?: unknown };
+  const body = (c.req.valid("json") ?? {}) as { title?: string | null; pinned?: boolean; archived?: boolean; mode?: Conversation["mode"]; settings?: unknown; folder_id?: unknown };
+  const id = c.req.valid("param").id;
+  // PROJECTS-01a: move the chat into a project, or out of one with null.
+  if (Object.hasOwn(body, "folder_id")) {
+    const result = updateConversationFolder(actor, id, body.folder_id);
+    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+    return c.json(result.value, 200);
+  }
   if (body.archived !== undefined) {
-    const result = updateConversationArchived(actor, c.req.param("id"), body.archived);
-    if (!result.ok) return fail(c, result);
-    return c.json(result.value);
+    const result = updateConversationArchived(actor, id, body.archived);
+    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+    return c.json(result.value, 200);
   }
   if (body.mode !== undefined) {
     const mode = Conversation.shape.mode.safeParse(body.mode);
     if (!mode.success || mode.data === undefined) return c.json({ error: "invalid conversation mode" }, 400);
-    const result = updateConversationMode(actor, c.req.param("id"), mode.data);
-    if (!result.ok) return fail(c, result);
-    return c.json(result.value);
+    const result = updateConversationMode(actor, id, mode.data);
+    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+    return c.json(result.value, 200);
   }
   if (Object.hasOwn(body, "settings")) {
-    const result = updateConversationSettings(actor, c.req.param("id"), body.settings);
-    if (!result.ok) return fail(c, result);
-    return c.json(result.value);
+    const result = updateConversationSettings(actor, id, body.settings);
+    if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+    return c.json(result.value, 200);
   }
-  const result = updateConversationTitle(actor, c.req.param("id"), body.title, body.pinned);
-  if (!result.ok) return fail(c, result);
-  return c.json(result.value);
+  const result = updateConversationTitle(actor, id, body.title, body.pinned);
+  if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 403 | 404);
+  return c.json(result.value, 200);
 });
 
 conversationsRoutes.delete("/:id", requireAuth, async (c) => {

@@ -37,6 +37,7 @@ import {
   attachments,
   artifacts,
   conversations,
+  chatFolders,
   clonedVoices,
   commands,
   notificationDeliveries,
@@ -160,6 +161,7 @@ export function resetDb(): void {
   db.delete(artifacts).run(); // the chat program's generated-document versions, reference conversations and conversation_turns
   db.delete(conversationTurns).run();
   db.delete(conversations).run();
+  db.delete(chatFolders).run(); // PROJECTS-01a: conversations reference it
   db.delete(memoryEmbeddings).run();
   db.delete(pendingEmbeddings).run();
   db.delete(pendingMemoryWork).run();

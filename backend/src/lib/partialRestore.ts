@@ -165,6 +165,12 @@ export async function restorePersonFromBackup(filename: string, personId: string
         }
 
         const conversationThreads = copyPersonScopedRows("conversations", "person_id = ?", personId);
+        // PROJECTS-01a: a restored chat whose project has since been
+        // deleted (or never existed live) comes back out of any project,
+        // so the chat list and the project list never disagree.
+        sqlite
+          .query("UPDATE conversations SET folder_id = NULL WHERE person_id = ? AND folder_id IS NOT NULL AND folder_id NOT IN (SELECT id FROM chat_folders WHERE deleted_at IS NULL)")
+          .run(personId);
         const conversations = copyPersonScopedRows("conversation_turns", "person_id = ?", personId);
         // MEM-03: episodes are derived from turns (two verbatim rows per
         // turn, embedded later by the retry job), so they are rebuilt from

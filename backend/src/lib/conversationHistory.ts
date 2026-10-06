@@ -36,6 +36,7 @@ import { redactCredentials, CREDENTIAL_REDACTION, CREDENTIAL_SAFE_MESSAGE } from
 import { withoutBankLines, bankLineNote, bankLinesOf, splitIntoSentences } from "@/lib/guards";
 import { archiveByProvenance } from "@/lib/memory";
 import { deleteAttachmentsForTurns } from "@/lib/attachments";
+import { checkFolderFor } from "@/lib/chatFolders";
 import { db, sqlite } from "@/db";
 import { conversationTurns, conversations, people, memoryRecords, commands, openQuestions, relationships } from "@/db/schema";
 import { pruneTemporaryChatImages } from "@/lib/attachments";
@@ -686,6 +687,7 @@ export function listTemporaryConversations(actor: PersonRow, personId?: string):
       title: conversation.title,
       pinned: conversation.pinned,
       archived: false,
+      folder_id: null,
       turn_count: turns.length,
       last_turn_at: turns.at(-1)?.createdAt ?? null,
       created_at: conversation.created_at,
@@ -985,6 +987,7 @@ export function toConversationRecord(row: ConversationRow): Conversation {
     companion_id: row.companionId,
     title: row.title,
     pinned: row.pinned,
+    folder_id: row.folderId,
     settings: row.settings ? JSON.parse(row.settings) : undefined,
     status: row.status,
     summary: row.summary,
@@ -1005,6 +1008,7 @@ function conversationToDbValues(c: Conversation) {
     companionId: c.companion_id,
     title: c.title,
     pinned: c.pinned,
+    folderId: c.folder_id ?? null,
     settings: c.settings ? JSON.stringify(c.settings) : null,
     status: c.status,
     summary: c.summary,
@@ -1378,10 +1382,20 @@ const VALID_MODES = new Set(modeEnum.options);
 
 export function createConversation(
   actor: PersonRow,
-  opts: { surface?: Surface; companionId?: string | null; mode?: Conversation["mode"]; carryFrom?: string | null } = {},
+  opts: { surface?: Surface; companionId?: string | null; mode?: Conversation["mode"]; carryFrom?: string | null; folderId?: string | null } = {},
 ): ConversationOpResult<Conversation> {
   const surface = opts.surface ?? "chat";
   const mode = opts.mode ?? "chat";
+  // PROJECTS-01a: a new chat may start inside one of the person's own
+  // projects (chat folders). A temporary chat never joins one: it must
+  // leave nothing behind, and a project is a durable place.
+  let folderId: string | null = null;
+  if (opts.folderId !== undefined && opts.folderId !== null) {
+    if (mode === "temporary") return { ok: false, status: 400, error: "a temporary chat cannot be in a project" };
+    const folder = checkFolderFor(actor.id, opts.folderId);
+    if (!folder.ok) return { ok: false, status: 400, error: folder.error };
+    folderId = folder.value;
+  }
   // THIN-3G (rule 4): a new chat that carries an earlier chat's summary
   // forward. The person's own chat only; a temporary chat's summary goes
   // only into another temporary chat (it must never become a stored row).
@@ -1438,6 +1452,10 @@ export function createConversation(
       db.update(conversations).set({ summary: carried, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(conversations.id, value.id)).run();
     }
     value = { ...value, summary: carried };
+  }
+  if (folderId) {
+    db.update(conversations).set({ folderId }).where(eq(conversations.id, value.id)).run();
+    value = { ...value, folder_id: folderId };
   }
   return { ok: true, value };
 }
@@ -1536,6 +1554,7 @@ function toConversationSummary(row: ConversationRow, turnCount: number, lastTurn
     title: row.title,
     pinned: row.pinned,
     archived: row.archived,
+    folder_id: row.folderId,
     turn_count: turnCount,
     last_turn_at: lastTurnAt,
     created_at: row.createdAt,
@@ -1874,6 +1893,23 @@ export function updateConversationArchived(actor: PersonRow, id: string, archive
   if (isTemporaryConversation(id)) return { ok: false, status: 400, error: "a temporary chat cannot be archived" };
   db.update(conversations).set({ archived, hlc: nextHlc() }).where(eq(conversations.id, id)).run();
   return found;
+}
+
+/** PROJECTS-01a: put a chat in one of its person's projects (chat
+ * folders), or take it out with null. Same access rule as a rename, so an
+ * owner or admin may move a child's chat and a child may move their own.
+ * Like archiving, it leaves updated_at alone (moving a chat is not
+ * activity, so Recents keep their order); only the sync clock moves. */
+export function updateConversationFolder(actor: PersonRow, id: string, folderId: unknown): ConversationOpResult<Conversation> {
+  if (folderId !== null && typeof folderId !== "string") return { ok: false, status: 400, error: "folder_id must be a project id or null" };
+  const found = getConversation(actor, id);
+  if (!found.ok) return found;
+  if (isTemporaryConversation(id) || found.value.mode === "temporary") return { ok: false, status: 400, error: "a temporary chat cannot be in a project" };
+  const folder = checkFolderFor(found.value.person, folderId);
+  if (!folder.ok) return { ok: false, status: 400, error: folder.error };
+  const hlc = nextHlc();
+  db.update(conversations).set({ folderId: folder.value, hlc }).where(eq(conversations.id, id)).run();
+  return { ok: true, value: { ...found.value, folder_id: folder.value, hlc } };
 }
 
 /** COMP-02: switch only the presentation mode of an owned conversation.

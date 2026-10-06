@@ -881,6 +881,11 @@ describe("deleting a person erases what the household held about them", () => {
     });
     resolveOrCreateConversation(toPersonRow(person.id), "chat");
     setValue(toPersonRow(person.id), `person:${person.id}`, "tts.voice_id", "alba");
+    // PROJECTS-01a: a project (chat folder) with a chat in it.
+    const folderRes = await personClient.post("/api/chat-folders", { name: "Trains" });
+    expect(folderRes.status).toBe(201);
+    const folderId = ((await folderRes.json()) as { id: string }).id;
+    expect((await personClient.post("/api/conversations", { folder_id: folderId })).status).toBe(201);
 
     // Step 7: a code review (2026-09-06) found entities/relationships/
     // grants/approvals entirely unexercised by this test - it never
