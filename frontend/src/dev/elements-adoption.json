@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T20:53:50.623Z",
-  "kitTag": "ui-v0.5.119",
+  "generatedAt": "2026-10-06T21:03:05.303Z",
+  "kitTag": "ui-v0.5.122",
   "items": [
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
@@ -13,14 +13,6 @@
     {
       "file": "__snapshots__/k03-baseline.test.tsx.snap",
       "name": "k03-baseline",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
-      "file": "activity-graph.test.tsx",
-      "name": "activity-graph",
       "group": "tests/support",
       "verdict": "no-fit",
       "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
@@ -66,14 +58,6 @@
       "verdictReason": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements.",
       "implemented": false,
       "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
-    },
-    {
-      "file": "approval-card.test.tsx",
-      "name": "approval-card.test",
-      "group": "approval",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
     },
     {
       "file": "approval-card.tsx",
@@ -206,14 +190,6 @@
       "implemented": false
     },
     {
-      "file": "composer-runtime.aui.test.tsx",
-      "name": "composer-runtime",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
       "file": "composer-slash-commands.aui.tsx",
       "name": "composer-slash-commands.aui",
       "group": "composer",
@@ -222,35 +198,11 @@
       "implemented": false
     },
     {
-      "file": "composer-trigger-popover.aui.test.tsx",
-      "name": "composer-trigger-popover",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
       "file": "composer-trigger-popover.aui.tsx",
       "name": "composer-trigger-popover.aui",
       "group": "composer",
       "verdict": "later",
       "verdictReason": "Vendored by ELT-T1-K01a; wired by an ELEMENTS-ADOPT-01 batch, not yet.",
-      "implemented": false
-    },
-    {
-      "file": "composer-trigger.aui.test.tsx",
-      "name": "composer-trigger",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
-      "file": "composer-voice.aui.test.tsx",
-      "name": "composer-voice",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
       "implemented": false
     },
     {
@@ -342,14 +294,6 @@
       "implemented": false
     },
     {
-      "file": "day-separator.test.tsx",
-      "name": "day-separator.test",
-      "group": "day",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
-    },
-    {
       "file": "day-separator.tsx",
       "name": "day-separator",
       "group": "message",
@@ -407,28 +351,12 @@
       "implemented": false
     },
     {
-      "file": "empty-state.test.tsx",
-      "name": "empty-state.test",
-      "group": "empty",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
-    },
-    {
       "file": "empty-state.tsx",
       "name": "empty-state",
       "group": "settings/onboarding",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
-    },
-    {
-      "file": "error-state.test.tsx",
-      "name": "error-state-test",
-      "group": "errors/states",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
     },
     {
       "file": "error-state.tsx",
@@ -503,14 +431,6 @@
       "implemented": true
     },
     {
-      "file": "heat-graph.test.tsx",
-      "name": "heat-graph",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
       "file": "heat-graph.tsx",
       "name": "heat-graph",
       "group": "charts/data",
@@ -546,14 +466,6 @@
       "file": "href.ts",
       "name": "href",
       "group": "other",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
-    },
-    {
-      "file": "image-gallery.test.tsx",
-      "name": "image-gallery.test",
-      "group": "image",
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
@@ -600,22 +512,6 @@
       "reading": "ACTIVITY-01d: stays the inline project card in chat; not used for the activity card above the composer, which needs no looping spinner (verdict C3), Approve, Deny and Open, and the 16 px floor. That card is ChatActivityCard, shipped Alert, Button and Progress (named gap KIT-ACTIVITY-CARD-01)."
     },
     {
-      "file": "k03-baseline.test.tsx",
-      "name": "k03-baseline",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
-      "file": "k03-props.test.tsx",
-      "name": "k03-props",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
       "file": "launcher-bubble.tsx",
       "name": "launcher-bubble",
       "group": "other",
@@ -646,14 +542,6 @@
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": true
-    },
-    {
-      "file": "markdown-text.test.tsx",
-      "name": "markdown-text.test",
-      "group": "other",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
     },
     {
       "file": "markdown-text.tsx",
@@ -789,14 +677,6 @@
       "implemented": false
     },
     {
-      "file": "option-list.test.tsx",
-      "name": "option-list",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
       "file": "option-list.tsx",
       "name": "option-list",
       "group": "composer",
@@ -821,14 +701,6 @@
       "implemented": false
     },
     {
-      "file": "question-flow.test.tsx",
-      "name": "question-flow",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
       "file": "question-flow.tsx",
       "name": "question-flow",
       "group": "composer",
@@ -850,14 +722,6 @@
       "group": "message",
       "verdict": "later",
       "verdictReason": "Deferred until composer quoting in the adapter.",
-      "implemented": false
-    },
-    {
-      "file": "quote.aui.test.tsx",
-      "name": "quote",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
       "implemented": false
     },
     {
@@ -1072,14 +936,6 @@
       "implemented": false
     },
     {
-      "file": "surfaces.test.tsx",
-      "name": "surfaces.test",
-      "group": "other",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
-    },
-    {
       "file": "surfaces.tsx",
       "name": "surfaces",
       "group": "other",
@@ -1112,14 +968,6 @@
       "implemented": false
     },
     {
-      "file": "thinking-indicator.test.tsx",
-      "name": "thinking-indicator.test",
-      "group": "other",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
-    },
-    {
       "file": "thinking-indicator.tsx",
       "name": "thinking-indicator",
       "group": "reasoning/tools",
@@ -1136,28 +984,12 @@
       "implemented": false
     },
     {
-      "file": "thread-list.aui.test.tsx",
-      "name": "thread-list.aui.test",
-      "group": "other",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
-    },
-    {
       "file": "thread-list.aui.tsx",
       "name": "thread-list",
       "group": "thread/list",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
-    },
-    {
-      "file": "thread-list.pin.aui.test.tsx",
-      "name": "thread-list.pin.aui.test",
-      "group": "thread/list",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
     },
     {
       "file": "thread-list.tsx",
@@ -1168,36 +1000,12 @@
       "implemented": false
     },
     {
-      "file": "thread-search.test.tsx",
-      "name": "thread-search.test",
-      "group": "thread/list",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
-    },
-    {
       "file": "thread-search.tsx",
       "name": "thread-search",
       "group": "thread/list",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
-    },
-    {
-      "file": "thread-viewport.test.tsx",
-      "name": "thread-viewport.test",
-      "group": "thread",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
-    },
-    {
-      "file": "thread.aui.test.tsx",
-      "name": "thread.aui.test",
-      "group": "other",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
     },
     {
       "file": "thread.aui.tsx",
@@ -1221,7 +1029,7 @@
       "group": "agent/workflow",
       "verdict": "wire-after",
       "verdictReason": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline.",
-      "implemented": false,
+      "implemented": true,
       "reading": "SINCE-01 uses TimelineEvent for the per-person dashboard timeline."
     },
     {
@@ -1415,22 +1223,6 @@
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": true
-    },
-    {
-      "file": "vendored-no-remote.test.ts",
-      "name": "vendored-no-remote",
-      "group": "tests/support",
-      "verdict": "no-fit",
-      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
-      "implemented": false
-    },
-    {
-      "file": "voice-conversation.test.tsx",
-      "name": "voice-conversation.test",
-      "group": "other",
-      "verdict": "support",
-      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
-      "implemented": false
     },
     {
       "file": "voice-conversation.tsx",
