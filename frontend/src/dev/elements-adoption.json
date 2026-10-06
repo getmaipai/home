@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T08:21:36.638Z",
-  "kitTag": "ui-v0.5.101",
+  "generatedAt": "2026-10-06T08:35:54.433Z",
+  "kitTag": "ui-v0.5.102",
   "items": [
     {
       "file": "activity-graph.tsx",
@@ -331,6 +331,27 @@
       "name": "hooks/use-mobile",
       "group": "other",
       "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "href.ts",
+      "name": "href",
+      "group": "other",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "image-gallery.test.tsx",
+      "name": "image-gallery.test",
+      "group": "image",
+      "verdict": "support",
+      "implemented": false
+    },
+    {
+      "file": "image-gallery.tsx",
+      "name": "image-gallery",
+      "group": "image",
+      "verdict": "wire-after",
       "implemented": false
     },
     {
