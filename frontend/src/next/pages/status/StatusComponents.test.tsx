@@ -78,6 +78,14 @@ function stubHealth(body: HealthStatus) {
 // our health page show bad health when these are down." Every state
 // below comes from the backend's real probe, never from a kind label.
 describe("StatusComponents", () => {
+  test("the Element info tooltip button keeps its accessible name", async () => {
+    const restore = stubHealth(health());
+    try {
+      const { findByRole } = renderWithQuery(<StatusComponents person={makePerson("owner")} health={health()} />);
+      expect(await findByRole("button", { name: "About Brain" })).toBeInTheDocument();
+    } finally { restore(); }
+  });
+
   test("all engines answering reads as everything running", async () => {
     const restore = stubHealth(health());
     try {

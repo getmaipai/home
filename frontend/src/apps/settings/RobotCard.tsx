@@ -3,6 +3,7 @@ import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
+import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import type { DeviceInfo, RobotDeviceState } from "@/lib/api";
 
 const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
@@ -148,7 +149,14 @@ export function RobotCard({
           <>
             {state !== null ? (
               <>
-                {muteError ? <p className="mr-auto text-sm text-destructive">Could not send that to {device.name}.</p> : null}
+                {muteError ? (
+                  <ErrorState
+                    layout="inline"
+                    retrying={false}
+                    title={`Could not send that to ${device.name}.`}
+                    onRetry={() => void askMute(!state.muted)}
+                  />
+                ) : null}
                 {askedMuted !== null && !muteError ? (
                   <p className="mr-auto text-sm text-muted-foreground">Asked {device.name} to {askedMuted ? "mute" : "unmute"}, waiting for it.</p>
                 ) : null}

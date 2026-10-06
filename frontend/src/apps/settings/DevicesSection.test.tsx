@@ -1,7 +1,7 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { DevicesSection } from "@/apps/settings/DevicesSection";
-import { didPutDownCountIncrease } from "@/apps/settings/RobotCard";
+import { didPutDownCountIncrease, RobotCard } from "@/apps/settings/RobotCard";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { DeviceInfo, SessionInfo } from "@/lib/api";
 
@@ -293,5 +293,34 @@ describe("DevicesSection", () => {
     } finally {
       restore();
     }
+  });
+
+  test("a robot error retry resends the existing mute request", async () => {
+    let calls = 0;
+    const onSetMuted = mock(async (_muted: boolean) => {
+      calls += 1;
+      if (calls === 1) throw new Error("offline");
+    });
+    const view = render(<RobotCard
+      device={device({
+        id: "robot-mute-retry",
+        kind: "robot",
+        name: "Riff",
+        state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null },
+      })}
+      onRemove={() => {}}
+      confirmingRemove={false}
+      onConfirmRemove={() => {}}
+      onCancelRemove={() => {}}
+      busy={false}
+      onSetMuted={onSetMuted}
+    />);
+    fireEvent.click(view.getByRole("button", { name: "Mute microphone" }));
+    await view.findByRole("alert");
+    fireEvent.click(view.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(onSetMuted).toHaveBeenCalledTimes(2));
+    expect(onSetMuted).toHaveBeenNthCalledWith(1, true);
+    expect(onSetMuted).toHaveBeenNthCalledWith(2, true);
+    expect(view.queryByRole("alert")).toBeNull();
   });
 });
