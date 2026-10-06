@@ -13,12 +13,13 @@ function viewer(overrides: Partial<Roster> = {}): Roster {
     id: "person-sage", display_name: "Sage", nickname: null, role: "adult", avatar_seed: "person-sage",
     bio: null, accent: null, source: "hub", local_only: false, created_at: "2026-09-05T00:00:00.000Z",
     updated_at: "2026-09-05T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null,
-    memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true, ...overrides,
+    memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true, age_band: "adult", ...overrides,
   } as Roster;
 }
 
 function rosterEntry(overrides: Partial<Roster> = {}): PersonRosterEntry {
-  const result = { ...viewer(), sessionLockRequired: false, sessionLockTimeoutMinutes: 0, ...overrides };
+  const role = overrides.role ?? "adult";
+  const result = { ...viewer(), sessionLockRequired: false, sessionLockTimeoutMinutes: 0, age_band: role === "child" ? "child" : role === "teen" ? "teen" : "adult", ...overrides };
   delete (result as Partial<Roster>).hasSecret;
   return result as PersonRosterEntry;
 }
@@ -181,6 +182,21 @@ describe("NextPersonProfilePage", () => {
       const view = renderProfile("/people/person-nova", viewer({ role: "owner" }));
       await view.findByText("Nova");
       expect(view.queryByRole("tab", { name: "Limits" })).toBeNull();
+      globalThis.fetch = original;
+    } finally { restore(); }
+  });
+
+  test("limits follow the backend age band when an adult role has a child birthdate", async () => {
+    const restore = stubFetch({});
+    try {
+      const mismatch = rosterEntry({ id: "person-bramble", display_name: "Bramble", role: "adult", age_band: "child" });
+      const original = globalThis.fetch;
+      globalThis.fetch = mock((input: RequestInfo | URL) => String(input).includes("/api/people")
+        ? Promise.resolve(Response.json([people[0], mismatch, people[2]]))
+        : Promise.resolve(Response.json([]))) as unknown as typeof fetch;
+      const view = renderProfile("/people/person-bramble?tab=limits", viewer({ role: "owner" }));
+      await view.findByText("Bramble");
+      expect(await view.findByRole("tab", { name: "Limits" })).toBeTruthy();
       globalThis.fetch = original;
     } finally { restore(); }
   });

@@ -34,9 +34,10 @@ describe("setup (first-run owner creation)", () => {
 
     const me = await client.get("/api/auth/me");
     expect(me.status).toBe(200);
-    const meBody = (await me.json()) as { id: unknown; hasSecret: boolean };
+    const meBody = (await me.json()) as { id: unknown; hasSecret: boolean; age_band: string };
     expect(meBody.id).toBe(person.id);
     expect(meBody.hasSecret).toBe(true);
+    expect(meBody.age_band).toBe("adult");
   });
 
   test("refuses a second setup once a person exists", async () => {
@@ -74,6 +75,24 @@ describe("setup (first-run owner creation)", () => {
     const rows = db.select().from(people).all();
     expect(rows.length).toBe(1);
     expect(rows[0]!.role).toBe("owner");
+  });
+});
+
+describe("/api/auth/me age band", () => {
+  test("uses the backend band for both role and birthdate disagreements", async () => {
+    const owner = new TestClient();
+    const { person } = await setUpOwner(owner);
+    db.update(people).set({ birthdate: "2015-01-01" }).where(eq(people.id, String(person.id))).run();
+    const ownerMe = (await (await owner.get("/api/auth/me")).json()) as { age_band: string };
+    expect(ownerMe.age_band).toBe("child"); // owner role, child birthdate
+
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "child", birthdate: "1990-01-01" });
+    expect(created.status).toBe(201);
+    const childId = ((await created.json()) as { id: string }).id;
+    const child = new TestClient();
+    await child.post("/api/auth/select", { personId: childId });
+    const childMe = (await (await child.get("/api/auth/me")).json()) as { age_band: string };
+    expect(childMe.age_band).toBe("child"); // child role remains the stricter floor
   });
 });
 

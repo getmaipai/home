@@ -49,6 +49,7 @@ import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice } f
 import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
+import { photoUploadsEnabledForBand } from "@/apps/chat/photoUploadAccess";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
 import { createSttSocket } from "@/lib/voice/sttSocket";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
@@ -365,9 +366,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const photoSettingsQuery = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const photoSettings = Array.isArray(photoSettingsQuery.data) ? photoSettingsQuery.data : [];
   const photoSetting = photoSettings.find((setting) => setting.key === "chat.photo_uploads");
-  const photoUploadsEnabled = person.role === "child"
-    ? photoSetting?.source !== "default" && photoSetting?.value === true
-    : photoSetting?.value === true;
+  const photoUploadsEnabled = photoUploadsEnabledForBand(person.age_band, photoSetting);
   const chatRole = enginesQuery.data?.roles?.find((role) => role.id === "chat");
   const modelOptions = useMemo<ModelOption[]>(() => {
     if (!enginesQuery.data?.configured) return [];
@@ -444,22 +443,9 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
         }
       });
   }, []);
-  // Safety ruling, 2026-09-22: the same non-minor floor temporary chat
-  // already uses (owner/admin/adult) - a minor's turn request never
-  // carries `thinking` at all, belt and braces alongside the composer
-  // control being hidden below (a client can be edited). A code review
-  // found this is ROLE alone, while the backend's own real gate
-  // (routes/turn.ts's isMinor, ageBand.ts's speakerAgeBand) takes the
-  // STRICTER of role and birthdate - `Roster` never carries birthdate to
-  // the frontend at all (wire.ts's own omission, a deliberate privacy
-  // choice), so an account whose role says non-minor but whose
-  // birthdate makes the real band stricter shows this control with no
-  // effect (the backend still force-sets thinking:false and strips
-  // reasoning regardless - no disclosure risk, just a confusing no-op
-  // toggle). Fixing it for real needs the backend to expose a computed
-  // age_band on the signed-in person's own profile, a wire addition out
-  // of scope here - flagged, not silently accepted as correct.
-  const thinkingAllowed = canHaveTemporaryChatRole(person.role);
+  // The signed-in payload carries the backend's shared band. Keep model,
+  // thinking and temporary-chat controls aligned with the turn gate.
+  const thinkingAllowed = person.age_band === "adult" && canHaveTemporaryChatRole(person.role);
   const applyConversationThinking = useCallback((value: boolean) => {
     thinkingRef.current = value;
     setThinkingState(value);
@@ -1832,7 +1818,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                   temporary={temporaryNext}
                   onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
                   modelPickerAllowed={modelPickerAllowed}
-                  canUseIncognito={canHaveTemporaryChatRole(person.role)}
+                  canUseIncognito={person.age_band === "adult" && canHaveTemporaryChatRole(person.role)}
                   onOpenSettings={() => navigate("/settings")}
                   openingConversationId={openingConversationId}
                 />

@@ -802,6 +802,14 @@
                       },
                       "hasPasskeys": {
                         "type": "boolean"
+                      },
+                      "age_band": {
+                        "type": "string",
+                        "enum": [
+                          "child",
+                          "teen",
+                          "adult"
+                        ]
                       }
                     },
                     "required": [
@@ -814,7 +822,8 @@
                       "updated_at",
                       "hlc",
                       "hasSecret",
-                      "hasPasskeys"
+                      "hasPasskeys",
+                      "age_band"
                     ],
                     "additionalProperties": false
                   }
@@ -1491,6 +1500,14 @@
                     "hasPasskeys": {
                       "type": "boolean"
                     },
+                    "age_band": {
+                      "type": "string",
+                      "enum": [
+                        "child",
+                        "teen",
+                        "adult"
+                      ]
+                    },
                     "sessionLockRequired": {
                       "type": "boolean"
                     },
@@ -1509,6 +1526,7 @@
                     "hlc",
                     "hasSecret",
                     "hasPasskeys",
+                    "age_band",
                     "sessionLockRequired",
                     "sessionLockTimeoutMinutes"
                   ],
@@ -1839,6 +1857,14 @@
                         "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
                         "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
                       },
+                      "age_band": {
+                        "type": "string",
+                        "enum": [
+                          "child",
+                          "teen",
+                          "adult"
+                        ]
+                      },
                       "sessionLockRequired": {
                         "type": "boolean"
                       },
@@ -1855,6 +1881,7 @@
                       "created_at",
                       "updated_at",
                       "hlc",
+                      "age_band",
                       "sessionLockRequired",
                       "sessionLockTimeoutMinutes"
                     ],
@@ -2117,6 +2144,14 @@
                       "type": "string",
                       "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
                       "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "age_band": {
+                      "type": "string",
+                      "enum": [
+                        "child",
+                        "teen",
+                        "adult"
+                      ]
                     }
                   },
                   "required": [
@@ -2127,7 +2162,8 @@
                     "source",
                     "created_at",
                     "updated_at",
-                    "hlc"
+                    "hlc",
+                    "age_band"
                   ],
                   "additionalProperties": false
                 }
@@ -2436,6 +2472,14 @@
                       "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
                       "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
                     },
+                    "age_band": {
+                      "type": "string",
+                      "enum": [
+                        "child",
+                        "teen",
+                        "adult"
+                      ]
+                    },
                     "sessionLockRequired": {
                       "type": "boolean"
                     },
@@ -2452,6 +2496,7 @@
                     "created_at",
                     "updated_at",
                     "hlc",
+                    "age_band",
                     "sessionLockRequired",
                     "sessionLockTimeoutMinutes"
                   ],

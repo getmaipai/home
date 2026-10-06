@@ -26,6 +26,7 @@ function makePerson(): Roster {
     memorialized_at: null,
     hlc: "1788000000000:0:test",
     hasSecret: true,
+    age_band: "adult",
   };
 }
 

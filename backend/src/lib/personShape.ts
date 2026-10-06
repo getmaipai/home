@@ -1,5 +1,6 @@
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import type { PersonRow } from "@/types";
+import { speakerAgeBand } from "@/lib/ageBand";
 
 // Drizzle's row shape is camelCase (JS convention); home/spec/schemas/
 // person.schema.json is snake_case (the shared shape hub and robot both
@@ -31,11 +32,11 @@ export function toPerson(row: PersonRow): Person {
 
 // The household roster shape: a Person with birthdate left out. 3.1 and
 // 4.2: birthdate is core-only, packages and API clients only ever see
-// age_range (derived server-side; age-band derivation itself is a later
-// hub release, see docs/dev.md).
-export function toRoster(row: PersonRow): Omit<Person, "birthdate"> {
+// age_range plus the shared turn age band are derived server-side; the
+// birthdate itself never leaves the backend.
+export function toRoster(row: PersonRow): Omit<Person, "birthdate"> & { age_band: "child" | "teen" | "adult" } {
   const { birthdate: _birthdate, ...roster } = toPerson(row);
-  return roster;
+  return { ...roster, age_band: speakerAgeBand(row, new Date()) };
 }
 
 // The exact wire shape routes/auth.ts hands back for every roster entry:

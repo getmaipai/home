@@ -91,6 +91,7 @@ import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 export type PersonRosterEntry = Omit<Person, "birthdate"> & {
   sessionLockRequired: boolean;
   sessionLockTimeoutMinutes: number;
+  age_band: "child" | "teen" | "adult";
 };
 
 // The signed-in person's own roster entry, as /api/auth/me actually
@@ -101,6 +102,7 @@ export type PersonRosterEntry = Omit<Person, "birthdate"> & {
 export type SignedInPerson = Roster & {
   sessionLockRequired: boolean;
   sessionLockTimeoutMinutes: number;
+  age_band: "child" | "teen" | "adult";
 };
 export type Role = Person["role"];
 

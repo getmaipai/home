@@ -113,6 +113,7 @@ function makePerson(overrides: Partial<Roster> = {}): Roster {
     memorialized_at: null,
     hlc: "1788000000000:0:test",
     hasSecret: true,
+    age_band: "adult",
     ...overrides,
   };
 }
@@ -3327,7 +3328,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson({ role: "child" })} />
+          <NextChatPage person={makePerson({ role: "child", age_band: "child" })} />
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
@@ -3637,6 +3638,27 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     }
   });
 
+  test.each([
+    ["adult role with child backend band", { role: "adult" as const, age_band: "child" as const }, { value: true, source: "default" }],
+    ["child role with child backend band", { role: "child" as const, age_band: "child" as const }, { value: true, source: "default" }],
+  ])("photo upload menu and queue follow the backend band: %s", async (_label, personFields, photos) => {
+    const restore = stubAddMenuFetch(undefined, false, 390, photos);
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <NextChatPage person={makePerson(personFields)} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      await within(addMenu()).findByText("Add files");
+      expect(within(addMenu()).queryByText("Add photos and files")).toBeNull();
+      expect(within(addMenu()).queryByText("Take a photo")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
   test("Create image and Web search render with the unwired-controls flag forced on - Create image also needs the image role ready", async () => {
     __setUnwiredControlsForTests(true);
     const restore = stubAddMenuFetch(undefined, true);
@@ -3705,7 +3727,7 @@ describe("NextChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson({ role: "child" })} />
+          <NextChatPage person={makePerson({ role: "child", age_band: "child" })} />
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");

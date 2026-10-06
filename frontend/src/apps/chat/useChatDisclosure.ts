@@ -5,8 +5,8 @@ import { api, type Roster } from "@/lib/api";
 /** Chat's own Developer-disclosure gate (docs/SETTINGS.md's three
  * levels): owner, admin, and adult can hold the `ui.show_turn_stats`
  * setting; a child or teen never can. */
-export function canViewChatDetails(role: Roster["role"]): boolean {
-  return role === "owner" || role === "admin" || role === "adult";
+export function canViewChatDetails(person: Pick<Roster, "role" | "age_band">): boolean {
+  return person.age_band === "adult" && (person.role === "owner" || person.role === "admin" || person.role === "adult");
 }
 
 // Keyed by person id, shared across every `useChatDisclosure` call site -
@@ -39,7 +39,7 @@ const fetchInFlight = new Set<string>();
  * (ChatPage's own "Details" toggle) that needs an optimistic update
  * before the write settles; every other caller only reads it. */
 export function useChatDisclosure(person: Roster): [boolean | null, Dispatch<SetStateAction<boolean | null>>] {
-  const eligible = canViewChatDetails(person.role);
+  const eligible = canViewChatDetails(person);
   const visible = useDisclosureStore((s) => s.byPersonId[person.id] ?? null);
   const setStoreValue = useDisclosureStore((s) => s.set);
   useEffect(() => {

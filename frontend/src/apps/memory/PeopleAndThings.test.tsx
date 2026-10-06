@@ -66,6 +66,7 @@ function person(overrides: Partial<PersonRosterEntry> = {}): PersonRosterEntry {
     display_name: "Sage",
     nickname: null,
     role: "adult",
+    age_band: "adult",
     avatar_seed: "person-sage",
     source: "hub",
     local_only: false,

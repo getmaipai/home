@@ -29,7 +29,7 @@ import { getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEO
 
 export const auth = apiRouter();
 
-const RosterSchema = Person.omit({ birthdate: true }).extend({ hasSecret: z.boolean(), hasPasskeys: z.boolean() });
+const RosterSchema = Person.omit({ birthdate: true }).extend({ hasSecret: z.boolean(), hasPasskeys: z.boolean(), age_band: z.enum(["child", "teen", "adult"]) });
 
 // Shared by /verify-secret and /change-secret: "prove you know this
 // person's current secret" is the identical lockout-check, verify,

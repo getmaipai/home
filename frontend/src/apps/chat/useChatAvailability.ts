@@ -22,10 +22,10 @@ export function useChatAvailability() {
 /** CHAT-CALM-ERRORS-01d: the composer line for this person, picked by band
  * from the health row's `notice` (the words live in backend failureCopy.ts,
  * never here). The same ["health"] query as above, so one fetch serves both. */
-export function useChatComposerNotice(person: Pick<Roster, "role">): ChatComposerNoticeValue | null {
+export function useChatComposerNotice(person: Pick<Roster, "role" | "age_band">): ChatComposerNoticeValue | null {
   const health = useHealthQuery().data?.engines?.chat;
   const notice = health?.notice;
   if (!notice || chatAvailability(health) === "ready") return null;
-  const text = person.role === "child" ? notice.child : person.role === "teen" ? notice.teen : notice.adult;
-  return { text, repairsLink: isOwnerOrAdminRole(person.role) ? notice.repairs_link : null };
+  const text = person.age_band === "child" ? notice.child : person.age_band === "teen" ? notice.teen : person.age_band === "adult" ? notice.adult : null;
+  return text === null ? null : { text, repairsLink: isOwnerOrAdminRole(person.role) ? notice.repairs_link : null };
 }

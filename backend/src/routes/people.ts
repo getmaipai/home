@@ -24,7 +24,7 @@ export const peopleRoutes = apiRouter();
 // real generated spec schema with `.omit()` rather than redescribed by
 // hand, the same "one definition" reasoning lib/personShape.ts's own
 // toRoster() already applies at the lib layer.
-const RosterSchema = Person.omit({ birthdate: true });
+const RosterSchema = Person.omit({ birthdate: true }).extend({ age_band: z.enum(["child", "teen", "adult"]) });
 
 // INCOGNITO-07: session lock's two settings-backed fields, merged onto
 // the roster shape the same way auth.ts's own RosterSchema adds
@@ -197,8 +197,7 @@ peopleRoutes.openapi(createRoute_, async (c) => {
       .run();
   }
 
-  const { birthdate: _birthdate, ...roster } = candidate.data;
-  return c.json(roster, 201);
+  return c.json(toRoster(db.select().from(people).where(eq(people.id, id)).get()!), 201);
 });
 
 // Editing and deleting a person (2026-09-05). Both were named in
@@ -408,7 +407,7 @@ peopleRoutes.openapi(patchRoute, async (c) => {
     if (!result.ok) return c.json({ error: result.error }, result.status);
   }
 
-  const { birthdate: _birthdate, ...roster } = candidate.data;
+  const roster = toRoster(db.select().from(people).where(eq(people.id, id)).get()!);
   return c.json(withSessionLock(roster), 200);
 });
 

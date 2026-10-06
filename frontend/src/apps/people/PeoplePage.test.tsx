@@ -13,6 +13,7 @@ function member(id: string, name: string, role: PersonRosterEntry["role"]): Pers
     display_name: name,
     nickname: null,
     role,
+    age_band: role === "child" ? "child" : role === "teen" ? "teen" : "adult",
     avatar_seed: id,
     source: "hub",
     local_only: false,

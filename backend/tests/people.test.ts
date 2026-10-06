@@ -57,11 +57,13 @@ describe("creating people", () => {
     const owner = await ownerClient();
     const res = await owner.post("/api/people", { displayName: "Bramble", role: "child" });
     const body = (await res.json()) as Record<string, unknown>;
+    expect(body.age_band).toBe("child");
     // Never returned by this API surface (3.1: birthdate is core-only).
     expect(body.birthdate).toBeUndefined();
     // Filling it back in with null (its schema default) must still satisfy
     // Person, proving nothing else drifted from the spec shape.
-    expect(() => Person.parse({ ...body, birthdate: null })).not.toThrow();
+    const { age_band: _ageBand, ...personFields } = body;
+    expect(() => Person.parse({ ...personFields, birthdate: null })).not.toThrow();
   });
 
   // Step 10 (session-a-intelligence.md): "every write sets a monotonic

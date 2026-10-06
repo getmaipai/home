@@ -33,7 +33,7 @@ export type { HardwareInfo, CudaDevice } from "./lib/hardware";
 // mocks built before step 6 that construct a Roster literal without it
 // keep compiling, rather than every one of them needing an edit the
 // moment this field was added.
-export type Roster = Omit<Person, "birthdate"> & { hasSecret: boolean; hasPasskeys?: boolean };
+export type Roster = Omit<Person, "birthdate"> & { hasSecret: boolean; hasPasskeys?: boolean; age_band?: "child" | "teen" | "adult" };
 
 /** One row of a spec-sheet Element's own prop shape, exactly
  * (assistant-ui.com/elements/spec-sheet: `title`, `subtitle?`,

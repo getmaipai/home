@@ -36,7 +36,7 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
   const viewingSelf = id === person.id;
   const canViewMemories = viewingSelf || isOwnerOrAdminRole(person.role);
   const canViewLimits = !viewingSelf && isOwnerOrAdminRole(person.role)
-    && rosterQuery.data?.some((entry) => entry.id === id && entry.role === "child") === true;
+    && rosterQuery.data?.some((entry) => entry.id === id && entry.age_band === "child") === true;
   const activeTab = params.get("tab") === "memories" && canViewMemories
     ? "memories"
     : params.get("tab") === "limits" && canViewLimits
@@ -72,7 +72,7 @@ export function NextPersonProfilePage({ person, onPersonChange }: { person: Rost
               </div>
             );
           }
-          const showLimits = canViewLimits && profile.role === "child" && canManagePerson(person.role, person.id, { id: profile.id, role: profile.role });
+          const showLimits = canViewLimits && profile.age_band === "child" && canManagePerson(person.role, person.id, { id: profile.id, role: profile.role });
           return (
             <>
               <ProfileHeaderCard profile={profile} viewer={person} viewingSelf={viewingSelf} onPersonChange={onPersonChange} />
@@ -143,7 +143,7 @@ function FaceStatusRow({ profile }: { profile: ProfileEntry }) {
  * child never consents for themself) for the Enroll action itself,
  * matching `createBiometricPrint`'s. Mirrors the profile-edit dialog's
  * own "Use a real photo" admin-approval-required pattern for
- * `role === "child"` (docs/BACKLOG.md's own FACE-02 entry). */
+ * backend-provided `age_band` (docs/BACKLOG.md's own FACE-02 entry). */
 function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { profile: ProfileEntry; viewer: Roster; viewingSelf: boolean; onPersonChange: () => void | Promise<void> }) {
   const [editOpen, setEditOpen] = useState(false);
   const canEdit = canManagePerson(viewer.role, viewer.id, { id: profile.id, role: profile.role });
