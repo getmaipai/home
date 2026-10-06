@@ -2868,6 +2868,12 @@ async function captureElementsReview(browser: Browser, sessionValue: string): Pr
         await page.getByRole("textbox", { name: "Message input" }).waitFor();
         await settleAnimations(page);
         await page.screenshot({ path: join(outDir, `new-chat-${viewport.width}-${theme}.png`) });
+        if (slug === "desktop" && theme === "dark") {
+          // A starter chip sends its prompt like a typed message.
+          await page.getByRole("button", { name: "Explain how rainbows form" }).click();
+          await page.getByText("Explain how rainbows form, in plain words.").first().waitFor({ timeout: 15000 });
+          console.log("elements-review: the Explain chip sent its prompt");
+        }
       } finally {
         await context.close();
       }

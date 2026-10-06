@@ -17,6 +17,8 @@ import { Source, SourceIcon, SourceTitle } from "@maipai/ui/src/elements/sources
 import { Collapsible, CollapsibleContent } from "@maipai/ui/src/ui/collapsible";
 import { collapsePanel } from "@maipai/ui/src/elements/surfaces";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
+import { EmptyState, EmptyStateGreeting, EmptyStateSuggestion, EmptyStateSuggestions } from "@maipai/ui/src/elements/empty-state";
+import { STARTER_SUGGESTIONS } from "@/apps/chat/chatStarterSuggestions";
 import { GenerationLoader } from "@maipai/ui/src/elements/loading-state";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
@@ -319,28 +321,29 @@ export function EngineStartingLoader({ Loader = GenerationLoader }: {
 // slot only reflects the shared state and does not add a second toggle.
 export function NextChatWelcome() {
   const { on } = useContext(TemporaryChatContext);
+  const aui = useAui();
   return (
-    <div className="relative mb-6 flex flex-col px-2">
+    <div className="relative mb-6 flex flex-col items-center px-2">
       <EngineStartingLoader />
-      {on ? (
-        <div className="flex flex-col gap-1">
-          <p className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-2xl font-medium tracking-tight duration-200">
-            Temporary chat
-          </p>
-          <p className="text-muted-foreground fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-sm duration-200">
-            This chat won&apos;t be saved to your history.
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-1">
-          <p className="fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-2xl font-medium tracking-tight duration-200">
-            How can I help you today?
-          </p>
-          <p className="text-muted-foreground fade-in slide-in-from-bottom-1 animate-in fill-mode-both text-sm duration-200">
-            Runs on your own hub. Your chats stay at home.
-          </p>
-        </div>
-      )}
+      <EmptyState className="max-w-none gap-4">
+        <EmptyStateGreeting>{on ? "Temporary chat" : "How can I help you today?"}</EmptyStateGreeting>
+        {on ? <p className="text-muted-foreground text-center text-sm">This chat won&apos;t be saved to your history.</p> : null}
+        <EmptyStateSuggestions>
+          {STARTER_SUGGESTIONS.map((suggestion, index) => (
+            <EmptyStateSuggestion
+              key={suggestion.title}
+              index={index}
+              className="min-h-12"
+              onClick={() => {
+                aui.composer().setText(suggestion.prompt);
+                aui.composer().send();
+              }}
+            >
+              {suggestion.title} {suggestion.label}
+            </EmptyStateSuggestion>
+          ))}
+        </EmptyStateSuggestions>
+      </EmptyState>
     </div>
   );
 }

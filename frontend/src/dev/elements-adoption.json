@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T18:52:10.610Z",
+  "generatedAt": "2026-10-06T19:16:49.382Z",
   "kitTag": "ui-v0.5.110",
   "items": [
     {
@@ -255,7 +255,7 @@
       "name": "empty-state",
       "group": "settings/onboarding",
       "verdict": "wire-now",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "error-state.test.tsx",
