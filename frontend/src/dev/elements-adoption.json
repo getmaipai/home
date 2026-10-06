@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T22:23:00.497Z",
-  "kitTag": "ui-v0.5.130",
+  "generatedAt": "2026-10-06T22:41:00.765Z",
+  "kitTag": "ui-v0.5.131",
   "items": [
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
@@ -800,9 +800,9 @@
       "file": "number-ticker.tsx",
       "name": "number-ticker",
       "group": "other",
-      "verdict": "later",
-      "verdictReason": "Deferred until a Home feature requiring this Element is planned.",
-      "implemented": false
+      "verdict": "wire-now",
+      "verdictReason": "ELT-T1-01 is owner-approved to replace the plain numeric StatCard value with the shipped NumberTicker.",
+      "implemented": true
     },
     {
       "file": "onboarding.tsx",
@@ -1238,6 +1238,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "thread.engine-down.test.tsx",
+      "name": "thread.engine-down.test",
+      "group": "tests/support",
+      "verdict": "no-fit",
+      "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists.",
+      "implemented": false
     },
     {
       "file": "threadlist-sidebar.aui.tsx",
