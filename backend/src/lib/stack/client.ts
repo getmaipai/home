@@ -72,6 +72,9 @@ export interface StackClient {
   healthFix(code: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   settings(opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
   applySettings(values: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
+  /** SEARXNG-SET-03: Stack-owned SearXNG settings preview and revert. */
+  searchPreview(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
+  searchRevert(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   budget(opts?: { signal?: AbortSignal }): Promise<BudgetResponse>;
   fitPlan(body: FitPlanRequest, opts?: { signal?: AbortSignal }): Promise<StackFitPlan>;
   hardware(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
@@ -327,6 +330,8 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     healthFix: (code, opts) => call(`/stack/v1/health/${encodeURIComponent(code)}/fix`, { method: "POST" }, json<Record<string, unknown>>, opts),
     settings: (opts) => call("/stack/v1/settings", { method: "GET" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
     applySettings: (values, opts) => call("/stack/v1/settings/apply", jsonInit(values), json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
+    searchPreview: (opts) => call("/stack/v1/search/preview", { method: "GET" }, json<Record<string, unknown>>, opts),
+    searchRevert: (opts) => call("/stack/v1/search/revert", { method: "POST" }, json<Record<string, unknown>>, opts),
     budget: (opts) => call("/stack/v1/hardware/budget", { method: "GET" }, json<BudgetResponse>, opts),
     fitPlan: (body, opts) => call("/stack/v1/fit-plan", jsonInit(body), json<StackFitPlan>, opts),
     hardware: (opts) => call("/stack/v1/hardware", { method: "GET" }, json<Record<string, unknown>>, opts),
