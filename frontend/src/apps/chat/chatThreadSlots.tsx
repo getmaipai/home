@@ -22,6 +22,7 @@ import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
 import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorSearch, ModelSelectorList, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
+import { RegenerateMenu } from "@maipai/ui/src/elements/regenerate-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -42,7 +43,7 @@ import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { ChatActivityCard } from "@/apps/chat/ChatActivityCard";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
-import { AdminContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { AdminContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/next/pages/TurnErrorDetails";
 
@@ -166,7 +167,6 @@ export function ComposerTrailingWithModelSelector() {
     </>
   );
 }
-
 /** slice 5(e): the "..." menu's second entry (Details, the stats reveal -
  * slice 5(d), landed 2026-09-22) - COORDINATOR named both for this same
  * menu so it's touched once. Admin-only on both sides: hidden here for
@@ -542,8 +542,24 @@ export function FailedTurnErrorDetailsAction() {
 
 /** Compose both controls in the kit's single action-bar append point. */
 export function FailedTurnActionBarExtras() {
+  const { models, value } = useContext(ModelPickerContext);
+  const aui = useAui();
+  const eligible = useContext(ModelChoiceAllowedContext);
+  const [open, setOpen] = useState(false);
   return (
     <>
+      {eligible && models.length >= 2 && value ? (
+        <RegenerateMenu
+          options={models.map((model) => ({ id: model.id, label: model.name, detail: model.description ?? model.id }))}
+          open={open}
+          currentId={value}
+          onOpenChange={setOpen}
+          onPick={(model) => {
+            setOpen(false);
+            aui.message().reload({ runConfig: { custom: { model } } });
+          }}
+        />
+      ) : null}
       <SourcesActionBarTrigger />
       <FailedTurnErrorDetailsAction />
     </>

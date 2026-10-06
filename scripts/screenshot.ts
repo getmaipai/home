@@ -289,6 +289,7 @@ const nextPerformanceReview = process.argv.includes("--next-performance-review")
 const nextStorageReview = process.argv.includes("--next-storage-review");
 const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
+const regenerateMenuReview = process.argv.includes("--regenerate-menu-review");
 const nextChatHistoryReview = process.argv.includes("--next-chat-history-review");
 const nextChatAnswerImages = process.argv.includes("--next-chat-answer-images");
 // UPLOAD-IMG-02: sent pictures in the composer, above the bubble, in the
@@ -312,7 +313,7 @@ const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audi
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview;
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -3826,8 +3827,8 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
   // source check pointed at that binding, where it moved from the page.
   const chatThreadSource = readFileSync(join(ROOT, "frontend", "src", "apps", "chat", "ChatThread.tsx"), "utf8");
   const elementBindingsSource = readFileSync(join(ROOT, "frontend", "src", "apps", "chat", "elementBindings.ts"), "utf8");
-  if (!chatThreadSource.includes("ComposerExtra: modelPickerAllowed ? MODEL_SELECTOR_SLOT : undefined") || !elementBindingsSource.includes("export const MODEL_SELECTOR_SLOT = ComposerModelSelector") || chatThreadSource.includes("ComposerThinkingControl")) {
-    throw new Error("captureNextChatReview: shared ComposerModelSelector binding was not found or retired ComposerThinkingControl remains");
+  if (!chatThreadSource.includes("ComposerExtraEnd: MODEL_TRAILING_SLOT") || !elementBindingsSource.includes("export const MODEL_TRAILING_SLOT = ComposerTrailingWithModelSelector") || chatThreadSource.includes("ComposerThinkingControl")) {
+    throw new Error("captureNextChatReview: shared trailing ComposerModelSelector binding was not found or retired ComposerThinkingControl remains");
   }
   console.log("captureNextChatReview: shared composer source check confirms ComposerModelSelector is wired");
 
@@ -3938,6 +3939,26 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
     await page.close();
   } finally {
     await wideTenContext.close();
+  }
+
+  if (regenerateMenuReview) {
+    const context = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "dark", sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/chat?conversation=${conversation.id}`);
+      await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).last().waitFor();
+      await page.getByRole("button", { name: "Regenerate with a different model" }).last().click();
+      await page.getByRole("button", { name: /Alternate screenshot stub/ }).waitFor();
+      await settleAnimations(page);
+      const file = "regenerate-menu-1440-dark.png";
+      const path = join(outDir, file);
+      await page.screenshot({ path });
+      dedicatedScreenshots.push({ file, route: "/chat", viewport: "desktop", theme: "dark" });
+      console.log(`Wrote ${path}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
   }
 }
 
@@ -8216,7 +8237,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview ? startScreenshotStack(chatModel.url) : undefined;
+  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -8525,9 +8546,9 @@ async function main() {
       return;
     }
 
-    if (nextChatReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview) {
+    if ((nextChatReview || regenerateMenuReview) && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview) {
       await captureNextChatReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-review");
+      console.log(`completed named review: ${regenerateMenuReview ? "--regenerate-menu-review" : "--next-chat-review"}`);
       return;
     }
 

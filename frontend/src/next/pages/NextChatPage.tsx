@@ -59,7 +59,7 @@ import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognito
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { ChatShortcutReference } from "@/next/pages/ChatShortcutReference";
-import { ArtifactOpenContext, AdminContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, AdminContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, MODEL_EFFORTS, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
@@ -596,6 +596,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
           // saved by its setter, and used on every send until changed.
           getThinking: () => (thinkingAllowed && currentModelThinksRef.current ? thinkingRef.current : undefined),
           getModel: () => (modelPickerAllowedRef.current ? selectedModelRef.current : undefined),
+          getAgeBand: () => person.age_band,
           consumeSupersedes,
           consumePackageScope: () => {
             const value = packageScopeRef.current?.id;
@@ -1212,6 +1213,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       <DetailsOpenContext.Provider value={detailsOpenValue}>
       <ThinkingModeContext.Provider value={thinkingModeValue}>
       <ModelPickerContext.Provider value={modelPickerValue}>
+      <ModelChoiceAllowedContext.Provider value={modelPickerAllowed}>
       <BareModeContext.Provider value={bareModeValue}>
       <TemporaryChatContext.Provider value={temporaryChatValue}>
       <DraftConversationContext.Provider value={draftConversationId}>
@@ -1480,6 +1482,7 @@ export function NextChatPage({ person }: { person: Roster }) {
       </DraftConversationContext.Provider>
       </TemporaryChatContext.Provider>
       </BareModeContext.Provider>
+      </ModelChoiceAllowedContext.Provider>
       </ModelPickerContext.Provider>
       </ThinkingModeContext.Provider>
       </DetailsOpenContext.Provider>

@@ -9,7 +9,7 @@ import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { closeDanglingClause } from "@/lib/wellFormed";
 import { STABLE_SYSTEM_SUFFIX_SENTENCES } from "../scripts/bench/oldStableSuffix";
 import { __embedCallCountForTests, __resetEmbedCallCountForTests } from "@/lib/routing";
-import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
+import { resolveTurnModel, streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { guardReply } from "@/lib/guards";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
@@ -1923,6 +1923,12 @@ describe("matchPattern()", () => {
 });
 
 describe("POST /api/turn", () => {
+  test("a minor's forged model value falls back to the active chat model", async () => {
+    const selection = await resolveTurnModel("forged-unavailable-model", "chat", true, false);
+    expect(selection.model).toBeUndefined();
+    expect(selection.status).toMatchObject({ requested: "forged-unavailable-model", selected: null, fallback: true });
+  });
+
   test("requires a signed-in person", async () => {
     const client = new TestClient();
     const res = await client.post("/api/turn", { text: "hi" });

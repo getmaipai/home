@@ -34,7 +34,7 @@ import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
 
 type ModelSelectionStatus = { requested: string; selected: string | null; fallback: boolean; message?: string };
 
-async function resolveTurnModel(requested: string | undefined, surface: Surface, minor: boolean, bare: boolean): Promise<{ model?: string; status?: ModelSelectionStatus }> {
+export async function resolveTurnModel(requested: string | undefined, surface: Surface, minor: boolean, bare: boolean): Promise<{ model?: string; status?: ModelSelectionStatus }> {
   if (requested === undefined) return {};
   const fallback = (selected: string | null, message: string): { status: ModelSelectionStatus } => ({ status: { requested, selected, fallback: true, message } });
   if (surface !== "chat" || minor || bare) return fallback(null, "Model selection is unavailable for this turn; the active chat model was used.");

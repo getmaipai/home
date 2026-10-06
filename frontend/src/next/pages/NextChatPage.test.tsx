@@ -3006,12 +3006,12 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
   // braces alongside the backend's own REASONING-03 gate
   // (routes/turn.ts: thinking forced off for a minor regardless of what
   // the request claims).
-  test("a child's chat renders no model/mode picker, and its turn request has neither field", async () => {
+  test.each(["child", "teen"] as const)("a %s chat renders no model/mode picker, and its turn request has neither field", async (band) => {
     const restore = stubMultiTurnFetch();
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/chat"]}>
-          <NextChatPage person={makePerson({ role: "child", age_band: "child" })} />
+          <NextChatPage person={makePerson({ role: band, age_band: band })} />
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
@@ -3021,6 +3021,7 @@ describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mod
       await waitFor(() => expect(send.disabled).toBe(false));
       fireEvent.click(send);
       await view.findByText("Reply 1.");
+      expect(view.queryByRole("button", { name: "Regenerate with a different model" })).toBeNull();
       const bodies = turnRequestBodies();
       expect(bodies).toHaveLength(1);
       expect("thinking" in bodies[0]!).toBe(false);
