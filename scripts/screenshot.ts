@@ -304,6 +304,7 @@ const nextChatRichReview = process.argv.includes("--next-chat-rich-review");
 const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview || nextChatRichReview;
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
 const nextChatQueueReview = process.argv.includes("--next-chat-queue-review");
+const composerLayoutReview = process.argv.includes("--composer-layout-review");
 const nextChatQueueEmptyReview = process.argv.includes("--next-chat-queue-empty-review");
 const nextChatQueueBeforeReview = process.argv.includes("--next-chat-queue-before-review");
 const nextChatAuditReview = process.argv.includes("--next-chat-audit-review");
@@ -311,7 +312,7 @@ const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audi
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -5058,6 +5059,145 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
   }
 }
 
+/** COMPOSER-01: the composer's layout contract, measured in a real browser.
+ * Empty and one line stay 56 to 60 px, text wrapping grows it toward 220 px
+ * and then scrolls inside, the controls stay on the bottom edge, one model
+ * selector, Send 32 to 36 px. Throws on a violation, so a regression fails
+ * the capture, and writes PNGs (empty, one line, multiline, long, generating,
+ * paused notice) at 1440 and 390, light and dark. */
+async function captureComposerLayoutReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = process.env.MAIPAI_COMPOSER_OUT_DIR || join(ROOT, "data-scratch", "screenshots", "composer");
+  mkdirSync(outDir, { recursive: true });
+  const measure = async (page: Page) => page.evaluate(() => {
+    const shell = document.querySelector('[data-slot="aui_composer-shell"]') as HTMLElement;
+    const box = shell.getBoundingClientRect();
+    const rect = (el: Element | null) => { if (!el) return null; const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height }; };
+    const input = shell.querySelector("textarea");
+    const send = shell.querySelector('button[aria-label="Send message"], button[aria-label="Stop generating"]');
+    const column = document.querySelector(".aui-thread-viewport-footer");
+    const buttons = [...shell.querySelectorAll(".aui-composer-action-wrapper button")].filter((b) => { const r = b.getBoundingClientRect(); return r.width > 0 && r.height > 0 && b.getAttribute("data-slot") !== "composer-menu-item"; }).map((b) => rect(b));
+    const selectors = document.querySelectorAll('[data-slot="model-selector-trigger"]').length;
+    return {
+      shell: rect(shell), input: rect(input), send: rect(send), column: rect(column), buttons, selectors,
+      inputScrolls: input ? input.scrollHeight > input.clientHeight + 1 : false,
+      overflowX: document.documentElement.scrollWidth > window.innerWidth + 1,
+    };
+  });
+  const results: string[] = [];
+  // MAIPAI_COMPOSER_SOFT=1 records violations instead of throwing (before/after measuring).
+  const fail = (message: string) => { if (process.env.MAIPAI_COMPOSER_SOFT) results.push(`VIOLATION ${message}`); else throw new Error(message); };
+  const longText = Array.from({ length: 14 }, (_, i) => `Line ${i + 1} of a long draft message`).join("\n");
+  for (const theme of THEMES) {
+    for (const width of [1440, 390] as const) for (const withModels of [false, true]) {
+      const viewport = VIEWPORTS.find((v) => v.width === width)!;
+      const tag = `${width}-${theme}${withModels ? "-models" : ""}`;
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(15000);
+        const shot = async (name: string) => {
+          await settleAnimations(page);
+          const path = join(outDir, `composer-${name}-${tag}.png`);
+          await page.screenshot({ path });
+          console.log(`Wrote ${path}`);
+        };
+        if (withModels) {
+          // Two chat models make the owner's one model selector appear.
+          await page.route("**/api/engines", async (route) => {
+            const response = await route.fetch();
+            const body = await response.json() as { configured: boolean; roles: Array<Record<string, unknown>> };
+            body.configured = true;
+            const chat = body.roles.find((role) => role.id === "chat");
+            if (chat) chat.models = [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }];
+            await route.fulfill({ response, json: body });
+          });
+        }
+        await page.goto(`${BASE_URL}/chat`);
+        const input = page.getByRole("textbox", { name: "Message input" });
+        await input.waitFor();
+        await page.evaluate(() => document.fonts.ready);
+        // Empty.
+        if (withModels) await page.locator('[data-slot="model-selector-trigger"]').waitFor();
+        let m = await measure(page);
+        const emptyH = m.shell!.height;
+        results.push(`${tag} empty ${emptyH.toFixed(1)}px send ${m.send!.width.toFixed(0)}x${m.send!.height.toFixed(0)} selectors ${m.selectors}`);
+        if (m.selectors !== (withModels ? 1 : 0)) fail(`composer ${tag}: ${m.selectors} model selectors, want ${withModels ? 1 : 0}`);
+        const maxRow = withModels && width < 640 ? 100 : 60.5; // a phone with the model label stacks its controls
+        if (emptyH < 55 || emptyH > maxRow) fail(`composer ${tag}: empty height ${emptyH}px, want 56 to 60`);
+        if (m.send!.width < 31.5 || m.send!.width > 36.5) fail(`composer ${tag}: send is ${m.send!.width}px, want 32 to 36`);
+                if (m.overflowX) fail(`composer ${tag}: horizontal overflow`);
+        await shot("empty");
+        // One line.
+        await input.fill("Plan my day");
+        m = await measure(page);
+        results.push(`${tag} one line ${m.shell!.height.toFixed(1)}px`);
+        if (m.shell!.height > maxRow) fail(`composer ${tag}: one-line height ${m.shell!.height}px`);
+        await shot("one-line");
+        // Three lines: grows, controls stay on the bottom edge.
+        await input.fill("First line of a longer message\nSecond line\nThird line");
+        m = await measure(page);
+        results.push(`${tag} three lines ${m.shell!.height.toFixed(1)}px`);
+        if (m.shell!.height <= emptyH + 20) fail(`composer ${tag}: did not grow (${m.shell!.height}px)`);
+        for (const b of m.buttons) if (b && m.shell!.bottom - b.bottom > 12) fail(`composer ${tag}: a control floats ${m.shell!.bottom - b.bottom}px above the bottom edge`);
+        if (m.input!.bottom > m.send!.top + 1) fail(`composer ${tag}: text overlaps the controls`);
+        await shot("multiline");
+        // Long: capped, the text scrolls inside, controls anchored.
+        await input.fill(longText);
+        m = await measure(page);
+        results.push(`${tag} long ${m.shell!.height.toFixed(1)}px scrolls ${m.inputScrolls}`);
+        if (m.shell!.height > 240) fail(`composer ${tag}: grew to ${m.shell!.height}px, cap is about 220`);
+        if (!m.inputScrolls) fail(`composer ${tag}: long text does not scroll inside`);
+        for (const b of m.buttons) if (b && m.shell!.bottom - b.bottom > 12) fail(`composer ${tag}: a control floats ${m.shell!.bottom - b.bottom}px above the bottom edge (long)`);
+        await shot("long");
+        if (withModels) { await page.close(); continue; }
+        // Generating: Stop replaces Send.
+        await input.fill("CHAT QUEUE screenshot: tell me a little about the day");
+        await page.getByRole("button", { name: "Send message", exact: true }).click();
+        await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor();
+        await page.waitForTimeout(400);
+        m = await measure(page);
+        results.push(`${tag} generating ${m.shell!.height.toFixed(1)}px stop ${m.send!.width.toFixed(0)}px input ${m.input?.height.toFixed(0)}`);
+        if (m.shell!.height > 60.5) fail(`composer ${tag}: generating height ${m.shell!.height}px`);
+        await shot("generating");
+        await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+        await page.waitForTimeout(2000); // let the held reply finish before the page closes
+        await page.close();
+        // Paused: the notice sits below the composer without crowding.
+        const paused = await context.newPage();
+        paused.setDefaultTimeout(15000);
+        await paused.route("**/api/health", async (route) => {
+          const response = await route.fetch();
+          const body = await response.json() as { engines: { chat: Record<string, unknown> } };
+          const line = "Chat is paused. You can type now and send when it's back.";
+          body.engines.chat = { ...body.engines.chat, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", notice: { adult: line, teen: line, child: line, repairs_link: "Open Repairs" } };
+          await route.fulfill({ response, json: body });
+        });
+        await paused.goto(`${BASE_URL}/chat`);
+        await paused.getByRole("textbox", { name: "Message input" }).waitFor();
+        await paused.getByText("Chat is paused", { exact: false }).first().waitFor();
+        const pm = await paused.evaluate(() => {
+          const shell = document.querySelector('[data-slot="aui_composer-shell"]')!.getBoundingClientRect();
+          const note = document.querySelector('[data-slot="aui_composer-notice"], [data-chat-notice]')!.getBoundingClientRect();
+          const footer = document.querySelector(".aui-thread-viewport-footer")!.getBoundingClientRect();
+          return { shellH: shell.height, gap: note.top - shell.bottom, noteBottom: note.bottom, footerBottom: footer.bottom, winH: window.innerHeight };
+        });
+        results.push(`${tag} paused shell ${pm.shellH.toFixed(1)}px gap ${pm.gap.toFixed(1)}px`);
+        if (pm.shellH > 60.5) fail(`composer ${tag}: paused height ${pm.shellH}px`);
+        if (pm.gap < 0 || pm.noteBottom > pm.winH) fail(`composer ${tag}: paused notice crowds or leaves the screen`);
+        await settleAnimations(paused);
+        const pausedPath = join(outDir, `composer-paused-${tag}.png`);
+        await paused.screenshot({ path: pausedPath });
+        console.log(`Wrote ${pausedPath}`);
+        await paused.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+  writeFileSync(join(outDir, "measurements.txt"), results.join("\n") + "\n");
+  console.log(results.join("\n"));
+}
+
 /** Capture the real kit MessageQueue above the composer while the scripted
  * first reply is held open. The fixed prompt is unique to this named review;
  * the backend fixture delays it long enough for both queued messages to be
@@ -8473,6 +8613,12 @@ async function main() {
     if (activityCardReview) {
       await captureActivityCardReview(browser, sessionValue);
       console.log("completed named review: --activity-card-review");
+      return;
+    }
+
+    if (composerLayoutReview) {
+      await captureComposerLayoutReview(browser, sessionValue);
+      console.log("completed named review: --composer-layout-review");
       return;
     }
 

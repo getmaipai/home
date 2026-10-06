@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState } from "@assistant-ui/react";
 import { Thread } from "@maipai/ui/src/elements/thread.aui";
-import { DATA_BINDINGS, MODEL_SELECTOR_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
+import { DATA_BINDINGS, MODEL_TRAILING_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
 import { ChatThreadExtras } from "@/apps/chat/ChatThreadExtras";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
@@ -139,7 +139,7 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
               scrollToBottomOnInitialize: true,
               scrollToBottomOnThreadSwitch: true,
             },
-            ComposerExtra: modelPickerAllowed ? MODEL_SELECTOR_SLOT : undefined,
+            ...(modelPickerAllowed ? { ComposerExtraEnd: MODEL_TRAILING_SLOT } : {}),
           }}
         />
       </ChatExtrasContext.Provider>

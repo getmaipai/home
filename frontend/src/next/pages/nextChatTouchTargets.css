@@ -6,10 +6,15 @@
   position: relative;
 }
 
-[data-slot="next-chat-pane"] .aui-composer-dictate::before,
+[data-slot="next-chat-pane"] .aui-composer-dictate::before {
+  position: absolute;
+  inset: -8px;
+  content: "";
+}
+
 [data-slot="next-chat-pane"] .aui-composer-send::before {
   position: absolute;
-  inset: -10px;
+  inset: -6px;
   content: "";
 }
 

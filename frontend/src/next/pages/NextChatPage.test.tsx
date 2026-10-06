@@ -2515,6 +2515,29 @@ describe("NextChatPage (MODEL-SEL-01: session model picker)", () => {
   });
 });
 
+describe("NextChatPage (COMPOSER-01: the model label sits just left of the mic)", () => {
+  test("one model selector, in the trailing group before voice and Send", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-09-27T00:00:00.000Z" }, reason: null, model: { id: "a", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true }, models: [{ id: "a", name: "Alpha" }, { id: "b", name: "Beta" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
+      const trigger = await view.findByRole("combobox", { name: "Choose model" });
+      expect(document.querySelectorAll('[data-slot="model-selector-trigger"]').length).toBe(1);
+      const groups = document.querySelectorAll(".aui-composer-action-wrapper > div");
+      expect(groups.length).toBe(2);
+      expect(groups[0]!.contains(trigger)).toBe(false);
+      expect(groups[1]!.contains(trigger)).toBe(true);
+      const send = view.getByRole("button", { name: "Send message" });
+      expect(trigger.compareDocumentPosition(send) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } finally { globalThis.fetch = original; }
+  });
+});
+
 describe("NextChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode picker)", () => {
   async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
     fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });

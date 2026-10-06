@@ -28,7 +28,7 @@ import {
   ChatMessageQueue,
   ChatThinkingIndicator,
   ComposerExtraControls,
-  ComposerModelSelector,
+  ComposerTrailingWithModelSelector,
   MessageFooterExtra,
   NextChatWelcome,
   NextReasoningGroup,
@@ -117,5 +117,6 @@ export const THREAD_SLOTS = {
 
 // The composer's model selector renders nothing under two models, so the
 // showcase (no model list) shows no picker; the chat page gates it further on
-// its own `modelPickerAllowed`.
-export const MODEL_SELECTOR_SLOT = ComposerModelSelector;
+// its own `modelPickerAllowed`. It sits in the trailing slot, just left of the
+// mic (COMPOSER-01), so this replaces THREAD_SLOTS' own ComposerExtraEnd.
+export const MODEL_TRAILING_SLOT = ComposerTrailingWithModelSelector;

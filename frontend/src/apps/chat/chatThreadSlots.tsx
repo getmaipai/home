@@ -143,7 +143,7 @@ export function ComposerModelSelector() {
       effort={mode}
       onEffortChange={(effort) => setMode(effort === "thinking" ? "thinking" : "instant")}
     >
-      <ModelSelectorTrigger variant="ghost" size="sm" aria-label="Choose model" className="max-w-48">
+      <ModelSelectorTrigger variant="ghost" size="sm" aria-label="Choose model" className="max-w-40 shrink min-w-0">
         <ModelSelectorValue showEffort />
       </ModelSelectorTrigger>
       <ModelSelectorContent side="top" align="start">
@@ -152,6 +152,18 @@ export function ComposerModelSelector() {
         <ModelSelectorEffort label="Mode" />
       </ModelSelectorContent>
     </ModelSelectorRoot>
+  );
+}
+
+/** COMPOSER-01: ChatGPT puts the model label just left of the mic, so the one
+ * selector rides the trailing ComposerExtraEnd slot in front of the existing
+ * trailing controls instead of the leading ComposerExtra slot beside Add. */
+export function ComposerTrailingWithModelSelector() {
+  return (
+    <>
+      <ComposerModelSelector />
+      <ComposerExtraControls />
+    </>
   );
 }
 

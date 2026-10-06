@@ -124,8 +124,8 @@ export function ComposerDictationWaveform() {
       return;
     }
     if (shell.hasAttribute("data-multiline")) return;
-    const lineHeight = parseFloat(getComputedStyle(element).lineHeight) || 24;
-    if (text.includes("\n") || element.scrollHeight > lineHeight * 1.5 + 24) shell.setAttribute("data-multiline", "");
+    const lineHeight = parseFloat(getComputedStyle(element).lineHeight) || 22;
+    if (text.includes("\n") || element.scrollHeight > lineHeight * 1.5 + 14) shell.setAttribute("data-multiline", "");
   }, [text, dictating]);
 
   const input = !dictating ? (
@@ -150,7 +150,7 @@ export function ComposerDictationWaveform() {
       // eslint exemption for that non-Tailwind naming convention.
       // deliberate type-floor exception: the owner's chat layout (RAIL-01,
       // 2026-10-06) sets the composer text at 15px, ChatGPT's density.
-      className="caret-primary placeholder:text-muted-foreground/60 max-h-38 min-h-12 w-full resize-none bg-transparent px-2 py-3 text-[15px] leading-6 outline-none"
+      className="caret-primary placeholder:text-muted-foreground/60 max-h-40 min-h-9 w-full resize-none bg-transparent px-2 py-[7px] text-[15px] leading-[22px] outline-none"
       rows={1}
       enterKeyHint="send"
       aria-label="Message input"
@@ -164,7 +164,7 @@ export function ComposerDictationWaveform() {
     // this whole wrapper computing to a genuine 0px height. `w-full`
     // is the same horizontal-growth approach the kit's own Input
     // already uses in this exact spot.
-    <div className="flex h-12 w-full items-center px-1">
+    <div className="flex h-9 w-full items-center px-1">
       <span className="sr-only">Listening</span>
       <div aria-hidden="true" className="flex h-full min-w-0 flex-1 items-center gap-[2px] overflow-hidden">
         {levels.map((level, index) => (

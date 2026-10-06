@@ -261,7 +261,7 @@ export function ComposerAddMenu() {
   if (directAttachment) {
     return (
       <ComposerPrimitive.AddAttachment asChild>
-        <ComposerAttachButton aria-label="Add" className="size-12" />
+        <ComposerAttachButton aria-label="Add" className="relative before:absolute before:-inset-2 before:content-['']" />
       </ComposerPrimitive.AddAttachment>
     );
   }
