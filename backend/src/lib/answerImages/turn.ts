@@ -20,6 +20,10 @@ import { selectAnswerImages, type AnswerImageSelection, type AnswerImageTrace } 
 export const SHOW_IMAGES_TOOL_ID = "show_images";
 /** The whole pipeline's wall budget beside the answer; past it, no pictures. */
 export const ANSWER_IMAGES_BUDGET_MS = 4_000;
+/** The part of that budget kept for validating and caching what arrived:
+ * the picture fetch stops this long before the budget ends (ANSWER-IMG-05,
+ * measured 2026-10-06: about 175 ms per 1280 px photo, four at a time). */
+const ANSWER_IMAGES_FINISH_MS = 1_000;
 
 export type AnswerImageTurnState = {
   subject: string;
@@ -35,7 +39,7 @@ export type AnswerImageTurnState = {
 /** Section 4.3's one line, the same whatever the pipeline later finds: no
  * count, no bytes, and the model is told never to mention them. */
 export function showImagesResultLine(subject: string): string {
-  return `Photos of ${subject} will be shown above or beside your answer if good ones are found. Do not mention, describe, list or link them.`;
+  return `Photos of ${subject} will be shown above or beside your answer if good ones are found. The person sees them without your help: never mention photos, pictures, images or search results in your answer, and never describe, list or link them.`;
 }
 export const SHOW_IMAGES_UNAVAILABLE_LINE = "Photos cannot be shown here. Answer without mentioning photos.";
 
@@ -62,7 +66,8 @@ export function startAnswerImages(state: TurnState, subject: string): AnswerImag
   const budget = new Promise<AnswerImageSelection>((resolve) => {
     timer = setTimeout(() => resolve({ set: null, trace: { subject, skipped: "error" } }), ANSWER_IMAGES_BUDGET_MS);
   });
-  entry.done = Promise.race([selectAnswerImages({ subject, actor: state.actor, band, roster }), budget])
+  const deadlineAt = Date.now() + ANSWER_IMAGES_BUDGET_MS - ANSWER_IMAGES_FINISH_MS;
+  entry.done = Promise.race([selectAnswerImages({ subject, actor: state.actor, band, roster, deadlineAt }), budget])
     .catch((): AnswerImageSelection => ({ set: null, trace: { subject, skipped: "error" } }))
     .then((selection) => {
       clearTimeout(timer);

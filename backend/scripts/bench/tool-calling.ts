@@ -34,6 +34,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 import { SPEC_DIR } from "@/lib/specDir";
 import { CATALOG } from "@/lib/modelCatalog";
+import answerImageRows from "./datasets/answer-images.json";
 
 interface ToolCallCorpusRow {
   utterance: string;
@@ -97,10 +98,15 @@ const WRITE_DOCUMENT_ROWS: ToolCallCorpusRow[] = [
  * backend/packages manifest on disk (lib/projects/tool.ts's own
  * header), the same shape `nodes/model.ts`'s own `toolSpecFor()`
  * special-cases - mirrored here for the identical reason. */
+// ANSWER-IMG-05: MAIPAI_BENCH_OFFER=show_images offers a tool beside the
+// shipped budget set, so a candidate's effect on the existing corpus is
+// measured before it joins the catalog record (never a change to the record).
+const EXTRA_OFFERED = (process.env.MAIPAI_BENCH_OFFER ?? "").split(",").map((id) => id.trim()).filter(Boolean);
+
 function budgetOfferedTools(): ToolSpec[] {
   const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
   if (!entry?.turn_budget) throw new Error("qwen3-8b-instruct-q4-k-m has no turn_budget in modelCatalog.ts");
-  return entry.turn_budget.tools_offered
+  return [...new Set([...entry.turn_budget.tools_offered, ...EXTRA_OFFERED])]
     .slice()
     .sort()
     .map((id) => {
@@ -184,7 +190,8 @@ async function main(): Promise<{ executed: number; engine: string }> {
   }
 
   const budgetExecuted = await budgetOfferedPass();
-  return { executed: corpus.length * REPEATS + budgetExecuted, engine };
+  const imageExecuted = await answerImagesPass();
+  return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted, engine };
 }
 
 /** PHRASE-02's coordinator follow-up (CHAT-RICH-01), kept for the next
@@ -228,6 +235,40 @@ async function budgetOfferedPass(): Promise<number> {
     console.log(`${rowPass}/${REPEATS}  "${row.utterance}" -> expected [${row.expect_calls.join(", ")}], got: ${outcomes.join(" | ")}`);
   }
   console.log(`\nBudget-offered pass, false calls on negative rows: ${falseCalls}/${falseCallAttempts}`);
+  return executed;
+}
+
+/** ANSWER-IMG-05: section 13's single-turn adult rows
+ * (datasets/answer-images.json, the one definition answer-images.ts also
+ * reads) over the same budget set: a bare `complete()` without Home's system
+ * prompt, so it isolates the tool block's own pull. A visual row passes when
+ * `show_images` is among the calls (a search beside it is fine); any other
+ * row passes when it is not. answer-images.ts measures the real turn path. */
+async function answerImagesPass(): Promise<number> {
+  const tools = budgetOfferedTools();
+  if (!tools.some((t) => t.id === "show_images")) {
+    console.log("\nAnswer-images rows skipped: show_images is not offered (set MAIPAI_BENCH_OFFER=show_images to measure it before it ships).");
+    return 0;
+  }
+  const rows = (answerImageRows.rows as { id: string; label: string; person: string; text: string; setup?: string; spoken?: boolean }[])
+    .filter((row) => row.person === "owner" && !row.setup && !row.spoken && (row.label === "V" || row.label === "N"));
+  console.log(`\nAnswer-images pass: ${rows.length} rows, ${REPEATS} repeats each...\n`);
+  let executed = 0, visualRuns = 0, visualCalls = 0, otherRuns = 0, otherCalls = 0;
+  for (const row of rows) {
+    const outcomes: string[] = [];
+    let called = 0;
+    for (let i = 0; i < REPEATS; i++) {
+      const result = await completeWithTimeout("chat", [{ role: "user", content: row.text }], { tools, tool_choice: "auto" });
+      if (!result.ok) { outcomes.push("no reply"); continue; }
+      executed++;
+      const ids = (result.value.tool_calls ?? []).map((c) => c.tool).sort();
+      if (ids.includes("show_images")) called++;
+      outcomes.push(ids.length === 0 ? "[]" : `[${ids.join(", ")}]`);
+    }
+    if (row.label === "V") { visualRuns += REPEATS; visualCalls += called; } else { otherRuns += REPEATS; otherCalls += called; }
+    console.log(`${row.label} ${called}/${REPEATS} show_images  "${row.text}" -> ${outcomes.join(" | ")}`);
+  }
+  console.log(`\nAnswer-images pass: show_images on ${visualCalls}/${visualRuns} visual runs, ${otherCalls}/${otherRuns} non-visual runs`);
   return executed;
 }
 

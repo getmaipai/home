@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Info",
   "display": "Show Pictures",
-  "description": "Show a few photos of a real thing they can look at, like a famous person, place, show, animal, car or product.",
+  "description": "Show photos whenever someone asks about or mentions a famous person, place, film, show, animal, car or product.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -21,7 +21,7 @@
     "type": "object",
     "required": ["subject"],
     "properties": {
-      "subject": { "type": "string", "minLength": 1, "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Use this when they ask what something looks like, ask who or what a well-known thing is, or are chatting about a thing whose look matters; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. The app shows the photos itself; never describe, list or link them." }
+      "subject": { "type": "string", "minLength": 1, "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Use this when they ask what something looks like, ask who or what a well-known thing is, or are chatting about a thing whose look matters, for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\" and \"what is the PlayStation 5\" means subject \"PlayStation 5\"; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. The app shows the photos itself; never describe, list or link them." }
     }
   },
   "incognito": "unaffected",

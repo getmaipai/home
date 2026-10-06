@@ -159,6 +159,44 @@ describe("ANSWER-IMG-02: sources per subject and band", () => {
     expect(r5.set?.visible).toBe(3);
     expect(new Set(srcs(r5.set?.items)).size).toBe(5);
   });
+
+  // ANSWER-IMG-05, measured on the real network (2026-10-06): the image
+  // search took 1.2 s after the Commons lookup had finished, so a thing's
+  // pictures could not fit the turn's budget. Both ask at once now.
+  test("the image search asks beside the Commons lookup, not after it", async () => {
+    const world = fixtureWorld([KOALA], { searchRows: () => [] });
+    let commonsAnswered = false;
+    const seen: { searchedBeforeCommonsAnswered: boolean | null } = { searchedBeforeCommonsAnswered: null };
+    __setAnswerImageDepsForTests({
+      ...world.deps,
+      fetchJson: async (url) => {
+        if (!url.includes("commons.wikimedia.org")) return world.deps.fetchJson!(url);
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        commonsAnswered = true;
+        return world.deps.fetchJson!(url);
+      },
+      imageSearch: async (query, actor, band) => {
+        seen.searchedBeforeCommonsAnswered ??= !commonsAnswered;
+        return world.deps.imageSearch!(query, actor, band);
+      },
+    });
+    await selectAnswerImages({ subject: "koala", actor: people.owner, band: "adult", roster: [] });
+    expect(seen.searchedBeforeCommonsAnswered).toBe(true);
+  });
+
+  test("the picture fetch ends by the deadline the turn passes in", async () => {
+    const world = fixtureWorld([TOWER]);
+    const hang = async (_url: string | URL | Request, init?: RequestInit) => await new Promise<Response>((_resolve, reject) => {
+      (init?.signal as AbortSignal).addEventListener("abort", () => reject(new Error("fixture timeout")), { once: true });
+    });
+    __setAnswerImageDepsForTests({ ...world.deps, fetchOptions: { ...world.deps.fetchOptions, fetch: hang as unknown as typeof fetch } });
+    const started = Date.now();
+    const { set, trace } = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [], deadlineAt: started + 500 });
+    expect(Date.now() - started).toBeLessThan(1_500);
+    expect(set).toBeNull();
+    expect(trace.skipped).toBe("none_survived");
+    expect(trace.dropped_by_fetch?.deadline).toBeGreaterThan(0);
+  });
 });
 
 describe("ANSWER-IMG-02: SearXNG image search per band", () => {

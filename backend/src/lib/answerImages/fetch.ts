@@ -25,7 +25,10 @@ function quiet(host: string, until: number, now: number): void {
 
 export type AnswerImageSource = { id: string; url: string; leadImage?: boolean };
 export type AnswerImageFetchResult = { images: ValidatedAnswerImage[]; originals: Record<string, string>; dropped_by_fetch: Record<string, number>; dropped_by_quality: Record<string, number> };
-type Options = { fetch?: typeof fetch; dnsLookup?: DnsLookup; now?: () => number };
+/** `deadlineAt` (ms, the same clock as `now`): the caller's own end for the
+ * set when it comes before the set's 2.5 s (the turn's picture budget minus
+ * the time validation and caching need). */
+type Options = { fetch?: typeof fetch; dnsLookup?: DnsLookup; now?: () => number; deadlineAt?: number };
 
 async function validateUrl(url: URL, dns?: DnsLookup): Promise<void> {
   if (!/^https?:$/.test(url.protocol) || url.username || url.password) throw new Error("unsupported image URL");
@@ -104,6 +107,7 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
       if (!bytes) {
         if (timedOut && attempt === 0 && now() < deadline) continue;
         if (!timedOut) dropped.size_limit = (dropped.size_limit ?? 0) + 1;
+        else if (now() >= deadline) dropped.deadline = (dropped.deadline ?? 0) + 1;
         return null;
       }
       if (now() > deadline) return null;
@@ -112,6 +116,9 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
       if (error instanceof SsrfBlockedError) { dropped.ssrf = (dropped.ssrf ?? 0) + 1; return null; }
       if (controller.signal.aborted) {
         if (timedOut && attempt === 0 && now() < deadline) continue;
+        // Cut off by the set's deadline while in flight: counted, so the
+        // trace says the time budget, not the host, cost this picture.
+        if (timedOut && now() >= deadline) dropped.deadline = (dropped.deadline ?? 0) + 1;
         return null;
       }
       if (attempt === 1 || now() >= deadline) return null;
@@ -123,21 +130,28 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
 export async function fetchAnswerImages(sources: AnswerImageSource[], options: Options = {}): Promise<AnswerImageFetchResult> {
   const dropped_by_fetch: Record<string, number> = {};
   const countDrop = (why: string) => { dropped_by_fetch[why] = (dropped_by_fetch[why] ?? 0) + 1; };
-  const deadline = (options.now ?? Date.now)() + SET_DEADLINE_MS;
+  const now = options.now ?? Date.now;
+  const deadline = Math.min(now() + SET_DEADLINE_MS, options.deadlineAt ?? Number.POSITIVE_INFINITY);
   const input = sources.slice(0, 12);
   if (sources.length > 12) countDrop("candidate_cap");
-  const results: Awaited<ReturnType<typeof fetchOne>>[] = [];
-  for (let i = 0; i < input.length; i += 4) {
-    if ((options.now ?? Date.now)() >= deadline) { countDrop("deadline"); break; }
-    const group = await Promise.all(input.slice(i, i + 4).map(source => fetchOne(source, options, deadline, dropped_by_fetch)));
-    results.push(...group);
-  }
+  // Four at a time as a pool, not in lockstep groups: a picture that never
+  // answers holds one slot until its own timeout, never the other three
+  // (ANSWER-IMG-05, measured on Commons 2026-10-06). What has not arrived by
+  // the deadline is dropped; what arrived is validated and kept.
+  const results: Awaited<ReturnType<typeof fetchOne>>[] = new Array(input.length).fill(null);
+  let next = 0;
+  let stoppedAtDeadline = false;
+  const worker = async () => {
+    while (next < input.length) {
+      if (now() >= deadline) { stoppedAtDeadline = true; return; }
+      const i = next++;
+      results[i] = await fetchOne(input[i]!, options, deadline, dropped_by_fetch);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, input.length) }, worker));
+  if (stoppedAtDeadline) countDrop("deadline");
   const good = results.filter((r): r is NonNullable<typeof r> => r !== null);
   const checked = await filterAnswerImages(good.map(item => ({ id: item.id, bytes: item.bytes, contentType: item.contentType, leadImage: input.find(s => s.id === item.id)?.leadImage, sourceHost: item.host })));
-  if ((options.now ?? Date.now)() >= deadline) {
-    countDrop("deadline");
-    return { images: [], originals: {}, dropped_by_fetch, dropped_by_quality: checked.dropped_by_quality };
-  }
   const originals: Record<string, string> = {};
   for (const image of checked.images) {
     const source = input.find(item => item.id === image.id);

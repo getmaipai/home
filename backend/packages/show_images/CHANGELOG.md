@@ -2,6 +2,17 @@
 
 All notable changes to the Show Pictures package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [Unreleased]
+
+### Changed
+
+- ANSWER-IMG-05: the description asks for photos whenever someone asks about
+  or mentions a famous person, place, film, show, animal, car or product, and
+  the `subject` argument carries two short examples; measured on the real
+  model, recall went from 65.5 to 80 percent with no call on a non-visual row.
+  Still not offered to the model: recall and the time to first text when it is
+  called alone miss their bars.
+
 ## [0.1.0] - 2026-10-06
 
 ### Added

@@ -36171,3 +36171,30 @@ Implemented the hub half of the robot channel against `spec-v0.1.76`. `GET /api/
 Fail-first coverage exercises an unauthenticated upgrade, disconnected command replay and ack, mute state update, device and person settings delivery, time envelope, both heartbeat directions, and connection replacement. The device-session route allowlist was extended only for this exact GET path. Low review completed, with medium scrutiny on that auth allowlist and the command/heartbeat wire shapes.
 
 The final `bash scripts/check.sh` passed: backend 4,732/4,732, scripts 82/82, frontend 1,355/1,355, with typecheck, lint, build, a11y, docs, and standards checks green. Two intermediate runs exposed unrelated timing-sensitive failures (`partialRestore` temporary backup read, then `summaryRefresh` duplicate debounce); each passed alone, and the final sharded gate passed. Full output is in `data-scratch/chat-ab/a47-gate.log`.
+
+## ANSWER-IMG-05: the picture bench, and why `show_images` stays off (2026-10-06)
+
+Measured on the real turn path (`backend/scripts/bench/answer-images.ts`, rows in `scripts/bench/datasets/answer-images.json`, section 13 of the design note) against the resident chat model on the MaiPai Stack: engine `local b10797-832fd6f17`, model file `Qwen3-8B-Q4_K_M.gguf`, Apple M4 Pro with 24 GB unified memory, production sampling, thinking off, 5 repeats per row, real SearXNG and Wikimedia at a person's pace. Two arms alternate by round: OFF is the catalog record as shipped, ON adds `show_images`. Other gates were running on the machine (load 15 to 20), so absolute times are high; the arms share the load. Arm 2 ran after the Stack's restart onto the build with `/v1/tokenize`.
+
+| Bar (design 4.3) | Baseline wording | Arm 1: two examples on `subject`, firmer result line | Arm 2: arm 1 plus a firmer first sentence | Pass |
+|---|---|---|---|---|
+| Recall, visual rows (55 runs) | 65.5% | 76.4% | 80.0% | no (85%) |
+| Calls on visual rows | 100% | 100% | 100% | yes |
+| Non-visual rows calling it (50 runs) | 0% | 0% | 0% | yes |
+| 50-turn non-visual conversation | 0 calls | not run | 0 calls | yes |
+| First text, not called (median change) | +12 ms | not run | +17 ms | yes |
+| First text, called alone (median change) | +1.02 s | not run | +1.14 s | no (+1.0 s) |
+| First text, called with `websearch` | never happened | never happened | never happened | n/a |
+| Existing corpus (`tool-calling.ts` budget pass, offered vs not) | | | no row worse, 0/30 false calls | yes |
+| Broken, blocked or duplicate tiles | 0 of 218 | 0 of 301 | 0 of 291 | yes |
+| Badge equals gallery count | every set | every set | every set | yes |
+| Picture fetches per call | at most 12 | at most 12 | at most 12 | yes |
+| Wikimedia API calls per call | median 3, max 4 | median 3, max 4 | median 3, max 4 | no for a teen (the article check is a 4th) |
+
+Arm 2 per row (ON calls of 5): Corey Feldman 5, David Blaine 5, "what does he look like" 5 (subject David Blaine every time), Stranger Things 5, Eiffel Tower 5, koala 5, Pontiac Fiero 5, Nintendo Switch 5, the Jurassic Park remark 0, teen red panda 3, child with pictures on 1. Every non-visual row 0, including the household member's name. Not offered, as required: the child with pictures off, the spoken turn. The private name and the living person under 18 showed no pictures (the under-18 call was skipped as `minor_subject`). Adult rows alone reach 40 of 45 (89%); the misses are the casual film remark and the minors' rows, whose system prompt differs.
+
+Found and fixed while measuring: the picture pipeline showed nothing for most things. One Commons picture that never answered held its group of four to the 2.5 s set deadline, and `fetchAnswerImages` then threw away the whole set, pictures that had arrived in the first second included; the SearXNG image search (1.2 to 2 s) ran only after the Commons lookup; validation (about 175 ms per 1280 px photo) ran one picture at a time. A koala answer took 5.8 s and showed nothing, past the turn's 4 s picture budget. Now the fetch is a pool of four that keeps what arrived, stops by a deadline the turn passes in (budget minus 1 s for validation and caching), the search asks beside Wikimedia, and four pictures are validated at once. Regression tests in `answerImageFetch.test.ts` and `answerImagesSelect.test.ts`, each seen failing first. After the fix, 41 of 45 calls in arm 2 showed pictures.
+
+Opened and judged by eye (every contact sheet of all three runs): no broken tile, no exact duplicate, but tiles a person would call wrong do show in the visible row. David Blaine's Commons category puts London City Hall second in every set; SearXNG's results for Stranger Things and the Nintendo Switch include photos of private people (young cosplayers, a shopper carrying a box), a LEGO set and an unrelated object; one teen red panda set has a desktop screenshot. The child's strict-SearXNG koala set and the Fiero, Eiffel Tower and red panda Commons sets are clean. Four of 45 arm 2 answers still mention the photos ("photos of David Blaine can be viewed"), and for "what does he look like" the model now declines to describe him, because the result line says never to describe.
+
+What next, in order: (1) an owner ruling on whether a thing's SearXNG pictures may show private people, before the tool is on for anyone; (2) the called-alone cost: the extra model round is about 1 s on this machine under load, so re-measure it on a quiet machine before changing anything; (3) recall: the remaining misses are casual remarks about a film and the minors' prompts; the next arm is the result line rewritten to allow describing the subject from knowledge, and a re-run on a quiet machine; a second-pass judge still needs an owner ruling on rule 1. The tool stays out of `modelCatalog.ts`'s `tools_offered` until a run clears every bar.

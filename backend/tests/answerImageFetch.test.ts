@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { fetchAnswerImages, __setAnswerImageDnsLookupForTests, __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
+import { syntheticPhoto } from "./answerImagesFixture";
 
 afterEach(() => { __setAnswerImageDnsLookupForTests(null); __resetAnswerImageFetchForTests(); });
 
@@ -110,6 +111,38 @@ describe("answer image fetch", () => {
     const result = await fetchAnswerImages([{ id: "deadline", url: "https://deadline.example/picture" }], { fetch: fetcher as unknown as typeof fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }) });
     expect(Date.now() - started).toBeLessThan(2_800);
     expect(calls).toBe(2);
+    expect(result.images).toHaveLength(0);
+  });
+
+  // ANSWER-IMG-05, found on the real engine (2026-10-06): one Commons picture
+  // that never answered held its group of four to the deadline, and then the
+  // whole set was thrown away, so a koala answer showed nothing although
+  // seven good pictures had arrived in the first second.
+  test("a picture that never answers costs only itself, never the pictures that arrived in time", async () => {
+    const photos = await Promise.all([2, 3, 4].map((seed) => syntheticPhoto(seed)));
+    const fetcher = async (url: string | URL | Request, init?: RequestInit) => {
+      const host = new URL(url.toString()).hostname;
+      if (host === "hang.example") {
+        return await new Promise<Response>((_resolve, reject) => {
+          (init?.signal as AbortSignal).addEventListener("abort", () => reject(new Error("fixture timeout")), { once: true });
+        });
+      }
+      return new Response(photos[Number(host.replace(/\D/g, ""))]!, { status: 200, headers: { "content-type": "image/jpeg" } });
+    };
+    const sources = [{ id: "hang", url: "https://hang.example/picture" }, ...[0, 1, 2].map((i) => ({ id: `ok${i}`, url: `https://ok${i}.example/picture` }))];
+    const started = Date.now();
+    const result = await fetchAnswerImages(sources, { fetch: fetcher as unknown as typeof fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }) });
+    expect(Date.now() - started).toBeLessThan(2_800);
+    expect(result.images.map((image) => image.id).sort()).toEqual(["ok0", "ok1", "ok2"]);
+  });
+
+  test("the set stops at the caller's deadline when that comes before its own", async () => {
+    const fetcher = async (_url: string | URL | Request, init?: RequestInit) => await new Promise<Response>((_resolve, reject) => {
+      (init?.signal as AbortSignal).addEventListener("abort", () => reject(new Error("fixture timeout")), { once: true });
+    });
+    const started = Date.now();
+    const result = await fetchAnswerImages([{ id: "slow", url: "https://slow.example/picture" }], { fetch: fetcher as unknown as typeof fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }), deadlineAt: started + 600 });
+    expect(Date.now() - started).toBeLessThan(1_000);
     expect(result.images).toHaveLength(0);
   });
 });

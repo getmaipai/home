@@ -65,53 +65,75 @@ function nearestDistance(a: PerceptualHashes, b: PerceptualHashes): number {
   return min;
 }
 
+/** One candidate's checks, in order: the first failing check's reason, or
+ * the validated picture. */
+async function checkOne(candidate: AnswerImageCandidate): Promise<ValidatedAnswerImage | QualityDropReason> {
+  if (candidate.bytes.byteLength > MAX_BYTES) return "decode_error";
+  const declared = candidate.contentType.split(";")[0]!.trim().toLowerCase();
+  if (declared === "image/gif") return "animated_image";
+  const detected = await fileTypeFromBuffer(candidate.bytes).catch(() => undefined);
+  if (!detected && declared !== "image/svg+xml") return "not_image";
+  if (!ALLOWED.has(declared) || !detected || MIME_BY_EXT[detected.ext] !== declared) return "unsupported_format";
+  let metadata: Metadata;
+  try { metadata = await sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS, failOn: "error" }).metadata(); }
+  catch { return "decode_error"; }
+  if ((metadata.pages ?? 1) > 1) return "animated_image";
+  if (!metadata.width || !metadata.height) return "decode_error";
+  const short = Math.min(metadata.width, metadata.height);
+  if (short < (candidate.leadImage ? 400 : 200)) return "too_small";
+  const ratio = metadata.width / metadata.height;
+  if (ratio < 0.4 || ratio > 2.5) return "bad_aspect_ratio";
+  const digest = createHash("sha256").update(candidate.bytes).digest("hex");
+  if (fingerprints.sha256.includes(digest)) return "known_placeholder";
+  if (declared === "image/jpeg" && metadata.width * metadata.height >= 1_000_000 && candidate.bytes.byteLength / (metadata.width * metadata.height) < 0.02) return "low_bytes_per_pixel";
+  let stat: Stats;
+  let hs: Awaited<ReturnType<typeof hashes>>;
+  try {
+    const pipeline = sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS });
+    [stat, hs] = await Promise.all([pipeline.stats(), hashes(candidate.bytes)]);
+  } catch { return "decode_error"; }
+  const raw = await sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS }).resize(64, 64, { fit: "fill" }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const alphaValues = raw.data.filter((_, i) => i % raw.info.channels === 3);
+  if (alphaValues.length && alphaValues.filter(a => a < 128).length / alphaValues.length > 0.3) return "mostly_transparent";
+  const gray = stat.channels.slice(0, 3).reduce((sum, channel) => sum + channel.stdev, 0) / 3;
+  if (gray < 2) return "known_placeholder";
+  if (fingerprints.dhash.some(hash => hs.dhash.some(actual => hamming(hash, actual) === 0))) return "known_placeholder";
+  const colors = new Map<string, number>();
+  for (let i = 0; i < raw.data.length; i += raw.info.channels) {
+    const key = `${raw.data[i]}:${raw.data[i + 1]}:${raw.data[i + 2]}`;
+    colors.set(key, (colors.get(key) ?? 0) + 1);
+  }
+  const topTwo = [...colors.values()].sort((a, b) => b - a).slice(0, 2).reduce((a, b) => a + b, 0) / (64 * 64);
+  if (gray < 8 || topTwo >= 0.9 || hs.dhash.some(hash => hash === "0".repeat(64) || hash === "1".repeat(64))) return "flat_or_text";
+  const sourceHost = candidate.sourceHost?.toLowerCase().replace(/\.$/, "");
+  if (sourceHost && fingerprints.stock_hosts.some(host => sourceHost === host || sourceHost.endsWith(`.${host}`))) return "stock_preview";
+  const full = await sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS }).rotate().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 86 }).toBuffer();
+  const tile = await sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS }).rotate().resize({ width: 640, height: 640, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
+  return { id: candidate.id, tile: new Uint8Array(tile), full: new Uint8Array(full), width: metadata.width, height: metadata.height, leadImage: candidate.leadImage ?? false, sharpness: stat.sharpness, hash: hs };
+}
+
+/** Pictures validated at once; each check decodes the picture several times
+ * (about 175 ms for a 1280 px photo), so a set of twelve one after another
+ * missed the turn's picture budget (ANSWER-IMG-05, 2026-10-06). */
+const VALIDATE_AT_ONCE = 4;
+
 export async function filterAnswerImages(candidates: AnswerImageCandidate[]): Promise<QualityResult> {
   const dropped_by_quality: QualityResult["dropped_by_quality"] = {};
   const drop = (reason: QualityDropReason) => { dropped_by_quality[reason] = (dropped_by_quality[reason] ?? 0) + 1; };
-  const valid: ValidatedAnswerImage[] = [];
-  for (const candidate of candidates) {
-    if (candidate.bytes.byteLength > MAX_BYTES) { drop("decode_error"); continue; }
-    const declared = candidate.contentType.split(";")[0]!.trim().toLowerCase();
-    if (declared === "image/gif") { drop("animated_image"); continue; }
-    const detected = await fileTypeFromBuffer(candidate.bytes).catch(() => undefined);
-    if (!detected && declared !== "image/svg+xml") { drop("not_image"); continue; }
-    if (!ALLOWED.has(declared) || !detected || MIME_BY_EXT[detected.ext] !== declared) { drop("unsupported_format"); continue; }
-    let metadata: Metadata;
-    try { metadata = await sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS, failOn: "error" }).metadata(); }
-    catch { drop("decode_error"); continue; }
-    if ((metadata.pages ?? 1) > 1) { drop("animated_image"); continue; }
-    if (!metadata.width || !metadata.height) { drop("decode_error"); continue; }
-    const short = Math.min(metadata.width, metadata.height);
-    if (short < (candidate.leadImage ? 400 : 200)) { drop("too_small"); continue; }
-    const ratio = metadata.width / metadata.height;
-    if (ratio < 0.4 || ratio > 2.5) { drop("bad_aspect_ratio"); continue; }
-    const digest = createHash("sha256").update(candidate.bytes).digest("hex");
-    if (fingerprints.sha256.includes(digest)) { drop("known_placeholder"); continue; }
-    if (declared === "image/jpeg" && metadata.width * metadata.height >= 1_000_000 && candidate.bytes.byteLength / (metadata.width * metadata.height) < 0.02) { drop("low_bytes_per_pixel"); continue; }
-    let stat: Stats;
-    let hs: Awaited<ReturnType<typeof hashes>>;
-    try {
-      const pipeline = sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS });
-      [stat, hs] = await Promise.all([pipeline.stats(), hashes(candidate.bytes)]);
-    } catch { drop("decode_error"); continue; }
-    const raw = await sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS }).resize(64, 64, { fit: "fill" }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-    const alphaValues = raw.data.filter((_, i) => i % raw.info.channels === 3);
-    if (alphaValues.length && alphaValues.filter(a => a < 128).length / alphaValues.length > 0.3) { drop("mostly_transparent"); continue; }
-    const gray = stat.channels.slice(0, 3).reduce((sum, channel) => sum + channel.stdev, 0) / 3;
-    if (gray < 2) { drop("known_placeholder"); continue; }
-    if (fingerprints.dhash.some(hash => hs.dhash.some(actual => hamming(hash, actual) === 0))) { drop("known_placeholder"); continue; }
-    const colors = new Map<string, number>();
-    for (let i = 0; i < raw.data.length; i += raw.info.channels) {
-      const key = `${raw.data[i]}:${raw.data[i + 1]}:${raw.data[i + 2]}`;
-      colors.set(key, (colors.get(key) ?? 0) + 1);
+  const outcomes: (ValidatedAnswerImage | QualityDropReason)[] = new Array(candidates.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < candidates.length) {
+      const i = next++;
+      outcomes[i] = await checkOne(candidates[i]!).catch((): QualityDropReason => "decode_error");
     }
-    const topTwo = [...colors.values()].sort((a, b) => b - a).slice(0, 2).reduce((a, b) => a + b, 0) / (64 * 64);
-    if (gray < 8 || topTwo >= 0.9 || hs.dhash.some(hash => hash === "0".repeat(64) || hash === "1".repeat(64))) { drop("flat_or_text"); continue; }
-    const sourceHost = candidate.sourceHost?.toLowerCase().replace(/\.$/, "");
-    if (sourceHost && fingerprints.stock_hosts.some(host => sourceHost === host || sourceHost.endsWith(`.${host}`))) { drop("stock_preview"); continue; }
-    const full = await sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS }).rotate().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 86 }).toBuffer();
-    const tile = await sharp(candidate.bytes, { limitInputPixels: MAX_PIXELS }).rotate().resize({ width: 640, height: 640, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
-    valid.push({ id: candidate.id, tile: new Uint8Array(tile), full: new Uint8Array(full), width: metadata.width, height: metadata.height, leadImage: candidate.leadImage ?? false, sharpness: stat.sharpness, hash: hs });
+  };
+  await Promise.all(Array.from({ length: Math.min(VALIDATE_AT_ONCE, candidates.length) }, worker));
+  // Results in the candidates' own order, so the sort below breaks ties as before.
+  const valid: ValidatedAnswerImage[] = [];
+  for (const outcome of outcomes) {
+    if (typeof outcome === "string") drop(outcome);
+    else valid.push(outcome);
   }
   valid.sort((a, b) => Number(b.leadImage) - Number(a.leadImage) || b.width * b.height - a.width * a.height || b.sharpness - a.sharpness);
   const chosen: ValidatedAnswerImage[] = [];

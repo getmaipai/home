@@ -67,8 +67,9 @@ function clip(text: string, max: number): string {
 }
 
 /** The pictures for `subject` that `actor` (in `band`) may see. Never
- * throws: any failure is no pictures (rule 6). */
-export async function selectAnswerImages(input: { subject: string; actor: PersonRow; band: AgeBand; roster: readonly string[] }): Promise<AnswerImageSelection> {
+ * throws: any failure is no pictures (rule 6). `deadlineAt` is when the
+ * picture fetch must stop so the set is ready inside the turn's budget. */
+export async function selectAnswerImages(input: { subject: string; actor: PersonRow; band: AgeBand; roster: readonly string[]; deadlineAt?: number }): Promise<AnswerImageSelection> {
   const subject = input.subject.trim().slice(0, 200);
   const trace: AnswerImageTrace = { subject };
   const skip = (why: AnswerImageSkip): AnswerImageSelection => ({ set: null, trace: { ...trace, skipped: why } });
@@ -89,28 +90,30 @@ export async function selectAnswerImages(input: { subject: string; actor: Person
     if (trips(`${entity.label}. ${entity.description}`, input.band)) return skip("floor_subject");
     if (entity.human && (entity.birthDate === undefined ? false : isUnder18(entity.birthDate, now()))) return skip("minor_subject");
 
-    const candidates: Candidate[] = [];
-    let wikimedia = 0, searxng = 0;
     // Wikimedia (sources 1 and 2): adults; a teen only once the article's own
     // text passed the floor; never a child (Wikimedia has no safe filter).
     // A person with no birth date on record gets the lead image only.
-    let wikimediaAllowed = input.band === "adult";
-    if (input.band === "teen") {
-      const extract = await wikipediaExtract(entity.wikipediaTitle, fetchJson).catch(() => null);
-      wikimediaAllowed = extract !== null && !trips(extract, "teen");
-    }
-    if (wikimediaAllowed) {
-      const found = await wikimediaCandidates(entity, fetchJson, { leadOnly: entity.human && entity.birthDate === undefined }).catch(() => []);
-      wikimedia = found.length;
-      candidates.push(...found);
-    }
+    const fromWikimedia = async (): Promise<Candidate[]> => {
+      let allowed = input.band === "adult";
+      if (input.band === "teen") {
+        const extract = await wikipediaExtract(entity.wikipediaTitle, fetchJson).catch(() => null);
+        allowed = extract !== null && !trips(extract, "teen");
+      }
+      if (!allowed) return [];
+      return wikimediaCandidates(entity, fetchJson, { leadOnly: entity.human && entity.birthDate === undefined }).catch(() => []);
+    };
     // SearXNG images (source 4): never for a person (it returns look-alikes
-    // and strangers); a minor only through safe-search-capable engines.
-    if (!entity.human) {
+    // and strangers); a minor only through safe-search-capable engines. Asked
+    // beside Wikimedia, not after it (ANSWER-IMG-05: the search alone took
+    // 1.2 s on the household's instance, past the turn's picture budget).
+    const fromSearch = async (): Promise<Candidate[]> => {
+      if (entity.human) return [];
       const rows = await imageSearch(entity.label, input.actor, input.band).catch(() => []);
-      searxng = rows.length;
-      for (const row of rows) candidates.push({ url: row.image, page: row.url, title: row.title, description: "", lead: false });
-    }
+      return rows.map((row) => ({ url: row.image, page: row.url, title: row.title, description: "", lead: false }));
+    };
+    const [wikimediaFound, searchFound] = await Promise.all([fromWikimedia(), fromSearch()]);
+    const candidates: Candidate[] = [...wikimediaFound, ...searchFound];
+    const wikimedia = wikimediaFound.length, searxng = searchFound.length;
     // Source 3 (cited pages' og:image) is not built: no page read keeps it yet.
     trace.sources = { wikimedia, searxng };
 
@@ -129,7 +132,7 @@ export async function selectAnswerImages(input: { subject: string; actor: Person
     if (kept.length === 0) return skip("no_candidates");
 
     const sources: AnswerImageSource[] = kept.map((c, i) => ({ id: `c${i}`, url: c.url, leadImage: c.lead }));
-    const fetched = await fetchAnswerImages(sources, deps.fetchOptions ?? {});
+    const fetched = await fetchAnswerImages(sources, { ...deps.fetchOptions, ...(input.deadlineAt !== undefined ? { deadlineAt: input.deadlineAt } : {}) });
     trace.dropped_by_fetch = fetched.dropped_by_fetch;
     trace.dropped_by_quality = fetched.dropped_by_quality as Record<string, number>;
     // The filter keeps the best of each near-duplicate group; the row keeps
