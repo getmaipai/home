@@ -74,6 +74,7 @@ describe("registerPackageNotificationTypes", () => {
       template: "Severe weather: {summary}",
       configurable: true,
       defaultChannels: ["in_app"],
+      privacy: true,
       toast: true,
     });
   });
@@ -95,12 +96,12 @@ describe("registerPackageNotificationTypes", () => {
     expect(getNotificationType("safety.flagged_turn")?.configurable).toBe(false);
   });
 
-  test("a channel the spec names but Home does not deliver yet (robot, spec-v0.1.79) is left off the registered type", () => {
+  test("a channel declared by the spec is retained by the Home notification registry", () => {
     registerPackageNotificationTypes({
       id: "test-robot-pkg",
       notifications: [{ id: "test-robot-pkg.arrived", level: "passive", audience: "person", template: "Arrived", configurable: true, default_channels: ["in_app", "robot"] }],
     });
-    expect(getNotificationType("test-robot-pkg.arrived")?.defaultChannels).toEqual(["in_app"]);
+    expect(getNotificationType("test-robot-pkg.arrived")?.defaultChannels).toEqual(["in_app", "robot"]);
   });
 
   test("a package with no notifications declared is a no-op", () => {
@@ -136,4 +137,17 @@ describe("registerPackageNotificationTypes", () => {
     });
     expect(getNotificationType("test-idempotent-pkg.first")?.template).toBe("first");
   });
+});
+
+test("notification declarations preserve privacy and default absent privacy to private", () => {
+  registerPackageNotificationTypes({
+    id: "test-privacy-pkg",
+    notifications: [
+      { id: "test-privacy-pkg.private", level: "time_sensitive", audience: "person", template: "Secret", configurable: true, default_channels: ["in_app", "robot"] },
+      { id: "test-privacy-pkg.public", level: "time_sensitive", audience: "person", template: "Public", configurable: true, default_channels: ["in_app", "robot"], privacy: false },
+    ],
+  });
+  expect(getNotificationType("test-privacy-pkg.private")?.privacy).toBe(true);
+  expect(getNotificationType("test-privacy-pkg.public")?.privacy).toBe(false);
+  expect(getNotificationType("test-privacy-pkg.private")?.defaultChannels).toEqual(["in_app", "robot"]);
 });

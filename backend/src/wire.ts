@@ -788,7 +788,7 @@ export interface NotificationDeliveryView {
   typeId: string;
   level: "immediate" | "time_sensitive" | "passive";
   text: string;
-  channels: ("in_app" | "telegram")[];
+  channels: ("in_app" | "telegram" | "robot")[];
   createdAt: string;
   readAt: string | null;
   dismissedAt: string | null;

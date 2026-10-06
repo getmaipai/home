@@ -8,16 +8,16 @@
 // db/schema.ts's notificationDeliveries comment).
 //
 // What's real here: declared types (lib/notificationTypes.ts), a
-// household-wide `adults` and `person` audience, two channels (`in_app` -
-// the pending list, always on - and `telegram`, opt-in), a non-
+// household-wide `adults` and `person` audience, three channels (`in_app` -
+// the pending list, always on - `telegram`, opt-in - and `robot`, enabled
+// per person for time-sensitive types), a non-
 // configurable type that always fires regardless of preference, and a
 // thirty-day-center-shaped read/dismiss history (routes/notifications.ts).
 //
 // What's deferred, named rather than half-built: the `passive`
 // digest batching (every level delivers immediately today; a `passive`
 // type is stored and readable the same as the others, just not yet
-// batched into a scheduled digest), browser push / Go / TV overlay /
-// robot speech (no such clients exist yet to receive them), and a real
+// batched into a scheduled digest), browser push / Go / TV overlay, and a real
 // `parents_of_child` audience (Person has no parent/guardian link -
 // lib/notificationTypes.ts's own comment on why `adults` stands in).
 // Package-declared notification types are a real extension point, not
@@ -27,13 +27,14 @@
 // editing this file.
 import { eq, and, isNull, inArray, desc, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { notificationDeliveries, notificationHolds, people } from "@/db/schema";
+import { deviceCommands, devices, notificationDeliveries, notificationHolds, people } from "@/db/schema";
 import { newNotificationId } from "@/lib/id";
 import { getSettingValueForPerson, getHouseholdSettingValue } from "@/lib/settings";
 import { sendTelegramMessage } from "@/lib/telegramChannel";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listActivePeople } from "@/lib/access";
 import { getNotificationType, type NotificationChannel, type NotificationType } from "@/lib/notificationTypes";
+import { issueDeviceCommand } from "@/lib/deviceCommands";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { PersonRow } from "@/types";
 
@@ -91,6 +92,12 @@ function resolveChannelsFor(type: NotificationType, recipient: PersonRow): Notif
   if (wantsTelegram) {
     const chatId = getSettingValueForPerson(recipient.id, "notifications.telegram.chat_id") as string | undefined;
     if (chatId) channels.push("telegram");
+  }
+  if (type.level === "time_sensitive" &&
+      getSettingValueForPerson(recipient.id, "notifications.time_sensitive.robot") === true) {
+    const robots = db.select({ id: devices.id }).from(devices)
+      .where(and(eq(devices.personId, recipient.id), eq(devices.kind, "robot"))).all();
+    if (robots.length) channels.push("robot");
   }
   return channels;
 }
@@ -214,6 +221,7 @@ function quietHours(recipient: PersonRow, now: Date): { active: boolean; endAt: 
 
 async function deliver(type: NotificationType, recipient: PersonRow, text: string, opts: TriggerOptions, now: Date): Promise<void> {
     const channels = resolveChannelsFor(type, recipient);
+    const notificationId = newNotificationId();
     if (channels.includes("telegram")) {
       // resolveChannelsFor() only ever includes "telegram" once it has
       // already confirmed a real chat id exists, so this is never
@@ -225,7 +233,7 @@ async function deliver(type: NotificationType, recipient: PersonRow, text: strin
     }
     db.insert(notificationDeliveries)
       .values({
-        id: newNotificationId(),
+        id: notificationId,
         typeId: type.id,
         recipientId: recipient.id,
         text,
@@ -236,6 +244,20 @@ async function deliver(type: NotificationType, recipient: PersonRow, text: strin
         memoryIds: opts.memoryIds ? JSON.stringify(opts.memoryIds) : null,
       })
       .run();
+    if (channels.includes("robot")) {
+      const robots = db.select({ id: devices.id }).from(devices)
+        .where(and(eq(devices.personId, recipient.id), eq(devices.kind, "robot"))).all();
+      const payload = type.privacy === false
+        ? { notification_id: notificationId, person_id: recipient.id, text }
+        : { notification_id: notificationId, person_id: recipient.id, form: "waiting" as const };
+      for (const robot of robots) {
+        try {
+          issueDeviceCommand(robot.id, "notify", payload);
+        } catch (error) {
+          console.error(`[notifications] robot delivery failed for ${notificationId}: ${(error as Error).message}`);
+        }
+      }
+    }
 }
 
 /** Deliver durable notifications once their recipient's quiet hours have ended. */

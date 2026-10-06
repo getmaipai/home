@@ -7,7 +7,9 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { trigger, listPending, listHistory, markRead, dismiss, dismissMany, deliverHeldNotifications } from "@/lib/notifications";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { deviceCommands, people } from "@/db/schema";
+import { issueDeviceToken } from "@/lib/deviceTokens";
+import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
 
@@ -75,6 +77,38 @@ async function setPersonSetting(client: TestClient, personId: string, key: strin
 }
 
 describe("trigger()", () => {
+  test("private and unclassified notifications send only the content-free robot waiting form", async () => {
+    setSystemTime(new Date(2026, 9, 6, 12, 0));
+    const { client, row } = await owner();
+    issueDeviceToken(row.id, "robot", "Reachy Mini");
+    await setPersonSetting(client, row.id, "notifications.time_sensitive.robot", true);
+    registerPackageNotificationTypes({ id: "test-private", notifications: [{ id: "test-private.waiting", level: "time_sensitive", audience: "person", template: "The private secret {secret}", configurable: true, default_channels: ["in_app", "robot"] }] });
+
+    await trigger("test-private.waiting", { secret: "verbatim confidential content" }, { personId: row.id });
+    mock.restore();
+
+    const commands = db.select().from(deviceCommands).all().filter((command) => command.kind === "notify");
+    expect(commands).toHaveLength(1);
+    expect(JSON.parse(commands[0]!.payload)).toEqual({ notification_id: expect.any(String), person_id: row.id, form: "waiting" });
+    expect(commands[0]!.payload).not.toContain("verbatim confidential content");
+    expect(listPending(row)[0]?.channels).toEqual(["in_app", "robot"]);
+  });
+
+  test("explicitly non-private notification text may be sent to the preferred robot", async () => {
+    setSystemTime(new Date(2026, 9, 6, 12, 0));
+    const { client, row } = await owner();
+    issueDeviceToken(row.id, "robot", "Reachy Mini");
+    await setPersonSetting(client, row.id, "notifications.time_sensitive.robot", true);
+    registerPackageNotificationTypes({ id: "test-public", notifications: [{ id: "test-public.ready", level: "time_sensitive", audience: "person", template: "Public {item}", configurable: true, default_channels: ["in_app"], privacy: false }] });
+
+    await trigger("test-public.ready", { item: "dinner" }, { personId: row.id });
+    mock.restore();
+
+    const command = db.select().from(deviceCommands).all().find((item) => item.kind === "notify");
+    expect(command).toBeDefined();
+    expect(JSON.parse(command!.payload)).toEqual({ notification_id: listPending(row)[0]!.id, person_id: row.id, text: "Public dinner" });
+  });
+
   test("an undeclared type id is a no-op, not a throw", async () => {
     await trigger("no.such.type", {});
   });

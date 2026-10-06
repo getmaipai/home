@@ -10,7 +10,7 @@ const NotificationSchema = z.object({
   typeId: z.string(),
   level: z.enum(["immediate", "time_sensitive", "passive"]),
   text: z.string(),
-  channels: z.array(z.enum(["in_app", "telegram"])),
+  channels: z.array(z.enum(["in_app", "telegram", "robot"])),
   createdAt: z.string(),
   readAt: z.string().nullable(),
   dismissedAt: z.string().nullable(),

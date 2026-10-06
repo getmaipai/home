@@ -101,6 +101,24 @@ describe("GET /api/devices/me/events", () => {
     }
   });
 
+  test("refuses robot offer answers whose declared source is not voice", async () => {
+    const { client: owner, personId } = await ownerSession();
+    const { client: robot } = await robotSession(personId);
+    const server = Bun.serve({ port: 0, fetch: app.fetch, websocket });
+    const cookie = robot.getCookie();
+    if (!cookie) throw new Error("robot session cookie missing");
+    try {
+      const socket = new DeviceSocket(`ws://127.0.0.1:${server.port}/api/devices/me/events`, { cookie });
+      await socket.open();
+      socket.ws.send(JSON.stringify({ kind: "offer_answer", payload: { offer_id: "offer-test", approved: true, source: "gesture" } }));
+      const response = await socket.next((message) => message.type === "error");
+      expect(response.message).toContain("invalid");
+      socket.ws.close();
+    } finally {
+      server.stop(true);
+    }
+  });
+
   test("replays a disconnected mute with the same id, then stops after its ack", async () => {
     const { client: owner, personId } = await ownerSession();
     const { client: robot, deviceId } = await robotSession(personId);

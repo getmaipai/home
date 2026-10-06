@@ -35,6 +35,9 @@ export interface NotificationType {
    * settings/notificationKeys.ts; a `true` one gets none - there is
    * nothing for a person to turn off. */
   configurable: boolean;
+  /** Declaration-only privacy classification. Missing manifest values are
+   * normalized to private so no caller can accidentally infer openness. */
+  privacy?: boolean;
   /** Channels used when a recipient has no reachable override - always
    * for a non-configurable type, the starting point for a configurable
    * one before per-person preferences narrow or widen it. */
@@ -49,9 +52,9 @@ export interface NotificationType {
   toast: boolean;
 }
 
-export type NotificationChannel = "in_app" | "telegram";
+export type NotificationChannel = "in_app" | "telegram" | "robot";
 function isDeliveredChannel(channel: string): channel is NotificationChannel {
-  return channel === "in_app" || channel === "telegram";
+  return channel === "in_app" || channel === "telegram" || channel === "robot";
 }
 
 // `in_app` (the pending list / thirty-day center) is deliberately never
@@ -437,11 +440,10 @@ interface ManifestNotificationType {
   audience: NotificationAudience;
   template: string;
   configurable: boolean;
-  /** The spec's channel list (spec-v0.1.79 added `robot`); only the
-   * channels Home delivers today are registered. */
+  privacy?: boolean;
+  /** The spec's channel list, including `robot`. */
   default_channels: readonly string[];
-  /** Present only when the manifest schema carries it (the schema does
-   * not yet - a package that doesn't declare one is treated as `true`). */
+  /** The manifest's declared toast behavior. */
   toast?: boolean;
 }
 
@@ -460,8 +462,8 @@ export function registerPackageNotificationTypes(manifest: {
   for (const declared of manifest.notifications ?? []) {
     if (NOTIFICATION_TYPES.some((t) => t.id === declared.id)) continue;
     if (packageNotificationTypes.has(declared.id)) continue;
-    const { default_channels, toast, ...rest } = declared;
-    packageNotificationTypes.set(declared.id, { ...rest, defaultChannels: default_channels.filter(isDeliveredChannel), toast: toast ?? true });
+    const { default_channels, toast, privacy, ...rest } = declared;
+    packageNotificationTypes.set(declared.id, { ...rest, privacy: privacy ?? true, defaultChannels: default_channels.filter(isDeliveredChannel), toast: toast ?? true });
   }
 }
 

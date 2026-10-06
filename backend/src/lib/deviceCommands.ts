@@ -4,6 +4,7 @@
 import { randomUUID } from "node:crypto";
 import { and, asc, eq, gte, isNull, lt } from "drizzle-orm";
 import { DeviceCommand, type DeviceCommand as DeviceCommandShape } from "@maipai/spec/gen/ts/device-command.js";
+import { RobotChannelFrame } from "@maipai/spec/gen/ts/robot-channel-frame.js";
 import type { WSEvents, WSContext } from "hono/ws";
 import { db } from "@/db";
 import { deviceCommands, devices } from "@/db/schema";
@@ -273,6 +274,18 @@ export function deviceCommandWebSocket(deviceId: string, lastEventId?: string): 
           return;
         }
         connection.lastEventId = message.id;
+        return;
+      }
+      if (typeof message === "object" && message !== null && (message as Record<string, unknown>).kind === "offer_answer") {
+        const frame = RobotChannelFrame.safeParse(message);
+        if (!frame.success || frame.data.kind !== "offer_answer") {
+          sendControl(connection, { type: "error", message: "invalid offer answer: source must be voice" });
+          return;
+        }
+        // Offer acceptance is intentionally not connected to turn creation
+        // here; this guard ensures a future handler cannot bypass the shared
+        // voice-only wire contract.
+        sendControl(connection, { type: "error", message: "offer answers are not currently actionable" });
         return;
       }
       sendControl(connection, { type: "error", message: "unknown device channel message" });
