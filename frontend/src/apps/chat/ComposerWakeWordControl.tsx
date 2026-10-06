@@ -1,4 +1,4 @@
-import { HomeTooltipIconButton } from "@/apps/chat/HomeTooltipIconButton";
+import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import type { Roster } from "@/lib/api";
 import { useDeviceWakeWordSetting } from "@/apps/chat/useDeviceWakeWordSetting";
@@ -10,17 +10,17 @@ export function ComposerWakeWordControl({ person }: { person: Roster }) {
   if (!wakeWord.adult || !wakeWord.available || wakeWord.loading) return null;
   const label = wakeWord.enabled ? "Turn off wake word listening" : "Turn on wake word listening";
   return (
-    <HomeTooltipIconButton
+    <TooltipIconButton
       tooltip={wakeWord.enabled ? "Wake word listening is on" : "Turn on wake word listening"}
       type="button"
       variant={wakeWord.enabled ? "default" : "outline"}
       size="icon"
-      className="size-7 rounded-full"
+      className="relative size-7 rounded-full before:absolute before:-inset-3 before:content-['']"
       aria-label={label}
       aria-pressed={wakeWord.enabled}
       onClick={() => void wakeWord.setEnabled(!wakeWord.enabled)}
     >
       <MicIcon className="size-4" />
-    </HomeTooltipIconButton>
+    </TooltipIconButton>
   );
 }

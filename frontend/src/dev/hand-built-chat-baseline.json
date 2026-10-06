@@ -8,14 +8,8 @@
   "apps/chat/ChatThreadExtras.tsx": [
     "ChatThreadExtras"
   ],
-  "apps/chat/HomeTooltipIconButton.tsx": [
-    "HomeTooltipIconButton"
-  ],
   "apps/chat/WakeWordIndicator.tsx": [
     "WakeWordIndicator"
-  ],
-  "apps/chat/chatActionBar.tsx": [
-    "FeedbackReasonRow"
   ],
   "apps/chat/chatAnswerImages.tsx": [
     "AnswerImagesDataRender"

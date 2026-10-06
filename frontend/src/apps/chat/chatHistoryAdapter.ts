@@ -156,10 +156,7 @@ export function rowsToBranchableMessages(
       createdAt,
       // CHAT-20: the same memory fields the reply carries below - a
       // turn's memory belongs to the whole exchange, not one side of it
-      // (`memoryRecords.source` is the turn id either way), and
-      // RememberThisButton renders on this row too (thread.aui.tsx's
-      // UserActionBar), reading the identical chatMemoryState.ts store
-      // entry the reply's own chip does.
+      // (`memoryRecords.source` is the turn id either way).
       metadata: { custom: { turnId: row.id, conversationId, memoryIds: row.memory_ids, judgeStatus: row.judgeStatus, source: row.source, senderName: selfName } },
     };
     const replyMessage: ThreadMessageLike = {

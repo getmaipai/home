@@ -29,7 +29,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAui } from "@assistant-ui/react";
 import { VoiceConversation, type VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
-import { HomeTooltipIconButton } from "@/apps/chat/HomeTooltipIconButton";
+import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { createSttSocket, type SttSocket, type SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
@@ -262,11 +262,11 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
             its own card" has no edge to sit past - inset from the
             surface's own corner instead; at sm and up, back to sitting
             just outside the smaller floating card's own corner. */}
-        <HomeTooltipIconButton asChild tooltip="Voice settings" className="absolute top-4 right-4 z-10 sm:-top-2 sm:-right-2">
+        <TooltipIconButton asChild tooltip="Voice settings" className="absolute top-4 right-4 z-10 before:absolute before:-inset-3 before:content-[''] sm:-top-2 sm:-right-2">
           <Link to="/settings/voices" aria-label="Voice settings">
             <SettingsIcon />
           </Link>
-        </HomeTooltipIconButton>
+        </TooltipIconButton>
         <VoiceConversation
           mode={mode}
           amplitude={amplitude}
