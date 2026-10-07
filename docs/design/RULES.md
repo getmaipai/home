@@ -86,9 +86,9 @@ wins.
    the fixed per-band line). It is told only the kind of failure (down,
    timed out, found nothing), never the raw error text, never invents a
    fact to fill the gap, and passes the same output gate as any reply.
-   Every person gets the same reply; an admin also sees a small error
-   indicator on that reply that opens the raw details (the tool, the
-   error, the timing). Raw details never reach a non-admin, a child or
+   Every person gets the same reply; an admin sees the raw-error
+   indicator only on their own replies, and it opens raw details (the
+   tool, the error, the timing). Raw details never reach a non-admin or
    the model. Policy refusals (consent, crisis, temporary mode,
    ungrounded arguments) are not tool failures and keep their own
    replies. A robot with no hub and no network answers the same way.
@@ -96,6 +96,14 @@ wins.
    a robot's alarm, carry or pairing line) are not replies; each is
    reviewed by a person against the child floor when written and listed
    on the privacy page.
+6a. **Logs and admin visibility protect each person's activity.** No log,
+    trace, status or admin page carries text a person produced, a title,
+    URL, filename, argument, a stable person or record id next to an
+    activity, or a hash of any of these. A log line is a typed event from
+    the registry. An admin troubleshoots from component health, error
+    codes with their plain-words message, timings and counts that name no
+    person; details reach an admin only through a report the affected
+    person previews and sends.
 7. **Search gives the model pages, not snippets.** Result pages are
    fetched and their text is given with numbered sources; the
    instruction is to ground the answer in them and cite by number. Page
@@ -318,8 +326,10 @@ S4. **Every settings screen is the one kit settings shell.** An app's
     data (spec `areas.json` or a package's `contributes.settings_area`)
     and drawn by the kit's `SettingsShell`; Home writes no settings
     layout, and each registry group is placed in exactly one card.
-S5. **Copy is per person.** Settings text comes from the spec's `copy`
-    fields through `describeSetting`; a page never hand-writes setting
-    help, option descriptions or a reason line. COPY-LINT-01 fails the
-    gate on a new key that breaks the machine-checkable half; review
-    holds the rest (UI.md "Messages people read").
+S5. **Copy is per person.** Setting text comes from the spec copy fields
+    through `describeSetting`; a page never hand-writes setting help, option
+    descriptions or a reason line. A description says only what the setting
+    does for the reader; a subtitle states why only when the setting is
+    disabled for them (Disabled for the home, Disabled by Dad).
+    COPY-LINT-01 fails the gate on a new key that breaks the machine-checkable
+    half; review holds the rest.
