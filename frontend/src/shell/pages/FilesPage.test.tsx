@@ -43,6 +43,21 @@ describe("FilesPage", () => {
     } finally { restore(); }
   });
 
+  test("the kit table sorts its returned Library rows by owner", async () => {
+    const { restore } = mockFetch([file("file-owned123", "person-abc123"), file("file-shared123", "person-sage123", true, "document")]);
+    try {
+      renderWithQueryClient(<FilesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
+      const header = document.querySelector('[data-slot="data-table-header-row"] button[aria-label="Sort by Owner"]')!;
+      fireEvent.click(header);
+      await waitFor(() => {
+        const rows = Array.from(document.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'));
+        expect(rows[0]?.textContent).toContain("Sage");
+        expect(rows[1]?.textContent).toContain("You");
+      });
+    } finally { restore(); }
+  });
+
   test("shows owned and shared files under their real owners and filters the list", async () => {
     const { restore } = mockFetch([file("file-abc123", "person-abc123"), file("file-sage123", "person-sage123", true, "document")]);
     try {

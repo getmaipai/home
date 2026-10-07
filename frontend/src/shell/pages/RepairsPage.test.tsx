@@ -79,8 +79,28 @@ describe("RepairsPage", () => {
       expect(document.body.textContent).toContain("Storage is nearly full");
       expect(document.body.textContent).toContain("Warning");
       expect(document.body.textContent).not.toContain("Employee Data Table");
-      const issueRow = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((row) => row.textContent?.includes("A backup failed"))!;
+      const issueRow = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((row) => row.textContent?.includes("A backup failed"))!;
       expect(within(issueRow as HTMLElement).getByRole("button", { name: "More actions" })).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+
+  test("the kit table sorts the exact repair rows by title", async () => {
+    const { restore } = mockRepairsFetch([
+      makeIssue({ id: "issue-z", title: "Storage is nearly full" }),
+      makeIssue({ id: "issue-a", title: "A backup failed" }),
+    ]);
+    try {
+      renderWithQueryClient(<RepairsPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("A backup failed"));
+      const header = document.querySelector('[data-slot="data-table-header-row"] button[aria-label="Sort by Title"]')!;
+      fireEvent.click(header);
+      await waitFor(() => {
+        const rows = Array.from(document.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'));
+        expect(rows[0]?.textContent).toContain("A backup failed");
+        expect(rows[1]?.textContent).toContain("Storage is nearly full");
+      });
     } finally {
       restore();
     }
@@ -113,7 +133,7 @@ describe("RepairsPage", () => {
     try {
       const view = renderWithQueryClient(<RepairsPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("A backup failed"));
-      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((candidate) => candidate.textContent?.includes("A backup failed"))!;
+      const row = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((candidate) => candidate.textContent?.includes("A backup failed"))!;
       fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "More actions" }));
       fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Retry now" }));
 
@@ -136,7 +156,7 @@ describe("RepairsPage", () => {
     try {
       renderWithQueryClient(<RepairsPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("A backup failed"));
-      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((candidate) => candidate.textContent?.includes("A backup failed"))!;
+      const row = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((candidate) => candidate.textContent?.includes("A backup failed"))!;
       fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "More actions" }));
       expect(await within(document.body).findByRole("menuitem", { name: "Dismiss" })).toBeTruthy();
       expect(within(document.body).queryByRole("menuitem", { name: "Retry now" })).toBeNull();

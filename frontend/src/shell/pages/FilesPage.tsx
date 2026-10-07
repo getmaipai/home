@@ -4,15 +4,21 @@ import { toast } from "sonner";
 import { getIcon } from "@maipai/ui/src/icons";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Input as TableInput } from "@maipai/ui/src/dashboard/components/ui/input";
+import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
+import { Select as TableSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { File } from "@maipai/ui/src/elements/file";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
+import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { api, ApiError, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
 export const FilesIcon = getIcon("folder");
+const Download = getIcon("download");
 
 const KIND_LABELS: Record<string, string> = { image: "Image", video: "Video", audio: "Audio", document: "Document", story: "Story", other: "File" };
 const kindLabel = (kind: string) => KIND_LABELS[kind] ?? KIND_LABELS.other!;
@@ -61,8 +67,9 @@ export function FilesPage({ person }: { person: Roster }) {
       kind: kindLabel(row.file.kind),
     };
     Object.defineProperty(visible, "id", { value: row.file.id });
-    return visible as FileRow;
+    return visible as unknown as FileRow;
   });
+  const model = useDataTableModel(tableRows, tableColumns<FileRow>(["file", "owner", "kind"], { file: 200, owner: 260, kind: 120 }), "Nothing here yet. Stories, pictures and documents you make in chat are kept here.");
 
   async function shareSelected() {
     if (!selected) return;
@@ -81,7 +88,7 @@ export function FilesPage({ person }: { person: Roster }) {
   }
 
   return (
-    <div className="flex flex-col gap-4 pb-4">
+    <>
       <CardHeader>
         <CardTitle><span className="flex items-center gap-2"><FilesIcon size={16} className="text-muted-foreground" />Library</span></CardTitle>
       </CardHeader>
@@ -105,7 +112,23 @@ export function FilesPage({ person }: { person: Roster }) {
               </div>
             </CardContent>
           </Card>
-          <DataTable data={tableRows} rowKey={(row) => row.id} rowActions={(row) => [{ label: "View details", onClick: () => setSelectedId(row.id) }]} emptyMessage="Nothing here yet. Stories, pictures and documents you make in chat are kept here." />
+          <DataTable
+            {...model}
+            caption="Library files"
+            getRowId={(row) => row.id}
+            toolbar={<div className="flex w-full flex-col gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <TableInput size="row" type="search" aria-label="Search table rows" value={model.filter} onChange={(event) => { model.setFilter(event.target.value); model.setPageIndex(0); }} placeholder="Search rows…" />
+                <Button type="button" size="row" variant="outline" aria-label="Download table as CSV" onClick={model.downloadCsv}><Download aria-hidden="true" className="size-4" /><span>Download CSV</span></Button>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex gap-2"><Button type="button" size="row" variant="secondary" disabled={model.currentPage === 0} onClick={() => model.setPageIndex((page) => Math.max(0, page - 1))}>Previous</Button><Button type="button" size="row" disabled={model.currentPage + 1 >= model.pageCount} onClick={() => model.setPageIndex((page) => Math.min(model.pageCount - 1, page + 1))}>Next</Button></div>
+                <p className="text-sm text-muted-foreground" aria-live="polite">Page {model.currentPage + 1} of {model.pageCount}</p>
+                <div className="flex items-center gap-2"><Label htmlFor={model.pageSizeId}>Rows per page:</Label><TableSelect value={String(model.pageSize)} onValueChange={(value) => { model.setPageSize(Number(value)); model.setPageIndex(0); }}><SelectTrigger id={model.pageSizeId} size="row"><SelectValue /></SelectTrigger><SelectContent>{model.availablePageSizes.map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}</SelectContent></TableSelect></div>
+              </div>
+            </div>}
+            rowActions={(row) => <DataTableRowActions actions={[{ label: "View details", onClick: () => setSelectedId(row.id) }]} />}
+          />
           {tableRows.length > 0 ? (
             <Card>
               <CardHeader><CardTitle>File details</CardTitle></CardHeader>
@@ -136,7 +159,7 @@ export function FilesPage({ person }: { person: Roster }) {
           ) : null}
         </>}
       </AsyncState>
-    </div>
+    </>
   );
 }
 

@@ -916,7 +916,6 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
         document.querySelectorAll<HTMLElement>(".overflow-x-auto").forEach((element) => { element.scrollLeft = 0; });
         window.scrollTo(0, 0);
       });
-      await settleAnimations(page);
     }
 
     // getmaipai/home, found live 2026-09-13: Home's "who's here" avatar
@@ -1052,6 +1051,7 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     if (saveScreenshot) {
       mkdirSync(SCREENS_DIR, { recursive: true });
       screenshotFile = `${route.slug}-${viewport.slug}-${theme}.png`;
+      if (route.slug === "files") await page.addStyleTag({ content: '[data-slot="data-table-row"], [data-slot="data-table-card-row"] { animation: none !important; opacity: 1 !important; transform: none !important; }' });
       await page.screenshot({ path: join(SCREENS_DIR, screenshotFile), fullPage: true });
     }
 
@@ -8812,7 +8812,7 @@ async function captureNextRepairsReview(browser: Browser, sessionValue: string):
         // server failing to bind - found live, not fabricated for the
         // capture), so a real table row is the honest wait condition
         // here, not the empty state this function first assumed.
-        await page.locator("table tbody tr").first().waitFor({ timeout: 15000 });
+        await page.locator('[data-slot="data-table-row"]:visible, [data-slot="data-table-card-row"]:visible').first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Repairs");
         await settleAnimations(page);
         const path = join(outDir, `next-repairs-${viewport.width}-${theme}.png`);
@@ -8998,7 +8998,7 @@ async function captureNextBackupsReview(browser: Browser, sessionValue: string):
       try {
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/backups`);
-        await page.locator("text=No data available.").first().waitFor({ timeout: 15000 });
+        await page.locator('[data-slot="data-table-empty"]:visible').first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Backups");
         await settleAnimations(page);
         const path = join(outDir, `next-backups-${viewport.width}-${theme}.png`);
@@ -9897,10 +9897,14 @@ async function main() {
 
     if (nextRepairsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview) {
       await captureNextRepairsReview(browser, sessionValue);
+      console.log("completed named review: --next-repairs-review");
+      return;
     }
 
     if (nextBackupsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview) {
       await captureNextBackupsReview(browser, sessionValue);
+      console.log("completed named review: --next-backups-review");
+      return;
     }
 
     if (nextChatPolishReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {

@@ -3,9 +3,14 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
+import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
+import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
@@ -66,6 +71,9 @@ export function BackupsPage({ person }: { person: Roster }) {
   const [running, setRunning] = useState(false);
   const [busyFilename, setBusyFilename] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const tableRows = (backupsQuery.data ?? []).map(toRow);
+  const model = useDataTableModel(tableRows, tableColumns<Row>(["date", "size"], { date: 220, size: 120 }));
+  const Download = getIcon("download");
 
   async function handleRunBackup() {
     setRunning(true);
@@ -109,7 +117,7 @@ export function BackupsPage({ person }: { person: Roster }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       <CardHeader className="p-0">
         <CardTitle className="flex items-center gap-2">
           <BackupsIcon size={16} className="text-muted-foreground" />
@@ -146,15 +154,29 @@ export function BackupsPage({ person }: { person: Roster }) {
                 </Card>
               ) : null}
               <DataTable
-                data={backups.map(toRow)}
-                rowKey={(row) => row.filename}
-                rowActions={canRestore && !pendingQuery.data?.pending ? (row) => [{
-                  label: "Restore",
-                  destructive: true,
-                  confirmLabel: `Restore the backup from ${row.date}? Everyone in your household, everything MaiPai remembers, and every conversation will go back to how they were then. Anything added since will be gone. This takes effect the next time MaiPai Home starts.`,
-                  disabled: busyFilename !== null,
-                  onClick: () => handleRestore(row.filename),
-                }] : undefined}
+                {...model}
+                caption="Backup history"
+                getRowId={(row) => row.filename}
+                toolbar={<div className="flex w-full flex-col gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <Input size="row" type="search" aria-label="Search table rows" value={model.filter} onChange={(event) => { model.setFilter(event.target.value); model.setPageIndex(0); }} placeholder="Search rows…" />
+                    <Button type="button" size="row" variant="outline" aria-label="Download table as CSV" onClick={model.downloadCsv}><Download aria-hidden="true" className="size-4" /><span>Download CSV</span></Button>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex gap-2"><Button type="button" size="row" variant="secondary" disabled={model.currentPage === 0} onClick={() => model.setPageIndex((page) => Math.max(0, page - 1))}>Previous</Button><Button type="button" size="row" disabled={model.currentPage + 1 >= model.pageCount} onClick={() => model.setPageIndex((page) => Math.min(model.pageCount - 1, page + 1))}>Next</Button></div>
+                    <p className="text-sm text-muted-foreground" aria-live="polite">Page {model.currentPage + 1} of {model.pageCount}</p>
+                    <div className="flex items-center gap-2"><Label htmlFor={model.pageSizeId}>Rows per page:</Label><Select value={String(model.pageSize)} onValueChange={(value) => { model.setPageSize(Number(value)); model.setPageIndex(0); }}><SelectTrigger id={model.pageSizeId} size="row"><SelectValue /></SelectTrigger><SelectContent>{model.availablePageSizes.map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}</SelectContent></Select></div>
+                  </div>
+                </div>}
+                rowActions={canRestore && !pendingQuery.data?.pending ? (row) => (
+                  <DataTableRowActions actions={[{
+                    label: "Restore",
+                    destructive: true,
+                    confirmLabel: `Restore the backup from ${row.date}? Everyone in your household, everything MaiPai remembers, and every conversation will go back to how they were then. Anything added since will be gone. This takes effect the next time MaiPai Home starts.`,
+                    disabled: busyFilename !== null,
+                    onClick: () => handleRestore(row.filename),
+                  }]} />
+                ) : undefined}
               />
               <Button variant="secondary" onClick={handleRunBackup} disabled={running} className="w-fit min-h-13">
                 {running ? "Backing up…" : "Back up now"}
@@ -163,6 +185,6 @@ export function BackupsPage({ person }: { person: Roster }) {
           )}
         </AsyncState>
       )}
-    </div>
+    </>
   );
 }

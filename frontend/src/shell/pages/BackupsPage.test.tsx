@@ -70,12 +70,20 @@ describe("BackupsPage", () => {
   });
 
   test("real backup history: date and size, not demo data", async () => {
-    const { restore } = mockBackupsFetch([{ filename: "backup-2026-09-21.tar.gz", createdAt: "2026-09-21T03:00:00.000Z", bytes: 52_428_800 }]);
+    const { restore } = mockBackupsFetch([
+      { filename: "backup-2026-09-21.tar.gz", createdAt: "2026-09-21T03:00:00.000Z", bytes: 52_428_800 },
+      { filename: "backup-2026-09-20.tar.gz", createdAt: "2026-09-20T03:00:00.000Z", bytes: 1024 },
+    ]);
     try {
       renderWithQueryClient(<BackupsPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("50 MB"));
       expect(document.body.textContent).not.toContain("No data available.");
       expectHomeTablesWithoutDemoOrActions();
+      fireEvent.click(document.querySelector('[data-slot="data-table-header-row"] button[aria-label="Sort by Date"]')!);
+      await waitFor(() => {
+        const rows = Array.from(document.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'));
+        expect(rows[0]?.textContent).toContain(new Date("2026-09-20T03:00:00.000Z").toLocaleString());
+      });
     } finally {
       restore();
     }
@@ -138,7 +146,7 @@ describe("BackupsPage", () => {
       renderWithQueryClient(<BackupsPage person={makePerson()} />);
       const backupDate = new Date("2026-09-20T03:00:00.000Z").toLocaleString();
       await waitFor(() => expect(document.body.textContent).toContain(backupDate));
-      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((item) => item.textContent?.includes(backupDate))!;
+      const row = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((item) => item.textContent?.includes(backupDate))!;
       fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "More actions" }));
       fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Restore" }));
       expect(document.body.textContent).toContain("Restore the backup from");
@@ -147,7 +155,7 @@ describe("BackupsPage", () => {
       fireEvent.click(within(document.body).getByRole("button", { name: "Confirm" }));
       await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/backups/backup-2026-09-20.tar.gz/restore"), expect.objectContaining({ method: "POST" })));
       await waitFor(() => expect(document.body.textContent).toContain("Ready to restore"));
-      const restoredRow = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((item) => item.textContent?.includes(backupDate))!;
+      const restoredRow = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((item) => item.textContent?.includes(backupDate))!;
       expect(within(restoredRow as HTMLElement).queryByRole("button", { name: "More actions" })).toBeNull();
     } finally {
       restore();
@@ -180,7 +188,7 @@ describe("BackupsPage", () => {
       await waitFor(() => expect(document.body.textContent).toContain("Ready to restore"));
       expect(within(document.body).queryByRole("button", { name: "Cancel restore" })).toBeNull();
       const backupDate = new Date("2026-09-20T03:00:00.000Z").toLocaleString();
-      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((item) => item.textContent?.includes(backupDate))!;
+      const row = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((item) => item.textContent?.includes(backupDate))!;
       expect(within(row as HTMLElement).queryByRole("button", { name: "More actions" })).toBeNull();
     } finally {
       restore();

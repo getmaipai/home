@@ -3,8 +3,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
+import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
+import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { api, ApiError, isOwnerOrAdminRole, type Issue, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
@@ -24,6 +30,7 @@ import { useTabItem } from "@/shell/tabIdentity";
 // directly for the header's left slot rather than re-declaring the
 // icon name a second time - one definition, this page's own.
 export const RepairsIcon = getIcon("wrench");
+const Download = getIcon("download");
 
 interface Row extends Record<string, unknown> {
   title: string;
@@ -50,6 +57,8 @@ export function RepairsPage({ person }: { person: Roster }) {
   const query = useQuery<Issue[]>({ queryKey: ["repairs"], queryFn: () => api.repairs(), enabled: canManage });
   const queryClient = useQueryClient();
   const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
+  const tableRows = (query.data ?? []).map(toRow);
+  const model = useDataTableModel(tableRows, tableColumns<Row>(["title", "status", "detail", "fix"], { title: 220, status: 120, detail: 320, fix: 180 }));
 
   async function runFix(id: string) {
     setPendingIds((previous) => new Set(previous).add(id));
@@ -84,7 +93,7 @@ export function RepairsPage({ person }: { person: Roster }) {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       <CardHeader className="p-0">
         <CardTitle className="flex items-center gap-2">
           <RepairsIcon size={16} className="text-muted-foreground" />
@@ -109,13 +118,25 @@ export function RepairsPage({ person }: { person: Roster }) {
         >
           {(issues: Issue[]) => (
             <DataTable
-              data={issues.map(toRow)}
-              rowKey={(row) => row.id}
+              {...model}
+              caption="Repair issues"
+              getRowId={(row) => row.id}
+              toolbar={<div className="flex w-full flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <Input size="row" type="search" aria-label="Search table rows" value={model.filter} onChange={(event) => { model.setFilter(event.target.value); model.setPageIndex(0); }} placeholder="Search rows…" />
+                  <Button type="button" size="row" variant="outline" aria-label="Download table as CSV" onClick={model.downloadCsv}><Download aria-hidden="true" className="size-4" /><span>Download CSV</span></Button>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex gap-2"><Button type="button" size="row" variant="secondary" disabled={model.currentPage === 0} onClick={() => model.setPageIndex((page) => Math.max(0, page - 1))}>Previous</Button><Button type="button" size="row" disabled={model.currentPage + 1 >= model.pageCount} onClick={() => model.setPageIndex((page) => Math.min(model.pageCount - 1, page + 1))}>Next</Button></div>
+                  <p className="text-sm text-muted-foreground" aria-live="polite">Page {model.currentPage + 1} of {model.pageCount}</p>
+                  <div className="flex items-center gap-2"><Label htmlFor={model.pageSizeId}>Rows per page:</Label><Select value={String(model.pageSize)} onValueChange={(value) => { model.setPageSize(Number(value)); model.setPageIndex(0); }}><SelectTrigger id={model.pageSizeId} size="row"><SelectValue /></SelectTrigger><SelectContent>{model.availablePageSizes.map((size) => <SelectItem key={size} value={String(size)}>{size}</SelectItem>)}</SelectContent></Select></div>
+                </div>
+              </div>}
               rowActions={(row) => {
                 const issue = issues.find((candidate) => candidate.id === row.id);
-                if (!issue) return [];
+                if (!issue) return null;
                 const isPending = pendingIds.has(issue.id);
-                return [
+                const actions = [
                   ...(issue.fix ? [{ label: issue.fix.label, onClick: () => runFix(issue.id), disabled: isPending }] : []),
                   {
                     label: "Dismiss",
@@ -125,11 +146,12 @@ export function RepairsPage({ person }: { person: Roster }) {
                     disabled: isPending,
                   },
                 ];
+                return <DataTableRowActions actions={actions} />;
               }}
             />
           )}
         </AsyncState>
       )}
-    </div>
+    </>
   );
 }
