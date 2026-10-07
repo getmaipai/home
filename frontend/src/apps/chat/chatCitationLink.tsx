@@ -12,5 +12,5 @@ export function ChatCitationLink({ href, children, ...props }: ComponentProps<"a
   const source = index ? sources[index - 1] : undefined;
   if (index && !source) return <span>{children}</span>;
   if (source) return <Citation index={index! - 1} source={{ domain: source.domain, title: source.title, href: source.url }} open={open} onOpenChange={setOpen} />;
-  return <a href={href} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" {...props}>{children}</a>;
+  return <a href={href} title={props.title ?? (href && /^https?:/i.test(href) ? href : undefined)} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" {...props}>{children}</a>;
 }

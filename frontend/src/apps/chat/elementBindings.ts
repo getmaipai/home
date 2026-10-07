@@ -42,6 +42,8 @@ import { ChatDateDivider } from "@/apps/chat/chatDateDivider";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
 import { preprocessChatMarkdown } from "@/apps/chat/chatStreamingMarkdown";
 import { ANSWER_IMAGES_PART, AnswerImagesDataRender } from "@/apps/chat/chatAnswerImages";
+import { trustedChatLinks } from "@/apps/chat/trustedChatLinks";
+import type { MarkdownLinkContext } from "@maipai/ui/src/elements/markdown-text";
 export type ToolBinding = {
   /** The tool-call part's `toolName` on the wire (chatModelAdapter.ts). */
   toolName: string;
@@ -90,6 +92,7 @@ export const THREAD_SLOTS = {
     components: { a: ChatCitationLink },
     preprocess: preprocessChatMarkdown,
     remend: { links: false, linkMode: "text-only" },
+    trustedLinks: ({ message, messages }: MarkdownLinkContext) => trustedChatLinks(message, messages),
   },
   Welcome: NextChatWelcome,
   // ELEMENTS-ADOPT-01 E4: the kit DayDivider before a message that opens a new day or follows a long pause.

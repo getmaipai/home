@@ -1320,7 +1320,8 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
       expect(within(pane).getByRole("heading", { name: "Pizza night", level: 1 })).toBeTruthy();
       expect(within(pane).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["dough", "sauce"]);
       expect(within(pane).getByRole("table")).toBeTruthy();
-      expect(within(pane).getByRole("link", { name: "the recipe" }).getAttribute("href")).toBe("https://example.com/recipe");
+      expect(within(pane).queryByRole("link", { name: "the recipe" })).toBeNull();
+      expect(pane.textContent).toContain("the recipe (https://example.com/recipe)");
       expect(pane.querySelector("code")?.textContent).toBe("oven");
       // Raw Markdown syntax never shows as text.
       expect(pane.textContent).not.toContain("# Pizza night");

@@ -54,12 +54,10 @@ describe("a reply with every rich element (UI-1, A3)", () => {
     expect(container.querySelectorAll("li.task-list-item").length).toBe(2);
   });
 
-  test("a link opens a new tab and tells the site nothing", () => {
+  test("an untrusted external URL stays visible as text rather than a clickable link", () => {
     const { container } = renderReply(RICH_REPLY_MARKDOWN);
-    const link = container.querySelector('a[href^="https://developer.mozilla.org"]');
-    expect(link?.getAttribute("target")).toBe("_blank");
-    expect(link?.getAttribute("rel")).toBe("noopener noreferrer");
-    expect(link?.getAttribute("referrerpolicy")).toBe("no-referrer");
+    expect(container.querySelector('a[href^="https://developer.mozilla.org"]')).toBeNull();
+    expect(container.querySelector(".aui-md")?.textContent).toContain("https://developer.mozilla.org/en-US/docs/Web/JavaScript");
   });
 
   test("a Mermaid fence draws a diagram, not code", async () => {

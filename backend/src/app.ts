@@ -64,6 +64,7 @@ import { faviconRoutes } from "@/routes/favicon";
 import { answerImageRoutes } from "@/routes/answerImage";
 import { dashboardRoutes } from "@/routes/dashboard";
 import { requireAuth } from "@/middleware/auth";
+import { pageCsp } from "@/middleware/pageCsp";
 import { collectHealth } from "@/lib/healthSnapshot";
 
 // Session F, step 4: every route file converts to @hono/zod-openapi
@@ -238,6 +239,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const distDir = join(here, "..", "..", "frontend", "dist");
 const indexPath = join(distDir, "index.html");
 
+// PI-RENDER-01: the app page and its assets carry the Content-Security-Policy.
+app.use("/*", pageCsp);
 app.use("/*", serveStatic({ root: distDir }));
 
 // SPA fallback: any GET that isn't an API route and didn't match a

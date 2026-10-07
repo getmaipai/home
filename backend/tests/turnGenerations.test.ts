@@ -81,10 +81,11 @@ describe("LAT-00: a hidden second generation is recorded, not overwritten", () =
       // The bug this replaces: a single streamStats field meant the
       // first generation's own numbers were gone by the time the turn
       // finished, overwritten by the second. Both entries' own
-      // request_sent_ms survive independently, the second strictly
-      // later than the first.
+      // request_sent_ms survive independently and stay nondecreasing. The
+      // clock has millisecond resolution, so adjacent generations may share
+      // the same timestamp.
       expect(generations![0]!.request_sent_ms).toBeGreaterThanOrEqual(0);
-      expect(generations![1]!.request_sent_ms).toBeGreaterThan(generations![0]!.request_sent_ms);
+      expect(generations![1]!.request_sent_ms).toBeGreaterThanOrEqual(generations![0]!.request_sent_ms);
     } finally {
       await stub.stop();
       __resetLlmSupervisorForTests();
