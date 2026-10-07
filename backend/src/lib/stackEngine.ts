@@ -40,7 +40,7 @@ export function getStackUrl(): string | null {
 }
 
 export function isStackConfigured(): boolean {
-  return testClient !== null || getStackUrl() !== null;
+  return (testClient !== null && testClient !== defaultTestClient) || getStackUrl() !== null;
 }
 
 export type StackRole = "chat" | "embeddings" | "stt" | "tts";
@@ -64,7 +64,19 @@ let defaultTestClient: StackClient | null = null;
  * admin action, never mid-turn) invalidates the cache the same way a
  * generation bump invalidates llmSupervisor.ts's own cached backend. */
 export function getStackClient(): StackClient {
-  if (testClient) return testClient;
+  if (testClient) {
+    if (testClient === defaultTestClient && getStackUrl() === null) {
+      throw new Error("no MaiPai Stack is configured (engines.stack.url is empty)");
+    }
+    return testClient;
+  }
+  // A backend test may clear the preload's scripted client to exercise
+  // unconfigured behavior, but it must never turn a household URL into a
+  // real network client. Tests that need Stack behavior install an
+  // explicit fixture client with __setStackClientForTests().
+  if (process.env.NODE_ENV === "test" && getStackUrl() === "http://127.0.0.1:8770") {
+    throw new Error("backend tests must inject a Stack fixture before resolving getStackClient()");
+  }
   const url = getStackUrl();
   if (!url) throw new Error("no MaiPai Stack is configured (engines.stack.url is empty)");
   if (!cachedClient || cachedUrl !== url) {

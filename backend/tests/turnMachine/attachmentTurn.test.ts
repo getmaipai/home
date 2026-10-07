@@ -51,7 +51,7 @@ describe("THIN-7C: document attachments on the default path", () => {
       expect(value.reply.text).toBe("It says the boiler service is due in March.");
       const last = seen.at(-1)!.messages.at(-1)!;
       expect(last.role).toBe("user");
-      expect(String(last.content)).toBe('Summarize this\n\n<document name="notes.pdf">\nThe boiler service is due in March.\n</document>');
+      expect(String(last.content)).toContain("The person's words:\nSummarize this\n\n<document name=\"notes.pdf\">\nThe boiler service is due in March.\n</document>");
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, value.turn_id)).get();
       expect(row?.userText).toBe("Summarize this");
       expect(row?.status).toBe("done");

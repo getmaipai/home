@@ -24,6 +24,9 @@ import { countTokens } from "@/lib/tokenCount";
 import { storeTemporaryChatImage } from "@/lib/attachments";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { buildStablePrefix, PHOTO_IDENTITY_SENTENCE } from "@/lib/turnShared";
+import { DEFAULT_PERSONA } from "@/lib/persona";
+import { fallbackSignal } from "@/lib/turnSignal";
+import { planFor, type PlanInput } from "@/lib/register";
 import { __setStackClientForTests } from "@/lib/stackEngine";
 import { drainStream, withEngine } from "./modeHarness";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
@@ -90,20 +93,20 @@ describe("VISION-02c: picture parts for a chat model that reads pictures", () =>
       expect(parts[2]!.text).toBe("Picture: blue-square.jpg");
       expect(parts[1]!.image_url!.url.startsWith("data:image/jpeg;base64,")).toBe(true);
       expect(parts[3]!.image_url!.url).not.toBe(parts[1]!.image_url!.url);
-      expect(parts[4]!.text).toBe("what colours are these?");
+      expect(parts[4]!.text).toContain("The person's words:\nwhat colours are these?");
       // The "cannot see" note is not sent for pictures the model received.
       const prompt = JSON.stringify(seen.at(-1)!.messages);
       expect(prompt).not.toContain("You cannot see pictures yet");
     });
   });
 
-  test("with the flag off the note and today's plain-text message stay exactly as they were", async () => {
+  test("with the flag off the note and the raw words stay on the final text message", async () => {
     __setChatPictureCapabilityForTests({ imageParts: false, pictureTokensMax: null });
     const conversation = temporaryChat();
     const images = await twoStoredPictures(people.owner.id, conversation.id, "turn-pictures02");
     await withEngine(() => "I can't see pictures yet.", async (seen) => {
       await drainStream(await runTurnNextStream(people.owner, "chat", "what colours are these?", { conversationId: conversation.id, turnId: "turn-pictures02", images }));
-      expect(lastUserParts(seen.at(-1)!)).toBe("what colours are these?");
+      expect(String(lastUserParts(seen.at(-1)!))).toContain("The person's words:\nwhat colours are these?");
       const prompt = JSON.stringify(seen.at(-1)!.messages);
       expect(prompt).toContain("You cannot see pictures yet");
       expect(prompt).not.toContain("image_url");
@@ -180,14 +183,14 @@ describe("VISION-02c: picture parts for a chat model that reads pictures", () =>
 
   test("the stable prefix is the same on a picture turn, and carries the photo identity line once (prefix cache intact)", () => {
     const part: LlmImagePart = { id: "file-redpic01", name: "red-square.jpg", url: "data:image/jpeg;base64,AAAA", reservedTokens: 2560 };
-    const plan = { age_band: "adult" } as never;
-    const signal = {} as never;
-    const persona = undefined as never;
-    const without = contextToMessages([], "hi", persona, plan, signal, "written");
-    const withPicture = contextToMessages([], "hi", persona, plan, signal, "written", [part]);
+    const signal = fallbackSignal("hi", "adult", "identified_profile", "greeting");
+    const planInput: PlanInput = { signal, surface: "chat", surfaceClass: "written", brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: "balanced", vocabulary: "advanced" }, band: "adult", deferred: false, disclosureWithheld: false };
+    const plan = planFor(planInput);
+    const without = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "written");
+    const withPicture = contextToMessages([], "hi", DEFAULT_PERSONA, plan, signal, "written", [part]);
     expect(withPicture.slice(0, -1)).toEqual(without.slice(0, -1));
     expect(withPicture[0]!.content.split(PHOTO_IDENTITY_SENTENCE).length - 1).toBe(1);
-    expect(buildStablePrefix(undefined, "written")).toContain(PHOTO_IDENTITY_SENTENCE);
+    expect(buildStablePrefix(DEFAULT_PERSONA, "written")).toContain(PHOTO_IDENTITY_SENTENCE);
     expect(withPicture.at(-1)!.images).toEqual([part]);
   });
 

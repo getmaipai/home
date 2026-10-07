@@ -50,7 +50,7 @@ export interface LongMemEvalResult {
    * incorrect, not a lost run), and the message says why. */
   error?: string;
   /** The live question turn's own context message (the recording
-   * proxy's systemText, joined) - the memory and episode lines recall
+   * proxy's system messages and final user message, joined) - the memory and episode lines recall
    * actually put in front of the model, verbatim. Null when no model
    * call was made (a thrown question, matching the household bench's
    * own contextMessage: null convention for that case). */

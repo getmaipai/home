@@ -113,13 +113,12 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   let disclosureWithheld = false;
 
   // GROUND-01 (state record, step 3): the current utterance joins the
-  // context list as its own item, source "utterance" - the list's own
-  // contract says it is the prompt's only input, so the utterance
-  // belongs on it structurally, not just as the separate parameter
-  // messages.ts also takes. Never answer evidence on purpose: source
-  // "utterance" is excluded from the grounding checks (quoting the question
-  // back proves nothing) and from the prompt's context block in messages.ts
-  // (it is already the turn's final user message there, never printed twice).
+  // context list as its own item, source "utterance". Keep this exact raw
+  // text here and in conversationHistory; messages.ts composes the volatile
+  // prompt block only for the model request and never writes it back into
+  // this item or the replayed window. Never answer evidence on purpose:
+  // source "utterance" is excluded from grounding checks and messages.ts
+  // uses its explicit utterance argument exactly once as the final words.
   items.push({ id: "utterance", text: input.utterance, source: "utterance", subjects: [], disclosure: "child_ok" });
   // UPLOAD-IMG-02: pictures sent with this message. Not for a bare turn
   // (the route refuses pictures there). VISION-02c: when the chat model

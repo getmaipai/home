@@ -66,24 +66,17 @@ describe("parity-bisect-stages: buildStages()", () => {
     expect(stage2.opts.tool_choice).toBe("auto");
   });
 
-  // The written prompt on tier 1, decided (dev.md, the coordinator's own
-  // design record, 2026-09-23): contextToMessages() now omits the
-  // volatile system message entirely on a written-adult turn when there
-  // is nothing to put in it (no memory match, no other volatile items) -
-  // stage 3's own fixture (empty context) is exactly that case, so it
-  // gets two messages now, not three. buildStages()'s own merge logic
-  // (`stage3Messages.filter(m => m.role === "system")`) is robust to
-  // this by construction - it was never counting on a fixed length -
-  // only this test's own hard-coded number was.
-  test("stage 3, with nothing in the volatile zone, is the stable message plus the question - two messages, not three", () => {
+  test("stage 3 carries volatile context at the start of the final user message", () => {
     const stages = buildStages(DEFAULT_PERSONA, plan, signal, TOOLS);
     const stage3 = stages.find((s) => s.name === "3-plus-volatile")!;
     expect(stage3.messages.length).toBe(2);
     expect(stage3.messages[0]!.role).toBe("system");
-    expect(stage3.messages[1]!).toEqual({ role: "user", content: QUESTION });
+    expect(stage3.messages[1]!.role).toBe("user");
+    expect(stage3.messages[1]!.content).toContain("Context for this turn");
+    expect(stage3.messages[1]!.content).toEndWith(`The person's words:\n${QUESTION}`);
   });
 
-  test("stage 4's merge is a no-op here (stage 3 already has one system message) - same content either way", () => {
+  test("stage 4's former merge is a no-op with late user context", () => {
     const stages = buildStages(DEFAULT_PERSONA, plan, signal, TOOLS);
     const stage3 = stages.find((s) => s.name === "3-plus-volatile")!;
     const stage4 = stages.find((s) => s.name === "4-merged-system")!;
