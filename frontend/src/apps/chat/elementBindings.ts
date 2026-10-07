@@ -46,6 +46,7 @@ import { preprocessChatMarkdown } from "@/apps/chat/chatStreamingMarkdown";
 import { ANSWER_IMAGES_PART, AnswerImagesDataRender } from "@/apps/chat/chatAnswerImages";
 import { trustedChatLinks } from "@/apps/chat/trustedChatLinks";
 import type { MarkdownLinkContext } from "@maipai/ui/src/elements/markdown-text";
+import { ComposerQuotePreview, SelectionToolbar } from "@maipai/ui/src/elements/quote.aui";
 export type ToolBinding = {
   /** The tool-call part's `toolName` on the wire (chatModelAdapter.ts). */
   toolName: string;
@@ -116,6 +117,8 @@ export const THREAD_SLOTS = {
   MessageError: ChatMessageError,
   ComposerAddAttachmentOverride: ComposerAddMenu,
   ComposerQueue: ChatMessageQueue,
+  SelectionToolbar,
+  ComposerQuotePreview,
   // CHAT-CALM-ERRORS-01d: the one quiet line under the composer while chat
   // cannot answer; renders nothing while chat is ready.
   ComposerNotice: ChatComposerNotice,

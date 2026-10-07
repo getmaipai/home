@@ -153,12 +153,12 @@ export default defineConfig({
       srcDir: "src",
       filename: "sw.ts",
       injectManifest: {
-        // ui-v0.5.69 brings the shared kit's DiceBear-backed Avatar
-        // into the shell; the built entry chunk is now 2.21 MB. Keep
-        // that real shell chunk in the precache with a 3 MiB ceiling
-        // until the existing route-level code-splitting work removes
-        // it from the entry bundle.
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+        // ui-v0.5.69 brought the shared kit's DiceBear-backed Avatar
+        // into the shell, requiring a 3 MiB ceiling. The chat quote
+        // Elements bring Routes just over 3 MiB, so raise the ceiling
+        // to 4 MiB until route-level code splitting removes the route
+        // bundle from the precache.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // The onnxruntime-web runtime (copy-ort.mjs's public/ort/ files,
         // ~40 MB, plus its own bundled JS loader emitted as a hashed
         // `assets/ort.bundle.min-*.js` chunk - a code review found the

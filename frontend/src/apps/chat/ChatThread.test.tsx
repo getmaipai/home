@@ -248,7 +248,13 @@ describe("ChatThread", () => {
       } else if (name === "composerDensity") {
         expect(slot).toBe("compact");
       } else {
-        expect(typeof slot).toBe("function");
+        const marker = typeof slot === "object" && slot !== null ? (slot as { $$typeof?: unknown }).$$typeof : undefined;
+        const isValidComponentType = typeof slot === "function" || [
+          Symbol.for("react.memo"),
+          Symbol.for("react.forward_ref"),
+          Symbol.for("react.lazy"),
+        ].includes(marker as symbol);
+        expect(isValidComponentType).toBe(true);
       }
     }
   });

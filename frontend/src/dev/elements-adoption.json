@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-07T11:16:27.534Z",
-  "kitTag": "ui-v0.5.168",
+  "generatedAt": "2026-10-07T14:19:38.895Z",
+  "kitTag": "ui-v0.5.173",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -56,6 +56,22 @@
       "group": "thread/showcase",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for K07, covered by the Commons showcase tests; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "ThreadSearchDensityShowcase.tsx",
+      "name": "ThreadSearchDensityShowcase",
+      "group": "thread/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for ui-v0.5.172 ThreadSearch density; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "TraceWaterfallShowcase.tsx",
+      "name": "TraceWaterfallShowcase",
+      "group": "thread/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for ELT-T1-22 TraceWaterfall contrast; not a standalone Home product surface.",
       "implemented": false
     },
     {
@@ -243,7 +259,7 @@
       "group": "composer",
       "verdict": "later",
       "verdictReason": "Vendored by ELT-T1-K01a; wired by an ELEMENTS-ADOPT-01 batch, not yet.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "composer-slash-commands.aui.tsx",
@@ -816,9 +832,9 @@
       "file": "quote.aui.tsx",
       "name": "quote.aui",
       "group": "composer",
-      "verdict": "later",
-      "verdictReason": "Vendored by ELT-T1-K01a; wired by an ELEMENTS-ADOPT-01 batch, not yet.",
-      "implemented": false
+      "verdict": "wire-now",
+      "verdictReason": "ELT-T1-22 wires SelectionToolbar and ComposerQuotePreview into Home's Thread and folds the selected quote into sent text.",
+      "implemented": true
     },
     {
       "file": "range.ts",
@@ -882,7 +898,7 @@
       "group": "message",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "research-report.tsx",

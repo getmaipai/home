@@ -1,7 +1,7 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { takeCarry } from "@/apps/chat/chatCarry";
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, PendingAttachment, ThreadMessage } from "@assistant-ui/react";
-import { createChatModelAdapter, stripThinking } from "@/apps/chat/chatModelAdapter";
+import { createChatModelAdapter, stripThinking, type ChatModelAdapterDeps } from "@/apps/chat/chatModelAdapter";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
 import { createLocalImageAttachmentAdapter, clearStagedImageAttachments } from "@/apps/chat/localImageAttachmentAdapter";
@@ -21,7 +21,7 @@ function runAdapter(adapter: ChatModelAdapter, options: ChatModelRunOptions): As
   return adapter.run(options) as AsyncGenerator<ChatModelRunResult, void>;
 }
 
-function fakeUserMessage(text: string): ThreadMessage {
+function fakeUserMessage(text: string): Extract<ThreadMessage, { role: "user" }> {
   return {
     id: "msg-1",
     createdAt: new Date("2026-09-05T00:00:00.000Z"),
@@ -72,7 +72,7 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   };
 }
 
-async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, _legacyBanner?: unknown, getModel?: () => string | undefined, onArtifactReady?: (artifactId: string) => void, onConnection?: (state: { phase: "online" | "dropped" | "reconnecting" | "resumed"; attempt?: number; resumedTokens?: number }) => void): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
+async function collect(messages: ThreadMessage[], abortSignal = new AbortController().signal, _legacyBanner?: unknown, getModel?: () => string | undefined, onArtifactReady?: (artifactId: string) => void, onConnection?: (state: { phase: "online" | "dropped" | "reconnecting" | "resumed"; attempt?: number; resumedTokens?: number }) => void, overrides: Partial<ChatModelAdapterDeps> = {}): Promise<{ yields: ChatModelRunResult[]; error?: unknown }> {
   const adapter = createChatModelAdapter({
     consumeThinking: () => false,
     consumeSupersedes: () => undefined,
@@ -80,6 +80,7 @@ async function collect(messages: ThreadMessage[], abortSignal = new AbortControl
     getModel,
     onArtifactReady,
     onConnection,
+    ...overrides,
   });
   const options = { messages, runConfig: {}, abortSignal, context: {}, unstable_getMessage: () => messages[messages.length - 1]! } as unknown as ChatModelRunOptions;
   const yields: ChatModelRunResult[] = [];
@@ -265,6 +266,72 @@ describe("document attachment content", () => {
       expect(result.error).toBeUndefined();
       expect(lastText(result.yields)).toBe("Noted.");
       expect(env.turnBodies[0]).toMatchObject({ text: 'what does this say\n\n<attachment name="notes.txt">\nbuy milk\n</attachment>' });
+    } finally {
+      env.restore();
+    }
+  });
+
+  test.each(["child", "teen", "adult"] as const)("a %s reply quote folds into the same outgoing text", async (ageBand) => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "delta", text: "Here is more detail." },
+      { type: "done", value: { turn_id: "turn-quote", reply: { text: "Here is more detail." }, source: "model", safety: SAFETY } },
+    ]));
+    try {
+      const message = {
+        ...fakeUserMessage("Can you explain that?"),
+        metadata: { custom: { quote: { text: "first quoted line\nsecond quoted line", messageId: "msg-previous" } } },
+        attachments: [{
+          id: "att-quote-text",
+          type: "document",
+          name: "notes.txt",
+          contentType: "text/plain",
+          status: { type: "complete" as const },
+          content: [{ type: "text" as const, text: "<attachment name=\"notes.txt\">\nsource text\n</attachment>" }],
+        }],
+      };
+      const result = await collect([message], undefined, undefined, undefined, undefined, undefined, { getAgeBand: () => ageBand });
+
+      expect(result.error).toBeUndefined();
+      expect(env.turnBodies[0]).toMatchObject({ text: "> first quoted line\n> second quoted line\n\nCan you explain that?\n\n<attachment name=\"notes.txt\">\nsource text\n</attachment>" });
+      expect(env.turnBodies[0]).not.toHaveProperty("quote");
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("spoken turns keep their transcript and do not fold a written quote into it", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "delta", text: "I heard you." },
+      { type: "done", value: { turn_id: "turn-spoken-quote", reply: { text: "I heard you." }, source: "model", safety: SAFETY } },
+    ]));
+    try {
+      const message = {
+        ...fakeUserMessage("Tell me more"),
+        metadata: { custom: { quote: { text: "quoted text from chat", messageId: "msg-previous" } } },
+      };
+      await collect([message], undefined, undefined, undefined, undefined, undefined, { consumeSpoken: () => true, speakReplies: false });
+
+      expect(env.turnBodies[0]).toMatchObject({ text: "Tell me more", spoken: true });
+      expect(JSON.stringify(env.turnBodies[0])).not.toContain("quoted text from chat");
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("an Incognito quote uses the same folded text and temporary turn flag", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "delta", text: "A temporary answer." },
+      { type: "done", value: { turn_id: "turn-quote-incognito", reply: { text: "A temporary answer." }, source: "model", safety: SAFETY } },
+    ]));
+    try {
+      const message = {
+        ...fakeUserMessage("What does that mean?"),
+        metadata: { custom: { quote: { text: "a selected sentence", messageId: "msg-previous" } } },
+      };
+      await collect([message], undefined, undefined, undefined, undefined, undefined, { consumeTemporary: () => true });
+
+      expect(env.turnBodies[0]).toMatchObject({ text: "> a selected sentence\n\nWhat does that mean?", temporary: true });
+      expect(env.turnBodies[0]).not.toHaveProperty("quote");
     } finally {
       env.restore();
     }

@@ -52,17 +52,27 @@ export function stripThinking(text: string): string {
 // (routes/turn.ts never mentions one) - folded into the one text field
 // it does read, the same inline shape the adapter's own tag already
 // gives it.
-function lastUserText(messages: ChatModelRunOptions["messages"]): string | undefined {
+function userQuote(last: ChatModelRunOptions["messages"][number] | undefined): string | undefined {
+  if (!last || last.role !== "user") return undefined;
+  const quote = last.metadata.custom.quote;
+  if (typeof quote !== "object" || quote === null || !("text" in quote)) return undefined;
+  return typeof quote.text === "string" && quote.text.trim() ? quote.text : undefined;
+}
+
+function lastUserText(messages: ChatModelRunOptions["messages"], includeQuote = true): string | undefined {
   const last = messages[messages.length - 1];
   if (!last || last.role !== "user") return undefined;
   const typed = messageText(last);
+  const selectedQuote = includeQuote ? userQuote(last) : undefined;
+  const quoteText = selectedQuote
+    ? `> ${selectedQuote.replace(/\r\n?/g, "\n").split("\n").join("\n> ")}`
+    : "";
   const attachmentText = last.attachments
     .flatMap((attachment) => attachment.content ?? [])
     .filter((part): part is { type: "text"; text: string } => part.type === "text")
     .map((part) => part.text)
     .join("\n\n");
-  if (!attachmentText) return typed;
-  return typed ? `${typed}\n\n${attachmentText}` : attachmentText;
+  return [quoteText, typed, attachmentText].filter(Boolean).join("\n\n") || undefined;
 }
 
 export interface ChatModelAdapterDeps {
@@ -197,6 +207,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
     async *run({ messages, abortSignal, runConfig }: ChatModelRunOptions): AsyncGenerator<ChatModelRunResult, void> {
       deps.onDraftSent?.();
       const lastMessage = messages[messages.length - 1];
+      const quote = userQuote(lastMessage);
+      const quoteSpoken = quote ? deps.consumeSpoken?.() : undefined;
       // UPLOAD-IMG-02: only a picture picked in this session (it still holds
       // its File) is uploaded with the turn. A picture rebuilt from the hub's
       // store on a reopened chat (chatHistoryAdapter.ts) is already saved
@@ -205,7 +217,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       const newPictures = lastMessage?.role === "user" ? lastMessage.attachments.filter((attachment) => attachment.type === "image" && !isStoredPicture(attachment)) : [];
       const imageAttached = newPictures.length > 0;
       const documentPayloads = lastMessage?.role === "user" ? (await Promise.all(lastMessage.attachments.filter((attachment) => attachment.type === "file").map((attachment) => stagedDocumentPayload(attachment.id)))).filter((item): item is NonNullable<typeof item> => Boolean(item)) : [];
-      const typedText = lastUserText(messages);
+      const typedText = lastUserText(messages, !quoteSpoken);
       const text = typedText || (documentPayloads.length > 0 ? "Please read the attached document." : undefined);
       if (!text && !imageAttached && documentPayloads.length === 0) return;
 
@@ -370,7 +382,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             resumeFrom: resumeToken ? lastAcknowledgedSequence : undefined,
             packageScope: reconnectAttempts === 0 ? deps.consumePackageScope?.() : undefined,
             temporary: reconnectAttempts === 0 ? temporary : undefined,
-            spoken: reconnectAttempts === 0 ? deps.consumeSpoken?.() : undefined,
+            spoken: reconnectAttempts === 0 ? quote ? quoteSpoken : deps.consumeSpoken?.() : undefined,
             // APPROVE-CARD-01: the same reconnectAttempts===0 gate as
             // packageScope/temporary/spoken above - a single-shot field
             // only ever meaningful on the first attempt of this send,
