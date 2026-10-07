@@ -3,6 +3,7 @@
 // @maipai/spec once those schemas move into shared/spec.
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
+import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
 export type { StackFitPlan };
 export type { StackJob };
 
@@ -108,7 +109,7 @@ export interface RoleState {
   reason?: string | null;
 }
 
-export interface RoleInfo {
+export interface RoleInfo extends ChatRoleContext {
   id: RoleId;
   label: string;
   wire: "chat" | "embeddings" | "rerank" | "transcription" | "speech" | "job";
@@ -131,8 +132,6 @@ export interface RoleInfo {
   /** VISION-02b: the most tokens one picture takes in the chat process
    * (its declared --image-max-tokens); null or absent when it reads none. */
   picture_tokens_max?: number | null;
-  /** STATUS-STACK-01: live context from the running engine. */
-  context?: { context_length: number | null; slots: number | null; context_per_slot: number | null; reason: string | null };
   check: {
     state: "not checked" | "passed" | "failed" | "skipped";
     at: string | null;

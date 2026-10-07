@@ -1,6 +1,7 @@
 
 import { getStackClient, isStackConfigured, stackRefusal } from "@/lib/stackEngine";
 import type { EngineHealthEntry } from "@/wire";
+import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
 
 export type HealthRole = "chat" | "embed" | "background" | "voice";
 /** THIN-1C (fixes part of getmaipai/home#203): `detail`, present only
@@ -49,7 +50,7 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
     const row = roles.find((item) => item.id === id);
     if (!row) return { availability: "unavailable", reason: "stack_unreachable" };
     const state = row.state.state;
-    const status = role === "chat" ? { ...chatContextStatus(row as typeof row & { context?: { context_length?: number | null; context_per_slot?: number | null; slots?: number | null; reason?: string | null } | null }), ...(row.model?.id ? { modelId: row.model.id } : {}) } : {};
+    const status = role === "chat" ? { ...chatContextStatus(row), ...(row.model?.id ? { modelId: row.model.id } : {}) } : {};
     if (state === "ready" || state === "installed") return { availability: "ready", reason: null, ...status };
     if (state === "loaded") return { availability: row.state.reason === STACK_IDLE_REASON ? "ready" : "starting", reason: null, ...status };
     return { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start" };
@@ -59,12 +60,15 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
 }
 
 /** Resolve llama-server's launched context to the actual per-request window.
- * Stack's context_length is the -c total, divided across --parallel slots. */
-export function chatContextStatus(row: { context?: { context_length?: number | null; context_per_slot?: number | null; slots?: number | null; reason?: string | null } | null }) {
-  const context = row.context;
-  const slots = Number.isInteger(context?.slots) && context!.slots! > 0 ? context!.slots! : undefined;
-  const perSlot = Number.isInteger(context?.context_per_slot) && context!.context_per_slot! > 0 ? context!.context_per_slot! : undefined;
-  return perSlot && slots ? { contextLength: context?.context_length ?? undefined, slots, contextPerSlot: perSlot, contextScope: "per_slot" as const } : {};
+ * Only Stack's explicit per-slot value is used to size the turn window. */
+export function chatContextStatus(row: ChatRoleContext) {
+  const slots = Number.isInteger(row.slots) && row.slots! > 0 ? row.slots! : undefined;
+  const perSlot = Number.isInteger(row.context_per_slot) && row.context_per_slot! > 0 ? row.context_per_slot! : undefined;
+  return {
+    ...(Number.isInteger(row.context_length) && row.context_length! > 0 ? { contextLength: row.context_length! } : {}),
+    ...(slots ? { slots } : {}),
+    ...(perSlot ? { contextPerSlot: perSlot, contextScope: "per_slot" as const } : {}),
+  };
 }
 
 export const MINIMUM_CHAT_WINDOW_TOKENS = 2048;
@@ -77,7 +81,7 @@ export async function chatWindowContext(): Promise<{ tokens: number; slots: numb
   if (chatWindowContextForTests !== undefined) return { tokens: chatWindowContextForTests, slots: null, reported: true };
   const health = await roleHealth("chat", { live: true });
   const model = health.modelId ? { modelId: health.modelId } : {};
-  if (health.contextPerSlot && health.slots) return { tokens: health.contextPerSlot, slots: health.slots, reported: true, ...model };
+  if (health.contextPerSlot) return { tokens: health.contextPerSlot, slots: health.slots ?? null, reported: true, ...model };
   return { tokens: MINIMUM_CHAT_WINDOW_TOKENS, slots: health.slots ?? null, reported: false, ...model };
 }
 

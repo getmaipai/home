@@ -4032,6 +4032,150 @@
     "result": "deny:crisis_state"
   },
   {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "tool.offer:show_images",
+    "capability": "tool.offer:show_images",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow"
+  },
+  {
     "id": "camera:still",
     "capability": "camera:still",
     "band": "child",

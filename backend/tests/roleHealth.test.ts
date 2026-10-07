@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
+import { createStackClient } from "@/lib/stack/client";
+import { startStubStackRolesServer } from "@maipai/spec/stack/ts/stubServer.js";
 import { chatContextStatus, roleHealth, __setChatWindowContextForTests, chatWindowContext, MINIMUM_CHAT_WINDOW_TOKENS } from "@/lib/roleHealth";
 
 beforeEach(() => resetDb());
@@ -13,9 +15,9 @@ function client(roles: Array<{ id: string; state: { state: string; reason?: stri
 
 describe("roleHealth", () => {
   test("Stack role context resolves to the per-slot chat window", () => {
-    expect(chatContextStatus({ context: { context_length: 4096, slots: 1, context_per_slot: 4096 } })).toMatchObject({ contextLength: 4096, slots: 1, contextPerSlot: 4096, contextScope: "per_slot" });
-    expect(chatContextStatus({ context: { context_length: 40960, slots: 1, context_per_slot: 40960 } })).toMatchObject({ contextPerSlot: 40960 });
-    expect(chatContextStatus({ context: { context_length: 40960, slots: 2, context_per_slot: 20480 } })).toMatchObject({ contextPerSlot: 20480, slots: 2 });
+    expect(chatContextStatus({ context_length: 4096, slots: 1, context_per_slot: 4096 })).toMatchObject({ contextLength: 4096, slots: 1, contextPerSlot: 4096, contextScope: "per_slot" });
+    expect(chatContextStatus({ context_length: 40960, slots: 1, context_per_slot: 40960 })).toMatchObject({ contextPerSlot: 40960 });
+    expect(chatContextStatus({ context_length: 40960, slots: 2, context_per_slot: 20480 })).toMatchObject({ contextPerSlot: 20480, slots: 2 });
     expect(chatContextStatus({})).toEqual({});
   });
 
@@ -49,8 +51,33 @@ describe("roleHealth", () => {
 
   test("live Stack chat health carries reported context and slots", async () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
-    client([{ id: "chat", state: { state: "ready" }, context: { context_length: 40960, slots: 2, context_per_slot: 20480 } } as never]);
+    client([{ id: "chat", state: { state: "ready" }, context_length: 40960, slots: 2, context_per_slot: 20480 } as never]);
     expect(await roleHealth("chat")).toMatchObject({ contextLength: 40960, slots: 2, contextPerSlot: 20480, contextScope: "per_slot" });
+  });
+
+  test("flat Stack role context reaches the chat window as a per-slot figure", async () => {
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    const stub = startStubStackRolesServer(0);
+    __setStackClientForTests(createStackClient({ baseUrl: stub.url }));
+    try {
+      expect(await chatWindowContext()).toMatchObject({ tokens: 20480, slots: 2, reported: true });
+    } finally {
+      stub.stop();
+    }
+  });
+
+  test("a total context figure never replaces a missing per-slot figure", async () => {
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    client([{
+      id: "chat",
+      state: { state: "ready" },
+      context_length: 40960,
+      context_per_slot: null,
+      context_total: 81920,
+      slots: 2,
+      context_scope: "total across slots",
+    } as never]);
+    expect(await chatWindowContext()).toMatchObject({ tokens: MINIMUM_CHAT_WINDOW_TOKENS, slots: 2, reported: false });
   });
 
   test("Stack installed and idle loaded roles are available on demand, while active loading stays degraded", async () => {
