@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, setSystemTime } from "bun:test";
 import { TOTP, Secret } from "otpauth";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -8,6 +8,7 @@ beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
 });
+afterEach(() => setSystemTime());
 
 const PERIOD_MS = 30_000;
 
@@ -78,6 +79,7 @@ describe("TOTP enrollment and sign-in, end to end", () => {
     const personId = profiles.find((p) => p.display_name === "Sage")!.id;
 
     for (let i = 0; i < 5; i++) {
+      setSystemTime(new Date(Date.now() + 60_000));
       const res = await new TestClient().post("/api/auth/totp/challenge", { personId, token: "000000" });
       expect(res.status).toBe(401);
     }

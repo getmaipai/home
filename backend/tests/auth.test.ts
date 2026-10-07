@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, setSystemTime } from "bun:test";
 import { eq } from "drizzle-orm";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import { app } from "@/app";
@@ -13,6 +13,7 @@ beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
 });
+afterEach(() => setSystemTime());
 
 async function setUpOwner(client: TestClient, displayName = "Sage", secret = "correcthorse") {
   const res = await client.post("/api/auth/setup", { displayName, secret });
@@ -231,6 +232,7 @@ describe("verify-secret and lockout", () => {
     const { person } = await setUpOwner(setupClient);
 
     for (let i = 0; i < 5; i++) {
+      setSystemTime(new Date(Date.now() + 60_000));
       const client = new TestClient();
       const res = await client.post("/api/auth/verify-secret", {
         personId: person.id,
@@ -245,6 +247,16 @@ describe("verify-secret and lockout", () => {
       secret: "correcthorse",
     });
     expect(locked.status).toBe(429);
+  });
+
+  test("a correct secret succeeds after the address delay expires", async () => {
+    const setupClient = new TestClient();
+    const { person } = await setUpOwner(setupClient);
+    const client = new TestClient();
+    expect((await client.post("/api/auth/verify-secret", { personId: person.id, secret: "wrong" })).status).toBe(401);
+    expect((await client.post("/api/auth/verify-secret", { personId: person.id, secret: "correcthorse" })).status).toBe(429);
+    setSystemTime(new Date(Date.now() + 1_000));
+    expect((await client.post("/api/auth/verify-secret", { personId: person.id, secret: "correcthorse" })).status).toBe(200);
   });
 
   // Step 6: TOTP delays the session, it never replaces the PIN check -
@@ -506,14 +518,24 @@ describe("change-secret (self-service PIN/password change)", () => {
 
     // Whichever write landed last, exactly one of the two secrets works -
     // not both, and not neither.
-    const triedFirst = await new TestClient().post("/api/auth/verify-secret", {
+    let triedFirst = await new TestClient().post("/api/auth/verify-secret", {
       personId: child.id,
       secret: "kidpassword1",
     });
-    const triedSecond = await new TestClient().post("/api/auth/verify-secret", {
+    if (triedFirst.status === 429) {
+      const { retryAfter } = (await triedFirst.json()) as { retryAfter: number };
+      setSystemTime(new Date(Date.now() + retryAfter * 1_000));
+      triedFirst = await new TestClient().post("/api/auth/verify-secret", { personId: child.id, secret: "kidpassword1" });
+    }
+    let triedSecond = await new TestClient().post("/api/auth/verify-secret", {
       personId: child.id,
       secret: "kidpassword2",
     });
+    if (triedSecond.status === 429) {
+      const { retryAfter } = (await triedSecond.json()) as { retryAfter: number };
+      setSystemTime(new Date(Date.now() + retryAfter * 1_000));
+      triedSecond = await new TestClient().post("/api/auth/verify-secret", { personId: child.id, secret: "kidpassword2" });
+    }
     expect([triedFirst.status, triedSecond.status].sort()).toEqual([200, 401]);
   });
 
@@ -527,6 +549,7 @@ describe("change-secret (self-service PIN/password change)", () => {
     await setUpOwner(owner);
 
     for (let i = 0; i < 5; i++) {
+      setSystemTime(new Date(Date.now() + 60_000));
       const res = await owner.post("/api/auth/change-secret", {
         currentSecret: "wrong",
         newSecret: "newpassword123",
