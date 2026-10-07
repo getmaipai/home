@@ -270,7 +270,14 @@ describe("cloned voices", () => {
 });
 
 describe("household voice catalog routes", () => {
+  const previousCatalogUrl = process.env.MAIPAI_VOICE_CATALOG_URL;
+  afterEach(() => {
+    if (previousCatalogUrl === undefined) delete process.env.MAIPAI_VOICE_CATALOG_URL;
+    else process.env.MAIPAI_VOICE_CATALOG_URL = previousCatalogUrl;
+  });
+
   test("catalog browsing requires owner or admin, including on the server", async () => {
+    process.env.MAIPAI_VOICE_CATALOG_URL = "http://127.0.0.1:1/unreachable";
     const owner = await ownerClient();
     const adminRes = await owner.post("/api/people", { displayName: "Marlow", role: "admin", secret: "0000" });
     const admin = (await adminRes.json()) as { id: string };
@@ -289,7 +296,7 @@ describe("household voice catalog routes", () => {
     const adultClient = await clientFor(adult.id);
     const teenClient = await clientFor(teen.id);
     const childClient = await clientFor(child.id);
-    // Get/select are exercised only far enough to confirm the server gate; no catalog network is needed.
+    // Owner/admin proceed to the catalog fetch; use an unreachable local endpoint so the test stays offline.
     expect((await adminClient.get("/api/voice/catalog")).status).toBe(503);
     expect((await owner.get("/api/voice/catalog")).status).toBe(503);
     for (const member of [adultClient, teenClient, childClient]) {

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-07T16:08:08.206Z",
-  "kitTag": "ui-v0.5.168",
+  "generatedAt": "2026-10-07T17:41:26.481Z",
+  "kitTag": "ui-v0.5.174",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -56,6 +56,22 @@
       "group": "thread/showcase",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for K07, covered by the Commons showcase tests; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "ThreadSearchDensityShowcase.tsx",
+      "name": "ThreadSearchDensityShowcase",
+      "group": "thread/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only showcase fixture for the kit's ThreadSearch density variants; it is not a standalone Home adoption target.",
+      "implemented": false
+    },
+    {
+      "file": "TraceWaterfallShowcase.tsx",
+      "name": "TraceWaterfallShowcase",
+      "group": "agent/workflow/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only showcase fixture for the kit's TraceWaterfall variants; it is not a standalone Home adoption target.",
       "implemented": false
     },
     {

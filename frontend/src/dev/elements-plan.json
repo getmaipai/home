@@ -1,6 +1,20 @@
 {
   "items": [
     {
+      "file": "ThreadSearchDensityShowcase.tsx",
+      "name": "ThreadSearchDensityShowcase",
+      "group": "thread/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only showcase fixture for the kit's ThreadSearch density variants; it is not a standalone Home adoption target."
+    },
+    {
+      "file": "TraceWaterfallShowcase.tsx",
+      "name": "TraceWaterfallShowcase",
+      "group": "agent/workflow/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only showcase fixture for the kit's TraceWaterfall variants; it is not a standalone Home adoption target."
+    },
+    {
       "file": "ActivityCardsShowcase.tsx",
       "name": "ActivityCardsShowcase",
       "group": "activity/showcase",
