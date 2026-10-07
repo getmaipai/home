@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-10-07T18:33:12.046Z",
-  "kitTag": "ui-v0.5.174",
+  "kitTag": "ui-v0.5.175",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -832,9 +832,9 @@
       "file": "quote.aui.tsx",
       "name": "quote.aui",
       "group": "composer",
-      "verdict": "later",
-      "verdictReason": "Vendored by ELT-T1-K01a; wired by an ELEMENTS-ADOPT-01 batch, not yet.",
-      "implemented": false
+      "verdict": "wire-now",
+      "verdictReason": "ELT-T1-22 wires SelectionToolbar and ComposerQuotePreview into Home's Thread and folds the selected quote into sent text.",
+      "implemented": true
     },
     {
       "file": "range.ts",

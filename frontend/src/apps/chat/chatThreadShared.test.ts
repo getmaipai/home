@@ -41,4 +41,10 @@ describe("one chat thread composition", () => {
     expect(registry).toContain("How to add an Element");
     expect(registry).toContain("scripts/elementsAdoption.ts");
   });
+
+  test("the quote Elements are registered directly as Thread slots", () => {
+    const registry = read("./elementBindings.ts");
+    expect(registry).toMatch(/import\s*\{[^}]*ComposerQuotePreview[^}]*SelectionToolbar[^}]*\}\s*from\s*"@maipai\/ui\/src\/elements\/quote\.aui"/);
+    expect(registry).toMatch(/ComposerQueue:\s*ChatMessageQueue,[\s\S]*SelectionToolbar,[\s\S]*ComposerQuotePreview,/);
+  });
 });
