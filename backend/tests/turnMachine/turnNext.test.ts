@@ -29,7 +29,7 @@ import { StreamSafetyRefusal, StreamUnavailable, type StreamOutcome, type Speake
 import * as llm from "@/lib/llm";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import type { TurnStreamEvent } from "@/wire";
-import { getPendingAsk, resolveOrCreateConversation } from "@/lib/conversationHistory";
+import { getPendingAsk, resolveOrCreateConversation, setPendingAsk } from "@/lib/conversationHistory";
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
 import { conversationTurns, conversations, memoryRecords, people as people_ } from "@/db/schema";
@@ -634,6 +634,7 @@ describe("turnNext.ts: consent and confirmation", () => {
     const ask = getPendingAsk(parked.value.conversation_id);
     expect(ask).not.toBeNull();
     expect(ask?.packageId).toBe("lock-doors");
+    expect(ask?.capabilities).toEqual(["home:lock"]);
 
     const resumed = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "yes", { conversationId: parked.value.conversation_id }));
     expect(resumed.ok).toBe(true);
@@ -646,6 +647,45 @@ describe("turnNext.ts: consent and confirmation", () => {
     // what conversationRunner.ts's scorer and any real client expect.
     expect(resumed.value.source).toBe("plugin");
     expect(resumed.value.plugin_id).toBe("lock-doors");
+  });
+
+  test("PARENT-ASK-01a: bedtime-storybook remains a child self-confirmation", async () => {
+    registerProjectType({ id: "bedtime-storybook", title: "Bedtime storybook", description: "A bedtime storybook.", minRole: "child", consequential: true, paramsSchema: { type: "object", required: ["topic"], properties: { topic: { type: "string" } }, additionalProperties: false }, buildPlan: () => ({ steps: [{ id: "a", kind: "text", needs: [], params: { role: "chat", promptTemplate: "write a gentle story", inputs: [] } }], ceilings: { maxWallSeconds: 30, maxGeneratorJobs: 1 } }) });
+    const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
+    const original = entry.turn_budget;
+    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, START_PROJECT_TOOL_ID] };
+    try {
+      const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === START_PROJECT_TOOL_ID) ? [{ id: "storybook", name: START_PROJECT_TOOL_ID, args: JSON.stringify({ type: "bedtime-storybook", params: { topic: "a moon rabbit" } }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "make a bedtime storybook about a moon rabbit"));
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.source).toBe("confirm");
+    } finally { entry.turn_budget = original; __resetProjectTypesForTests(); }
+  });
+
+  test("PARENT-ASK-01a: a child's family-name search is refused without claiming a parent was asked", async () => {
+    const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
+    const original = entry.turn_budget;
+    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "websearch"] };
+    try {
+      const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "websearch") ? [{ id: "search", name: "websearch", args: JSON.stringify({ expression: "Jesse Torres news" }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "search the web for Jesse Torres news"));
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+      expect(result.value.confirm).toBeUndefined();
+      expect(getPendingAsk(result.value.conversation_id)).toBeNull();
+    } finally { entry.turn_budget = original; }
+  });
+
+  test("PARENT-ASK-01a: a teen's yes cannot resume a legacy lock confirmation", async () => {
+    const actor = { ...people.child, role: "teen" };
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error("expected the teen conversation");
+    setPendingAsk(conversation.value.id, { kind: "confirm", prompt: "Lock the front door?", packageId: "lock-doors", args: {}, turnId: "legacy-lock-ask" });
+    const result = await withStub({ reply: () => "unused" }, () => runTurnNext(actor, "chat", "yes", { conversationId: conversation.value.id }));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected the refusal");
+    expect(result.code).toBe("parent_required");
+    expect(getPendingAsk(conversation.value.id)).toBeNull();
   });
 });
 

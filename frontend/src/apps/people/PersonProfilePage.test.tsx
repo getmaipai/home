@@ -38,6 +38,7 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     tier: "durable",
     status: "active",
     scope: "person",
+    folder_id: null,
     person: "person-abc123",
     companion_id: null,
     subject_id: null,

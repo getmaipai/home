@@ -108,12 +108,12 @@ function deadlineFor(context: MachineContext, baseMs: number): number {
   return retryRound(context) ? retryDeadlineMs(baseMs, context.turnState.spoken || context.turnState.planBasis.surfaceClass === "spoken") : baseMs;
 }
 
-function proposalsFrom(policy: PolicyOutput): { toRun: ActionProposal[]; parkedAsk: { prompt: string; proposal: ActionProposal } | null } {
+function proposalsFrom(policy: PolicyOutput): { toRun: ActionProposal[]; parkedAsk: { prompt: string; proposal: ActionProposal; capabilities?: string[]; consequential?: boolean } | null } {
   const toRun: ActionProposal[] = [];
-  let parkedAsk: { prompt: string; proposal: ActionProposal } | null = null;
+  let parkedAsk: { prompt: string; proposal: ActionProposal; capabilities?: string[]; consequential?: boolean } | null = null;
   for (const { proposal, decision } of policy.entries) {
     if (decision.allow) toRun.push(proposal);
-    else if ((decision.reason === "consent_needed" || decision.reason === "confirm_needed") && decision.ask) parkedAsk = { prompt: decision.ask.prompt, proposal };
+    else if ((decision.reason === "consent_needed" || decision.reason === "confirm_needed") && decision.ask) parkedAsk = { prompt: decision.ask.prompt, proposal, capabilities: decision.ask.capabilities, consequential: decision.ask.consequential };
   }
   return { toRun, parkedAsk };
 }
@@ -318,7 +318,7 @@ export const turnMachine = setup({
     parkAsk: ({ context }) => {
       const { parkedAsk } = proposalsFrom(context.step as PolicyOutput);
       if (parkedAsk) {
-        context.turnState.ask = { kind: "confirm", prompt: parkedAsk.prompt, packageId: parkedAsk.proposal.request.tool, args: parkedAsk.proposal.request.args };
+        context.turnState.ask = { kind: "confirm", prompt: parkedAsk.prompt, packageId: parkedAsk.proposal.request.tool, args: parkedAsk.proposal.request.args, capabilities: parkedAsk.capabilities, consequential: parkedAsk.consequential };
       }
     },
     // "Reasoning is a second output": output_gate is the one node that

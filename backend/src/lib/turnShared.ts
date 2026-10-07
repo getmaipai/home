@@ -50,7 +50,7 @@ const IMPLEMENTED_SURFACES: ReadonlySet<Surface> = new Set(["chat", "robot"]);
 // error. New path only (turnMachine/turnNext.ts's beginTurn()) - the
 // old path (runTurn()/runTurnStream() below) has no `ask_answer` field
 // to ever produce one.
-export type TurnFailure = { ok: false; status: 400 | 409 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable" | "engine_unavailable" | "temporary_mismatch" | "ask_stale"; error: string };
+export type TurnFailure = { ok: false; status: 400 | 403 | 409 | 503; code: "unsupported_surface" | "invalid_input" | "unavailable" | "engine_unavailable" | "temporary_mismatch" | "ask_stale" | "parent_required"; error: string };
 
 /** Shared by runTurn() and runTurnStream() (a review, 2026-09-06, found
  * this exact trio of checks copy-pasted between them - the same
