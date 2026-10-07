@@ -74,36 +74,35 @@ function stubFetch(
 }
 
 describe("ClonedVoicesSection", () => {
-  test("lists existing cloned voices with who uploaded them", async () => {
+  test("lists household cloned voices and names who uploaded them", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = stubFetch();
     try {
       const { findByText } = render(<ClonedVoicesSection person={makePerson()} />);
       await findByText("Dad's voice");
+      expect(await findByText("Nova's voice")).toBeTruthy();
       await findByText("Uploaded by Nova");
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
-  test("shows no delete button for a voice neither uploaded by, nor viewable-as-admin", async () => {
+  test("an adult can select another person's clone but cannot delete it", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = stubFetch();
     try {
       const adult = makePerson({ id: "person-marlow", display_name: "Marlow", role: "adult" });
-      const { findByText, findAllByText, queryAllByText } = render(<ClonedVoicesSection person={adult} />);
+      const { findByText, queryAllByText } = render(<ClonedVoicesSection person={adult} />);
       await findByText("Dad's voice");
       await findByText("Nova's voice");
-      // Marlow uploaded neither and isn't owner/admin: no Delete anywhere.
       expect(queryAllByText("Delete").length).toBe(0);
-      // Can still select either voice, though.
-      expect((await findAllByText("Use this voice")).length).toBe(2);
+      expect(queryAllByText("Use this voice").length).toBe(2);
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
-  test("an owner sees Delete on every voice, not just their own", async () => {
+  test("an owner sees household cloned voices and may delete them", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = stubFetch();
     try {

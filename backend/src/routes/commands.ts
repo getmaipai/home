@@ -11,7 +11,7 @@ const commandSchema = z.object({ id: z.string(), creatorId: z.string(), trigger:
 const commandInputSchema = z.object({ trigger: z.string(), minRole: z.string(), action: z.unknown() });
 const idResponse = z.object({ id: z.string() });
 
-const listRoute = createRoute({ method: "get", path: "/", tags: ["Commands"], summary: "List household commands", middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: z.array(commandSchema) } }, description: "Household commands." }, ...errorResponses({ 401: "Not signed in" }) } });
+const listRoute = createRoute({ method: "get", path: "/", tags: ["Commands"], summary: "List household commands", middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: z.array(commandSchema) } }, description: "Household commands." }, ...errorResponses({ 401: "Not signed in", 403: "Only owner or admin" }) } });
 const createRouteDef = createRoute({ method: "post", path: "/", tags: ["Commands"], summary: "Create a household command", middleware: [requireAuth] as const, request: { body: { content: { "application/json": { schema: commandInputSchema } } } }, responses: { 200: { content: { "application/json": { schema: commandSchema } }, description: "Created command." }, ...errorResponses({ 400: "Invalid command", 401: "Not signed in", 403: "Not allowed" }) } });
 const deleteRoute = createRoute({ method: "delete", path: "/{id}", tags: ["Commands"], summary: "Delete a household command", middleware: [requireAuth] as const, request: { params: idParamSchema("id") }, responses: { 200: { content: { "application/json": { schema: idResponse } }, description: "Deleted command." }, ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "Unknown command" }) } });
 
@@ -23,7 +23,9 @@ function fail<T>(result: Extract<CommandOpResult<T>, { ok: false }>) {
 // gate pluginsRoutes.get("/") already uses - createCommand/deleteCommand
 // carry their own, tighter role checks below.
 commandsRoutes.openapi(listRoute, (c) => {
-  return c.json(listCommands(), 200);
+  const result = listCommands(c.get("person"));
+  if (!result.ok) return c.json({ error: result.error }, 403);
+  return c.json(result.value, 200);
 });
 
 commandsRoutes.openapi(createRouteDef, async (c) => {

@@ -57,6 +57,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false }:
       return Promise.resolve(Response.json({ key: def.key, value: body.value, source: "user", label: def.label, help: def.help, level: def.level, secret: def.secret ?? false }));
     }
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
+    if (url.endsWith("/api/voice/cloned")) return Promise.resolve(Response.json({ voices: [] }));
     if (url.includes("/api/settings?scope=")) {
       const scope = decodeURIComponent(url.split("scope=")[1] ?? "");
       scopes.push(scope);
@@ -64,6 +65,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false }:
       return Promise.resolve(Response.json(registry.filter((k) => k.scope === kind).map((k) => ({ key: k.key, value: k.default ?? null, source: "default", label: k.label, help: k.help, level: k.level, secret: k.secret ?? false }))));
     }
     if (url.includes("/api/voice/wakewords")) return Promise.resolve(Response.json({ detectors: [], installed: wakeword }));
+    if (url.endsWith("/api/commands")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/devices/robots")) return Promise.resolve(Response.json(robots ? [{ id: "d1", kind: "robot", name: "Robot" }] : []));
     if (url.includes("/api/devices")) return Promise.resolve(Response.json(robots ? [{ id: "d1", kind: "robot", name: "Robot" }] : []));
     if (url.endsWith("/api/people") || url.includes("/api/people?")) return Promise.resolve(Response.json(hasChild ? [{ id: "person-kid", role: "child", display_name: "Kid" }] : []));

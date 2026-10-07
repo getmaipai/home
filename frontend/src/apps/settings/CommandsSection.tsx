@@ -8,6 +8,7 @@ import { ROLE_LABELS, ROLE_LADDER, meetsMinRole } from "@/apps/people/roles";
 
 interface CommandsSectionProps {
   person: Roster;
+  management?: boolean;
 }
 
 type ActionKind = CommandAction["kind"];
@@ -22,15 +23,10 @@ function summarize(action: CommandAction): string {
   return `Calls ${action.domain}.${action.service} on ${entityId}`;
 }
 
-// The command primitive's own settings surface (docs/dev.md: "The
-// command primitive, shipped" - lib/commands.ts and its /api/commands
-// routes existed with no UI to reach them until now). Household-wide
-// list (any signed-in person, the same visibility GET /api/plugins
-// already has); the create form only renders for a role that could
-// actually create one (adult or higher - lib/commands.ts's own
-// MIN_ROLE_TO_CREATE), the same "hide what would just 403" posture
-// UsersSection.tsx's own role gating takes.
-export function CommandsSection({ person }: CommandsSectionProps) {
+// The management view lists commands in Home settings. Adult members
+// use the separate creation surface; the server keeps MIN_ROLE_TO_CREATE
+// as the floor for creating a command.
+export function CommandsSection({ person, management = false }: CommandsSectionProps) {
   const [commands, setCommands] = useState<CommandRow[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -57,8 +53,8 @@ export function CommandsSection({ person }: CommandsSectionProps) {
   }
 
   useEffect(() => {
-    void load();
-  }, []);
+    if (management) void load();
+  }, [management]);
 
   const canCreate = meetsMinRole(person.role, "adult");
 
@@ -78,7 +74,7 @@ export function CommandsSection({ person }: CommandsSectionProps) {
       setDomain("");
       setService("");
       setEntityId("");
-      await load();
+      if (management) await load();
     } catch (err) {
       setCreateError(err instanceof ApiError ? err.message : "Could not create that command.");
     } finally {
@@ -91,7 +87,7 @@ export function CommandsSection({ person }: CommandsSectionProps) {
     setActionError(null);
     try {
       await api.deleteCommand(id);
-      await load();
+      if (management) await load();
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not delete that command.");
     } finally {
@@ -100,12 +96,12 @@ export function CommandsSection({ person }: CommandsSectionProps) {
   }
 
   return (
-    <Section heading="Commands">
+    <Section heading={management ? "Household commands" : "Commands"}>
       <p className="text-base text-[var(--muted-foreground)]">
         Teach MaiPai a phrase of your own - "when I say X, do Y." A command always fires on an exact phrase, never a
         guess.
       </p>
-      {loadError ? (
+      {management && loadError ? (
         <div className="flex flex-col items-start gap-2">
           <p className="text-base text-[var(--destructive)]">{loadError}</p>
           <Button variant="secondary" onClick={load}>
@@ -185,9 +181,9 @@ export function CommandsSection({ person }: CommandsSectionProps) {
             </form>
           ) : null}
           {actionError ? <p className="text-base text-[var(--destructive)]">{actionError}</p> : null}
-          {commands === null ? null : commands.length === 0 ? (
+          {management && commands === null ? null : management && commands?.length === 0 ? (
             <p className="text-base text-[var(--muted-foreground)]">No commands yet.</p>
-          ) : (
+          ) : management && commands ? (
             <ul className="flex flex-col divide-y divide-[var(--border)]">
               {commands.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-3 py-2">
@@ -205,7 +201,7 @@ export function CommandsSection({ person }: CommandsSectionProps) {
                 </li>
               ))}
             </ul>
-          )}
+          ) : null}
         </>
       )}
     </Section>

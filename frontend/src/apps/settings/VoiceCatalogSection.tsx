@@ -10,6 +10,7 @@ import { readMicDevicePreference, writeMicDevicePreference } from "@/lib/voice/m
 
 interface VoiceCatalogSectionProps {
   personId: string;
+  householdManagement?: boolean;
 }
 
 interface CatalogEntry {
@@ -33,7 +34,7 @@ const MAX_RESULTS_SHOWN = 40;
 // only recognizes its 26 known options) - this section shows the
 // current value itself instead, so picking a catalog voice never looks
 // like it silently did nothing.
-export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
+export function VoiceCatalogSection({ personId, householdManagement = false }: VoiceCatalogSectionProps) {
   const [expanded, setExpanded] = useState(false);
   const [catalog, setCatalog] = useState<CatalogEntry[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -47,10 +48,13 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
     if (catalog !== null) return;
     setLoadError(null);
     try {
-      const [catalogRes, values] = await Promise.all([api.voiceCatalog(), api.settingsValues(`person:${personId}`)]);
+      const [catalogRes, values] = await Promise.all([
+        api.voiceCatalog(),
+        householdManagement ? Promise.resolve([]) : api.settingsValues(`person:${personId}`),
+      ]);
       setCatalog(catalogRes.entries);
       const voice = values.find((v) => v.key === "tts.voice_id");
-      setCurrentValue(typeof voice?.value === "string" ? voice.value : null);
+      if (!householdManagement) setCurrentValue(typeof voice?.value === "string" ? voice.value : null);
     } catch (e) {
       setLoadError(e instanceof ApiError ? e.message : "Could not load the voice catalog.");
     }
@@ -88,7 +92,8 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
        * the catalog. Rendered here, outside every catalog-state
        * branch below, so it's reachable regardless of whether the
        * (external) catalog ever loads. */}
-      <MicrophoneSection />
+      {!householdManagement ? <MicrophoneSection /> : null}
+      {householdManagement ? <p className="text-base text-[var(--muted-foreground)]">Browse household voice catalog entries. Each person chooses their own voice in Account settings.</p> : null}
       {!expanded ? (
         // w-fit (previously) sized this to its own unwrapped text width
         // regardless of the section's own available width - found live
@@ -100,7 +105,7 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
         // single nowrap line, wrong for a sentence this long on a
         // narrow screen.
         <Button type="button" variant="link" onClick={expand} className="h-auto min-h-12 w-full text-left whitespace-normal">
-          Browse the full community voice catalog (2,000+ voices)
+          Browse the {householdManagement ? "household" : "full community"} voice catalog (2,000+ voices)
         </Button>
       ) : loadError ? (
         <div className="flex flex-col items-start gap-2">
@@ -113,7 +118,7 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
         <Progress mode="spinner" label="Loading the voice catalog" />
       ) : (
         <div className="flex flex-col gap-2">
-          {currentIsCatalogVoice ? (
+          {!householdManagement && currentIsCatalogVoice ? (
             <p className="text-base text-[var(--muted-foreground)]">
               Currently using a catalog voice: {currentCatalogLabel}
             </p>
@@ -138,14 +143,13 @@ export function VoiceCatalogSection({ personId }: VoiceCatalogSectionProps) {
                     <span className="text-base">{voiceDisplayName(entry.path)}</span>
                     <span className="text-base text-[var(--muted-foreground)]">{titleCaseOption(entry.collection)}</span>
                   </div>
-                  <Button
+                  {!householdManagement ? <Button
                     variant="secondary"
-
                     disabled={pendingPath === entry.path}
                     onClick={() => selectVoice(entry.path)}
                   >
                     {pendingPath === entry.path ? "Setting…" : "Use this voice"}
-                  </Button>
+                  </Button> : null}
                 </li>
               ))}
             </ul>

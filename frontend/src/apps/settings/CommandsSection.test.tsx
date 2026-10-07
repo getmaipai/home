@@ -70,7 +70,7 @@ describe("CommandsSection", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = stubFetch();
     try {
-      const { findByText } = render(<CommandsSection person={makePerson()} />);
+      const { findByText } = render(<CommandsSection person={makePerson()} management />);
       await findByText('"movie night"');
       await findByText(/Replies: "Starting movie night mode\."/);
     } finally {
@@ -83,7 +83,7 @@ describe("CommandsSection", () => {
     globalThis.fetch = stubFetch();
     try {
       const { findByText, queryByPlaceholderText } = render(
-        <CommandsSection person={makePerson({ role: "teen" })} />,
+        <CommandsSection person={makePerson({ role: "teen" })} management />,
       );
       await findByText('"movie night"');
       expect(queryByPlaceholderText(/Trigger phrase/)).toBeNull();
@@ -97,8 +97,7 @@ describe("CommandsSection", () => {
     let created: unknown = null;
     globalThis.fetch = stubFetch({ onCreate: (body) => (created = body) });
     try {
-      const { findByText, getByPlaceholderText } = render(<CommandsSection person={makePerson()} />);
-      await findByText('"movie night"');
+      const { getByPlaceholderText, findByText } = render(<CommandsSection person={makePerson({ role: "adult" })} />);
       fireEvent.change(getByPlaceholderText(/Trigger phrase/), { target: { value: "good morning" } });
       fireEvent.change(getByPlaceholderText("What MaiPai says back"), { target: { value: "Good morning!" } });
       fireEvent.click(await findByText("Create command"));
@@ -114,7 +113,7 @@ describe("CommandsSection", () => {
     globalThis.fetch = stubFetch();
     try {
       const { findByText, queryByText } = render(
-        <CommandsSection person={makePerson({ id: "person-other", role: "adult" })} />,
+        <CommandsSection person={makePerson({ id: "person-other", role: "adult" })} management />,
       );
       await findByText('"movie night"');
       expect(queryByText("Delete")).toBeNull();
@@ -128,7 +127,7 @@ describe("CommandsSection", () => {
     let deletedId: string | null = null;
     globalThis.fetch = stubFetch({ onDelete: (id) => (deletedId = id) });
     try {
-      const { findByText, queryByText } = render(<CommandsSection person={makePerson()} />);
+      const { findByText, queryByText } = render(<CommandsSection person={makePerson()} management />);
       await findByText('"movie night"');
       fireEvent.click(await findByText("Delete"));
       await waitFor(() => expect(deletedId).toBe("cmd-abc"));

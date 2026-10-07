@@ -166,42 +166,56 @@ describe("createCommand", () => {
 });
 
 describe("listCommands / deleteCommand", () => {
-  test("listCommands is household-wide, visible regardless of creator", async () => {
+  test("only owner and admin can list the household command set", async () => {
     const { client: ownerClient, row: ownerRow } = await owner();
+    const { row: admin } = await withRole(ownerClient, "Marlow", "admin");
     const { row: adult } = await withRole(ownerClient, "Bramble", "adult");
+    const { row: teen } = await withRole(ownerClient, "Nova", "teen");
+    const { row: child } = await withRole(ownerClient, "Poppy", "child");
     createCommand(ownerRow, "movie night", "child", { kind: "reply", text: "Hi" });
     createCommand(adult, "game time", "child", { kind: "reply", text: "Hi" });
-    expect(listCommands().length).toBe(2);
+    expect(listCommands(ownerRow)).toMatchObject({ ok: true, value: expect.arrayContaining([expect.anything(), expect.anything()]) });
+    expect(listCommands(admin).ok).toBe(true);
+    for (const member of [adult, teen, child]) {
+      expect(listCommands(member)).toMatchObject({ ok: false, status: 403 });
+    }
   });
 
-  test("the creator can delete their own command", async () => {
+  test("an owner can delete a household command", async () => {
     const { row } = await owner();
     const created = createCommand(row, "movie night", "child", { kind: "reply", text: "Hi" });
     if (!created.ok) throw new Error("setup failed");
     const result = deleteCommand(row, created.value.id);
     expect(result.ok).toBe(true);
-    expect(listCommands().length).toBe(0);
+    expect(listCommands(row)).toMatchObject({ ok: true, value: [] });
   });
 
   test("an owner/admin can delete someone else's command", async () => {
     const { client: ownerClient, row: ownerRow } = await owner();
+    const { row: admin } = await withRole(ownerClient, "Marlow", "admin");
     const { row: adult } = await withRole(ownerClient, "Bramble", "adult");
     const created = createCommand(adult, "game time", "child", { kind: "reply", text: "Hi" });
     if (!created.ok) throw new Error("setup failed");
-    const result = deleteCommand(ownerRow, created.value.id);
-    expect(result.ok).toBe(true);
+    const adminResult = deleteCommand(admin, created.value.id);
+    expect(adminResult.ok).toBe(true);
+    const second = createCommand(adult, "movie time", "child", { kind: "reply", text: "Hi" });
+    if (!second.ok) throw new Error("setup failed");
+    const ownerResult = deleteCommand(ownerRow, second.value.id);
+    expect(ownerResult.ok).toBe(true);
   });
 
-  test("an unrelated non-admin household member cannot delete someone else's command", async () => {
+  test("a non-admin household member cannot delete a command", async () => {
     const { client: ownerClient, row: ownerRow } = await owner();
     const { row: adultA } = await withRole(ownerClient, "Bramble", "adult");
     const { row: adultB } = await withRole(ownerClient, "Cosmo", "adult");
+    const { row: teen } = await withRole(ownerClient, "Nova", "teen");
+    const { row: child } = await withRole(ownerClient, "Poppy", "child");
     const created = createCommand(adultA, "game time", "child", { kind: "reply", text: "Hi" });
     if (!created.ok) throw new Error("setup failed");
-    const result = deleteCommand(adultB, created.value.id);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.status).toBe(403);
+    for (const member of [adultB, teen, child]) {
+      const result = deleteCommand(member, created.value.id);
+      expect(result).toMatchObject({ ok: false, status: 403 });
+    }
     void ownerRow;
   });
 
@@ -352,6 +366,25 @@ describe("HTTP: /api/commands", () => {
     expect(((await client.get("/api/commands")).status)).toBe(200);
     const afterDelete = (await (await client.get("/api/commands")).json()) as Array<{ id: string }>;
     expect(afterDelete.some((r) => r.id === id)).toBe(false);
+  });
+
+  test("only owner and admin can read the household list; adult creation stays available", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: adminClient } = await withRole(ownerClient, "Marlow", "admin");
+    const { client: adultClient } = await withRole(ownerClient, "Bramble", "adult");
+    const { client: teenClient } = await withRole(ownerClient, "Nova", "teen");
+    const { client: childClient } = await withRole(ownerClient, "Poppy", "child");
+    expect((await adminClient.get("/api/commands")).status).toBe(200);
+    expect((await ownerClient.get("/api/commands")).status).toBe(200);
+    for (const client of [adultClient, teenClient, childClient]) {
+      expect((await client.get("/api/commands")).status).toBe(403);
+    }
+    const created = await adultClient.post("/api/commands", {
+      trigger: "game time",
+      minRole: "child",
+      action: { kind: "reply", text: "Hi" },
+    });
+    expect(created.status).toBe(200);
   });
 
   test("a below-adult person gets a 403 creating a command over HTTP", async () => {

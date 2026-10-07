@@ -391,8 +391,8 @@ const ROUTES: RouteSpec[] = [
   { slug: "turn-trace", path: "/trace/screenshot-trace-turn" },
   { slug: "settings-models", path: "/models" },
   { slug: "settings-backups", path: "/backups" },
-  { slug: "settings-voices", path: "/voices" },
-  { slug: "settings-commands", path: "/commands" },
+  { slug: "settings-voices", path: "/settings/account/voice" },
+  { slug: "settings-commands", path: "/settings/home/commands" },
   // Added here 2026-09-06 alongside settings-devices: main's own commit
   // that shipped this page (the People/Users split) never updated this
   // file's own route list - this file's own comment above says "a route

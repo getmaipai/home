@@ -22,7 +22,7 @@ import "@/shell/pages/settings/settingsTokens.css";
 import { useTabItem } from "@/shell/tabIdentity";
 import { settingsArea, settingsPath } from "@/shell/pages/settings/settingsAreas";
 import { SettingsSectionContent, beforeSettingChange } from "@/shell/pages/settings/SettingsSectionContent";
-import { SETTINGS_VIEWS } from "@/shell/pages/settings/settingsViews";
+import { SettingsView } from "@/shell/pages/settings/settingsViews";
 import { baseViewer, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 
@@ -136,7 +136,7 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
       );
   } else if (active) {
     content = active.kind === "view"
-      ? <>{active.view ? SETTINGS_VIEWS[active.view]?.({ person, onPersonChange }) : null}</>
+      ? <>{active.view ? <SettingsView view={active.view} person={person} onPersonChange={onPersonChange} /> : null}</>
       : <SettingsSectionContent section={active} viewer={viewer} registry={registry} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />;
   }
 

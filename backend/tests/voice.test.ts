@@ -187,7 +187,7 @@ describe("cloned voices", () => {
     expect(res.status).toBe(401);
   });
 
-  test("uploads, lists household-wide, selects, and deletes a real cloned voice", async () => {
+  test("uploads, lists household-wide, selects, and deletes a cloned voice", async () => {
     const owner = await ownerClient();
     const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
     const adult = (await adultRes.json()) as { id: string };
@@ -203,7 +203,7 @@ describe("cloned voices", () => {
     expect(uploaded.label).toBe("Dad's voice");
     expect(uploaded.creatorName).toBe("Sage");
 
-    // Household-wide: the adult who didn't upload it can still see it.
+    // Another person can select the shared recording for their own voice.
     const listRes = await adultClient.get("/api/voice/cloned");
     const { voices } = (await listRes.json()) as { voices: { id: string }[] };
     expect(voices.map((v) => v.id)).toContain(uploaded.id);
@@ -226,7 +226,7 @@ describe("cloned voices", () => {
     // The adult (not the creator) can't delete it...
     const forbiddenDelete = await adultClient.post(`/api/voice/cloned/${uploaded.id}/delete`, {});
     expect(forbiddenDelete.status).toBe(403);
-    // ...but the owner (also not the creator here, but owner/admin) can.
+    // ...but the creator can.
     const deleteRes = await owner.post(`/api/voice/cloned/${uploaded.id}/delete`, {});
     expect(deleteRes.status).toBe(200);
 
@@ -267,4 +267,35 @@ describe("cloned voices", () => {
     const res = await owner.postForm("/api/voice/cloned", form);
     expect(res.status).toBe(413);
   }, 20_000);
+});
+
+describe("household voice catalog routes", () => {
+  test("catalog browsing requires owner or admin, including on the server", async () => {
+    const owner = await ownerClient();
+    const adminRes = await owner.post("/api/people", { displayName: "Marlow", role: "admin", secret: "0000" });
+    const admin = (await adminRes.json()) as { id: string };
+    const adultRes = await owner.post("/api/people", { displayName: "Bramble", role: "adult", secret: "0000" });
+    const adult = (await adultRes.json()) as { id: string };
+    const teenRes = await owner.post("/api/people", { displayName: "Nova", role: "teen", secret: "0000" });
+    const teen = (await teenRes.json()) as { id: string };
+    const childRes = await owner.post("/api/people", { displayName: "Poppy", role: "child", secret: "0000" });
+    const child = (await childRes.json()) as { id: string };
+    const clientFor = async (personId: string) => {
+      const client = new TestClient();
+      expect((await client.post("/api/auth/verify-secret", { personId, secret: "0000" })).status).toBe(200);
+      return client;
+    };
+    const adminClient = await clientFor(admin.id);
+    const adultClient = await clientFor(adult.id);
+    const teenClient = await clientFor(teen.id);
+    const childClient = await clientFor(child.id);
+    // Get/select are exercised only far enough to confirm the server gate; no catalog network is needed.
+    expect((await adminClient.get("/api/voice/catalog")).status).toBe(503);
+    expect((await owner.get("/api/voice/catalog")).status).toBe(503);
+    for (const member of [adultClient, teenClient, childClient]) {
+      expect((await member.get("/api/voice/catalog")).status).toBe(403);
+      expect((await member.post("/api/voice/catalog/select", { path: "en/example.wav" })).status).toBe(403);
+    }
+    expect((await adminClient.post("/api/voice/catalog/select", { path: "en/example.wav" })).status).toBe(503);
+  });
 });

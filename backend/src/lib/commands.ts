@@ -182,23 +182,22 @@ export function createCommand(
   return { ok: true, value: toCommandRow(row) };
 }
 
-/** Household-wide, like scheduledJobs' own listJobs() precedent for a
- * shared, non-personal record: a command's trigger and action are
- * something every household member benefits from seeing exists, not
- * private state scoped to whoever created it. */
-export function listCommands(): CommandRow[] {
-  return [...loadAllCommands()];
+/** The household command set is shown and managed from Home settings by
+ * owners and admins; adult members retain a separate creation surface. */
+export function listCommands(actor: PersonRow): CommandOpResult<CommandRow[]> {
+  if (!isOwnerOrAdmin(actor)) {
+    return { ok: false, status: 403, error: "only an owner or admin can view household commands" };
+  }
+  return { ok: true, value: [...loadAllCommands()] };
 }
 
-/** The creator, or an owner/admin cleaning up after someone else - never
- * an unrelated non-admin household member, the same shape scheduledJobs'
- * own cancelJob() authorization already takes. */
+/** Household command deletion is part of Home settings management. */
 export function deleteCommand(actor: PersonRow, id: string): CommandOpResult<{ id: string }> {
+  if (!isOwnerOrAdmin(actor)) {
+    return { ok: false, status: 403, error: "only an owner or admin can delete household commands" };
+  }
   const existing = db.select().from(commands).where(eq(commands.id, id)).get();
   if (!existing) return { ok: false, status: 404, error: `no command ${id}` };
-  if (existing.creatorId !== actor.id && !isOwnerOrAdmin(actor)) {
-    return { ok: false, status: 403, error: "only the creator or an owner/admin can delete this command" };
-  }
   db.delete(commands).where(eq(commands.id, id)).run();
   commandsCache = null;
   return { ok: true, value: { id } };

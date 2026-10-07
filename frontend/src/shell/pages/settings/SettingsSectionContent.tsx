@@ -7,7 +7,7 @@ import type { BeforeChange } from "@maipai/ui/src/settings/SettingRow";
 import { resolveHref, visibleCards, type Card, type Section, type SettingsViewer } from "@maipai/ui/src/settings/settingsAudience";
 import { minorVisibleSettingKeys } from "@maipai/home-backend/src/wire";
 import { SettingsLinks } from "@/shell/pages/settings/SettingsLinks";
-import { SETTINGS_VIEWS, type SettingsViewProps } from "@/shell/pages/settings/settingsViews";
+import { SettingsView, type SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 import { scopeValueFor } from "@/shell/pages/settings/settingsViewer";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 
@@ -48,6 +48,7 @@ function SettingsFold({ label, startOpen, children }: { label: string; startOpen
 function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps) {
   const group = card.group!;
   const scope = card.scope!;
+  const title = props.section.id === "voice" && group === "person.voice" ? "Speaking voice" : card.label;
   const allowed = minorVisibleSettingKeys(viewer.band);
   const renderer = (
     <SettingsRenderer
@@ -56,7 +57,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
       honouredBy="home"
       only={[group]}
       includeKeys={allowed ? [...allowed] : undefined}
-      titleOverrides={{ [group]: card.label }}
+      titleOverrides={{ [group]: title }}
       beforeChange={beforeSettingChange}
       focusKey={props.focusKey}
     />
@@ -84,10 +85,10 @@ export interface SectionContentProps extends SettingsViewProps {
 export function SettingsSectionContent(props: SectionContentProps) {
   const { section, viewer, registry, person, onPersonChange } = props;
   const viewProps = { person, onPersonChange };
-  if (section.kind === "view") return <>{section.view ? SETTINGS_VIEWS[section.view]?.(viewProps) : null}</>;
+  if (section.kind === "view") return <>{section.view ? <SettingsView view={section.view} {...viewProps} /> : null}</>;
   return (
     <div className="flex min-w-0 flex-col gap-14">
-      {section.lead_view ? SETTINGS_VIEWS[section.lead_view]?.(viewProps) : null}
+      {section.lead_view ? <SettingsView view={section.lead_view} {...viewProps} /> : null}
       {visibleCards(section, viewer, registry, "home").map((card) => {
         // Until APP-SET-05 re-points the face card onto the kit renderer, the
         // face card inside `account.profile` already draws this group's one
@@ -96,7 +97,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
         if (card.links) return <SettingsLinks key={card.label} label={card.label} links={card.links.map((link) => ({ label: link.label, href: resolveHref(link.href, viewer) }))} />;
         return <div key={`${card.scope}:${card.group}`}>{keysCard(card, viewer, props)}</div>;
       })}
-      {section.trail_view ? SETTINGS_VIEWS[section.trail_view]?.(viewProps) : null}
+      {section.trail_view ? <SettingsView view={section.trail_view} {...viewProps} /> : null}
     </div>
   );
 }

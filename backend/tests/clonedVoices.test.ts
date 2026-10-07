@@ -93,15 +93,18 @@ describe("saveClonedVoice()", () => {
 });
 
 describe("listClonedVoices()", () => {
-  test("is household-wide: shows a voice uploaded by any person", () => {
+  test("lists recordings uploaded by any household member", () => {
     const jesse = makePerson("Jesse", "owner");
-    const nova = makePerson("Nova", "child");
+    const admin = makePerson("Marlow", "admin");
+    const adult = makePerson("Pip", "adult");
+    const teen = makePerson("Nova", "teen");
+    const child = makePerson("Poppy", "child");
     saveClonedVoice(jesse, "Dad's voice", WAV_BYTES, "audio/wav");
-    saveClonedVoice(nova, "Nova's voice", WAV_BYTES, "audio/wav");
-
-    const all = listClonedVoices();
-    expect(all.length).toBe(2);
-    expect(all.map((v) => v.label).sort()).toEqual(["Dad's voice", "Nova's voice"]);
+    saveClonedVoice(child, "Poppy's voice", WAV_BYTES, "audio/wav");
+    saveClonedVoice(teen, "Teen voice", WAV_BYTES, "audio/wav");
+    expect(listClonedVoices().map((v) => v.label).sort()).toEqual(["Dad's voice", "Poppy's voice", "Teen voice"]);
+    void admin;
+    void adult;
   });
 });
 
@@ -118,14 +121,17 @@ describe("deleteClonedVoice()", () => {
     expect(existsSync(filePath)).toBe(false);
   });
 
-  test("an owner/admin can delete someone else's", () => {
+  test("an owner/admin can delete someone else's recording", () => {
     const jesse = makePerson("Jesse", "owner");
+    const marlow = makePerson("Marlow", "admin");
     const nova = makePerson("Nova", "child");
     const saved = saveClonedVoice(nova, "Nova's voice", WAV_BYTES, "audio/wav");
     if (!saved.ok) throw new Error("setup failed");
 
     const result = deleteClonedVoice(jesse, saved.value.id);
     expect(result.ok).toBe(true);
+    expect(clonedVoiceExists(saved.value.id)).toBe(false);
+    void marlow;
   });
 
   test("a non-creator, non-admin is refused", () => {

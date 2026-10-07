@@ -4949,6 +4949,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Only owner or admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       },
@@ -13370,6 +13380,16 @@
               }
             }
           },
+          "403": {
+            "description": "Only owner or admin may manage household voices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "503": {
             "description": "Voice catalog unavailable",
             "content": {
@@ -13767,7 +13787,7 @@
           "Voice"
         ],
         "summary": "List cloned voices",
-        "description": "The household-wide list of cloned voices, each with its label, file size, MIME type, and creation timestamp.",
+        "description": "The household's cloned voices, each with its label, file size, MIME type, and creation timestamp.",
         "responses": {
           "200": {
             "description": "The list of cloned voices.",
@@ -13935,7 +13955,7 @@
           "Voice"
         ],
         "summary": "Select a cloned voice as the person's TTS voice",
-        "description": "Sets the signed-in person's own tts.voice_id to the given cloned voice. The voice id must exist in the cloned-voice table.",
+        "description": "Sets the signed-in person's own tts.voice_id to the given cloned voice.",
         "parameters": [
           {
             "schema": {
@@ -14059,7 +14079,7 @@
           "Voice"
         ],
         "summary": "Delete a cloned voice",
-        "description": "Deletes the given cloned voice from the household. Any signed-in person can delete any cloned voice (same posture as the list and select routes).",
+        "description": "Deletes a cloned voice uploaded by the signed-in person, or any household voice for an owner/admin.",
         "parameters": [
           {
             "schema": {

@@ -80,8 +80,20 @@ describe("the settings route", () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/home/general"));
     await waitFor(() => expect(rows(view)).toContain("Maintenance"));
-    expect(rows(view)).toEqual(["General", "People", "Search", "Integrations", "AI", "Storage and backups", "Maintenance", "Privacy"]);
+    expect(rows(view)).toEqual(["General", "People", "Search", "Integrations", "Voices", "Commands", "AI", "Storage and backups", "Maintenance", "Privacy"]);
     expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
+  });
+
+  test("an owner manages the household command list in Home settings", async () => {
+    const view = open(makePerson("owner"), "/settings/home/commands");
+    await waitFor(() => expect(where(view)).toBe("/settings/home/commands"));
+    await waitFor(() => expect(document.body.textContent).toContain("No commands yet."));
+  });
+
+  test("an admin opens the household voice catalog in Home settings", async () => {
+    const view = open(makePerson("admin"), "/settings/home/voices");
+    await waitFor(() => expect(where(view)).toBe("/settings/home/voices"));
+    await waitFor(() => expect(view.getByText(/Browse the household voice catalog/)).toBeTruthy());
   });
 
   test("a section the viewer may not see replaces to the first visible one, naming nothing", async () => {

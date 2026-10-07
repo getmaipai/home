@@ -874,10 +874,8 @@ export const projects = sqliteTable("projects", {
 // back to this hub's own file-serving route (routes/voice.ts's
 // `GET /cloned/:id/file`) satisfies that unchanged, no new mechanism on
 // the Pocket TTS side needed. Household-wide visibility, not per-person:
-// the same "anyone can select any voice regardless of who found it"
-// shape the community catalog already has (VoiceCatalogSection.tsx) - a
-// shared family hub, not a personal library. Deletion is creator or
-// owner/admin only (routes/voice.ts). Not backed up (lib/backup.ts's
+// anyone can select any voice regardless of who found it. Deletion is
+// creator or owner/admin only (routes/voice.ts). Not backed up (lib/backup.ts's
 // VACUUM INTO only covers hub.db, not files under data/) - a real,
 // documented gap, unlike the wake-word models this shares a storage
 // shape with: those are re-downloadable, a person's recorded voice is

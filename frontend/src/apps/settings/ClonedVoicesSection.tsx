@@ -14,9 +14,8 @@ interface ClonedVoicesSectionProps {
 // community catalog uses (VoiceCatalogSection.tsx) - a URL, not a
 // preset name, so it shows up here the same "the generic dropdown can't
 // display it, so this section shows the current value itself" way that
-// section's own comment explains. File upload only for v1 (no live
-// browser recording - docs/dev.md's scoping note); household-wide list,
-// same visibility as the catalog.
+// section's own comment explains. The list is household-wide, while the
+// selected tts.voice_id remains scoped to the signed-in person's account.
 export function ClonedVoicesSection({ person }: ClonedVoicesSectionProps) {
   const [voices, setVoices] = useState<ClonedVoiceInfo[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -148,9 +147,7 @@ export function ClonedVoicesSection({ person }: ClonedVoicesSectionProps) {
                       {pendingId === voice.id ? "Setting…" : "Use this voice"}
                     </Button>
                     {canManage || voice.creatorId === person.id ? (
-                      <Button variant="secondary" disabled={pendingId === voice.id} onClick={() => deleteVoice(voice.id)}>
-                        Delete
-                      </Button>
+                      <Button variant="secondary" disabled={pendingId === voice.id} onClick={() => deleteVoice(voice.id)}>Delete</Button>
                     ) : null}
                   </div>
                 </li>

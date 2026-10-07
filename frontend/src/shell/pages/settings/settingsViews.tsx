@@ -1,10 +1,14 @@
-import type { ReactNode } from "react";
+import type { ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { ChatSkillsSection } from "@/shell/pages/settings/ChatSkillsSection";
 import { ChatShortcutsView } from "@/shell/pages/settings/ChatShortcutsView";
 import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearanceControl";
+import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
+import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
+import { CommandsSection } from "@/apps/settings/CommandsSection";
+import { useTabItem } from "@/shell/tabIdentity";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
 
 export interface SettingsViewProps {
@@ -22,14 +26,30 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
   );
 }
 
-/** The view table (design 2.5): the spec lists the view ids an area may name
- * (`account.profile`, `account.device_appearance`, `chat.skills`,
- * `chat.shortcuts`); this is the one map from each to the component that
- * draws it. The components are not Home's to restyle here: Skills belongs to
- * the Projects and Skills work and is only registered by id. */
-export const SETTINGS_VIEWS: Record<string, (props: SettingsViewProps) => ReactNode> = {
-  "account.profile": (props) => <AccountProfile {...props} />,
-  "account.device_appearance": () => <DeviceAppearanceControl />,
-  "chat.skills": ({ person }) => <ChatSkillsSection person={person} />,
-  "chat.shortcuts": () => <ChatShortcutsView />,
+/** The view table: spec/settings/areas.json names each view, and this is
+ * the one map from those ids to the components that draw them. */
+function DeviceAppearanceSettings() { return <DeviceAppearanceControl />; }
+function ChatSkillsSettings({ person }: SettingsViewProps) { return <ChatSkillsSection person={person} />; }
+function ChatShortcutsSettings() { return <ChatShortcutsView />; }
+function HomeCommandsSettings({ person }: SettingsViewProps) { return <CommandsSection person={person} management />; }
+function HomeVoiceCatalogSettings({ person }: SettingsViewProps) { useTabItem("Voices"); return <VoiceCatalogSection personId={person.id} householdManagement />; }
+
+export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = {
+  "account.profile": AccountProfile,
+  "account.voice": AccountVoiceControls,
+  "home.commands": HomeCommandsSettings,
+  "home.voice_catalog": HomeVoiceCatalogSettings,
+  "account.device_appearance": DeviceAppearanceSettings,
+  "chat.skills": ChatSkillsSettings,
+  "chat.shortcuts": ChatShortcutsSettings,
 };
+
+export function SettingsView({ view, person, onPersonChange }: SettingsViewProps & { view: string }) {
+  const View = SETTINGS_VIEWS[view];
+  return View ? <View person={person} onPersonChange={onPersonChange} /> : null;
+}
+
+function AccountVoiceControls({ person }: SettingsViewProps) {
+  useTabItem("Voice");
+  return <ClonedVoicesSection person={person} />;
+}

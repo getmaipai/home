@@ -8,9 +8,9 @@ import type { Roster } from "@/lib/api";
 
 afterEach(cleanup);
 
-function makePerson(): Roster {
+function makePerson(role: Roster["role"] = "child"): Roster {
   return {
-    id: "person-abc123", display_name: "Nova", nickname: null, role: "child",
+    id: "person-abc123", display_name: "Nova", nickname: null, role,
     avatar_seed: "person-abc123", source: "hub", local_only: false,
     created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z",
     deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null,
@@ -22,8 +22,8 @@ function mockApi() {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL) => {
     const url = String(input);
-    if (url.includes("/api/voices/catalog")) return Promise.resolve(Response.json([]));
-    if (url.includes("/api/voices/cloned")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/voice/catalog")) return Promise.resolve(Response.json({ entries: [] }));
+    if (url.includes("/api/voice/cloned")) return Promise.resolve(Response.json({ voices: [] }));
     if (url.includes("/api/settings")) return Promise.resolve(Response.json({ settings: [] }));
     if (url.includes("/api/commands")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/devices")) return Promise.resolve(Response.json([]));
@@ -34,7 +34,7 @@ function mockApi() {
 }
 
 describe("Next personal management pages", () => {
-  test("a child can reach the real Voices sections", async () => {
+  test("personal voice sections remain available in Account", async () => {
     const restore = mockApi();
     try {
       renderWithQueryClient(<VoicesPage person={makePerson()} />);
@@ -44,12 +44,13 @@ describe("Next personal management pages", () => {
     } finally { restore(); }
   });
 
-  test("a child can reach the real Commands section", async () => {
+  test("an adult can reach command creation without loading the household list", async () => {
     const restore = mockApi();
     try {
-      renderWithQueryClient(<CommandsPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("Commands"));
-      expect(document.body.textContent).toContain("No commands");
+      renderWithQueryClient(<CommandsPage person={makePerson("adult")} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Create a command"));
+      expect(document.querySelector('input[placeholder*="Trigger phrase"]')).not.toBeNull();
+      expect(document.body.textContent).not.toContain("No commands");
     } finally { restore(); }
   });
 

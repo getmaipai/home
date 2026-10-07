@@ -6,13 +6,13 @@ import type { Roster } from "@/lib/api";
 
 export const CommandsIcon = getIcon("workflow");
 
-/** Household command management; the existing section owns its role checks. */
+/** Adult command authoring; the household list lives in Home settings. */
 export function CommandsPage({ person }: { person: Roster }) {
-  useTabItem("Commands");
+  useTabItem("Create command");
   return (
     <div className="flex flex-col gap-4">
       <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2"><CommandsIcon size={16} className="text-muted-foreground" />Commands</CardTitle>
+        <CardTitle className="flex items-center gap-2"><CommandsIcon size={16} className="text-muted-foreground" />Create a command</CardTitle>
       </CardHeader>
       <CommandsSection person={person} />
     </div>

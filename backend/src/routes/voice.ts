@@ -151,11 +151,12 @@ const voiceCatalogRoute = createRoute({
       },
       description: "The list of voice catalog entries.",
     },
-    ...errorResponses({ 401: "Not signed in", 503: "Voice catalog unavailable" }),
+    ...errorResponses({ 401: "Not signed in", 403: "Only owner or admin may manage household voices", 503: "Voice catalog unavailable" }),
   },
 });
 
 voiceRoutes.openapi(voiceCatalogRoute, async (c) => {
+  if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "only an owner or admin can manage the household voice catalog" }, 403);
   try {
     const entries = await getVoiceCatalog();
     return c.json({ entries }, 200);
@@ -203,6 +204,7 @@ const catalogSelectRoute = createRoute({
 
 voiceRoutes.openapi(catalogSelectRoute, async (c) => {
   const actor = c.get("person");
+  if (!isOwnerOrAdmin(actor)) return c.json({ error: "only an owner or admin can manage the household voice catalog" }, 403);
   const body = c.req.valid("json");
   const path = body.path;
   let entries;
@@ -316,17 +318,16 @@ voiceRoutes.openapi(hfTokenRemoveRoute, async (c) => {
 });
 
 // Voice cloning (2026-09-04, the follow-up to voice.hf_token): a real
-// audio sample a household member uploaded, not the community catalog's
-// pre-existing files. Household-wide list, same visibility as the
-// catalog's own selection - see lib/clonedVoices.ts's own comment.
+// audio sample household members can select. Listing stays household-wide;
+// the signed-in person's selected voice setting remains personal.
 const clonedListRoute = createRoute({
   method: "get",
   path: "/cloned",
   tags: ["Voice"],
   summary: "List cloned voices",
   description:
-    "The household-wide list of cloned voices, each with its label, file " +
-    "size, MIME type, and creation timestamp.",
+    "The household's cloned voices, each with its label, file size, " +
+    "MIME type, and creation timestamp.",
   middleware: [requireAuth] as const,
   responses: {
     200: {
@@ -434,8 +435,7 @@ const clonedSelectRoute = createRoute({
   tags: ["Voice"],
   summary: "Select a cloned voice as the person's TTS voice",
   description:
-    "Sets the signed-in person's own tts.voice_id to the given cloned voice. " +
-    "The voice id must exist in the cloned-voice table.",
+    "Sets the signed-in person's own tts.voice_id to the given cloned voice.",
   middleware: [requireAuth] as const,
   request: {
     params: z.object({ id: z.string() }),
@@ -469,8 +469,7 @@ const clonedDeleteRoute = createRoute({
   tags: ["Voice"],
   summary: "Delete a cloned voice",
   description:
-    "Deletes the given cloned voice from the household. Any signed-in person " +
-    "can delete any cloned voice (same posture as the list and select routes).",
+    "Deletes a cloned voice uploaded by the signed-in person, or any household voice for an owner/admin.",
   middleware: [requireAuth] as const,
   request: {
     params: z.object({ id: z.string() }),

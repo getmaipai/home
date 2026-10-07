@@ -60,6 +60,21 @@ describe("VoiceCatalogSection", () => {
     expect(queryByText("p228 023 enhanced")).toBeNull();
   });
 
+  test("Home settings browsing does not fetch or replace a person's voice preference", async () => {
+    const { catalog, settings, select } = stubApi();
+    const { findByText, findByLabelText, queryByText } = render(
+      <VoiceCatalogSection personId="person-admin" householdManagement />,
+    );
+    fireEvent.click(await findByText("Browse the household voice catalog (2,000+ voices)"));
+    expect(catalog).toHaveBeenCalledTimes(1);
+    expect(settings).not.toHaveBeenCalled();
+    const input = await findByLabelText("Search the voice catalog");
+    fireEvent.change(input, { target: { value: "p228" } });
+    await findByText("p228 023 enhanced");
+    expect(queryByText("Use this voice")).toBeNull();
+    expect(select).not.toHaveBeenCalled();
+  });
+
   test("a search shorter than 2 characters shows a prompt instead of results", async () => {
     stubApi();
     const { findByText, findByLabelText } = render(<VoiceCatalogSection personId="person-1" />);

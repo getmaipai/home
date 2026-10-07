@@ -102,12 +102,12 @@ describe("ported from the old settings page", () => {
     }
   });
 
-  test("Voice has the voice setting and links to Voices and Commands", async () => {
+  test("Voice keeps personal controls and links adults to command creation", async () => {
     const view = open(makePerson("adult"), "/settings/account/voice");
-    await waitFor(() => expect(view.getByText("Voice", { selector: "h2" })).toBeTruthy());
+    await waitFor(() => expect(view.getByText("Speaking voice", { selector: "h2" })).toBeTruthy());
     const links = view.getAllByRole("link").map((a) => a.getAttribute("href"));
-    expect(links).toContain("/voices");
     expect(links).toContain("/commands");
+    expect(links).not.toContain("/voices");
   });
 
   test("Data and privacy links to devices, storage and the privacy page", async () => {

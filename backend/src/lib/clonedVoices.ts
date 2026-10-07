@@ -60,9 +60,7 @@ function toInfo(row: typeof clonedVoices.$inferSelect, creatorName: string): Clo
   };
 }
 
-/** Household-wide, not per-person: the same "anyone can select any voice
- * regardless of who found it" visibility the community catalog already
- * has - see schema.ts's own comment on clonedVoices for why. */
+/** Household-wide, like the community catalog: anyone can select any voice. */
 export function listClonedVoices(): ClonedVoiceInfo[] {
   const rows = db
     .select({ voice: clonedVoices, creatorName: people.displayName })
@@ -122,9 +120,7 @@ export function saveClonedVoice(
   return { ok: true, value: toInfo(row, creator.displayName) };
 }
 
-/** Creator or owner/admin only - the same "you, or a parent-tier role"
- * shape memory's forget() and the backups routes already use for
- * household-shared-but-personally-created data. */
+/** Creator or owner/admin may remove a household recording. */
 export function deleteClonedVoice(actor: PersonRow, id: string): ClonedVoiceOpResult<true> {
   const row = db.select().from(clonedVoices).where(eq(clonedVoices.id, id)).get();
   if (!row) return { ok: false, status: 404, error: "cloned voice not found" };

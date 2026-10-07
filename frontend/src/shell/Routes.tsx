@@ -22,8 +22,8 @@ import { RepairsPage } from "@/shell/pages/RepairsPage";
 import { StatusPage } from "@/shell/pages/StatusPage";
 import { UiShowcasePage } from "@/shell/pages/UiShowcasePage";
 import { BackupsPage } from "@/shell/pages/BackupsPage";
-import { VoicesPage } from "@/shell/pages/VoicesPage";
 import { CommandsPage } from "@/shell/pages/CommandsPage";
+import { meetsMinRole } from "@/apps/people/roles";
 import { DevicesPage } from "@/shell/pages/DevicesPage";
 import { PrivacyPage } from "@/shell/pages/PrivacyPage";
 import { UsersPage } from "@/shell/pages/UsersPage";
@@ -86,7 +86,6 @@ function PageHeaderLayout() {
     "/repairs": "Repairs",
     "/status": "Status",
     "/backups": "Backups",
-    "/voices": "Voices",
     "/commands": "Commands",
     "/devices": "Devices",
     "/privacy": "Privacy",
@@ -190,6 +189,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
               replace to the page that holds them now; `/customize` is gone. */}
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
           <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={onPersonChange} />} />
+          <Route path="voices" element={<Navigate to={meetsMinRole(person.role, "admin") ? "/settings/home/voices" : "/settings/account/voice"} replace />} />
           <Route path="customize" element={<CustomizeRedirect person={person} />} />
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />
@@ -203,8 +203,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="repairs" element={<RepairsPage person={person} />} />
             <Route path="status" element={<StatusPage person={person} />} />
             <Route path="backups" element={<BackupsPage person={person} />} />
-            <Route path="voices" element={<VoicesPage person={person} />} />
-            <Route path="commands" element={<CommandsPage person={person} />} />
+            <Route path="commands" element={meetsMinRole(person.role, "adult") ? <CommandsPage person={person} /> : <Navigate to="/settings/account" replace />} />
             <Route path="devices" element={<DevicesPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="users" element={<UsersPage person={person} />} />
