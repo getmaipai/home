@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { balance, chooseShardCount, discoverTests, failedTests, FlakeLedger, junitFileSeconds, parseSummary, readShardLog, run } from "./shardTests";
+import { balance, chooseShardCount, discoverTests, failedTests, FlakeLedger, junitFileSeconds, parseStackBudget, parseSummary, readShardLog, reserveWorkerSlot, run, workerSlotCount } from "./shardTests";
 
 describe("balance", () => {
   test("every file lands in exactly one shard", () => {
@@ -50,13 +50,42 @@ describe("chooseShardCount", () => {
     expect(chooseShardCount({ env: "6", cores: 14, freeGb: 20, files: 2 })).toBe(2);
   });
 
-  test("memory caps the count on a small machine", () => {
-    expect(chooseShardCount({ cores: 14, freeGb: 1.7, files: 100 })).toBe(2);
+  test("engine and OS reserves cap forced workers to reclaimable memory", () => {
+    expect(chooseShardCount({ env: "12", cores: 14, freeGb: 4.5, totalGb: 24, engineGb: 9, osReserveGb: 3, files: 100, gbPerShard: 1.5 })).toBe(3);
+  });
+
+  test("memory caps the count using the conservative worker peak", () => {
+    expect(chooseShardCount({ cores: 14, freeGb: 1.7, files: 100, gbPerShard: 1.25 })).toBe(1);
   });
 
   test("cores cap it at half, and it is never below 1", () => {
     expect(chooseShardCount({ cores: 8, freeGb: 64, files: 100 })).toBe(4);
     expect(chooseShardCount({ cores: 1, freeGb: 0.1, files: 100 })).toBe(1);
+  });
+});
+
+describe("Stack memory reserve", () => {
+  test("adds measured resident peaks and falls back when any loaded role is unmeasured", () => {
+    expect(parseStackBudget({ loaded: [{ peakBytes: 1024 ** 3, measured: true }, { peakBytes: 512 * 1024 ** 2, measured: true }] })).toBe(1.5);
+    expect(parseStackBudget({ loaded: [{ peakBytes: 1024 ** 3, measured: false }] })).toBe(8);
+    expect(parseStackBudget({ loaded: null })).toBe(8);
+  });
+});
+
+describe("shared worker slots", () => {
+  test("the runner-wide semaphore is atomic and refuses the first slot above budget", () => {
+    const directory = mkdtempSync(join(tmpdir(), "maipai-worker-slots-"));
+    try {
+      const slots = Array.from({ length: 3 }, () => reserveWorkerSlot(directory, 3));
+      expect(slots.every((slot) => typeof slot === "string")).toBe(true);
+      expect(workerSlotCount(directory)).toBe(3);
+      expect(reserveWorkerSlot(directory, 3)).toBeNull();
+      rmSync(slots[0] as string, { force: true });
+      expect(workerSlotCount(directory)).toBe(2);
+      expect(reserveWorkerSlot(directory, 3)).not.toBeNull();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 
@@ -84,6 +113,13 @@ describe("parsing", () => {
 });
 
 describe("run: the gate's pass/fail meaning", () => {
+  const fixtureBudget = {
+    engineGb: 0,
+    gbPerShard: 1,
+    resourceProbe: () => ({ reclaimableGb: 64, totalGb: 64, pressureLevel: 0 }),
+    sleep: async () => {},
+  };
+
   function fixture(body: Record<string, string>): string {
     const dir = mkdtempSync(join(tmpdir(), "maipai-shard-fixture-"));
     mkdirSync(join(dir, "tests"));
@@ -106,7 +142,7 @@ describe("run: the gate's pass/fail meaning", () => {
     process.stderr.write = (() => true) as typeof process.stderr.write;
     console.log = () => {};
     console.error = () => {};
-    try { return await run(options); }
+    try { return await run({ ...fixtureBudget, ...options }); }
     finally { process.stdout.write = stdout; process.stderr.write = stderr; console.log = log; console.error = error; }
   }
 
@@ -125,9 +161,77 @@ describe("run: the gate's pass/fail meaning", () => {
       "b.test.ts": `import {test,expect} from "bun:test"; test("b",()=>expect(2).toBe(2));`,
     });
     try {
-      expect(await run({ dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json") })).toBe(0);
+      expect(await run({ ...fixtureBudget, dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json") })).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("pressure level 2 pauses every new shard until pressure falls", async () => {
+    const marker = join(tmpdir(), `maipai-pressure-${Date.now()}`);
+    const dir = fixture(Object.fromEntries(Array.from({ length: 3 }, (_, index) => [`w${index}.test.ts`,
+      `import {test} from "bun:test"; import {writeFileSync} from "node:fs"; test("worker ${index}",()=>writeFileSync(${JSON.stringify(`${marker}-${index}`)},"started"));`,
+    ])));
+    const levels = [0, 2, 2, 0, 0, 0];
+    let pauses = 0;
+    const previous = process.env.MAIPAI_GATE_SHARDS;
+    delete process.env.MAIPAI_GATE_SHARDS;
+    try {
+      expect(await quietRun({
+        dir,
+        root: "tests",
+        shards: 3,
+        timingsPath: join(dir, "t.json"),
+        engineGb: 0,
+        gbPerShard: 1,
+        resourceProbe: () => ({ reclaimableGb: 16, totalGb: 16, pressureLevel: levels.shift() ?? 0 }),
+        sleep: async () => {
+          pauses += 1;
+          expect([0, 1, 2].every((index) => !existsSync(`${marker}-${index}`))).toBe(true);
+        },
+      })).toBe(0);
+      expect(pauses).toBe(2);
+      expect([0, 1, 2].every((index) => existsSync(`${marker}-${index}`))).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.MAIPAI_GATE_SHARDS;
+      else process.env.MAIPAI_GATE_SHARDS = previous;
+      rmSync(dir, { recursive: true, force: true });
+      for (let index = 0; index < 3; index += 1) rmSync(`${marker}-${index}`, { force: true });
+    }
+  });
+
+  test("concurrent workspace runners share one memory budget", async () => {
+    const slotsDir = mkdtempSync(join(tmpdir(), "maipai-shared-workers-"));
+    const first = fixture(Object.fromEntries(Array.from({ length: 4 }, (_, index) => [`a${index}.test.ts`,
+      `import {test} from "bun:test"; test("a${index}",async()=>Bun.sleep(150));`,
+    ])));
+    const second = fixture(Object.fromEntries(Array.from({ length: 4 }, (_, index) => [`b${index}.test.ts`,
+      `import {test} from "bun:test"; test("b${index}",async()=>Bun.sleep(150));`,
+    ])));
+    let maxSlotsSeen = 0;
+    const resourceProbe = () => {
+      const slots = readdirSync(slotsDir).filter((name) => name.startsWith("slot-")).length;
+      maxSlotsSeen = Math.max(maxSlotsSeen, slots);
+      return { reclaimableGb: 5, totalGb: 8, pressureLevel: 0 };
+    };
+    const options = (dir: string) => ({
+      dir,
+      root: "tests",
+      shards: 4,
+      timingsPath: join(dir, "timings.json"),
+      engineGb: 0,
+      gbPerShard: 2.5,
+      resourceProbe,
+      workerSlotsDir: slotsDir,
+    });
+    try {
+      expect(await Promise.all([run(options(first)), run(options(second))])).toEqual([0, 0]);
+      expect(maxSlotsSeen).toBe(2);
+      expect(readdirSync(slotsDir).filter((name) => name.startsWith("slot-")).length).toBe(0);
+    } finally {
+      rmSync(first, { recursive: true, force: true });
+      rmSync(second, { recursive: true, force: true });
+      rmSync(slotsDir, { recursive: true, force: true });
     }
   });
 
@@ -167,7 +271,7 @@ describe("run: the gate's pass/fail meaning", () => {
     const originalLog = console.log;
     console.log = (...args: unknown[]) => messages.push(args.join(" "));
     try {
-      expect(await run({ dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "flaky once"), failureLog: log, changedFiles: [] })).toBe(0);
+      expect(await run({ ...fixtureBudget, dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "flaky once"), failureLog: log, changedFiles: [] })).toBe(0);
       expect(existsSync(other)).toBe(true);
       expect(readFileSync(log, "utf8")).toContain("flaky\t");
       expect(messages.join("\n")).toContain("FLAKY");

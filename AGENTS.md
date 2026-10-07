@@ -41,7 +41,7 @@ From the repo root (the `home/` folder with `package.json`):
 - `bun run dev` in `backend/` or `frontend/` runs a dev server; `bun test` there runs that package's tests.
 - Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend).
 - `bash scripts/check.sh` is the full gate; `bash scripts/check.sh --docs` is the seconds-long gate for a docs-only commit.
-  `bash scripts/check.sh --pre` runs the cheap generated-file, UI-rule, typecheck, secrets and PII checks without taking the machine-wide lock; it is a preflight, not a gate pass. Full `check.sh` runs it before taking the lock.
+  `bash scripts/check.sh --pre` runs the cheap generated-file, UI-rule, typecheck, secrets and PII checks under the per-worktree lock without taking the machine-wide lock; it is a preflight, not a gate pass. Full `check.sh` keeps the same worktree lock while its preflight runs, and all test shards share one machine-wide memory budget.
   Never hand-roll a wait for another gate: run `check.sh`, which takes the machine-wide lock.
 
 ## Pins, lockfiles and what is live on 8787

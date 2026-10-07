@@ -13,14 +13,14 @@
 //
 // Usage: bun scripts/gate/shardTests.ts --dir backend [--root tests]
 //          [--shards N] [--record] [-- extra bun test args]
-//   --shards N   shard count; default from MAIPAI_GATE_SHARDS, else chosen
-//                from cores and free memory (chooseShardCount)
+//   --shards N   requested ceiling; the engine/OS memory budget and CPU cap
+//                still apply (chooseShardCount)
 //   --record     rewrites scripts/gate/test-timings.json for this workspace
 //                from the junit reports of this run
 import { Glob } from "bun";
 import { cpus, freemem, tmpdir, totalmem } from "node:os";
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import flakesFile from "./flakes.json";
 
 export type Timings = Record<string, number>;
@@ -92,24 +92,145 @@ export function balance(files: string[], timings: Timings, n: number): string[][
 }
 
 /**
- * Shard count: MAIPAI_GATE_SHARDS wins when set to a positive integer.
- * Otherwise half the cores (the Stack engine and the other legs need the
- * rest), capped by free memory at `gbPerShard` each (measured: ~0.4 GB per backend shard), never below 1 or above
- * the file count, and 6 at most (the Stack engine and the other suite need the rest). The memory budget keeps a 24 GB laptop that also runs the
- * Stack engine out of swap.
+ * The requested shard count can never exceed the budget: reclaimable pages
+ * are capped by total memory minus the Stack and OS/editor reserves, then
+ * divided by the sampled peak of a prior worker or a conservative bootstrap
+ * value. Worker count is also capped at half the cores and six, with at least
+ * one worker when current memory pressure allows a new launch.
  */
 export function chooseShardCount(opts: {
   env?: string | undefined;
   cores: number;
+  /** Reclaimable pages, not the kernel's optimistic availability percentage. */
   freeGb: number;
+  totalGb?: number;
+  engineGb?: number;
+  osReserveGb?: number;
   files: number;
   gbPerShard?: number;
 }): number {
+  const reclaimableGb = Math.min(opts.freeGb, Math.max(0, (opts.totalGb ?? Number.POSITIVE_INFINITY) - (opts.engineGb ?? 0) - (opts.osReserveGb ?? 0)));
+  const gbPerShard = opts.gbPerShard ?? 1.25;
+  const byCores = Math.max(1, Math.floor(opts.cores / 2));
+  const byMem = Math.max(1, Math.floor(reclaimableGb / gbPerShard));
+  const safeMaximum = Math.max(1, Math.min(byCores, byMem, opts.files, 6));
   const forced = Number.parseInt(opts.env ?? "", 10);
-  if (Number.isInteger(forced) && forced > 0) return Math.min(forced, Math.max(1, opts.files));
-  const byCores = Math.floor(opts.cores / 2);
-  const byMem = Math.floor(opts.freeGb / (opts.gbPerShard ?? 0.8));
-  return Math.max(1, Math.min(byCores, byMem, opts.files, 6));
+  if (Number.isInteger(forced) && forced > 0) return Math.min(forced, safeMaximum);
+  return safeMaximum;
+}
+
+export type ResourceSnapshot = { reclaimableGb: number; totalGb: number; pressureLevel: number };
+
+export function processTreeRssGb(rootPid: number): number {
+  const res = Bun.spawnSync(["ps", "-A", "-o", "pid=,ppid=,rss="]);
+  if (res.exitCode !== 0) return 0;
+  const rows = res.stdout.toString().split(/\r?\n/).flatMap((line) => {
+    const values = line.trim().split(/\s+/).map(Number);
+    const [pid, ppid, rssKb] = values;
+    return Number.isInteger(pid) && Number.isInteger(ppid) && Number.isFinite(rssKb)
+      ? [{ pid: pid as number, ppid: ppid as number, rssKb: rssKb as number }]
+      : [];
+  });
+  const children = new Map<number, typeof rows>();
+  for (const row of rows) children.set(row.ppid, [...(children.get(row.ppid) ?? []), row]);
+  let rssKb = 0;
+  const visit = (pid: number) => {
+    for (const row of children.get(pid) ?? []) {
+      rssKb += row.rssKb;
+      visit(row.pid);
+    }
+  };
+  const root = rows.find((row) => row.pid === rootPid);
+  if (!root) return 0;
+  rssKb += root.rssKb;
+  visit(rootPid);
+  return rssKb / 1024 ** 2;
+}
+
+/** Atomically reserves one shared worker slot across all gate runners on this machine. */
+export function reserveWorkerSlot(directory: string, capacity: number, ownerPid = process.pid): string | null {
+  mkdirSync(directory, { recursive: true });
+  const perl = `
+    use Fcntl qw(:flock O_CREAT O_EXCL O_WRONLY);
+    my ($dir, $owner, $capacity) = @ARGV;
+    open(my $lock, ">>", "$dir/.mutex") or die "worker slots: open mutex: $!\\n";
+    flock($lock, LOCK_EX) or die "worker slots: lock mutex: $!\\n";
+    my @live;
+    for my $path (glob("$dir/slot-*")) {
+      open(my $record, "<", $path) or next;
+      my $pid = <$record> // "";
+      close($record);
+      $pid =~ s/\\s+\\z//;
+      if ($pid =~ /^\\d+$/ && kill(0, $pid)) { push @live, $path; }
+      else { unlink($path); }
+    }
+    exit 75 if @live >= $capacity;
+    my $path = "$dir/slot-$owner-$$";
+    sysopen(my $record, $path, O_CREAT | O_EXCL | O_WRONLY, 0600) or die "worker slots: create slot: $!\\n";
+    print $record "$owner\\n";
+    close($record);
+    print "$path\\n";
+  `;
+  const result = Bun.spawnSync(["perl", "-e", perl, directory, String(ownerPid), String(capacity)]);
+  if (result.exitCode === 75) return null;
+  if (result.exitCode !== 0) throw new Error(result.stderr.toString() || `worker slots: could not reserve in ${directory}`);
+  return result.stdout.toString().trim();
+}
+
+export function workerSlotCount(directory: string): number {
+  mkdirSync(directory, { recursive: true });
+  const perl = `
+    use Fcntl qw(:flock);
+    my ($dir) = @ARGV;
+    open(my $lock, ">>", "$dir/.mutex") or die "worker slots: open mutex: $!\\n";
+    flock($lock, LOCK_EX) or die "worker slots: lock mutex: $!\\n";
+    my $count = 0;
+    for my $path (glob("$dir/slot-*")) {
+      open(my $record, "<", $path) or next;
+      my $pid = <$record> // "";
+      close($record);
+      $pid =~ s/\\s+\\z//;
+      if ($pid =~ /^\\d+$/ && kill(0, $pid)) { $count += 1; }
+      else { unlink($path); }
+    }
+    print "$count\\n";
+  `;
+  const result = Bun.spawnSync(["perl", "-e", perl, directory]);
+  if (result.exitCode !== 0) throw new Error(result.stderr.toString() || `worker slots: could not count ${directory}`);
+  return Number(result.stdout.toString().trim());
+}
+
+export function parseStackBudget(data: unknown): number {
+  if (!data || typeof data !== "object" || !Array.isArray((data as { loaded?: unknown }).loaded)) return 8;
+  let bytes = 0;
+  for (const loaded of (data as { loaded: unknown[] }).loaded) {
+    if (!loaded || typeof loaded !== "object") return 8;
+    const entry = loaded as { peakBytes?: unknown; measured?: unknown };
+    if (typeof entry.peakBytes !== "number" || !Number.isFinite(entry.peakBytes) || entry.peakBytes < 0 || entry.measured !== true) return 8;
+    bytes += entry.peakBytes;
+  }
+  return bytes / 1024 ** 3;
+}
+
+export async function engineResidentGb(stackUrl = process.env.MAIPAI_STACK_URL ?? "http://127.0.0.1:8770/stack/v1/hardware/budget"): Promise<number> {
+  try {
+    const response = await fetch(stackUrl, { signal: AbortSignal.timeout(1000) });
+    if (!response.ok) return 8;
+    return parseStackBudget(await response.json());
+  } catch {
+    return 8;
+  }
+}
+
+export function memoryPressureLevel(): number {
+  if (process.platform !== "darwin") return 0;
+  const result = Bun.spawnSync(["sysctl", "-n", "kern.memorystatus_vm_pressure_level"]);
+  const level = Number(result.stdout.toString().trim());
+  return result.exitCode === 0 && Number.isFinite(level) ? level : 0;
+}
+
+export function resourceSnapshot(): ResourceSnapshot {
+  return { reclaimableGb: availableGb(), totalGb: totalmem() / 1024 ** 3, pressureLevel: memoryPressureLevel() };
 }
 
 export interface Summary {
@@ -194,6 +315,12 @@ export interface RunOptions {
   ledger?: FlakeLedger;
   failureLog?: string;
   changedFiles?: string[];
+  resourceProbe?: () => ResourceSnapshot | Promise<ResourceSnapshot>;
+  engineGb?: number;
+  gbPerShard?: number;
+  sleep?: (milliseconds: number) => Promise<void>;
+  peakFile?: string;
+  workerSlotsDir?: string;
 }
 
 export async function run(opts: RunOptions): Promise<number> {
@@ -211,12 +338,35 @@ export async function run(opts: RunOptions): Promise<number> {
     console.log(`shard: no test files under ${dir}`);
     return 0;
   }
-  const freeGb = (freemem() + 0) / 1024 ** 3;
-  const n = files.length === 0 ? 0 : (opts.shards ?? chooseShardCount({ env: process.env.MAIPAI_GATE_SHARDS, cores: cpus().length, freeGb: Math.max(freeGb, availableGb()), files: files.length }));
+  const probe = opts.resourceProbe ?? resourceSnapshot;
+  const workerSlotsDir = opts.workerSlotsDir;
+  const initialResources = await probe();
+  const engineGb = opts.engineGb ?? await engineResidentGb();
+  const peakFile = opts.peakFile ?? (process.env.MAIPAI_GATE_SHARD_PEAKS_DIR ? join(process.env.MAIPAI_GATE_SHARD_PEAKS_DIR, `${label}.json`) : undefined);
+  let shardPeakGb = opts.gbPerShard ?? 1.25;
+  if (peakFile && existsSync(peakFile)) {
+    try {
+      const saved = Number(JSON.parse(readFileSync(peakFile, "utf8")).peakGb);
+      if (Number.isFinite(saved) && saved > 0) shardPeakGb = Math.max(shardPeakGb, saved);
+    } catch { /* use the conservative bootstrap peak */ }
+  }
+  const initialReservedGb = workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0;
+  const maxWorkers = files.length === 0 ? 0 : chooseShardCount({
+    env: process.env.MAIPAI_GATE_SHARDS,
+    cores: cpus().length,
+    freeGb: initialResources.reclaimableGb + initialReservedGb,
+    totalGb: initialResources.totalGb,
+    engineGb,
+    osReserveGb: 3,
+    files: files.length,
+    gbPerShard: shardPeakGb,
+  });
+  const requestedWorkers = opts.shards === undefined ? maxWorkers : Math.max(1, Math.min(opts.shards, maxWorkers));
+  const n = files.length === 0 ? 0 : requestedWorkers;
   const plan = balance(files, allTimings[label] ?? {}, n);
   const started = Date.now();
   const scratch = mkdtempSync(join(tmpdir(), "maipai-gate-shards-"));
-  console.log(`shard: ${label}: ${files.length} parallel files in ${plan.length} shards; ${serialFiles.length} serial; ${skipped.length} skipped (cores ${cpus().length}, ${(totalmem() / 1024 ** 3).toFixed(0)} GB)`);
+  console.log(`shard: ${label}: ${files.length} parallel files in ${plan.length} shards; ${serialFiles.length} serial; ${skipped.length} skipped (workers capped by ${shardPeakGb.toFixed(2)} GB measured/bootstrap peak, engine reserve ${engineGb.toFixed(2)} GB, pressure ${initialResources.pressureLevel})`);
 
   interface Live {
     index: number;
@@ -227,7 +377,9 @@ export async function run(opts: RunOptions): Promise<number> {
     files: string[];
   }
   const live: Live[] = [];
+  const active = new Set<Live>();
   let firstFail: { shard: Live; code: number; line?: string } | null = null;
+  let maxObservedPeakGb = 0;
   const flakyCandidates = new Map<string, { entry: FlakeEntry; line: string }>();
   const liveEntries = ledger.flakes.filter((entry) => entry.deadline >= new Date().toISOString().slice(0, 10));
   const changedFiles = opts.changedFiles ?? changedTestFiles(dir, liveEntries);
@@ -247,10 +399,10 @@ export async function run(opts: RunOptions): Promise<number> {
     return found.length === 1 ? found[0] : undefined;
   };
   const stopAll = (except?: Live) => {
-    for (const s of live) if (s !== except) killTree(s.proc.pid);
+    for (const s of active) if (s !== except) killTree(s.proc.pid);
   };
 
-  plan.forEach((shardFiles, index) => {
+  const launchShard = (shardFiles: string[], index: number, slot: string | undefined) => {
     const tmp = join(scratch, `s${index}`);
     Bun.spawnSync(["mkdir", "-p", tmp]);
     const logPath = join(scratch, `s${index}.log`);
@@ -267,6 +419,14 @@ export async function run(opts: RunOptions): Promise<number> {
       stderr: "pipe",
     });
     const shard: Live = { index, proc, logPath, junit, files: shardFiles, done: Promise.resolve(0) };
+    active.add(shard);
+    setSlotOwner(slot, proc.pid);
+    let shardPeakGb = processTreeRssGb(proc.pid);
+    maxObservedPeakGb = Math.max(maxObservedPeakGb, shardPeakGb);
+    const sampler = setInterval(() => {
+      shardPeakGb = Math.max(shardPeakGb, processTreeRssGb(proc.pid));
+      maxObservedPeakGb = Math.max(maxObservedPeakGb, shardPeakGb);
+    }, 1000);
     const drain = async (stream: ReadableStream<Uint8Array>, path: string) => {
       const reader = stream.getReader();
       const decoder = new TextDecoder();
@@ -300,9 +460,15 @@ export async function run(opts: RunOptions): Promise<number> {
       const allListed = failures.length > 0 && failures.every((line) => isListed(line, shardFiles));
       if (code !== 0 && !allListed && !firstFail) { firstFail = { shard, code }; stopAll(shard); }
       return code;
+    }).finally(() => {
+      clearInterval(sampler);
+      shardPeakGb = Math.max(shardPeakGb, processTreeRssGb(proc.pid));
+      maxObservedPeakGb = Math.max(maxObservedPeakGb, shardPeakGb);
+      active.delete(shard);
+      releaseSlot(slot);
     });
     live.push(shard);
-  });
+  };
 
   const onSignal = () => {
     stopAll();
@@ -312,20 +478,108 @@ export async function run(opts: RunOptions): Promise<number> {
   process.on("SIGINT", onSignal);
   process.on("SIGTERM", onSignal);
 
+  const pause = opts.sleep ?? ((milliseconds: number) => Bun.sleep(milliseconds));
+  const waitForPressureRelief = async () => {
+    while (true) {
+      const resources = await probe();
+      if (resources.pressureLevel < 2) return;
+      console.log(`shard: pressure ${resources.pressureLevel}; pausing new workers`);
+      await pause(1000);
+    }
+  };
+  const reserveSharedSlot = (capacity: number) => workerSlotsDir ? reserveWorkerSlot(workerSlotsDir, capacity) : undefined;
+  const setSlotOwner = (slot: string | undefined, pid: number) => {
+    if (!slot) return;
+    const replacement = join(dirname(slot), `.worker-slot-owner-${process.pid}`);
+    writeFileSync(replacement, `${pid}\n`);
+    renameSync(replacement, slot);
+  };
+  const releaseSlot = (slot: string | undefined) => {
+    if (slot) rmSync(slot, { force: true });
+  };
+  const reserveForSingleWorker = async () => {
+    while (true) {
+      const resources = await probe();
+      if (resources.pressureLevel >= 2) {
+        console.log(`shard: pressure ${resources.pressureLevel}; pausing new workers`);
+        await pause(1000);
+        continue;
+      }
+      const reservedGb = workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0;
+      const capacity = chooseShardCount({ cores: cpus().length, freeGb: resources.reclaimableGb + reservedGb, totalGb: resources.totalGb, engineGb, osReserveGb: 3, files: 6, gbPerShard: shardPeakGb });
+      const slot = reserveSharedSlot(capacity);
+      if (slot !== null) return slot;
+      console.log("shard: waiting for a shared worker slot");
+      await pause(1000);
+    }
+  };
+  let nextShard = 0;
+  while (nextShard < plan.length || active.size > 0) {
+    if (firstFail) break;
+    const resources = await probe();
+    if (firstFail) break;
+    const currentCap = chooseShardCount({
+      cores: cpus().length,
+      freeGb: resources.reclaimableGb + (workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0),
+      totalGb: resources.totalGb,
+      engineGb,
+      osReserveGb: 3,
+      files: Math.max(1, plan.length),
+      gbPerShard: shardPeakGb,
+    });
+    const globalCap = chooseShardCount({
+      cores: cpus().length,
+      freeGb: resources.reclaimableGb + (workerSlotsDir ? workerSlotCount(workerSlotsDir) * shardPeakGb : 0),
+      totalGb: resources.totalGb,
+      engineGb,
+      osReserveGb: 3,
+      files: 6,
+      gbPerShard: shardPeakGb,
+    });
+    if (resources.pressureLevel >= 2 || active.size >= currentCap || nextShard >= plan.length) {
+      if (active.size > 0) {
+        await Promise.race([...active].map((shard) => shard.done));
+      } else if (nextShard < plan.length) {
+        console.log(`shard: pressure ${resources.pressureLevel}; pausing new workers`);
+        await pause(1000);
+      }
+      continue;
+    }
+    const slot = reserveSharedSlot(globalCap);
+    if (slot === null) {
+      console.log("shard: waiting for a shared worker slot");
+      if (active.size > 0) await Promise.race([...active].map((shard) => shard.done));
+      else await pause(1000);
+      continue;
+    }
+    launchShard(plan[nextShard] as string[], nextShard, slot);
+    nextShard += 1;
+  }
   await Promise.all(live.map((s) => s.done));
 
   // Real network tests and UI fetch mocks run alone after parallel shards to
   // avoid cross-file multicast and process-global fetch interference.
   for (const file of serialFiles) {
     if (firstFail) break;
+    const slot = await reserveForSingleWorker();
     const proc = Bun.spawn(["bun", "test", file.startsWith("./") ? file : `./${file}`], {
       cwd: dir,
       env: process.env,
       stdout: "pipe",
       stderr: "pipe",
     });
+    setSlotOwner(slot, proc.pid);
+    let serialPeakGb = processTreeRssGb(proc.pid);
+    const serialSampler = setInterval(() => {
+      serialPeakGb = Math.max(serialPeakGb, processTreeRssGb(proc.pid));
+      maxObservedPeakGb = Math.max(maxObservedPeakGb, serialPeakGb);
+    }, 1000);
     const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
     const code = await proc.exited;
+    releaseSlot(slot);
+    clearInterval(serialSampler);
+    serialPeakGb = Math.max(serialPeakGb, processTreeRssGb(proc.pid));
+    maxObservedPeakGb = Math.max(maxObservedPeakGb, serialPeakGb);
     process.stdout.write(stdout);
     process.stderr.write(stderr);
     if (code !== 0) {
@@ -340,10 +594,13 @@ export async function run(opts: RunOptions): Promise<number> {
   // shards have finished. Expired entries were excluded above and therefore
   // fail fast as ordinary failures.
   if (!firstFail) for (const { entry, line } of flakyCandidates.values()) {
+    const slot = await reserveForSingleWorker();
     const exactName = `^${entry.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
     const proc = Bun.spawn(["bun", "test", entry.file, "-t", exactName], { cwd: dir, env: process.env, stdout: "pipe", stderr: "pipe" });
+    setSlotOwner(slot, proc.pid);
     const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
     const rerunCode = await proc.exited;
+    releaseSlot(slot);
     if (rerunCode !== 0) {
       process.stdout.write(stdout);
       process.stderr.write(stderr);
@@ -354,6 +611,15 @@ export async function run(opts: RunOptions): Promise<number> {
     recordFlaky(entry, line);
   }
 
+  if (peakFile && maxObservedPeakGb > 0) {
+    try {
+      mkdirSync(dirname(peakFile), { recursive: true });
+      writeFileSync(peakFile, `${JSON.stringify({ peakGb: maxObservedPeakGb, measuredAt: new Date().toISOString(), platform: process.platform })}\n`);
+      console.log(`shard: sampled peak ${maxObservedPeakGb.toFixed(2)} GB per worker; budget floor ${shardPeakGb.toFixed(2)} GB; saved ${peakFile}`);
+    } catch (error) {
+      console.warn(`shard: could not save measured worker peak: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
   const elapsed = (Date.now() - started) / 1000;
   let code = 0;
   const failure = firstFail as { shard: Live; code: number; line?: string } | null;
@@ -407,17 +673,15 @@ function changedTestFiles(dir: string, entries: FlakeEntry[]): string[] {
   return [...new Set([...result.stdout.toString().split(/\r?\n/), ...untracked.stdout.toString().split(/\r?\n/)].filter(Boolean))];
 }
 
-/** Reclaimable memory in GB (free + inactive + speculative pages on macOS, MemAvailable on Linux). */
+/** Reclaimable memory in GB (free + inactive + speculative + purgeable pages on macOS). */
 export function availableGb(): number {
   try {
     if (process.platform === "darwin") {
       const out = Bun.spawnSync(["vm_stat"]).stdout.toString();
       const page = Number(/page size of (\d+) bytes/.exec(out)?.[1] ?? 16384);
       const pages = (k: string) => Number(new RegExp(`${k}:\\s+(\\d+)`).exec(out)?.[1] ?? 0);
-      const reclaimable = ((pages("Pages free") + pages("Pages inactive") + pages("Pages speculative")) * page) / 1024 ** 3;
-      // The kernel's own free percentage also counts what it can compress or purge.
-      const level = Number(Bun.spawnSync(["sysctl", "-n", "kern.memorystatus_level"]).stdout.toString().trim());
-      return Math.max(reclaimable, Number.isFinite(level) ? (level / 100) * (totalmem() / 1024 ** 3) : 0);
+      const reclaimable = ((pages("Pages free") + pages("Pages inactive") + pages("Pages speculative") + pages("Pages purgeable")) * page) / 1024 ** 3;
+      return reclaimable;
     }
     const m = /MemAvailable:\s+(\d+) kB/.exec(readFileSync("/proc/meminfo", "utf8"));
     if (m) return Number(m[1]) / 1024 ** 2;
@@ -442,7 +706,7 @@ if (import.meta.main) {
     process.exit(2);
   }
   const shards = get("--shards") ? Number(get("--shards")) : undefined;
-  const code = await run({ dir, root: get("--root"), shards, record: own.includes("--record"), extraArgs });
+  const code = await run({ dir, root: get("--root"), shards, record: own.includes("--record"), extraArgs, workerSlotsDir: process.env.MAIPAI_GATE_WORKER_SLOTS_DIR });
   console.log(`shard: exit ${code}`);
   process.exit(code);
 }

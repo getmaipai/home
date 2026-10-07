@@ -281,6 +281,12 @@ fi
 echo "== scope: $SCOPE ($SCOPE_WHY)"
 if [ -z "${GATE_DIFF_BASE:-}" ]; then GATE_DIFF_BASE="$(gate_diff_base 2>/dev/null || true)"; fi
 
+# One check at a time in this exact worktree, including standalone --pre.
+# The full run keeps this descriptor open while its child --pre runs; that
+# child inherits the lock and recognizes it by the Git worktree lock path.
+source scripts/gate/worktreeLock.sh
+if ! acquire_worktree_lock; then exit 1; fi
+
 if [ "$PRE_ONLY" != 1 ]; then
   stage "preflight"
   bash scripts/check.sh --pre
@@ -305,12 +311,25 @@ if [ "$SCOPE" != "docs" ] && [ "$PRE_ONLY" != 1 ]; then
   # backend or full gate (GATE-SPEED-01 d); frontend gates still queue
   # behind each other.
   if [ "$SCOPE" = "frontend" ]; then export GATE_LOCK_NAME=frontend; fi
+  if [ -z "${GATE_LOCK_LANE:-}" ]; then
+    GATE_BRANCH="$(git branch --show-current)"
+    case "$GATE_BRANCH" in
+      codex-a-*) GATE_LOCK_LANE=codex-a ;;
+      codex-b-*) GATE_LOCK_LANE=codex-b ;;
+      codex-c-*) GATE_LOCK_LANE=codex-c ;;
+      codex-d-*) GATE_LOCK_LANE=codex-d ;;
+      codex/*) GATE_LOCK_LANE=codex ;;
+      opencode/*) GATE_LOCK_LANE=opencode ;;
+      *) GATE_LOCK_LANE="" ;;
+    esac
+  fi
+  export GATE_LOCK_LANE
   GATE_LOCK_LABEL="home-$$"
   # This lane must remain queued through long concurrent work. Extend the
   # lock's normal cap for this invocation; load is diagnostic only.
   export GATE_LOCK_PER_POSITION_SECONDS=86400 GATE_LOCK_MAX_SECONDS=86400
   LOCK_START=$(date +%s)
-  if ! GATE_LOCK_PID=$$ bash "$GATE_LOCK" acquire "$GATE_LOCK_LABEL" "${GATE_LOCK_ITEM:-}"; then
+  if ! GATE_LOCK_PID=$$ bash "$GATE_LOCK" acquire "$GATE_LOCK_LABEL" "${GATE_LOCK_ITEM:-}" "${GATE_LOCK_LANE:-}"; then
     echo "== gate-lock: could not take the machine-wide full-gate lock (see above); not running the $SCOPE gate"
     exit 1
   fi
@@ -475,7 +494,10 @@ run_tests() {
   if [ "${MAIPAI_GATE_SHARDED:-1}" = 0 ]; then
     (cd "$dir" && bun test)
   else
-    GATE_FAILURE_LOG="$GATE_FAILURE_LOG" GATE_DIFF_BASE="${GATE_DIFF_BASE:-}" bun scripts/gate/shardTests.ts --dir "$dir" --root "$root" ${shards:+--shards "$shards"}
+    GATE_FAILURE_LOG="$GATE_FAILURE_LOG" GATE_DIFF_BASE="${GATE_DIFF_BASE:-}" \
+      MAIPAI_GATE_SHARD_PEAKS_DIR="$GATE_HOME_ROOT/data-scratch/gate-stats/shard-peaks" \
+      MAIPAI_GATE_WORKER_SLOTS_DIR="$GATE_HOME_ROOT/data-scratch/gate-stats/shard-workers" \
+      bun scripts/gate/shardTests.ts --dir "$dir" --root "$root" ${shards:+--shards "$shards"}
   fi
 }
 
