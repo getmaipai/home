@@ -3,6 +3,18 @@ import { CHAT_COMMAND_SHORTCUTS } from "@/apps/chat/chatCommands";
 
 export const CHAT_SHORTCUTS = CHAT_COMMAND_SHORTCUTS.map(({ name, shortcut }) => [name, shortcut] as const);
 
+/** The one Cmd/Ctrl+B binding for the current app column. Chat and Settings
+ * both provide their own shared column hook's toggle here. */
+export function registerSidebarToggleShortcut(toggleSidebar?: () => void): () => void {
+  function onKeyDown(event: KeyboardEvent) {
+    if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== "b") return;
+    event.preventDefault();
+    toggleSidebar?.();
+  }
+  window.addEventListener("keydown", onKeyDown);
+  return () => window.removeEventListener("keydown", onKeyDown);
+}
+
 export function registerChatShortcuts({
   aui,
   isRunning,
@@ -17,6 +29,7 @@ export function registerChatShortcuts({
   /** COLUMN-01: the history column's own toggle (ChatColumnControl). */
   toggleSidebar?: () => void;
 }): () => void {
+  const unregisterSidebarShortcut = registerSidebarToggleShortcut(toggleSidebar);
   function onKeyDown(event: KeyboardEvent) {
     const key = event.key.toLowerCase();
     const matches = (id: string) => {
@@ -45,11 +58,11 @@ export function registerChatShortcuts({
       // itself (Radix prevents its default) is not also a stop.
       event.preventDefault();
       aui.thread.cancelRun();
-    } else if (matches("toggle-sidebar")) {
-      event.preventDefault();
-      toggleSidebar?.();
     }
   }
   window.addEventListener("keydown", onKeyDown);
-  return () => window.removeEventListener("keydown", onKeyDown);
+  return () => {
+    window.removeEventListener("keydown", onKeyDown);
+    unregisterSidebarShortcut();
+  };
 }

@@ -56,8 +56,8 @@ describe("ported from the old settings page", () => {
   });
 
   test("Profile draws the profile form", async () => {
-    const view = open(makePerson("adult"), "/settings/account/profile");
-    await waitFor(() => expect(view.container.querySelector("input#profile-display-name")).not.toBeNull());
+    open(makePerson("adult"), "/settings/account/profile");
+    await waitFor(() => expect(document.body.querySelector("input#profile-display-name")).not.toBeNull());
   });
 
   test("Appearance offers a device-only override and reset without writing the setting", async () => {
@@ -82,13 +82,13 @@ describe("ported from the old settings page", () => {
     await waitFor(() => expect(view.getByText("Show alerts on this device")).toBeTruthy());
     expect(view.queryByText("Telegram chat id")).toBeNull();
     fireEvent.click(view.getByRole("button", { name: "Telegram" }));
-    await waitFor(() => expect(view.container.querySelector('[data-setting-key="notifications.telegram.chat_id"]')).not.toBeNull());
+    await waitFor(() => expect(document.body.querySelector('[data-setting-key="notifications.telegram.chat_id"]')).not.toBeNull());
   });
 
   test("turning browser alerts on asks the browser for permission first, and a refusal writes nothing", async () => {
-    const original = { notification: (globalThis as { Notification?: unknown }).Notification, sw: Object.getOwnPropertyDescriptor(navigator, "serviceWorker") };
+    const original = { notification: Object.getOwnPropertyDescriptor(globalThis, "Notification"), sw: Object.getOwnPropertyDescriptor(navigator, "serviceWorker") };
     const ask = mock(async () => "denied");
-    (globalThis as { Notification?: unknown }).Notification = { requestPermission: ask };
+    Object.defineProperty(globalThis, "Notification", { configurable: true, writable: true, value: { requestPermission: ask } });
     Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: {} });
     try {
       const view = open(makePerson("adult"), "/settings/account/notifications");
@@ -97,7 +97,7 @@ describe("ported from the old settings page", () => {
       expect(ask).toHaveBeenCalled();
       expect(fixture!.puts.filter((put) => put.key === "notifications.browser.enabled")).toEqual([]);
     } finally {
-      (globalThis as { Notification?: unknown }).Notification = original.notification;
+      if (original.notification) Object.defineProperty(globalThis, "Notification", original.notification); else delete (globalThis as { Notification?: unknown }).Notification;
       if (original.sw) Object.defineProperty(navigator, "serviceWorker", original.sw); else delete (navigator as { serviceWorker?: unknown }).serviceWorker;
     }
   });
@@ -124,9 +124,9 @@ describe("ported from the old settings page", () => {
     for (const section of ["people", "ai", "storage", "maintenance", "privacy"]) {
       cleanup();
       fixture!.restore();
-      const next = open(owner, `/settings/home/${section}`);
-      await waitFor(() => expect(within(next.container).getAllByRole("link").length).toBeGreaterThan(8));
-      within(next.container).getAllByRole("link").forEach((a) => hrefs.add(a.getAttribute("href") ?? ""));
+      open(owner, `/settings/home/${section}`);
+      await waitFor(() => expect(within(document.body).getAllByRole("link").length).toBeGreaterThan(8));
+      within(document.body).getAllByRole("link").forEach((a) => hrefs.add(a.getAttribute("href") ?? ""));
     }
     void view;
     for (const href of ["/users", "/people", "/models", "/engines", "/backups", "/storage", "/updates", "/repairs", "/performance", "/status", "/privacy"]) expect(hrefs).toContain(href);

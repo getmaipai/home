@@ -1,11 +1,13 @@
 import { useEffect, type ReactNode } from "react";
-import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { Empty, EmptyDescription, EmptyHeader } from "@maipai/ui/src/dashboard/components/ui/empty";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { SettingsShell } from "@maipai/ui/src/settings/SettingsShell";
+import { SidebarMenuButton } from "@maipai/ui/src/dashboard/components/ui/sidebar";
+import { getIcon } from "@maipai/ui/src/icons";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import { searchSettings, type ScopedValues } from "@maipai/ui/src/settings/searchSettings";
 import {
@@ -25,10 +27,14 @@ import { SettingsSectionContent, beforeSettingChange } from "@/next/pages/settin
 import { SETTINGS_VIEWS } from "@/next/pages/settings/settingsViews";
 import { baseViewer, scopeValueFor, visibleRegistry } from "@/next/pages/settings/settingsViewer";
 import { useSettingsCapabilities } from "@/next/pages/settings/useSettingsCapabilities";
+import { useChatColumn } from "@/next/pages/ChatColumn";
+import { registerSidebarToggleShortcut } from "@/next/pages/chatShortcuts";
+import { lastAppRoute } from "@/next/pages/settings/settingsBackLink";
 
 /** The kit's `lg` breakpoint: from here the column and the content sit side
  * by side; below it the shell drills in (the column alone, then a section). */
 const DESKTOP_MIN_WIDTH = 960;
+const BackArrow = getIcon("chevron-left");
 
 /** `/settings/:area/:section?`: one settings area in the kit's one settings
  * shell (RULES S4). This page holds data only: the area from the spec, who is
@@ -57,8 +63,10 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
   const location = useLocation();
   const [params, setParams] = useSearchParams();
   const desktop = useBreakpoint().atLeast(DESKTOP_MIN_WIDTH);
+  const column = useChatColumn({ isDesktop: desktop });
   const query = params.get("q") ?? "";
   useTabItem(area.title);
+  useEffect(() => desktop ? registerSidebarToggleShortcut(column.control.toggle) : undefined, [desktop, column.control]);
 
   const registryQuery = useQuery<SettingsKey[]>({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry(), staleTime: Infinity });
   const { capabilities, ready } = useSettingsCapabilities(person);
@@ -99,6 +107,13 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
   if (!sectionId && !desktop && !first && area.id !== "account") return <Navigate to={settingsPath("account")} replace />;
 
   const focusKey = location.hash.length > 1 ? decodeURIComponent(location.hash.slice(1)) : undefined;
+  const backToApp = lastAppRoute();
+  const backLink = (
+    <SidebarMenuButton size="settings" render={<Link to={backToApp} />} data-slot="settings-back-to-app">
+      <BackArrow aria-hidden className="size-4" />
+      <span>Back to app</span>
+    </SidebarMenuButton>
+  );
   const values: ScopedValues = {};
   scopes.forEach((scope, index) => { const data = valueQueries[index]?.data; if (data) values[scope] = data; });
 
@@ -142,6 +157,19 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
 
   return (
     <SettingsShell
+      layout="docked"
+      backLink={backLink}
+      collapsible={desktop ? {
+        collapsed: column.collapsed,
+        peek: column.peek,
+        onToggle: column.toggleFromButton,
+        columnToggleRef: column.columnToggleRef,
+        headerToggleRef: column.headerToggleRef,
+        onPeekEnter: column.peekZoneHandlers.onPointerEnter,
+        onPeekLeave: column.peekZoneHandlers.onPointerLeave,
+        onPeekColumnEnter: column.peekColumnHandlers.onPointerEnter,
+        onPeekColumnLeave: column.peekColumnHandlers.onPointerLeave,
+      } : undefined}
       contentAs="section"
       area={area}
       viewer={viewer}

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T23:17:05.222Z",
-  "kitTag": "ui-v0.5.134",
+  "generatedAt": "2026-10-06T23:58:03.618Z",
+  "kitTag": "ui-v0.5.144",
   "items": [
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
@@ -690,6 +690,30 @@
       "group": "settings/onboarding",
       "verdict": "later",
       "verdictReason": "Deferred until tools T4.",
+      "implemented": false
+    },
+    {
+      "file": "project-mark.tsx",
+      "name": "project-mark",
+      "group": "project",
+      "verdict": "no-fit",
+      "verdictReason": "Home's project pages use the kit's project blocks; the standalone assistant-ui project Element is not used on this non-chat surface.",
+      "implemented": false
+    },
+    {
+      "file": "project-settings.tsx",
+      "name": "project-settings",
+      "group": "project",
+      "verdict": "no-fit",
+      "verdictReason": "Home's project settings are rendered by the kit's shadcn project blocks, not this assistant-ui Element.",
+      "implemented": false
+    },
+    {
+      "file": "project-share.tsx",
+      "name": "project-share",
+      "group": "project",
+      "verdict": "no-fit",
+      "verdictReason": "Home's project sharing is rendered by the kit's shadcn project blocks, not this assistant-ui Element.",
       "implemented": false
     },
     {

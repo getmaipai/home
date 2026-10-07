@@ -479,7 +479,7 @@ describe("NextRoutes settings areas", () => {
           <Routes><Route path="/*" element={<NextRoutes person={makePerson()} onSignedIn={() => {}} />} /></Routes>
         </MemoryRouter>,
       );
-      await waitFor(() => expect(view.container.querySelector('[data-slot="settings-shell"]')).toBeTruthy());
+      await waitFor(() => expect(document.body.querySelector('[data-slot="settings-shell"]')).toBeTruthy());
       expect(view.getByRole("heading", { level: 1, name: "Profile" })).toBeTruthy();
       expect(view.container.querySelector("h1.sr-only")).toBeNull();
       expect(view.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();

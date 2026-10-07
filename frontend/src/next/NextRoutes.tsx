@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
@@ -40,6 +41,7 @@ import { useStatusApps } from "@/shell/useStatusApps";
 import { sidebarItemStatus } from "@/shell/statusApps";
 import { TabIdentityProvider } from "@/shell/tabIdentity";
 import { useSessionLocked } from "@/shell/sessionLockContext";
+import { rememberLastAppRoute } from "@/next/pages/settings/settingsBackLink";
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -117,9 +119,14 @@ function NextRoutesInner({ person, onPersonChange, onSignedOut }: { person: Rost
 }
 
 function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
+  const location = useLocation();
   const statusAppsQuery = useStatusApps();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const locked = useSessionLocked();
+
+  useEffect(() => {
+    rememberLastAppRoute(`${location.pathname}${location.search}${location.hash}`);
+  }, [location.pathname, location.search, location.hash]);
 
   const onIncognitoChange = (on: boolean) => {
     if (on === incognito) return;

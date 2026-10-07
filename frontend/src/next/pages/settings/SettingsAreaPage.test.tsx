@@ -18,6 +18,8 @@ let fixture: HomeFixture | null = null;
 
 afterEach(() => {
   cleanup();
+  window.sessionStorage.clear();
+  window.localStorage.removeItem("maipai.chat.rail-collapsed");
   fixture?.restore();
   fixture = null;
   window.matchMedia = originalMatchMedia;
@@ -50,16 +52,19 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
           <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
           <Route path="customize" element={<CustomizeRedirect person={person} />} />
           <Route path="chat" element={<h1>Chat</h1>} />
+          <Route path="status" element={<h1>Status</h1>} />
         </Route>
       </Routes>
     </MemoryRouter>,
   );
-  return view;
+  return Object.assign(view, within(document.body));
 }
 
 const where = (view: ReturnType<typeof open>) => view.getByTestId("where").textContent;
-const column = (view: ReturnType<typeof open>) => view.container.querySelector<HTMLElement>('[data-slot="settings-column"]')!;
-const rows = (view: ReturnType<typeof open>) => within(column(view)).queryAllByRole("link").map((a) => a.textContent?.trim());
+const column = (_view: ReturnType<typeof open>) => document.body.querySelector<HTMLElement>('[data-slot="settings-column"]')!;
+const rows = (view: ReturnType<typeof open>) => [...within(column(view)).queryAllByRole("link")]
+  .filter((link) => link.textContent?.trim() !== "Back to app")
+  .map((link) => link.textContent?.trim());
 
 describe("the settings route", () => {
   test("an adult asking for Home settings is replaced to Account and no household request is made", async () => {
@@ -77,7 +82,7 @@ describe("the settings route", () => {
     await waitFor(() => expect(where(view)).toBe("/settings/home/general"));
     await waitFor(() => expect(rows(view)).toContain("Maintenance"));
     expect(rows(view)).toEqual(["General", "People", "Search", "Integrations", "AI", "Storage and backups", "Maintenance", "Privacy"]);
-    expect(within(view.container).getByRole("heading", { level: 1, name: "General" })).toBeTruthy();
+    expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
   });
 
   test("a section the viewer may not see replaces to the first visible one, naming nothing", async () => {
@@ -100,6 +105,8 @@ describe("the settings route", () => {
     await waitFor(() => expect(rows(view)).toContain("Keyboard shortcuts"));
     expect(where(view)).toBe("/settings/chat");
     expect(view.getByRole("searchbox", { name: "Search" })).toBeTruthy();
+    expect(column(view).inert).toBe(false);
+    expect(view.queryByRole("button", { name: /settings sidebar/ })).toBeNull();
   });
 
   test("an arrow row opened directly goes where it points", async () => {
@@ -112,6 +119,36 @@ describe("the settings route", () => {
     await waitFor(() => expect(rows(view)).toContain("Memories"));
     const memories = within(column(view)).getByRole("link", { name: /Memories/ });
     expect(memories.getAttribute("href")).toBe("/people/person-adult?tab=memories");
+  });
+
+  test("Back to app returns to the remembered app route, falling back to Chat", async () => {
+    window.sessionStorage.setItem("maipai.settings.last-app-route", "/status?tab=system");
+    const remembered = open(makePerson("adult"), "/settings/chat/general");
+    const back = await remembered.findByRole("link", { name: "Back to app" });
+    expect(back.getAttribute("href")).toBe("/status?tab=system");
+    fireEvent.click(back);
+    await waitFor(() => expect(where(remembered)).toBe("/status?tab=system"));
+
+    cleanup();
+    fixture!.restore();
+    window.sessionStorage.clear();
+    const fallback = open(makePerson("adult"), "/settings/chat/general");
+    const fallbackLink = await fallback.findByRole("link", { name: "Back to app" });
+    expect(fallbackLink.getAttribute("href")).toBe("/chat");
+    fireEvent.click(fallbackLink);
+    await waitFor(() => expect(where(fallback)).toBe("/chat"));
+  });
+
+  test("the desktop hide control, content-header control, and Cmd/Ctrl+B share the remembered state", async () => {
+    window.localStorage.removeItem("maipai.chat.rail-collapsed");
+    const view = open(makePerson("adult"), "/settings/chat/general");
+    const columnToggle = await view.findByRole("button", { name: "Hide settings sidebar" });
+    fireEvent.click(columnToggle);
+    await waitFor(() => expect(view.getByRole("button", { name: "Show settings sidebar" })).toBeTruthy());
+    expect(window.localStorage.getItem("maipai.chat.rail-collapsed")).toBe("1");
+    fireEvent.keyDown(window, { key: "b", metaKey: true });
+    await waitFor(() => expect(view.getByRole("button", { name: "Hide settings sidebar" })).toBeTruthy());
+    expect(window.localStorage.getItem("maipai.chat.rail-collapsed")).toBe("0");
   });
 });
 
@@ -176,9 +213,9 @@ describe("what the page asks for", () => {
   });
 
   test("a #<key> deep link scrolls to the row and focuses its control", async () => {
-    const view = open(makePerson("adult"), "/settings/chat/general#chat.photo_uploads");
+    open(makePerson("adult"), "/settings/chat/general#chat.photo_uploads");
     await waitFor(() => {
-      const row = view.container.querySelector('[data-setting-key="chat.photo_uploads"]');
+      const row = document.body.querySelector('[data-setting-key="chat.photo_uploads"]');
       expect(row).toBeTruthy();
       expect(row!.contains(document.activeElement)).toBe(true);
     });
