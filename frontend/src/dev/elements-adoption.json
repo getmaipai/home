@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-07T08:10:03.629Z",
-  "kitTag": "ui-v0.5.158",
+  "generatedAt": "2026-10-07T08:18:29.303Z",
+  "kitTag": "ui-v0.5.159",
   "items": [
     {
       "file": "ProjectHomePageShowcase.tsx",
@@ -762,7 +762,7 @@
       "group": "errors/states",
       "verdict": "wire-after",
       "verdictReason": "Deferred until none beyond existing storage overview.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "quote-reply.tsx",
