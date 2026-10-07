@@ -3992,7 +3992,7 @@ describe("ChatPage (DICT-01: the mic button's not-installed state)", () => {
 // (`ComposerExtraEnd`, commons ui-v0.5.36) mounts `ComposerVoiceControls`
 // (composerVoiceControls.tsx, already built and unit-tested on its own)
 // - this describe covers the item's own acceptance line: "the waveform
-// renders in the composer on /next/chat when stt and tts are both ready
+// renders in the composer on /chat when stt and tts are both ready
 // and is absent otherwise."
 describe("ChatPage (VOICE-LIVE-01: the composer's voice-conversation trigger)", () => {
   function stubDictationFetch(sttTtsReady: boolean): () => void {

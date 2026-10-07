@@ -43,7 +43,7 @@ export interface LiveVoiceSessionProps {
   onOpenChange: (open: boolean) => void;
   turnSchedulerRef: { current: SentenceSpeechScheduler | null };
   liveVoiceActiveRef: { current: boolean };
-  spokenNextRef: { current: boolean };
+  pendingSpeechRef: { current: boolean };
   /** sttDictationAdapter.ts's own established shape: `createSttSocket`
    * (the default, real `WS /api/stt/stream`) or `createMockSttSocket`
    * with a fixture in a test - this file never knows or cares which. */
@@ -68,7 +68,7 @@ export interface LiveVoiceSessionProps {
   speakingEndedAt: number;
 }
 
-export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
+export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
   const aui = useAui();
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
@@ -161,7 +161,7 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
               break;
             }
             setMode("thinking");
-            spokenNextRef.current = true;
+            pendingSpeechRef.current = true;
             aui.composer.setText(text);
             void Promise.resolve(aui.composer.send());
             break;
@@ -201,7 +201,7 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
       levelMeter?.stop();
       socket.close();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- aui/onOpenChange/spokenNextRef are stable refs/client accessors; listenGeneration is the deliberate re-run trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- aui/onOpenChange/pendingSpeechRef are stable refs/client accessors; listenGeneration is the deliberate re-run trigger.
   }, [open, listenGeneration]);
 
   // The speaking half of the loop: chatModelAdapter.ts's own scheduler

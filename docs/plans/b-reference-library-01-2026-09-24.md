@@ -41,7 +41,7 @@ file in a separate process before it joins the library" - same
 principle, a ZIM applies).
 
 **Updates rows**: `frontend/src/apps/settings/UpdatesSection.tsx` and
-`frontend/src/next/pages/NextUpdatesPage.tsx` are the existing pattern
+`frontend/src/shell/pages/UpdatesPage.tsx` are the existing pattern
 for a pending-update row - a reference set's own update (Kiwix ships a
 new snapshot date) shows there the same way an engine or model update
 does. Read both files' existing row shape before adding a new kind

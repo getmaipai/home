@@ -354,7 +354,7 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
 // rather than a message/part-scoped one (`ConfirmAskAnswerContext`'s own
 // doc comment has the live "Composer is not available" failure this
 // fixed). `askAnswerRef` is armed here, synchronously, before the
-// composer send - the same single-shot shape `spokenNextRef` already
+// composer send - the same single-shot shape `pendingSpeechRef` already
 // uses for VOICE-LIVE-02's live voice session; `chatModelAdapter.ts`'s
 // own `consumeAskAnswer()` reads AND resets it.
 export function ConfirmAskAnswerProvider({ askAnswerRef, children }: { askAnswerRef: MutableRefObject<{ turnId: string; approved: boolean } | undefined>; children: ReactNode }) {

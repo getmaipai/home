@@ -5,7 +5,7 @@
 // dictation look). Mounted as ChatPage.tsx's own
 // `ComposerInputOverride` (VOICE-LIVE-04b, ui-v0.5.40 - the vendored
 // kit's own slot cut for exactly this, `elements/thread.aui.tsx`'s own
-// Composer; /next/chat's real composer lives there, never in this
+// Composer; /chat's real composer lives there, never in this
 // repo's own apps/chat/thread.aui.tsx).
 //
 // The row's own first plan named `react-audio-visualize`'s

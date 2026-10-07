@@ -15,7 +15,7 @@ to the title, like the notification bell's badge. Research (already done,
 not yours to redo): use the shipped `Badge` primitive
 (`@maipai/ui/src/dashboard/components/ui/badge`, already used the same way
 in `Notifications.tsx`'s dropdown body and imported elsewhere in this repo's
-`NextChatPage.tsx`), not a hand-rolled count. Tabs stay tabs (no change to
+`ChatPage.tsx`), not a hand-rolled count. Tabs stay tabs (no change to
 the People/Pets/Bots grouping itself, that question was separately
 resolved to keep the current structure).
 
@@ -23,8 +23,8 @@ resolved to keep the current structure).
 
 `~/Developer/github.com/getmaipai/home-codex-2` (your own worktree, already
 on `main` from FAMILY-TABS-01 landing):
-- `frontend/src/next/pages/NextFamilyPage.tsx`
-- its test file (`NextFamilyPage.test.tsx`)
+- `frontend/src/shell/pages/FamilyPage.tsx`
+- its test file (`FamilyPage.test.tsx`)
 
 Nothing else. Don't touch `commons`, `scripts/`, or any pin.
 
@@ -36,7 +36,7 @@ anything landed since your last commit, including this plan file).
 
 ## Steps
 
-1. Read the current `NextFamilyPage.tsx` you just built. The three queries
+1. Read the current `FamilyPage.tsx` you just built. The three queries
    (`peopleQuery`/`rosterQuery`, check its actual name, , `petsQuery`,
    `botsQuery`) currently gate `petsQuery`/`botsQuery` with `enabled:
    activeTab === "pets"` / `"bots"` (lazy, only the open tab fetches).
@@ -51,7 +51,7 @@ anything landed since your last commit, including this plan file).
    `activeTab` anymore, so a non-admin's `botsQuery` should stay disabled
    entirely, not just hidden).
 2. Add a `Badge` (import from `@maipai/ui/src/dashboard/components/ui/badge`,
-   mirror exactly how `Notifications.tsx` line ~56 or `NextChatPage.tsx`
+   mirror exactly how `Notifications.tsx` line ~56 or `ChatPage.tsx`
    line ~37 already import and use it, same package, same component, no
    new primitive) next to each `TabsTrigger`'s label: `People
    <Badge>{count}</Badge>`, `Pets <Badge>{count}</Badge>`, and `Bots
@@ -66,7 +66,7 @@ anything landed since your last commit, including this plan file).
    a smaller variant only if the default one looks obviously oversized
    next to the existing tab label styling (`min-h-12 min-w-12` etc.), 
    judge this from a real screenshot, not by assumption.
-3. Update `NextFamilyPage.test.tsx`: existing tests that assert on tab
+3. Update `FamilyPage.test.tsx`: existing tests that assert on tab
    label text (e.g. `getByRole("tab", { name: "People" })`) may need their
    matcher loosened (a regex or `{ name: /People/ }`) once a badge number
    is appended to the accessible name, check and fix any that break.
@@ -85,7 +85,7 @@ anything landed since your last commit, including this plan file).
   legible and not visually broken against the tab label. Open and judge
   the image yourself before reporting done, don't just assert the code
   compiles.
-- `bun test src/next/pages/NextFamilyPage.test.tsx` green, including the
+- `bun test src/shell/pages/FamilyPage.test.tsx` green, including the
   new badge-count test.
 - `bash scripts/check.sh` green, scope noted.
 
@@ -95,7 +95,7 @@ anything landed since your last commit, including this plan file).
 - Code review at `low` effort (a small, mechanical UI addition to a file
   already reviewed at medium for FAMILY-TABS-01) with an explicit target
   (`main...HEAD` in your worktree).
-- One commit, staged by name (`NextFamilyPage.tsx`, its test file, list
+- One commit, staged by name (`FamilyPage.tsx`, its test file, list
   them explicitly).
 - Push once green.
 

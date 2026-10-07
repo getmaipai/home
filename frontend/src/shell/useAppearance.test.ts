@@ -50,7 +50,7 @@ describe("useAppearance", () => {
   });
 
   // HOME-UI-04b: "system" always resolves to a concrete class now, not
-  // neither - found live on /next/apps, the vendored shadcndashboard
+  // neither - found live on /apps, the vendored shadcndashboard
   // template's own `dark:*` Tailwind utilities are gated by this
   // project's `@custom-variant dark (&:is(.dark *))`, which needs a
   // literal `.dark` ancestor and never matches the OS-level

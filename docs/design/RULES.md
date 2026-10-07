@@ -14,7 +14,7 @@ supersedes.
 Record: [the thin chat path](../plans/chat-thin-path-2026-10-02.md),
 accepted 2026-10-02.
 
-Governs: backend/src/lib/turnMachine/**, backend/src/lib/turnEngine.ts, backend/src/lib/llm.ts, backend/src/lib/composer.ts, backend/src/lib/conversationHistory.ts, backend/src/lib/packageHost.ts, backend/src/lib/wellFormed.ts, backend/src/lib/register.ts, backend/src/lib/modelCatalog.ts, backend/src/routes/turn.ts, backend/packages/websearch/**, frontend/src/apps/chat/**, frontend/src/next/pages/NextChatPage.tsx
+Governs: backend/src/lib/turnMachine/**, backend/src/lib/turnEngine.ts, backend/src/lib/llm.ts, backend/src/lib/composer.ts, backend/src/lib/conversationHistory.ts, backend/src/lib/packageHost.ts, backend/src/lib/wellFormed.ts, backend/src/lib/register.ts, backend/src/lib/modelCatalog.ts, backend/src/routes/turn.ts, backend/packages/websearch/**, frontend/src/apps/chat/**, frontend/src/shell/pages/ChatPage.tsx
 
 Each rule overrides any earlier design, plan or backlog item that says
 otherwise. A change that breaks one is a defect, whatever older document
@@ -270,7 +270,7 @@ expands (S1 below). Owner-approved 2026-10-06: the app settings design
 drawer, S2 phone layout, S3 widths); they supersede the earlier S1
 profile-menu list and the "every width" wording.
 
-Governs: frontend/src/next/**, frontend/src/apps/**
+Governs: frontend/src/shell/**, frontend/src/apps/**
 
 S1. **The main navigation is permanent.** The column that lists the apps
     (Home, Chat, Library, Family today; more apps later) is present on

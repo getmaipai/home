@@ -61,7 +61,7 @@ function inheritedRow(inherited: { files: number; bytes: number }): PersonUsageR
   };
 }
 
-/** /next/storage (STORE-PAGE-01, docs/BACKLOG.md): each person's usage
+/** /storage (STORE-PAGE-01, docs/BACKLOG.md): each person's usage
  * against their cap, the household total against its cap, the largest
  * kinds per person, and the cap controls for an admin - composed
  * entirely from the template's `Card`/`DataTable` and the settings

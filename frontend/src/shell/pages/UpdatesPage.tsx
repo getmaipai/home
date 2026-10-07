@@ -9,7 +9,7 @@ import { rowsFrom, hasUpdate, type UpdateRow } from "@/apps/settings/updatesData
 import { api, ApiError, isOwnerOrAdminRole, type UpdateProjection, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
-/** /next/updates: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
+/** /updates: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/updates` through Home's
  * shared table, reusing `updatesData.ts`'s own `rowsFrom()`/
  * `hasUpdate()` (exported, pure data logic) rather than a second

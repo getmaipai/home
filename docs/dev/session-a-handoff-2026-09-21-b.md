@@ -6,7 +6,7 @@ and start only on its start message.
 
 **Restart line**: read this file, then
 [docs/plans/shell-on-shadcndashboard-2026-09-21.md](../plans/shell-on-shadcndashboard-2026-09-21.md)'s
-wiring table (the `/next/chat` row), then
+wiring table (the `/chat` row), then
 `../../commons-a/ui/docs/dashboard-upstream.md`'s "A real version-skew
 risk did surface" section for the full mechanical trail of what's
 already been tried and ruled out.
@@ -17,7 +17,7 @@ Two commits on `home-a2` (worktree, branch `a/settings-redesign`):
 
 - `3401ecb5` - re-pinned `@maipai/ui` to `ui-v0.5.6` (the sidebar CSS
   fix and the second missed Buy Now upsell removal); wired `ui.look`
-  into `/next` via a new `useNextLook`, sharing `useLook`'s resolution
+  into `/` via a new `useShellLook`, sharing `useLook`'s resolution
   (`useLookValue`, `@/shell/useLook.ts`) rather than duplicating the
   query/type/guard - a review finding, fixed before commit; and fixed
   a real screenshot-capture bug in `scripts/screenshot.ts`
@@ -30,7 +30,7 @@ Two commits on `home-a2` (worktree, branch `a/settings-redesign`):
   taking a plain screenshot instead - avoids the stitch entirely, no
   app-code change was needed.
 - `93fb414d` - the 40 acceptance captures themselves
-  (`docs/assets/screens/next-standup/`), each opened and judged before
+  (`docs/assets/screens/-standup/`), each opened and judged before
   the commit.
 
 Full `scripts/check.sh` is green on `3401ecb5` (502 frontend tests
@@ -45,7 +45,7 @@ Settings page (Settings > System, the "General" group,
 `frontend/src/apps/settings/SettingsPage.tsx`) via the generic
 renderer, once expert-level settings are visible for his account. No
 UI wiring was skipped; this is the one definition, one renderer.
-Toggling it on there flips `/next` live for the household. The direct
+Toggling it on there flips `/` live for the household. The direct
 API form, if expert level isn't surfaced yet:
 `PUT /api/settings` with body
 `{"scope":"household","key":"ui.shell.next","value":true}`.
@@ -92,7 +92,7 @@ version, run Home's full frontend suite (`bun test` in `frontend/`,
 502 tests as of this hand-off - the 18-failure signature from the
 earlier attempts is exactly what a real desync still looks like), fix
 whatever the new major/minor actually breaks in the wrappers
-themselves (not just the version string), then wire `/next/chat` on
+themselves (not just the version string), then wire `/chat` on
 the Elements' `Thread` with a mock `useLocalRuntime` + canned
 `ChatModelAdapter` (assistant-ui's own docs-site pattern - not a
 registry item, Home writes this glue itself) per the stand-up's
@@ -101,7 +101,7 @@ original ask. The old chat (flag off) must keep working throughout;
 switch, not as part of this item.
 
 **Acceptance**: one kit tag (`ui-v0.5.7` or later), one Home commit;
-full `home` suite green with the flag both on and off; `/next/chat`
+full `home` suite green with the flag both on and off; `/chat`
 screenshot (1440 and 390, both themes) opened and judged the same way
 this hand-off's own captures were, showing a real empty-state thread
 against the mock runtime, nothing Home-drawn.

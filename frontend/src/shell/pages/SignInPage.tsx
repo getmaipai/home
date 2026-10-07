@@ -11,7 +11,7 @@ import { useProfileSignIn } from "@/kit/hooks/useProfileSignIn";
 import { api, ApiError, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
-/** /next/sign-in: SHELL-08's own row (docs/plans/shell-on-shadcndashboard-
+/** /sign-in: SHELL-08's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - the real profile picker and secret entry
  * (`GET /api/auth/profiles`, `POST /api/auth/select`,
  * `POST /api/auth/verify-secret`), composed from the template's own auth

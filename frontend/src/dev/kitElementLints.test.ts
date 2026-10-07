@@ -105,7 +105,7 @@ describe("className overrides on kit Elements (ELEMENTS-LINT-02)", () => {
 
   test("the scanner flags a seeded override and leaves tokens, colors and placement alone", () => {
     const findings = classNameOverrideFindings(SRC, {
-      "next/fixture.tsx": `
+      "shell/fixture.tsx": `
         import { CanvasSplit, CanvasSplitBody } from "@maipai/ui/src/elements/canvas-split";
         import { Button } from "@maipai/ui/src/ui/button";
         import { Card } from "@maipai/ui/src/dashboard/components/ui/card";

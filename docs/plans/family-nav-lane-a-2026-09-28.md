@@ -42,7 +42,7 @@ to make, just a different edit.
     hand-edited)
   - `docs/BACKLOG.md` (tick FAMILY-NAV-01, see step 5)
 
-Do not touch anything under `home/frontend/src/next/` or
+Do not touch anything under `home/frontend/src/shell/` or
 `home/frontend/src/shell/` - that's FAMILY-TABS-01's lane (codex-b),
 running in parallel in `home-codex-2`. Do not touch any other pin in
 `scripts/check.sh` or either `package.json` (core, spec) - only the
@@ -68,12 +68,12 @@ over it.
    writing; re-read the file, don't trust the line numbers if the file
    has moved). Two edits:
    - Delete the whole "Tools" item object (the one with `name: "Tools"`,
-     `url: "/next/tools"`, and its header comment about "internal
+     `url: "/tools"`, and its header comment about "internal
      tool-capability plugins" / the `ui-v0.5.62` ruling) from the
      "Home" heading's `items` array.
    - In the "Household" heading's `items` array, change the "People"
      item's `name: "People"` to `name: "Family"`. Leave its `url:
-     "/next/people"` and `icon: Users` unchanged - FAMILY-TABS-01
+     "/people"` and `icon: Users` unchanged - FAMILY-TABS-01
      keeps the route path as-is, only the label changes here.
    - The file's own header comment (around lines 41-55, "Manage routes
      ... Labels and routes only - the template's own nav-items/Sidebar

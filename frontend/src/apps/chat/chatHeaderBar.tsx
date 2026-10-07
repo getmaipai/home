@@ -146,7 +146,7 @@ export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boole
 
   // Non-chat pages never call useSetChatHeaderData at all (they don't
   // import this file), so this is only ever null for one real reason:
-  // /next/chat itself hasn't finished its own first render yet. Nothing
+  // /chat itself hasn't finished its own first render yet. Nothing
   // to show for that one frame - the shipped Search field is what a
   // person would otherwise briefly see instead, and swapping between
   // the two on every mount would be its own small defect.

@@ -73,23 +73,23 @@ exactly as they are, do not invent a parallel one:
 ## Files you own
 
 All in `home-codex-2` (your worktree of `home`):
-- `frontend/src/next/pages/NextPeoplePage.tsx` - **rename** to
-  `frontend/src/next/pages/NextFamilyPage.tsx`, function renamed
-  `NextFamilyPage` (keep `PersonCard` as an internal helper, unchanged
+- `frontend/src/shell/pages/PeoplePage.tsx` - **rename** to
+  `frontend/src/shell/pages/FamilyPage.tsx`, function renamed
+  `FamilyPage` (keep `PersonCard` as an internal helper, unchanged
   except whatever wrapping the tabs need).
-- `frontend/src/next/pages/NextAppsPage.tsx` - delete.
-- `frontend/src/next/NextRoutes.tsx` - remove the `NextAppsPage`
+- `frontend/src/shell/pages/AppsPage.tsx` - delete.
+- `frontend/src/shell/Routes.tsx` - remove the `AppsPage`
   import and its `<Route path="tools" .../>`; remove `"/tools":
-  "Tools"` from `titleByPath`; update the `NextPeoplePage` import and
-  `<Route path="people" element={<NextPeoplePage .../>} />` line to
-  `NextFamilyPage` (**keep the route path string `"people"` and the URL
-  `/next/people` exactly as they are** - FAMILY-NAV-01 already points
+  "Tools"` from `titleByPath`; update the `PeoplePage` import and
+  `<Route path="people" element={<PeoplePage .../>} />` line to
+  `FamilyPage` (**keep the route path string `"people"` and the URL
+  `/people` exactly as they are** - FAMILY-NAV-01 already points
   the sidebar's Family label at that same URL; don't rename the route,
   only the component); update `titleByPath`'s `"/people": "People"` to
   `"/people": "Family"`.
 - `frontend/src/App.tsx` - remove the `<Route path="/apps"
-  element={<LegacyNextRedirect />} />` line.
-- `frontend/src/next/LegacyNextRedirect.tsx` - remove the `"/apps":
+  element={<LegacyShellRedirect />} />` line.
+- `frontend/src/shell/LegacyShellRedirect.tsx` - remove the `"/apps":
   "/tools"` line from the `aliases` map.
 - `frontend/src/shell/nav.ts` - remove the `{ to: "/apps", icon:
   "layout-grid", label: "Apps" }` entry from `NAV_ENTRIES`; change `{
@@ -121,8 +121,8 @@ All in `home-codex-2` (your worktree of `home`):
 - `frontend/src/apps/library/appPresentation.ts` - **do not touch.**
   The Explore pass that scoped this item flagged this file as sharing
   a "companion" kind label with the Tools listing; confirm with `grep
-  -rn NextAppsPage frontend/src` that nothing except the route and the
-  page file itself imports `NextAppsPage` before you delete it, and if
+  -rn AppsPage frontend/src` that nothing except the route and the
+  page file itself imports `AppsPage` before you delete it, and if
   `appPresentation.ts` turns out to be used only by the page you're
   deleting, say so in your done report rather than deleting it
   yourself - it's also read by `frontend/src/apps/library/` (the
@@ -153,17 +153,17 @@ question instead of merging over it).
 
 ## Steps
 
-1. Read `frontend/src/next/pages/NextPersonProfilePage.tsx` (already
+1. Read `frontend/src/shell/pages/PersonProfilePage.tsx` (already
    open in the exploration that scoped this item, lines 1-50) for the
    exact `Tabs`/`useSearchParams` pattern to mirror: `activeTab`
    derived from `params.get("tab")`, an `onTabChange` that sets or
    deletes the `tab` param (`replace: true`), one tab with no query
    param (the default, "people") and the others named explicitly
-   ("pets", "bots"). Also skim `NextSettingsPage.tsx` lines 75-103 for
+   ("pets", "bots"). Also skim `SettingsPage.tsx` lines 75-103 for
    how conditionally-shown `TabsTrigger`s look (`Bots` is
    role-conditional per the "Why" section above; `People` and `Pets`
    are not).
-2. Rename `NextPeoplePage.tsx` to `NextFamilyPage.tsx`. Wrap its
+2. Rename `PeoplePage.tsx` to `FamilyPage.tsx`. Wrap its
    existing return value (the `AsyncState`-wrapped grid, unchanged) in
    a `Tabs` with three triggers: "People" (default/no query param),
    "Pets", and "Bots" (only rendered when
@@ -199,21 +199,21 @@ question instead of merging over it).
    entries today, or whether `AsyncState` needs an explicit empty
    message prop - match its existing convention, don't invent new copy
    style).
-5. `NextRoutes.tsx`, `App.tsx`, `LegacyNextRedirect.tsx`, `nav.ts`,
+5. `Routes.tsx`, `App.tsx`, `LegacyShellRedirect.tsx`, `nav.ts`,
    `appCatalog.ts`, `routeHeader.ts`, `search/providers.ts`: the exact
    edits are listed under "Files you own" above. Delete
-   `NextAppsPage.tsx` last, after confirming (per that section) nothing
+   `AppsPage.tsx` last, after confirming (per that section) nothing
    else imports it.
-6. Fix `NextPersonProfilePage.tsx`'s "Back to People" link (around
+6. Fix `PersonProfilePage.tsx`'s "Back to People" link (around
    line 68 as of the exploration pass - re-read to confirm) to read
    "Back to Family".
-7. `PeopleCountCard.tsx` (`frontend/src/next/pages/dashboard/`) stays
+7. `PeopleCountCard.tsx` (`frontend/src/shell/pages/dashboard/`) stays
    "People" - it's a count of household *people* specifically, not the
    Family section's label, and is out of scope for this item. Don't
    touch it.
-8. Existing tests: `grep -rln NextPeoplePage frontend/src --include
+8. Existing tests: `grep -rln PeoplePage frontend/src --include
    "*.test.tsx"` and update every hit to the new name and behavior
-   (there is very likely a `NextPeoplePage.test.tsx` or similar to
+   (there is very likely a `PeoplePage.test.tsx` or similar to
    rename alongside the component and extend with tab coverage - match
    its existing structure, don't invent a new test harness). Add
    coverage for: the People tab's existing grid still renders

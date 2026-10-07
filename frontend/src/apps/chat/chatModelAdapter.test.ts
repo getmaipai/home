@@ -546,7 +546,7 @@ describe("createChatModelAdapter streaming", () => {
 });
 
 // SHELL-02: the reasoning Element (thread.aui.tsx) has an actual mount
-// point now (/next/chat), so the `reasoning` wire event (REASONING-01)
+// point now (/chat), so the `reasoning` wire event (REASONING-01)
 // stops being discarded client-side and becomes its own
 // ReasoningMessagePart alongside the reply text.
 describe("createChatModelAdapter reasoning (SHELL-02)", () => {

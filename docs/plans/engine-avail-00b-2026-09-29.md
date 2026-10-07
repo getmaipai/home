@@ -27,15 +27,15 @@ it works again with no reload.
 
 - The state already exists: `ChatAvailabilityContext` and `useChatAvailability` in
   `frontend/src/apps/chat/useChatAvailability.ts`; the page provides it around
-  everything it renders (`NextChatPage.tsx`, the `ChatAvailabilityContext.Provider`
-  in `NextChatPage`'s return). Both `NextThreadList` instances (the sheet at about
+  everything it renders (`ChatPage.tsx`, the `ChatAvailabilityContext.Provider`
+  in `ChatPage`'s return). Both `ThreadList` instances (the sheet at about
   line 2370 and the rail at about line 2783) render inside that provider.
-- `NextThreadList` (`NextChatPage.tsx` about line 1332) renders
+- `ThreadList` (`ChatPage.tsx` about line 1332) renders
   `<ThreadListNew className="min-h-12" onClick={onNewThread} />`. The shipped
   `ThreadListNew` (`@maipai/ui/src/elements/thread-list.aui.tsx` line 222) spreads
   its props onto the kit `Button`, so a `disabled` prop reaches the button. Pass
   it; do not edit the kit or `node_modules`.
-- The shortcut lives in `frontend/src/next/pages/chatShortcuts.ts`:
+- The shortcut lives in `frontend/src/shell/pages/chatShortcuts.ts`:
   `registerChatShortcuts({ aui, isRunning, setReferenceOpen })` handles
   Cmd/Ctrl+Shift+O with `aui.threads.switchToNewThread()` (line 25 to 27). Its
   caller is `ChatShortcutReference.tsx`. Add an `unavailable: boolean` input that
@@ -50,10 +50,10 @@ it works again with no reload.
 2. Make `registerChatShortcuts` take `unavailable` and pass it from
    `ChatShortcutReference.tsx`, which reads `ChatAvailabilityContext` (check where
    the component is mounted relative to the provider; if it sits outside, pass the
-   value down from `NextChatPage` instead, and say which in the report).
-3. In `NextThreadList`, read `ChatAvailabilityContext` and pass
+   value down from `ChatPage` instead, and say which in the report).
+3. In `ThreadList`, read `ChatAvailabilityContext` and pass
    `disabled={availability === "unavailable"}` to `ThreadListNew`.
-4. Component test in `NextChatPage.test.tsx`, mirroring the test ENGINE-AVAIL-00
+4. Component test in `ChatPage.test.tsx`, mirroring the test ENGINE-AVAIL-00
    added there: with health reporting the chat engine `blocked`, the New thread
    button is disabled; existing thread items are not.
 5. Docs, same commit: extend the `docs/dev.md` "ENGINE-AVAIL-00" section by one
@@ -65,8 +65,8 @@ it works again with no reload.
 ## Files
 
 Yours: `chatShortcuts.ts` and its test, `ChatShortcutReference.tsx`,
-`NextChatPage.tsx` (the `NextThreadList` change only, and a prop pass if step 2
-needs it), `NextChatPage.test.tsx`, the two doc lines. Forbidden: `backend/`,
+`ChatPage.tsx` (the `ThreadList` change only, and a prop pass if step 2
+needs it), `ChatPage.test.tsx`, the two doc lines. Forbidden: `backend/`,
 `@maipai/ui`, lockfiles, `package.json`, `scripts/`.
 
 ## Rules you have broken before

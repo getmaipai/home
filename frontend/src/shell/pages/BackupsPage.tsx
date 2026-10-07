@@ -10,7 +10,7 @@ import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type BackupInfo, type PendingRestore, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
-/** /next/backups: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
+/** /backups: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/backups` through Home's
  * shared table: date and size, the same two fields `BackupsSection.tsx`
  * shows per row, plus the real "ready to restore" banner

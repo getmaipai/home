@@ -145,7 +145,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   };
 
   return (
-    // CHAT-HEADER-01: wraps every /next page (a Route element, never a
+    // CHAT-HEADER-01: wraps each root app page (a Route element, never a
     // per-page one) since FullLayout's own Header - where ChatHeaderBar
     // actually renders (a sibling of this Outlet, not a descendant) -
     // needs the SAME provider instance ChatPage writes into.
@@ -219,8 +219,8 @@ function SignedOutRoutes({ onSignedIn }: { onSignedIn: () => void }) {
       <Route path="sign-in" element={<BlankLayout />}>
         <Route index element={<SignInPage onSignedIn={onSignedIn} />} />
       </Route>
-      {/* Any other /next/* path while signed out (including bare
-          /next) lands on the sign-in screen, not a blank no-match -
+      {/* Any other /* path while signed out (including bare
+          the preview route lands on the sign-in screen, not a blank no-match -
           the same "nothing renders before someone is signed in"
           posture the old shell's own SignIn.tsx documents. */}
       <Route path="*" element={<Navigate to="/sign-in" replace />} />

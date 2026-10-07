@@ -55,7 +55,7 @@ describe("PageHeaderTitle", () => {
     });
   }
 
-  // /next/chat itself IS in SidebarContent (it's the real "Chat" nav
+  // /chat itself IS in SidebarContent (it's the real "Chat" nav
   // entry) - this component would correctly answer for it too, it
   // just never actually mounts there in the real app (Routes.tsx
   // keeps chat a true sibling route, never wrapped by

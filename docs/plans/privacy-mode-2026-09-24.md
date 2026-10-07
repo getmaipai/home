@@ -47,7 +47,7 @@ asterisk.
   call is to turn it off entirely instead, which is both simpler to
   build and more honest (a companion normally built on continuity
   appearing with none of that continuity is its own kind of confusing).
-  `NextChatPage.tsx` already has `ADMIN-COMPARE-01`'s "bare mode" - the
+  `ChatPage.tsx` already has `ADMIN-COMPARE-01`'s "bare mode" - the
   persona/voice layer stripped, the bare-floor reply served as-is,
   today used for comparison/measurement. Incognito reuses that same
   mechanism rather than inventing a second way to turn the companion
@@ -199,7 +199,7 @@ settled" above); **entering Incognito mid-conversation always starts
 blank**, no offer to continue context privately; **minors are allowed
 by default**, no adult-only floor inherited from Temporary chat (a
 real change from today's behavior - this needs its own look at
-`NextChatPage.tsx`'s existing role-vs-birthdate gating gap, since
+`ChatPage.tsx`'s existing role-vs-birthdate gating gap, since
 "allowed by default" for Incognito while chat itself still gates
 Temporary chat to non-minors is a real inconsistency to resolve, not
 just leave standing).

@@ -84,18 +84,18 @@ Elements use).
 ## Step 1: the visual stand-up (one session-day, no wiring)
 
 Behind one household setting, `ui.shell.next` (a spec key, off by
-default; it governs the chat too, there is no separate chat flag), a second route tree at `/next/*` mounts the template's
+default; it governs the chat too, there is no separate chat flag), a second route tree at `/*` mounts the template's
 FullLayout with Home's sidebar items as data (Home, Chat, Apps;
 Household: People; System: Settings; Manage: Engines, Updates,
 Repairs, Backups; the labels and routes only), and the template's
-views on their own demo data: `/next` the dashboard, `/next/apps` the
-data-tables view, `/next/people` the user-profile and tables views,
-`/next/settings` the form-layouts view under tabs, `/next/sign-in`
-the auth view, `/next/chat` the Elements thread with the mock runtime
+views on their own demo data: `/` the dashboard, `/apps` the
+data-tables view, `/people` the user-profile and tables views,
+`/settings` the form-layouts view under tabs, `/sign-in`
+the auth view, `/chat` the Elements thread with the mock runtime
 the Elements ship for demos, with reasoning, a tool call, sources and
 an artifact-card that opens canvas-split. The old routes and the old
 shell are untouched. Acceptance: at 8787 with the setting on, every
-`/next` route renders the template's page in both looks and both
+`/` route renders the template's page in both looks and both
 themes; captures at 1440 and 390 of each, opened and judged for one
 thing only, that nothing on them is Home-drawn; the kit tag (ui-v0.5.0)
 carries the vendored snapshot, NOTICE, the upstream note and the two
@@ -107,16 +107,16 @@ One item per row, each swapping a demo data source for Home's and
 keeping the template's page as shipped. The table is filled in as
 each lands.
 
-| /next route | Template view or Element | Data source to wire | Old file it retires |
+| / route | Template view or Element | Data source to wire | Old file it retires |
 |---|---|---|---|
-| `/next` | modern dashboard (KPI cards, charts, recent list) | engines status, updates, repairs, people, activity | `frontend/src/apps/home/*`, the dashboard blocks in the kit |
-| `/next/chat` | Elements: thread, thread-list-sidebar, composer family, reasoning, tool-call, sources, artifact-card, canvas-split, orb, read-aloud | the existing model, history, thread-list, suggestion, attachment, dictation adapters; the artifact record | `apps/chat/thread.aui.tsx`, `chatDocumentPane.tsx`, the kit's `.aui` files |
-| `/next/apps` | data-tables view (`DataTable`) | packages list (`GET /api/plugins`); real Remove landed `NEXTTABLE-ACTIONS-01` (2026-09-27, `docs/BACKLOG.md`), install stays on the old route | not yet - `apps/library/AppsPage.tsx` still owns install, `ThingsTable` retires once it does |
-| `/next/people` | user-profile (own profile card), data-tables (`DataTable`) | the household (`GET /api/people`); the signed-in person's own profile only (see the row's own named gap below) | not yet - viewing another person's own profile and the Memories tab still need `apps/people/*`, `apps/memories/*` |
-| `/next/settings` | form-layouts in tabs and cards (`Tabs`, `Card`) | the settings registry (`GET /api/settings/registry`, `GET`/`PUT`/`reset /api/settings`) by section and scope; every other management page stays on the old route (see the row's own named gap below) | not yet - only the registry-driven inline keys moved, `apps/settings/*` still owns every dedicated management page |
-| `/next/engines` | data-tables (`DataTable`) | `GET /api/engines`, `GET /api/engines/health` (HOME-STACK-04a) - roles by address, engine state, health severities; actions (start/stop/restart, a role switch) stay on the old surface (see the row's own named gap below) | none (new) |
-| `/next/updates`, `/next/repairs`, `/next/backups` | data-tables (`DataTable`) | `GET /api/updates`, `/api/repairs`, `/api/backups`; real apply/rollback, fix/dismiss and run/restore/cancel landed `NEXTTABLE-ACTIONS-02/03/04` (2026-09-27, `docs/BACKLOG.md`) | not yet - the three old pages are unused by `/next` now but not yet deleted (SHELL-09) |
-| `/next/sign-in` | auth view | Home's sign-in and passkeys | `apps/auth/*` |
+| `/` | modern dashboard (KPI cards, charts, recent list) | engines status, updates, repairs, people, activity | `frontend/src/apps/home/*`, the dashboard blocks in the kit |
+| `/chat` | Elements: thread, thread-list-sidebar, composer family, reasoning, tool-call, sources, artifact-card, canvas-split, orb, read-aloud | the existing model, history, thread-list, suggestion, attachment, dictation adapters; the artifact record | `apps/chat/thread.aui.tsx`, `chatDocumentPane.tsx`, the kit's `.aui` files |
+| `/apps` | data-tables view (`DataTable`) | packages list (`GET /api/plugins`); real Remove landed `NEXTTABLE-ACTIONS-01` (2026-09-27, `docs/BACKLOG.md`), install stays on the old route | not yet - `apps/library/AppsPage.tsx` still owns install, `ThingsTable` retires once it does |
+| `/people` | user-profile (own profile card), data-tables (`DataTable`) | the household (`GET /api/people`); the signed-in person's own profile only (see the row's own named gap below) | not yet - viewing another person's own profile and the Memories tab still need `apps/people/*`, `apps/memories/*` |
+| `/settings` | form-layouts in tabs and cards (`Tabs`, `Card`) | the settings registry (`GET /api/settings/registry`, `GET`/`PUT`/`reset /api/settings`) by section and scope; every other management page stays on the old route (see the row's own named gap below) | not yet - only the registry-driven inline keys moved, `apps/settings/*` still owns every dedicated management page |
+| `/engines` | data-tables (`DataTable`) | `GET /api/engines`, `GET /api/engines/health` (HOME-STACK-04a) - roles by address, engine state, health severities; actions (start/stop/restart, a role switch) stay on the old surface (see the row's own named gap below) | none (new) |
+| `/updates`, `/repairs`, `/backups` | data-tables (`DataTable`) | `GET /api/updates`, `/api/repairs`, `/api/backups`; real apply/rollback, fix/dismiss and run/restore/cancel landed `NEXTTABLE-ACTIONS-02/03/04` (2026-09-27, `docs/BACKLOG.md`) | not yet - the three old pages are unused by `/` now but not yet deleted (SHELL-09) |
+| `/sign-in` | auth view | Home's sign-in and passkeys | `apps/auth/*` |
 
 **SHELL-01's own named gap (found landing the row, 2026-09-21):** the
 modern dashboard's widgets (`@maipai/ui/src/dashboard/components/
@@ -133,7 +133,7 @@ reference picture - shadcn's own dashboard-01 block is the density
 wanted): Home composes its own page from the SAME shipped primitives
 those widgets are built from (`Card`, the chart wrapper under
 `components/ui/chart`, `Table`, as shipped), mirroring each vendored
-widget's own JSX 1:1, one file per widget under `frontend/src/next/
+widget's own JSX 1:1, one file per widget under `frontend/src/shell/
 pages/dashboard/`. Only widgets with a real Home counterpart exist:
 the greeting, people count, updates available, repairs open and engine
 health (owner/admin only - the wire itself omits those fields for
@@ -153,8 +153,8 @@ real rows and columns. Two narrower gaps inside that same file, found
 the same way: (1) its header is a literal `Employee Data Table` string
 in the JSX, not a prop - every table built on it, whatever data it
 carries, shows that title; not fixable without forking the vendored
-file, so `NextAppsPage.tsx` puts a real `CardHeader`/`CardTitle` (the
-same shipped primitives every other `/next` page's own header already
+file, so `AppsPage.tsx` puts a real `CardHeader`/`CardTitle` (the
+same shipped primitives every other `/` page's own header already
 uses) above the table instead - the page's real title reads correctly
 even though the table's own internal one still doesn't, and the
 vendored file stays untouched. (2) its per-row "Action" column (a
@@ -162,7 +162,7 @@ pencil and a trash icon) has no click handler wired to either icon at
 all - decorative, not a real prop surface - so real install/remove
 stays on `AppsPage.tsx` (the old shell's own route, with its own
 `DetailsPane` and a working Remove action) until a shipped table with
-an actions callback exists to move it to. `/next/apps` is the
+an actions callback exists to move it to. `/apps` is the
 read-only listing only: name, category, type, version, and a real
 Ready/Attention status (`packageState()`, exported from `AppsPage.tsx`
 so both routes read the identical rule rather than defining "Ready"
@@ -187,12 +187,12 @@ a name, a subtitle line) - every field with no Home counterpart comes
 out rather than getting faked: no email, phone, position, social
 links, address, or Edit action (account editing already lives in
 Settings -> Users, the same "the edit part is for USERS, not people"
-rule `AppsPage.tsx` documents). `/next/people` shows the SIGNED-IN
+rule `AppsPage.tsx` documents). `/people` shows the SIGNED-IN
 person's own profile only - viewing someone else's profile, and the
 Memories tab, stay on `PersonProfilePage.tsx` until their own row
 moves them; `PersonProfilePage.tsx`'s own real "This is your own
 profile." copy is reused verbatim rather than reworded. The household
-list reuses `/next/apps`'s own `DataTable` pattern exactly (a real
+list reuses `/apps`'s own `DataTable` pattern exactly (a real
 `data` prop, real rows, the same hardcoded-title fix as a `CardHeader`/
 `CardTitle` above it, the same dead Action-column icons left
 unwired) - `GET /api/people` is unscoped by design (`PeoplePage.tsx`'s
@@ -206,23 +206,23 @@ the profile view - zero data-binding surface, every field a local
 `useState` seeded with demo values. Composed instead from the template's
 own individual form primitives (`Input`, `Select`, `Switch`, `Button`,
 all under `.../dashboard/components/ui/*`) through one new mapping,
-`NextSettingField.tsx`: the registry's own selector vocabulary
+`SettingField.tsx`: the registry's own selector vocabulary
 (boolean/select/number/text/secret today; duration/time/entity/area/
 person/media typed but unbuilt, same as the kit's own pre-existing
 `SettingField.tsx`) to the primitive that renders it, one definition,
 reused by every key rather than a per-key component. That existing kit
 file (`@maipai/ui/src/settings/SettingField.tsx`, home/kit-authored, not
 a vendored snapshot) already solved this exact mapping against the
-kit's own pre-shadcndashboard primitives - `NextSettingField.tsx`
+kit's own pre-shadcndashboard primitives - `SettingField.tsx`
 mirrors its selector-by-selector logic (the draft/commit/reset cycle,
 the write-only secret flow) rather than reinventing it, reusing its two
 pure exported helpers (`titleCaseOption`, `localeDisplayName`)
 directly. The grouping logic itself (`groupSettings()`, `sectionTitle()`
 - three disclosure levels, expert filtered out, advanced folds at three
 or more) is pure, no-UI, and imported as-is by the new
-`NextSettingsRenderer.tsx` rather than copied a third time; only the
+`SettingsRenderer.tsx` rather than copied a third time; only the
 JSX renders through `Card`/`CardHeader`/`CardTitle` (matching every
-other `/next` page's own section-heading shape) in place of the kit's
+other `/` page's own section-heading shape) in place of the kit's
 `Section` primitive. A named, accepted duplication until the old shell
 retires: the field-control logic now lives in two files reading the
 identical registry, the same class of cost SHELL-03's `packageState()`/
@@ -238,7 +238,7 @@ list among them - Commands, Devices, Repairs, Updates, Health), the
 retired "one section tree" redesign and its link-out cards, Privacy's
 things-table, Voice's top-choices row (all `docs/dev/session-a-
 settings-rulings-2026-09-21.md`), and `@modified`/search filtering
-(docs/SETTINGS.md Rule 5). `/next/settings` is the registry's own
+(docs/SETTINGS.md Rule 5). `/settings` is the registry's own
 inline keys only, split Household vs Me exactly as `SettingsPage.tsx`'s
 own tab switcher already does (same two labels, the Household tab
 gated to owner/admin - a non-admin has nothing else to switch to,
@@ -261,7 +261,7 @@ a 503 - the identical "null is the real answer, not a fabricated one"
 posture `dashboard.ts`'s own `engineStatusCounts()` already took for
 this exact case, just never extended to these two routes until this
 row needed it. (2) the vendored `DataTable` has the same dead Action
-column every other `/next` table already found (no click handler on
+column every other `/` table already found (no click handler on
 either icon) - real engine actions (start, stop, restart) and a role
 switch have no shipped table to carry them, so they stay wherever they
 already partly exist (the Stack's own admin surface; Home has never
@@ -297,9 +297,9 @@ three old pages through the kit's own `ThingsTable`/hand-built
 `Button`s - real callback surfaces `UpdatesSection.tsx`'s own
 `rowActions` prop and `RepairsSection.tsx`'s/`BackupsSection.tsx`'s own
 `onClick`s already use. The vendored `DataTable`'s Action column has no
-click handler wired to either icon, the same gap every `/next`
+click handler wired to either icon, the same gap every `/`
 data-table has found so far, so all three actions stay on the old
-routes. All three `/next` pages gate to owner/admin exactly as their
+routes. All three `/` pages gate to owner/admin exactly as their
 old counterparts do (`AdminGatedContent`), even where a route itself
 reads looser (`GET /api/updates` is `requireAuth` only) - matching the
 old page's own visible gate is the parity this row asks for, not a new
@@ -323,7 +323,7 @@ self-service).
 Two real, separate limitations, not built around: (1) `useShellNext()`
 resolves `ui.shell.next` via `GET /api/settings?scope=household`,
 which is `requireAuth` - a genuinely cold, never-authenticated load of
-`/next/sign-in` has no session to read the flag with. Landing this row
+`/sign-in` has no session to read the flag with. Landing this row
 found a second way this bites, not just the cold-browser case: signing
 out invalidates the session server-side, and if anything refetches
 this exact query afterward (found live, capturing this row's own
@@ -335,12 +335,12 @@ false flag already gives), so a real failure no longer hangs, though a
 genuinely cold, never-authenticated visit still has no session to
 resolve the flag with at all - that half needs its own pre-auth path,
 out of this row's scope. The realistic warm path this row's acceptance
-asks for (a sign-out from within an already-open `/next`, not a cold
+asks for (a sign-out from within an already-open `/`, not a cold
 browser typing the URL first) still works the way it always did: no
 page reload happens on sign-out - only `App.tsx`'s own
 `setPerson(null)` - so the settings query's cache from before signing
 out stays valid as long as nothing forces a refetch in between.
-(2) No real sign-out control exists yet anywhere in `/next`'s own
+(2) No real sign-out control exists yet anywhere in `/`'s own
 chrome to reach that in-session path from: the vendored `FullLayout`
 header's `Profile.tsx` sheet has a genuine "Log Out" button (a real
 callback-capable shipped part, unlike a dead Action-column icon), but
@@ -355,14 +355,14 @@ person state Home actually runs on.
 
 One flag, one switch (owner's rule, 2026-09-21 03:30): the shell and
 the chat move together. There is no `ui.chat.next`; `ui.shell.next`
-governs both, the `/next/chat` row is part of the same stand-up, and
-the day the flag defaults on, `/next` becomes `/` for every page
+governs both, the `/chat` row is part of the same stand-up, and
+the day the flag defaults on, `/` becomes `/` for every page
 including Chat. The old shell and the old chat are deleted together,
 one commit, a release later.
 
 ## The chat's wiring table: every capability to its Element
 
-The `/next/chat` row is landed capability by capability against this
+The `/chat` row is landed capability by capability against this
 table (owner's instruction, 2026-09-21 04:35: each Element is called
 at the moment its capability happens). Left, what the turn engine or
 the Stack does; right, the Element that renders it, as shipped, and
@@ -372,7 +372,7 @@ named gap, not a Home-drawn substitute.
 | Capability (Home / Stack) | Element(s) | Fed by |
 |---|---|---|
 | The reply text | markdown-text (renderer), message-pair, message-actions, message-timing | the model adapter's text parts |
-| Thinking before the reply | reasoning, thinking-indicator | the reasoning part (`--reasoning` on, streamed) (landed: REASONING-01, home 57c4b430). **`thinking-indicator` landed 2026-09-22 (slice 5(c))**: the kit's own `elements/thread.aui.tsx` gained an `Indicator` slot (`ui-v0.5.29`, an upstream-bound patch) whose default now renders the shipped `ThinkingIndicator` Element instead of a hand-drawn dot; `NextChatPage.tsx` overrides it with `ChatThinkingIndicator`, porting `/chat`'s own `status`/`spoken_cue`-driven activity line and 45s "still working" timer - `status` turned out to already be a real wire event (CHAT-16, 2026-09-15), so this is live-rendering behavior, not scaffolding, proven by a genuinely staggered-stream test. See `docs/dev.md`. |
+| Thinking before the reply | reasoning, thinking-indicator | the reasoning part (`--reasoning` on, streamed) (landed: REASONING-01, home 57c4b430). **`thinking-indicator` landed 2026-09-22 (slice 5(c))**: the kit's own `elements/thread.aui.tsx` gained an `Indicator` slot (`ui-v0.5.29`, an upstream-bound patch) whose default now renders the shipped `ThinkingIndicator` Element instead of a hand-drawn dot; `ChatPage.tsx` overrides it with `ChatThinkingIndicator`, porting `/chat`'s own `status`/`spoken_cue`-driven activity line and 45s "still working" timer - `status` turned out to already be a real wire event (CHAT-16, 2026-09-15), so this is live-rendering behavior, not scaffolding, proven by a genuinely staggered-stream test. See `docs/dev.md`. |
 | A tool call and its result | tool-call, tool-group, tool-timeline, tool-error, tool-fallback | the tool-call parts the turn engine already emits |
 | A tool result with structure (weather, almanac, lookups, comparisons, procedures) | chart, spec-sheet, data-table, diagram, mermaid-diagram | the structured part per the generative-UI contract; nothing drawn by Home (landed for weather and almanac: home af0af0aa) |
 | Image generation (the Stack's `image` role) | image-generation | the image job: queued, progress from the Stack's job events, the finished file |
@@ -412,7 +412,7 @@ already has what it needs.
 | **chart** | `ToolCallMessagePartComponent<TArgs,TResult>`; component props `label, value, delta, points, visibleCount, variant` | `TurnArtifact.section` has no time-series shape (its five kinds: lookup, card, procedure, comparison, document) | **gap, unfed today.** Nothing in the current composer produces a numeric series. Not needed for weather/almanac's first conversion (both are point-in-time facts, not series) - a real producer needs a new `TurnArtifact` section kind, out of tonight's scope, named here so it isn't silently forgotten. |
 | **spec-sheet** | `backend`-tool render: `result.title`, `result.subtitle?`, `result.rows: {label, value, emphasis?}[]`, `visibleCount` | `TurnArtifact`'s `card` section (film/person/place, each a flat set of named fields plus `source_id`) | **rename.** A `card` section maps directly: `title = name`, `rows = [{label, value}, ...]` for each non-null field in kind order. This is weather's and almanac's spec-sheet target. |
 | **data-table** | `ToolCallMessagePartComponent<TArgs, readonly Row[]>`; standalone `rows`, `cycle` | `TurnArtifact`'s `lookup` section (`{title, line}[]`) and `comparison` section (`subjects[]` + `rows: {attribute, values[]}[]`) | **rename.** Both map onto `data-table` rows; `comparison`'s subjects become columns. `procedure` (numbered steps with quantities) fits neither `data-table` nor `spec-sheet` well - flagged as an unmapped section, not solved here since no Element on this session's list covers it (the catalog's `todo-list` is a candidate; Session A's row, not mine). |
-| **sources** | Message part `{type: "source", sourceType: "url"\|"document", id, url?, title?, mediaType, filename?, status}`, registered as `MessagePrimitive.Parts` `components={{Source: Sources}}` | `TurnArtifact.sources[]`: `{id, kind: web\|wikidata\|wikipedia\|weather\|package, title, url, site, snippet, source, created_at, hlc}` | **gap/rename.** Shapes don't line up: no `sourceType`, no `mediaType`. Every one of our `kind`s is web-ish, none an uploaded document, so the adapter is one direction only: emit `sourceType: "url"` for all of them, `id`/`url`/`title` pass through, `site`/`snippet`/`kind`/`hlc` drop (the Element doesn't render them). A `source` message part per `TurnValue.sources` entry needs adding to the stream - today sources ride only inside `done`'s `TurnValue`, never as their own streamed parts. **Correction, slice 5(a) (2026-09-22):** the `MessagePrimitive.Parts components={{Source: Sources}}` binding above does not hold against the vendored kit - `elements/thread.aui.tsx`'s own parts switch has no `case "source"` and `ThreadComponents` has no such slot (it was written from the upstream Elements docs, not the snapshot actually vendored into `commons`). Landed instead as a synthetic `tool-call` part (`toolName: "sources"`), the same composition already used for `structured_part`/`write_document` - see `docs/dev.md`, "Slice 5(a)." **Follow-up (2026-09-22):** the Element itself gained a `layout="list"` prop (kit `ui-v0.5.26`, `commons/ui/docs/dashboard-upstream.md`'s own "Patches pending upstream" table) for shadcn.io's AI Sources shape - an upstream-bound patch, not a fork; retires once the PR against `assistant-ui/assistant-ui` merges and a newer snapshot carries it. PR opened 2026-09-22: [assistant-ui/assistant-ui#7962](https://github.com/assistant-ui/assistant-ui/pull/7962) (the `layout` prop and the key fix only, per scope). **Second follow-up (2026-09-22, CHAT-UI-03):** the trigger itself moved into the assistant message's own action bar (last item after "..."), the compact list rendering below the whole footer row - two more upstream-bound patches (kit `ui-v0.5.27`): `Sources` gained `hideTrigger` so a caller's own trigger elsewhere can drive the same lifted state, and `thread.aui.tsx`'s `ThreadComponents` gained `AssistantActionBarExtra`/`AssistantMessageFooterExtra` as the two append points. `NextChatPage.tsx`'s own `SourcesActionBarTrigger`/`SourcesFooterContent` compose the subtle bar-row trigger (stacked favicon glyphs, the word "Sources", ghost style, no pill/badge/chevron - the count lives in the tooltip) from the same shipped `SourceGlyph`/`Sources`, no new visual component. |
+| **sources** | Message part `{type: "source", sourceType: "url"\|"document", id, url?, title?, mediaType, filename?, status}`, registered as `MessagePrimitive.Parts` `components={{Source: Sources}}` | `TurnArtifact.sources[]`: `{id, kind: web\|wikidata\|wikipedia\|weather\|package, title, url, site, snippet, source, created_at, hlc}` | **gap/rename.** Shapes don't line up: no `sourceType`, no `mediaType`. Every one of our `kind`s is web-ish, none an uploaded document, so the adapter is one direction only: emit `sourceType: "url"` for all of them, `id`/`url`/`title` pass through, `site`/`snippet`/`kind`/`hlc` drop (the Element doesn't render them). A `source` message part per `TurnValue.sources` entry needs adding to the stream - today sources ride only inside `done`'s `TurnValue`, never as their own streamed parts. **Correction, slice 5(a) (2026-09-22):** the `MessagePrimitive.Parts components={{Source: Sources}}` binding above does not hold against the vendored kit - `elements/thread.aui.tsx`'s own parts switch has no `case "source"` and `ThreadComponents` has no such slot (it was written from the upstream Elements docs, not the snapshot actually vendored into `commons`). Landed instead as a synthetic `tool-call` part (`toolName: "sources"`), the same composition already used for `structured_part`/`write_document` - see `docs/dev.md`, "Slice 5(a)." **Follow-up (2026-09-22):** the Element itself gained a `layout="list"` prop (kit `ui-v0.5.26`, `commons/ui/docs/dashboard-upstream.md`'s own "Patches pending upstream" table) for shadcn.io's AI Sources shape - an upstream-bound patch, not a fork; retires once the PR against `assistant-ui/assistant-ui` merges and a newer snapshot carries it. PR opened 2026-09-22: [assistant-ui/assistant-ui#7962](https://github.com/assistant-ui/assistant-ui/pull/7962) (the `layout` prop and the key fix only, per scope). **Second follow-up (2026-09-22, CHAT-UI-03):** the trigger itself moved into the assistant message's own action bar (last item after "..."), the compact list rendering below the whole footer row - two more upstream-bound patches (kit `ui-v0.5.27`): `Sources` gained `hideTrigger` so a caller's own trigger elsewhere can drive the same lifted state, and `thread.aui.tsx`'s `ThreadComponents` gained `AssistantActionBarExtra`/`AssistantMessageFooterExtra` as the two append points. `ChatPage.tsx`'s own `SourcesActionBarTrigger`/`SourcesFooterContent` compose the subtle bar-row trigger (stacked favicon glyphs, the word "Sources", ghost style, no pill/badge/chevron - the count lives in the tooltip) from the same shipped `SourceGlyph`/`Sources`, no new visual component. |
 | **inline-citation** | Not runtime-bound at all: "assistant-ui has no positional link between a citation marker and an offset inside streamed message text" - ships as a specimen you hand-edit, placing `<Citation index={n}>` around your own sentence | The reply text already carries `[N]` markers baked in (composer.ts's docstring: the Perplexity-shaped pattern CHAT-16 validated) | **rename, frontend-side.** No backend change: the `[N]` markers plus the reshaped `sources` array (row above) are exactly what a custom `markdown-text` renderer needs to place `<Citation>` at each `[N]`. This is Session A's wiring, named here because it depends on the `sources` reshape above. |
 | **image-generation** | `backend`-tool render: `args.prompt` (string, partial while streaming), `status.type: running\|complete\|incomplete\|requires-action`; only `"running"` shows the generating animation; no image URL prop at all - a separate renderer takes over once done | The Stack's `image` role job events: `queued`, `progress` (presumably numeric), `done` with a file | **gap.** Two real mismatches: (1) `image-generation` has no field for a numeric progress percentage, only a boolean-ish `running`/not; the plan's capability row promises "progress from the Stack's job events" but the shipped Element cannot show a number - `queued` and `progress` both have to collapse into `running` until upstream adds one, which is a real, stated gap, not something to invent a prop for. (2) once `done`, the finished file needs the separate `image` Element (not on this session's list) - `image-generation` never renders the result itself. |
 | **reasoning** | Message part `{type: "reasoning", text, status?, unstable_summary?}`; consecutive parts grouped via `groupPartByType({reasoning: ["group-reasoning"]})` | `TurnStreamEvent` has no reasoning event today (`turn_meta`, `signal`, `delta`, `status`, `spoken_cue`, `done`, `error`) | **gap.** Needs a new additive stream event, `{ type: "reasoning"; text: string; sequence?: number }`, alongside `delta`, fed from the chat engine's own `--reasoning` output when the role has it on (today only the background role runs with `--reasoning off`; the chat role's reasoning stream isn't captured anywhere yet). |
@@ -511,7 +511,7 @@ earlier table), with `TurnValue.artifact` set from its result.
 
 The order as it ran (updated 2026-09-21 afternoon): Session A did step
 1, then the stand-up's defects (HOME-UI-04b, 04d, 04e), CHAT-SDK-01
-and LOOK-01, and now takes SHELL-02 (`/next/chat`) in slices, the
+and LOOK-01, and now takes SHELL-02 (`/chat`) in slices, the
 first being the Elements thread and composer on Home's existing
 adapters with one streaming turn and the reasoning element live, then
 history, the thread list, attachments, suggestions, tools and
@@ -521,7 +521,7 @@ whole (backend and page) and SHELL-03, and takes the remaining SHELL
 rows in order (04, 05, 06, 07, 08), each row one commit with its
 tests, its captures from `scripts/screenshot.ts` and the BACKLOG row
 ticked; the local-model lane takes HOME-UI-04g (the first paint of
-`/next`) and S items beside; Codex takes docs and backlog. Each row's
+`/`) and S items beside; Codex takes docs and backlog. Each row's
 reviewer first checks "is anything here Home-drawn", and a yes returns
 the item; a vendored part with no data surface is composed from its
 own primitives and the gap is named in this record's row.
@@ -533,4 +533,4 @@ row; every row is one commit; rollback is the flag. The vendored
 snapshot's upstream drift is a manual merge, on a schedule (the
 monthly dependency sweep), against the pinned sha in the upstream
 note.
- The end state is SHELL-09 (docs/BACKLOG.md): once the rows are ticked and the owner says cut, `/next` becomes `/`, the flag goes, and the old shell, chat, kit pieces, tokens, look values and spec keys that existed only for the old interface are deleted in one release, so nothing of the hand-built interface survives as dead code or a second theme system.
+ The end state is SHELL-09 (docs/BACKLOG.md): once the rows are ticked and the owner says cut, `/` becomes `/`, the flag goes, and the old shell, chat, kit pieces, tokens, look values and spec keys that existed only for the old interface are deleted in one release, so nothing of the hand-built interface survives as dead code or a second theme system.

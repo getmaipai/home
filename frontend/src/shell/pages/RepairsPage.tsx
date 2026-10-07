@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { api, ApiError, isOwnerOrAdminRole, type Issue, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
-/** /next/repairs: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
+/** /repairs: SHELL-07's own row (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's plan row) - `GET /api/repairs` through Home's
  * shared table: severity, title, detail and the fix's own label, the
  * same fields `RepairsSection.tsx` shows.

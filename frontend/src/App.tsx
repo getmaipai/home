@@ -24,8 +24,8 @@ function lazyNamed<P extends object = Record<string, never>>(
 }
 
 // Setup remains a separate first-run route. The migrated application
-// shell owns every other route from the root, while `/next/*` remains a
-// compatibility prefix for bookmarks and links made during preview.
+// shell owns every other route from the root, while the preview bookmark prefix remains a
+// compatibility route for bookmarks and links made during preview.
 const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWizard")["SetupWizard"]>>(
   () => import("@/apps/setup/SetupWizard"),
   "SetupWizard",

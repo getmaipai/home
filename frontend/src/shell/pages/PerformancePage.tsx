@@ -12,7 +12,7 @@ import { LabelsCard } from "@/shell/pages/performance/LabelsCard";
 import { EnginesHealthCard } from "@/shell/pages/performance/EnginesHealthCard";
 import { DiskHardwareCard } from "@/shell/pages/performance/DiskHardwareCard";
 
-/** /next/performance (ADMIN-PERF-01, docs/dev.md's own design note): how
+/** /performance (ADMIN-PERF-01, docs/dev.md's own design note): how
  * the hub is doing over time, composed entirely from the template's
  * shipped chart wrapper, Home's shared table and the kit's `Card` - the same one-query,
  * `AsyncState`-wrapped shape `DashboardPage.tsx` and

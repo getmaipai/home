@@ -279,8 +279,8 @@ describe("Routes Incognito toggle", () => {
   });
 });
 
-// SHELL-FLAG-01's third redirect: signing in at /next/sign-in lands on
-// /next. Already-working behavior (RoutesInner's own `path="sign-in"`
+// SHELL-FLAG-01's third redirect: signing in at /sign-in lands on
+// the root route. Already-working behavior (RoutesInner's own `path="sign-in"`
 // route, above, redirects an authenticated visit there), proven here
 // with a real destination registered to land on - the file's own
 // earlier appearance tests exercise the identical redirect as a side
@@ -373,7 +373,7 @@ describe("Routes signed-out redirect", () => {
 });
 
 describe("Routes retired Tools paths", () => {
-  function renderNextRoute(path: string) {
+  function renderRoute(path: string) {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -399,7 +399,7 @@ describe("Routes retired Tools paths", () => {
   }
 
   test.each(["/tools", "/apps"])("%s renders without Tools page content", (path) => {
-    const { view, restore } = renderNextRoute(path);
+    const { view, restore } = renderRoute(path);
     try {
       expect(view.container.textContent).not.toContain("Everything installed on this hub.");
       expect(view.container.querySelector('[data-slot="card-title"]')).toBeNull();
@@ -411,7 +411,7 @@ describe("Routes retired Tools paths", () => {
 });
 
 describe("next Manage routes", () => {
-  // /next/engines moved off this shared "still a stub" check once
+  // /engines moved off this shared "still a stub" check once
   // SHELL-06 gave it real data and its own dedicated test file
   // (EnginesPage.test.tsx). These three are real data pages now
   // (SHELL-07): each renders Home's shared table fed by its own

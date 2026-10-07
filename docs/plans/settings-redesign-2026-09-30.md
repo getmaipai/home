@@ -13,10 +13,10 @@ settings editor", FACE-02H and "Selector renderers so the custom sections can be
   - 16 `notifications.*.telegram` toggles and a chat id, meaningful only to someone using Telegram.
   - 2 storage cap keys, an admin concept.
 - Face enrollment is reachable only through a button on the profile page's Overview tab
-  (`NextPersonProfilePage.tsx`, route `/people/:id/enroll-face`); profile editing only through a dialog there.
+  (`PersonProfilePage.tsx`, route `/people/:id/enroll-face`); profile editing only through a dialog there.
 - The Household tab is 5 cards plus 7 link cards with no grouping.
 - The renderer (`groupSettings.ts`) groups by `lives_in` only and ignores `section`, `order` and `collapsed`;
-  the layouts are hard-coded in `NextSettingsPage.tsx` and `NextManageSection.tsx`.
+  the layouts are hard-coded in `SettingsPage.tsx` and `ManageSection.tsx`.
 
 ## Decisions
 

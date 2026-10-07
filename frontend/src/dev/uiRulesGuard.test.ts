@@ -4,7 +4,7 @@ import { BASELINES, guardProblems, LEDGER, type Reader } from "./uiRulesGuard";
 // PRECOMMIT-RULES-01: the staged-vs-HEAD guard refuses growth and lost reasons.
 const ledger = (rows: string[]) => rows.map((id) => `| ${id} | a | b | c | d | e | active exception |`).join("\n");
 const wrap = (entries: Record<string, { ed?: string; reason?: string }>) => JSON.stringify({ "shell/a.tsx": entries });
-const oldWrap = (entries: Record<string, { ed?: string; reason?: string }>) => JSON.stringify({ "next/a.tsx": entries });
+const oldWrap = (entries: Record<string, { ed?: string; reason?: string }>) => JSON.stringify({ [["next", "a.tsx"].join("/")]: entries });
 const reader = (staged: Record<string, string>, head: Record<string, string>): Reader => (p, side) => (side === "staged" ? staged : head)[p] ?? null;
 
 describe("ui-rules pre-commit guard", () => {

@@ -229,7 +229,7 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
   );
 }
 
-/** /next/chat: SHELL-02's slice 2 (docs/plans/shell-on-shadcndashboard-
+/** /chat: SHELL-02's slice 2 (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md's own wiring table) - the Elements thread LIST
  * (ui/src/elements/thread-list.aui.tsx, self-contained: New Thread,
  * search, grouped items, rename, delete) joins slice 1's thread on
@@ -276,13 +276,13 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
  * no "stop speaking" control on screen yet. */
 
 function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void) {
-  const temporaryNextRef = useRef(temporaryNext);
-  temporaryNextRef.current = temporaryNext;
+  const temporaryModeRef = useRef(temporaryNext);
+  temporaryModeRef.current = temporaryNext;
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
   // VOICE-LIVE-02: true only while the live voice session (below) is
-  // open - the one gate on `speakReplies` above, and `spokenNextRef` the
+  // open - the one gate on `speakReplies` above, and `pendingSpeechRef` the
   // one flag `consumeSpoken` reads and clears, the same single-shot
-  // shape `temporaryNextRef`/`packageScopeRef` already use.
+  // shape `temporaryModeRef`/`packageScopeRef` already use.
   const liveVoiceActiveRef = useRef(false);
   // HANDSFREE-01(a): automatic read-aloud is remembered per conversation.
   const [autoReadReplies, setAutoReadReplies] = useState(false);
@@ -308,12 +308,12 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const ttsAvailable = useVoiceAvailable();
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
-  const spokenNextRef = useRef(false);
+  const pendingSpeechRef = useRef(false);
   const selectedModelRef = useRef<string | undefined>(undefined);
   // APPROVE-CARD-01: armed by ConfirmAskAnswerProvider's own `respond`
   // callback (ConfirmToolRender's respondToApproval, via
   // ConfirmAskAnswerContext), the same single-shot shape as
-  // `spokenNextRef` above - `consumeAskAnswer` below reads and clears it.
+  // `pendingSpeechRef` above - `consumeAskAnswer` below reads and clears it.
   const askAnswerRef = useRef<{ turnId: string; approved: boolean } | undefined>(undefined);
   // VOICE-LIVE-02: chatModelAdapter.ts's own onSpeakingChange, relayed as
   // real state so LiveVoiceSession (a sibling component, not inside this
@@ -544,7 +544,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     const chatModelAdapter = useMemo(
       () =>
         createChatModelAdapter({
-          onDraftSent: () => { if (!temporaryNextRef.current) discardDraft(visibleConversationIdRef.current); },
+          onDraftSent: () => { if (!temporaryModeRef.current) discardDraft(visibleConversationIdRef.current); },
           getConversationId: async () => {
             const { remoteId } = await aui.threadListItem().initialize();
             await settingsWriteRef.current;
@@ -607,15 +607,15 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
             return value;
           },
           consumeTemporary: () => {
-            return temporaryNextRef.current || undefined;
+            return temporaryModeRef.current || undefined;
           },
           // VOICE-LIVE-02: armed once, right before the live voice
           // session's own aui.composer.send() for its final transcript -
           // the single-shot shape every other per-send choice here
           // already uses.
           consumeSpoken: () => {
-            const value = spokenNextRef.current || undefined;
-            spokenNextRef.current = false;
+            const value = pendingSpeechRef.current || undefined;
+            pendingSpeechRef.current = false;
             return value;
           },
           // APPROVE-CARD-01: armed once, right before ConfirmTool's own
@@ -768,7 +768,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     },
   });
 
-  return { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1185,7 +1185,7 @@ export function ChatPage({ person }: { person: Roster }) {
   // inside useChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useChatRuntime(person, () => {
+  const { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1250,7 +1250,7 @@ export function ChatPage({ person }: { person: Roster }) {
           onOpenChange={setVoiceOpen}
           turnSchedulerRef={turnSchedulerRef}
           liveVoiceActiveRef={liveVoiceActiveRef}
-          spokenNextRef={spokenNextRef}
+          pendingSpeechRef={pendingSpeechRef}
           isSpeaking={isSpeaking}
           speakingEndedAt={speakingEndedAt}
         />

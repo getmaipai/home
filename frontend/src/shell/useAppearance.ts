@@ -12,7 +12,7 @@ function applyAppearance(appearance: Appearance) {
     appearance === "dark" ||
     (appearance === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   // Always a concrete class, "system" included (HOME-UI-04b, found live
-  // on /next/apps): the kit's own components never needed one - they
+  // on /apps): the kit's own components never needed one - they
   // read the CSS variables, which already follow `@media (prefers-
   // color-scheme: dark)` with no class required - but the vendored
   // shadcndashboard template's `dark:*` Tailwind utilities are governed

@@ -73,7 +73,7 @@ group. A summary line at the top: total findings per category.
 
 This is a big scan - work through it in passes by area (`backend/src/lib`,
 `backend/src/routes`, `backend/src/settings`, `frontend/src/apps`,
-`frontend/src/next`, `frontend/src/shell`, etc.) rather than trying to
+`frontend/src/`, `frontend/src/shell`, etc.) rather than trying to
 hold the whole repo in one pass, and write findings to the report file
 incrementally as you go rather than holding everything until the end.
 

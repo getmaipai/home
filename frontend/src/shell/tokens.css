@@ -742,7 +742,7 @@ header nav a:has(> img[alt="logo"]) {
 /* CHAT-UI-01 finding 2: FullLayout.tsx's own `.container` (globals.css's
  * `@utility container { max-w-[1367px] mx-auto }`) wraps every /next
  * page's <Outlet/>, a fixed cap that's fine for a form or a table but
- * leaves an ugly, ever-growing dead gutter on /next/chat once the rail
+ * leaves an ugly, ever-growing dead gutter on /chat once the rail
  * collapses and frees more width than the cap uses - found live,
  * 2026-09-21, "New Thread" sitting ~75px into empty space instead of
  * flush against the rail. `:has()` targets the one page that needs the

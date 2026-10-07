@@ -40,14 +40,14 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
   const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: !open });
   voiceRuntime = runtime;
   return (
-    <MemoryRouter initialEntries={["/next/chat"]}>
+    <MemoryRouter initialEntries={["/chat"]}>
       <AssistantRuntimeProvider runtime={runtime}>
         <LiveVoiceSession
           open={open}
           onOpenChange={onOpenChange}
           turnSchedulerRef={{ current: null as SentenceSpeechScheduler | null }}
           liveVoiceActiveRef={{ current: false }}
-          spokenNextRef={{ current: false }}
+          pendingSpeechRef={{ current: false }}
           isSpeaking={isSpeaking}
           speakingEndedAt={speakingEndedAt}
           createSocket={(handlers) => createMockSttSocket(fixture, handlers)}

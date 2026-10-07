@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from "react-router-dom";
 
-/** Keep preview-era `/next/*` bookmarks and in-app links working after
+/** Keep preview-era bookmarks and in-app links working after
  * the migrated shell moves to the root route. */
 export function LegacyShellRedirect() {
   const { pathname, search, hash } = useLocation();

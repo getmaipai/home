@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 
 /** CHAT-HEADER-01: the shell header's own `headerExtra` slot (ui-v0.5.35,
  * `useHeaderExtra(Component)`) takes a stable COMPONENT reference, mounted
- * by FullLayout's own Header - a sibling of `/next/chat`'s own Outlet
+ * by FullLayout's own Header - a sibling of `/chat`'s own Outlet
  * content, never a descendant of it. That means `ChatHeaderBar` (the
  * component ChatPage.tsx hands to `useHeaderExtra`) renders OUTSIDE
  * ChatPage's own AssistantRuntimeProvider tree, so it can't call
@@ -10,7 +10,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
  * ancestry to read.
  *
  * This context bridges the gap: RoutesInner (Routes.tsx) provides
- * it, wrapping every `/next/*` page; a small always-mounted component
+ * it, wrapping every `/*` page; a small always-mounted component
  * INSIDE ChatPage's own runtime tree (which does have real access)
  * pushes fresh data into it on every relevant change; `ChatHeaderBar`
  * reads it back out. Plain data and callbacks, never JSX or a component

@@ -14,7 +14,7 @@ rule on are numbered at the end.
 A creator page works because a creator is a stranger the viewer chooses
 to let in. A household member isn't a stranger: everyone in `/api/people`
 already has each other's name, role and shared files, and today's People
-page (`frontend/src/next/pages/NextPeoplePage.tsx`) already lists the
+page (`frontend/src/shell/pages/PeoplePage.tsx`) already lists the
 whole roster to anyone signed in, unscoped, by design. So the parts of
 the metaphor worth keeping are the browsing feel (a grid of pictures, not
 a table of names) and the page shape (a picture, a line in their own
@@ -58,10 +58,10 @@ this item.
 
 ## The directory: a grid, not a table
 
-`NextPeoplePage.tsx` today stacks two of the vendored dashboard's own
+`PeoplePage.tsx` today stacks two of the vendored dashboard's own
 views (its own header comment: "one route, two of the template's own
 views stacked exactly as the Step 1 stand-up first mounted them") - the
-signed-in person's profile card, then `NextDataTable` rendering the
+signed-in person's profile card, then `DataTable` rendering the
 roster as rows of name/role. The table was the honest placeholder for a
 stand-up, not a design; this replaces it. The directory becomes a grid of
 cards, one per household member: `Card` (`@maipai/ui/src/dashboard/
@@ -82,7 +82,7 @@ Tapping a card opens the profile page, same route pattern
 
 Composed from the vendored `UserProfile`'s own shape (`commons/ui/src/
 dashboard/components/user-profile/index.tsx`), not the component itself
-- its header comment on `NextPeoplePage.tsx` already worked out why:
+- its header comment on `PeoplePage.tsx` already worked out why:
 `UserProfile` takes no props, everything is local hardcoded `useState`
 (email, phone, position, social links, address, a local-only Edit dialog
 that never reaches a server), and none of those fields exist on `Person`.
@@ -224,7 +224,7 @@ page theming beyond the named accent set.
 - `PEOPLE-SPEC-01` (commons, S): the three `Person` fields above, the
   fixture and round-trip test, tag bump.
 - `PEOPLE-GRID-01` (home, M): the directory as a card grid, retiring
-  `NextDataTable`'s roster table; depends on nothing else.
+  `DataTable`'s roster table; depends on nothing else.
 - `PEOPLE-PROFILE-01` (home, M): the profile page's header card, the
   Edit dialog (bio, photo opt-in, accent), the manage-actions link-out;
   depends on `PEOPLE-SPEC-01`.

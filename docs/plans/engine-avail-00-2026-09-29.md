@@ -41,16 +41,16 @@ themselves within a few seconds, with no reload.
 - The composer input is already a component we own:
   `frontend/src/apps/chat/composerDictationWaveform.tsx` renders a real
   `ComposerPrimitive.Input` (around line 93) inside the kit's
-  `ComposerInputOverride` slot, wired at `NextChatPage.tsx` around line 2829.
+  `ComposerInputOverride` slot, wired at `ChatPage.tsx` around line 2829.
   assistant-ui's `ComposerPrimitive.Input` accepts a `disabled` prop
   (`node_modules/@assistant-ui/react/dist/primitives/composer/ComposerInput.js`
   lines 59 and 160). Use that prop. Do not edit anything under `@maipai/ui` or
   `node_modules`, and do not hand-build a replacement input.
 - Notices above the conversation are the kit `Alert` already used at
-  `NextChatPage.tsx` lines 2683 to 2692 (`bareMode` and `banner`). Add yours as a
+  `ChatPage.tsx` lines 2683 to 2692 (`bareMode` and `banner`). Add yours as a
   sibling in the same place, same component, same classes.
 - `isOwnerOrAdminRole(role)` is exported from `@/lib/api`. The page has the
-  signed-in person as `person` in the chat runtime hook (`useNextChatRuntime`,
+  signed-in person as `person` in the chat runtime hook (`useChatRuntime`,
   line 1352); find where the page component itself gets the same person.
 
 ## The steps
@@ -73,14 +73,14 @@ themselves within a few seconds, with no reload.
    (`ChatAvailabilityContext`, default `"ready"`) that the composer reads.
    Reuse an existing `["health"]` query key if the page or app already declares
    one (grep `queryKey: \["health"` first); never run two polls.
-4. **Wire the page.** In `NextChatPage.tsx`: call the hook once in the page
+4. **Wire the page.** In `ChatPage.tsx`: call the hook once in the page
    component, provide the context around the same subtree that holds the
    composer, and render the `Alert` when the state is `unavailable`.
    - Everyone: title "MaiPai's AI isn't running right now", description
      "You can't send messages until it's back."
    - Owner or admin adds a second sentence: "Open Repairs to see what's wrong."
      Plain text; make it a link only if a Repairs route already exists in
-     `NextRoutes.tsx` (grep `repairs`); if you link, use the router's own link.
+     `Routes.tsx` (grep `repairs`); if you link, use the router's own link.
    - No port, pid, process or engine words anywhere in the copy. Reading level
      grade 6. No em dashes anywhere, in code comments or copy.
 5. **Disable the input.** In `composerDictationWaveform.tsx`, read the context in
@@ -94,7 +94,7 @@ themselves within a few seconds, with no reload.
    existing harness): with the context `unavailable` the textbox is `disabled` and
    shows the new placeholder; with `ready` it is enabled with the old placeholder;
    flipping the context from `unavailable` to `ready` re-enables it. Add one page
-   level test only if `NextChatPage` already has a test harness that makes it
+   level test only if `ChatPage` already has a test harness that makes it
    cheap; otherwise say so in the report.
 7. **Screenshot, if the repo's pattern allows.** Look for the existing scripted
    screenshot runner (`scripts/` or `frontend/scripts/`). If one runs headless
@@ -113,10 +113,10 @@ themselves within a few seconds, with no reload.
 
 Yours: `frontend/src/apps/chat/chatAvailability.ts`, `chatAvailability.test.ts`,
 `useChatAvailability.ts`, `composerDictationWaveform.tsx` and its test,
-`frontend/src/next/pages/NextChatPage.tsx` (the new hook call, provider and
+`frontend/src/shell/pages/ChatPage.tsx` (the new hook call, provider and
 `Alert` only), `docs/BACKLOG.md` (that one status line), `docs/dev.md` (the new
 section). Forbidden: everything under `backend/`, `@maipai/ui`, any lockfile or
-`package.json`, `scripts/`, and any other line of `NextChatPage.tsx`.
+`package.json`, `scripts/`, and any other line of `ChatPage.tsx`.
 
 ## Rules you have broken before, named so you do not
 

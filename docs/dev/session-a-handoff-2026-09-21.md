@@ -77,7 +77,7 @@ carries forward as code:
 
 **`home-a2`** (the worktree this session's UI work has run in):
 working tree clean, matches origin's `main`. Reusable as-is for the
-program's step 1 (the `/next` route tree) - no need to recreate it.
+program's step 1 (the `/` route tree) - no need to recreate it.
 
 **`commons`**: branch `a/settings-redesign` (`ui-v0.4.10`, commit
 `ab9b833`) still exists, unmerged into `main`. It added an optional

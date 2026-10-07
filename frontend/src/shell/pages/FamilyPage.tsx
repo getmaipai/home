@@ -64,7 +64,7 @@ function PersonCard({ entry }: { entry: PersonRosterEntry }) {
   );
 }
 
-/** /next/people: the household directory as a card grid (`PEOPLE-GRID-01`,
+/** /people: the household directory as a card grid (`PEOPLE-GRID-01`,
  * `docs/plans/people-profile-2026-09-26.md`), retiring the roster table
  * SHELL-04's own stand-up left here ("the honest placeholder for a
  * stand-up, not a design," the design record's own words). `GET /api/

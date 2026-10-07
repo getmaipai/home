@@ -74,7 +74,7 @@ export interface ChatModelAdapterDeps {
   getThinking?(): boolean | undefined;
   // Retired ChatPage's one-message "Think longer" action.
   consumeThinking?(): boolean | undefined;
-  /** Session-local model selected in /next/chat; read once so a reconnect
+  /** Session-local model selected in /chat; read once so a reconnect
    * retries the same model even if the composer changes meanwhile. */
   getModel?(): string | undefined;
   /** Age band for the signed-in person; per-message model choice is adults-only. */
@@ -157,7 +157,7 @@ export interface ChatModelAdapterDeps {
   // SHELL-02: the plan's own wiring table (docs/plans/shell-on-
   // shadcndashboard-2026-09-21.md) lists "Speaking a reply" (the
   // read-aloud Element) as its own row, separate from the reply text
-  // and reasoning rows this adapter already renders - /next/chat's
+  // and reasoning rows this adapter already renders - /chat's
   // first slice mounts the Elements composer with no "stop speaking"
   // control on screen yet, so false here skips every enqueueSentence()
   // call rather than have a turn autoplay audio nothing can cut off.

@@ -103,13 +103,13 @@ let debugSpy: ReturnType<typeof mock>;
 let infoSpy: ReturnType<typeof mock>;
 let posts = 0;
 let postedBodies: Array<{ person_id: string; samples: unknown[] }> = [];
-let failNextPost = false;
+let failFollowingPost = false;
 // The operator's stored `ui.enrollment_sounds` (FACE-02N); undefined = never set.
 let soundsSetting: boolean | undefined;
 
 beforeEach(() => {
   postedBodies = [];
-  failNextPost = false;
+  failFollowingPost = false;
   soundsSetting = undefined;
   facePresent = true;
   faceSize = 190;
@@ -146,8 +146,8 @@ beforeEach(() => {
       posts += 1;
       const sent = JSON.parse(String(init.body)) as { person_id: string; samples: unknown[] };
       postedBodies.push(sent);
-      if (failNextPost) {
-        failNextPost = false;
+      if (failFollowingPost) {
+        failFollowingPost = false;
         return Promise.resolve(Response.json({ error: "boom" }, { status: 500 }));
       }
       return Promise.resolve(Response.json({ prints: sent.samples.map((_, i) => ({ id: `print-${i + 1}` })), replaced: 0 }, { status: 201 }));
@@ -306,7 +306,7 @@ describe("FACE-02J: the capture ring", () => {
   }, 40000);
 
   test("a failed save says nothing was changed, and Try saving again resends the whole set", async () => {
-    failNextPost = true;
+    failFollowingPost = true;
     renderPage();
     const prompts: Record<Pose, string> = {
       frontal: "look straight at me",

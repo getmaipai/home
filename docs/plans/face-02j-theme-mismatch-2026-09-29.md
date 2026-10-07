@@ -24,7 +24,7 @@ FACE-02J". Wait for "start".
    for it, that one's the camera viewfinder itself and is probably
    correct as-is per the reasoning above, don't just delete it without
    checking). Find whatever wraps the WHOLE page/route and compare it to
-   how a normal page in this app (e.g. `NextPersonProfilePage.tsx`,
+   how a normal page in this app (e.g. `PersonProfilePage.tsx`,
    or the shell route it's rendered inside) gets its background - does
    it come from the kit's own theme tokens (CSS variables, a shared
    layout wrapper), or did this page build its own full-page container
