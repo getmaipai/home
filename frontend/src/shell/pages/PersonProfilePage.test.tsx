@@ -257,6 +257,8 @@ describe("PersonProfilePage", () => {
       const other = renderProfile("/people/person-bramble", viewer({ role: "owner" }));
       expect(await other.findByRole("button", { name: "Edit" })).toBeTruthy();
       expect(await other.findByText("Face recognition")).toBeTruthy();
+      const accentedCard = other.container.querySelector('[data-slot="card"][data-accent="teal"]');
+      expect(accentedCard?.querySelector('[data-slot="avatar"]')?.getAttribute("data-accent")).toBe("teal");
       expect(other.queryByRole("link", { name: "Edit profile" })).toBeNull();
       expect(other.queryByRole("link", { name: "Manage in Settings" })).toBeNull();
     } finally { restore(); }

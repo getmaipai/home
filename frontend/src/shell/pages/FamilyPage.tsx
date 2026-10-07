@@ -9,7 +9,7 @@ import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { getIcon } from "@maipai/ui/src/icons";
 import type { Icon } from "@maipai/ui/src/icons";
 import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
-import { ROLE_LABELS, ACCENT_RING_CLASS } from "@/apps/people/roles";
+import { ROLE_LABELS } from "@/apps/people/roles";
 import { api, ApiError, isOwnerOrAdminRole, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
@@ -34,16 +34,15 @@ interface FamilyCardProps {
   badge?: string;
   icon?: Icon;
   avatarName?: string;
-  avatarClassName?: string;
+  accent?: PersonRosterEntry["accent"];
   to?: string;
-  className?: string;
 }
 
-function FamilyCard({ title, subtitle, detail, badge, icon: IconComponent, avatarName, avatarClassName, to, className }: FamilyCardProps) {
+function FamilyCard({ title, subtitle, detail, badge, icon: IconComponent, avatarName, accent, to }: FamilyCardProps) {
   const card = (
-    <Card className={className}>
+    <Card accent={accent ?? undefined} interactive={Boolean(to)}>
       <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
-        {IconComponent ? <IconComponent size={32} className="text-muted-foreground" /> : avatarName ? <Avatar name={avatarName} className={avatarClassName ?? "size-16 text-xl"} /> : null}
+        {IconComponent ? <IconComponent size={32} className="text-muted-foreground" /> : avatarName ? <Avatar name={avatarName} size="profile" accent={accent ?? undefined} /> : null}
         <div className="flex flex-col gap-1">
           <h2 className="text-base font-semibold">{title}</h2>
           {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
@@ -58,9 +57,8 @@ function FamilyCard({ title, subtitle, detail, badge, icon: IconComponent, avata
 }
 
 function PersonCard({ entry }: { entry: PersonRosterEntry }) {
-  const accentClass = entry.accent ? ACCENT_RING_CLASS[entry.accent] : null;
   return (
-    <FamilyCard title={entry.display_name} subtitle={ROLE_LABELS[entry.role]} detail={entry.bio} avatarName={entry.display_name} avatarClassName={accentClass ? `size-16 text-xl ring-2 ring-offset-2 ring-offset-card ${accentClass}` : "size-16 text-xl"} to={`/people/${entry.id}`} className={accentClass ? `ring-2 ring-offset-2 ring-offset-background transition-shadow hover:shadow-md ${accentClass}` : "transition-shadow hover:shadow-md"} />
+    <FamilyCard title={entry.display_name} subtitle={ROLE_LABELS[entry.role]} detail={entry.bio} avatarName={entry.display_name} accent={entry.accent} to={`/people/${entry.id}`} />
   );
 }
 

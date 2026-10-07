@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { MemoryRouter, Route, Routes as RouterRoutes, useLocation } from "react-router-dom";
 import { UpdatesPage } from "@/shell/pages/UpdatesPage";
 import { RepairsPage } from "@/shell/pages/RepairsPage";
@@ -10,6 +11,15 @@ import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 import { mockHome } from "@/shell/pages/settings/settingsTestKit";
 import type { Roster } from "@/lib/api";
+
+const KIT_GLOBALS = readFileSync(new URL("../../node_modules/@maipai/ui/src/dashboard/css/globals.css", import.meta.url), "utf8");
+
+function lookTokenRules(look: string) {
+  return [`.style-${look}`, `.dark .style-${look}`].map((selector) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return KIT_GLOBALS.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{[^}]*\\}`, "m"))?.[0] ?? "";
+  }).join("\n");
+}
 
 afterEach(() => {
   cleanup();
@@ -495,6 +505,53 @@ describe("Routes settings areas", () => {
       expect(view.getByRole("navigation", { name: "Primary navigation" })).toBeTruthy();
     } finally {
       fixture.restore();
+    }
+  });
+
+  test("appearance controls change their live look and theme tokens on the settings route", async () => {
+    const fixture = mockHome();
+    const style = document.createElement("style");
+    style.dataset.testid = "appearance-look-token-test";
+    style.textContent = ["neutral", "olive"].map(lookTokenRules).join("\n");
+    document.head.append(style);
+    try {
+      const view = renderWithQueryClient(
+        <MemoryRouter initialEntries={["/settings/account/appearance"]}>
+          <RouterRoutes><Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} /></RouterRoutes>
+        </MemoryRouter>,
+      );
+      const choose = async (label: string, value: string) => {
+        fireEvent.click(await view.findByRole("combobox", { name: label }));
+        const option = await view.findByRole("option", { name: value });
+        await act(async () => {
+          fireEvent.pointerDown(option, { pointerId: 1, pointerType: "mouse", button: 0 });
+          fireEvent.pointerUp(option, { pointerId: 1, pointerType: "mouse", button: 0 });
+          fireEvent.click(option);
+        });
+      };
+      await waitFor(() => expect(document.body.classList.contains("style-neutral")).toBe(true));
+      const neutralPrimary = getComputedStyle(document.body).getPropertyValue("--primary").trim();
+      await choose("Look", "Olive");
+      await waitFor(() => expect(document.body.classList.contains("style-olive")).toBe(true));
+      const oliveLightPrimary = getComputedStyle(document.body).getPropertyValue("--primary").trim();
+      expect(oliveLightPrimary).not.toBe(neutralPrimary);
+      await choose("Appearance", "Dark");
+      await waitFor(() => expect(fixture.puts).toContainEqual({ scope: "person:person-abc123", key: "ui.appearance", value: "dark" }));
+      await waitFor(() => expect(document.documentElement.classList.contains("dark")).toBe(true));
+      const oliveDarkPrimary = getComputedStyle(document.body).getPropertyValue("--primary").trim();
+      expect(oliveDarkPrimary).not.toBe(oliveLightPrimary);
+      await choose("On this device only", "Light");
+      await waitFor(() => expect(document.documentElement.classList.contains("light")).toBe(true));
+      expect(getComputedStyle(document.body).getPropertyValue("--primary").trim()).toBe(oliveLightPrimary);
+      expect(fixture.puts).toContainEqual({ scope: "person:person-abc123", key: "ui.look", value: "olive" });
+      expect(fixture.puts).toContainEqual({ scope: "person:person-abc123", key: "ui.appearance", value: "dark" });
+      expect(fixture.puts.filter((put) => put.key === "ui.appearance")).toHaveLength(1);
+      await choose("On this device only", "Use my setting");
+      await waitFor(() => expect(document.documentElement.classList.contains("dark")).toBe(true));
+      expect(getComputedStyle(document.body).getPropertyValue("--primary").trim()).toBe(oliveDarkPrimary);
+    } finally {
+      fixture.restore();
+      style.remove();
     }
   });
 });

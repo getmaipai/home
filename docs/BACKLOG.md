@@ -32,6 +32,7 @@ Design: [settings redesign plan](plans/settings-redesign-2026-09-30.md).
 ## Settings and copy polish
 
 - [x] **SETTINGS-SAVE-01: show save results for profile edits and settings** (S, 2026-10-07): the profile form marks drafts, warns before route or page exit, confirms a save, reports errors, and removes the inactive photo switch. Registry settings keep their immediate apply behavior and show a saved status after success. Remaining explicit-save forms are inventoried in the H1 report.
+- [x] **SETTINGS-APPEARANCE-01: make look and profile accent changes visible** (S, 2026-10-07): each existing look applies a distinct, contrast-checked primary token; the profile accent previews live and uses kit Card/Avatar variants; person appearance and browser-only overrides update the active theme live.
 
 ## Thin chat path
 

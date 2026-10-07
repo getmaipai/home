@@ -43,15 +43,10 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "profile.appearance",
     honoured_by: ["home"],
   }),
-  // HOME-UI-04b (2026-09-21): the seven shadcn base-color presets
-  // (ui.shadcn.com/docs/theming's own current list - Neutral, Stone,
-  // Zinc, Mauve, Olive, Mist, Taupe), each a full style-variant preset
-  // (commons-a/ui/src/dashboard/css/globals.css), applied on /next
-  // only (`useNextLook`) - the old shell's `useLook` still resolves
-  // the value (`Look` widened to match in `@/shell/useLook.ts`) but
-  // has no `.style-<color>` CSS of its own, so an old-shell person who
-  // picked a color preset sees no change there until the old shell
-  // retires.
+  // Seven surface presets based on shadcn's Neutral, Stone, Zinc, Mauve,
+  // Olive, Mist and Taupe, plus MaiPai's Navy. The current shell applies
+  // these through the kit's body-class token sets; SETTINGS-APPEARANCE-01
+  // gives each look a distinct contrast-checked primary accent.
   //
   // HOME-UI-04e (2026-09-21): the default palette stopped being Home's
   // navy hex set and became the shadcndashboard template's own
@@ -62,13 +57,13 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
   // LOOK-01 (2026-09-21, owner ruling): "I like the black as the
   // default, same as the shadcn dashboard example, but we should be
   // using themes and have a black theme as our default" - the default
-  // is a named shadcn theme, not a Home name that hides what it is.
+  // is a named shadcn surface palette, not a Home name that hides what it is.
   // `studio` and `calm` retire from the enum: they were geometry
   // presets (a 12px tile vs. a circle) layered over this same shared
   // palette, and the template's own default geometry already matches
   // what `studio` set, so neither needs a preset of its own anymore.
-  // `neutral` becomes the default - the exact palette `studio` always
-  // rendered, so nothing on screen moves for anyone already on it.
+  // `neutral` becomes the default - the surface palette `studio` always
+  // rendered, with the current Home primary accent layered on top.
   // Stored `studio`/`calm` values migrate to the new default via
   // db/migrations/0057_look_studio_calm_to_neutral.sql, not a code-
   // level fallback: lib/settings.ts's own read path decodes whatever's

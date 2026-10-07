@@ -5,7 +5,7 @@ import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { useLook } from "@/shell/useLook";
-import { useAppearance } from "@/shell/useAppearance";
+import { useAppearance } from "@/shell/useShellAppearance";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { ChatPage } from "@/shell/pages/ChatPage";

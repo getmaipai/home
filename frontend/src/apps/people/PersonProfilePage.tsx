@@ -8,7 +8,7 @@ import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { MediaGrid, type MediaGridItem } from "@maipai/ui/src/primitives/MediaGrid";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@maipai/ui/src/ui/tabs";
-import { Card, CardContent } from "@maipai/ui/src/ui/card";
+import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@maipai/ui/src/ui/dialog";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
@@ -18,7 +18,7 @@ import { Switch } from "@maipai/ui/src/ui/switch";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
 import { api, ApiError, isOwnerOrAdminRole, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
-import { ROLE_LABELS, canManagePerson, ACCENT_RING_CLASS, ACCENT_SELECT_OPTIONS, ACCENT_SELECT_LABELS, NO_ACCENT } from "@/apps/people/roles";
+import { ROLE_LABELS, canManagePerson, ACCENT_SELECT_OPTIONS, ACCENT_SELECT_LABELS, NO_ACCENT } from "@/apps/people/roles";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 
 const PencilIcon = getIcon("pencil");
@@ -238,14 +238,13 @@ function ProfileHeaderCard({
   // target's role: the link only ever points somewhere already gated a
   // second time on arrival.
   const showManageLink = isOwnerOrAdminRole(viewer.role) && !viewingSelf;
-  const accentClass = profile.accent ? ACCENT_RING_CLASS[profile.accent] : null;
-
   return (
-    <Card className={accentClass ? cn("ring-2 ring-offset-2 ring-offset-background", accentClass) : undefined}>
+    <Card accent={profile.accent ?? undefined}>
       <CardContent className="flex flex-wrap items-center gap-4 p-6">
         <Avatar
           name={profile.display_name}
-          className={accentClass ? cn("h-16 w-16 text-xl ring-2 ring-offset-2 ring-offset-card", accentClass) : "h-16 w-16 text-xl"}
+          size="profile"
+          accent={profile.accent ?? undefined}
         />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h1 className="truncate text-xl font-semibold">{profile.display_name}</h1>

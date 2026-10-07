@@ -10,7 +10,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
-import { ACCENT_RING_CLASS, canManagePerson, ROLE_LABELS } from "@/apps/people/roles";
+import { canManagePerson, ROLE_LABELS } from "@/apps/people/roles";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
@@ -148,11 +148,10 @@ function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { p
   const [editOpen, setEditOpen] = useState(false);
   const canEdit = canManagePerson(viewer.role, viewer.id, { id: profile.id, role: profile.role });
   const showSelfEdit = viewingSelf && isOwnerOrAdminRole(viewer.role);
-  const accentClass = profile.accent ? ACCENT_RING_CLASS[profile.accent] : null;
   return (
-    <Card className={accentClass ? `ring-2 ring-offset-2 ring-offset-background ${accentClass}` : undefined}>
+    <Card accent={profile.accent ?? undefined}>
       <CardContent className="flex flex-wrap items-center gap-4 p-6">
-        <Avatar name={profile.display_name} className={accentClass ? `h-16 w-16 text-xl ring-2 ring-offset-2 ring-offset-card ${accentClass}` : "h-16 w-16 text-xl"} />
+        <Avatar name={profile.display_name} size="profile" accent={profile.accent ?? undefined} />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <h1 className="truncate text-xl font-semibold">{profile.display_name}</h1>
           <p className="text-sm text-muted-foreground">{ROLE_LABELS[profile.role]}</p>

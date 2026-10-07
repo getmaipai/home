@@ -104,6 +104,20 @@ describe("FamilyPage", () => {
     }
   });
 
+  test("profile accent tokens reach the kit card and avatar", async () => {
+    const restore = mockFamilyFetch([makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner", accent: "violet" })]);
+    try {
+      renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role: "owner" }));
+      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
+      const card = document.querySelector('[data-slot="card"][data-accent="violet"]');
+      expect(card).not.toBeNull();
+      expect(card?.querySelector('[data-slot="avatar"]')?.getAttribute("data-accent")).toBe("violet");
+      expect((card as HTMLElement).style.getPropertyValue("--profile-accent-active")).toBe("var(--profile-accent-violet)");
+    } finally {
+      restore();
+    }
+  });
+
   test("a card shows the bio line only when the person set one", async () => {
     const restore = mockFamilyFetch([
       makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner", bio: "Runs this house." }),

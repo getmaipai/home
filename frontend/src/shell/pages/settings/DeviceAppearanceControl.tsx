@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { api } from "@/lib/api";
@@ -33,7 +32,6 @@ export function DeviceAppearanceControl() {
                 {options.map((option) => <SelectItem key={option} value={option}>{option[0]!.toUpperCase() + option.slice(1)}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Button type="button" variant="secondary" size="row" aria-label="Reset device appearance" onClick={() => { setValue(null); writeDeviceAppearancePreference(null); }}>Reset</Button>
           </ItemActions>
         </Item>
       </ItemGroup>

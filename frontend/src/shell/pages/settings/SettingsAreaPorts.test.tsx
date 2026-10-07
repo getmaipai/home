@@ -2,7 +2,7 @@
 // and never weakened (SettingsPage, MeSettings and
 // HouseholdSettings tests, deleted with those files).
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
@@ -60,11 +60,28 @@ describe("ported from the old settings page", () => {
     await waitFor(() => expect(document.body.querySelector("input#profile-display-name")).not.toBeNull());
   });
 
-  test("Appearance offers a device-only override and reset without writing the setting", async () => {
+  test("changing the profile accent updates the kit preview token before save", async () => {
+    const view = open(makePerson("owner"), "/settings/account/profile");
+    const select = await view.findByRole("combobox", { name: "Accent color" });
+    fireEvent.click(select);
+    const teal = await view.findByRole("option", { name: "Teal" });
+    await act(async () => {
+      fireEvent.pointerDown(teal, { pointerId: 1, pointerType: "mouse", button: 0 });
+      fireEvent.pointerUp(teal, { pointerId: 1, pointerType: "mouse", button: 0 });
+      fireEvent.click(teal);
+    });
+    const preview = view.getByTestId("profile-accent-preview") as HTMLElement;
+    expect(preview.dataset.accent).toBe("teal");
+    expect(preview.style.getPropertyValue("--profile-accent-active")).toBe("var(--profile-accent-teal)");
+    expect(preview.querySelector('[data-slot="avatar"]')?.getAttribute("data-accent")).toBe("teal");
+  });
+
+  test("Appearance offers a device-only override and inheritance without writing the setting", async () => {
     const view = open(makePerson("adult"), "/settings/account/appearance");
     const choose = await view.findByRole("combobox", { name: "On this device only" });
     expect(choose).toBeTruthy();
-    fireEvent.click(await view.findByRole("button", { name: "Reset device appearance" }));
+    fireEvent.click(choose);
+    fireEvent.click(await view.findByRole("option", { name: "Use my setting" }));
     expect(fixture!.puts.filter((put) => put.key === "ui.appearance")).toEqual([]);
     expect(view.getByText("Choose a look for this browser. It does not change your personal setting.")).toBeTruthy();
   });

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { api, ApiError, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { ACCENT_SELECT_LABELS, ACCENT_SELECT_OPTIONS, NO_ACCENT } from "@/apps/people/roles";
 import { registerRouteLeaveGuard } from "@/shell/routeLeaveGuard";
+import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 
 export type ProfileFormPerson = PersonRosterEntry | Roster;
 
@@ -174,6 +175,9 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
           <SelectTrigger aria-label="Accent color"><SelectValue>{ACCENT_SELECT_LABELS[accent] ?? accent}</SelectValue></SelectTrigger>
           <SelectContent>{[...ACCENT_SELECT_OPTIONS].map((value) => <SelectItem key={value} value={value}>{ACCENT_SELECT_LABELS[value] ?? value}</SelectItem>)}</SelectContent>
         </Select>
+        <Card data-testid="profile-accent-preview" aria-label="Accent preview" accent={nextAccent ?? undefined} size="sm">
+          <Avatar name={trimmedName || person.display_name} accent={nextAccent ?? undefined} size="profile" />
+        </Card>
         {!canEdit ? <p className="text-sm text-muted-foreground">Ask an admin to change this.</p> : null}
       </div>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
