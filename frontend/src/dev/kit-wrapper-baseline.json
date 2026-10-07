@@ -13,8 +13,8 @@
   },
   "apps/chat/ChatThreadExtras.tsx": {
     "ChatThreadExtras": {
-      "ed": "ED-023",
-      "reason": "Hand-drawn palette overlay; kit ships ui/dialog; ELT-PALETTE-01."
+      "ed": "ED-034",
+      "reason": "Custom fixed find-bar overlay around ConversationSearch (cleanup item 5, chat wrappers)."
     }
   },
   "apps/chat/ComposerWakeWordControl.tsx": {

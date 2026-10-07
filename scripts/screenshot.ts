@@ -178,6 +178,7 @@ const chatMissingStatesOutDirArg = process.argv.find((arg) => arg.startsWith("--
 const chatMissingStatesOutDir = chatMissingStatesOutDirArg || process.env.MAIPAI_CHAT_MISSING_STATES_OUT_DIR || join(ROOT, "data-scratch", "screenshots", "chat-missing-states");
 const chatListReview = process.argv.includes("--chat-list-review");
 const chatSearchReview = process.argv.includes("--chat-search-review");
+const chatPaletteReview = process.argv.includes("--chat-palette-review");
 const chatMobileSheetReview = process.argv.includes("--chat-mobile-sheet-review");
 const chatShortcutsReview = process.argv.includes("--chat-shortcuts-review");
 const chatFindHeaderAlignmentReview = process.argv.includes("--chat-find-header-alignment-review");
@@ -3666,6 +3667,36 @@ async function captureChatSearchReview(browser: Browser, sessionValue: string): 
       if (await scope.getByText("Family shopping list", { exact: true }).count()) throw new Error("Search audit state still shows a non-matching chat");
       await settleAnimations(page);
       const file = `chat-search-${viewport.width}-${theme}.png`;
+      await page.screenshot({ path: join(outDir, file), fullPage: slug === "phone" });
+      console.log(`Wrote ${join(outDir, file)}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
+  }
+}
+
+/** ELT-PALETTE-01: open the shipped chat command palette on desktop and
+ * phone using the seeded demo household, then save the real UI state. */
+async function captureChatPaletteReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "palette-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  await seedTitledConversation("captureChatPaletteReview", cookie, "Palette review conversation");
+  for (const [slug, theme] of [["desktop", "light"], ["phone", "dark"]] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).waitFor();
+      await page.getByRole("textbox", { name: "Message input" }).focus();
+      await page.keyboard.press(process.platform === "darwin" ? "Meta+k" : "Control+k");
+      await page.getByRole("dialog", { name: "Chat commands" }).waitFor({ state: "visible" });
+      await page.getByRole("combobox", { name: "Type a command" }).waitFor({ state: "visible" });
+      await settleAnimations(page);
+      const file = `chat-palette-${viewport.width}-${theme}.png`;
       await page.screenshot({ path: join(outDir, file), fullPage: slug === "phone" });
       console.log(`Wrote ${join(outDir, file)}`);
       await page.close();
@@ -9341,6 +9372,12 @@ async function main() {
 
     if (nextChatAuditReview) {
       await captureNextChatAuditReview(browser, sessionValue);
+      return;
+    }
+
+    if (chatPaletteReview) {
+      await captureChatPaletteReview(browser, sessionValue);
+      console.log("completed named review: --chat-palette-review");
       return;
     }
 

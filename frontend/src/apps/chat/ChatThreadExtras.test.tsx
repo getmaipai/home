@@ -151,8 +151,25 @@ test("Cmd+K opens the palette and running a command closes it", async () => {
   act(() => root.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true, cancelable: true })));
   const paletteInput = await view.findByRole("combobox", { name: "Type a command" });
   expect(paletteInput).not.toBeNull();
+  expect(view.getByRole("dialog", { name: "Chat commands" })).not.toBeNull();
+  expect(view.getByRole("option", { name: /New chat/ })).not.toBeNull();
+  expect(view.getByRole("option", { name: /Scroll to latest/ })).not.toBeNull();
+  await waitFor(() => expect(document.activeElement).toBe(paletteInput));
   fireEvent.click(view.getByRole("option", { name: /Scroll to latest/ }));
   await waitFor(() => expect(view.queryByRole("combobox", { name: "Type a command" })).toBeNull());
+});
+
+test("Focus composer keeps focus after the command palette closes", async () => {
+  const view = renderChat({ count: 1 });
+  const root = view.container.querySelector('[data-slot="aui_thread-viewport"]')!;
+  const composer = view.getByRole("textbox", { name: "Message input" });
+  composer.focus();
+  act(() => root.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true, cancelable: true })));
+  await view.findByRole("combobox", { name: "Type a command" });
+  fireEvent.click(view.getByRole("option", { name: /Focus composer/ }));
+  await waitFor(() => expect(view.queryByRole("combobox", { name: "Type a command" })).toBeNull());
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  expect(document.activeElement).toBe(composer);
 });
 
 test("the palette hides Incognito for a child", async () => {

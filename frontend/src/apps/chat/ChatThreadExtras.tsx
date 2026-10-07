@@ -1,6 +1,6 @@
 import { memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAui, useAuiState } from "@assistant-ui/react";
-import { CommandPalette } from "@maipai/ui/src/elements/command-palette";
+import { CommandPaletteDialog } from "@maipai/ui/src/elements/command-palette";
 import { ConversationMap } from "@maipai/ui/src/elements/conversation-map";
 import { ConversationSearch, type SearchHit } from "@maipai/ui/src/elements/conversation-search";
 import { messagesForSearch, useScrollToMessage, useVisibleMessageIds } from "@maipai/ui/src/elements/thread.aui";
@@ -87,9 +87,14 @@ export function ChatThreadExtras() {
     paletteOpen,
   }), [actions, availability, canUseIncognito, isRunning, openSettings, paletteOpen, threadIds.length]);
   const runCommand = useCallback((id: string) => {
-    commands.find((command) => command.id === id)?.onRun();
+    const command = commands.find((candidate) => candidate.id === id);
     setPaletteOpen(false);
     setPaletteQuery("");
+    if (id === "focus-composer") {
+      window.setTimeout(() => command?.onRun(), 0);
+      return;
+    }
+    command?.onRun();
   }, [commands]);
   const stepSearch = useCallback((delta: number) => {
     if (hits.length === 0) return;
@@ -100,11 +105,6 @@ export function ChatThreadExtras() {
     if (!searchOpen) return;
     rootRef.current?.querySelector<HTMLInputElement>('[aria-label="Find in conversation"]')?.focus();
   }, [rootRef, searchOpen]);
-
-  useEffect(() => {
-    if (!paletteOpen) return;
-    rootRef.current?.querySelector<HTMLInputElement>('[aria-label="Type a command"]')?.focus();
-  }, [paletteOpen, rootRef]);
 
   useEffect(() => {
     if (searchOpen && hits.length > 0) scrollToMessage(hits[Math.min(activeIndex, hits.length - 1)]!.id);
@@ -157,12 +157,6 @@ export function ChatThreadExtras() {
         setSearchOpen(false);
         return;
       }
-      if (paletteOpen && key === "escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        setPaletteOpen(false);
-        return;
-      }
       if (searchOpen && key === "enter") {
         event.preventDefault();
         stepSearch(event.shiftKey ? -1 : 1);
@@ -202,21 +196,17 @@ export function ChatThreadExtras() {
         </div>
       )}
       {paletteOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Chat commands"
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[18vh] text-foreground"
-        >
-          <CommandPalette
-            commands={paletteCommands}
-            query={paletteQuery}
-            activeId={activeCommand || paletteCommands[0]?.id || ""}
-            onQueryChange={setPaletteQuery}
-            onActiveChange={setActiveCommand}
-            onRun={runCommand}
-          />
-        </div>
+        <CommandPaletteDialog
+          open
+          onOpenChange={(open) => { if (!open) { setPaletteOpen(false); setPaletteQuery(""); } }}
+          title="Chat commands"
+          commands={paletteCommands}
+          query={paletteQuery}
+          activeId={activeCommand || paletteCommands[0]?.id || ""}
+          onQueryChange={setPaletteQuery}
+          onActiveChange={setActiveCommand}
+          onRun={runCommand}
+        />
       )}
     </>
   );

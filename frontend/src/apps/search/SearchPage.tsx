@@ -16,7 +16,7 @@ interface SearchPageProps {
 // `far`'s own destination for the "Search" nav row and Cmd/Ctrl+K (step
 // 6: "on far the palette is a page with no free text entry beyond the
 // remote's keyboard") - the same shared search (`useSearchCommand`,
-// lane 9) `CommandPalette.tsx` uses, laid out as a real page instead of
+// lane 9) the desktop command palette uses, laid out as a real page instead of
 // a modal, since a Dialog over a remote-navigated ten-foot surface is
 // the wrong shape (nothing to click outside of, no pointer to dismiss
 // it with).

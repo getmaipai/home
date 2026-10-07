@@ -51,7 +51,7 @@ function renderSearchPage() {
 }
 
 // `far`'s own destination for "Search" and Cmd/Ctrl+K - the same shared
-// search (`useSearchCommand`) `CommandPalette.tsx` uses, as a real page.
+// search (`useSearchCommand`) the desktop command palette uses, as a real page.
 describe("SearchPage", () => {
   test("typing lists a matching app", async () => {
     const restore = stubFetch();

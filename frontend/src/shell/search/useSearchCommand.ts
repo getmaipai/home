@@ -5,7 +5,7 @@ import { runSearchProviders, type SearchGroup, type SearchResultItem } from "@/s
 
 /** The one query behind every search-or-chat box (docs/BACKLOG.md: "This
  * is the same prompt box the home-screen item above describes; build it
- * once") - `CommandPalette.tsx` (Cmd/Ctrl+K, desktop) and `HomePage.tsx`'s
+ * once") - `SearchPage` (Cmd/Ctrl+K on the far surface) and `HomePage.tsx`'s
  * own prompt box (lane 9 item 1) both call this, so a query has to only
  * ever be answered one way. `personId` is what a launcher needs for its
  * own Favorites row (`usePinnedApps`, the sidebar's own `pinnedIds`); a
