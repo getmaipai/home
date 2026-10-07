@@ -783,6 +783,8 @@ export const api = {
   // FEEDBACK-CANCEL-01: tapping the lit thumb again takes the rating back.
   clearConversationFeedback: (id: string) =>
     request<null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`, { method: "DELETE" }),
+  followUpSuggestions: (id: string, signal?: AbortSignal) =>
+    request<{ suggestions: { prompt: string }[] }>(`/api/conversations/turns/${encodeURIComponent(id)}/follow-up-suggestions`, { method: "POST", signal }),
   renameConversation: (id: string, title: string | null, pinned?: boolean) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
       method: "PATCH",

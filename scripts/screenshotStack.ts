@@ -19,6 +19,7 @@ export function startScreenshotStack(modelUrl: string, includeAlternateChatModel
         const modelInfo = (id: string) => ({ id, sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true });
         return Response.json({ roles: [
           { id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: ["/v1/chat/completions"], quality: ["everyday"], sharesModelWith: null, state: state(), reason: null, model: modelInfo("stub-chat"), check: check(), models: [{ id: "stub-chat", name: "Screenshot stub" }, ...(includeAlternateChatModel ? [{ id: "stub-chat-alt", name: "Alternate screenshot stub", description: "For regenerate menu capture" }] : [])] },
+          { id: "judge", label: "Judge", wire: "chat", residency: "resident", endpoints: ["/v1/chat/completions"], quality: [], sharesModelWith: null, state: state(), reason: null, model: modelInfo("stub-judge"), check: check(), models: [{ id: "stub-judge", name: "Screenshot background stub" }] },
           { id: "embed", label: "Embeddings", wire: "embeddings", residency: "resident", endpoints: ["/v1/embeddings"], quality: [], sharesModelWith: null, state: state(), reason: null, model: modelInfo("stub-embed"), check: check() },
         ] });
       }

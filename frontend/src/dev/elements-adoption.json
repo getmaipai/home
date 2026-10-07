@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-07T22:18:05.385Z",
-  "kitTag": "ui-v0.5.175",
+  "generatedAt": "2026-10-07T23:21:17.614Z",
+  "kitTag": "ui-v0.5.174",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -103,7 +103,7 @@
       "name": "agent-card",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -111,7 +111,7 @@
       "name": "agent-handoff",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -119,7 +119,7 @@
       "name": "agent-plan",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -186,7 +186,7 @@
       "name": "chat-panel",
       "group": "message",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -194,7 +194,7 @@
       "name": "checkpoint-history",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -202,7 +202,7 @@
       "name": "code-diff",
       "group": "canvas/artifacts",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -226,7 +226,7 @@
       "name": "comparison-card",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": true
     },
     {
@@ -298,7 +298,7 @@
       "name": "computer-use",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -306,7 +306,7 @@
       "name": "confidence-marker",
       "group": "sources/citations",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -354,7 +354,7 @@
       "name": "cost-meter",
       "group": "charts/data",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -451,7 +451,7 @@
       "name": "file-tree",
       "group": "canvas/artifacts",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -467,15 +467,15 @@
       "name": "flow-graph",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
       "file": "follow-up-suggestions.aui.tsx",
       "name": "follow-up-suggestions",
       "group": "composer",
-      "verdict": "wire-after",
-      "verdictReason": "Deferred until backend follow-up generator (adult only, passes the gate; gap matrix A15).",
+      "verdict": "wire-now",
+      "verdictReason": "E14 wires the shipped Element to optional suggestions from only the current completed adult chat turn; minor and temporary chats receive none.",
       "implemented": true
     },
     {
@@ -483,7 +483,7 @@
       "name": "github",
       "group": "other",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -588,7 +588,7 @@
       "name": "launcher-bubble",
       "group": "other",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -689,7 +689,7 @@
       "name": "message-pair",
       "group": "message",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -721,7 +721,7 @@
       "name": "model-picker",
       "group": "composer",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -857,7 +857,7 @@
       "name": "reasoning-effort",
       "group": "composer",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -865,7 +865,7 @@
       "name": "reasoning-panel",
       "group": "reasoning/tools",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -889,7 +889,7 @@
       "name": "recommendation-card",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": true
     },
     {
@@ -905,7 +905,7 @@
       "name": "research-report",
       "group": "canvas/artifacts",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -921,7 +921,7 @@
       "name": "reviewable-diff",
       "group": "canvas/artifacts",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -937,7 +937,7 @@
       "name": "score-breakdown",
       "group": "charts/data",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -954,7 +954,7 @@
       "name": "settings-panel",
       "group": "settings/onboarding",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -1019,7 +1019,7 @@
       "name": "streaming-text",
       "group": "message",
       "verdict": "support",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false,
       "reading": "STREAMING-TEXT-01: its look (word fades in blue over 500 ms, settles to ink over 700 ms, pulsing blue caret) is the chat reply's streaming animation, drawn by CSS transitions in markdown-text.css on Streamdown's word spans and caret prop inside MarkdownText (ui-v0.5.112). The Element itself renders one plain <p> that drops line breaks and has no markdown, so it cannot be the reply renderer and Home never imports it; the scan reads it as not implemented. It tints the newest two words by position; here a word is tinted until the next delta restamps it."
     },
@@ -1028,7 +1028,7 @@
       "name": "subagent-list",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -1036,7 +1036,7 @@
       "name": "suggestions",
       "group": "composer",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -1052,7 +1052,7 @@
       "name": "task-card",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": true
     },
     {
@@ -1068,7 +1068,7 @@
       "name": "terminal-block",
       "group": "agent/workflow",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -1108,7 +1108,7 @@
       "name": "thread-list",
       "group": "thread/list",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -1132,7 +1132,7 @@
       "name": "threadlist-sidebar",
       "group": "thread/list",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -1189,7 +1189,7 @@
       "name": "tool-group",
       "group": "reasoning/tools",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -1221,7 +1221,7 @@
       "name": "typing-indicator",
       "group": "errors/states",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     },
     {
@@ -1365,7 +1365,7 @@
       "name": "web-search",
       "group": "reasoning/tools",
       "verdict": "no-fit",
-      "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
+      "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision.",
       "implemented": false
     }
   ]

@@ -1,58 +1,47 @@
 import { afterEach, describe, expect, test, mock, spyOn } from "bun:test";
+import type { ThreadMessage } from "@assistant-ui/react";
 import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
-import { api, type PackageManifest } from "@/lib/api";
+import { api } from "@/lib/api";
 
 afterEach(() => mock.restore());
 
-function manifest(id: string, examples?: string[]): PackageManifest {
+function reply(turnId: string, status: "complete" | "running" = "complete"): ThreadMessage {
   return {
-    id,
-    version: "1.0.0",
-    kind: "plugin",
-    category: "Utilities",
-    display: id,
-    description: id,
-    author: "MaiPai",
-    license: "AGPL-3.0",
-    platforms: ["home"],
-    min_role: "guest",
-    consequential: false,
-    offline: "unavailable",
-    min_app: "0.1.0",
-    tier: 0,
-    ...(examples ? { routing: { examples } } : {}),
-  } as PackageManifest;
-}
-
-function stubPlugins(manifests: PackageManifest[]) {
-  return spyOn(api, "plugins").mockResolvedValue(manifests as never);
+    id: `${turnId}-reply`,
+    createdAt: new Date(),
+    role: "assistant",
+    content: [{ type: "text", text: "Here is the answer." }],
+    status: status === "complete" ? { type: "complete", reason: "stop" } : { type: "running" },
+    metadata: { unstable_state: null, unstable_annotations: [], unstable_data: [], steps: [], custom: { turnId } },
+  } as unknown as ThreadMessage;
 }
 
 describe("createChatSuggestionAdapter", () => {
-  test("takes the first routing example from up to three installed packages", async () => {
-    stubPlugins([
-      manifest("weather", ["What's the weather tomorrow?", "Will it rain today?"]),
-      manifest("calendar", ["What's on my calendar?"]),
-      manifest("recipes", ["Suggest a dinner recipe"]),
-      manifest("timers", ["Set a 10 minute timer"]),
-    ]);
-    const suggestions = await createChatSuggestionAdapter().generate({ messages: [], signal: undefined });
-    expect(suggestions).toEqual([
-      { prompt: "What's the weather tomorrow?" },
-      { prompt: "What's on my calendar?" },
-      { prompt: "Suggest a dinner recipe" },
-    ]);
+  test("loads prompts for the final completed persisted assistant turn", async () => {
+    const fetch = spyOn(api, "followUpSuggestions").mockResolvedValue({ suggestions: [{ prompt: "What would change in winter?" }] });
+    const suggestions = await createChatSuggestionAdapter().generate({ messages: [reply("turn-a")], signal: undefined });
+    expect(fetch).toHaveBeenCalledWith("turn-a", undefined);
+    expect(suggestions).toEqual([{ prompt: "What would change in winter?" }]);
   });
 
-  test("skips a package that declares no routing examples", async () => {
-    stubPlugins([manifest("no-examples"), manifest("weather", ["What's the weather?"])]);
-    const suggestions = await createChatSuggestionAdapter().generate({ messages: [], signal: undefined });
-    expect(suggestions).toEqual([{ prompt: "What's the weather?" }]);
+  test("does not request suggestions in Incognito", async () => {
+    const fetch = spyOn(api, "followUpSuggestions");
+    const suggestions = await createChatSuggestionAdapter(() => true).generate({ messages: [reply("turn-incognito")], signal: undefined });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(suggestions).toEqual([]);
   });
 
-  test("returns no suggestions rather than throwing when the plugins list fails to load", async () => {
-    spyOn(api, "plugins").mockRejectedValue(new Error("network error"));
-    const suggestions = await createChatSuggestionAdapter().generate({ messages: [], signal: undefined });
+  test("does not generate from an unfinished or non-final assistant message", async () => {
+    const fetch = spyOn(api, "followUpSuggestions");
+    const adapter = createChatSuggestionAdapter();
+    expect(await adapter.generate({ messages: [reply("turn-live", "running")], signal: undefined })).toEqual([]);
+    expect(await adapter.generate({ messages: [reply("turn-old"), { id: "user-next", role: "user", createdAt: new Date(), content: [], attachments: [], metadata: { unstable_state: null, unstable_annotations: [], unstable_data: [], steps: [], custom: {} } } as unknown as ThreadMessage], signal: undefined })).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  test("returns no suggestions when the endpoint fails", async () => {
+    spyOn(api, "followUpSuggestions").mockRejectedValue(new Error("network error"));
+    const suggestions = await createChatSuggestionAdapter().generate({ messages: [reply("turn-failed")], signal: undefined });
     expect(suggestions).toEqual([]);
   });
 });
