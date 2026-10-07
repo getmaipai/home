@@ -36,6 +36,7 @@
 // advanced reply-details popover open, plus the normal chat accessibility
 // checks; it is intentionally separate from the ordinary matrix shots.
 import { chromium, firefox, webkit, type Browser, type BrowserContext, type Locator, type Page } from "playwright";
+import { assistantStreamBody } from "../frontend/tests/assistantStreamBody";
 import { findClippedStrips, findOverflowingPanels } from "./panelOverflow";
 // A repo-root script, not a workspace member, so it can't resolve the
 // @maipai/spec package (only backend/ and frontend/ have it installed);
@@ -58,7 +59,6 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
 import { startScreenshotStack } from "./screenshotStack";
-import { assistantStreamBody } from "../frontend/tests/assistantStreamBody";
 import { RICH_REPLY_MARKDOWN, RICH_REPLY_PROMPT } from "../frontend/src/shell/pages/richReplyFixture";
 import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
@@ -159,6 +159,7 @@ const fitVerdictReview = process.argv.includes("--fit-verdict-review");
 const chatReview = process.argv.includes("--chat-review") || chatFocusReview || chatTemporaryReview;
 const chatStatsReview = process.argv.includes("--chat-stats-review");
 const liveVoiceSessionReview = process.argv.includes("--live-voice-session-review");
+const canvasPaneReview = process.argv.includes("--canvas-pane-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
 // spec.md "Acceptance for an implementation": the three states with no
 // existing dedicated capture (sources card + memory chip + image
@@ -322,7 +323,7 @@ const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const projectPageReview = process.argv.includes("--projects-page-review");
-const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview;
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -6980,6 +6981,65 @@ async function captureNextChatArtifactReview(browser: Browser, sessionValue: str
   }
 }
 
+/** ELT-T1-18: a real artifact canvas in the shipped pane variant, with
+ * the history column both visible and collapsed at 1440px in light and
+ * dark themes. */
+async function captureCanvasPaneReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots", "canvas-pane");
+  mkdirSync(outDir, { recursive: true });
+  for (const theme of THEMES) {
+    for (const history of ["open", "closed"] as const) {
+      const viewport = VIEWPORTS.find((item) => item.slug === "desktop")!;
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      await context.addInitScript((collapsed) => localStorage.setItem("maipai.chat.rail-collapsed", collapsed ? "1" : "0"), history === "closed");
+      try {
+        const page = await context.newPage();
+        await page.route("**/api/turn/stream", async (route) => {
+          const stream = assistantStreamBody([
+            { type: "delta", text: "Here's Pizza Night." },
+            { type: "done", value: {
+              turn_id: "turn-artifact123",
+              reply: { text: "Here's Pizza Night." },
+              source: "plugin",
+              plugin_id: "write_document",
+              safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-10-07T00:00:00.000Z" },
+              artifact: { id: "art-example123", version: 1 },
+            } },
+          ]);
+          const body = Buffer.from(await new Response(stream).arrayBuffer());
+          await route.fulfill({ status: 200, headers: { "content-type": "text/plain; charset=utf-8", "x-vercel-ai-data-stream": "v1" }, body });
+        });
+        await page.route("**/api/artifacts/art-example123/current", (route) => route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ id: "art-example123", conversation_id: "conv-artifact123", turn_id: "turn-artifact123", kind: "markdown", title: "Pizza Night", body: "Every Friday night, the whole family makes pizza together. Everyone picks their own toppings, and the little ones help roll out the dough.", version: 1, parent_version: null, created_by: "person-abc123", provenance: "turn-artifact123", created_at: "2026-10-07T00:00:00.000Z", hlc: "1791331200000:0:screenshot" }),
+        }));
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        const column = page.locator('[data-slot="next-chat-rail"]');
+        await column.waitFor({ state: "attached" });
+        const expectedColumnState = history === "open" ? "open" : "closed";
+        await page.waitForFunction((expected) => document.querySelector('[data-slot="next-chat-rail"]')?.getAttribute("data-state") === expected, expectedColumnState);
+        const input = page.getByRole("textbox", { name: "Message input" });
+        await input.fill("Write a short note about pizza night");
+        await page.getByRole("button", { name: "Send message", exact: true }).click();
+        const canvas = page.locator('[data-slot="canvas-split"][data-variant="pane"]');
+        await canvas.waitFor({ state: "visible", timeout: 15000 });
+        await canvas.getByText("Every Friday night, the whole family makes pizza together.").waitFor();
+        await page.mouse.move(0, 0);
+        await settleAnimations(page);
+        const filename = `canvas-pane-1440-history-${history}-${theme}.png`;
+        const path = join(outDir, filename);
+        await page.screenshot({ path, fullPage: true });
+        dedicatedScreenshots.push({ file: filename, route: "chat-artifact-canvas-pane", viewport: "desktop", theme });
+        console.log(`Wrote ${path}`);
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureNextShellFoldReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -9782,6 +9842,12 @@ async function main() {
       return;
     }
 
+    if (!a11yOnly && canvasPaneReview) {
+      await captureCanvasPaneReview(browser, sessionValue);
+      console.log("completed named review: --canvas-pane-review");
+      return;
+    }
+
     if (!a11yOnly && chatStatsReview) await captureChatStatsReview(browser, sessionValue);
 
     if (!a11yOnly && chatResearchReview) await captureChatResearchReview(browser, sessionValue);
@@ -9926,7 +9992,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -9957,7 +10023,7 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview || liveVoiceSessionReview
+    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview
       ? []
       : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
         ? A11Y_ONLY_COMBOS

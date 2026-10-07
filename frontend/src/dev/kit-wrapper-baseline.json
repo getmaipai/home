@@ -205,16 +205,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "shell/pages/ChatPage.tsx": {
-    "ArtifactCanvasPanel": {
-      "ed": "ED-028",
-      "reason": "Kit CanvasSplit lacked a pane variant (variant=pane in ui-v0.5.116); ELT-T1-18."
-    },
-    "BareCompareCanvasPanel": {
-      "ed": "ED-028",
-      "reason": "Kit CanvasSplit lacked a pane variant (variant=pane in ui-v0.5.116); ELT-T1-18."
-    }
-  },
   "shell/pages/FamilyPage.tsx": {
     "FamilyCard": {
       "ed": "ED-038",

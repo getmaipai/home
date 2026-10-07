@@ -81,98 +81,33 @@ const VoiceSettingsIcon = getIcon("settings");
 const LazyProjectHomeHeader = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeHeader })));
 const LazyProjectHomeTabs = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeTabs })));
 
-/** canvas-split's own acceptance: opens beside the thread, closing
- * keeps the thread, a later turn's update to the same artifact
- * replaces the pane's content. The last one comes free of any id
- * bookkeeping: `api.artifactCurrent()` always resolves through the
- * artifact's own key server-side (routes/artifacts.ts's `/current`),
- * so re-fetching the SAME `openArtifactId` after a new turn completes
- * is enough - `ChatPage`'s own effect invalidates the query
- * whenever the thread's message count changes, the simplest real
- * signal "a turn just finished." No mini transcript reconstruction
- * (`CanvasSplitThread`/`CanvasSplitMessage`, used exactly as shipped
- * below): fetching the triggering turn's own user message would be a
- * second round trip this slice doesn't need yet, so this shows the
- * document's own title as the one assistant-side line instead of
- * inventing dialogue. */
-function ArtifactCanvasPanel({ artifactId, onClose }: { artifactId: string; onClose: () => void }) {
-  const query = useQuery({ queryKey: ["artifact-current", artifactId], queryFn: () => api.artifactCurrent(artifactId) });
-  return (
-    // Jesse found this: CanvasSplit's own shipped default is a fixed
-    // `md:h-80` (its own upstream use is a small preview card, never a
-    // full desktop side panel), so this panel stopped 320px down with
-    // empty space below it instead of filling the row's real height
-    // (ChatPage.tsx's own wrapping div already stretches to the
-    // row's full height via flexbox's default `align-items: stretch` -
-    // CanvasSplit itself just never grew into it). Overridden here via
-    // the component's own `className` passthrough (never editing the
-    // vendored file) - `md:h-full` specifically, so `cn()`'s
-    // `tailwind-merge` matches and replaces the shipped `md:h-80`
-    // (same variant, same property) rather than adding a conflicting
-    // rule beside it.
-    //
-    // Jesse also found this: CanvasSplit's own shipped `paper` surface
-    // (bg-background, a border on all four sides) plus its own
-    // `rounded-[20px]` reads as a floating card next to the thread,
-    // where ChatGPT's own reference (a real split pane, edge to edge,
-    // divided by a single hairline, never rounded) reads as an attached
-    // panel. `rounded-none` clears the shipped radius; `border-0
-    // border-l` clears the shipped all-sides border first, then adds
-    // back only the left edge as the pane's own divider (tailwind-merge
-    // tracks each side's border-width separately, so this is a real
-    // override per side, not an extra border stacked on top of the
-    // existing four). The wrapping `div` in ChatPage.tsx dropped its
-    // own `ms-4` gap to match - flush against the thread, the same way
-    // the reference's pane sits with no gap before its own divider.
-    <CanvasSplit className="rounded-none border-0 border-l md:h-full">
-      <CanvasSplitThread>
-        <CanvasSplitMessage speaker="assistant">{query.data ? `Wrote "${query.data.title}."` : "Wrote the document."}</CanvasSplitMessage>
-      </CanvasSplitThread>
-      <CanvasSplitDocument>
-        <AsyncState
-          data={query.data}
-          error={query.isError}
-          isFetching={query.isFetching}
-          onRetry={() => void query.refetch()}
-          errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load this document."}
-          loadingLabel="Loading document"
-        >
-          {(artifact) => (
-            <>
-              <CanvasSplitHeader title={artifact.title} version={artifact.version} saved onCopy={() => void navigator.clipboard.writeText(artifact.body)} onClose={onClose} />
-              <CanvasSplitBody>
-                {/* THIN-5F (rule 9): the chat's own MarkdownText, exactly as
-                    shipped. MarkdownDocument gives the fetched body the
-                    message scope the kit's code slot reads; a refetch swaps
-                    the text in place. */}
-                <MarkdownDocument text={artifact.body} />
-              </CanvasSplitBody>
-            </>
-          )}
-        </AsyncState>
-      </CanvasSplitDocument>
-    </CanvasSplit>
-  );
+function useArtifactCanvas(artifactId: string | null) {
+  return useQuery({
+    queryKey: ["artifact-current", artifactId],
+    queryFn: () => api.artifactCurrent(artifactId!),
+    enabled: artifactId !== null,
+  });
 }
 
-/** ADMIN-COMPARE-01: "Compare with the bare model" opens this beside the
- * thread, the same `CanvasSplit` the artifact panel above uses - a bare
- * container (`flex ... md:flex-row`, nothing hardwired to one document)
- * composed TWICE here, ours and the bare model's own reply side by side,
- * rather than forked or given a second Element. `version`/`saved` on
- * `CanvasSplitHeader` are the artifact shape's own fields (no real
- * "version" concept for either side of a compare) - both panes read
- * `version={1} saved` so the shipped header renders its normal "saved"
- * state instead of a half-finished "editing" one neither pane is ever
- * actually in. */
-function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; onClose: () => void }) {
+function useBareCompareCanvas(target: CompareTarget | null) {
   const [trace, setTrace] = useState<BareCompareTrace | null>(null);
   const [bareText, setBareText] = useState("");
   const [refused, setRefused] = useState(false);
   const [status, setStatus] = useState<"loading" | "streaming" | "done" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const conversationId = target?.conversationId;
+  const turnId = target?.turnId;
+  const ourText = target?.ourText;
 
   useEffect(() => {
+    if (conversationId === undefined || turnId === undefined || ourText === undefined) {
+      setTrace(null);
+      setBareText("");
+      setRefused(false);
+      setStatus("loading");
+      setErrorMessage(null);
+      return;
+    }
     const controller = new AbortController();
     setTrace(null);
     setBareText("");
@@ -181,7 +116,7 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
     setErrorMessage(null);
     (async () => {
       try {
-        const response = await api.compareTurnBare(target.conversationId, target.turnId, controller.signal);
+        const response = await api.compareTurnBare(conversationId, turnId, controller.signal);
         for await (const event of readBareCompareStream(response)) {
           if (event.type === "trace") {
             setTrace(event.trace);
@@ -202,42 +137,9 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
       }
     })();
     return () => controller.abort();
-  }, [target.conversationId, target.turnId]);
+  }, [conversationId, turnId, ourText, target]);
 
-  return (
-    <CanvasSplit>
-      <CanvasSplitDocument>
-        <CanvasSplitHeader title="Ours" version={1} saved onCopy={() => void navigator.clipboard.writeText(target.ourText)} onClose={onClose} />
-        <CanvasSplitBody>
-          <CanvasSplitLine>{target.ourText}</CanvasSplitLine>
-          {trace ? (
-            <>
-              <CanvasSplitLine heading>Trace</CanvasSplitLine>
-              <CanvasSplitLine>Rung: {trace.rung ?? "none"}</CanvasSplitLine>
-              <CanvasSplitLine>
-                Route: {trace.routing_tier ?? "model"}
-                {trace.routing_score !== null ? ` (${trace.routing_score.toFixed(2)})` : ""}
-              </CanvasSplitLine>
-              <CanvasSplitLine>Rules fired: {trace.rules.length > 0 ? trace.rules.join(", ") : "none"}</CanvasSplitLine>
-              <CanvasSplitLine>Guard: {trace.guard_reason ?? "none"}</CanvasSplitLine>
-              <CanvasSplitLine>Thinking: {trace.stats?.thinking ? "on" : "off"}</CanvasSplitLine>
-              <CanvasSplitLine>Model: {trace.stats?.engine ?? "unknown"}</CanvasSplitLine>
-              <CanvasSplitLine>Persona in effect: {trace.persona_fragments || "none"}</CanvasSplitLine>
-            </>
-          ) : null}
-        </CanvasSplitBody>
-      </CanvasSplitDocument>
-      <CanvasSplitDocument>
-        <CanvasSplitHeader title="Bare model" version={1} saved onCopy={() => void navigator.clipboard.writeText(bareText)} onClose={onClose} />
-        <CanvasSplitBody writing={status === "streaming"}>
-          {status === "loading" ? <CanvasSplitLine>Asking the bare model…</CanvasSplitLine> : null}
-          {status === "error" ? <CanvasSplitLine>{errorMessage}</CanvasSplitLine> : null}
-          {bareText ? <CanvasSplitLine>{bareText}</CanvasSplitLine> : null}
-          {refused ? <CanvasSplitLine>The bare reply was refused by the same safety pass a real turn uses.</CanvasSplitLine> : null}
-        </CanvasSplitBody>
-      </CanvasSplitDocument>
-    </CanvasSplit>
-  );
+  return { trace, bareText, refused, status, errorMessage };
 }
 
 /** /chat: SHELL-02's slice 2 (docs/plans/shell-on-shadcndashboard-
@@ -1333,6 +1235,69 @@ export function ChatPage({ person }: { person: Roster }) {
   const temporaryChatValue = useMemo(() => ({ on: temporaryNext }), [temporaryNext]);
   const closeArtifact = () => setOpenArtifactId(null);
   const closeCompare = () => setCompareTarget(null);
+  const artifactCanvasId = isDesktopCanvas ? lastCanvasArtifactId : openArtifactId;
+  const artifactQuery = useArtifactCanvas(artifactCanvasId);
+  const compareCanvas = useBareCompareCanvas(compareTarget);
+  const artifactCanvas = artifactCanvasId === null ? null : (
+    <CanvasSplit variant="pane">
+      <CanvasSplitThread>
+        <CanvasSplitMessage speaker="assistant">{artifactQuery.data ? `Wrote "${artifactQuery.data.title}."` : "Wrote the document."}</CanvasSplitMessage>
+      </CanvasSplitThread>
+      <CanvasSplitDocument>
+        <AsyncState
+          data={artifactQuery.data}
+          error={artifactQuery.isError}
+          isFetching={artifactQuery.isFetching}
+          onRetry={() => void artifactQuery.refetch()}
+          errorMessage={artifactQuery.error instanceof ApiError ? artifactQuery.error.message : "Could not load this document."}
+          loadingLabel="Loading document"
+        >
+          {(artifact) => (
+            <>
+              <CanvasSplitHeader title={artifact.title} version={artifact.version} saved onCopy={() => void navigator.clipboard.writeText(artifact.body)} onClose={closeArtifact} />
+              <CanvasSplitBody>
+                <MarkdownDocument text={artifact.body} />
+              </CanvasSplitBody>
+            </>
+          )}
+        </AsyncState>
+      </CanvasSplitDocument>
+    </CanvasSplit>
+  );
+  const compareCanvasElement = compareTarget === null ? null : (
+    <CanvasSplit>
+      <CanvasSplitDocument>
+        <CanvasSplitHeader title="Ours" version={1} saved onCopy={() => void navigator.clipboard.writeText(compareTarget.ourText)} onClose={closeCompare} />
+        <CanvasSplitBody>
+          <CanvasSplitLine>{compareTarget.ourText}</CanvasSplitLine>
+          {compareCanvas.trace ? (
+            <>
+              <CanvasSplitLine heading>Trace</CanvasSplitLine>
+              <CanvasSplitLine>Rung: {compareCanvas.trace.rung ?? "none"}</CanvasSplitLine>
+              <CanvasSplitLine>
+                Route: {compareCanvas.trace.routing_tier ?? "model"}
+                {compareCanvas.trace.routing_score !== null ? ` (${compareCanvas.trace.routing_score.toFixed(2)})` : ""}
+              </CanvasSplitLine>
+              <CanvasSplitLine>Rules fired: {compareCanvas.trace.rules.length > 0 ? compareCanvas.trace.rules.join(", ") : "none"}</CanvasSplitLine>
+              <CanvasSplitLine>Guard: {compareCanvas.trace.guard_reason ?? "none"}</CanvasSplitLine>
+              <CanvasSplitLine>Thinking: {compareCanvas.trace.stats?.thinking ? "on" : "off"}</CanvasSplitLine>
+              <CanvasSplitLine>Model: {compareCanvas.trace.stats?.engine ?? "unknown"}</CanvasSplitLine>
+              <CanvasSplitLine>Persona in effect: {compareCanvas.trace.persona_fragments || "none"}</CanvasSplitLine>
+            </>
+          ) : null}
+        </CanvasSplitBody>
+      </CanvasSplitDocument>
+      <CanvasSplitDocument>
+        <CanvasSplitHeader title="Bare model" version={1} saved onCopy={() => void navigator.clipboard.writeText(compareCanvas.bareText)} onClose={closeCompare} />
+        <CanvasSplitBody writing={compareCanvas.status === "streaming"}>
+          {compareCanvas.status === "loading" ? <CanvasSplitLine>Asking the bare model…</CanvasSplitLine> : null}
+          {compareCanvas.status === "error" ? <CanvasSplitLine>{compareCanvas.errorMessage}</CanvasSplitLine> : null}
+          {compareCanvas.bareText ? <CanvasSplitLine>{compareCanvas.bareText}</CanvasSplitLine> : null}
+          {compareCanvas.refused ? <CanvasSplitLine>The bare reply was refused by the same safety pass a real turn uses.</CanvasSplitLine> : null}
+        </CanvasSplitBody>
+      </CanvasSplitDocument>
+    </CanvasSplit>
+  );
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
@@ -1559,12 +1524,12 @@ export function ChatPage({ person }: { person: Roster }) {
                   if (e.target === e.currentTarget && e.propertyName === "width" && openArtifactId === null) setLastCanvasArtifactId(null);
                 }}
               >
-                {lastCanvasArtifactId !== null ? <ArtifactCanvasPanel artifactId={lastCanvasArtifactId} onClose={closeArtifact} /> : null}
+                {lastCanvasArtifactId !== null ? artifactCanvas : null}
               </div>
             ) : null}
             {compareTarget !== null ? (
               <div className="ms-4 hidden w-full max-w-3xl shrink-0 overflow-y-auto lg:block">
-                <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} />
+                {compareCanvasElement}
               </div>
             ) : null}
           </div>
@@ -1620,7 +1585,7 @@ export function ChatPage({ person }: { person: Roster }) {
               <SheetTitle>Document</SheetTitle>
               <SheetDescription>The document from this reply</SheetDescription>
             </SheetHeader>
-            {!isDesktopCanvas && openArtifactId !== null ? <ArtifactCanvasPanel artifactId={openArtifactId} onClose={closeArtifact} /> : null}
+            {!isDesktopCanvas && openArtifactId !== null ? artifactCanvas : null}
           </SheetContent>
         </Sheet>
         <Sheet open={compareTarget !== null} onOpenChange={(next) => { if (!next) closeCompare(); }}>
@@ -1631,7 +1596,7 @@ export function ChatPage({ person }: { person: Roster }) {
               <SheetTitle>Compare with the bare model</SheetTitle>
               <SheetDescription>Our reply beside the same model with no routing, packages, persona or guards</SheetDescription>
             </SheetHeader>
-            {compareTarget !== null ? <BareCompareCanvasPanel target={compareTarget} onClose={closeCompare} /> : null}
+            {compareCanvasElement}
           </SheetContent>
         </Sheet>
       </ChatColumnControlContext.Provider>

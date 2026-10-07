@@ -580,16 +580,6 @@
     }
   },
   "shell/pages/ChatPage.tsx": {
-    "CanvasSplit": {
-      "tokens": [
-        "border-0",
-        "border-l",
-        "md:h-full",
-        "rounded-none"
-      ],
-      "ed": "ED-028",
-      "reason": "Kit CanvasSplit lacked a pane variant (variant=pane in ui-v0.5.116); ELT-T1-18."
-    },
     "Alert": {
       "tokens": [
         "max-w-200",
