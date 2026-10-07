@@ -383,7 +383,11 @@ describe("NextChatPage (SHELL-02's slice 2: the thread list)", () => {
       const list = view.container.querySelector('[data-slot="aui_thread-list-items"]')!;
       const rows = Array.from(list.querySelectorAll('[data-slot="aui_thread-list-item"]'));
       expect(rows.map((row) => row.querySelector('[data-slot="aui_thread-list-item-title"]')?.textContent?.trim())).toEqual(["Garden pinned", "Garden today", "Garden yesterday", "Garden earlier"]);
-      expect(Array.from(list.querySelectorAll('[data-slot="aui_thread-list-group-label"]')).map((label) => label.textContent)).toEqual(["Pinned", "Today", "Yesterday", "Earlier"]);
+      const groupLabels = Array.from(list.querySelectorAll('[data-slot="aui_thread-list-group-label"]')).map((label) => label.textContent);
+      expect(groupLabels).toEqual(["Pinned", "Today", "Yesterday", "Earlier"]);
+      expect(groupLabels.every((label) => !/\d/.test(label ?? ""))).toBe(true);
+      const groupNodes = Array.from(list.querySelectorAll<HTMLElement>('[data-slot="aui_thread-list-group-label"]'));
+      expect(groupNodes.map((label) => label.nextSibling?.textContent?.trim() ?? "").filter((text) => /^\d+$/.test(text))).toEqual([]);
       // The kit's matcher retains pin/day metadata and Enter uses its ordered results.
       const search = view.container.querySelector('[data-slot="thread-search"]')!;
       expect(search).toBeVisible();

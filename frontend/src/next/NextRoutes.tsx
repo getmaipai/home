@@ -41,7 +41,7 @@ import { useStatusApps } from "@/shell/useStatusApps";
 import { sidebarItemStatus } from "@/shell/statusApps";
 import { TabIdentityProvider } from "@/shell/tabIdentity";
 import { useSessionLocked } from "@/shell/sessionLockContext";
-import { rememberLastAppRoute } from "@/next/pages/settings/settingsBackLink";
+import { activeAppHref, rememberLastAppRoute } from "@/next/pages/settings/settingsBackLink";
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -120,6 +120,7 @@ function NextRoutesInner({ person, onPersonChange, onSignedOut }: { person: Rost
 
 function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
   const location = useLocation();
+  const selectedAppHref = activeAppHref(location.pathname);
   const statusAppsQuery = useStatusApps();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const locked = useSessionLocked();
@@ -176,7 +177,7 @@ function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { pers
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail headerSearchRemote={api.search} railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail activeAppHref={selectedAppHref} headerSearchRemote={api.search} railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<NextChatPage person={person} />} />
           {/* APP-SET-02 (RULES S4): the settings areas draw no slim title bar,
               like ChatGPT's own settings page: the column title is the page's

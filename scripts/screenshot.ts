@@ -5049,7 +5049,11 @@ async function captureNextChatHistoryReview(browser: Browser, sessionValue: stri
         }));
         const groups = await scope.locator('[data-slot="aui_thread-list-group-label"]').allTextContents();
         console.log(`captureNextChatHistoryReview ${evidenceTag} ${slug}/${theme}: ${JSON.stringify({ groups, rows: report })}`);
-        if (report.length !== seeds.length + 1) throw new Error(`captureNextChatHistoryReview: expected ${seeds.length + 1} history rows on ${slug}/${theme}, found ${report.length}`);
+        const expectedTitles = [activeTitle, ...seeds.map((seed) => seed.title)];
+        const renderedTitles = new Set(report.map((row) => row.title));
+        const missingTitles = expectedTitles.filter((title) => !renderedTitles.has(title));
+        if (missingTitles.length > 0) throw new Error(`captureNextChatHistoryReview: missing seeded history rows on ${slug}/${theme}: ${missingTitles.join(", ")}`);
+        if (groups.some((label) => /\d/.test(label))) throw new Error(`captureNextChatHistoryReview: a group header contains a digit on ${slug}/${theme}: ${groups.join(", ")}`);
         const activeRows = report.filter((row) => row.active === "true");
         if (activeRows.length !== 1 || activeRows[0]!.title !== activeTitle) throw new Error(`captureNextChatHistoryReview: expected exactly one active row, "${activeTitle}", on ${slug}/${theme}`);
         const file = `next-chat-history-${evidenceTag}-${viewport.width}-${theme}.png`;
@@ -7161,8 +7165,13 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        await page.goto(`${BASE_URL}/settings`);
-        await page.locator("text=Family name").first().waitFor({ timeout: 15000 });
+        await page.goto(`${BASE_URL}${slug === "phone" ? "/settings/home" : "/settings/home/general"}`);
+        if (slug === "phone") {
+          await page.getByRole("heading", { level: 2, name: "Settings" }).waitFor({ timeout: 15000 });
+          await page.getByRole("searchbox", { name: "Search" }).waitFor({ timeout: 15000 });
+        } else {
+          await page.locator("text=Family name").first().waitFor({ timeout: 15000 });
+        }
         await settleAnimations(page);
         const path = join(outDir, `next-settings-${viewport.width}-${theme}.png`);
         await page.screenshot({ path, fullPage: slug === "phone" });
@@ -9314,6 +9323,8 @@ async function main() {
 
     if (nextSettingsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview) {
       await captureNextSettingsReview(browser, sessionValue);
+      console.log("completed named review: --next-settings-review");
+      return;
     }
 
     if (nextEnginesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview) {
