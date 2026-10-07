@@ -92,10 +92,16 @@ describe("(a) one cause, one visual", () => {
       const dot = notice(view.container)?.querySelector('[data-slot="chat-notice-dot"]');
       expect(dot?.innerHTML).toContain("tint-attention-fg");
       expect(dot?.innerHTML).not.toContain("animate-ping");
+      expect(dot?.className).toContain("inline-flex");
       const repairs = view.getByRole("link", { name: "Open Repairs" });
       expect(repairs.getAttribute("data-slot")).toBe("button");
-      expect(repairs.getAttribute("data-size")).toBe("sm");
-      expect(repairs.className).toContain("before:-inset-2");
+      expect(repairs.getAttribute("data-size")).toBe("xs");
+      expect(repairs.getAttribute("data-variant")).toBe("quiet-link");
+      expect(repairs.className).toContain("before:-inset-3");
+      expect(repairs.className).toContain("focus-visible:ring-[3px]");
+      repairs.focus();
+      expect(document.activeElement).toBe(repairs);
+      expect(notice(view.container)?.querySelector("[data-chat-notice-text]")?.textContent).toBe(PAUSED.adult);
       expect([...notice(view.container)!.children].map((node) => (node as HTMLElement).dataset.slot ?? node.tagName)).toEqual([
         "chat-notice-dot",
         "SPAN",

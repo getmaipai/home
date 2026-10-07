@@ -334,6 +334,7 @@ const engineDownReview = process.argv.includes("--engine-down-review");
 // APP-SET-02: the settings areas (Account, Chat settings, Home settings) as an admin, an adult, a teen and a child see them.
 const appSettingsReview = process.argv.includes("--app-settings-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
+const noticeStyleReview = process.argv.includes("--notice-style-review");
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -2822,6 +2823,79 @@ async function captureChatProjectsReview(browser: Browser, ownerSession: string)
 /** COLUMN-01 (owner, 2026-10-06): the chat history column, open, hidden,
  * mid-slide, searching, hovered and selected rows, pinned, empty, loading
  * and the phone sheet, in both themes, measured. */
+async function captureChatNoticeReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "column-shots");
+  mkdirSync(outDir, { recursive: true });
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
+  for (const [slug, viewport] of [["1440", desktop], ["390", phone], ["360", { ...phone, width: 360 }]] as const) {
+    for (const theme of THEMES) {
+      for (const level of ["amber", "red"] as const) {
+        const context = await newContext(browser, viewport, theme, sessionValue);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          await page.route("**/api/health", async (route) => {
+            const response = await route.fetch();
+            const body = await response.json();
+            body.engines = { ...(body.engines ?? {}), chat: { kind: "stopped", pid: null, alive: false, availability: "unavailable", reason: "stopped", notice: {
+              adult: "Chat is paused. Your message stays here; press Send once it is back.",
+              teen: "Chat is paused right now. Your message stays here; press Send once it is back.",
+              child: "I'm taking a break. Ask a grown-up, or try again soon.",
+              repairs_link: "Open Repairs",
+            } } };
+            await route.fulfill({ response, json: body });
+          });
+          await page.route("**/api/status/apps", (route) => route.fulfill({ json: [
+            { id: "chat", name: "Chat", state: level === "red" ? "down" : "degraded", reason: level === "red" ? "Chat is down." : "Chat is paused.", paused: level === "amber", history: [], uptimePercent: 100 },
+          ] }));
+          await page.goto(`${BASE_URL}/chat`);
+          await page.getByRole("textbox", { name: "Message input" }).waitFor();
+          const notice = page.locator("[data-chat-notice]");
+          await notice.waitFor();
+          await page.waitForFunction((want) => document.querySelector("[data-chat-notice]")?.getAttribute("data-level") === want, level);
+          const facts = await page.evaluate(() => {
+            const el = document.querySelector<HTMLElement>("[data-chat-notice]")!;
+            const dot = el.querySelector<HTMLElement>('[data-slot="chat-notice-dot"] > span')!;
+            const slot = el.closest<HTMLElement>("[data-slot='aui_composer-notice']")!;
+            const text = el.querySelector<HTMLElement>("[data-chat-notice-text]")!;
+            const range = document.createRange();
+            range.selectNodeContents(text);
+            const link = el.querySelector<HTMLElement>('a[href="/repairs"]')!;
+            return {
+              dot: getComputedStyle(dot).backgroundColor,
+              dotSize: Math.round(dot.getBoundingClientRect().width),
+              text: getComputedStyle(slot).color,
+              size: getComputedStyle(slot).fontSize,
+              slotWidth: slot.clientWidth,
+              slotScrollWidth: slot.scrollWidth,
+              textOverflow: getComputedStyle(text).textOverflow,
+              textWhiteSpace: getComputedStyle(slot).whiteSpace,
+              textLines: range.getClientRects().length,
+              linkVisible: !!link && link.getBoundingClientRect().width > 0,
+              order: [...el.children].map((child) => {
+                const element = child as HTMLElement;
+                if (element.matches("a[href='/repairs']")) return "link";
+                return element.dataset.slot ?? (element.dataset.chatNoticeText !== undefined ? "text" : element.tagName);
+              }),
+            };
+          });
+          if (facts.order.join(",") !== "chat-notice-dot,text,link") throw new Error(`NOTICE-STYLE-01: wrong dot/sentence/link order at ${slug}/${theme}/${level}: ${facts.order.join(",")}`);
+          if (Number(slug) < 400 && (facts.textOverflow === "ellipsis" || facts.textWhiteSpace === "nowrap" || facts.slotScrollWidth > facts.slotWidth || facts.textLines < 2 || !facts.linkVisible)) {
+            throw new Error(`NOTICE-STYLE-01: notice clipped or failed to wrap at ${slug}/${theme}/${level}: ${JSON.stringify(facts)}`);
+          }
+          console.log(`notice ${slug}/${theme}/${level}`, facts);
+          const file = join(outDir, `notice-${level}-${slug}-${theme}.png`);
+          await page.screenshot({ path: file });
+          console.log(`Wrote ${file}`);
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
+}
+
 async function captureChatColumnReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "chat-ab", "column-shots");
   mkdirSync(outDir, { recursive: true });
@@ -3111,46 +3185,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
     }
   }
 
-  // CHAT-NOTICE-LED-01: the calm composer notice, a status dot then one sentence.
-  for (const [slug, viewport] of [["1440", desktop], ["390", phone]] as const) {
-    for (const theme of THEMES) {
-      for (const level of ["amber", "red"] as const) {
-        const context = await newContext(browser, viewport, theme, sessionValue);
-        try {
-          const page = await context.newPage();
-          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-          await page.route("**/api/health", async (route) => {
-            const response = await route.fetch();
-            const body = await response.json();
-            body.engines = { ...(body.engines ?? {}), chat: { kind: "stopped", pid: null, alive: false, availability: "unavailable", reason: "stopped", notice: {
-              adult: "Chat is paused. Your message stays here; press Send once it is back.",
-              teen: "Chat is paused right now. Your message stays here; press Send once it is back.",
-              child: "I'm taking a break. Ask a grown-up, or try again soon.",
-              repairs_link: "Open Repairs",
-            } } };
-            await route.fulfill({ response, json: body });
-          });
-          await page.route("**/api/status/apps", (route) => route.fulfill({ json: [
-            { id: "chat", name: "Chat", state: level === "red" ? "down" : "degraded", reason: level === "red" ? "Chat is down." : "Chat is paused.", paused: level === "amber", history: [], uptimePercent: 100 },
-          ] }));
-          await page.goto(`${BASE_URL}/chat`);
-          await page.getByRole("textbox", { name: "Message input" }).waitFor();
-          const notice = page.locator("[data-chat-notice]");
-          await notice.waitFor();
-          await page.waitForFunction((want) => document.querySelector("[data-chat-notice]")?.getAttribute("data-level") === want, level);
-          const facts = await page.evaluate(() => {
-            const el = document.querySelector<HTMLElement>("[data-chat-notice]")!;
-            const dot = el.querySelector<HTMLElement>('[data-slot="chat-notice-dot"] > span')!;
-            return { dot: getComputedStyle(dot).backgroundColor, dotSize: Math.round(dot.getBoundingClientRect().width), text: getComputedStyle(el).color, size: getComputedStyle(el).fontSize, box: getComputedStyle(el).backgroundColor, border: getComputedStyle(el).borderTopWidth };
-          });
-          log(`notice ${slug}/${theme}/${level}`, facts);
-          await shoot(page, `notice-${level}-${slug}-${theme}`);
-        } finally {
-          await context.close();
-        }
-      }
-    }
-  }
+  await captureChatNoticeReview(browser, sessionValue);
 
   // Loading: hold the conversation list so the skeleton rows show.
   {
@@ -9429,6 +9464,12 @@ async function main() {
     if (chatProjectsReview) {
       await captureChatProjectsReview(browser, sessionValue);
       console.log("completed named review: --chat-projects-review");
+      return;
+    }
+
+    if (noticeStyleReview) {
+      await captureChatNoticeReview(browser, sessionValue);
+      console.log("completed named review: --notice-style-review");
       return;
     }
 

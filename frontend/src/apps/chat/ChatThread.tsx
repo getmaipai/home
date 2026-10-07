@@ -129,6 +129,7 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
           scrollToBottomOffset={56}
           components={{
             ...THREAD_SLOTS,
+            composerNoticeLayout: "wrap",
             onEditSend,
             sendHeld,
             engineDown,

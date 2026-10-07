@@ -98,32 +98,32 @@ function chatNoticeLevel(apps: StatusAppsResponse | undefined): "amber" | "red" 
 
 /** CHAT-CALM-ERRORS-01d (design sections 2 and 7): the kit Thread's
  * ComposerNotice slot, the one place chat says it cannot answer right now.
- * The kit draws the muted one-line frame; this fills it with the band's line
- * from the health row and, for an owner or admin, the Repairs link (the link
- * the old full-width banner carried, ported here). Nothing while chat is
- * ready. */
+ * The kit draws the muted frame; this fills it with the band's line from the
+ * health row and, for an owner or admin, the Repairs link. Nothing while chat
+ * is ready. */
 export function ChatComposerNotice() {
   const notice = useContext(ChatComposerNoticeContext);
   const apps = useStatusApps().data;
   if (!notice) return null;
   const level = chatNoticeLevel(apps);
   return (
-    // The kit frame is one truncated line. The kit Button's compact size
-    // keeps the Repairs link's visible label small and extends its hit area
-    // to 48px without changing this row's layout.
     // CHAT-NOTICE-LED-01 (owner, 2026-10-06): ChatGPT's quiet status line, a small
     // LED dot then one sentence in the normal foreground. The dot is the
     // kit's StatusIndicator (degraded or offline, no ping), the same dot as the
     // header status pill, on the kit's attention and destructive tokens,
     // chosen by the status-board state the rail's Chat icon reads; every notice, for
     // every age band, goes through this one presentation.
-    <span data-chat-notice data-level={level} role="status" aria-live="polite" title={notice.text} className="text-foreground inline-flex max-w-full items-center gap-2">
-      <StatusIndicator data-slot="chat-notice-dot" status={level === "red" ? "offline" : "degraded"} ping={false} />
-      <span className="min-w-0 truncate">{notice.text}</span>
+    <span data-chat-notice data-level={level} role="status" aria-live="polite" title={notice.text}>
+      <StatusIndicator data-slot="chat-notice-dot" status={level === "red" ? "offline" : "degraded"} ping={false} inline />
+      {" "}
+      <span data-chat-notice-text>{notice.text}</span>
       {notice.repairsLink ? (
-        <KitButton variant="link" size="sm" asChild>
-          <Link to="/repairs">{notice.repairsLink}</Link>
-        </KitButton>
+        <>
+          {" "}
+          <KitButton variant="quiet-link" size="xs" asChild>
+            <Link to="/repairs">{notice.repairsLink}</Link>
+          </KitButton>
+        </>
       ) : null}
     </span>
   );
