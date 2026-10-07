@@ -1734,5 +1734,33 @@
     "theme": "dark",
     "capturedAt": "2026-09-28T04:40:13.545Z",
     "captureScript": "scripts/screenshot.ts --shell-09-docs-matrix"
+  },
+  "files-desktop-light.png": {
+    "route": "files",
+    "viewport": "desktop",
+    "theme": "light",
+    "capturedAt": "2026-10-07T08:46:40.390Z",
+    "captureScript": "scripts/screenshot.ts --files-review"
+  },
+  "files-desktop-dark.png": {
+    "route": "files",
+    "viewport": "desktop",
+    "theme": "dark",
+    "capturedAt": "2026-10-07T08:46:40.390Z",
+    "captureScript": "scripts/screenshot.ts --files-review"
+  },
+  "files-phone-light.png": {
+    "route": "files",
+    "viewport": "phone",
+    "theme": "light",
+    "capturedAt": "2026-10-07T08:46:40.390Z",
+    "captureScript": "scripts/screenshot.ts --files-review"
+  },
+  "files-phone-dark.png": {
+    "route": "files",
+    "viewport": "phone",
+    "theme": "dark",
+    "capturedAt": "2026-10-07T08:46:40.390Z",
+    "captureScript": "scripts/screenshot.ts --files-review"
   }
 }

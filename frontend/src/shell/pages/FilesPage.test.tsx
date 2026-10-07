@@ -10,8 +10,13 @@ function makePerson(): Roster {
   return { id: "person-abc123", display_name: "Nova", nickname: null, role: "owner", avatar_seed: "person-abc123", source: "hub", local_only: false, created_at: "2026-09-04T00:00:00.000Z", updated_at: "2026-09-04T00:00:00.000Z", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1788000000000:0:test", hasSecret: true } as Roster;
 }
 
-function file(id: string, owner: string, shared = false, kind: "image" | "document" = "image"): VisibleFile {
-  return { owner_person_id: owner, shared, household: false, former_owner_name: null, file: { id, owner_person_id: owner, origin: "made", kind, media_type: kind === "image" ? "image/png" : "application/pdf", size: 2048, sha256: "a".repeat(64), storage_path: `people/${owner}/files/${id}`, retention: "kept", provenance: {}, created_at: "2026-09-04T00:00:00.000Z", hlc: "1788000000000:0:test" } as VisibleFile["file"] as VisibleFile["file"] };
+type FileKind = "image" | "video" | "audio" | "document" | "story" | "other";
+const MIME_TYPES: Record<FileKind, string> = {
+  image: "image/png", video: "video/mp4", audio: "audio/mpeg", document: "application/pdf", story: "text/markdown", other: "application/octet-stream",
+};
+
+function file(id: string, owner: string, shared = false, kind: FileKind = "image"): VisibleFile {
+  return { owner_person_id: owner, shared, household: false, former_owner_name: null, file: { id, owner_person_id: owner, origin: "made", kind, media_type: MIME_TYPES[kind], size: 2048, sha256: "a".repeat(64), storage_path: `people/${owner}/files/${id}`, retention: "kept", provenance: {}, created_at: "2026-09-04T00:00:00.000Z", hlc: "1788000000000:0:test" } as VisibleFile["file"] as VisibleFile["file"] };
 }
 
 function mockFetch(files: VisibleFile[]) {
@@ -45,7 +50,7 @@ describe("FilesPage", () => {
       await waitFor(() => expect(document.body.textContent).toContain("image/png"));
       expect(document.body.textContent).toContain("You");
       expect(document.body.textContent).toContain("Sage");
-      fireEvent.change(document.querySelector("#library-search")!, { target: { value: "Sage" } });
+      fireEvent.change(document.querySelector<HTMLInputElement>("#library-search")!, { target: { value: "Sage" } });
       await waitFor(() => expect(document.body.textContent).not.toContain("image/png"));
       expect(document.body.textContent).toContain("application/pdf");
     } finally { restore(); }
@@ -72,6 +77,62 @@ describe("FilesPage", () => {
       expect(document.body.textContent).toContain("Sage");
       fireEvent.click(document.querySelectorAll("button").item(Array.from(document.querySelectorAll("button")).findIndex((button) => button.textContent === "Unshare"))!);
       await waitFor(() => expect(fetchMock.mock.calls.some(([input, init]) => String(input).includes("/api/shares/share-abc123") && init?.method === "DELETE")).toBe(true));
+    } finally { restore(); }
+  });
+
+  test("File parts show name, size and the Library download route for every file kind", async () => {
+    const kinds: FileKind[] = ["image", "video", "audio", "document", "story", "other"];
+    for (const kind of kinds) {
+      const id = `file-${kind}123`;
+      const { restore } = mockFetch([file(id, "person-abc123", false, kind)]);
+      try {
+        const { container } = renderWithQueryClient(<FilesPage person={makePerson()} />);
+        await waitFor(() => expect(document.body.textContent).toContain(MIME_TYPES[kind]));
+        fireEvent.click(document.querySelector('[aria-label="More actions"]')!);
+        fireEvent.click(await waitFor(() => document.querySelector('[role="menuitem"]')!));
+        const name = await waitFor(() => container.querySelector('[data-slot="file-name"]'));
+        expect(name?.textContent).toBe(id);
+        expect(container.querySelector('[data-slot="file-size"]')?.textContent).toBe("2.0 KB");
+        const download = container.querySelector<HTMLAnchorElement>('[data-slot="file-download"]');
+        expect(download?.href).toBe(`http://localhost/api/files/${id}/content`);
+        expect(download?.download).toBe(id);
+      } finally { restore(); cleanup(); }
+    }
+  });
+
+  test("kit search and source and kind filters continue to filter the returned file rows", async () => {
+    const { restore } = mockFetch([
+      file("file-owned123", "person-abc123", false, "image"),
+      file("file-shared123", "person-sage123", true, "document"),
+      file("file-audio123", "person-abc123", false, "audio"),
+    ]);
+    try {
+      renderWithQueryClient(<FilesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
+      const source = document.querySelector('[aria-label="Whose"]')!;
+      fireEvent.click(source);
+      fireEvent.click(await waitFor(() => document.querySelector('[role="option"]:nth-child(2)')!));
+      await waitFor(() => expect(document.body.textContent).not.toContain("application/pdf"));
+      expect(document.body.textContent).toContain("image/png");
+      expect(document.body.textContent).toContain("audio/mpeg");
+      const kind = document.querySelector('[aria-label="Kind"]')!;
+      fireEvent.click(kind);
+      fireEvent.click(await waitFor(() => Array.from(document.querySelectorAll('[role="option"]')).find((option) => option.textContent === "Image")!));
+      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
+      expect(document.body.textContent).not.toContain("audio/mpeg");
+      fireEvent.change(document.querySelector<HTMLInputElement>("#library-search")!, { target: { value: "no match" } });
+      await waitFor(() => expect(document.body.textContent).toContain("Nothing here yet."));
+    } finally { restore(); }
+  });
+
+  test("a child only sees the files returned by the visibility-filtered Library route", async () => {
+    const child = { ...makePerson(), id: "person-child123", role: "child" } as Roster;
+    const { fetchMock, restore } = mockFetch([file("file-visible123", child.id, false, "image")]);
+    try {
+      renderWithQueryClient(<FilesPage person={child} />);
+      await waitFor(() => expect(document.body.textContent).toContain("image/png"));
+      expect(document.body.textContent).not.toContain("file-private123");
+      expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/api/files"))).toBe(true);
     } finally { restore(); }
   });
 });
