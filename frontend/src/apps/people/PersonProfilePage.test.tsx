@@ -34,7 +34,6 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     id: "mem1-abc123",
     record_kind: "memory",
     text: "Likes dinosaurs",
-    folder_id: null,
     category: "preference",
     tier: "durable",
     status: "active",
@@ -64,6 +63,7 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     hlc: "1788000000000:0:test",
     deleted_at: null,
     ...overrides,
+    folder_id: overrides.folder_id ?? null,
   };
 }
 

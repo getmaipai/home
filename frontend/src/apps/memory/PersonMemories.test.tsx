@@ -20,7 +20,6 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     id: "mem1042-a1b2c3",
     record_kind: "memory",
     text: "Riff prefers oat milk in coffee",
-    folder_id: null,
     category: "preference",
     tier: "durable",
     status: "active",
@@ -50,6 +49,7 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     hlc: "1756800000000:0:a1b2c3",
     deleted_at: null,
     ...overrides,
+    folder_id: overrides.folder_id ?? null,
   };
 }
 

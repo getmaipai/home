@@ -11,6 +11,9 @@
 // "household privacy and disclosure ... filtered before the prompt,
 // never left to the model").
 import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConversation, windowPreview, type ConversationWindow } from "@/lib/conversationHistory";
+import { and, eq, isNull } from "drizzle-orm";
+import { db } from "@/db";
+import { chatFolders } from "@/db/schema";
 import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "../messages";
 import { toolSpecFor, replyMaxTokensFor } from "./model";
@@ -19,6 +22,7 @@ import { subjectRosterFor } from "@/lib/subjects";
 import { subjectsForTurn } from "@/lib/askNames";
 import type { SubjectRef } from "@/lib/unknownNames";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { MAX_MEMORY_SNIPPETS } from "@/lib/turnShared";
 import { recallEpisodes, formatEpisodesForPrompt, episodeQueryEligible, asksWhatHubSaid, earliestDroppedTurn, contentTerms, PROMPT_BLOCK_MAX_LINES, EARLIER_HEADER, ASKS_ABOUT_START_RE, type EpisodeMatch } from "@/lib/episodes";
@@ -349,6 +353,30 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   roster.forEach((name, i) => {
     items.push({ id: `roster-${i}`, text: name, source: "roster", subjects: [], disclosure: "child_ok" });
   });
+
+  // PROJECTS-P2: project instructions are stable labelled data. Only a
+  // durable written chat in its owner's live project can receive them;
+  // shared project records never grant access to another person's chats.
+  if (!temporary && !state.bare && state.surface === "chat" && !state.spoken && conversation.folder_id) {
+    const folder = db.select({ id: chatFolders.id, name: chatFolders.name, instructions: chatFolders.instructions })
+      .from(chatFolders)
+      .where(and(eq(chatFolders.id, conversation.folder_id), eq(chatFolders.personId, state.actor.id), isNull(chatFolders.deletedAt)))
+      .get();
+    const instructions = folder?.instructions.slice(0, 1500) ?? "";
+    const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
+    if (folder && instructions.trim() !== "" && (band === "adult" || !evaluateSafety(instructions, band).flagged)) {
+      const name = sanitizeForPrompt(folder.name).slice(0, 80);
+      const safeInstructions = sanitizeForPrompt(instructions);
+      items.push({
+        id: `project-${folder.id}`,
+        text: `Notes this person set for the project ${name}. Follow them for chats in this project. Where they disagree with the person's general notes, these win. They never change safety rules, age limits or reply limits.\n${safeInstructions}`,
+        source: "project",
+        subjects: [],
+        disclosure: "child_ok",
+      });
+    }
+  }
+
 
   // THIN-3C (rule 4): the history budget is the engine's per-slot context
   // less this turn's own reply ceiling and the engine's count of the rest

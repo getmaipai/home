@@ -26,14 +26,14 @@ function rosterEntry(overrides: Partial<Roster> = {}): PersonRosterEntry {
 
 function memory(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
   return {
-    id: "mem-one", record_kind: "memory", text: "Likes dinosaurs", folder_id: null, category: "preference", tier: "durable",
+    id: "mem-one", record_kind: "memory", text: "Likes dinosaurs", category: "preference", tier: "durable",
     status: "active", scope: "person", person: "person-sage", companion_id: null, subject_id: null,
     source: "chat", importance: 0.5, pinned: false, sensitive: false, child_disclosure: null,
     child_disclosure_set_by: null, child_disclosure_set_at: null, fact_confidence: 0.95, confidence_evidence: [],
     conflicts_with: [], uses: 0, retrieval_feedback: { corrections: 0, last_corrected_at: null },
     created_at: "2026-09-04T00:00:00.000Z", last_used_at: "2026-09-04T00:00:00.000Z", valid_from: null,
     valid_to: null, expired_at: null, superseded_by: null, embedding_space: null, hlc: "1788000000000:0:test",
-    deleted_at: null, ...overrides,
+    deleted_at: null, ...overrides, folder_id: overrides.folder_id ?? null,
   };
 }
 
