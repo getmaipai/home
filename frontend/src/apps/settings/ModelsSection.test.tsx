@@ -125,10 +125,10 @@ describe("ModelsSection", () => {
       fireEvent.change(input, { target: { value: "https://huggingface.co/example-org/second-model" } });
       await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
       await findByText("example-org/second-model");
-      expect(document.querySelectorAll('[data-slot="compare-models"] [data-slot="card"]')).toHaveLength(3);
-      expect(document.querySelector('[data-slot="compare-models"]')?.textContent).toContain("Qwen3 8B Instruct");
-      expect(document.querySelector('[data-slot="compare-models"]')?.textContent).toContain("example-model-Q4_K_M");
-      expect(document.querySelector('[data-slot="compare-models"]')?.textContent).toContain("example-org/second-model");
+      expect(document.querySelectorAll('[data-slot="comparison-card"]')).toHaveLength(1);
+      expect(document.querySelector('[data-slot="comparison-card"]')?.textContent).toContain("Qwen3 8B Instruct");
+      expect(document.querySelector('[data-slot="comparison-card"]')?.textContent).toContain("example-model-Q4_K_M");
+      expect(document.querySelector('[data-slot="comparison-card"]')?.textContent).toContain("example-org/second-model");
     } finally { restore(); }
   });
 
@@ -142,7 +142,8 @@ describe("ModelsSection", () => {
         await act(async () => { fireEvent.click(getByRole("button", { name: "Check" })); });
         await findByText("example-model-Q4_K_M");
       }
-      expect(document.querySelectorAll('[data-slot="compare-models"] [data-slot="card"]')).toHaveLength(2);
+      expect(document.querySelectorAll('[data-slot="comparison-card"]')).toHaveLength(1);
+      expect(document.querySelectorAll('[data-slot="comparison-card"] > div > div')).toHaveLength(2);
     } finally { restore(); }
   });
 
@@ -151,7 +152,7 @@ describe("ModelsSection", () => {
     try {
       const { findByText } = render(<ModelsSection />);
       await findByText("This computer: Apple Silicon, 24 GB memory.");
-      expect(document.querySelector('[data-slot="compare-models"]')).toBeNull();
+      expect(document.querySelector('[data-slot="comparison-card"]')).toBeNull();
     } finally { restore(); }
   });
 
@@ -171,10 +172,13 @@ describe("ModelsSection", () => {
         "example-model-Q4_K_M", "Runs well on this computer",
         "example-org/example-big-model", "Won't fit",
       ]) expect(text).toContain(expected);
-      const noCard = Array.from(document.querySelectorAll('[data-slot="compare-models"] [data-slot="card"]')).find((card) => card.textContent?.includes("example-org/example-big-model"));
-      expect(noCard).toBeDefined();
-      expect(noCard?.textContent).not.toContain("pick");
-      expect(noCard?.querySelector("svg")).toBeNull();
+      const comparison = document.querySelector('[data-slot="comparison-card"]');
+      const noOption = Array.from(comparison?.querySelectorAll(":scope > div > div") ?? []).find((option) => option.textContent?.includes("example-org/example-big-model"));
+      expect(noOption).toBeDefined();
+      expect(noOption?.textContent).toContain("Won't fit");
+      expect(noOption?.textContent).toContain("Memory it needs:");
+      expect(noOption?.textContent).not.toContain("pick");
+      expect(noOption?.querySelector("svg")?.getAttribute("class")).not.toContain("emerald-500");
     } finally { restore(); }
   });
 

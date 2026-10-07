@@ -2202,9 +2202,9 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       await page.getByRole("heading", { name: "Compare", exact: true }).waitFor();
       await page.getByText("Needs about 6 GB more memory.", { exact: true }).waitFor();
       await settleAnimations(page);
-      const screenshot = `fit-compare-${viewport.slug}-light.png`;
+      const screenshot = `fit-compare-${viewport.slug}-${theme}.png`;
       await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
-      dedicatedScreenshots.push({ file: screenshot, route: "settings-models-fit-compare", viewport: viewport.slug, theme: "light" });
+      dedicatedScreenshots.push({ file: screenshot, route: "settings-models-fit-compare", viewport: viewport.slug, theme });
       return;
     }
     if (state === "checked-yes" || state === "checked-no" || state === "checked-error" || state === "checked-notfound" || state === "checked-nostack" || state === "checked-unknown") {
@@ -2245,14 +2245,14 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       dedicatedScreenshots.push({ file: tightShot, route: "settings-models-computer-memory", viewport: viewport.slug, theme });
       return;
     }
-    if ((state === "yes" || state === "no") && theme === "light") {
+    if (state === "yes" || state === "no") {
       await page.getByRole("button", { name: "Details", exact: true }).click();
       await page.getByText("Memory it needs", { exact: true }).waitFor();
       if (state === "no") await page.getByText(/It needs about 6 GB more memory\./).waitFor();
       await settleAnimations(page);
-      const panelShot = `fit-panel-${state}-${viewport.slug}-light.png`;
+      const panelShot = `fit-panel-${state}-${viewport.slug}-${theme}.png`;
       await page.screenshot({ path: join(SCREENS_DIR, panelShot), fullPage: true });
-      dedicatedScreenshots.push({ file: panelShot, route: "settings-models-fit-panel", viewport: viewport.slug, theme: "light" });
+      dedicatedScreenshots.push({ file: panelShot, route: "settings-models-fit-panel", viewport: viewport.slug, theme });
     }
   } finally {
     await context.close();
@@ -9540,6 +9540,7 @@ async function main() {
         for (const state of ["yes", "no"] as const) {
           await captureFitVerdictCard(browser, sessionValue, viewport, "dark", state);
         }
+        await captureFitVerdictCard(browser, sessionValue, viewport, "dark", "compare");
       }
       console.log("completed named review: --fit-verdict-review");
       return;

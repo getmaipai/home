@@ -158,10 +158,6 @@
       "ed": "ED-020",
       "reason": "Hand text where recommendation-card ships; replaced in ELT-T1-10."
     },
-    "CompareCard": {
-      "ed": "ED-019",
-      "reason": "HOME-FIT-04 row names comparison-card; hand-built CompareCard until ELT-T1-10."
-    },
     "ComputerMemoryCard": {
       "ed": "ED-037",
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."

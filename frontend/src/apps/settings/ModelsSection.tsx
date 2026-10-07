@@ -6,12 +6,12 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Textarea } from "@maipai/ui/src/ui/textarea";
 import { getIcon } from "@maipai/ui/src/icons";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
+import { ComparisonCard } from "@maipai/ui/src/elements/comparison-card";
 import { api, ApiError, type HardwareInfo, type ModelFit } from "@/lib/api";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
 import { modelLinkName, parseModelLink } from "@/lib/modelLink";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
-import { Card } from "@maipai/ui/src/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { describeFitPlan, describeHomeOwnedRoles, fitBadgeWord, fitSourceSentence, type FitPanelRow } from "@/lib/fitPanel";
 import type { ComputerMemoryResponse } from "@/lib/api";
@@ -84,7 +84,7 @@ export function ModelsSection() {
             fitPlan={recommendedFit}
           />
           <CheckModelCard onChecked={(name, response) => setChecked((items) => [{ name, response }, ...items.filter((item) => item.name !== name)].slice(0, 3))} />
-          {recommended ? <CompareCard recommended={{ name: recommended.model.label, response: recommendedFit.response?.plan ? recommendedFit.response : null }} checked={checked} hardware={hardware} /> : null}
+          {recommended ? <ModelComparison recommended={{ name: recommended.model.label, response: recommendedFit.response?.plan ? recommendedFit.response : null }} checked={checked} hardware={hardware} /> : null}
           <PlannedRoleCard title="Image generation" fits={imageFits} />
           <PlannedRoleCard title="Video generation" fits={videoFits} />
         </div>
@@ -224,7 +224,7 @@ function FitPanel({ response }: { response: FitPlanResponse }) {
   return <div className="flex flex-col gap-3 pt-2"><SpecSheet title="Fit details" rows={rows.map(({ label, value }) => ({ label, value }))} visibleCount={rows.length} />{rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}{remedy ? <Alert><AlertTitle>What would help?</AlertTitle><AlertDescription>{remedy}</AlertDescription></Alert> : null}</div>;
 }
 
-function CompareCard({ recommended, checked, hardware }: { recommended: { name: string; response: FitPlanResponse | null }; checked: Array<{ name: string; response: FitPlanResponse }>; hardware: HardwareInfo | null }) {
+function ModelComparison({ recommended, checked, hardware }: { recommended: { name: string; response: FitPlanResponse | null }; checked: Array<{ name: string; response: FitPlanResponse }>; hardware: HardwareInfo | null }) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -234,19 +234,11 @@ function CompareCard({ recommended, checked, hardware }: { recommended: { name: 
     ...checked.filter((item) => item.response.plan !== null),
   ];
   if (comparable.length < 2) return null;
-  const cards = comparable.map((item) => {
+  const options = comparable.map((item, index) => {
     const need = describeFitPlan(item.response.plan!).rows.find((row) => row.label === "Memory it needs")?.value ?? "Not known yet";
-    return (
-      <Card key={item.name} className="gap-3 p-4">
-        <h4 className="break-words text-base font-medium">{item.name}</h4>
-        <FitVerdictBadge verdict={item.response.wording.verdict} />
-        <p className="text-sm text-[var(--muted-foreground)]">{item.response.wording.headline}</p>
-        <div className="flex flex-col gap-1">
-          <span className="text-sm text-[var(--muted-foreground)]">Memory it needs</span>
-          <span className="break-words text-base tabular-nums">{need}</span>
-        </div>
-      </Card>
-    );
+    const verdict = item.response.wording.verdict;
+    const headline = verdict === "yes" ? item.response.wording.headline : `${item.response.wording.headline} · Memory it needs: ${need}`;
+    return { id: `${index}-${item.name}`, name: item.name, headline, traits: [verdict === "yes" ? need : false as const] };
   });
   const usableGb = recommended.response?.plan?.cap.high === null || recommended.response?.plan?.cap.high === undefined
     ? null
@@ -269,13 +261,12 @@ function CompareCard({ recommended, checked, hardware }: { recommended: { name: 
     }
   }
   return (
-    <RoleCardShell title="Compare">
-      <div className="flex flex-col gap-3">
-        <div data-slot="compare-models" className="flex flex-col gap-3">{cards}</div>
-        <Button type="button" variant="secondary" className="w-fit" onClick={() => void copySummary()}>{copied ? "Copied" : "Copy summary"}</Button>
-        {copyFailed ? <div className="flex flex-col gap-2"><p className="text-base text-[var(--muted-foreground)]">Could not copy. Select the text below instead.</p><Textarea aria-label="Summary to copy" readOnly rows={Math.min(12, summary.split("\n").length)} value={summary} /></div> : null}
-      </div>
-    </RoleCardShell>
+    <>
+      <h2 className="text-base font-medium">Compare</h2>
+      <ComparisonCard traitLabels={["Memory it needs"]} options={options} />
+      <Button type="button" variant="secondary" onClick={() => void copySummary()}>{copied ? "Copied" : "Copy summary"}</Button>
+      {copyFailed ? <div className="flex flex-col gap-2"><p className="text-base text-[var(--muted-foreground)]">Could not copy. Select the text below instead.</p><Textarea aria-label="Summary to copy" readOnly rows={Math.min(12, summary.split("\n").length)} value={summary} /></div> : null}
+    </>
   );
 }
 

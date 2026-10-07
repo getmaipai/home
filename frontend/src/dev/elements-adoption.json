@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T09:05:20.003Z",
+  "generatedAt": "2026-10-07T09:13:03.821Z",
   "kitTag": "ui-v0.5.161",
   "items": [
     {
@@ -171,7 +171,7 @@
       "group": "agent/workflow",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "composer-attachments.aui.tsx",

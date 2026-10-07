@@ -328,19 +328,10 @@
       "ed": "ED-037",
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
     },
-    "Card": {
-      "tokens": [
-        "gap-3",
-        "p-4"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
     "Button": {
       "tokens": [
         "gap-1",
-        "justify-start",
-        "w-fit"
+        "justify-start"
       ],
       "ed": "ED-037",
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
