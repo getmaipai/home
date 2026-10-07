@@ -6646,6 +6646,76 @@
         }
       }
     },
+    "/api/conversations/turns/{id}/follow-up-suggestions": {
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Generate follow-up suggestions for a completed chat turn",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "turn-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Suggestions for an eligible adult chat turn, or an empty list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "suggestions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "prompt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "prompt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "suggestions"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Turn not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations": {
       "post": {
         "tags": [

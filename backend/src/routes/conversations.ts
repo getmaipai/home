@@ -11,6 +11,7 @@ import { and, eq } from "drizzle-orm";
 import { canAccessPerson } from "@/lib/access";
 import { projectDocument } from "@/lib/composer";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { canGenerateFollowUpSuggestions, generateFollowUpSuggestions } from "@/lib/followUpSuggestions";
 import { nextHlc } from "@/lib/hlc";
 import { newReplyFeedbackId } from "@/lib/id";
 import {
@@ -23,6 +24,7 @@ import {
   createConversation,
   getConversation,
   listConversationTurns,
+  isTemporaryConversation,
   updateConversationTitle,
   updateConversationArchived,
   updateConversationFolder,
@@ -99,6 +101,31 @@ conversationsRoutes.get("/turns", requireAuth, async (c) => {
   const actor = c.get("person");
   const person = c.req.query("person");
   return c.json(list(actor, person));
+});
+
+const followUpSuggestionsResponse = z.object({ suggestions: z.array(z.object({ prompt: z.string() })) });
+const followUpSuggestionsRoute = createRoute({
+  method: "post",
+  path: "/turns/{id}/follow-up-suggestions",
+  tags: ["Conversations"],
+  summary: "Generate follow-up suggestions for a completed chat turn",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "turn-example123") },
+  responses: {
+    200: { content: { "application/json": { schema: followUpSuggestionsResponse } }, description: "Suggestions for an eligible adult chat turn, or an empty list." },
+    ...errorResponses({ 401: "Sign in first", 404: "Turn not found or not visible" }),
+  },
+});
+
+conversationsRoutes.openapi(followUpSuggestionsRoute, async (c) => {
+  const actor = c.get("person");
+  const turn = visibleTurn(actor, c.req.valid("param").id);
+  // An administrator may inspect a household member's turns, but must not
+  // trigger a model call over another person's words.
+  if (!turn || turn.personId !== actor.id) return c.json({ error: "turn not found" }, 404);
+  if (!turn.conversationId || isTemporaryConversation(turn.conversationId) || !canGenerateFollowUpSuggestions(actor, turn)) return c.json({ suggestions: [] }, 200);
+  const suggestions = await generateFollowUpSuggestions(turn.userText, turn.replyText);
+  return c.json({ suggestions }, 200);
 });
 
 conversationsRoutes.post("/turns/:id/choose", requireAuth, async (c) => {

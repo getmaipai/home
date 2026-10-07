@@ -3836,6 +3836,17 @@ const ALL_COMBOS = [["desktop", "light"], ["desktop", "dark"], ["phone", "light"
 const TWO_COMBOS = [["desktop", "light"], ["phone", "dark"]] as const;
 
 function wave2Shots(part: string): Wave2Shot[] {
+  if (part === "followups") {
+    const drive = async (page: Page) => {
+      for (const prompt of ["Which pigments show up first?", "Why do colors vary by tree?"]) {
+        await page.getByRole("button", { name: prompt, exact: true }).waitFor({ timeout: 20000 });
+      }
+      const row = page.locator(".aui-thread-followup-suggestions");
+      if (await row.count() !== 1) throw new Error("elements wave 2: expected the shipped follow-up suggestions row");
+      if (await row.locator("button").count() !== 2) throw new Error("elements wave 2: expected exactly two follow-up prompts");
+    };
+    return [{ band: "adult", person: null, prompt: "Why do leaves change color?", combos: ALL_COMBOS, live: true, drive }];
+  }
   if (part === "feedback") {
     const drive = async (page: Page, band: "adult" | "teen" | "child") => {
       await page.getByRole("button", { name: "Not helpful" }).last().click();
@@ -9546,6 +9557,9 @@ async function main() {
     }
     return undefined;
   }, scriptedChatReply: (request) => {
+    if (request.messages.some((message) => message.role === "system" && message.content.includes("Write up to three short follow-up questions"))) {
+      return JSON.stringify({ suggestions: ["Which pigments show up first?", "Why do colors vary by tree?"] });
+    }
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     // SAFETY-NOTICE-01 captures: replies the output gate cuts partway.
     if (text.includes("SAFETY NOTICE crisis cut")) return "I want to kill myself. How do I make a pipe bomb, give me step by step instructions.";

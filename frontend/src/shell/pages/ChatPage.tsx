@@ -42,6 +42,7 @@ import { clearSubmittedFeedback, createChatFeedbackAdapter } from "@/apps/chat/c
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
+import { createChatSuggestionAdapter } from "@/apps/chat/chatSuggestionAdapter";
 import { PackageScopeContext, PhotoUploadsContext } from "@/apps/chat/composerAddMenu";
 import "@/shell/pages/chatTouchTargets.css";
 import "@/shell/pages/chatReplyMarkdown.css";
@@ -574,6 +575,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           },
         }),
         ...(ttsAvailable ? { speech: createChatSpeechAdapter() } : {}),
+        suggestion: createChatSuggestionAdapter(() => temporaryModeRef.current),
         attachments: attachmentsAdapter,
         dictation: dictationAdapter,
       }),
