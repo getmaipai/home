@@ -550,6 +550,9 @@ export interface ResolvedSetting {
   /** Only meaningful when secret is true: whether a real value has been
    * stored, without ever revealing it (lib/settings.ts's resolveForResponse). */
   isSet?: boolean;
+  does?: string;
+  state?: string;
+  reason?: string;
 }
 
 export interface BackupInfo {

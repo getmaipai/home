@@ -4,7 +4,7 @@
 // `inferred` and wrong, so nothing here ever feeds a permission check.
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { relationships, entities } from "@/db/schema";
+import { relationships, entities, people } from "@/db/schema";
 import { newRelationshipId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { validateRelationship, validateRelationshipEndpoints, inverseRelationship, relationshipTypes } from "@maipai/spec/records/ts/validate.js";
@@ -35,6 +35,7 @@ function toRelationship(row: RelationshipRow): RelationshipT {
     person: row.person,
     sensitive: row.sensitive,
     note: row.note,
+    called: row.called ?? undefined,
     created_at: row.createdAt,
     updated_at: row.updatedAt,
     deleted_at: row.deletedAt,
@@ -62,6 +63,7 @@ function toRow(rel: RelationshipT) {
     person: rel.person,
     sensitive: rel.sensitive,
     note: rel.note,
+    called: rel.called,
     createdAt: rel.created_at,
     updatedAt: rel.updated_at,
     deletedAt: rel.deleted_at,
@@ -80,6 +82,7 @@ export interface RelationshipCreate {
   scope?: "household" | "person";
   person?: string | null;
   sensitive?: boolean;
+  called?: string;
   /** Provenance. The API route never sets it (a person typing a
    * relationship in is stating it, so the route's default holds); the
    * judge's subject writer (lib/subjects.ts, step 3a) passes `stated`
@@ -135,6 +138,7 @@ export function createRelationship(actor: { id: string }, input: RelationshipCre
     person: input.scope === "household" ? null : (input.person ?? actor.id),
     sensitive: input.sensitive ?? false,
     note: input.note ?? null,
+    called: input.called,
     created_at: now,
     updated_at: now,
     deleted_at: null,
@@ -170,6 +174,28 @@ export function listRelationships(actor: { id: string; role: string }, entityId?
     .filter((r) => (entityId ? r.fromId === entityId || r.toId === entityId : true))
     .filter((r) => r.scope === "household" || canSeeAll || r.person === actor.id);
   return rows.map(toRelationship);
+}
+
+/** A minor's own settings may use the word they call an administrator
+ * only when the edge is live, confirmed enough to use as a fact, safe
+ * to disclose, and visible to that reader. Admins never read this word
+ * from a teen's private settings. */
+export function calledAdminForOwnSettings(reader: { id: string; role: string }): string | undefined {
+  if (reader.role !== "child" && reader.role !== "teen") return undefined;
+  const edges = listRelationships(reader);
+  for (const edge of edges) {
+    if (edge.type !== "child_of" && edge.type !== "ward_of") continue;
+    if (edge.valid_to !== null || edge.deleted_at !== null || edge.sensitive) continue;
+    if (edge.source !== "stated" && !(edge.source === "inferred" && edge.confirmed_by_person_id)) continue;
+    if (edge.scope !== "household" && !(edge.scope === "person" && edge.person === reader.id)) continue;
+    if (!edge.called) continue;
+    const from = db.select({ accountPersonId: entities.accountPersonId }).from(entities).where(and(eq(entities.id, edge.from_id), isNull(entities.deletedAt))).get();
+    const to = db.select({ accountPersonId: entities.accountPersonId }).from(entities).where(and(eq(entities.id, edge.to_id), isNull(entities.deletedAt))).get();
+    if (from?.accountPersonId !== reader.id || !to?.accountPersonId) continue;
+    const admin = db.select({ role: people.role }).from(people).where(and(eq(people.id, to.accountPersonId), isNull(people.deletedAt))).get();
+    if (admin?.role === "owner" || admin?.role === "admin") return edge.called;
+  }
+  return undefined;
 }
 
 function getOwnedRow(actor: { id: string; role: string }, id: string): RelationshipRow | undefined {

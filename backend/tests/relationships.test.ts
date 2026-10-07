@@ -11,8 +11,8 @@ async function ownerSession(): Promise<TestClient> {
   return client;
 }
 
-async function makeEntity(client: TestClient, kind: string, name: string): Promise<string> {
-  const res = await client.post("/api/entities", { kind, name });
+async function makeEntity(client: TestClient, kind: string, name: string, accountPersonId?: string): Promise<string> {
+  const res = await client.post("/api/entities", { kind, name, ...(accountPersonId ? { account_person_id: accountPersonId } : {}) });
   expect(res.status).toBe(201);
   return ((await res.json()) as { id: string }).id;
 }
@@ -34,6 +34,20 @@ describe("POST /api/relationships", () => {
     expect(reciprocal).toBeDefined();
     expect(reciprocal!.from_id).toBe(child);
     expect(reciprocal!.to_id).toBe(parent);
+  });
+
+  test("called survives on the reciprocal edge used by the child reader", async () => {
+    const owner = await ownerSession();
+    const parent = await makeEntity(owner, "person", "Sage");
+    const childId = (await (await owner.post("/api/people", { displayName: "Bramble", role: "child" })).json()) as { id: string };
+    const child = await makeEntity(owner, "person", "Bramble", childId.id);
+
+    const res = await owner.post("/api/relationships", {
+      type: "parent_of", from_id: parent, to_id: child, called: "Dad", scope: "person", person: childId.id,
+    });
+    expect(res.status).toBe(201);
+    const list = (await (await owner.get(`/api/relationships?entityId=${child}`)).json()) as Array<{ type: string; called?: string }>;
+    expect(list.find((edge) => edge.type === "child_of")?.called).toBe("Dad");
   });
 
   test("a symmetric type (partner_of) stores exactly one row, not two", async () => {

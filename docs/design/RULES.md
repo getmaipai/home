@@ -270,7 +270,7 @@ expands (S1 below). Owner-approved 2026-10-06: the app settings design
 drawer, S2 phone layout, S3 widths); they supersede the earlier S1
 profile-menu list and the "every width" wording.
 
-Governs: frontend/src/shell/**, frontend/src/apps/**
+Governs: frontend/src/shell/**, frontend/src/apps/**, backend/src/settings/**, backend/src/wire.ts
 
 S1. **The main navigation is permanent.** The column that lists the apps
     (Home, Chat, Library, Family today; more apps later) is present on
@@ -318,3 +318,8 @@ S4. **Every settings screen is the one kit settings shell.** An app's
     data (spec `areas.json` or a package's `contributes.settings_area`)
     and drawn by the kit's `SettingsShell`; Home writes no settings
     layout, and each registry group is placed in exactly one card.
+S5. **Copy is per person.** Settings text comes from the spec's `copy`
+    fields through `describeSetting`; a page never hand-writes setting
+    help, option descriptions or a reason line. COPY-LINT-01 fails the
+    gate on a new key that breaks the machine-checkable half; review
+    holds the rest (UI.md "Messages people read").

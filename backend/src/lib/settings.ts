@@ -7,6 +7,7 @@ import { eq, and, isNull, like } from "drizzle-orm";
 import { db } from "@/db";
 import { settingsValues, people } from "@/db/schema";
 import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
+import { calledAdminForOwnSettings } from "@/lib/relationships";
 import { nextHlc, compareHlc, seedHlc } from "@/lib/hlc";
 import { isOwnerOrAdmin, canAccessPerson, getPersonRole } from "@/lib/access";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
@@ -15,6 +16,7 @@ import { safeSearchDefaultFor, safeSearchStrictness, type SafeSearchLevel } from
 import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { describeSetting } from "@maipai/spec/interpreters/ts/describeSetting.js";
 import type { PersonRow } from "@/types";
 
 // `CLAUDE.md` > Credentials and secrets: "Any reversible secret the app
@@ -212,10 +214,55 @@ export function resolveForResponse(
   keyDef: SettingsKey,
   rawValue: unknown,
   source: ResolvedSetting["source"],
+  context?: { viewer: PersonRow; subject?: PersonRow; adminName?: string | null },
 ): ResolvedSetting {
-  const base = { key: keyDef.key, source, label: keyDef.label, help: keyDef.help, level: keyDef.level, secret: keyDef.secret };
-  if (!keyDef.secret) return { ...base, value: rawValue };
+  const subject = context?.subject ?? context?.viewer;
+  const band = subject ? speakerAgeBand(subject, new Date()) : "adult";
+  const viewer = context?.viewer ?? subject;
+  let value = rawValue;
+  if (keyDef.scope === "person" && subject && source === "default" && band === "child"
+    && (keyDef.key === "chat.photo_uploads" || keyDef.key === "reference.images")) value = false;
+  const descriptionValue = keyDef.secret ? null : value;
+  const description = describeSetting(
+    { ...keyDef, copy: keyDef.copy ?? { does: keyDef.label } },
+    {
+      subjectBand: band,
+      viewer: !viewer || !subject || viewer.id === subject.id ? "self" : viewer.role === "owner" || viewer.role === "admin" ? "admin" : "guardian",
+      value: descriptionValue,
+      source,
+      effective: descriptionValue,
+      adminName: context && "adminName" in context
+        ? context.adminName ?? undefined
+        : subject && viewer?.id === subject.id && (band === "child" || band === "teen") && keyDef.scope === "person"
+          ? calledAdminForOwnSettings(viewer!) ?? householdAdminName()
+          : viewer && viewer.id !== subject?.id ? viewer.displayName : householdAdminName(),
+      personName: subject?.displayName,
+    },
+  );
+  const base = { key: keyDef.key, source, label: keyDef.label, help: keyDef.help, level: keyDef.level, secret: keyDef.secret, ...description };
+  if (!keyDef.secret) return { ...base, value };
   return { ...base, value: null, isSet: source !== "default" };
+}
+
+function responseSubject(actor: PersonRow, parsed: ParsedScope): PersonRow {
+  if (parsed.kind === "person" && parsed.id) {
+    return db.select().from(people).where(and(eq(people.id, parsed.id), isNull(people.deletedAt))).get() ?? actor;
+  }
+  return actor;
+}
+
+function householdAdminName(): string | undefined {
+  const candidates = db.select({ displayName: people.displayName, role: people.role }).from(people).where(isNull(people.deletedAt)).all();
+  return candidates.find((person) => person.role === "owner")?.displayName
+    ?? candidates.find((person) => person.role === "admin")?.displayName;
+}
+
+function responseContext(viewer: PersonRow, subject: PersonRow, scopeKind: ParsedScope["kind"]) {
+  const band = speakerAgeBand(subject, new Date());
+  const adminName = scopeKind === "person" && viewer.id === subject.id && (band === "child" || band === "teen")
+    ? calledAdminForOwnSettings(viewer) ?? householdAdminName()
+    : viewer.id !== subject.id ? viewer.displayName : householdAdminName();
+  return { viewer, subject, adminName };
 }
 
 /** Every registered key whose scope kind matches, each resolved to its
@@ -233,6 +280,8 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
 
   const stored = db.select().from(settingsValues).where(eq(settingsValues.scope, scope)).all();
   const storedByKey = new Map(stored.map((row) => [row.key, row]));
+  const subject = responseSubject(actor, parsed);
+  const descriptionContext = responseContext(actor, subject, parsed.kind);
 
   const results: ResolvedSetting[] = getRegistry()
     .filter((k) => k.scope === parsed.kind && (!adultWakewordRead || k.key === WAKEWORD_SETTING_KEY))
@@ -240,7 +289,7 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
       const row = storedByKey.get(k.key);
       const rawValue = row ? decodeStoredRow(k, row.value) : k.default;
       const source = row ? (row.source as ResolvedSetting["source"]) : "default";
-      return resolveForResponse(k, rawValue, source);
+      return resolveForResponse(k, rawValue, source, descriptionContext);
     });
   return { ok: true, value: results };
 }
@@ -254,7 +303,7 @@ function writeValue(
   scope: string,
   keyDef: SettingsKey,
   value: unknown,
-  opts: { skipValidation?: boolean } = {},
+  opts: { skipValidation?: boolean; viewer?: PersonRow; subject?: PersonRow; adminName?: string | null } = {},
 ): SettingsOpResult<ResolvedSetting> {
   const key = keyDef.key;
   if (!opts.skipValidation) {
@@ -290,7 +339,10 @@ function writeValue(
   }
 
   settingsCache.delete(settingsCacheKey(scope, key));
-  return { ok: true, value: resolveForResponse(keyDef, value, "user") };
+  const descriptionContext = opts.viewer
+    ? { viewer: opts.viewer, subject: opts.subject, adminName: opts.adminName }
+    : undefined;
+  return { ok: true, value: resolveForResponse(keyDef, value, "user", descriptionContext) };
 }
 
 // SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): `search.safe_search`
@@ -439,7 +491,7 @@ export function setValue(
           : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
-  return writeValue(scope, keyDef, value);
+  return writeValue(scope, keyDef, value, responseContext(actor, responseSubject(actor, parsed), parsed.kind));
 }
 
 /** Household-scope write with no actor gate: for a core background job
@@ -533,7 +585,7 @@ export function getPersonSettingSource(personId: string, key: string): string | 
 export function setPersonTtsVoiceUnchecked(actor: PersonRow, hfPath: string): SettingsOpResult<ResolvedSetting> {
   const keyDef = getRegistryKey("tts.voice_id");
   if (!keyDef) return { ok: false, status: 400, error: "unknown settings key: tts.voice_id" };
-  return writeValue(`person:${actor.id}`, keyDef, hfPath, { skipValidation: true });
+  return writeValue(`person:${actor.id}`, keyDef, hfPath, { skipValidation: true, ...responseContext(actor, actor, "person") });
 }
 
 // In-process cache for resolveStoredValue() (a latency review, 2026-09-06:
@@ -615,7 +667,7 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
 
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));
-  return { ok: true, value: resolveForResponse(keyDef, keyDef.default, "default") };
+  return { ok: true, value: resolveForResponse(keyDef, keyDef.default, "default", responseContext(actor, responseSubject(actor, parsed), parsed.kind)) };
 }
 
 /** Clears every stored value at `key`, across every scope, whose stored

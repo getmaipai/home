@@ -15,6 +15,7 @@ import { SPEC_DIR } from "./specDir.js";
 import { areWakewordAssetsInstalled } from "@/lib/wakewordAssets";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 import { NOTIFICATION_SETTINGS_KEYS } from "@/settings/notificationKeys";
+import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 
 const REGISTRY_PATH = join(SPEC_DIR, "settings", "keys.json");
 
@@ -26,7 +27,34 @@ function loadRegistry(): SettingsKey[] {
   // until the shared snapshot is advanced.
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
-  return [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS].filter((entry) => !keys.has(entry.key))];
+  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS].filter((entry) => !keys.has(entry.key))];
+  return combined.map(withPersonGuardFacts);
+}
+
+const CHILD_GUARDIAN_KEYS = new Set(["chat.photo_uploads", "reference.images"]);
+const ADMIN_ONLY_KEYS = new Set([
+  "security.session_lock_required",
+  "security.session_lock_timeout_minutes",
+  PERSON_STORAGE_CAP_KEY,
+]);
+
+/** C1 describes the existing guard and per-band defaults in the Home
+ * registry. The current write checks remain in settings.ts and
+ * chatPictures.ts; COPY-GUARD-READS-SPEC-01 will make them read these
+ * fields later. */
+function withPersonGuardFacts(key: SettingsKey): SettingsKey {
+  if (key.scope !== "person") return key;
+  const bandDefault = {
+    child: key.key === "search.safe_search" ? "strict" : CHILD_GUARDIAN_KEYS.has(key.key) ? false : key.default,
+    teen: key.key === "search.safe_search" ? "moderate" : key.default,
+    adult: key.key === "search.safe_search" ? "off" : key.default,
+  };
+  const control = {
+    child: CHILD_GUARDIAN_KEYS.has(key.key) || ADMIN_ONLY_KEYS.has(key.key) ? "guardian" : "self",
+    teen: ADMIN_ONLY_KEYS.has(key.key) ? "guardian" : "self",
+    adult: ADMIN_ONLY_KEYS.has(key.key) ? "guardian" : "self",
+  };
+  return SettingsKey.parse({ ...key, control: key.control ?? control, band_default: key.band_default ?? bandDefault });
 }
 
 let cached: SettingsKey[] | null = null;

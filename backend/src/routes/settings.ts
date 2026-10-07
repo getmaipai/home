@@ -25,6 +25,9 @@ export const ResolvedSettingSchema = z.object({
   level: z.enum(["basic", "advanced", "expert"]),
   secret: z.boolean(),
   isSet: z.boolean().optional(),
+  does: z.string().optional(),
+  state: z.string().optional(),
+  reason: z.string().optional(),
 });
 
 // The registry itself: declarative metadata (labels, defaults, help), not

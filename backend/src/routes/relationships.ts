@@ -52,6 +52,7 @@ const createRoute_ = createRoute({
             scope: z.enum(["household", "person"]).optional(),
             person: z.string().nullable().optional(),
             sensitive: z.boolean().optional(),
+            called: z.string().min(1).max(40).optional(),
           }),
         },
       },

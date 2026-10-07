@@ -1,10 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { MergedSetting } from "@maipai/ui/src/settings/groupSettings";
+import type { ResolvedSetting } from "@/lib/api";
 import { titleCaseOption, localeDisplayName } from "@maipai/ui/src/settings/SettingField";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { ItemDescription } from "@maipai/ui/src/dashboard/components/ui/item";
 import { PersonMultiSelect } from "@/shell/pages/settings/PersonMultiSelect";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 
@@ -46,7 +48,8 @@ interface SettingFieldProps {
 }
 
 export function SettingField({ setting, onChange, onReset, disabled, selfPersonId }: SettingFieldProps) {
-  const { def, resolved } = setting;
+  const { def } = setting;
+  const resolved = setting.resolved as MergedSetting["resolved"] & Pick<ResolvedSetting, "does" | "state" | "reason">;
   const [draft, setDraft] = useState<string>(String(resolved.value ?? ""));
   const canReset = resolved.source === "user";
 
@@ -216,7 +219,9 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     <div className="flex flex-col items-start gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 flex-col gap-0.5">
         <span className="text-sm">{def.label}</span>
-        {def.help ? <span className="text-sm text-muted-foreground">{def.help}</span> : null}
+        {resolved.does ? <ItemDescription clamp={false}>{resolved.does}</ItemDescription> : null}
+        {resolved.state ? <ItemDescription clamp={false}>{resolved.state}</ItemDescription> : null}
+        {resolved.reason ? <ItemDescription clamp={false}>{resolved.reason}</ItemDescription> : null}
         {canReset ? (
           <Button type="button" variant="link" size="sm" onClick={onReset} disabled={disabled} className="h-auto min-h-12 w-fit p-0">
             Reset to default

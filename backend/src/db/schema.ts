@@ -1435,6 +1435,7 @@ export const relationships = sqliteTable("relationships", {
   person: text("person").references(() => people.id),
   sensitive: integer("sensitive", { mode: "boolean" }).notNull().default(false),
   note: text("note"),
+  called: text("called"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
   deletedAt: text("deleted_at"),

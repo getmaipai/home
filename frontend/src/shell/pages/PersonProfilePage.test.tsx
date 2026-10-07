@@ -72,11 +72,11 @@ function renderProfile(path: string, who: Roster = viewer()) {
 function limitSettings() {
   const registry: SettingsKey[] = [
     ...Array.from({ length: 9 }, (_, i) => ({
-      key: `allowance.${i}.daily_minutes`, scope: "person", selector: "number", label: `Allowance ${i + 1}`,
+      key: `allowance.${i}.daily_minutes`, scope: "person", selector: "number", default: 0, label: `Allowance ${i + 1}`,
       level: "basic", secret: false, lives_in: "person.allowance", honoured_by: ["home"], range: { min: 0, max: 1440 },
     } as SettingsKey)),
     ...["storage.cap", "storage.cap_warning"].map((key) => ({
-      key, scope: "person", selector: "number", label: key, level: "basic", secret: false,
+      key, scope: "person", selector: "number", default: 0, label: key, level: "basic", secret: false,
       lives_in: "person.storage", honoured_by: ["home"], range: { min: 0, max: 100000 },
     } as SettingsKey)),
   ];

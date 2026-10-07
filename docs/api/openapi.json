@@ -4204,7 +4204,22 @@
                         "description": "Home Assistant's selector names (3.2)."
                       },
                       "range": {
-                        "nullable": true,
+                        "type": "object",
+                        "properties": {
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "options_from": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "additionalProperties": {
+                          "nullable": true
+                        },
                         "description": "Selector-specific: min/max for number, a duration unit, an option list for select, and so on. Shape depends on selector."
                       },
                       "default": {
@@ -4216,6 +4231,81 @@
                       },
                       "help": {
                         "type": "string"
+                      },
+                      "copy": {
+                        "type": "object",
+                        "properties": {
+                          "does": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "does_child": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "does_teen": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "options": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          }
+                        },
+                        "required": [
+                          "does"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "control": {
+                        "type": "object",
+                        "properties": {
+                          "child": {
+                            "type": "string",
+                            "enum": [
+                              "self",
+                              "guardian"
+                            ]
+                          },
+                          "teen": {
+                            "type": "string",
+                            "enum": [
+                              "self",
+                              "guardian"
+                            ]
+                          },
+                          "adult": {
+                            "type": "string",
+                            "enum": [
+                              "self",
+                              "guardian"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "child",
+                          "teen",
+                          "adult"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "band_default": {
+                        "type": "object",
+                        "properties": {
+                          "child": {
+                            "nullable": true
+                          },
+                          "teen": {
+                            "nullable": true
+                          },
+                          "adult": {
+                            "nullable": true
+                          }
+                        },
+                        "additionalProperties": false
                       },
                       "section": {
                         "type": "object",
@@ -4358,6 +4448,15 @@
                       },
                       "isSet": {
                         "type": "boolean"
+                      },
+                      "does": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -4475,6 +4574,15 @@
                     },
                     "isSet": {
                       "type": "boolean"
+                    },
+                    "does": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -4590,6 +4698,15 @@
                     },
                     "isSet": {
                       "type": "boolean"
+                    },
+                    "does": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
                     },
                     "success": {
                       "type": "boolean",
@@ -13333,6 +13450,15 @@
                     },
                     "isSet": {
                       "type": "boolean"
+                    },
+                    "does": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -13456,6 +13582,15 @@
                     },
                     "isSet": {
                       "type": "boolean"
+                    },
+                    "does": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -13561,6 +13696,15 @@
                     },
                     "isSet": {
                       "type": "boolean"
+                    },
+                    "does": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -13844,6 +13988,15 @@
                     },
                     "isSet": {
                       "type": "boolean"
+                    },
+                    "does": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -24585,6 +24738,12 @@
                         ],
                         "default": null
                       },
+                      "called": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 40,
+                        "description": "The word the person at the from end uses for the person at the to end, such as Dad or Mom."
+                      },
                       "created_at": {
                         "type": "string",
                         "format": "date-time"
@@ -24695,6 +24854,11 @@
                   },
                   "sensitive": {
                     "type": "boolean"
+                  },
+                  "called": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 40
                   }
                 },
                 "required": [
@@ -24925,6 +25089,12 @@
                         }
                       ],
                       "default": null
+                    },
+                    "called": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40,
+                      "description": "The word the person at the from end uses for the person at the to end, such as Dad or Mom."
                     },
                     "created_at": {
                       "type": "string",
@@ -25263,6 +25433,12 @@
                         }
                       ],
                       "default": null
+                    },
+                    "called": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40,
+                      "description": "The word the person at the from end uses for the person at the to end, such as Dad or Mom."
                     },
                     "created_at": {
                       "type": "string",
