@@ -7154,6 +7154,16 @@ approvals are still real, unstarted work for a future session.
             `labelOf()` and `exportLabels()`. Acceptance: weekly JSONL places
             verdict and reason beside rung and rules by `turn_id`; exit:
             labels tests and `bash scripts/check.sh`.
+      - [x] **FEEDBACK-CANCEL-01: cancel a thumbs-down, and take a rating
+            back** (M, owner bug 2026-10-06, architect APPROVED). The kit
+            feedback-dialog takes `onCancel` (Cancel button, Escape, press
+            outside; `ui-v0.5.134`); Cancel closes the form and keeps the
+            thumbs-down. Tapping the lit thumb again (up or down, every age
+            band) clears the rating: additive `DELETE
+            /api/conversations/turns/{id}/feedback` removes the person's one
+            row, and the thread un-lights the thumb. A child's flow still has
+            no reasons form. Exit: backend `replyFeedback` and chat
+            `chatFeedbackDialog` tests, `bash scripts/check.sh`.
 - [ ] **ATT-01: Attachments in chat: a document, a photo, "summarize
       this"** (L, design and spec landed 2026-09-16). The design record
       is `docs/dev.md`'s "ATT-01: attachments" section and the shared

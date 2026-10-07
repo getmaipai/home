@@ -182,6 +182,48 @@ describe("POST/GET /api/conversations/turns/:id/feedback", () => {
     expect(teenRead.note).toBe("It ignored my question.");
   });
 
+  const clear = (client: TestClient, id: string) => client.request(`/api/conversations/turns/${id}/feedback`, { method: "DELETE" });
+
+  test("FEEDBACK-CANCEL-01: an adult clearing a rating removes the row, reasons and note, and GET reads null", async () => {
+    const { client, actor } = await owner();
+    const id = turnFor(actor, "turn-feedbackclearadult");
+    await client.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", reasons: ["wrong"], note: "Nope." });
+    const response = await clear(client, id);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toBeNull();
+    expect(db.select().from(replyFeedback).where(eq(replyFeedback.turnId, id)).all()).toHaveLength(0);
+    expect(await (await client.get(`/api/conversations/turns/${id}/feedback`)).json()).toBeNull();
+  });
+
+  test("FEEDBACK-CANCEL-01: a teen and a child can clear their own rating, and clearing twice is harmless", async () => {
+    const { client: ownerClient } = await owner();
+    for (const [role, name] of [["teen", "Juniper"], ["child", "Bramble"]] as const) {
+      const { client, actor } = await childOf(ownerClient, role, name);
+      const id = turnFor(actor, `turn-feedbackclear${role}`);
+      await client.post(`/api/conversations/turns/${id}/feedback`, role === "teen" ? { verdict: "down", note: "Private." } : { verdict: "up" });
+      expect((await clear(client, id)).status).toBe(200);
+      expect(db.select().from(replyFeedback).where(eq(replyFeedback.turnId, id)).all()).toHaveLength(0);
+      const again = await clear(client, id);
+      expect(again.status).toBe(200);
+      expect(await again.json()).toBeNull();
+    }
+  });
+
+  test("FEEDBACK-CANCEL-01: clearing removes only my own label, never another person's", async () => {
+    const { client: ownerClient, actor: ownerActor } = await owner();
+    const { client: childClient } = await childOf(ownerClient);
+    const id = turnFor(ownerActor, "turn-feedbackclearshared");
+    await ownerClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down" });
+    await clear(childClient, id);
+    expect(db.select().from(replyFeedback).where(eq(replyFeedback.turnId, id)).all()).toHaveLength(1);
+  });
+
+  test("FEEDBACK-CANCEL-01: clearing needs sign-in and a visible turn", async () => {
+    const { client } = await owner();
+    expect((await clear(client, "turn-nosuchturn")).status).toBe(404);
+    expect((await clear(new TestClient(), "turn-nosuchturn")).status).toBe(401);
+  });
+
   test("ELEMENTS-ADOPT-02: a repeated reason or an over-long note is refused", async () => {
     const { client, actor } = await owner();
     const id = turnFor(actor, "turn-feedbackinvalid");

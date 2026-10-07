@@ -750,6 +750,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify(details ? { verdict, reason, reasons: details.reasons, note: details.note } : { verdict, reason }),
     }),
+  // FEEDBACK-CANCEL-01: tapping the lit thumb again takes the rating back.
+  clearConversationFeedback: (id: string) =>
+    request<null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`, { method: "DELETE" }),
   renameConversation: (id: string, title: string | null, pinned?: boolean) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, {
       method: "PATCH",

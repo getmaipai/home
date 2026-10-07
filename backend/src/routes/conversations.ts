@@ -246,6 +246,22 @@ const postFeedbackRoute = createRoute({
   responses: feedbackResponses,
 });
 
+// FEEDBACK-CANCEL-01: tapping the lit thumb again takes the rating back.
+// It removes this person's one row (rating, reasons and note together), so
+// the weekly label export and every reader see an unrated turn.
+const deleteFeedbackRoute = createRoute({
+  method: "delete",
+  path: "/turns/{id}/feedback",
+  tags: ["Conversations"],
+  summary: "Clear my label for an assistant turn",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "turn-example123") },
+  responses: {
+    200: { content: { "application/json": { schema: z.null() } }, description: "Cleared (null), whether or not a label existed." },
+    ...errorResponses({ 401: "Sign in first", 404: "Turn not found or not visible" }),
+  },
+});
+
 const documentRoute = createRoute({
   method: "get",
   path: "/turns/{id}/document",
@@ -353,6 +369,16 @@ conversationsRoutes.openapi(postFeedbackRoute, (c) => {
     .where(and(eq(replyFeedback.turnId, id), eq(replyFeedback.personId, actor.id)))
     .get()!;
   return c.json(toReplyFeedback(saved), 200);
+});
+
+conversationsRoutes.openapi(deleteFeedbackRoute, (c) => {
+  const actor = c.get("person");
+  const turn = visibleTurn(actor, c.req.valid("param").id);
+  if (!turn) return c.json({ error: "turn not found" }, 404);
+  db.delete(replyFeedback)
+    .where(and(eq(replyFeedback.turnId, turn.id), eq(replyFeedback.personId, actor.id)))
+    .run();
+  return c.json(null, 200);
 });
 
 conversationsRoutes.openapi(documentRoute, (c) => {
