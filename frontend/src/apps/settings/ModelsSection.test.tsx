@@ -340,8 +340,13 @@ describe("ModelsSection", () => {
       await findByText("This computer: Apple Silicon, 24 GB memory.");
       fireEvent.click(getByText("Details"));
       await findByText("It needs about 6 GB more memory. A smaller version of this model, or a shorter conversation memory, would help.");
-      expect(document.querySelector('[data-slot="recommendation-card"]')).toBeNull();
-      expect(document.querySelector('[role="alert"]')).not.toBeNull();
+      const recommendation = document.querySelector('[data-slot="recommendation-card"]');
+      expect(recommendation).not.toBeNull();
+      expect(recommendation?.textContent).toContain("What would help?");
+      expect(recommendation?.textContent).toContain("It needs about 6 GB more memory.");
+      expect(recommendation?.textContent).not.toContain("Accept");
+      expect(recommendation?.textContent).not.toContain("Alternatives");
+      expect(recommendation?.textContent).not.toContain("confidence");
     } finally { restore(); }
   });
 

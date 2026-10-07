@@ -12,7 +12,7 @@ import { formatBytes } from "@/apps/settings/formatBytes";
 import { useFitPlan } from "@/lib/useFitPlan";
 import { modelLinkName, parseModelLink } from "@/lib/modelLink";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
-import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
+import { RecommendationCard } from "@maipai/ui/src/elements/recommendation-card";
 import { describeFitPlan, describeHomeOwnedRoles, fitBadgeWord, fitSourceSentence, type FitPanelRow } from "@/lib/fitPanel";
 import type { ComputerMemoryResponse } from "@/lib/api";
 import type { FitPlanResponse } from "@/lib/api";
@@ -125,6 +125,8 @@ function ChatModelCard({
   const ChevronIcon = getIcon("chevron-down");
   if (fits === null) return <RoleCardShell title="Chat"><Progress mode="spinner" label="Checking the MaiPai Stack" /></RoleCardShell>;
   const primary = fits.find((f) => f.model.id === selectedModelId) ?? fits.find((f) => f.model.implemented) ?? null;
+  const readyPlan = fitPlan.state === "ready" ? fitPlan.response?.plan : null;
+  const fitDetails = readyPlan ? describeFitPlan(readyPlan) : null;
   return (
     <RoleCardShell title="Chat">
       <div className="flex flex-col gap-2">
@@ -138,7 +140,14 @@ function ChatModelCard({
         </div>
         {primary ? <FitLine fitPlan={fitPlan} legacyWarning={!primary.fits} /> : null}
         <Disclosure open={showDetails} onToggle={() => setShowDetails((v) => !v)} label="Details" icon={ChevronIcon}>
-          <div className="flex flex-col gap-1 pt-1"><p className="text-base text-[var(--muted-foreground)]">Chat runs through the MaiPai Stack.</p>{primary ? <DetailsFitPanel fitPlan={fitPlan} legacyBytes={primary.requiredBytes} /> : <p className="text-base text-[var(--muted-foreground)]">The Stack has not reported a chat model.</p>}</div>
+          <div className="flex flex-col gap-1 pt-1">
+            <p className="text-base text-[var(--muted-foreground)]">Chat runs through the MaiPai Stack.</p>
+            {primary ? fitDetails ? <>
+              <SpecSheet title="Fit details" rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
+              {fitDetails.rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}
+              {fitDetails.remedy ? <RecommendationCard state="idle" question="What would help?">{fitDetails.remedy}</RecommendationCard> : null}
+            </> : <p className="text-base text-[var(--muted-foreground)]">Uses about {formatBytes(primary.requiredBytes)} of memory.</p> : <p className="text-base text-[var(--muted-foreground)]">The Stack has not reported a chat model.</p>}
+          </div>
         </Disclosure>
       </div>
     </RoleCardShell>
@@ -177,6 +186,7 @@ function CheckModelCard({ onChecked }: { onChecked: (name: string, response: Fit
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<Awaited<ReturnType<typeof api.fitPlan>> | null>(null);
   const [showPlan, setShowPlan] = useState(false);
+  const fitDetails = response?.plan ? describeFitPlan(response.plan) : null;
 
   async function check() {
     const parsed = parseModelLink(value);
@@ -207,21 +217,13 @@ function CheckModelCard({ onChecked }: { onChecked: (name: string, response: Fit
       </form>
       {error ? <p className="mt-2 text-base text-[var(--muted-foreground)]">{error}</p> : null}
       {busy ? <div className="mt-2"><Progress mode="spinner" label="Checking this computer" /></div> : null}
-      {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} sizedModel={response.plan && typeof response.plan.model === "string" && response.plan.model.length > 0 ? response.plan.model : null} />{response.plan ? <Disclosure open={showPlan} onToggle={() => setShowPlan((open) => !open)} label="How this was worked out" icon={getIcon("chevron-down")}><FitPanel response={response} /></Disclosure> : null}</div> : null}
+      {response ? <div className="mt-2"><FitResult headline={response.wording.headline} detail={response.wording.detail} verdict={response.wording.verdict} sizedModel={response.plan && typeof response.plan.model === "string" && response.plan.model.length > 0 ? response.plan.model : null} />{response.plan && fitDetails ? <Disclosure open={showPlan} onToggle={() => setShowPlan((open) => !open)} label="How this was worked out" icon={getIcon("chevron-down")}>
+        <SpecSheet title="Fit details" rows={fitDetails.rows.map(({ label, value }) => ({ label, value }))} visibleCount={fitDetails.rows.length} />
+        {fitDetails.rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}
+        {fitDetails.remedy ? <RecommendationCard state="idle" question="What would help?">{fitDetails.remedy}</RecommendationCard> : null}
+      </Disclosure> : null}</div> : null}
     </RoleCardShell>
   );
-}
-
-function DetailsFitPanel({ fitPlan, legacyBytes }: { fitPlan: ReturnType<typeof useFitPlan>; legacyBytes: number }) {
-  const { state, response } = fitPlan;
-  if (state === "ready" && response?.plan) return <FitPanel response={response} />;
-  return <p className="text-base text-[var(--muted-foreground)]">Uses about {formatBytes(legacyBytes)} of memory.</p>;
-}
-
-function FitPanel({ response }: { response: FitPlanResponse }) {
-  if (!response.plan) return null;
-  const { rows, remedy } = describeFitPlan(response.plan);
-  return <div className="flex flex-col gap-3 pt-2"><SpecSheet title="Fit details" rows={rows.map(({ label, value }) => ({ label, value }))} visibleCount={rows.length} />{rows.filter((row) => row.source).map((row) => <FitSource key={row.label} row={row} />)}{remedy ? <Alert><AlertTitle>What would help?</AlertTitle><AlertDescription>{remedy}</AlertDescription></Alert> : null}</div>;
 }
 
 function ModelComparison({ recommended, checked, hardware }: { recommended: { name: string; response: FitPlanResponse | null }; checked: Array<{ name: string; response: FitPlanResponse }>; hardware: HardwareInfo | null }) {
