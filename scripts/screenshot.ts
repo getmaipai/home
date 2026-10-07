@@ -576,6 +576,7 @@ async function seedHousehold(): Promise<string> {
   if (!seededPeople.ok) throw new Error(`seed people lookup failed: ${seededPeople.status}`);
   const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((person) => person.display_name === "Sage");
   if (!sage) throw new Error("seed people lookup did not return Sage");
+  seedChatHistoryRows(sage.id);
   if (chatArtifactCapture) attachWriteDocumentRoutingStats(sage.id);
   for (const person of [
     { displayName: "Marlow", role: "teen" },
@@ -621,6 +622,22 @@ async function seedHousehold(): Promise<string> {
   await seedPeopleAndThings(sessionValue);
 
   return sessionValue;
+}
+
+/** A-11Y-COLUMN-01: the chat history column must be scanned with real
+ * thread rows in it (row trigger, hover "More options"), not only the empty
+ * state, or a touch-target failure on a row only shows up for a household
+ * that has chats. Direct rows, one per title shape: a titled thread and an
+ * untitled one (the kit's "New Chat" fallback). */
+function seedChatHistoryRows(personId: string): void {
+  const db = new Database(join(DATA_DIR, "hub.db"));
+  const now = new Date().toISOString();
+  for (const [index, row] of [{ id: "a11y-history-1", title: "Weekend plans" }, { id: "a11y-history-2", title: null }].entries()) {
+    if (db.query("SELECT id FROM conversations WHERE id = ?").get(row.id)) continue;
+    const hlc = `${now}:${index}:screenshot`;
+    db.query("INSERT INTO conversations (id, person_id, surface, mode, hlc, created_at, updated_at, title) VALUES (?, ?, 'chat', 'chat', ?, ?, ?, ?)").run(row.id, personId, hlc, now, now, row.title);
+  }
+  db.close();
 }
 
 // Lane 11 item 2: real content for the Memory app's "People and things"
