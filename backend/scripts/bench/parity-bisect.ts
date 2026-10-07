@@ -99,7 +99,7 @@ async function main() {
   // backend/packages manifest on disk (lib/projects/tool.ts's own
   // header) - the same shape nodes/model.ts's own toolSpecFor() special-
   // cases, mirrored here.
-  const TOOLS: ToolSpec[] = budget.tools_offered
+  const TOOLS: ToolSpec[] = (budget.tools_offered ?? [])
     .slice()
     .sort()
     .map((id) => {

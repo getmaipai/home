@@ -20,9 +20,9 @@ type RecordedDeadlines = { model: number; tool: number; total: number; first_tok
 
 /** A catalog record's budget with the two stream fields filled in; the old
  * keys read exactly as measured. */
-function withStreamDeadlines(budget: Omit<TurnBudget, "deadlines_ms"> & { deadlines_ms: RecordedDeadlines }): TurnBudget {
+function withStreamDeadlines(budget: NonNullable<(typeof CATALOG)[number]["turn_budget"]> & { deadlines_ms: RecordedDeadlines }): TurnBudget {
   const d = budget.deadlines_ms;
-  return { ...budget, deadlines_ms: { ...d, first_token_ms: d.first_token_ms ?? FIRST_TOKEN_DEADLINE_MS, stall_ms: d.stall_ms ?? STALL_DEADLINE_MS } };
+  return { ...budget, tools_offered: budget.tools_offered ?? [], deadlines_ms: { ...d, first_token_ms: d.first_token_ms ?? FIRST_TOKEN_DEADLINE_MS, stall_ms: d.stall_ms ?? STALL_DEADLINE_MS } };
 }
 
 /** No search, no second round, no model-driven transition: the safest

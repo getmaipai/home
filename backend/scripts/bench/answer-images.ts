@@ -228,7 +228,7 @@ if (!searchSet.ok) throw new Error(`search setting: ${searchSet.error}`);
 
 const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
 if (!entry?.turn_budget) throw new Error("the 8B has no turn_budget");
-const shipped = entry.turn_budget.tools_offered.filter((id) => id !== SHOW);
+const shipped = (entry.turn_budget.tools_offered ?? []).filter((id) => id !== SHOW);
 function useArm(arm: Arm): void {
   entry!.turn_budget!.tools_offered = arm === "ON" ? [...shipped, SHOW].sort() : [...shipped];
 }

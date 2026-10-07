@@ -114,7 +114,7 @@ describe("TOOLSET-01: recall leaves the offered set", () => {
   test("no chat model's turn_budget offers recall", () => {
     for (const model of CATALOG) {
       if (model.role !== "chat" || !model.turn_budget) continue;
-      expect(model.turn_budget.tools_offered).not.toContain("recall");
+      expect(model.turn_budget.tools_offered ?? []).not.toContain("recall");
     }
   });
 });
