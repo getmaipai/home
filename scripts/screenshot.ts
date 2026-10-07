@@ -22,6 +22,9 @@
 //   docs/plans/wave-2.md's shared-file protocol - noted in this
 //   session's dev doc and the backlog instead, run for now via this
 //   repo's own `bun run a11y`.
+// - `bun run screenshots --files-review`: Files only, seeded with the six
+//   spec kinds in the browser request layer and captured at desktop/phone
+//   in both themes. The same browser fixture is used by --a11y-only.
 //
 // "far" (TV) is a user-agent, not a viewport (frontend/src/kit/
 // useSurface.ts's own TV_USER_AGENT) - the far entry below sets one.
@@ -69,6 +72,7 @@ let DATA_DIR: string;
 let BASE_URL: string;
 let DATA_OWNER: RunOwner;
 let STACK_URL: string;
+let SCREENSHOT_FILE_OWNER_ID: string;
 const ROOT = join(import.meta.dir, "..");
 const BUILD_LOCK = join(ROOT, ".screenshot-build.lock");
 const useWebkit = process.argv.includes("--webkit");
@@ -150,6 +154,7 @@ const TRAIL_THUMBNAIL_PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAYAAACLz2ctAAACxElEQVR42u3SRUIQAAAAQZ7IS3yOATZgByKpYHeLAXZ3t55kL77COewLdgYGV6/6O7im1ta6GqrhWl8bamNtqs21pbbWSI3WWG2r7bWjdtau2l17am/tq/01Xgdqog7WZE3VdM3UbM3VoTpc87VQR+poHavjdaJO1qk6XWfqbJ2r83WhLtalulxX6mpdq+u1WDfqZt2q27VUy3Wn7ta9ul8P6mE9qsf1pJ7Ws3peL+plvarX9abe1rt6Xx/qY32qz/Wlvta3+l4/6mf9qt/1p/6zHwMAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAIIIIAAAggggAACCCCAAAII4L8fK9fe4oni3vjtAAAAAElFTkSuQmCC";
 
 const a11yOnly = process.argv.includes("--a11y-only");
+const filesReview = process.argv.includes("--files-review");
 // Focused review retains the same seeded data, readiness, and a11y checks.
 const chatFocusReview = process.argv.includes("--chat-focus-review");
 const chatModeReview = process.argv.includes("--chat-mode-review");
@@ -421,6 +426,12 @@ const A11Y_ONLY_COMBOS: Array<{ viewport: string; theme: "light" | "dark" }> = [
   { viewport: "phone", theme: "dark" },
   { viewport: "desktop", theme: "light" },
 ];
+const FILES_REVIEW_COMBOS: Array<{ viewport: string; theme: "light" | "dark" }> = [
+  { viewport: "desktop", theme: "light" },
+  { viewport: "desktop", theme: "dark" },
+  { viewport: "phone", theme: "light" },
+  { viewport: "phone", theme: "dark" },
+];
 
 async function waitForHealth(timeoutMs = 15000): Promise<void> {
   const start = Date.now();
@@ -584,6 +595,7 @@ async function seedHousehold(): Promise<string> {
   if (!seededPeople.ok) throw new Error(`seed people lookup failed: ${seededPeople.status}`);
   const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((person) => person.display_name === "Sage");
   if (!sage) throw new Error("seed people lookup did not return Sage");
+  SCREENSHOT_FILE_OWNER_ID = sage.id;
   seedChatHistoryRows(sage.id);
   seedTraceReviewTurn(sage.id);
   if (chatArtifactCapture) attachWriteDocumentRoutingStats(sage.id);
@@ -763,6 +775,46 @@ async function settleAnimations(page: import("playwright").Page) {
   });
 }
 
+/** Files-page demo data stays in the screenshot browser request layer: it
+ * never enters the household DB or a real person's storage. Keep all six
+ * spec kinds visible in the page and a stable MIME/size for the File parts. */
+function screenshotLibraryFiles() {
+  const owner = SCREENSHOT_FILE_OWNER_ID;
+  if (!owner) throw new Error("Files screenshot fixture has no seeded owner");
+  const createdAt = "2026-10-07T00:00:00.000Z";
+  const fixtures = [
+    ["image", "image/png", 187_432],
+    ["video", "video/mp4", 2_345_678],
+    ["audio", "audio/mpeg", 523_901],
+    ["document", "application/pdf", 83_012],
+    ["story", "text/markdown", 4_281],
+    ["other", "application/octet-stream", 16_384],
+  ] as const;
+  return fixtures.map(([kind, mediaType, size], index) => {
+    const id = `file-screenshot${kind}01`;
+    return {
+      owner_person_id: owner,
+      shared: false,
+      household: false,
+      former_owner_name: null,
+      file: {
+        id,
+        owner_person_id: owner,
+        origin: "made",
+        kind,
+        media_type: mediaType,
+        size,
+        sha256: String(index + 1).repeat(64),
+        storage_path: `people/${owner}/files/${id}`,
+        retention: "kept",
+        provenance: { conversation_id: null, turn_id: null, package_id: null, job_id: null, requested_by_person_id: null, note: null },
+        created_at: createdAt,
+        hlc: `1791331200000:${index}:screenshot`,
+      },
+    };
+  });
+}
+
 /** Navigates to one route, waits for its real content (never a spinner or
  * an empty shell), runs the axe scan and the overflow check, and - unless
  * `a11yOnly` - saves the PNG. Throws on a navigation/selector failure
@@ -771,6 +823,9 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
   const page = await context.newPage();
   page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
   try {
+    if (route.slug === "files") {
+      await page.route("**/api/files", (request) => request.fulfill({ status: 200, json: screenshotLibraryFiles() }));
+    }
     if (route.slug === "status") {
       const today = new Date();
       const history = Array.from({ length: 90 }, (_, index) => ({
@@ -848,6 +903,17 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
       if (!cleared.ok()) throw new Error("Could not reset demo chats");
       await page.reload();
       await exerciseChat(page, viewport, theme);
+    }
+
+    if (route.slug === "files") {
+      await page.getByRole("button", { name: "More actions" }).first().click();
+      await page.getByRole("menuitem", { name: "View details" }).click();
+      await page.locator('[data-slot="file-root"]').waitFor();
+      await page.evaluate(() => {
+        document.querySelectorAll<HTMLElement>(".overflow-x-auto").forEach((element) => { element.scrollLeft = 0; });
+        window.scrollTo(0, 0);
+      });
+      await settleAnimations(page);
     }
 
     // getmaipai/home, found live 2026-09-13: Home's "who's here" avatar
@@ -9856,7 +9922,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview) {
+    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -9887,7 +9953,9 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview
+    const combos = filesReview
+      ? FILES_REVIEW_COMBOS
+      : notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview
       ? []
       : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
         ? A11Y_ONLY_COMBOS
@@ -9906,7 +9974,7 @@ async function main() {
       const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
       const comboResult: RunResult[] = [];
       try {
-        for (const route of ((chatReview || chatStatsReview || chatResearchReview || chatContinueReview) ? ROUTES.filter((entry) => entry.slug === "chat") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
+        for (const route of ((chatReview || chatStatsReview || chatResearchReview || chatContinueReview) ? ROUTES.filter((entry) => entry.slug === "chat") : filesReview ? ROUTES.filter((entry) => entry.slug === "files") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its
@@ -9957,7 +10025,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !chatShortcutsReview && !nextDashboardReview && !chatMobileSheetReview) {
+    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !chatShortcutsReview && !nextDashboardReview && !chatMobileSheetReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
