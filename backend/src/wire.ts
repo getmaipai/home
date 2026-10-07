@@ -465,6 +465,9 @@ export interface ConversationSummary {
   archived: boolean;
   /** PROJECTS-01a: the project (chat folder) this chat sits in, or null. */
   folder_id: string | null;
+  /** PROJECTS-UI-02a: read-time preview of the latest user turn. Null when
+   * this viewer is not the conversation's person or no safe turn exists. */
+  preview?: string | null;
   turn_count: number;
   last_turn_at: string | null;
   created_at: string;

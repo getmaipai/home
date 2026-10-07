@@ -689,6 +689,7 @@ export function listTemporaryConversations(actor: PersonRow, personId?: string):
       pinned: conversation.pinned,
       archived: false,
       folder_id: null,
+      preview: null,
       turn_count: turns.length,
       last_turn_at: turns.at(-1)?.createdAt ?? null,
       created_at: conversation.created_at,
@@ -1661,23 +1662,54 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
 
   const ids = rows.map((r) => r.id);
   const turnRows = db
-    .select({ conversationId: conversationTurns.conversationId, createdAt: conversationTurns.createdAt })
+    .select({
+      conversationId: conversationTurns.conversationId,
+      createdAt: conversationTurns.createdAt,
+      userText: conversationTurns.userText,
+      safetyFlagged: conversationTurns.safetyFlagged,
+      safetyAction: conversationTurns.safetyAction,
+      crisisSignal: conversationTurns.crisisSignal,
+    })
     .from(conversationTurns)
     .where(inArray(conversationTurns.conversationId, ids))
     .all();
   const byConversation = new Map<string, { count: number; last: string | null }>();
+  const latestUserTurn = new Map<string, (typeof turnRows)[number]>();
   for (const t of turnRows) {
     if (!t.conversationId) continue;
     const entry = byConversation.get(t.conversationId) ?? { count: 0, last: null };
     entry.count++;
     if (!entry.last || t.createdAt > entry.last) entry.last = t.createdAt;
     byConversation.set(t.conversationId, entry);
+    if (t.userText.trim()) {
+      const current = latestUserTurn.get(t.conversationId);
+      // Match listConversationTurns()' stable timestamp ordering: when
+      // rows share a timestamp, the later row in SQLite's returned order wins.
+      if (!current || t.createdAt >= current.createdAt) latestUserTurn.set(t.conversationId, t);
+    }
   }
 
+  const ownAdultView = actor.id === target && speakerAgeBand(actor, new Date()) === "adult";
+  const ownMinorView = actor.id === target && !ownAdultView;
   return rows.map((r) => {
     const agg = byConversation.get(r.id) ?? { count: 0, last: null };
-    return toConversationSummary(r, agg.count, agg.last);
+    const turn = latestUserTurn.get(r.id);
+    const preview = !turn || (!ownAdultView && !ownMinorView) ||
+      (ownMinorView && (turn.safetyFlagged || turn.safetyAction === "refuse" || turn.crisisSignal))
+      ? null
+      : previewText(turn.userText);
+    return { ...toConversationSummary(r, agg.count, agg.last), preview };
   });
+}
+
+/** One-line read-time preview, using the already-redacted text stored for
+ * the same turn row returned by GET /api/conversations/:id/turns. */
+function previewText(text: string): string | null {
+  const collapsed = text.replace(/\s+/g, " ").trim();
+  if (!collapsed) return null;
+  const chars = Array.from(collapsed);
+  if (chars.length <= 120) return collapsed;
+  return `${chars.slice(0, 119).join("").trimEnd()}…`;
 }
 
 /** GET /api/conversations/:id: a real 404 for anyone else's, deleted, or

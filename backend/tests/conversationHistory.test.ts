@@ -115,6 +115,7 @@ describe("logTurn (via runTurn)", () => {
     expect(getPendingAsk(conversation.value.id)).toBeNull();
     const result = await runTurnNext(actor, "chat", "remember that trash day is Tuesday", { conversationId: conversation.value.id });
     expect(result.ok).toBe(true);
+    expect(listTemporaryConversations(actor).find((row) => row.id === conversation.value.id)?.preview).toBeNull();
     expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, conversation.value.id)).all()).toHaveLength(0);
     expect(db.select().from(memoryRecords).where(eq(memoryRecords.person, actor.id)).all()).toHaveLength(0);
   });
@@ -1057,6 +1058,95 @@ describe("GET /api/conversations (step 3: now lists conversation THREADS, not tu
     const res = await client.get(`/api/conversations?q=${encodeURIComponent("not sure")}`);
     const rows = (await res.json()) as Array<{ id: string }>;
     expect(rows.map((row) => row.id)).toEqual([matching.value.id]);
+  });
+});
+
+describe("PROJECTS-UI-02a conversation previews", () => {
+  function recordTurn(actor: typeof people.$inferSelect, text: string, turnId: string, crisisSignal = false): string {
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error(conversation.error);
+    logTurn(actor, "chat", text, {
+      reply: { text: "Acknowledged." },
+      source: "model",
+      safety: SAFE,
+      conversation_id: conversation.value.id,
+      turn_id: turnId,
+    }, { crisisSignal });
+    return conversation.value.id;
+  }
+
+  test("an adult's own preview matches their redacted user turn, collapsed to one line", async () => {
+    const { actor, client } = await owner();
+    const id = recordTurn(actor, "  plan\t the project\n this week  ", "preview-adult");
+    const [listResponse, turnsResponse] = await Promise.all([
+      client.get("/api/conversations"),
+      client.get(`/api/conversations/${id}/turns`),
+    ]);
+    const summaries = (await listResponse.json()) as Array<{ id: string; preview?: string | null }>;
+    const turns = (await turnsResponse.json()) as Array<{ userText: string }>;
+    const preview = summaries.find((row) => row.id === id)?.preview;
+    expect(preview).toBe("plan the project this week");
+    expect(preview).toBe(turns[0]!.userText.replace(/\s+/g, " ").trim());
+  });
+
+  test("a long preview is cut at 120 characters with an ellipsis", async () => {
+    const { actor } = await owner();
+    const id = recordTurn(actor, "x".repeat(160), "preview-truncate");
+    const preview = listConversations(actor).find((row) => row.id === id)?.preview;
+    expect(preview).toBe(`${"x".repeat(119)}…`);
+    expect(Array.from(preview ?? "")).toHaveLength(120);
+  });
+
+  test("an admin viewing a child's conversation gets a null preview", async () => {
+    const { actor, client } = await owner();
+    const child = await addPerson(client, "Bramble", "child");
+    const id = recordTurn(child, "private child turn", "preview-admin-child");
+    const response = await client.get(`/api/conversations?person=${child.id}`);
+    const summaries = (await response.json()) as Array<{ id: string; preview?: string | null }>;
+    expect(summaries.find((row) => row.id === id)?.preview).toBeNull();
+    expect(actor.id).not.toBe(child.id);
+  });
+
+  test("a child's flagged turn has no preview", async () => {
+    const { client } = await owner();
+    const child = await addPerson(client, "Bramble", "child");
+    const id = recordTurn(child, "flagged child text", "preview-child-flagged");
+    db.update(conversationTurns).set({ safetyFlagged: true }).where(eq(conversationTurns.id, "preview-child-flagged")).run();
+    expect(listConversations(child).find((row) => row.id === id)?.preview).toBeNull();
+  });
+
+  test("a child's refused turn has no preview", async () => {
+    const { client } = await owner();
+    const child = await addPerson(client, "Bramble", "child");
+    const id = recordTurn(child, "refused child text", "preview-child-refused");
+    db.update(conversationTurns).set({ safetyAction: "refuse" }).where(eq(conversationTurns.id, "preview-child-refused")).run();
+    expect(listConversations(child).find((row) => row.id === id)?.preview).toBeNull();
+  });
+
+  test("a teen's crisis-marked turn has no preview", async () => {
+    const { client } = await owner();
+    const teen = await addPerson(client, "Marlow", "teen");
+    const id = recordTurn(teen, "crisis-marked teen text", "preview-teen-crisis", true);
+    expect(listConversations(teen).find((row) => row.id === id)?.preview).toBeNull();
+  });
+
+  test("credential text stays redacted in the preview just as it does in GET turns", async () => {
+    const { actor, client } = await owner();
+    const raw = "the wifi password is Don'tPanic42.";
+    const id = recordTurn(actor, raw, "preview-credential");
+    const response = await client.get(`/api/conversations/${id}/turns`);
+    const turns = (await response.json()) as Array<{ userText: string }>;
+    const preview = listConversations(actor).find((row) => row.id === id)?.preview;
+    expect(preview).toBe(turns[0]!.userText);
+    expect(preview).toContain("[credential redacted]");
+    expect(preview).not.toContain("Don'tPanic42");
+  });
+
+  test("a conversation with no user turn has a null preview", async () => {
+    const { actor } = await owner();
+    const conversation = createConversation(actor, { surface: "chat" });
+    if (!conversation.ok) throw new Error(conversation.error);
+    expect(listConversations(actor).find((row) => row.id === conversation.value.id)?.preview).toBeNull();
   });
 });
 
