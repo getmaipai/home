@@ -1,9 +1,7 @@
-// ACTIVITY-01d: what the Running now panel says, as data. Pure, so every
-// word a person reads (and every control they are offered) is decided and
-// tested in one place; RunningNowButton.tsx only wires it to the kit's
-// `RunningNow` part and the routes. Copy follows UI-STUDY.md 8.4: a child
-// reads friendly words with no numbers, nobody reads engine names, and
-// raw detail is an admin's only.
+// ACTIVITY-01d: map /api/jobs into the safe activity rows rendered by the
+// chat's shipped TaskCard and BackgroundInbox Elements. Copy follows
+// UI-STUDY.md 8.4: children get friendly words, nobody reads engine names,
+// and raw detail is an admin's only.
 import type { HomeJobView } from "@/lib/api";
 
 export type RunningNowBand = "child" | "teen" | "adult";

@@ -1,33 +1,4 @@
 {
-  "apps/chat/ChatActivityCard.tsx": {
-    "Alert": {
-      "tokens": [
-        "bg-[var(--tint-attention)]",
-        "border-[var(--tint-attention-hairline)]",
-        "my-2"
-      ],
-      "ed": "ED-022",
-      "reason": "Hand-built activity card where task-card and background-inbox ship; ELT-T1-11."
-    },
-    "AlertTitle": {
-      "tokens": [
-        "flex",
-        "gap-3",
-        "items-baseline",
-        "justify-between"
-      ],
-      "ed": "ED-022",
-      "reason": "Hand-built activity card where task-card and background-inbox ship; ELT-T1-11."
-    },
-    "Progress": {
-      "tokens": [
-        "mt-2",
-        "w-auto"
-      ],
-      "ed": "ED-022",
-      "reason": "Hand-built activity card where task-card and background-inbox ship; ELT-T1-11."
-    }
-  },
   "apps/chat/ComposerWakeWordControl.tsx": {
     "TooltipIconButton": {
       "tokens": [

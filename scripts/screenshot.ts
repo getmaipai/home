@@ -6370,7 +6370,7 @@ async function captureNextChatQueueReview(browser: Browser, sessionValue: string
   }
 }
 
-/** ACTIVITY-01d/e: the calm activity card above the composer, through the
+/** ELT-T1-11: the shipped activity Elements above the composer, through the
  * real routes. Jobs, an ask and an approval are seeded straight into the demo
  * database (the producers need engines a capture does not run); everything
  * shown is read back through GET /api/jobs. Also proves the header carries no
@@ -6397,7 +6397,10 @@ sqlite.query("DELETE FROM jobs WHERE id LIKE 'shot-%'").run();
 sqlite.query("DELETE FROM approvals WHERE id LIKE 'shot-%'").run();
 sqlite.query("UPDATE conversations SET pending_ask = NULL").run();
 const job = sqlite.query("INSERT INTO jobs (id, kind, started_by, for_person, title, state, progress, waiting_reason, result_ref, conversation_id, error_kind, raw, provenance, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, '{}', ?, ?)");
-if (scenario === "running") job.run("shot-fox", "image", owner.id, owner.id, "Making a picture of a red fox", "running", JSON.stringify({ fraction: 0.6, eta_seconds: 40 }), null, at(30), at(2));
+if (scenario === "running") {
+  job.run("shot-fox", "image", owner.id, owner.id, "Making a picture of a red fox", "running", JSON.stringify({ fraction: 0.6, eta_seconds: 40 }), null, at(30), at(1));
+  job.run("shot-video", "video", owner.id, owner.id, "Making a short video", "running", null, null, at(20), at(2));
+}
 if (scenario === "done") job.run("shot-done", "search", owner.id, owner.id, "Looked up train times to the coast", "done", null, ${JSON.stringify(askConversation.id)}, at(240), at(60));
 if (scenario === "waiting" || scenario === "child") sqlite.query("INSERT INTO approvals (id, kind, person_id, details, status, decided_by_person_id, decided_at, created_at) VALUES ('shot-ask', 'install_package', ?, ?, 'pending', NULL, NULL, ?)").run(nova.id, JSON.stringify({ packageName: "Chess" }), at(60));
 if (scenario === "waiting") {
@@ -6416,9 +6419,10 @@ sqlite.close();`;
     await page.getByRole("textbox", { name: "Message input" }).waitFor();
     await page.waitForResponse((response) => response.url().endsWith("/api/jobs")).catch(() => undefined);
     if (await page.getByRole("button", { name: /^Running now/ }).count()) throw new Error("captureActivityCardReview: a Running now button is still in the header");
-    if (await page.getByRole("alert").filter({ hasNot: page.locator('[data-slot="chat-activity-card"]') }).count()) throw new Error("captureActivityCardReview: an error banner");
+    if (await page.getByRole("alert").count()) throw new Error("captureActivityCardReview: an error banner");
   };
-  const card = (page: Page) => page.locator('[data-slot="chat-activity-card"]');
+  const card = (page: Page) => page.locator('[data-slot="task-card"]');
+  const inbox = (page: Page) => page.locator('[data-slot="background-inbox"]');
 
   // 1. Nothing relevant: no card at all.
   seed("none");
@@ -6436,7 +6440,7 @@ sqlite.close();`;
   // then running, then just finished.
   const states: Array<{ scenario: "waiting" | "running" | "done"; name: string; ready: (page: Page) => Promise<void> }> = [
     { scenario: "waiting", name: "waiting", ready: async (page) => { await card(page).waitFor(); await card(page).getByText("Needs you").waitFor(); } },
-    { scenario: "running", name: "running", ready: async (page) => { await card(page).getByText("Making a picture of a red fox").waitFor(); } },
+    { scenario: "running", name: "running", ready: async (page) => { await card(page).getByText("Making a picture of a red fox").waitFor(); await inbox(page).getByText("Making a short video").waitFor(); } },
     { scenario: "done", name: "done", ready: async (page) => { await card(page).getByText("Looked up train times to the coast").waitFor(); await card(page).getByRole("button", { name: "Dismiss" }).waitFor(); } },
   ];
   for (const state of states) {
@@ -6467,7 +6471,7 @@ sqlite.close();`;
       const page = await context.newPage();
       await openChat(page);
       await card(page).getByText("Asked a parent").waitFor();
-      if (await card(page).getByRole("button").count()) throw new Error("captureActivityCardReview: a child was offered buttons on her own ask");
+      if (await card(page).locator('[data-slot="task-card-actions"] button').count()) throw new Error("captureActivityCardReview: a child was offered approval actions on her own ask");
       await shot(page, "child", viewport, theme);
     } finally { await context.close(); }
   }

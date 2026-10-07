@@ -7,6 +7,7 @@ const ago = (seconds: number) => new Date(NOW - seconds * 1000).toISOString();
 const admin: RunningNowViewer = { id: "sage", band: "adult", admin: true };
 const adult: RunningNowViewer = { id: "marlow", band: "adult", admin: false };
 const child: RunningNowViewer = { id: "nova", band: "child", admin: false };
+const teen: RunningNowViewer = { id: "ember", band: "teen", admin: false };
 
 const job = (over: Partial<HomeJobView>): HomeJobView => ({ id: "j", kind: "image", state: "running", startedBy: "sage", forPerson: "sage", title: "Making a picture of a red fox", createdAt: ago(30), updatedAt: ago(5), actions: [], ...over });
 
@@ -90,6 +91,16 @@ describe("runningNowView", () => {
   test("a child's own ask reads Asked a parent, with no buttons and no worry", () => {
     const view = runningNowView({ jobs: [job({ id: "ask", kind: "approval", state: "waiting_for_you", forPerson: "nova", startedBy: "nova", title: 'Asked to install "Chess"', actions: [] })], viewer: child, now: NOW });
     expect(view.waiting[0]).toMatchObject({ title: "Asked a parent", status: "", actions: [] });
+  });
+
+  test("child, teen and adult approval rows keep their own copy and projected actions", () => {
+    const childRow = runningNowView({ jobs: [job({ id: "child-ask", kind: "approval", state: "waiting_for_you", forPerson: "nova", startedBy: "nova", title: 'Asked to install "Chess"', actions: [] })], viewer: child, now: NOW }).waiting[0];
+    const teenRow = runningNowView({ jobs: [job({ id: "teen-ask", kind: "approval", state: "waiting_for_you", forPerson: "ember", startedBy: "ember", title: 'Asked to install "Chess"', actions: [] })], viewer: teen, now: NOW }).waiting[0];
+    const adultRow = runningNowView({ jobs: [job({ id: "child-ask", kind: "approval", state: "waiting_for_you", forPerson: "nova", startedBy: "nova", title: 'Nova asked to install "Chess"', actions: ["approve", "deny"] })], viewer: admin, now: NOW }).waiting[0];
+
+    expect(childRow).toMatchObject({ title: "Asked a parent", status: "", actions: [] });
+    expect(teenRow).toMatchObject({ title: 'Asked to install "Chess"', status: "Needs you", actions: [] });
+    expect(adultRow).toMatchObject({ title: 'Nova asked to install "Chess"', actions: ["approve", "deny"] });
   });
 
   test("a child's job a grown-up stopped says so kindly", () => {
