@@ -70,6 +70,17 @@ function sharesOf(folderId: string): Array<{ person: string; role: "can_use" | "
     .map((s) => ({ person: s.personId, role: s.role as "can_use" | "can_edit" }));
 }
 
+/** Give each newly pinned project a strictly newer timestamp, including when
+ * two pin requests land during the same clock millisecond. This timestamp is
+ * also the persisted ordering key, so a tie would otherwise fall through to
+ * the unrelated default folder order. */
+function nextPinnedAt(now: string): string {
+  const latest = sqlite.query("SELECT MAX(pinned_at) AS value FROM chat_folders WHERE pinned = 1").get() as { value: string | null };
+  const latestTime = latest.value ? Date.parse(latest.value) : Number.NEGATIVE_INFINITY;
+  const nowTime = Date.parse(now);
+  return new Date(Number.isFinite(latestTime) ? Math.max(nowTime, latestTime + 1) : nowTime).toISOString();
+}
+
 function toRecord(row: ChatFolderRow): ChatFolder {
   return ChatFolder.parse({
     id: row.id,
@@ -332,7 +343,7 @@ export function updateChatFolder(actor: PersonRow, id: string, patch: PatchInput
   if (patch.pinned !== undefined) {
     if (typeof patch.pinned !== "boolean") return { ok: false, status: 400, error: "pinned must be true or false" };
     set.pinned = patch.pinned;
-    set.pinnedAt = patch.pinned ? (row.pinned ? row.pinnedAt : now) : null;
+    set.pinnedAt = patch.pinned ? (row.pinned ? row.pinnedAt : nextPinnedAt(now)) : null;
   }
   if (patch.archived !== undefined) {
     if (typeof patch.archived !== "boolean") return { ok: false, status: 400, error: "archived must be true or false" };

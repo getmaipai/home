@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, setSystemTime } from "bun:test";
 import { ChatFolder } from "@maipai/spec/gen/ts/chat-folder.js";
 import projectIcons from "@maipai/spec/vocab/project-icons.json" with { type: "json" };
 import { TestClient } from "./client";
@@ -14,6 +14,8 @@ beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
 });
+
+afterEach(() => setSystemTime());
 
 type View = ChatFolder & { access: "manage" | "edit" | "use"; last_activity_at: string; counts: { chats: number; files: number; artifacts: number } };
 
@@ -166,12 +168,15 @@ describe("listing, search, order, pin, archive", () => {
     const { owner } = await household();
     const a = await make(owner, { name: "Alpha" });
     const b = await make(owner, { name: "Beta" });
+    setSystemTime(new Date("2026-10-07T12:00:00.000Z"));
     const pinned = (await (await patch(owner, a.id, { pinned: true })).json()) as View;
     expect(pinned.pinned).toBe(true);
     expect(pinned.pinned_at).not.toBeNull();
     expect((await list(owner)).map((f) => f.id)[0]).toBe(a.id);
     await patch(owner, b.id, { pinned: true });
-    expect((await list(owner)).map((f) => f.id).slice(0, 2)).toEqual([b.id, a.id]);
+    const bothPinned = await list(owner);
+    expect(bothPinned.map((f) => f.id).slice(0, 2)).toEqual([b.id, a.id]);
+    expect(bothPinned[0]!.pinned_at! > bothPinned[1]!.pinned_at!).toBe(true);
     const unpinned = (await (await patch(owner, a.id, { pinned: false })).json()) as View;
     expect(unpinned.pinned).toBe(false);
     expect(unpinned.pinned_at).toBeNull();
