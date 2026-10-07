@@ -114,7 +114,8 @@ export const ModelPickerContext = createContext<{
   models: readonly ModelOption[];
   value: string | undefined;
   setValue: (model: string) => void;
-}>({ models: [], value: undefined, setValue: () => {} });
+  canSelect: boolean;
+}>({ models: [], value: undefined, setValue: () => {}, canSelect: false });
 
 /** ADMIN-COMPARE-01 (b): the compare-with-bare-model switch, a
  * conversation-wide sibling to feature (a)'s one-message

@@ -2488,16 +2488,24 @@ describe("NextChatPage (MODEL-SEL-01: session model picker)", () => {
     fireEvent.click(send);
   }
 
-  test("hides without Stack configuration and with fewer than two selectable models", async () => {
-    for (const [configured, count] of [[false, 0], [true, 1]] as const) {
-      const restore = stubModelPickerFetch(configured, count);
-      try {
-        const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
-        await view.findByLabelText("Message input");
-        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-        expect(view.queryByLabelText("Choose model")).toBeNull();
-      } finally { restore(); cleanup(); }
-    }
+  test("shows no model name before setup, then the Element label for one current model", async () => {
+    const unconfigured = stubModelPickerFetch(false, 0);
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
+      await view.findByLabelText("Message input");
+      await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+      expect(view.queryByText("Llama Default")).toBeNull();
+      expect(view.queryByLabelText("Choose model")).toBeNull();
+    } finally { unconfigured(); cleanup(); }
+
+    const oneModel = stubModelPickerFetch(true, 1);
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson()} /></MemoryRouter>);
+      await view.findByLabelText("Message input");
+      await view.findByText("Llama Default");
+      expect(view.container.querySelector('[data-slot="model-selector-value"]')?.textContent).toContain("Llama Default");
+      expect(view.queryByLabelText("Choose model")).toBeNull();
+    } finally { oneModel(); cleanup(); }
   });
 
   test("renders the shipped picker and sends its explicit choice on the turn", async () => {
@@ -2511,6 +2519,53 @@ describe("NextChatPage (MODEL-SEL-01: session model picker)", () => {
       await sendMessage(view, "use the faster model");
       await view.findByText("Chosen.");
       expect(turnRequestBodies()[0]!.model).toBe("qwen-fast");
+    } finally { restore(); }
+  });
+
+  function stubAdultChatModels(modelCount: number): () => void {
+    const original = globalThis.fetch;
+    const models = CHAT_ROLE.models.slice(0, modelCount).map((model) => ({ id: model.id, label: model.name }));
+    const selectedModel = models[0] ? { ...models[0], available: true } : null;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/host/chat-models")) return Promise.resolve(Response.json({ models, selectedModel, canSelect: false }));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    return () => { globalThis.fetch = original; };
+  }
+
+  test("an adult member sees the current one-model label without a dropdown", async () => {
+    const restore = stubAdultChatModels(1);
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson({ role: "adult" })} /></MemoryRouter>);
+      await view.findByLabelText("Message input");
+      await view.findByText("Llama Default");
+      expect(view.container.querySelector('[data-slot="model-selector-value"]')?.textContent).toContain("Llama Default");
+      expect(view.queryByRole("combobox", { name: "Choose model" })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("an adult member sees only the current model label when two models are available", async () => {
+    const restore = stubAdultChatModels(2);
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson({ role: "adult" })} /></MemoryRouter>);
+      await view.findByText("Llama Default");
+      expect(view.container.querySelector('[data-slot="model-selector-value"]')?.textContent).toContain("Llama Default");
+      expect(view.queryByRole("combobox", { name: "Choose model" })).toBeNull();
+    } finally { restore(); }
+  });
+
+  test.each([
+    ["child", "child"],
+    ["teen", "teen"],
+  ] as const)("a %s never sees the model label or dropdown", async (role, age_band) => {
+    const restore = stubAdultChatModels(2);
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><NextChatPage person={makePerson({ role, age_band })} /></MemoryRouter>);
+      await view.findByLabelText("Message input");
+      expect(view.queryByText("Llama Default")).toBeNull();
+      expect(view.queryByRole("combobox", { name: "Choose model" })).toBeNull();
     } finally { restore(); }
   });
 });

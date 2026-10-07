@@ -35,7 +35,7 @@ hostRoutes.get("/models", requireRole("owner", "admin"), async (c) => {
 // selected model without host diagnostics; a child gets the empty safe shape.
 hostRoutes.get("/chat-models", requireAuth, async (c) => {
   const actor = c.get("person");
-  if (actor.role === "child" || actor.role === "teen") {
+  if (speakerAgeBand(actor, new Date()) !== "adult") {
     return c.json({ models: [], selectedModel: null, canSelect: false as const });
   }
 

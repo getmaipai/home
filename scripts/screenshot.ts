@@ -303,6 +303,7 @@ const nextShellFoldReview = process.argv.includes("--next-shell-fold-review");
 const nextChatRichReview = process.argv.includes("--next-chat-rich-review");
 const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview || nextChatRichReview;
 const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
+const modelLabelReview = process.argv.includes("--model-label-review");
 const nextChatQueueReview = process.argv.includes("--next-chat-queue-review");
 const composerLayoutReview = process.argv.includes("--composer-layout-review");
 const nextChatQueueEmptyReview = process.argv.includes("--next-chat-queue-empty-review");
@@ -312,7 +313,7 @@ const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audi
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview;
+const chatPageScreenshotFixture = nextChatReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || modelLabelReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -5059,6 +5060,59 @@ async function captureNextChatComposerReview(browser: Browser, sessionValue: str
   }
 }
 
+/** ELT-MODELLABEL-01: capture the shipped one-model label at desktop and
+ * phone widths in both themes. The owner session uses the compact chat role
+ * response below so this review needs no local model installation. */
+async function captureModelLabelReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const chatModel = {
+    id: "demo-chat-model",
+    name: "MaiPai Chat Model",
+  };
+  const engines = {
+    configured: true,
+    roles: [{
+      id: "chat",
+      label: "Chat",
+      wire: "chat",
+      residency: "resident",
+      endpoints: [],
+      quality: [],
+      sharesModelWith: null,
+      state: { state: "ready", since: "2026-10-06T00:00:00.000Z" },
+      reason: null,
+      model: { id: chatModel.id, sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false },
+      models: [chatModel],
+      check: { state: "not checked", at: null, reason: null, stale: false },
+    }],
+    engines: [],
+    budget: null,
+  };
+  for (const theme of THEMES) {
+    for (const width of [1440, 390] as const) {
+      const viewport = VIEWPORTS.find((item) => item.width === width)!;
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.route("**/api/engines", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(engines) }));
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        await page.locator('[data-slot="model-selector-value"]').filter({ hasText: chatModel.name }).waitFor();
+        if (await page.getByRole("combobox", { name: "Choose model" }).count()) throw new Error("model-label-review: one model unexpectedly rendered a dropdown");
+        await settleAnimations(page);
+        const path = join(outDir, `model-label-${width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: true });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** COMPOSER-01: the composer's layout contract, measured in a real browser.
  * Empty and one line stay 56 to 60 px, text wrapping grows it toward 220 px
  * and then scrolls inside, the controls stay on the bottom edge, one model
@@ -8625,6 +8679,12 @@ async function main() {
     if (nextChatQueueReview) {
       await captureNextChatQueueReview(browser, sessionValue);
       console.log("completed named review: --next-chat-queue-review");
+      return;
+    }
+
+    if (modelLabelReview) {
+      await captureModelLabelReview(browser, sessionValue);
+      console.log("completed named review: --model-label-review");
       return;
     }
 

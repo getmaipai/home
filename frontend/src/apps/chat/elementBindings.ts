@@ -115,8 +115,7 @@ export const THREAD_SLOTS = {
   ReasoningGroup: NextReasoningGroup,
 } as const;
 
-// The composer's model selector renders nothing under two models, so the
-// showcase (no model list) shows no picker; the chat page gates it further on
-// its own `modelPickerAllowed`. It sits in the trailing slot, just left of the
-// mic (COMPOSER-01), so this replaces THREAD_SLOTS' own ComposerExtraEnd.
+// The composer's model Element shows a plain value with one model and its
+// picker with multiple models. The chat page gates the trailing slot on an
+// adult viewer with a current model; the showcase has no model list.
 export const MODEL_TRAILING_SLOT = ComposerTrailingWithModelSelector;

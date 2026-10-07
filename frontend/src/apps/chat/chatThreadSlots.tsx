@@ -132,8 +132,15 @@ export function ChatMessageQueue() {
 export const MODEL_EFFORTS = [{ id: "instant", name: "Instant" }, { id: "thinking", name: "Thinking" }] as const;
 
 export function ComposerModelSelector() {
-  const { models, value, setValue } = useContext(ModelPickerContext);
+  const { models, value, setValue, canSelect } = useContext(ModelPickerContext);
   const { mode, setMode } = useContext(ThinkingModeContext);
+  if (models.length > 0 && !canSelect) {
+    return (
+      <ModelSelectorRoot models={models} value={value}>
+        <ModelSelectorValue showEffort={false} />
+      </ModelSelectorRoot>
+    );
+  }
   if (models.length < 2) return null;
   return (
     <ModelSelectorRoot

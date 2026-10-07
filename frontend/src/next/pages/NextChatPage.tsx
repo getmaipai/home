@@ -27,7 +27,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
-import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type EnginesOverview, type InstalledPackage, type Roster } from "@/lib/api";
+import { api, ApiError, isOwnerOrAdminRole, canHaveTemporaryChatRole, readBareCompareStream, type BareCompareTrace, type ChatModelsResponse, type EnginesOverview, type InstalledPackage, type Roster } from "@/lib/api";
 import { CHAT_CAPABILITIES_QUERY_KEY, chatCapabilitiesFrom, modelThinks, NO_CHAT_PICTURES } from "@/apps/chat/visionCapability";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
@@ -287,7 +287,10 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const [autoReadReplies, setAutoReadReplies] = useState(false);
   const autoReadRepliesRef = useRef(false);
   autoReadRepliesRef.current = autoReadReplies;
-  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: isOwnerOrAdminRole(person.role) });
+  const isAdultBand = person.age_band === "adult";
+  const isOwnerOrAdmin = isOwnerOrAdminRole(person.role);
+  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: isOwnerOrAdmin });
+  const chatModelsQuery = useQuery<ChatModelsResponse>({ queryKey: ["chatModels"], queryFn: () => api.chatModels(), enabled: isAdultBand && !isOwnerOrAdmin });
   const photoSettingsQuery = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const photoSettings = Array.isArray(photoSettingsQuery.data) ? photoSettingsQuery.data : [];
   const photoSetting = photoSettings.find((setting) => setting.key === "chat.photo_uploads");
@@ -299,9 +302,11 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   const capabilitiesQuery = useQuery({ queryKey: CHAT_CAPABILITIES_QUERY_KEY, queryFn: async () => chatCapabilitiesFrom(await api.chatCapabilities().catch(() => undefined)) });
   const chatCapabilities = capabilitiesQuery.data ?? NO_CHAT_PICTURES;
   const modelOptions = useMemo<ModelOption[]>(() => {
-    if (!enginesQuery.data?.configured) return [];
-    return (chatRole?.models ?? []).map((model) => ({ ...model, efforts: modelThinks(chatCapabilities, model.id) ? MODEL_EFFORTS : undefined }));
-  }, [chatRole?.models, enginesQuery.data?.configured, chatCapabilities]);
+    const models = isOwnerOrAdmin
+      ? (enginesQuery.data?.configured ? chatRole?.models ?? [] : [])
+      : (chatModelsQuery.data?.models ?? []).map(({ id, label }) => ({ id, name: label }));
+    return models.map((model) => ({ ...model, efforts: modelThinks(chatCapabilities, model.id) ? MODEL_EFFORTS : undefined }));
+  }, [isOwnerOrAdmin, chatRole?.models, enginesQuery.data?.configured, chatModelsQuery.data?.models, chatCapabilities]);
   const ttsAvailable = readyRole(enginesQuery.data, "tts");
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
@@ -453,10 +458,12 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     onConversationSettingsLoaded(conversationId, conversation.settings);
     return conversation;
   }, [onConversationSettingsLoaded]);
-  const selectedModelValue = modelOptions.length >= 2
-    ? (modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions.some((model) => model.id === chatRole?.model?.id) ? chatRole?.model?.id : modelOptions[0]?.id)
+  const currentModelId = isOwnerOrAdmin ? chatRole?.model?.id : chatModelsQuery.data?.selectedModel?.id;
+  const selectedModelValue = modelOptions.length >= 1
+    ? (modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions.some((model) => model.id === currentModelId) ? currentModelId : modelOptions[0]?.id)
     : undefined;
-  const modelPickerAllowed = thinkingAllowed && enginesQuery.data?.configured === true && isOwnerOrAdminRole(person.role) && modelOptions.length >= 2;
+  const modelPickerAllowed = thinkingAllowed && modelOptions.length >= 2 && (isOwnerOrAdmin ? enginesQuery.data?.configured === true : chatModelsQuery.data?.canSelect === true);
+  const modelLabelVisible = isAdultBand && selectedModelValue !== undefined;
   selectedModelRef.current = modelPickerAllowed ? selectedModelValue : undefined;
   // The model this person's next turn runs on: the picked one, or the
   // household's current one.
@@ -766,7 +773,7 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     },
   });
 
-  return { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, modelLabelVisible, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1172,7 +1179,7 @@ export function NextChatPage({ person }: { person: Roster }) {
   // inside useNextChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
+  const { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, banner, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, modelLabelVisible, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, spokenNextRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useNextChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1192,7 +1199,7 @@ export function NextChatPage({ person }: { person: Roster }) {
     }),
     [thinking, setThinking],
   );
-  const modelPickerValue = useMemo(() => ({ models: modelOptions, value: selectedModelValue, setValue: setSelectedModel }), [modelOptions, selectedModelValue, setSelectedModel]);
+  const modelPickerValue = useMemo(() => ({ models: modelOptions, value: selectedModelValue, setValue: setSelectedModel, canSelect: modelPickerAllowed }), [modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed]);
   const bareModeValue = useMemo(() => ({ on: bareMode, toggle: () => setBareMode((value) => !value) }), [bareMode, setBareMode]);
   const packageScopeValue = useMemo(() => ({ scope: packageScope, setScope: setPackageScope }), [packageScope, setPackageScope]);
   const temporaryChatValue = useMemo(() => ({ on: temporaryNext }), [temporaryNext]);
@@ -1336,7 +1343,7 @@ export function NextChatPage({ person }: { person: Roster }) {
                 <ChatThread
                   temporary={temporaryNext}
                   onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
-                  modelPickerAllowed={modelPickerAllowed}
+                  modelLabelVisible={modelLabelVisible}
                   canUseIncognito={person.age_band === "adult" && canHaveTemporaryChatRole(person.role)}
                   onOpenSettings={() => navigate("/settings")}
                   openingConversationId={openingConversationId}
