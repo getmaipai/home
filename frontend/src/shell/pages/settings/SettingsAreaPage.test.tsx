@@ -9,6 +9,7 @@ import RailProfileMenu from "@maipai/ui/src/dashboard/layouts/full/vertical/rail
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
 import { CustomizeRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
+import { activeAppHref } from "@/shell/pages/settings/settingsBackLink";
 import { makePerson, mockHome, type HomeFixture } from "@/shell/pages/settings/settingsTestKit";
 import type { Roster } from "@/lib/api";
 
@@ -47,7 +48,7 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
     <MemoryRouter initialEntries={[url]}>
       <Where />
       <Routes>
-        <Route element={<FullLayout rail railProfile={<RailProfileMenu displayName={person.display_name} subtitle={person.role} settingsHref="/settings" helpHref="https://example.com/help" onLogout={() => {}} />} />}>
+        <Route element={<FullLayout rail activeAppHref={activeAppHref(new URL(url, "http://home").pathname)} railProfile={<RailProfileMenu displayName={person.display_name} subtitle={person.role} settingsHref="/settings" helpHref="https://example.com/help" onLogout={() => {}} />} />}>
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
           <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
           <Route path="customize" element={<CustomizeRedirect person={person} />} />
@@ -62,9 +63,7 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
 
 const where = (view: ReturnType<typeof open>) => view.getByTestId("where").textContent;
 const column = (_view: ReturnType<typeof open>) => document.body.querySelector<HTMLElement>('[data-slot="settings-column"]')!;
-const rows = (view: ReturnType<typeof open>) => [...within(column(view)).queryAllByRole("link")]
-  .filter((link) => link.textContent?.trim() !== "Back to app")
-  .map((link) => link.textContent?.trim());
+const rows = (view: ReturnType<typeof open>) => [...within(column(view)).queryAllByRole("link")].map((link) => link.textContent?.trim());
 
 describe("the settings route", () => {
   test("an adult asking for Home settings is replaced to Account and no household request is made", async () => {
@@ -121,34 +120,18 @@ describe("the settings route", () => {
     expect(memories.getAttribute("href")).toBe("/people/person-adult?tab=memories");
   });
 
-  test("Back to app returns to the remembered app route, falling back to Chat", async () => {
+  test("the column title stays Settings with no back row or collapse controls; Cmd/Ctrl+B is inert", async () => {
     window.sessionStorage.setItem("maipai.settings.last-app-route", "/status?tab=system");
-    const remembered = open(makePerson("adult"), "/settings/chat/general");
-    const back = await remembered.findByRole("link", { name: "Back to app" });
-    expect(back.getAttribute("href")).toBe("/status?tab=system");
-    fireEvent.click(back);
-    await waitFor(() => expect(where(remembered)).toBe("/status?tab=system"));
-
-    cleanup();
-    fixture!.restore();
-    window.sessionStorage.clear();
-    const fallback = open(makePerson("adult"), "/settings/chat/general");
-    const fallbackLink = await fallback.findByRole("link", { name: "Back to app" });
-    expect(fallbackLink.getAttribute("href")).toBe("/chat");
-    fireEvent.click(fallbackLink);
-    await waitFor(() => expect(where(fallback)).toBe("/chat"));
-  });
-
-  test("the desktop hide control, content-header control, and Cmd/Ctrl+B share the remembered state", async () => {
-    window.localStorage.removeItem("maipai.chat.rail-collapsed");
     const view = open(makePerson("adult"), "/settings/chat/general");
-    const columnToggle = await view.findByRole("button", { name: "Hide settings sidebar" });
-    fireEvent.click(columnToggle);
-    await waitFor(() => expect(view.getByRole("button", { name: "Show settings sidebar" })).toBeTruthy());
-    expect(window.localStorage.getItem("maipai.chat.rail-collapsed")).toBe("1");
+    expect(await view.findByRole("heading", { level: 2, name: "Settings" })).toBeTruthy();
+    expect(view.queryByRole("link", { name: "Back to app" })).toBeNull();
+    expect(view.queryByRole("button", { name: /settings sidebar/i })).toBeNull();
+    const before = column(view).getAttribute("data-state");
     fireEvent.keyDown(window, { key: "b", metaKey: true });
-    await waitFor(() => expect(view.getByRole("button", { name: "Hide settings sidebar" })).toBeTruthy());
-    expect(window.localStorage.getItem("maipai.chat.rail-collapsed")).toBe("0");
+    fireEvent.keyDown(window, { key: "b", ctrlKey: true });
+    expect(column(view).getAttribute("data-state")).toBe(before);
+    expect(view.getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
+    expect(view.getByRole("button", { name: /Open profile menu/ }).getAttribute("aria-current")).toBeNull();
   });
 });
 
