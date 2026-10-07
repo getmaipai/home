@@ -558,7 +558,7 @@ describe("structuredPartForOutcomes", () => {
     expect(structuredPartForOutcomes([searchOutcome()])).toBeNull();
   });
 
-  test.each(["almanac-time", "almanac-moon", "almanac-holiday", "almanac-onthisday", "media-lookup", "music", "currency", "convert", "define", "math"])("READY-unbound %s keeps typed data out of structured_part", (packageId) => {
+  test.each(["convert", "define", "math"])("bound id %s without a typed producer keeps data out of structured_part", (packageId) => {
     const unbound = outcome({ callId: "call-u", packageId, status: "succeeded", args: {}, result: { actions: [], reply: { text: "A result." }, data: { year: 2000 } } });
     expect(structuredPartForOutcomes([unbound])).toBeNull();
   });
@@ -574,7 +574,7 @@ describe("structuredPartForOutcomes", () => {
   ] as [string, Record<string, unknown>, string, { label: string; value: string }[]][])("projects %s from its recorded typed result.data", (packageId, data, title, rows) => {
     const recorded = outcome({ callId: "call-r", packageId, status: "succeeded", args: {}, result: { actions: [], reply: { text: "Recorded reply." }, data } });
     expect(specSheetCandidateForOutcome(recorded)).toEqual({ kind: "spec_sheet", title, rows });
-    expect(structuredPartForOutcomes([recorded])).toBeNull();
+    expect(structuredPartForOutcomes([recorded])).toEqual({ kind: "spec_sheet", tool_id: packageId, title, rows });
   });
 
   test.each(["child", "teen"] as const)("applies the %s output floor to every producer's free-text rows", (band) => {

@@ -1,12 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState } from "@assistant-ui/react";
+import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadComponents } from "@maipai/ui/src/elements/thread.aui";
 import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
-import { DATA_BINDINGS, MODEL_TRAILING_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
+import { AdminToolFallback, DATA_BINDINGS, MODEL_TRAILING_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
 import { ChatThreadExtras } from "@/apps/chat/ChatThreadExtras";
 import { ChatAvailabilityContext, engineDownReason } from "@/apps/chat/useChatAvailability";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
+import { AdminContext, ChatAgeBandContext } from "@/apps/chat/chatThreadContexts";
 
 export type ChatExtrasContextValue = {
   rootRef: RefObject<HTMLDivElement | null>;
@@ -34,6 +35,13 @@ function DataElementBinding({ binding }: { binding: DataBinding }) {
   useAssistantDataUI({ name: binding.name, render: binding.render });
   return null;
 }
+
+const BoundToolFallbackGuard: ToolCallMessagePartComponent = (props) => {
+  const admin = useContext(AdminContext);
+  const band = useContext(ChatAgeBandContext);
+  if (!admin && (band === "child" || band === "teen" || band === "adult")) return null;
+  return <AdminToolFallback {...props} />;
+};
 
 /** getmaipai/home#206: the longest Send waits for a saved chat to open. */
 const OPENING_HOLD_MS = 15_000;
@@ -145,6 +153,7 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
           scrollToBottomOffset={56}
           components={{
             ...THREAD_SLOTS,
+            ToolFallback: BoundToolFallbackGuard,
             composerNoticeLayout: "wrap",
             onEditSend,
             sendHeld,

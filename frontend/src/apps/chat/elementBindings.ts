@@ -22,6 +22,8 @@
 // are excluded. This registry documents which chat renderers compose each
 // Element, while the scanner reports imports mechanically.
 import type { DataMessagePartComponent, ToolCallMessagePartComponent } from "@assistant-ui/react";
+import { SPEC_SHEET_BOUND } from "@maipai/home-backend/src/lib/structuredPartIds";
+import { ToolFallback } from "@maipai/ui/src/assistant-ui/tool-fallback.aui";
 import {
   AssistantMoreItems,
   ChatComposerNotice,
@@ -62,9 +64,13 @@ export type ToolBinding = {
 // "1 tool call" trigger (found live: a weather card nobody can see without an
 // extra click is a real regression for a family hub, not a cosmetic nit).
 // Any tool id not listed here still renders through Thread's own ToolFallback.
+const [firstSpecSheetToolId, ...remainingSpecSheetToolIds] = [...SPEC_SHEET_BOUND];
+
 export const TOOL_BINDINGS: readonly ToolBinding[] = [
-  { toolName: "weather", element: "spec-sheet", render: SpecSheetToolRender },
-  { toolName: "almanac-date", element: "spec-sheet", render: SpecSheetToolRender },
+  // Keep one static registration visible to the wrapper lint; the remaining
+  // bound ids still come from the backend's single authoritative set.
+  { toolName: firstSpecSheetToolId!, element: "spec-sheet", render: SpecSheetToolRender },
+  ...remainingSpecSheetToolIds.map((toolName) => ({ toolName, element: "spec-sheet", render: SpecSheetToolRender })),
   { toolName: "write_document", element: "artifact-card", render: ArtifactCardToolRender },
   { toolName: "confirm", element: "tool-fallback (Approval)", render: ConfirmToolRender },
   { toolName: "project", element: "job-progress", render: ProjectToolRender },
@@ -85,6 +91,8 @@ export type DataBinding = {
 export const DATA_BINDINGS: readonly DataBinding[] = [
   { name: ANSWER_IMAGES_PART, element: "image-gallery", render: AnswerImagesDataRender },
 ];
+
+export const AdminToolFallback = ToolFallback;
 
 // The kit Thread's `components` slots. Per-page behaviour (what a sent edit
 // does, whether the model picker is allowed) is a ChatThread prop, never a

@@ -27,13 +27,13 @@ const MESSAGES: ThreadMessageLike[] = [
   },
 ];
 
-function Harness({ admin, connection = { phase: "online" }, adapter = NOOP, messages = MESSAGES }: { admin: boolean; connection?: ConnectionState; adapter?: ChatModelAdapter; messages?: ThreadMessageLike[] }) {
+function Harness({ admin, band = "child", connection = { phase: "online" }, adapter = NOOP, messages = MESSAGES }: { admin: boolean; band?: "child" | "teen" | "adult"; connection?: ConnectionState; adapter?: ChatModelAdapter; messages?: ThreadMessageLike[] }) {
   const runtime = useLocalRuntime(adapter, { initialMessages: messages });
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <AdminContext.Provider value={admin}>
         <ConnectionStateContext.Provider value={connection}>
-          <ChatThread />
+          <ChatAgeBandContext.Provider value={band}><ChatThread /></ChatAgeBandContext.Provider>
         </ConnectionStateContext.Provider>
       </AdminContext.Provider>
     </AssistantRuntimeProvider>
@@ -235,6 +235,7 @@ describe("ChatThread", () => {
     const ids = TOOL_BINDINGS.map((binding) => binding.toolName);
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ["weather", "almanac-date", "write_document", "confirm", "project", "tool_timeline"]) expect(ids).toContain(id);
+    for (const id of ["almanac-time", "almanac-moon", "almanac-holiday", "almanac-onthisday", "media-lookup", "music", "currency", "convert", "define", "math"]) expect(ids).toContain(id);
     for (const binding of TOOL_BINDINGS) expect(typeof binding.render).toBe("function");
     expect(TOOL_BINDINGS.find((binding) => binding.toolName === "tool_timeline")?.display).toBe("inline");
     expect(TOOL_BINDINGS.filter((binding) => binding.toolName !== "tool_timeline").every((binding) => binding.display === undefined || binding.display === "standalone")).toBe(true);
@@ -304,6 +305,33 @@ describe("ChatThread", () => {
     await waitFor(() => expect(view.getByRole("button", { name: "Error details" })).toBeTruthy());
   });
 
+  async function expectUnknownToolHidden(band: "child" | "teen" | "adult") {
+    const message: ThreadMessageLike[] = [{
+      role: "assistant",
+      content: [{ type: "tool-call", toolCallId: `unknown-${band}`, toolName: "unbound_tool", args: {}, result: { private: "raw private tool JSON" } }],
+      status: { type: "complete", reason: "stop" },
+    }];
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} band={band} messages={message} /></MemoryRouter>);
+    await waitFor(() => expect(view.container.querySelector('[data-slot="aui_assistant-message-root"]')).not.toBeNull());
+    expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
+    expect(view.container.textContent).not.toContain("raw private tool JSON");
+  }
+
+  test("a child does not see an unbound tool result as raw JSON", async () => expectUnknownToolHidden("child"));
+  test("a teen does not see an unbound tool result as raw JSON", async () => expectUnknownToolHidden("teen"));
+  test("an adult does not see an unbound tool result as raw JSON", async () => expectUnknownToolHidden("adult"));
+
+  test("an admin keeps the kit fallback for an unbound tool result", async () => {
+    const message: ThreadMessageLike[] = [{
+      role: "assistant",
+      content: [{ type: "tool-call", toolCallId: "unknown-admin", toolName: "unbound_tool", args: {}, result: { private: "admin raw result" }, mcp: { app: { resourceUri: "ui://unknown/tool" } } }],
+      status: { type: "complete", reason: "stop" },
+    }];
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin messages={[{ role: "assistant", content: [{ type: "text", text: "Admin sees fallback." }] }, ...message]} /></MemoryRouter>);
+    await waitFor(() => expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).not.toBeNull());
+    expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).not.toBeNull();
+  });
+
   test("a message with every bound part type renders its Elements", async () => {
     const view = renderWithQueryClient(<MemoryRouter><Harness admin /></MemoryRouter>);
     await waitFor(() => expect(view.container.textContent).toContain("It will be mild."));
@@ -313,6 +341,23 @@ describe("ChatThread", () => {
     // reasoning group slot (ReasoningGroup)
     expect(view.container.textContent?.toLowerCase()).toContain("reasoning");
     // Native sources render in the message footer without a synthetic tool card.
+    expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
+  });
+
+  test("three newly bound spec-sheet producers render their recorded result rows", async () => {
+    const message: ThreadMessageLike[] = [{
+      role: "assistant",
+      content: [
+        { type: "tool-call", toolCallId: "sheet-time", toolName: "almanac-time", args: {}, result: { kind: "spec_sheet", tool_id: "almanac-time", title: "Current time", rows: [{ label: "Time", value: "3:15 PM" }] } },
+        { type: "tool-call", toolCallId: "sheet-media", toolName: "media-lookup", args: {}, result: { kind: "spec_sheet", tool_id: "media-lookup", title: "Marsh Lantern", rows: [{ label: "Director", value: "A. Director" }] } },
+        { type: "tool-call", toolCallId: "sheet-music", toolName: "music", args: {}, result: { kind: "spec_sheet", tool_id: "music", title: "North Lights", rows: [{ label: "Area", value: "Canada" }] } },
+        { type: "text", text: "Here are three results." },
+      ],
+      status: { type: "complete", reason: "stop" },
+    }];
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    await waitFor(() => expect(view.container.textContent).toContain("Here are three results."));
+    for (const value of ["Current time", "3:15 PM", "Marsh Lantern", "A. Director", "North Lights", "Canada"]) expect(view.container.textContent).toContain(value);
     expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
   });
 

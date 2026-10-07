@@ -166,6 +166,7 @@ const chatStatsReview = process.argv.includes("--chat-stats-review");
 const liveVoiceSessionReview = process.argv.includes("--live-voice-session-review");
 const canvasPaneReview = process.argv.includes("--canvas-pane-review");
 const chatToolsRowReview = process.argv.includes("--chat-tools-row-review");
+const specSheetsReview = process.argv.includes("--spec-sheets-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
 // spec.md "Acceptance for an implementation": the three states with no
 // existing dedicated capture (sources card + memory chip + image
@@ -5904,6 +5905,48 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
   }
 }
 
+async function captureSpecSheetsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots", "spec-sheets");
+  mkdirSync(outDir, { recursive: true });
+  const conversation = await seedTitledConversation("captureSpecSheetsReview", { Cookie: `session=${sessionValue}` }, "Family facts");
+  const now = new Date().toISOString();
+  const parts = [
+    { tool_id: "almanac-time", title: "Current time", rows: [{ label: "Time", value: "3:15 PM" }, { label: "Place", value: "Lantern Bay" }] },
+    { tool_id: "media-lookup", title: "Marsh Lantern", rows: [{ label: "Year", value: "2026" }, { label: "Director", value: "A. Director" }, { label: "Runtime", value: "96 minutes" }, { label: "Rating", value: "PG" }] },
+    { tool_id: "music", title: "North Lights", rows: [{ label: "Artist", value: "a band" }, { label: "Area", value: "Canada" }, { label: "Started", value: "1998" }] },
+  ];
+  const source = `import { Database } from "bun:sqlite"; const db = new Database(${JSON.stringify(join(DATA_DIR, "hub.db"))}); const rows = ${JSON.stringify(parts)}; const now = ${JSON.stringify(now)}; for (const [i, part] of rows.entries()) { const id = "spec-sheet-review-" + part.tool_id; db.query("INSERT INTO conversation_turns (id, person_id, surface, conversation_id, user_text, reply_text, source, safety_action, minor_speaker, created_at, hlc, status, structured_part) VALUES (?, ?, 'chat', ?, ?, ?, 'plugin', 'allow', 0, ?, ?, 'done', ?)").run(id, ${JSON.stringify(SCREENSHOT_FILE_OWNER_ID)}, ${JSON.stringify(conversation.id)}, "Show me " + part.tool_id, "Here is the result.", now, now + ":" + i + ":" + id, JSON.stringify({ kind: "spec_sheet", ...part })); } db.close();`;
+  const seeded = Bun.spawnSync({ cmd: ["bun", "-e", source], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+  if (seeded.exitCode !== 0) throw new Error(`spec sheet screenshot fixtures failed with exit code ${seeded.exitCode}`);
+  const seededTurns = await fetch(`${BASE_URL}/api/conversations/${conversation.id}/turns`, { headers: { Cookie: `session=${sessionValue}` } });
+  if (!seededTurns.ok) throw new Error(`spec sheet screenshot turns failed: ${seededTurns.status}`);
+  const turnRows = await seededTurns.json() as Array<{ structured_part?: { tool_id?: string } }>;
+  if (!parts.every((part) => turnRows.some((row) => row.structured_part?.tool_id === part.tool_id))) throw new Error(`spec sheet fixtures are absent from history: ${JSON.stringify(turnRows)}`);
+  const viewportCombos = [
+    { slug: "desktop", width: 1440 },
+    { slug: "phone", width: 390 },
+  ];
+  for (const viewportInfo of viewportCombos) for (const theme of THEMES) {
+    const viewport = VIEWPORTS.find((candidate) => candidate.slug === viewportInfo.slug)!;
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      await openStoredConversation(page, conversation.id, "Family facts");
+      await page.locator('[data-slot="spec-sheet"]').waitFor();
+      for (const part of [...parts].reverse()) {
+        await page.getByText(part.title, { exact: true }).waitFor();
+        await settleAnimations(page);
+        const path = join(outDir, `spec-sheet-${part.tool_id}-${viewportInfo.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: viewportInfo.slug === "phone" });
+        console.log(`Wrote ${path}`);
+        if (part !== parts[0]) await page.getByRole("button", { name: "Previous" }).click();
+      }
+    } finally {
+      await context.close();
+    }
+  }
+}
+
 /** TOOL-EVENTS-02's own stated acceptance: "a live search on 8787 shows
  * the step with its site chips while the reply streams, each chip opens
  * its page, and a weather question shows the weather label with no
@@ -9886,6 +9929,12 @@ async function main() {
       await captureNextChatToolsSitesReview(browser, sessionValue);
       await captureNextChatToolsReview(browser, sessionValue);
       console.log("completed named review: --next-chat-tools-review");
+      return;
+    }
+
+    if (specSheetsReview) {
+      await captureSpecSheetsReview(browser, sessionValue);
+      console.log("completed named review: --spec-sheets-review");
       return;
     }
 

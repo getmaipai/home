@@ -12,6 +12,10 @@ export const SPEC_SHEET_READY = new Set([
   "math",
 ] as const);
 
-/** The only spec-sheet tool ids currently rendered by Home. ELT-T1-19 moves
- * READY ids here together with the matching frontend bindings. */
-export const SPEC_SHEET_BOUND = new Set(["weather", "almanac-date"] as const);
+/** Spec-sheet tool ids with matching frontend bindings. The frontend imports
+ * this list to keep its renderer registry in sync. */
+export const SPEC_SHEET_BOUND = new Set([
+  "weather",
+  "almanac-date",
+  ...SPEC_SHEET_READY,
+]);
