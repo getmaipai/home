@@ -52,6 +52,9 @@ export type ToolBinding = {
   // The renderers carry their own result types; the registry stores them erased.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous result shapes, each renderer types its own
   render: ToolCallMessagePartComponent<any, any>;
+  /** Override assistant-ui's default standalone presentation when a shipped
+   * Thread grouping should own the disclosure. */
+  display?: "standalone" | "inline";
 };
 
 // `display: "standalone"` is applied to every binding (ChatThread): without it
@@ -65,7 +68,7 @@ export const TOOL_BINDINGS: readonly ToolBinding[] = [
   { toolName: "write_document", element: "artifact-card", render: ArtifactCardToolRender },
   { toolName: "confirm", element: "tool-fallback (Approval)", render: ConfirmToolRender },
   { toolName: "project", element: "job-progress", render: ProjectToolRender },
-  { toolName: "tool_timeline", element: "tool-timeline", render: ToolTimelineToolRender },
+  { toolName: "tool_timeline", element: "tool-timeline", render: ToolTimelineToolRender, display: "inline" },
   { toolName: "sources", element: "sources", render: SourcesNoopRender },
 ];
 

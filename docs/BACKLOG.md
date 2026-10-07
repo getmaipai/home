@@ -9234,7 +9234,7 @@ Plain boolean switches and selects in `/settings` call the save handler immediat
 - [ ] **PRESENCE-MAP-01: presence map 01** (S; after design record; see `data-scratch/design/BUILD-PLAN.md`); needs its own architect verdict before dispatch
 - [ ] **BUNDLED-CATALOG-01: bundled catalog 01** (S; after design record; see `data-scratch/design/BUILD-PLAN.md`); needs its own architect verdict before dispatch
 - [ ] **ARTIFACTS-LIST-01: the Artifacts list page and sidebar row (same deliverable as CHAT-ARTIFACTS-LIST-01)** (S; after COLUMN-01; see `data-scratch/chat-ab/opus-column-report.md`); needs its own architect verdict before dispatch
-- [ ] **CHAT-TOOLS-ROW-01: "Used N tools" collapsed disclosure (tool-group)** (S; after LAND-01; see `data-scratch/design/BUILD-PLAN.md`); needs its own architect verdict before dispatch
+- [x] **CHAT-TOOLS-ROW-01: "Used N tools" collapsed disclosure (tool-group)** (S; after LAND-01). Implemented in ELT-T1-17: only the `tool_timeline` binding uses inline display so the shipped Thread tool group owns the disclosure; the timeline retains its shipped resting label. Failed tool details remain admin-only.
 - [ ] **CHAT-MODEL-REMEMBER-01: chat model remember 01** (S; after design record; see `data-scratch/design/BUILD-PLAN.md`); needs its own architect verdict before dispatch
 - [ ] **CHAT-FOOTNOTE-01: chat footnote 01** (S; after design record; see `data-scratch/design/BUILD-PLAN.md`); needs its own architect verdict before dispatch
 - [ ] **CHAT-STOPPED-01: chat stopped 01** (S; after design record; see `data-scratch/design/BUILD-PLAN.md`); needs its own architect verdict before dispatch
