@@ -27,6 +27,7 @@
     "frontend"
   ],
   "overrides": {
-    "zod": "4.6.5"
+    "zod": "4.6.5",
+    "hono": "4.13.8"
   }
 }
