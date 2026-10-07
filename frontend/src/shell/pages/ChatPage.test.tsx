@@ -186,7 +186,7 @@ function conversationCreateBodies(): Array<Record<string, unknown>> {
     .filter((c: unknown[]) => {
       const url = typeof c[0] === "string" ? c[0] : (c[0] as URL | Request).toString();
       const init = c[1] as RequestInit | undefined;
-      return url.includes("/api/conversations") && !url.includes("/resume") && init?.method === "POST";
+      return new URL(url, "http://localhost").pathname === "/api/conversations" && init?.method === "POST";
     })
     .map((c: unknown[]) => JSON.parse((c[1] as RequestInit).body as string));
 }
