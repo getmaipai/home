@@ -15,8 +15,8 @@
     "catalog_path": "plugins/info/knowledge"
   },
   "media-lookup": {
-    "sha256": "ca5261b9b81744abb88a1090187b66978d57404b2860739e85d86256432e34b9",
-    "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
+    "sha256": "9cafe8c28034424a0c67055b4a54c98490d04ab38ab3834ecd7fc763f0a26e64",
+    "source_commit": "d077bc1a73ce76e4552bf14a0d4bcffad97f5f9d",
     "catalog_path": "plugins/info/media-lookup"
   },
   "storytime-style": {

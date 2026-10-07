@@ -4,6 +4,19 @@ All notable changes to the Media Lookup package, in [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+### Changed
+
+- All eight `routing.patterns` entries are gone (every one opened with a
+  question word - "what's the runtime of \*", "who directed \*", "what
+  is \* about", "is \* any good", "when did \* come out", "who's in \*",
+  "what is \* rated", "tell me about the movie \*"). Each one let the
+  hub's own commands node fire on any matching question and hand the
+  remainder to this package before the model ever saw the words
+  (getmaipai/home OPENER-01, dev.md "The knowledge hijack"). This
+  package stays reachable as a model-chosen tool call and through its
+  own `examples`, never a blind pattern match on a question's opening
+  words.
+
 ## [0.1.0] - 2026-09-13
 
 ### Added
@@ -20,3 +33,9 @@ All notable changes to the Media Lookup package, in [Keep a Changelog](https://k
   spoken. A miss is reported as the typed `not_found` error (getmaipai/
   home#92's shape), not a spoken apology, the same as the knowledge
   package.
+
+### Added
+
+- A bounded `data` projection for CHAT-16 with only the title, year, kind,
+  director, runtime, rating, and source. Cast and Wikipedia synopsis remain
+  outside the model-facing data projection.

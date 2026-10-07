@@ -58,6 +58,22 @@ export interface MediaResult {
   source: "wikidata";
 }
 
+/** CHAT-16's deliberately small projection: no cast list or page text. */
+export interface MediaLookupData {
+  title: string;
+  year: number | null;
+  kind: "film" | "tv";
+  director: string | null;
+  runtime_min: number | null;
+  rating: string | null;
+  source: "wikidata";
+}
+
+export function mediaLookupData(result: MediaResult): MediaLookupData {
+  return { title: result.title, year: result.year, kind: result.kind, director: result.director,
+    runtime_min: result.runtime_min, rating: result.rating, source: result.source };
+}
+
 /** A person typing or speaking a title sometimes tacks a release year onto
  * the end ("Cobra 1986", "Cobra (1986)") - split it off so the Wikidata
  * search below (an exact/prefix label match, not full text) gets a clean
@@ -240,7 +256,7 @@ export async function handleMedia(
 
     const result = shapeMediaResult(labels[candidate.id] ?? title, candidate.kind, entity, labels, synopsis);
     const reply = composeReply(result);
-    return { content: [{ type: "text" as const, text: JSON.stringify({ reply, actions: [], result }) }] };
+    return { content: [{ type: "text" as const, text: JSON.stringify({ reply, actions: [], result, data: mediaLookupData(result) }) }] };
   } catch (err) {
     const data = (err as { data?: { code?: unknown } }).data;
     const code = typeof data?.code === "string" ? data.code : "network_unreachable";

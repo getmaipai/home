@@ -209,6 +209,11 @@ Deno.test("handleMedia answers a film end to end from recorded Wikidata and Wiki
   );
   const parsed = JSON.parse(result.content[0].text);
   assertEquals(parsed.reply.text, "Cobra (1986), directed by George P. Cosmatos, 83 minutes.");
+  assertEquals(parsed.data, { title: "Cobra", year: 1986, kind: "film", director: "George P. Cosmatos", runtime_min: 83, rating: null, source: "wikidata" });
+  assertEquals(Object.keys(parsed), ["reply", "actions", "result", "data"]);
+  for (const [key, value] of Object.entries(parsed.data)) if (typeof value === "string" && key !== "source" && key !== "kind") assertEquals(parsed.reply.text.includes(value), true);
+  assertEquals("synopsis" in parsed.data, false);
+  assertEquals("cast" in parsed.data, false);
   assertEquals(parsed.result.cast, ["Sylvester Stallone", "Brigitte Nielsen", "Reni Santoni"]);
   assertEquals(parsed.result.synopsis, COBRA_SUMMARY.extract);
 });

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MediaLookupData",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "year", "kind", "director", "runtime_min", "rating", "source"],
+  "properties": {
+    "title": { "type": "string" },
+    "year": { "type": ["integer", "null"] },
+    "kind": { "enum": ["film", "tv"] },
+    "director": { "type": ["string", "null"] },
+    "runtime_min": { "type": ["number", "null"] },
+    "rating": { "type": ["string", "null"] },
+    "source": { "const": "wikidata" }
+  }
+}
