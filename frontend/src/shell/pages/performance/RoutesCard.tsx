@@ -1,5 +1,6 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 
 const HistoryIcon = getIcon("history");
@@ -14,6 +15,8 @@ interface RouteRow extends Record<string, unknown> {
  * safety_refuse | confirm | policy) IS the route it took - no field
  * invented, no `nodes[]` parsing needed for this one. */
 export function RoutesCard({ byRoute }: { byRoute: readonly { route: string; count: number }[] }) {
+  const rows: RouteRow[] = byRoute.map((r) => ({ route: r.route, turns: r.count }));
+  const model = useDataTableModel(rows, tableColumns<RouteRow>(["route", "turns"]));
   return (
     <Card className="flex flex-col gap-0!">
       <CardHeader className="border-b border-border">
@@ -23,7 +26,7 @@ export function RoutesCard({ byRoute }: { byRoute: readonly { route: string; cou
         </CardTitle>
       </CardHeader>
       <CardContent className="px-0!">
-        <DataTable data={byRoute.map((r): RouteRow => ({ route: r.route, turns: r.count }))} />
+        <DataTable {...model} caption="Turn routes" getRowId={(row) => row.route} />
       </CardContent>
     </Card>
   );

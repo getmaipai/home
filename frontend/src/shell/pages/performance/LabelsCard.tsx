@@ -1,5 +1,6 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceLabels } from "@/lib/api";
 
@@ -26,6 +27,7 @@ export function LabelsCard({ labels }: { labels: PerformanceLabels }) {
     ...labels.rule_hits.map((h) => ({ kind: "rule", key: h.key, count: h.count })),
     ...labels.rungs.map((h) => ({ kind: "rung", key: h.key, count: h.count })),
   ];
+  const model = useDataTableModel(rows, tableColumns<HitRow>(["kind", "key", "count"]));
   return (
     <Card className="flex flex-col gap-0!">
       <CardHeader className="border-b border-border">
@@ -35,7 +37,7 @@ export function LabelsCard({ labels }: { labels: PerformanceLabels }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="px-0! flex flex-col gap-4">
-        <DataTable data={rows} />
+        <DataTable {...model} caption="Label harvest counts" getRowId={(row) => `${row.kind}-${row.key}`} />
         {labels.retire_eligible.length > 0 && (
           <p className="px-4 pb-4 text-sm text-muted-foreground">Zero hits this window, retire-eligible: {labels.retire_eligible.join(", ")}</p>
         )}

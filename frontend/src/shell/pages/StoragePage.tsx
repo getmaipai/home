@@ -3,7 +3,8 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { QuotaBanner } from "@maipai/ui/src/elements/quota-banner";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type PersonStorageRow } from "@/lib/api";
@@ -97,7 +98,15 @@ export function StoragePage({ person }: { person: Roster }) {
       errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load storage."}
       loadingLabel="Loading storage"
     >
-      {(data: StorageUsageOverview) => (
+      {(data: StorageUsageOverview) => <StorageContent data={data} isAdmin={isAdmin} />}
+    </AsyncState>
+  );
+}
+
+function StorageContent({ data, isAdmin }: { data: StorageUsageOverview; isAdmin: boolean }) {
+  const rows = [...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])];
+  const model = useDataTableModel(rows, tableColumns<PersonUsageRow>(["person", "role", "used", "cap", "top kind"]), "No files yet.");
+  return (
         <div className="flex flex-col gap-4 pb-4">
           <CardHeader className="p-0">
             <CardTitle className="flex items-center gap-2">
@@ -125,13 +134,8 @@ export function StoragePage({ person }: { person: Roster }) {
               </CardContent>
             </Card>
           ) : null}
-          <DataTable
-            data={[...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])]}
-            emptyMessage="No files yet."
-          />
+          <DataTable {...model} caption="Storage usage by person" getRowId={(row) => row.person} />
           {isAdmin ? <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} /> : null}
         </div>
-      )}
-    </AsyncState>
   );
 }

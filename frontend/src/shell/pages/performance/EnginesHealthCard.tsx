@@ -1,6 +1,7 @@
 import { getIcon } from "@maipai/ui/src/icons";
 import { Link } from "react-router-dom";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceEngines } from "@/lib/api";
 
@@ -20,6 +21,13 @@ interface IssueRow extends Record<string, unknown> {
  * covers the live roster and current health in full; this panel links
  * there rather than duplicating it. */
 export function EnginesHealthCard({ engines }: { engines: PerformanceEngines }) {
+  const rows: IssueRow[] = engines.recent_issues.map((i) => ({
+    issue: i.key,
+    severity: i.severity,
+    since: new Date(i.createdAt).toLocaleString(),
+    status: i.resolvedAt ? `Resolved ${new Date(i.resolvedAt).toLocaleDateString()}` : "Open",
+  }));
+  const model = useDataTableModel(rows, tableColumns<IssueRow>(["issue", "severity", "since", "status"]));
   return (
     <Card className="flex flex-col gap-0!">
       <CardHeader className="border-b border-border">
@@ -47,16 +55,7 @@ export function EnginesHealthCard({ engines }: { engines: PerformanceEngines }) 
                 see the live roster
               </Link>
             </p>
-            <DataTable
-              data={engines.recent_issues.map(
-                (i): IssueRow => ({
-                  issue: i.key,
-                  severity: i.severity,
-                  since: new Date(i.createdAt).toLocaleString(),
-                  status: i.resolvedAt ? `Resolved ${new Date(i.resolvedAt).toLocaleDateString()}` : "Open",
-                }),
-              )}
-            />
+            <DataTable {...model} caption="Recent engine issues" getRowId={(row) => `${row.issue}-${row.since}`} />
           </>
         )}
       </CardContent>

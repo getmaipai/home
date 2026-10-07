@@ -1,5 +1,6 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceDisk, PerformanceHardware } from "@/lib/api";
 
@@ -23,6 +24,8 @@ function toGb(bytes: number): string {
  * yet (`routes/storage.ts`'s own header: "none of it has a UI yet") -
  * no link to name here until one exists. */
 export function DiskHardwareCard({ disk, hardware }: { disk: PerformanceDisk; hardware: PerformanceHardware }) {
+  const rows: AreaRow[] = disk.areas.map((a) => ({ area: a.area, gb: toGb(a.bytes) }));
+  const model = useDataTableModel(rows, tableColumns<AreaRow>(["area", "gb"]));
   return (
     <Card className="flex flex-col gap-0!">
       <CardHeader className="border-b border-border">
@@ -35,7 +38,7 @@ export function DiskHardwareCard({ disk, hardware }: { disk: PerformanceDisk; ha
         <p className="text-sm text-muted-foreground">
           {toGb(disk.free_bytes)} free of {toGb(disk.total_bytes)}
         </p>
-        <DataTable data={disk.areas.map((a): AreaRow => ({ area: a.area, gb: toGb(a.bytes) }))} />
+        <DataTable {...model} caption="Storage areas" getRowId={(row) => row.area} />
         <p className="text-sm text-muted-foreground">Hardware reading: {hardware.configured ? (hardware.hardware ? "available" : "Stack configured, no reading yet") : "no Stack configured"}</p>
       </CardContent>
     </Card>
