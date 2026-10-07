@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { StoragePage } from "@/shell/pages/StoragePage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -104,6 +104,38 @@ describe("StoragePage", () => {
       // the household.storage group, not a hand-built form.
       await waitFor(() => expect(document.body.textContent).toContain("Household storage cap (bytes)"));
       expectHomeTablesWithoutDemoOrActions(1);
+    } finally {
+      restore();
+    }
+  });
+
+  test("the kit usage table sorts its returned people by name", async () => {
+    const restore = mockFetch(makeOverview({
+      people: [
+        { personId: "person-z", displayName: "Zelda", role: "admin", usageBytes: 1024, capBytes: 2048, byKind: [] },
+        { personId: "person-a", displayName: "Ada", role: "admin", usageBytes: 2048, capBytes: 4096, byKind: [] },
+      ],
+    }));
+    try {
+      renderWithQueryClient(<MemoryRouter><StoragePage person={makePerson()} /></MemoryRouter>);
+      const table = await waitFor(() => document.querySelector('[role="table"][aria-label="Storage usage by person"]')!);
+      fireEvent.click(table.querySelector('button[aria-label="Sort by Person"]')!);
+      await waitFor(() => {
+        const rows = Array.from(table.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'));
+        expect(rows[0]?.textContent).toContain("Ada");
+        expect(rows[1]?.textContent).toContain("Zelda");
+      });
+    } finally {
+      restore();
+    }
+  });
+
+  test("the kit usage table keeps the existing empty-files message", async () => {
+    const restore = mockFetch(makeOverview({ people: [], household: null }));
+    try {
+      renderWithQueryClient(<MemoryRouter><StoragePage person={makePerson()} /></MemoryRouter>);
+      await waitFor(() => expect(document.body.textContent).toContain("No files yet."));
+      expect(document.querySelector('[role="table"][aria-label="Storage usage by person"] [data-slot="data-table-empty"]')?.textContent).toBe("No files yet.");
     } finally {
       restore();
     }

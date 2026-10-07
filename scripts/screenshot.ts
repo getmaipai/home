@@ -8875,12 +8875,9 @@ async function captureNextRepairsReview(browser: Browser, sessionValue: string):
 
 /** ADMIN-PERF-01's own acceptance ("captures at 1440 and 390"): both
  * viewports, both themes, of `/performance`. This throwaway
- * backend has no Stack configured and no traced turns yet (the seeded
- * boot ran no turn), so the real, expected capture
- * is the two honest empty states side by side - Layers' own "No traced
- * turns yet" and Engines' own "No Stack configured" - the same
- * mirrored-from-NextEnginesPage empty-state posture as every other
- * Manage page captured here. */
+ * backend has no Stack configured but seeds one trace-review turn for
+ * the trace and Performance views, so these captures show the real kit
+ * tables alongside the Engines "No Stack configured" state. */
 async function captureNextPerformanceReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -8893,7 +8890,7 @@ async function captureNextPerformanceReview(browser: Browser, sessionValue: stri
       try {
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/performance`);
-        await page.locator("text=No traced turns yet").first().waitFor({ timeout: 15000 });
+        await page.getByRole("table", { name: "Layer timing" }).waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Performance");
         await settleAnimations(page);
         const path = join(outDir, `next-performance-${viewport.width}-${theme}.png`);
@@ -10056,6 +10053,8 @@ async function main() {
 
     if (nextPerformanceReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextStorageReview) {
       await captureNextPerformanceReview(browser, sessionValue);
+      console.log("completed named review: --next-performance-review");
+      return;
     }
 
     if (nextStorageReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview) {

@@ -1,5 +1,7 @@
 import { getIcon } from "@maipai/ui/src/icons";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { useDataTableModel } from "@/shell/components/dataTableModel";
+import { DataTableControls } from "@/shell/components/DataTableControls";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceEngineStats } from "@/lib/api";
 
@@ -29,6 +31,14 @@ function toRow(e: PerformanceEngineStats): EngineRow {
  * of it. Home's shared table derives its columns from these plain rows,
  * the same way it does for every table in `/`. */
 export function TurnsByEngineTable({ byEngine }: { byEngine: readonly PerformanceEngineStats[] }) {
+  const rows = byEngine.map(toRow);
+  const model = useDataTableModel(rows, [
+    { id: "engine", header: "Engine", sortable: true, minWidth: 100 },
+    { id: "turns", header: "Turns", sortable: true, minWidth: 55 },
+    { id: "median first token (ms)", header: "Median first token", sortable: true, minWidth: 145 },
+    { id: "median total (ms)", header: "Median total", sortable: true, minWidth: 115 },
+    { id: "tokens/sec", header: "Tokens/s", sortable: true, minWidth: 90 },
+  ]);
   return (
     <Card className="flex flex-col gap-0!">
       <CardHeader className="border-b border-border">
@@ -38,7 +48,7 @@ export function TurnsByEngineTable({ byEngine }: { byEngine: readonly Performanc
         </CardTitle>
       </CardHeader>
       <CardContent className="px-0!">
-        <DataTable data={byEngine.map(toRow)} />
+        <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Turns per engine" getRowId={(row) => row.engine} />
       </CardContent>
     </Card>
   );

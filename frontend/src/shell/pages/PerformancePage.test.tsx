@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { PerformancePage } from "@/shell/pages/PerformancePage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -89,6 +89,29 @@ describe("PerformancePage", () => {
       await waitFor(() => expect(document.body.textContent).toContain("qwen3-8b-instruct-q4-k-m"));
       expect(document.body.textContent).toContain("model");
       expectHomeTablesWithoutDemoOrActions(6);
+    } finally {
+      restore();
+    }
+  });
+
+  test("the kit route table sorts its existing aggregate rows", async () => {
+    const restore = mockPerformanceFetch(makePerformance({
+      turns: {
+        window_days: 30,
+        by_day: [],
+        by_engine: [],
+        by_route: [{ route: "zeta", count: 1 }, { route: "alpha", count: 2 }],
+      },
+    }));
+    try {
+      renderWithQueryClient(<MemoryRouter><PerformancePage /></MemoryRouter>);
+      const table = await waitFor(() => document.querySelector('[role="table"][aria-label="Turn routes"]')!);
+      fireEvent.click(table.querySelector('button[aria-label="Sort by Route"]')!);
+      await waitFor(() => {
+        const rows = Array.from(table.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'));
+        expect(rows[0]?.textContent).toContain("alpha");
+        expect(rows[1]?.textContent).toContain("zeta");
+      });
     } finally {
       restore();
     }

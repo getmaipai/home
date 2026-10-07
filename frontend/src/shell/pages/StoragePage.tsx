@@ -3,7 +3,9 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { QuotaBanner } from "@maipai/ui/src/elements/quota-banner";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable } from "@maipai/ui/src/elements/data-table";
+import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
+import { DataTableControls } from "@/shell/components/DataTableControls";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type PersonStorageRow } from "@/lib/api";
@@ -97,41 +99,50 @@ export function StoragePage({ person }: { person: Roster }) {
       errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load storage."}
       loadingLabel="Loading storage"
     >
-      {(data: StorageUsageOverview) => (
-        <div className="flex flex-col gap-4 pb-4">
-          <CardHeader className="p-0">
-            <CardTitle className="flex items-center gap-2">
-              <StorageIcon size={16} className="text-muted-foreground" />
-              Storage
-            </CardTitle>
-          </CardHeader>
-          {data.household?.capBytes && data.household.capBytes > 0 ? (
-            <>
-              <CardTitle>Household total</CardTitle>
-              <QuotaBanner
-                used={data.household.usageBytes}
-                limit={data.household.capBytes}
-                unit="bytes"
-                formatAmount={formatBytes}
-              />
-            </>
-          ) : data.household ? (
-            <Card>
-              <CardHeader className="border-b border-border">
-                <CardTitle>Household total</CardTitle>
-              </CardHeader>
-              <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground">{formatBytes(data.household.usageBytes)} used, no cap set</p>
-              </CardContent>
-            </Card>
-          ) : null}
-          <DataTable
-            data={[...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])]}
-            emptyMessage="No files yet."
-          />
-          {isAdmin ? <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} /> : null}
-        </div>
-      )}
+      {(data: StorageUsageOverview) => <StorageContent data={data} isAdmin={isAdmin} />}
     </AsyncState>
+  );
+}
+
+function StorageContent({ data, isAdmin }: { data: StorageUsageOverview; isAdmin: boolean }) {
+  const rows = [...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])];
+  const model = useDataTableModel(rows, tableColumns<PersonUsageRow>(["person", "role", "used", "cap", "top kind"], {
+    person: 180,
+    role: 100,
+    used: 120,
+    cap: 140,
+    "top kind": 240,
+  }), "No files yet.");
+  return (
+    <>
+      <CardHeader className="p-0">
+        <CardTitle className="flex items-center gap-2">
+          <StorageIcon size={16} className="text-muted-foreground" />
+          Storage
+        </CardTitle>
+      </CardHeader>
+      {data.household?.capBytes && data.household.capBytes > 0 ? (
+        <>
+          <CardTitle>Household total</CardTitle>
+          <QuotaBanner
+            used={data.household.usageBytes}
+            limit={data.household.capBytes}
+            unit="bytes"
+            formatAmount={formatBytes}
+          />
+        </>
+      ) : data.household ? (
+        <Card>
+          <CardHeader className="border-b border-border">
+            <CardTitle>Household total</CardTitle>
+          </CardHeader>
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">{formatBytes(data.household.usageBytes)} used, no cap set</p>
+          </CardContent>
+        </Card>
+      ) : null}
+      <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Storage usage by person" getRowId={(row) => row.person} />
+      {isAdmin ? <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} /> : null}
+    </>
   );
 }

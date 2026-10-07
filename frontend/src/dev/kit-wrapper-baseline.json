@@ -157,12 +157,6 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "shell/components/DataTable.tsx": {
-    "DataTable": {
-      "ed": "ED-018",
-      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built DataTable until K02 and ELT-T1-13a to 13d."
-    }
-  },
   "shell/pages/ChatColumn.tsx": {
     "ChatColumnToggle": {
       "ed": "ED-031",
