@@ -320,7 +320,8 @@ const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audi
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
-const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview;
+const projectPageReview = process.argv.includes("--projects-page-review");
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -2928,6 +2929,72 @@ async function captureProjectsListingReview(browser: Browser, ownerSession: stri
   const childSession = selected.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
   if (!childSession) throw new Error("projects listing review: the child sign-in carried no session cookie");
   await capturePerson(childSession, "child");
+}
+
+/** PROJECTS-UI-04: the project-home route's kit Thread slots and page rows. */
+async function captureProjectPageReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "projects-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${ownerSession}` };
+  const created = await fetch(`${BASE_URL}/api/chat-folders`, {
+    method: "POST", headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ name: "Project page review", icon: "sparkles", color: "violet", description: "A seeded project for visual review." }),
+  });
+  if (!created.ok) throw new Error(`project page review: project setup failed: ${created.status} ${await created.text()}`);
+  const folder = await created.json() as { id: string };
+  const projectConversations: Array<{ title: string; id: string }> = [];
+  for (const title of ["Design Review Prompt", "Splash introduction", "Podcast generator comparison"]) {
+    const conversation = await seedTitledConversation("captureProjectPageReview", cookie, title);
+    projectConversations.push({ title, id: conversation.id });
+    const moved = await fetch(`${BASE_URL}/api/conversations/${conversation.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...cookie }, body: JSON.stringify({ folder_id: folder.id }) });
+    if (!moved.ok) throw new Error(`project page review: moving ${title} failed: ${moved.status}`);
+  }
+  const conversations = await fetch(`${BASE_URL}/api/conversations?archived=include`, { headers: cookie }).then((response) => response.json()) as Array<{ id: string; title: string | null }>;
+  const reviewConversationId = conversations.find((row) => row.title === "Design Review Prompt")!.id;
+  const who = await fetch(`${BASE_URL}/api/auth/me`, { headers: cookie });
+  if (!who.ok) throw new Error(`project page review: reading signed-in person failed: ${who.status}`);
+  const personId = ((await who.json()) as { id: string }).id;
+  const previewFixtures = [
+    { title: "Design Review Prompt", text: "Make sure you are detailed on the project prompt bar.", at: "2026-10-06T17:00:00.000Z" },
+    { title: "Podcast generator comparison", text: "Forget the voice - I’m using pocket tts for now and when we get eth studio I have a test planned.", at: "2026-09-20T17:00:00.000Z" },
+  ];
+  const turns = previewFixtures.map((fixture, index) => {
+    const turnId = `project-page-review-turn-${index + 1}`;
+    const conversationId = projectConversations.find((row) => row.title === fixture.title)!.id;
+    return `sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, conversation_id, user_text, reply_text, source, safety_action, created_at, hlc) VALUES (?, ?, 'chat', ?, ?, ?, 'model', 'allow', ?, ?)").run(${[turnId, personId, conversationId, fixture.text, "A seeded project conversation response.", fixture.at, `${fixture.at}:0:${turnId}`].map((value) => JSON.stringify(value)).join(", ")});`;
+  });
+  const seedSource = ['import { sqlite } from "./src/db/index.ts";', ...turns, 'sqlite.close();'].join("\n");
+  const seededTurn = Bun.spawnSync({ cmd: ["bun", "-e", seedSource], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "pipe", stderr: "pipe" });
+  if (seededTurn.exitCode !== 0) throw new Error(`project page review: persisting preview fixture failed: ${seededTurn.stderr.toString()}`);
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((entry) => entry.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, ownerSession);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        page.on("pageerror", (error) => console.error("project page browser error", error.stack ?? error.message));
+        await page.goto(`${BASE_URL}/chat/projects/${encodeURIComponent(folder.id)}`);
+        await page.getByRole("heading", { name: "Project page review" }).waitFor();
+        await page.getByRole("tab", { name: "Chats" }).waitFor();
+        await page.getByPlaceholder("New chat in Project page review").waitFor();
+        await page.getByText("Design Review Prompt").waitFor();
+        if (await page.getByRole("button", { name: /Share/i }).count()) throw new Error("project page unexpectedly shows Share");
+        if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error(`project page ${slug} ${theme} scrolls sideways`);
+        const base = `project-page-${slug}-${viewport.width}-${theme}`;
+        await page.screenshot({ path: join(outDir, `${base}.png`) });
+        await page.getByRole("tab", { name: "Sources" }).click();
+        await page.getByText("No sources yet").waitFor();
+        await page.screenshot({ path: join(outDir, `${base}-sources.png`) });
+        await page.getByRole("tab", { name: "Artifacts" }).click();
+        await page.getByText("No artifacts yet").waitFor();
+        await page.screenshot({ path: join(outDir, `${base}-artifacts.png`) });
+        console.log(`Wrote project page review ${base} with Chats, Sources and Artifacts states`);
+      } finally {
+        await context.close();
+      }
+    }
+  }
 }
 
 /** COLUMN-01 (owner, 2026-10-06): the chat history column, open, hidden,
@@ -9696,6 +9763,12 @@ async function main() {
     if (projectsListingReview) {
       await captureProjectsListingReview(browser, sessionValue);
       console.log("completed named review: --projects-listing-review");
+      return;
+    }
+
+    if (projectPageReview) {
+      await captureProjectPageReview(browser, sessionValue);
+      console.log("completed named review: --projects-page-review");
       return;
     }
 

@@ -18,6 +18,10 @@ export interface ChatThreadListOptions {
    * (`canAccessPerson`, conversationHistory.ts); this just says who's
    * being asked for. */
   personId?: string;
+  /** PROJECTS-UI-04: constrain the project page's runtime to this folder. */
+  folderId?: string;
+  /** A reused runtime can read the active project scope on each list reload. */
+  folderIdRef?: { current: string | undefined };
   /** Server-side search (conversationHistory.ts's own `listConversations`
    * already matches title AND message body, not just title) - the thread
    * list's own client-side filter is skipped when this is set, so a
@@ -112,12 +116,13 @@ function rememberCustom(remoteId: string, custom: { pinned?: boolean; folder_id?
 }
 
 export function createChatThreadListAdapter(selfName: string, options: ChatThreadListOptions = {}): RemoteThreadListAdapter {
-  const { personId, query, incognito = false, onArchiveUnavailable, onSettingsLoaded, onOpenFailed, titlePollMs = 3000, titlePollAttempts = 40 } = options;
+  const { personId, query, folderId, folderIdRef, incognito = false, onArchiveUnavailable, onSettingsLoaded, onOpenFailed, titlePollMs = 3000, titlePollAttempts = 40 } = options;
   return {
     async list() {
       const rows = incognito ? await api.incognitoConversationList(personId) : await api.conversationList(personId, query, "include");
       if (incognito) for (const row of rows) incognitoThreadIds.add(row.id);
-      return { threads: rows.filter((row) => row.surface === "chat").map((row) => ({
+      const activeFolderId = folderIdRef?.current ?? folderId;
+      return { threads: rows.filter((row) => row.surface === "chat" && (!activeFolderId || (row.folder_id === activeFolderId && !row.archived))).map((row) => ({
         status: row.archived ? ("archived" as const) : ("regular" as const),
         remoteId: row.id,
         title: row.title ?? undefined,

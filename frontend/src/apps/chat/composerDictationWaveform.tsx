@@ -28,6 +28,7 @@ import { DraftRestore } from "@maipai/ui/src/elements/draft-restore";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { DraftConversationContext, TemporaryChatContext } from "@/apps/chat/chatThreadContexts";
+import { PageContext } from "@/shell/pages/chatProjectPageContext";
 import { DRAFT_DELAY_MS, discardDraft, readDraft, saveDraft, type ChatDraft } from "@/apps/chat/draftStore";
 
 const DictationLevelMeterContext = createContext<LevelMeter | null>(null);
@@ -68,6 +69,7 @@ export function ComposerDictationWaveform() {
   const text = useAuiState((s) => s.composer.text);
   const id = useContext(DraftConversationContext);
   const temporary = useContext(TemporaryChatContext).on;
+  const projectPage = useContext(PageContext);
   const aui = useAui();
   const meter = useContext(DictationLevelMeterContext);
   const held = useContext(ChatAvailabilityContext) !== "ready";
@@ -118,7 +120,7 @@ export function ComposerDictationWaveform() {
       // holds Send (Thread `sendHeld`, ChatThread.tsx) and Enter sends
       // nothing here. Why it waits is the composer line's job, so the
       // placeholder stays the plain one.
-      placeholder="Send a message..."
+      placeholder={projectPage ? `New chat in ${projectPage.folderName ?? "this project"}` : "Send a message..."}
       submitMode={held ? "none" : undefined}
       onKeyDown={held ? (event) => { if (event.key === "Enter" && !event.shiftKey) event.preventDefault(); } : undefined}
     />

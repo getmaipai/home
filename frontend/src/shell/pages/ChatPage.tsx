@@ -1,9 +1,12 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
+import { PageContext } from "@/shell/pages/chatProjectPageContext";
+import type { ThreadListProjects } from "@maipai/ui/src/elements/thread-list.aui";
+import type { ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
 import { MarkdownDocument } from "@/shell/pages/MarkdownDocument";
 // APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
 // default `ToolFallback` renders (its own `import { ToolFallback } from
@@ -64,11 +67,15 @@ import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarg
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, MODEL_EFFORTS, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
+import { chatFoldersQueryKey } from "@/apps/chat/chatProjects";
+import { projectConversationRows, projectSourcesVisible } from "@/shell/pages/chatProjectPageModel";
 
 // CHAT-FIND-0923-02: `panel-left-open` shows which way the click goes;
 // the phone row's sheet control uses the same glyph as the desktop
 // column's show control (ChatColumn.tsx).
 const ColumnOpenIcon = getIcon("panel-left-open");
+const LazyProjectHomeHeader = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeHeader })));
+const LazyProjectHomeTabs = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeTabs })));
 
 /** canvas-split's own acceptance: opens beside the thread, closing
  * keeps the thread, a later turn's update to the same artifact
@@ -275,7 +282,7 @@ function BareCompareCanvasPanel({ target, onClose }: { target: CompareTarget; on
  * wiring table's remaining rows). `speakReplies: false` still holds -
  * no "stop speaking" control on screen yet. */
 
-function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void) {
+function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: boolean, voiceOpen: boolean, onArtifactReady: (artifactId: string) => void, setDraftConversationId: (id: string | undefined) => void, folderId?: string) {
   const temporaryModeRef = useRef(temporaryNext);
   temporaryModeRef.current = temporaryNext;
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
@@ -496,11 +503,13 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   // The remote-thread runtime reloads its list when this adapter changes.
   // Incognito is an exclusive data source: its sessions never merge with
   // durable conversation rows.
+  const folderIdRef = useRef(folderId);
+  folderIdRef.current = folderId;
   // getmaipai/home#206: a saved chat that could not be opened releases the
   // Send hold ChatThread keeps while that chat is opening.
   const [unopenableConversationId, setUnopenableConversationId] = useState<string | undefined>(undefined);
   const forgetUnopenableConversation = useCallback(() => setUnopenableConversationId(undefined), []);
-  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name, { incognito: temporaryNext, onArchiveUnavailable, onSettingsLoaded: onConversationSettingsLoaded, onOpenFailed: setUnopenableConversationId }), [person.display_name, temporaryNext, onArchiveUnavailable, onConversationSettingsLoaded]);
+  const threadListAdapter = useMemo(() => createChatThreadListAdapter(person.display_name, { incognito: temporaryNext, folderIdRef, onArchiveUnavailable, onSettingsLoaded: onConversationSettingsLoaded, onOpenFailed: setUnopenableConversationId }), [person.display_name, temporaryNext, onArchiveUnavailable, onConversationSettingsLoaded]);
   // SHELL-02 slice 6: the same real adapters ChatPage.tsx's composer
   // already uses - images plus, new here, text/Markdown files through
   // the shipped `SimpleTextAttachmentAdapter` (client-side only, no
@@ -1056,6 +1065,7 @@ function ProjectResultReload() {
 
 export function ChatPage({ person }: { person: Roster }) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [draftConversationId, setDraftConversationId] = useState<string | undefined>(() => new URLSearchParams(window.location.search).get("conversation") ?? undefined);
   const chatAvailability = useChatAvailability();
   const composerNotice = useChatComposerNotice(person);
@@ -1065,6 +1075,83 @@ export function ChatPage({ person }: { person: Roster }) {
   // instead of filling the shell header's slot (which spanned the history
   // column too).
   const { on: temporaryNext } = useIncognitoContext();
+  const projectRoute = useMatch("/chat/projects/:id");
+  const projectFolderId = projectRoute?.params.id ? decodeURIComponent(projectRoute.params.id) : undefined;
+  const projectDetailQuery = useQuery({ queryKey: ["chat-folders", person.id, "one", projectFolderId ?? ""], queryFn: () => api.chatFolder(projectFolderId!), enabled: projectFolderId !== undefined && !temporaryNext });
+  const projectChatsQuery = useQuery({
+    queryKey: ["project-page-chats", person.id, projectFolderId ?? ""],
+    queryFn: () => api.conversationList(undefined, undefined, "include"),
+    enabled: projectFolderId !== undefined && !temporaryNext,
+  });
+  const projectRows = projectConversationRows(projectChatsQuery.data ?? [], projectFolderId ?? "");
+  const projectPageRows = useMemo(() => Object.fromEntries(projectRows.map((row) => [row.id, {
+    preview: row.preview,
+    date: row.last_turn_at ?? row.created_at,
+    projectIcon: { icon: projectDetailQuery.data?.icon, color: projectDetailQuery.data?.color },
+  }])), [projectRows, projectDetailQuery.data?.icon, projectDetailQuery.data?.color]);
+  const projectList: ThreadListProjects = useMemo(() => ({ folders: [], canMove: false, rowVariant: "page", pageRows: projectPageRows }), [projectPageRows]);
+  const projectFolder = projectDetailQuery.data;
+  const projectSettingsValue: ProjectSettingsValue | undefined = projectFolder ? {
+    name: projectFolder.name,
+    icon: projectFolder.icon,
+    color: projectFolder.color,
+    description: projectFolder.description ?? "",
+    instructions: projectFolder.instructions,
+    memory_mode: projectFolder.memory_mode,
+  } : undefined;
+  const projectCanManage = projectFolder?.access === "manage" && person.role !== "child";
+  const projectCanEdit = projectFolder?.access === "manage" || projectFolder?.access === "edit";
+  const refreshProject = () => queryClient.invalidateQueries({ queryKey: chatFoldersQueryKey(person.id) });
+  const projectPage = projectFolderId && !temporaryNext && projectFolder && projectSettingsValue ? {
+    folderId: projectFolderId,
+    context: { person, folderId: projectFolderId, folderName: projectFolder.name },
+    slots: {
+      WelcomeContent: <Suspense fallback={null}><LazyProjectHomeHeader
+        project={projectSettingsValue}
+        canEdit={projectCanEdit}
+        canManage={projectCanManage}
+        onSave={async (patch) => {
+          try {
+            await api.updateChatFolder(projectFolder.id, patch);
+            await refreshProject();
+          } catch (error) {
+            toast.error("Could not update that project. Try again.");
+            throw error;
+          }
+        }}
+        onArchive={async () => {
+          try {
+            await api.updateChatFolder(projectFolder.id, { archived: true });
+            await refreshProject();
+            navigate("/chat/projects");
+          } catch {
+            toast.error("Could not update that project. Try again.");
+          }
+        }}
+        onDelete={async () => {
+          try {
+            await api.deleteChatFolder(projectFolder.id);
+            await refreshProject();
+            navigate("/chat/projects");
+          } catch {
+            toast.error("Could not delete that project. Try again.");
+          }
+        }}
+      /></Suspense>,
+      BelowComposerContent: <Suspense fallback={null}><LazyProjectHomeTabs
+        projects={projectList}
+        showSources={projectSourcesVisible(person.role)}
+        chatsLoading={projectChatsQuery.isPending}
+        hasChats={projectRows.length > 0}
+      /></Suspense>,
+      emptyLayout: "top" as const,
+      composerDensity: "compact" as const,
+      composerPlaceholder: `New chat in ${projectFolder.name}`,
+    },
+  } : undefined;
+  useEffect(() => {
+    if (temporaryNext && projectRoute) navigate("/chat", { replace: true });
+  }, [temporaryNext, projectRoute, navigate]);
   // VOICE-LIVE-02: owned here (not inside useChatRuntime) since both
   // the composer's own waveform button (via VoiceSessionProvider,
   // composerVoiceControls.tsx's zero-prop slot needs a context to reach
@@ -1211,7 +1298,7 @@ export function ChatPage({ person }: { person: Roster }) {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
-  }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId);
+  }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, projectPage?.folderId);
   const [pageSearchParams] = useSearchParams();
   const requestedConversationId = pageSearchParams.get("conversation") ?? undefined;
   const openingConversationId = requestedConversationId !== unopenableConversationId ? requestedConversationId : undefined;
@@ -1381,6 +1468,7 @@ export function ChatPage({ person }: { person: Roster }) {
               they sit beside the reply that carried them (the message footer
               and the error slot draw the kit GuardrailNotice). */}
               <ConnectionStateContext.Provider value={{ ...connection, setConnection }}>
+                <PageContext.Provider value={projectPage?.context ?? null}>
                 <ChatThread
                   temporary={temporaryNext}
                   onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
@@ -1388,7 +1476,10 @@ export function ChatPage({ person }: { person: Roster }) {
                   canUseIncognito={person.age_band === "adult" && canHaveTemporaryChatRole(person.role)}
                   onOpenSettings={() => navigate("/settings/chat")}
                   openingConversationId={openingConversationId}
+                  pageSlots={projectPage?.slots}
+                  projectFolderId={projectPage?.folderId}
                 />
+                </PageContext.Provider>
               </ConnectionStateContext.Provider>
             </div>
             {isDesktopCanvas ? (

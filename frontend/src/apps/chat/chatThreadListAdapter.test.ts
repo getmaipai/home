@@ -112,6 +112,19 @@ describe("saved conversations", () => {
     ]);
   });
 
+  test("project pages list only active chats in their current folder scope", async () => {
+    globalThis.fetch = mock(async () => Response.json([
+      { id: "one-live", title: "First", surface: "chat", folder_id: "folder-one", created_at: "2026-09-07T00:00:00Z", last_turn_at: null, pinned: false, archived: false },
+      { id: "one-old", title: "Archived", surface: "chat", folder_id: "folder-one", created_at: "2026-09-06T00:00:00Z", last_turn_at: null, pinned: false, archived: true },
+      { id: "two-live", title: "Second", surface: "chat", folder_id: "folder-two", created_at: "2026-09-05T00:00:00Z", last_turn_at: null, pinned: false, archived: false },
+    ])) as unknown as typeof fetch;
+    const folderIdRef = { current: "folder-one" as string | undefined };
+    const adapter = createChatThreadListAdapter("Nova", { folderIdRef });
+    expect((await adapter.list()).threads.map((thread) => thread.remoteId)).toEqual(["one-live"]);
+    folderIdRef.current = "folder-two";
+    expect((await adapter.list()).threads.map((thread) => thread.remoteId)).toEqual(["two-live"]);
+  });
+
   test("a failed archive rejects so the runtime rolls back, and says so", async () => {
     const errorToast = spyOn(toast, "error");
     try {

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState } from "@assistant-ui/react";
-import { Thread } from "@maipai/ui/src/elements/thread.aui";
+import { Thread, type ThreadComponents } from "@maipai/ui/src/elements/thread.aui";
+import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
 import { DATA_BINDINGS, MODEL_TRAILING_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
 import { ChatThreadExtras } from "@/apps/chat/ChatThreadExtras";
@@ -37,7 +38,7 @@ function DataElementBinding({ binding }: { binding: DataBinding }) {
 /** getmaipai/home#206: the longest Send waits for a saved chat to open. */
 const OPENING_HOLD_MS = 15_000;
 
-export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false, canUseIncognito = false, onOpenSettings, openingConversationId }: {
+export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false, canUseIncognito = false, onOpenSettings, openingConversationId, pageSlots, projectFolderId }: {
   /** Incognito: the kit's temporary-thread styling. */
   temporary?: boolean;
   /** Called with the superseded turn id when an edited message is sent. */
@@ -51,6 +52,10 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
   /** The saved chat the page is opening (its id from the address). Until
    * the thread list has switched to it, Send waits (getmaipai/home#206). */
   openingConversationId?: string;
+  /** Project-home content supplied through the shipped Thread page slots. */
+  pageSlots?: Pick<ThreadComponents, "Welcome" | "WelcomeContent" | "BelowComposer" | "BelowComposerContent" | "emptyLayout" | "composerDensity" | "composerPlaceholder">;
+  /** Route scope to start a fresh conversation in this project. */
+  projectFolderId?: string;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   // COLUMN-01: the history column owns these (ChatColumn.tsx); the page
@@ -89,6 +94,17 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
   // the switch. Only what changed during the open moves: a draft that was
   // already in the box beforehand stays where it was typed.
   const aui = useAui();
+  useEffect(() => {
+    if (!projectFolderId) return;
+    let active = true;
+    void Promise.resolve(aui.threads().switchToNewThread()).then(() => {
+      if (!active) return;
+      return aui.threads().reload().then(() => {
+        if (active) setPendingChatFolder({ threadId: aui.threads().getState().mainThreadId, folderId: projectFolderId });
+      });
+    });
+    return () => { active = false; };
+  }, [aui, projectFolderId]);
   const composerText = useAuiState((s) => s.composer.text);
   const carry = useRef<{ before: string; latest: string } | null>(null);
   useEffect(() => {
@@ -144,6 +160,7 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
               scrollToBottomOnThreadSwitch: true,
             },
             ...(thinkingModeVisible ? { ComposerExtraEnd: MODEL_TRAILING_SLOT } : {}),
+            ...pageSlots,
           }}
         />
       </ChatExtrasContext.Provider>

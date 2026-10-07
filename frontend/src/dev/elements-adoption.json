@@ -1,7 +1,15 @@
 {
-  "generatedAt": "2026-10-07T06:25:18.463Z",
-  "kitTag": "ui-v0.5.156",
+  "generatedAt": "2026-10-07T07:26:45.501Z",
+  "kitTag": "ui-v0.5.157",
   "items": [
+    {
+      "file": "ProjectHomePageShowcase.tsx",
+      "name": "ProjectHomePageShowcase",
+      "group": "project",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for PROJECTS-UI-04, covered by its Commons component tests; not a standalone Home product surface.",
+      "implemented": false
+    },
     {
       "file": "ThreadListPageRowsShowcase.tsx",
       "name": "ThreadListPageRowsShowcase",
@@ -699,6 +707,14 @@
       "verdict": "later",
       "verdictReason": "Deferred until tools T4.",
       "implemented": false
+    },
+    {
+      "file": "project-home-page.tsx",
+      "name": "project-home-page",
+      "group": "project",
+      "verdict": "wire-now",
+      "verdictReason": "Selected for the current Home project page: owns the project header actions, project tabs, empty states, and page-row list using shipped kit Elements.",
+      "implemented": true
     },
     {
       "file": "project-mark.tsx",
