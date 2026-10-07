@@ -9,6 +9,14 @@ import { sqlite } from "@/db";
 // stored as chat folders. These hold the age-band rules (CHAT-UI-SPEC
 // section 9), the move rules and the deletion inventory.
 
+// PROJECTS-P1: a response is the spec record plus access, counts and
+// last_activity_at (the generated validator is strict), so the spec record is
+// checked on its own fields.
+function parseFolder(value: unknown): ChatFolder {
+  const { access: _a, last_activity_at: _l, counts: _c, ...record } = value as Record<string, unknown>;
+  return ChatFolder.parse(record);
+}
+
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
@@ -37,7 +45,7 @@ async function sessionFor(personId: string, secret?: string): Promise<TestClient
 async function makeFolder(client: TestClient, name: string, person?: string): Promise<ChatFolder> {
   const res = await client.post("/api/chat-folders", person ? { name, person } : { name });
   expect(res.status).toBe(201);
-  return ChatFolder.parse(await res.json());
+  return parseFolder(await res.json());
 }
 
 async function newChat(client: TestClient, body: Record<string, unknown> = {}): Promise<{ id: string; folder_id?: string | null }> {
@@ -65,10 +73,10 @@ describe("making and listing projects", () => {
 
     const renamed = await adult.request(`/api/chat-folders/${trip.id}`, { method: "PATCH", body: { name: "Summer trip", sort_order: 1 } });
     expect(renamed.status).toBe(200);
-    expect(ChatFolder.parse(await renamed.json()).name).toBe("Summer trip");
+    expect(parseFolder(await renamed.json()).name).toBe("Summer trip");
 
     const listed = (await (await adult.get("/api/chat-folders")).json()) as unknown[];
-    expect(listed.map((f) => ChatFolder.parse(f).name)).toEqual(["Garden plans", "Summer trip"]);
+    expect(listed.map((f) => parseFolder(f).name)).toEqual(["Garden plans", "Summer trip"]);
   });
 
   test("a name that is empty or longer than 80 characters is refused", async () => {
@@ -100,7 +108,7 @@ describe("making and listing projects", () => {
     expect(made.provenance).toMatch(/\(parent\)$/);
 
     const seen = (await (await child.get("/api/chat-folders")).json()) as unknown[];
-    expect(seen.map((f) => ChatFolder.parse(f).id)).toEqual([made.id]);
+    expect(seen.map((f) => parseFolder(f).id)).toEqual([made.id]);
     expect((await child.request(`/api/chat-folders/${made.id}`, { method: "PATCH", body: { name: "Games" } })).status).toBe(403);
     expect((await child.request(`/api/chat-folders/${made.id}`, { method: "DELETE" })).status).toBe(403);
 
@@ -206,7 +214,7 @@ describe("deleting", () => {
     const b = await newChat(owner, { folder_id: folder.id });
     const res = await owner.request(`/api/chat-folders/${folder.id}`, { method: "DELETE" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, chats_kept: 2 });
+    expect(await res.json()).toEqual({ ok: true, chats_kept: 2, files_removed: 0 });
     const chats = await listChats(owner);
     for (const id of [a.id, b.id]) expect(chats.find((c) => c.id === id)?.folder_id).toBeNull();
     expect((await (await owner.get("/api/chat-folders")).json()) as unknown[]).toEqual([]);

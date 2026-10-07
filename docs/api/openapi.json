@@ -3806,6 +3806,24 @@
                         "default": null,
                         "description": "Names the embedding space this record was indexed under, e.g. hub-bge-m3 or bot-minilm. The embedding vector itself is never part of this record and never syncs (4.11)."
                       },
+                      "folder_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^folder-[a-z0-9]{6,}$",
+                            "description": "The project (chat folder) this memory or episode was written in; null for none (PROJECTS-P1). Provenance only until the project's memory_mode is project_only, when recall inside and outside the project follows it."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The project (chat folder) this memory or episode was written in; null for none (PROJECTS-P1). Provenance only until the project's memory_mode is project_only, when recall inside and outside the project follows it."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "The project (chat folder) this memory or episode was written in; null for none (PROJECTS-P1). Provenance only until the project's memory_mode is project_only, when recall inside and outside the project follows it."
+                      },
                       "hlc": {
                         "type": "string",
                         "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
@@ -7981,7 +7999,7 @@
         "tags": [
           "Chat projects"
         ],
-        "summary": "List a person's chat projects",
+        "summary": "List chat projects",
         "parameters": [
           {
             "schema": {
@@ -7992,11 +8010,64 @@
             "description": "Whose projects; defaults to you. An owner or admin may name a child.",
             "name": "person",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "Search the name and description, case-insensitively."
+            },
+            "required": false,
+            "description": "Search the name and description, case-insensitively.",
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ],
+              "description": "true lists only archived projects; the default lists the rest."
+            },
+            "required": false,
+            "description": "true lists only archived projects; the default lists the rest.",
+            "name": "archived",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mine",
+                "shared",
+                "all"
+              ],
+              "description": "mine (default): the person's own. shared: projects others shared with you. all: both."
+            },
+            "required": false,
+            "description": "mine (default): the person's own. shared: projects others shared with you. all: both.",
+            "name": "scope",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "order",
+                "updated"
+              ],
+              "description": "order (default): sort_order then newest. updated: last activity first. Pinned projects always lead."
+            },
+            "required": false,
+            "description": "order (default): sort_order then newest. updated: last activity first. Pinned projects always lead.",
+            "name": "sort",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "The person's live projects, in their order. Empty for a person you cannot see.",
+            "description": "The matching live projects. Empty for a person you cannot see.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8069,6 +8140,151 @@
                         ],
                         "default": null,
                         "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                      },
+                      "color": {
+                        "type": "string",
+                        "enum": [
+                          "neutral",
+                          "blue",
+                          "violet",
+                          "teal",
+                          "orange",
+                          "pink",
+                          "red",
+                          "green",
+                          "yellow"
+                        ],
+                        "default": "neutral",
+                        "description": "A palette name, never a hex. Maps one to one to the kit's --hue-* tokens; neutral is the muted foreground."
+                      },
+                      "icon": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                        "default": "folder",
+                        "description": "A name from vocab/project-icons.json (a fixed list, no uploads, no emoji). Every name exists in the kit's icon registry."
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "default": "",
+                        "description": "Shown to people only, never sent to the model. A minor's description passes the output floor on save."
+                      },
+                      "instructions": {
+                        "type": "string",
+                        "maxLength": 1500,
+                        "default": "",
+                        "description": "Notes the model follows in this project's chats. Enters the prompt after the person's own custom instructions, as labelled data that never outranks the safety floor or the age band. Passes the output floor on save for a minor project or editor."
+                      },
+                      "pinned": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Pinned to the top of the project list."
+                      },
+                      "pinned_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                      },
+                      "archived_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                      },
+                      "memory_mode": {
+                        "type": "string",
+                        "enum": [
+                          "shared",
+                          "project_only"
+                        ],
+                        "default": "shared",
+                        "description": "shared: chats here read and write the person's normal memory. project_only: only memories written in this project are used here, and they are used nowhere else. A record without the field reads as shared (what every project did before this field); the hub writes project_only for a new project. A shared project (non-empty shares) is always project_only."
+                      },
+                      "shares": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "person": {
+                              "type": "string",
+                              "pattern": "^person-[a-z0-9]{6,}$",
+                              "description": "A household member the owner shared this project with. Unique within the list."
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "can_use",
+                                "can_edit"
+                              ],
+                              "description": "can_use: start chats in the project and use its instructions. can_edit: also change its name, icon, colour, description and instructions. Only the owner (or a parent for a child's project) changes the list, the memory mode, the archive or the delete."
+                            }
+                          },
+                          "required": [
+                            "person",
+                            "role"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "maxItems": 20,
+                        "default": [],
+                        "description": "Household members this project is shared with. Teens' and children's projects follow the band rules: a child's project is parent-managed, a teen shares only by their own choice, a child is added only by a parent."
+                      },
+                      "access": {
+                        "type": "string",
+                        "enum": [
+                          "manage",
+                          "edit",
+                          "use"
+                        ],
+                        "description": "What the caller may do: manage (owner or parent), edit (can_edit member), use (can_use member, or a child)."
+                      },
+                      "last_activity_at": {
+                        "type": "string",
+                        "description": "The latest of the project's own change and the newest chat in it."
+                      },
+                      "counts": {
+                        "type": "object",
+                        "properties": {
+                          "chats": {
+                            "type": "integer"
+                          },
+                          "files": {
+                            "type": "integer"
+                          },
+                          "artifacts": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "chats",
+                          "files",
+                          "artifacts"
+                        ]
                       }
                     },
                     "required": [
@@ -8079,10 +8295,12 @@
                       "provenance",
                       "hlc",
                       "created_at",
-                      "updated_at"
+                      "updated_at",
+                      "access",
+                      "last_activity_at",
+                      "counts"
                     ],
-                    "additionalProperties": false,
-                    "description": "A named group of one person's chat conversations, shown to people as a Project in the chat history column (CHAT-PROJECT-01a). It belongs to one person; a parent may make one for a child. A conversation joins it through Conversation.folder_id. Deleting a folder keeps its conversations (their folder_id goes back to null). Named 'chat folder' on the wire so it is never mistaken for the background-work Project record (project.schema.json). This version carries no instructions or files: a folder only groups conversations."
+                    "additionalProperties": false
                   }
                 }
               }
@@ -8119,6 +8337,26 @@
                     "type": "string",
                     "nullable": true,
                     "description": "Whose project; defaults to you. An owner or admin may make one for a child."
+                  },
+                  "color": {
+                    "nullable": true,
+                    "description": "One of neutral, blue, violet, teal, orange, pink, red, green, yellow."
+                  },
+                  "icon": {
+                    "nullable": true,
+                    "description": "A name from the project icon list (spec vocab/project-icons.json)."
+                  },
+                  "description": {
+                    "nullable": true,
+                    "description": "Up to 500 characters, shown to people, never sent to the model."
+                  },
+                  "instructions": {
+                    "nullable": true,
+                    "description": "Up to 1500 characters the model follows in this project's chats."
+                  },
+                  "memory_mode": {
+                    "nullable": true,
+                    "description": "shared or project_only. A new project defaults to project_only."
                   }
                 },
                 "required": [
@@ -8201,6 +8439,151 @@
                       ],
                       "default": null,
                       "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                    },
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "neutral",
+                        "blue",
+                        "violet",
+                        "teal",
+                        "orange",
+                        "pink",
+                        "red",
+                        "green",
+                        "yellow"
+                      ],
+                      "default": "neutral",
+                      "description": "A palette name, never a hex. Maps one to one to the kit's --hue-* tokens; neutral is the muted foreground."
+                    },
+                    "icon": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                      "default": "folder",
+                      "description": "A name from vocab/project-icons.json (a fixed list, no uploads, no emoji). Every name exists in the kit's icon registry."
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 500,
+                      "default": "",
+                      "description": "Shown to people only, never sent to the model. A minor's description passes the output floor on save."
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "maxLength": 1500,
+                      "default": "",
+                      "description": "Notes the model follows in this project's chats. Enters the prompt after the person's own custom instructions, as labelled data that never outranks the safety floor or the age band. Passes the output floor on save for a minor project or editor."
+                    },
+                    "pinned": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Pinned to the top of the project list."
+                    },
+                    "pinned_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                    },
+                    "archived_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                    },
+                    "memory_mode": {
+                      "type": "string",
+                      "enum": [
+                        "shared",
+                        "project_only"
+                      ],
+                      "default": "shared",
+                      "description": "shared: chats here read and write the person's normal memory. project_only: only memories written in this project are used here, and they are used nowhere else. A record without the field reads as shared (what every project did before this field); the hub writes project_only for a new project. A shared project (non-empty shares) is always project_only."
+                    },
+                    "shares": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "person": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$",
+                            "description": "A household member the owner shared this project with. Unique within the list."
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "can_use",
+                              "can_edit"
+                            ],
+                            "description": "can_use: start chats in the project and use its instructions. can_edit: also change its name, icon, colour, description and instructions. Only the owner (or a parent for a child's project) changes the list, the memory mode, the archive or the delete."
+                          }
+                        },
+                        "required": [
+                          "person",
+                          "role"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 20,
+                      "default": [],
+                      "description": "Household members this project is shared with. Teens' and children's projects follow the band rules: a child's project is parent-managed, a teen shares only by their own choice, a child is added only by a parent."
+                    },
+                    "access": {
+                      "type": "string",
+                      "enum": [
+                        "manage",
+                        "edit",
+                        "use"
+                      ],
+                      "description": "What the caller may do: manage (owner or parent), edit (can_edit member), use (can_use member, or a child)."
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "description": "The latest of the project's own change and the newest chat in it."
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "chats": {
+                          "type": "integer"
+                        },
+                        "files": {
+                          "type": "integer"
+                        },
+                        "artifacts": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "chats",
+                        "files",
+                        "artifacts"
+                      ]
                     }
                   },
                   "required": [
@@ -8211,16 +8594,18 @@
                     "provenance",
                     "hlc",
                     "created_at",
-                    "updated_at"
+                    "updated_at",
+                    "access",
+                    "last_activity_at",
+                    "counts"
                   ],
-                  "additionalProperties": false,
-                  "description": "A named group of one person's chat conversations, shown to people as a Project in the chat history column (CHAT-PROJECT-01a). It belongs to one person; a parent may make one for a child. A conversation joins it through Conversation.folder_id. Deleting a folder keeps its conversations (their folder_id goes back to null). Named 'chat folder' on the wire so it is never mistaken for the background-work Project record (project.schema.json). This version carries no instructions or files: a folder only groups conversations."
+                  "additionalProperties": false
                 }
               }
             }
           },
           "400": {
-            "description": "Missing or too long name",
+            "description": "Missing or too long name, or a bad field",
             "content": {
               "application/json": {
                 "schema": {
@@ -8263,11 +8648,287 @@
       }
     },
     "/api/chat-folders/{id}": {
+      "get": {
+        "tags": [
+          "Chat projects"
+        ],
+        "summary": "One chat project with its counts",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "folder-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The project, with counts of its chats, files and artifacts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^folder-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Whose folder this is. Only this person's conversations may join it."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "description": "What the person calls the project. Trimmed; not unique."
+                    },
+                    "sort_order": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0,
+                      "description": "Position among the person's folders, lowest first. Ties sort newest first."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced. Mirrors conversation.schema.json's own source field."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the folder, for example 'person-a1b2c3 (self)' or 'person-d4e5f6 (parent)'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                    },
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "neutral",
+                        "blue",
+                        "violet",
+                        "teal",
+                        "orange",
+                        "pink",
+                        "red",
+                        "green",
+                        "yellow"
+                      ],
+                      "default": "neutral",
+                      "description": "A palette name, never a hex. Maps one to one to the kit's --hue-* tokens; neutral is the muted foreground."
+                    },
+                    "icon": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                      "default": "folder",
+                      "description": "A name from vocab/project-icons.json (a fixed list, no uploads, no emoji). Every name exists in the kit's icon registry."
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 500,
+                      "default": "",
+                      "description": "Shown to people only, never sent to the model. A minor's description passes the output floor on save."
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "maxLength": 1500,
+                      "default": "",
+                      "description": "Notes the model follows in this project's chats. Enters the prompt after the person's own custom instructions, as labelled data that never outranks the safety floor or the age band. Passes the output floor on save for a minor project or editor."
+                    },
+                    "pinned": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Pinned to the top of the project list."
+                    },
+                    "pinned_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                    },
+                    "archived_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                    },
+                    "memory_mode": {
+                      "type": "string",
+                      "enum": [
+                        "shared",
+                        "project_only"
+                      ],
+                      "default": "shared",
+                      "description": "shared: chats here read and write the person's normal memory. project_only: only memories written in this project are used here, and they are used nowhere else. A record without the field reads as shared (what every project did before this field); the hub writes project_only for a new project. A shared project (non-empty shares) is always project_only."
+                    },
+                    "shares": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "person": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$",
+                            "description": "A household member the owner shared this project with. Unique within the list."
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "can_use",
+                              "can_edit"
+                            ],
+                            "description": "can_use: start chats in the project and use its instructions. can_edit: also change its name, icon, colour, description and instructions. Only the owner (or a parent for a child's project) changes the list, the memory mode, the archive or the delete."
+                          }
+                        },
+                        "required": [
+                          "person",
+                          "role"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 20,
+                      "default": [],
+                      "description": "Household members this project is shared with. Teens' and children's projects follow the band rules: a child's project is parent-managed, a teen shares only by their own choice, a child is added only by a parent."
+                    },
+                    "access": {
+                      "type": "string",
+                      "enum": [
+                        "manage",
+                        "edit",
+                        "use"
+                      ],
+                      "description": "What the caller may do: manage (owner or parent), edit (can_edit member), use (can_use member, or a child)."
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "description": "The latest of the project's own change and the newest chat in it."
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "chats": {
+                          "type": "integer"
+                        },
+                        "files": {
+                          "type": "integer"
+                        },
+                        "artifacts": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "chats",
+                        "files",
+                        "artifacts"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "name",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at",
+                    "access",
+                    "last_activity_at",
+                    "counts"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
       "patch": {
         "tags": [
           "Chat projects"
         ],
-        "summary": "Rename or reorder a chat project",
+        "summary": "Edit a chat project: rename, look, notes, pin, archive, memory",
         "parameters": [
           {
             "schema": {
@@ -8292,7 +8953,35 @@
                   "sort_order": {
                     "type": "integer",
                     "minimum": 0,
-                    "description": "A new position, lowest first."
+                    "description": "A new position, lowest first (owner only)."
+                  },
+                  "pinned": {
+                    "type": "boolean",
+                    "description": "Pin or unpin (owner only)."
+                  },
+                  "archived": {
+                    "type": "boolean",
+                    "description": "Archive or unarchive (owner only)."
+                  },
+                  "color": {
+                    "nullable": true,
+                    "description": "One of neutral, blue, violet, teal, orange, pink, red, green, yellow."
+                  },
+                  "icon": {
+                    "nullable": true,
+                    "description": "A name from the project icon list (spec vocab/project-icons.json)."
+                  },
+                  "description": {
+                    "nullable": true,
+                    "description": "Up to 500 characters, shown to people, never sent to the model."
+                  },
+                  "instructions": {
+                    "nullable": true,
+                    "description": "Up to 1500 characters the model follows in this project's chats."
+                  },
+                  "memory_mode": {
+                    "nullable": true,
+                    "description": "shared or project_only. A new project defaults to project_only."
                   }
                 }
               }
@@ -8372,6 +9061,151 @@
                       ],
                       "default": null,
                       "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                    },
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "neutral",
+                        "blue",
+                        "violet",
+                        "teal",
+                        "orange",
+                        "pink",
+                        "red",
+                        "green",
+                        "yellow"
+                      ],
+                      "default": "neutral",
+                      "description": "A palette name, never a hex. Maps one to one to the kit's --hue-* tokens; neutral is the muted foreground."
+                    },
+                    "icon": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                      "default": "folder",
+                      "description": "A name from vocab/project-icons.json (a fixed list, no uploads, no emoji). Every name exists in the kit's icon registry."
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 500,
+                      "default": "",
+                      "description": "Shown to people only, never sent to the model. A minor's description passes the output floor on save."
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "maxLength": 1500,
+                      "default": "",
+                      "description": "Notes the model follows in this project's chats. Enters the prompt after the person's own custom instructions, as labelled data that never outranks the safety floor or the age band. Passes the output floor on save for a minor project or editor."
+                    },
+                    "pinned": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Pinned to the top of the project list."
+                    },
+                    "pinned_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                    },
+                    "archived_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                    },
+                    "memory_mode": {
+                      "type": "string",
+                      "enum": [
+                        "shared",
+                        "project_only"
+                      ],
+                      "default": "shared",
+                      "description": "shared: chats here read and write the person's normal memory. project_only: only memories written in this project are used here, and they are used nowhere else. A record without the field reads as shared (what every project did before this field); the hub writes project_only for a new project. A shared project (non-empty shares) is always project_only."
+                    },
+                    "shares": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "person": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$",
+                            "description": "A household member the owner shared this project with. Unique within the list."
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "can_use",
+                              "can_edit"
+                            ],
+                            "description": "can_use: start chats in the project and use its instructions. can_edit: also change its name, icon, colour, description and instructions. Only the owner (or a parent for a child's project) changes the list, the memory mode, the archive or the delete."
+                          }
+                        },
+                        "required": [
+                          "person",
+                          "role"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 20,
+                      "default": [],
+                      "description": "Household members this project is shared with. Teens' and children's projects follow the band rules: a child's project is parent-managed, a teen shares only by their own choice, a child is added only by a parent."
+                    },
+                    "access": {
+                      "type": "string",
+                      "enum": [
+                        "manage",
+                        "edit",
+                        "use"
+                      ],
+                      "description": "What the caller may do: manage (owner or parent), edit (can_edit member), use (can_use member, or a child)."
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "description": "The latest of the project's own change and the newest chat in it."
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "chats": {
+                          "type": "integer"
+                        },
+                        "files": {
+                          "type": "integer"
+                        },
+                        "artifacts": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "chats",
+                        "files",
+                        "artifacts"
+                      ]
                     }
                   },
                   "required": [
@@ -8382,10 +9216,12 @@
                     "provenance",
                     "hlc",
                     "created_at",
-                    "updated_at"
+                    "updated_at",
+                    "access",
+                    "last_activity_at",
+                    "counts"
                   ],
-                  "additionalProperties": false,
-                  "description": "A named group of one person's chat conversations, shown to people as a Project in the chat history column (CHAT-PROJECT-01a). It belongs to one person; a parent may make one for a child. A conversation joins it through Conversation.folder_id. Deleting a folder keeps its conversations (their folder_id goes back to null). Named 'chat folder' on the wire so it is never mistaken for the background-work Project record (project.schema.json). This version carries no instructions or files: a folder only groups conversations."
+                  "additionalProperties": false
                 }
               }
             }
@@ -8411,7 +9247,7 @@
             }
           },
           "403": {
-            "description": "A child's projects are changed by a parent",
+            "description": "You may not change that",
             "content": {
               "application/json": {
                 "schema": {
@@ -8464,11 +9300,16 @@
                     },
                     "chats_kept": {
                       "type": "integer"
+                    },
+                    "files_removed": {
+                      "type": "integer",
+                      "description": "0 until projects hold files."
                     }
                   },
                   "required": [
                     "ok",
-                    "chats_kept"
+                    "chats_kept",
+                    "files_removed"
                   ]
                 }
               }
@@ -8485,7 +9326,7 @@
             }
           },
           "403": {
-            "description": "A child's projects are changed by a parent",
+            "description": "Only the owner (or a parent for a child) deletes",
             "content": {
               "application/json": {
                 "schema": {
@@ -8496,6 +9337,648 @@
           },
           "404": {
             "description": "Project not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat-folders/{id}/shares/{person}": {
+      "put": {
+        "tags": [
+          "Chat projects"
+        ],
+        "summary": "Share a project with a household member, or change their role",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The project id."
+            },
+            "required": true,
+            "description": "The project id.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The household member's person id."
+            },
+            "required": true,
+            "description": "The household member's person id.",
+            "name": "person",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "description": "can_use or can_edit."
+                  }
+                },
+                "required": [
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The project with its updated share list. Sharing makes the project project_only for memory.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^folder-[a-z0-9]{6,}$",
+                      "description": "Stable id, never reused."
+                    },
+                    "person": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$",
+                      "description": "Whose folder this is. Only this person's conversations may join it."
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80,
+                      "description": "What the person calls the project. Trimmed; not unique."
+                    },
+                    "sort_order": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0,
+                      "description": "Position among the person's folders, lowest first. Ties sort newest first."
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "hub",
+                        "local"
+                      ],
+                      "description": "hub: authoritative on the hub. local: made on a robot, not yet synced. Mirrors conversation.schema.json's own source field."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Free text naming who made the folder, for example 'person-a1b2c3 (self)' or 'person-d4e5f6 (parent)'."
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                    },
+                    "color": {
+                      "type": "string",
+                      "enum": [
+                        "neutral",
+                        "blue",
+                        "violet",
+                        "teal",
+                        "orange",
+                        "pink",
+                        "red",
+                        "green",
+                        "yellow"
+                      ],
+                      "default": "neutral",
+                      "description": "A palette name, never a hex. Maps one to one to the kit's --hue-* tokens; neutral is the muted foreground."
+                    },
+                    "icon": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                      "default": "folder",
+                      "description": "A name from vocab/project-icons.json (a fixed list, no uploads, no emoji). Every name exists in the kit's icon registry."
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 500,
+                      "default": "",
+                      "description": "Shown to people only, never sent to the model. A minor's description passes the output floor on save."
+                    },
+                    "instructions": {
+                      "type": "string",
+                      "maxLength": 1500,
+                      "default": "",
+                      "description": "Notes the model follows in this project's chats. Enters the prompt after the person's own custom instructions, as labelled data that never outranks the safety floor or the age band. Passes the output floor on save for a minor project or editor."
+                    },
+                    "pinned": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Pinned to the top of the project list."
+                    },
+                    "pinned_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                    },
+                    "archived_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                    },
+                    "memory_mode": {
+                      "type": "string",
+                      "enum": [
+                        "shared",
+                        "project_only"
+                      ],
+                      "default": "shared",
+                      "description": "shared: chats here read and write the person's normal memory. project_only: only memories written in this project are used here, and they are used nowhere else. A record without the field reads as shared (what every project did before this field); the hub writes project_only for a new project. A shared project (non-empty shares) is always project_only."
+                    },
+                    "shares": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "person": {
+                            "type": "string",
+                            "pattern": "^person-[a-z0-9]{6,}$",
+                            "description": "A household member the owner shared this project with. Unique within the list."
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "can_use",
+                              "can_edit"
+                            ],
+                            "description": "can_use: start chats in the project and use its instructions. can_edit: also change its name, icon, colour, description and instructions. Only the owner (or a parent for a child's project) changes the list, the memory mode, the archive or the delete."
+                          }
+                        },
+                        "required": [
+                          "person",
+                          "role"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "maxItems": 20,
+                      "default": [],
+                      "description": "Household members this project is shared with. Teens' and children's projects follow the band rules: a child's project is parent-managed, a teen shares only by their own choice, a child is added only by a parent."
+                    },
+                    "access": {
+                      "type": "string",
+                      "enum": [
+                        "manage",
+                        "edit",
+                        "use"
+                      ],
+                      "description": "What the caller may do: manage (owner or parent), edit (can_edit member), use (can_use member, or a child)."
+                    },
+                    "last_activity_at": {
+                      "type": "string",
+                      "description": "The latest of the project's own change and the newest chat in it."
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "chats": {
+                          "type": "integer"
+                        },
+                        "files": {
+                          "type": "integer"
+                        },
+                        "artifacts": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "chats",
+                        "files",
+                        "artifacts"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person",
+                    "name",
+                    "source",
+                    "provenance",
+                    "hlc",
+                    "created_at",
+                    "updated_at",
+                    "access",
+                    "last_activity_at",
+                    "counts"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad role or target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner shares; only a parent adds a child",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or person not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Chat projects"
+        ],
+        "summary": "Remove a member from a project, or leave it yourself",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "The project id."
+            },
+            "required": true,
+            "description": "The project id.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The household member's person id."
+            },
+            "required": true,
+            "description": "The household member's person id.",
+            "name": "person",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The project with its updated share list, or { left: true } when you left.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^folder-[a-z0-9]{6,}$",
+                          "description": "Stable id, never reused."
+                        },
+                        "person": {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$",
+                          "description": "Whose folder this is. Only this person's conversations may join it."
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80,
+                          "description": "What the person calls the project. Trimmed; not unique."
+                        },
+                        "sort_order": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 0,
+                          "description": "Position among the person's folders, lowest first. Ties sort newest first."
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "hub",
+                            "local"
+                          ],
+                          "description": "hub: authoritative on the hub. local: made on a robot, not yet synced. Mirrors conversation.schema.json's own source field."
+                        },
+                        "provenance": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Free text naming who made the folder, for example 'person-a1b2c3 (self)' or 'person-d4e5f6 (parent)'."
+                        },
+                        "hlc": {
+                          "type": "string",
+                          "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                          "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "deleted_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Set when the folder is deleted, so a syncing client drops it. Its conversations keep existing with folder_id null."
+                        },
+                        "color": {
+                          "type": "string",
+                          "enum": [
+                            "neutral",
+                            "blue",
+                            "violet",
+                            "teal",
+                            "orange",
+                            "pink",
+                            "red",
+                            "green",
+                            "yellow"
+                          ],
+                          "default": "neutral",
+                          "description": "A palette name, never a hex. Maps one to one to the kit's --hue-* tokens; neutral is the muted foreground."
+                        },
+                        "icon": {
+                          "type": "string",
+                          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                          "default": "folder",
+                          "description": "A name from vocab/project-icons.json (a fixed list, no uploads, no emoji). Every name exists in the kit's icon registry."
+                        },
+                        "description": {
+                          "type": "string",
+                          "maxLength": 500,
+                          "default": "",
+                          "description": "Shown to people only, never sent to the model. A minor's description passes the output floor on save."
+                        },
+                        "instructions": {
+                          "type": "string",
+                          "maxLength": 1500,
+                          "default": "",
+                          "description": "Notes the model follows in this project's chats. Enters the prompt after the person's own custom instructions, as labelled data that never outranks the safety floor or the age band. Passes the output floor on save for a minor project or editor."
+                        },
+                        "pinned": {
+                          "type": "boolean",
+                          "default": false,
+                          "description": "Pinned to the top of the project list."
+                        },
+                        "pinned_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "When it was pinned; null when not pinned. Pinned projects sort by this, newest pin first."
+                        },
+                        "archived_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Set when the project is archived: hidden from the default list, kept with its chats and settings. Distinct from deleted_at."
+                        },
+                        "memory_mode": {
+                          "type": "string",
+                          "enum": [
+                            "shared",
+                            "project_only"
+                          ],
+                          "default": "shared",
+                          "description": "shared: chats here read and write the person's normal memory. project_only: only memories written in this project are used here, and they are used nowhere else. A record without the field reads as shared (what every project did before this field); the hub writes project_only for a new project. A shared project (non-empty shares) is always project_only."
+                        },
+                        "shares": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "person": {
+                                "type": "string",
+                                "pattern": "^person-[a-z0-9]{6,}$",
+                                "description": "A household member the owner shared this project with. Unique within the list."
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "can_use",
+                                  "can_edit"
+                                ],
+                                "description": "can_use: start chats in the project and use its instructions. can_edit: also change its name, icon, colour, description and instructions. Only the owner (or a parent for a child's project) changes the list, the memory mode, the archive or the delete."
+                              }
+                            },
+                            "required": [
+                              "person",
+                              "role"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "maxItems": 20,
+                          "default": [],
+                          "description": "Household members this project is shared with. Teens' and children's projects follow the band rules: a child's project is parent-managed, a teen shares only by their own choice, a child is added only by a parent."
+                        },
+                        "access": {
+                          "type": "string",
+                          "enum": [
+                            "manage",
+                            "edit",
+                            "use"
+                          ],
+                          "description": "What the caller may do: manage (owner or parent), edit (can_edit member), use (can_use member, or a child)."
+                        },
+                        "last_activity_at": {
+                          "type": "string",
+                          "description": "The latest of the project's own change and the newest chat in it."
+                        },
+                        "counts": {
+                          "type": "object",
+                          "properties": {
+                            "chats": {
+                              "type": "integer"
+                            },
+                            "files": {
+                              "type": "integer"
+                            },
+                            "artifacts": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "chats",
+                            "files",
+                            "artifacts"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "person",
+                        "name",
+                        "source",
+                        "provenance",
+                        "hlc",
+                        "created_at",
+                        "updated_at",
+                        "access",
+                        "last_activity_at",
+                        "counts"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "left": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      },
+                      "required": [
+                        "left"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner removes others",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or member not found",
             "content": {
               "application/json": {
                 "schema": {

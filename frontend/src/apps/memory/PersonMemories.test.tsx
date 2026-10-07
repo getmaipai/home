@@ -48,6 +48,7 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     embedding_space: "hub-bge-m3",
     hlc: "1756800000000:0:a1b2c3",
     deleted_at: null,
+    folder_id: null,
     ...overrides,
   };
 }

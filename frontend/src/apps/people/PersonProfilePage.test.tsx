@@ -62,6 +62,7 @@ function record(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     embedding_space: null,
     hlc: "1788000000000:0:test",
     deleted_at: null,
+    folder_id: null,
     ...overrides,
   };
 }

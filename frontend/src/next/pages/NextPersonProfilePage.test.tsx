@@ -33,7 +33,7 @@ function memory(overrides: Partial<MemoryRecord> = {}): MemoryRecord {
     conflicts_with: [], uses: 0, retrieval_feedback: { corrections: 0, last_corrected_at: null },
     created_at: "2026-09-04T00:00:00.000Z", last_used_at: "2026-09-04T00:00:00.000Z", valid_from: null,
     valid_to: null, expired_at: null, superseded_by: null, embedding_space: null, hlc: "1788000000000:0:test",
-    deleted_at: null, ...overrides,
+    deleted_at: null, folder_id: null, ...overrides,
   };
 }
 
