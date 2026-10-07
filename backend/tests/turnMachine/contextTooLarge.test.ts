@@ -59,12 +59,13 @@ afterEach(() => {
 const hasTool = (messages: LlmMessage[]) => messages.some((m) => m.role === "tool");
 
 /** Round 1 asks for a search; every round that carries the tool result goes to `phrasing`. */
-function scriptTurn(phrasing: (call: number, messages: LlmMessage[]) => { ok: false; error: string } | { ok: true; text: string }) {
+function scriptTurn(phrasing: (call: number, messages: LlmMessage[]) => { ok: false; error: string } | { ok: true; text: string }, firstTurnFailure?: string) {
   const seen: { messages: LlmMessage[]; tools: unknown }[] = [];
   let phrasingCalls = 0;
   const spy = spyOn(llm, "startCompleteStreamPieces").mockImplementation(async (_role, messages, opts) => {
     seen.push({ messages, tools: opts?.tools });
     if (!hasTool(messages)) {
+      if (firstTurnFailure) return { ok: false, status: 503, code: "unavailable", error: firstTurnFailure };
       return { ok: true, pieces: (async function* () { return [{ id: "call-1", tool: "websearch", args: { expression: "when is the new avengers movie coming out" }, rawArgs: JSON.stringify({ expression: "when is the new avengers movie coming out" }) }]; })(), stats: { usage: null, timings: null, stopReason: null } };
     }
     const step = phrasing(++phrasingCalls, messages);
@@ -182,9 +183,9 @@ describe("the phrasing round after a context overflow", () => {
   });
 
   test("a minor gets the minor wording", async () => {
-    const turn = scriptTurn(() => ({ ok: false, error: `chat model unavailable: ${ENGINE_400}` }));
+    const turn = scriptTurn(() => ({ ok: false, error: `chat model unavailable: ${ENGINE_400}` }), `chat model unavailable: ${ENGINE_400}`);
     try {
-      const result = await runTurnNext(people.child, "chat", "when is the new avengers movie coming out");
+      const result = await runTurnNext(people.child, "chat", "tell me something fun");
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.reply.text).toBe(FAILURE_COPY.context_too_large.minor);
     } finally {

@@ -29,7 +29,7 @@ import { StreamSafetyRefusal, StreamUnavailable, type StreamOutcome, type Speake
 import * as llm from "@/lib/llm";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import type { TurnStreamEvent } from "@/wire";
-import { getPendingAsk, resolveOrCreateConversation } from "@/lib/conversationHistory";
+import { getPendingAsk, resolveOrCreateConversation, setPendingAsk } from "@/lib/conversationHistory";
 import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
 import { conversationTurns, conversations, memoryRecords, people as people_ } from "@/db/schema";
@@ -634,6 +634,7 @@ describe("turnNext.ts: consent and confirmation", () => {
     const ask = getPendingAsk(parked.value.conversation_id);
     expect(ask).not.toBeNull();
     expect(ask?.packageId).toBe("lock-doors");
+    expect(ask?.capabilities).toEqual(["home:lock"]);
 
     const resumed = await withStub({ reply: () => "unused" }, () => runTurnNext(people.owner, "chat", "yes", { conversationId: parked.value.conversation_id }));
     expect(resumed.ok).toBe(true);
@@ -646,6 +647,45 @@ describe("turnNext.ts: consent and confirmation", () => {
     // what conversationRunner.ts's scorer and any real client expect.
     expect(resumed.value.source).toBe("plugin");
     expect(resumed.value.plugin_id).toBe("lock-doors");
+  });
+
+  test("PARENT-ASK-01a: bedtime-storybook remains a child self-confirmation", async () => {
+    registerProjectType({ id: "bedtime-storybook", title: "Bedtime storybook", description: "A bedtime storybook.", minRole: "child", consequential: true, paramsSchema: { type: "object", required: ["topic"], properties: { topic: { type: "string" } }, additionalProperties: false }, buildPlan: () => ({ steps: [{ id: "a", kind: "text", needs: [], params: { role: "chat", promptTemplate: "write a gentle story", inputs: [] } }], ceilings: { maxWallSeconds: 30, maxGeneratorJobs: 1 } }) });
+    const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
+    const original = entry.turn_budget;
+    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, START_PROJECT_TOOL_ID] };
+    try {
+      const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === START_PROJECT_TOOL_ID) ? [{ id: "storybook", name: START_PROJECT_TOOL_ID, args: JSON.stringify({ type: "bedtime-storybook", params: { topic: "a moon rabbit" } }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "make a bedtime storybook about a moon rabbit"));
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.source).toBe("confirm");
+    } finally { entry.turn_budget = original; __resetProjectTypesForTests(); }
+  });
+
+  test("PARENT-ASK-01a: a child's family-name search is refused without claiming a parent was asked", async () => {
+    const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
+    const original = entry.turn_budget;
+    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "websearch"] };
+    try {
+      const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "websearch") ? [{ id: "search", name: "websearch", args: JSON.stringify({ expression: "Jesse Torres news" }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "search the web for Jesse Torres news"));
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+      expect(result.value.confirm).toBeUndefined();
+      expect(getPendingAsk(result.value.conversation_id)).toBeNull();
+    } finally { entry.turn_budget = original; }
+  });
+
+  test("PARENT-ASK-01a: a teen's yes cannot resume a legacy lock confirmation", async () => {
+    const actor = { ...people.child, role: "teen" };
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error("expected the teen conversation");
+    setPendingAsk(conversation.value.id, { kind: "confirm", prompt: "Lock the front door?", packageId: "lock-doors", args: {}, turnId: "legacy-lock-ask" });
+    const result = await withStub({ reply: () => "unused" }, () => runTurnNext(actor, "chat", "yes", { conversationId: conversation.value.id }));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected the refusal");
+    expect(result.code).toBe("parent_required");
+    expect(getPendingAsk(conversation.value.id)).toBeNull();
   });
 });
 
@@ -1403,7 +1443,7 @@ describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
     expect(allMessageText(request)).toContain("sentence");
   });
 
-  test("a teen's typed turn keeps today's limits: the written word budget as a token cap, 384 plain and 608 searched, and the 140-word line", async () => {
+  test("a teen's typed turn keeps today's 384-token cap and sentence line", async () => {
     const actor = await teen();
     let request: ChatCompletionRequest | undefined;
     const result = await withStub(
@@ -1416,15 +1456,6 @@ describe("turnNext.ts: THIN-1A, no word cap on an adult's written chat", () => {
     // through LAT-01's formula: ceil(220 * 1.6) + 32 = 384.
     expect(request?.max_tokens).toBe(384);
     expect(allMessageText(request)).toContain("sentence");
-
-    const searched = await searchedTurn(actor, "chat");
-    // The evidence-boosted row (360 words): ceil(360 * 1.6) + 32 = 608,
-    // and the spoken-class phrasing instruction with its own limits.
-    expect(searched.phrasingRequest?.max_tokens).toBe(608);
-    expect(await generationMaxTokens(searched.turnId)).toEqual([384, 608]);
-    const instruction = lastUserInstruction(searched.phrasingRequest);
-    expect(instruction).toContain("in one to three sentences");
-    expect(instruction).toContain("under 140 words");
   });
 
   test("a spoken adult turn keeps today's limits: the spoken act table, 128 tokens, and the 140-word line on a searched answer", async () => {
@@ -2084,28 +2115,23 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
     }
   });
 
-  test("THIN-1D: a child's and a teen's note is released through the gate as the model wrote it", async () => {
-    const searxng = startFakeSearxng();
-    setHouseholdSettingValue("search.searxng_url", searxng.url);
-    const childNote = "I couldn't check that, so I'm telling you what I remember: he was in Footloose.";
-    const teenNote = "Search wasn't working, so this is from memory: he was in Footloose.";
-    const ask = async (actor: typeof people.owner, note: string) =>
+  test("PARENT-ASK-01a: a child's and a teen's ordinary web searches wait for a parent", async () => {
+    const ask = (actor: typeof people.owner) =>
       withStub(
-        { calls: downCalls, reply: (request) => (answeringRound(request) ? note : "searching") },
+        { calls: downCalls, reply: () => "unused" },
         () => runTurnNext(actor, "chat", "what shows has kevin bacon been in"),
       );
-    try {
-      const child = await ask(people.child, childNote);
-      if (!child.ok || child.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(child.value.reply.text).toBe(childNote);
-      db.update(people_).set({ role: "teen" }).where(eq(people_.id, people.child.id)).run();
-      const teenActor = db.select().from(people_).where(eq(people_.id, people.child.id)).get()!;
-      const teen = await ask(teenActor, teenNote);
-      if (!teen.ok || teen.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(teen.value.reply.text).toBe(teenNote);
-    } finally {
-      searxng.stop();
-    }
+    const child = await ask(people.child);
+    if (!child.ok || child.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(child.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+    expect(child.value.confirm).toBeUndefined();
+
+    db.update(people_).set({ role: "teen" }).where(eq(people_.id, people.child.id)).run();
+    const teenActor = db.select().from(people_).where(eq(people_.id, people.child.id)).get()!;
+    const teen = await ask(teenActor);
+    if (!teen.ok || teen.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(teen.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+    expect(teen.value.confirm).toBeUndefined();
   });
 
   // THIN-1D (inverts the THIN-1B row): zero rows is a lookup that gave
@@ -2224,7 +2250,7 @@ describe("turnNext.ts: #168, a searched question is answered in the shape it cal
             return "Yes, they are still alive as of the most recent reports.";
           },
         },
-        () => runTurnNext(people.owner, surface, "is the person in the fixture still alive"),
+        () => runTurnNext(people.owner, surface, "is the person in the fixture still alive", surface === "robot" ? { speakerEvidence: { person: people.owner.id, basis: "voice", level: "confirmed" } } : undefined),
       );
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");

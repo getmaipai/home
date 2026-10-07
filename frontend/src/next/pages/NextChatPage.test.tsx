@@ -1290,7 +1290,7 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
   // THIN-5F (rule 9, closes CANVAS-READ-01): the pane renders the
   // document with the chat's own MarkdownText, so Markdown reads as a
   // page instead of raw lines.
-  test("desktop viewport: the canvas renders a document's Markdown (heading, list, table, link, code) with the chat's renderer", async () => {
+  test("desktop viewport: the canvas renders Markdown and leaves untrusted external links visible as text", async () => {
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
     artifactBodyOverride = [
@@ -1320,7 +1320,8 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
       expect(within(pane).getByRole("heading", { name: "Pizza night", level: 1 })).toBeTruthy();
       expect(within(pane).getAllByRole("listitem").map((item) => item.textContent)).toEqual(["dough", "sauce"]);
       expect(within(pane).getByRole("table")).toBeTruthy();
-      expect(within(pane).getByRole("link", { name: "the recipe" }).getAttribute("href")).toBe("https://example.com/recipe");
+      expect(within(pane).queryByRole("link", { name: "the recipe" })).toBeNull();
+      expect(pane.textContent).toContain("the recipe (https://example.com/recipe)");
       expect(pane.querySelector("code")?.textContent).toBe("oven");
       // Raw Markdown syntax never shows as text.
       expect(pane.textContent).not.toContain("# Pizza night");

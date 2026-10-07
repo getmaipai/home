@@ -1205,6 +1205,10 @@ export interface PendingAsk {
    * before this item or on any other kind, which keeps resuming by
    * typed/spoken text alone. */
   turnId?: string;
+  /** GATE-01: capabilities captured when this confirmation was created,
+   * re-decided at answer time against the speaker's current band. */
+  capabilities?: string[];
+  consequential?: boolean;
 }
 
 export function getPendingAsk(conversationId: string): PendingAsk | null {
