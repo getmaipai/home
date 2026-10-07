@@ -17,6 +17,8 @@ import { getTemporaryChatImage, readAttachmentForConversation } from "@/lib/atta
 import { getPersonSettingSource, getPersonSettingValue } from "@/lib/settings";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { cleanPictureName } from "@/lib/chatImageNote";
+import { decide } from "@/lib/gate/decide";
+import type { Role } from "@/middleware/auth";
 
 export interface ChatPictureCapability {
   /** The running chat model reads pictures, and the turn may send them. */
@@ -57,9 +59,15 @@ export async function chatModelReadsPictures(): Promise<ChatPictureCapability> {
  * and for a child only once a parent turned it on (child off by
  * default). A teen follows the same setting. */
 export function photoUploadsAllowed(actor: PersonRow, now = new Date()): boolean {
+  const band = speakerAgeBand(actor, now);
+  const gate = decide({
+    who: { personId: actor.id, role: actor.role as Role, band },
+    what: { capabilities: ["upload.photo"] },
+  });
+  if (gate.kind !== "allow_with_limits" || !gate.limits.includes("setting_gated")) return false;
   const settingOn = getPersonSettingValue(actor, "chat.photo_uploads") === true;
   if (!settingOn) return false;
-  if (speakerAgeBand(actor, now) === "child") return Boolean(getPersonSettingSource(actor.id, "chat.photo_uploads"));
+  if (band === "child") return Boolean(getPersonSettingSource(actor.id, "chat.photo_uploads"));
   return true;
 }
 
