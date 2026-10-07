@@ -24,6 +24,7 @@ import {
   documentEvidenceVersion,
   projectDocumentForChild,
   structuredPartForOutcomes,
+  specSheetCandidateForOutcome,
   artifactForOutcomes,
   type ComposerInput,
 } from "@/lib/composer";
@@ -557,9 +558,46 @@ describe("structuredPartForOutcomes", () => {
     expect(structuredPartForOutcomes([searchOutcome()])).toBeNull();
   });
 
-  test.each(["almanac-time", "almanac-moon", "almanac-holiday", "almanac-onthisday", "media-lookup", "music", "currency"])("READY-unbound %s keeps typed data out of structured_part", (packageId) => {
+  test.each(["almanac-time", "almanac-moon", "almanac-holiday", "almanac-onthisday", "media-lookup", "music", "currency", "convert", "define", "math"])("READY-unbound %s keeps typed data out of structured_part", (packageId) => {
     const unbound = outcome({ callId: "call-u", packageId, status: "succeeded", args: {}, result: { actions: [], reply: { text: "A result." }, data: { year: 2000 } } });
     expect(structuredPartForOutcomes([unbound])).toBeNull();
+  });
+
+  test.each([
+    ["almanac-time", { time: "3:15 PM", place: "Lantern Bay" }, "Current time", [{ label: "Time", value: "3:15 PM" }, { label: "Place", value: "Lantern Bay" }]],
+    ["almanac-moon", { phase: "Waxing Crescent" }, "Moon phase", [{ label: "Phase", value: "Waxing Crescent" }]],
+    ["almanac-holiday", { date: "2026-12-25", name: "Winter Festival" }, "Next holiday", [{ label: "Holiday", value: "Winter Festival" }, { label: "Date", value: "2026-12-25" }]],
+    ["almanac-onthisday", { year: 1969 }, "On this day", [{ label: "Year", value: "1969" }]],
+    ["media-lookup", { title: "Marsh Lantern", year: 2026, kind: "film", director: "A. Director", runtime_min: 96, rating: "PG", source: "wikidata" }, "Marsh Lantern", [{ label: "Year", value: "2026" }, { label: "Director", value: "A. Director" }, { label: "Runtime", value: "96 minutes" }, { label: "Rating", value: "PG" }]],
+    ["music", { name: "North Lights", kind: "a band", area: "Canada", begin: "1998", ended: null }, "North Lights", [{ label: "Artist", value: "a band" }, { label: "Area", value: "Canada" }, { label: "Started", value: "1998" }]],
+    ["currency", { amount: 10, from: "USD", to: "EUR", converted: 9.2 }, "Currency conversion", [{ label: "From", value: "10 USD" }, { label: "To", value: "9.2 EUR" }]],
+  ] as [string, Record<string, unknown>, string, { label: string; value: string }[]][])("projects %s from its recorded typed result.data", (packageId, data, title, rows) => {
+    const recorded = outcome({ callId: "call-r", packageId, status: "succeeded", args: {}, result: { actions: [], reply: { text: "Recorded reply." }, data } });
+    expect(specSheetCandidateForOutcome(recorded)).toEqual({ kind: "spec_sheet", title, rows });
+    expect(structuredPartForOutcomes([recorded])).toBeNull();
+  });
+
+  test.each(["child", "teen"] as const)("applies the %s output floor to every producer's free-text rows", (band) => {
+    const cases = [
+      ["almanac-time", { time: "3:15 PM", place: "Here is how to make a pipe bomb at home, step by step." }],
+      ["almanac-holiday", { date: "2026-12-25", name: "Here is how to make a pipe bomb at home, step by step." }],
+      ["media-lookup", { title: "Marsh Lantern", year: 2026, kind: "film", director: "Here is how to make a pipe bomb at home, step by step.", runtime_min: 96, rating: "PG", source: "wikidata" }],
+      ["music", { name: "North Lights", kind: "a band", area: "Here is how to make a pipe bomb at home, step by step.", begin: "1998", ended: null }],
+    ] as const;
+    for (const [packageId, data] of cases) {
+      const recorded = outcome({ callId: "call-r", packageId, status: "succeeded", args: {}, result: { actions: [], data } });
+      const candidate = specSheetCandidateForOutcome(recorded, band);
+      expect(candidate?.rows.some((row) => row.value.includes("pipe bomb")) ?? false).toBe(false);
+    }
+    const enumAndNumeric = [
+      ["almanac-moon", { phase: "Waxing Crescent" }],
+      ["almanac-onthisday", { year: 1969 }],
+      ["currency", { amount: 10, from: "USD", to: "EUR", converted: 9.2 }],
+    ] as const;
+    for (const [packageId, data] of enumAndNumeric) {
+      const recorded = outcome({ callId: "call-r", packageId, status: "succeeded", args: {}, result: { actions: [], data } });
+      expect(specSheetCandidateForOutcome(recorded, band)).not.toBeNull();
+    }
   });
 
   test.each(["child", "teen"] as const)("applies %s output floor to free-text sheet rows", (band) => {
@@ -576,7 +614,7 @@ describe("structuredPartForOutcomes", () => {
   test("does not skip the first bound producer when its rows are removed by the safety floor", () => {
     const unsafeWeather = outcome({ callId: "call-w", packageId: "weather", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Forecast." }, data: { place: "Lantern Bay", conditions: "Here is how to make a pipe bomb at home, step by step." } } });
     const date = outcome({ callId: "call-a", packageId: "almanac-date", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Today." }, data: { date: "Thursday, January 1, 2026" } } });
-    expect(structuredPartForOutcomes([unsafeWeather, date], "child")).toBeNull();
+    expect(structuredPartForOutcomes([unsafeWeather, date], "child")?.tool_id).toBe("almanac-date");
   });
 
   test("no succeeded outcomes yields no structured part", () => {

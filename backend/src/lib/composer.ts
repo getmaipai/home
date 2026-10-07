@@ -39,6 +39,15 @@ import type { StructuredPart } from "@/wire";
 import { evaluateSafety, forOutput } from "@/lib/safety";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
+import { SPEC_SHEET_BOUND, SPEC_SHEET_READY } from "@/lib/structuredPartIds";
+
+type AlmanacTimeData = { time: string; place: string | null };
+type AlmanacMoonData = { phase: string };
+type AlmanacHolidayData = { date: string; name: string };
+type AlmanacOnThisDayData = { year: number };
+type MediaLookupData = { title: string; year: number | null; kind: "film" | "tv"; director: string | null; runtime_min: number | null; rating: string | null; source: "wikidata" };
+type MusicData = { name: string; kind: string; area: string | null; begin: string | null; ended: string | null };
+type CurrencyData = { amount: number; from: string; to: string; converted: number };
 
 /** The fixed line for a data-only result the composer could not phrase
  * (the model failed, or the budget was spent with no direct reply). */
@@ -587,13 +596,102 @@ export function projectDocumentForChild(document: TurnArtifactValue): ChildTurnA
 export function structuredPartForOutcomes(outcomes: readonly ToolExecutionOutcome[], band: AgeBand = "adult"): StructuredPart | null {
   const succeeded = outcomes.filter((outcome): outcome is Succeeded => outcome.status === "succeeded");
   for (const outcome of succeeded) {
-    const part = outcome.packageId === "weather" ? weatherSpecSheet(outcome) : outcome.packageId === "almanac-date" ? almanacDateSpecSheet(outcome) : null;
+    if (!SPEC_SHEET_BOUND.has(outcome.packageId as "weather" | "almanac-date")) continue;
+    const part = specSheetCandidateForOutcome(outcome, band);
     if (part) {
-      const rows = part.rows.filter((row) => forOutput(evaluateSafety(row.value, band)).action !== "refuse");
-      return rows.length ? { ...part, rows, tool_id: outcome.packageId } : null;
+      return { ...part, tool_id: outcome.packageId };
     }
   }
   return null;
+}
+
+/** Maps the typed result.data value for a ready producer. This candidate
+ * mapper is also tested independently; structuredPartForOutcomes is the
+ * sole turn-path caller and gates candidates through SPEC_SHEET_BOUND. */
+export function specSheetCandidateForOutcome(outcome: ToolExecutionOutcome, band: AgeBand = "adult"): Omit<StructuredPart, "tool_id"> | null {
+  if (outcome.status !== "succeeded") return null;
+  let candidate: Omit<StructuredPart, "tool_id"> | null = null;
+  if (outcome.packageId === "weather") candidate = weatherSpecSheet(outcome as Succeeded);
+  else if (outcome.packageId === "almanac-date") candidate = almanacDateSpecSheet(outcome as Succeeded);
+  else if (!SPEC_SHEET_READY.has(outcome.packageId as (typeof SPEC_SHEET_READY extends Set<infer T> ? T : never))) return null;
+  if (candidate) return floorSpecSheet(candidate, band);
+  const data = recordData(outcome.result?.data);
+  if (!data) return null;
+  switch (outcome.packageId) {
+    case "almanac-time": {
+      const value = data as unknown as AlmanacTimeData;
+      if (typeof value.time !== "string" || (value.place !== null && typeof value.place !== "string")) return null;
+      candidate = { kind: "spec_sheet", title: "Current time", rows: [
+        { label: "Time", value: value.time },
+        ...(value.place ? [{ label: "Place", value: value.place }] : []),
+      ] };
+      break;
+    }
+    case "almanac-moon": {
+      const value = data as unknown as AlmanacMoonData;
+      if (typeof value.phase !== "string") return null;
+      candidate = { kind: "spec_sheet", title: "Moon phase", rows: [{ label: "Phase", value: value.phase }] }; break;
+    }
+    case "almanac-holiday": {
+      const value = data as unknown as AlmanacHolidayData;
+      if (typeof value.name !== "string" || typeof value.date !== "string") return null;
+      candidate = { kind: "spec_sheet", title: "Next holiday", rows: [
+        { label: "Holiday", value: value.name },
+        { label: "Date", value: value.date },
+      ] };
+      break;
+    }
+    case "almanac-onthisday": {
+      const value = data as unknown as AlmanacOnThisDayData;
+      if (typeof value.year !== "number" || !Number.isFinite(value.year)) return null;
+      candidate = { kind: "spec_sheet", title: "On this day", rows: [{ label: "Year", value: String(value.year) }] }; break;
+    }
+    case "media-lookup": {
+      const value = data as unknown as MediaLookupData;
+      if (typeof value.title !== "string" || (value.year !== null && typeof value.year !== "number") ||
+        (value.director !== null && typeof value.director !== "string") ||
+        (value.runtime_min !== null && typeof value.runtime_min !== "number") ||
+        (value.rating !== null && typeof value.rating !== "string")) return null;
+      candidate = { kind: "spec_sheet", title: value.title, rows: [
+        ...(value.year === null ? [] : [{ label: "Year", value: String(value.year) }]),
+        ...(value.director === null ? [] : [{ label: "Director", value: value.director }]),
+        ...(value.runtime_min === null ? [] : [{ label: "Runtime", value: `${value.runtime_min} minutes` }]),
+        ...(value.rating === null ? [] : [{ label: "Rating", value: value.rating }]),
+      ] };
+      break;
+    }
+    case "music": {
+      const value = data as unknown as MusicData;
+      if (typeof value.name !== "string" || typeof value.kind !== "string" ||
+        (value.area !== null && typeof value.area !== "string") ||
+        (value.begin !== null && typeof value.begin !== "string") ||
+        (value.ended !== null && typeof value.ended !== "string")) return null;
+      candidate = { kind: "spec_sheet", title: value.name, rows: [
+        { label: "Artist", value: value.kind },
+        ...(value.area === null ? [] : [{ label: "Area", value: value.area }]),
+        ...(value.begin === null ? [] : [{ label: "Started", value: value.begin }]),
+        ...(value.ended === null ? [] : [{ label: "Ended", value: value.ended }]),
+      ] };
+      break;
+    }
+    case "currency": {
+      const value = data as unknown as CurrencyData;
+      if (typeof value.amount !== "number" || typeof value.from !== "string" || typeof value.to !== "string" || typeof value.converted !== "number") return null;
+      candidate = { kind: "spec_sheet", title: "Currency conversion", rows: [
+        { label: "From", value: `${value.amount} ${value.from}` },
+        { label: "To", value: `${value.converted} ${value.to}` },
+      ] };
+      break;
+    }
+    default:
+      return null;
+  }
+  return candidate ? floorSpecSheet(candidate, band) : null;
+}
+
+function floorSpecSheet(part: Omit<StructuredPart, "tool_id">, band: AgeBand): Omit<StructuredPart, "tool_id"> | null {
+  const rows = part.rows.filter((row) => forOutput(evaluateSafety(row.value, band)).action !== "refuse");
+  return rows.length ? { ...part, rows } : null;
 }
 
 /** ARTIFACT-02: `TurnValue.artifact`'s own writer (wire.ts's own comment
