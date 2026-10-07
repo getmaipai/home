@@ -36,9 +36,6 @@
     "GroupLabel",
     "AppsGroup"
   ],
-  "apps/chat/composerDictationWaveform.tsx": [
-    "ComposerDictationWaveform"
-  ],
   "shell/pages/ChatColumn.tsx": [
     "ChatColumnToggle",
     "ChatHistoryPanel"

@@ -30,6 +30,7 @@ import { GenerationLoader } from "@maipai/ui/src/elements/loading-state";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
+import { ComposerModelPicker } from "@maipai/ui/src/elements/composer-model-picker.aui";
 import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
 import { RegenerateMenu } from "@maipai/ui/src/elements/regenerate-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
@@ -170,8 +171,24 @@ export const MODEL_EFFORTS = [{ id: "instant", name: "Instant" }, { id: "thinkin
 export function ComposerTrailingWithThinkingMode() {
   const { mode, setMode } = useContext(ThinkingModeContext);
   const capability = useContext(ThinkingModeCapabilityContext);
+  const band = useContext(ChatAgeBandContext);
+  const modelChoiceAllowed = useContext(ModelChoiceAllowedContext);
+  const { models, value, setValue } = useContext(ModelPickerContext);
+  const selected = models.find((model) => model.id === value) ?? models[0];
+  const composerModels = models.map((model) => ({ name: model.name, meta: model.description ?? model.id }));
   return (
     <>
+      {band === "adult" && modelChoiceAllowed && models.length >= 2 && selected ? (
+        <ComposerModelPicker
+          key={selected.id}
+          models={composerModels}
+          defaultModel={selected.name}
+          onChange={(name) => {
+            const choice = models.find((model) => model.name === name);
+            if (choice) setValue(choice.id);
+          }}
+        />
+      ) : null}
       {capability === "none" || capability === "always" ? (
         <ModelSelectorRoot
           models={[{ id: "mode", name: capability === "always" ? "Thinking" : "Instant" }]}

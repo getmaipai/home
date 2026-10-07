@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, jest, test } from "bun:test";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { AssistantRuntimeProvider, ComposerPrimitive, useLocalRuntime, type ChatModelAdapter, type DictationAdapter } from "@assistant-ui/react";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { ComposerDictationWaveform, DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
@@ -92,41 +92,40 @@ describe("ComposerDictationWaveform", () => {
     await waitFor(() => expect(runs).toBe(1));
   });
 
-  test("dictating: swaps to a fixed row of bars, at their resting height, and the real input is gone", async () => {
-    const { getByText, getAllByTestId, queryByLabelText } = render(<Harness meter={null} />);
+  test("dictating: uses the shipped voice-level Element and the real input is gone", async () => {
+    const { getByText, container, queryByLabelText } = render(<Harness meter={null} />);
     fireEvent.click(getByText("Start dictation"));
-    await waitFor(() => expect(getAllByTestId("dictation-bar")).toHaveLength(24));
-    for (const bar of getAllByTestId("dictation-bar")) expect(bar.style.height).toBe("8%");
+    await waitFor(() => expect(container.querySelector('[data-slot="composer-voice-levels"]')).not.toBeNull());
+    expect(container.querySelectorAll('[data-slot="composer-voice-levels"] [data-bar]')).toHaveLength(14);
+    expect(container.querySelector('[data-slot="composer-voice-levels"]')?.getAttribute("data-recording")).toBe("true");
     expect(queryByLabelText("Message input")).toBeNull();
   });
 
   test("the accessible text is present once dictating, even before the bars have anything to show", async () => {
-    const { getByText } = render(<Harness meter={null} />);
+    const { getByText, getByRole } = render(<Harness meter={null} />);
     fireEvent.click(getByText("Start dictation"));
-    await waitFor(() => expect(getByText("Listening")).toBeDefined());
+    await waitFor(() => expect(getByRole("status", { name: "Listening" })).toBeDefined());
   });
 
-  test("colors the bars from the design token", async () => {
-    document.documentElement.style.setProperty("--color-primary", "rgb(1, 2, 3)");
-    const { getByText, getAllByTestId } = render(<Harness meter={null} />);
-    fireEvent.click(getByText("Start dictation"));
-    await waitFor(() => expect(getAllByTestId("dictation-bar")).toHaveLength(24));
-    for (const bar of getAllByTestId("dictation-bar")) expect(bar.style.backgroundColor).toBe("rgb(1, 2, 3)");
-  });
-
-  test("falls back to a real color when the token isn't resolvable (never an empty barColor)", async () => {
-    const { getByText, getAllByTestId } = render(<Harness meter={null} />);
-    fireEvent.click(getByText("Start dictation"));
-    await waitFor(() => expect(getAllByTestId("dictation-bar")).toHaveLength(24));
-    for (const bar of getAllByTestId("dictation-bar")) expect(bar.style.backgroundColor).toBeTruthy();
-  });
-
-  test("bars animate from the live meter's own read() once one is in context", async () => {
+  test("voice levels use the live meter's own read()", async () => {
     const meter = fakeLevelMeter(() => 0.5);
-    const { getByText, getAllByTestId } = render(<Harness meter={meter} />);
+    const { getByText, container } = render(<Harness meter={meter} />);
     fireEvent.click(getByText("Start dictation"));
     // The poll interval is 60ms - wait past a few ticks so the rolling
     // window has shifted the fake meter's own 0.5 reading all the way in.
-    await waitFor(() => expect(getAllByTestId("dictation-bar").some((bar) => bar.style.height === "50%")).toBe(true), { timeout: 1000 });
+    await waitFor(() => expect(Array.from(container.querySelectorAll('[data-slot="composer-voice-levels"] [data-bar]')).some((bar) => (bar as HTMLElement).style.height === "13.5px")).toBe(true), { timeout: 1000 });
+  });
+
+  test("the kit voice-level timer advances once a second", async () => {
+    jest.useFakeTimers();
+    try {
+      const { getByText, getByRole } = render(<Harness meter={null} />);
+      fireEvent.click(getByText("Start dictation"));
+      await waitFor(() => expect(getByRole("status", { name: "Listening" }).textContent).toContain("0:00"));
+      act(() => jest.advanceTimersByTime(3_000));
+      expect(getByRole("status", { name: "Listening" }).textContent).toContain("0:03");
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

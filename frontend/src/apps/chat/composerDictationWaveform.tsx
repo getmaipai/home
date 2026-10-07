@@ -1,8 +1,8 @@
 "use client";
 
 // VOICE-LIVE-04: while dictation records, the composer's own text field
-// gives way to a live bar waveform of the microphone (ChatGPT's own
-// dictation look). Mounted as ChatPage.tsx's own
+// gives way to the shipped ComposerVoiceLevels Element, fed by the live
+// microphone analyser. Mounted as ChatPage.tsx's own
 // `ComposerInputOverride` (VOICE-LIVE-04b, ui-v0.5.40 - the vendored
 // kit's own slot cut for exactly this, `elements/thread.aui.tsx`'s own
 // Composer; /chat's real composer lives there, never in this
@@ -14,39 +14,25 @@
 // bundled dev-mode `react-jsx-runtime` shim reads an internals shape
 // React 19 removed), and the package has had no release since 2024-09 to
 // fix it. Named as a gap, this uses the platform standard's own fallback
-// instead: the smallest composition of already-shipped parts - the
-// native `AnalyserNode`, through `audioLevelMeter.ts`, the identical
-// mechanism VOICE-LIVE-02's live voice session already proved, polled on
-// the same 60ms interval that file already uses, into a short rolling
-// window of recent levels drawn as bars. Never a second `getUserMedia`
-// call: `sttDictationAdapter.ts` builds the meter over the exact stream
-// its own real capture pipeline already opened.
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { useAui, useAuiState } from "@assistant-ui/react";
+// instead: `sttDictationAdapter.ts` builds the meter over the exact stream
+// its own real capture pipeline already opened, and this slot reads it on
+// the same 60ms interval as before. There is no second getUserMedia call.
+import { createContext, useContext, useEffect, useState } from "react";
+import { useAuiState } from "@assistant-ui/react";
 import { ComposerInputField } from "@maipai/ui/src/elements/thread.aui";
+import { ComposerVoiceLevels } from "@maipai/ui/src/elements/composer-voice.aui";
 import { DraftRestore } from "@maipai/ui/src/elements/draft-restore";
 import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
-import { DraftConversationContext, TemporaryChatContext } from "@/apps/chat/chatThreadContexts";
+import { useComposerDraftRestore } from "@/apps/chat/composerDraftRestore";
 import { PageContext } from "@/shell/pages/chatProjectPageContext";
-import { DRAFT_DELAY_MS, discardDraft, readDraft, saveDraft, type ChatDraft } from "@/apps/chat/draftStore";
 
 const DictationLevelMeterContext = createContext<LevelMeter | null>(null);
 
 export const DictationLevelMeterProvider = DictationLevelMeterContext.Provider;
 
-/** Read once per mount, not watched live - `tokens.css`'s dark mode is a
- * synchronous `.dark` class swap, not a media query, so whatever is on
- * `documentElement` when a dictation session actually starts recording
- * (this component's own mount, gated by a real `LevelMeter` existing) is
- * already the real value; a theme flip mid-dictation is not a case
- * worth a MutationObserver for. */
-function readColorToken(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-}
-
-const BAR_COUNT = 24;
 const POLL_MS = 60;
+const LEVEL_COUNT = 24;
 
 /** Mounted as the vendored kit's own `ComposerInputOverride` slot
  * (`@maipai/ui/src/elements/thread.aui`, ui-v0.5.40) - that slot, once
@@ -59,41 +45,29 @@ const POLL_MS = 60;
  * same condition the kit's own Composer already uses to swap the mic
  * button to Stop) picks the waveform or a real `ComposerPrimitive.Input`,
  * styled identically to the kit's own default so normal typing looks
- * unchanged. The bars: a sized wrapper renders immediately at the text
- * field's own height, so the swap never collapses the composer's layout;
- * the bars themselves appear a beat later, once `sttDictationAdapter.ts`'s
- * `onLevelMeter` hands this a real meter (the brief socket handshake
- * before the server's own "ready"). */
+ * unchanged. The kit's ComposerVoiceLevels owns the recording presentation;
+ * analyser readings appear once `sttDictationAdapter.ts`'s `onLevelMeter`
+ * hands this slot a real meter (the brief socket handshake before the
+ * server's own "ready"). */
 export function ComposerDictationWaveform() {
   const dictating = useAuiState((s) => s.composer.dictation != null);
-  const text = useAuiState((s) => s.composer.text);
-  const id = useContext(DraftConversationContext);
-  const temporary = useContext(TemporaryChatContext).on;
   const projectPage = useContext(PageContext);
-  const aui = useAui();
   const meter = useContext(DictationLevelMeterContext);
   const held = useContext(ChatAvailabilityContext) !== "ready";
-  const [colors] = useState(() => ({ bar: readColorToken("--color-primary") || "rgb(160, 198, 255)" }));
-  const hadText = useRef(false);
-  // A rolling window of recent levels, oldest first - each render tick
-  // shifts one out and pushes the meter's current read in, the classic
-  // "recent history" bar look (RECALL each bar is a time-slice, not a
-  // frequency bin - a real spectrum needs its own AnalyserNode reads,
-  // which is exactly what this already is, one bin at a time).
-  const [levels, setLevels] = useState<number[]>(() => Array(BAR_COUNT).fill(0));
-  const [savedDraft, setSavedDraft] = useState<ChatDraft | null>(() => temporary ? null : readDraft(id));
-  useEffect(() => setSavedDraft(temporary ? null : readDraft(id)), [id, temporary]);
+  const draftRestore = useComposerDraftRestore();
+  const [levels, setLevels] = useState<number[]>(() => Array(LEVEL_COUNT).fill(0));
+  const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
-    if (temporary || !id) return;
-    if (!text) {
-      if (hadText.current) discardDraft(id);
+    if (!dictating) {
+      setSeconds(0);
       return;
     }
-    hadText.current = true;
-    const timer = setTimeout(() => { saveDraft(id, text); setSavedDraft(null); }, DRAFT_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [id, temporary, text]);
+    const startedAt = Date.now();
+    setSeconds(0);
+    const timer = setInterval(() => setSeconds(Math.floor((Date.now() - startedAt) / 1_000)), 1_000);
+    return () => clearInterval(timer);
+  }, [dictating]);
 
   useEffect(() => {
     // Gated on `dictating` too, not just `meter` - a review caught this:
@@ -102,7 +76,7 @@ export function ComposerDictationWaveform() {
     // on a component currently showing plain text, every time dictation
     // ended but the previous meter reference hadn't changed identity yet.
     if (!dictating || !meter) {
-      setLevels(Array(BAR_COUNT).fill(0));
+      setLevels(Array(LEVEL_COUNT).fill(0));
       return;
     }
     const timer = setInterval(() => {
@@ -124,27 +98,10 @@ export function ComposerDictationWaveform() {
       submitMode={held ? "none" : undefined}
       onKeyDown={held ? (event) => { if (event.key === "Enter" && !event.shiftKey) event.preventDefault(); } : undefined}
     />
-  ) : (
-    // w-full, not flex-1: the kit's own composer-shell is flex-col (the
-    // attachments row, this input row, the action row stacked
-    // vertically), so flex-1's own flex-basis: 0% fights `h-12` for the
-    // vertical dimension and wins - found live, the bars' real DOM
-    // values (getBoundingClientRect, not just the inline style) showed
-    // this whole wrapper computing to a genuine 0px height. `w-full`
-    // is the same horizontal-growth approach the kit's own Input
-    // already uses in this exact spot.
-    <div className="flex h-12 w-full items-center px-1">
-      <span className="sr-only">Listening</span>
-      <div aria-hidden="true" className="flex h-full min-w-0 flex-1 items-center gap-[2px] overflow-hidden">
-        {levels.map((level, index) => (
-          <div key={index} data-testid="dictation-bar" className="min-w-[3px] flex-1 rounded-full transition-[height] duration-75" style={{ height: `${Math.max(8, level * 100)}%`, backgroundColor: colors.bar }} />
-        ))}
-      </div>
-    </div>
-  );
+  ) : <ComposerVoiceLevels levels={levels} recording={dictating} seconds={seconds} role="status" aria-label="Listening" />;
   return (
     <>
-      {!temporary && savedDraft && !text ? <DraftRestore draft={savedDraft.text} savedAt={savedDraft.savedAt} onRestore={() => { aui.composer.setText(savedDraft.text); setSavedDraft(null); }} onDiscard={() => { discardDraft(id); setSavedDraft(null); }} /> : null}
+      {draftRestore ? <DraftRestore {...draftRestore} /> : null}
       {input}
     </>
   );
