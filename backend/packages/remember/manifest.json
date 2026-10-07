@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Remember",
   "description": "Remember a fact you tell it, for later.",
+  "offer": {"mode":"base","priority":4},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

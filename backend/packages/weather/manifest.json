@@ -17,19 +17,26 @@
       "how's the weather in Miami today",
       "is it going to rain in Portland today"
     ],
-    "patterns": ["what's the weather in *", "weather in *", "how's the weather in *", "what's the weather like in *", "is it going to rain in *", "will it rain in *"]
+    "patterns": []
   },
   "args": {
     "type": "object",
-    "required": ["place"],
+    "required": [
+      "place"
+    ],
     "properties": {
-      "place": { "type": "string", "minLength": 1 }
+      "place": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   },
-  "incognito": "unaffected",
   "requires": [],
   "optional": [],
-  "platforms": ["home", "bot"],
+  "platforms": [
+    "home",
+    "bot"
+  ],
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
@@ -45,17 +52,50 @@
       "retention": "unknown, see Open-Meteo's own policy"
     }
   ],
-  "permissions": ["net:geocoding-api.open-meteo.com", "net:api.open-meteo.com"],
+  "permissions": [
+    "net:geocoding-api.open-meteo.com",
+    "net:api.open-meteo.com"
+  ],
   "notifications": [],
-  "cache": { "key_template": "weather:{place}", "ttl_s": 1800, "stale_ok_s": 3600, "max_bytes": 4096 },
-  "warm": { "schedule": "every:1h", "keys": [{ "place": "Seattle" }] },
+  "cache": {
+    "key_template": "weather:{place}",
+    "ttl_s": 1800,
+    "stale_ok_s": 3600,
+    "max_bytes": 4096
+  },
+  "warm": {
+    "schedule": "every:1h",
+    "keys": [
+      {
+        "place": "Seattle"
+      }
+    ]
+  },
   "backup": "exclude",
   "background": false,
   "contributes": {
-    "widgets": [{ "id": "current", "title": "Weather", "size": "card", "refresh_s": 1800, "inputs": { "place": "Seattle" } }]
+    "widgets": [
+      {
+        "id": "current",
+        "title": "Weather",
+        "size": "card",
+        "refresh_s": 1800,
+        "inputs": {
+          "place": "Seattle"
+        }
+      }
+    ]
   },
   "min_app": "0.1.0",
   "tier": 0,
   "quality_scale": "bronze",
-  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  },
+  "incognito": "unaffected",
+  "offer": {
+    "mode": "base",
+    "priority": 8
+  }
 }

@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Math",
   "description": "Calculate a math expression.",
+  "offer": {"mode":"base","priority":3},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

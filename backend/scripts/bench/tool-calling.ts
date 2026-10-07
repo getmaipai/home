@@ -34,6 +34,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 import { SPEC_DIR } from "@/lib/specDir";
 import { CATALOG } from "@/lib/modelCatalog";
+import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import answerImageRows from "./datasets/answer-images.json";
 import routeDataset from "./datasets/chat-ab-01.json";
 import { contextToMessages } from "@/lib/turnMachine/messages";
@@ -115,9 +116,8 @@ const WRITE_DOCUMENT_ROWS: ToolCallCorpusRow[] = [
 const EXTRA_OFFERED = (process.env.MAIPAI_BENCH_OFFER ?? "").split(",").map((id) => id.trim()).filter(Boolean);
 
 function budgetOfferedTools(): ToolSpec[] {
-  const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
-  if (!entry?.turn_budget) throw new Error("qwen3-8b-instruct-q4-k-m has no turn_budget in modelCatalog.ts");
-  return [...new Set([...(entry.turn_budget.tools_offered ?? []), ...EXTRA_OFFERED])]
+  const budget = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+  return [...new Set([...budget.tools_offered, ...EXTRA_OFFERED])]
     .slice()
     .sort()
     .map((id) => {
@@ -240,7 +240,7 @@ async function routeDecisionPass(): Promise<{ executed: number; engine: string }
   const thinking = process.env.MAIPAI_BENCH_THINKING === "on";
   const schema = process.env.MAIPAI_BENCH_WEBSEARCH_SCHEMA ?? "current";
   if (!["current", "query"].includes(schema)) throw new Error("MAIPAI_BENCH_WEBSEARCH_SCHEMA must be current or query");
-  const offeredTools = catalog.turn_budget.tools_offered ?? [];
+  const offeredTools = resolveTurnBudget(catalog.id, "adult").tools_offered;
   const arm = process.env.MAIPAI_BENCH_ARM ?? (thinking ? "A1" : modelId?.includes("qwen3-vl") ? (sampling === "nodrx" ? "A2n" : "A2") : sampling === "nodrx" ? "A0n" : "A0");
   const { toolSpecFor } = await import("@/lib/turnMachine/nodes/model");
   const tools = offeredTools.slice().sort().map((id) => {

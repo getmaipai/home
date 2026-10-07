@@ -26,7 +26,7 @@ import { resolvePersona } from "@/lib/persona";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { planFor } from "@/lib/register";
-import { CATALOG } from "@/lib/modelCatalog";
+import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import { getEngineStatus } from "@/lib/llmSupervisor";
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import { buildStages, hasHeadings, hasLists, type Stage } from "./parity-bisect-stages";
@@ -92,9 +92,7 @@ async function main() {
   };
   const plan = planFor({ ...planBasis, evidence: { choices: 0, sources: 0, deliverable: false } });
 
-  const catalogEntry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m" && m.role === "chat");
-  if (!catalogEntry?.turn_budget) throw new Error("qwen3-8b-instruct-q4-k-m has no turn_budget in the catalog");
-  const budget = catalogEntry.turn_budget;
+  const budget = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
   // start_project (PROJECT-START-01) is a virtual tool with no
   // backend/packages manifest on disk (lib/projects/tool.ts's own
   // header) - the same shape nodes/model.ts's own toolSpecFor() special-

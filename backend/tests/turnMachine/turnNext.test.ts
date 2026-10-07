@@ -36,7 +36,7 @@ import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
 import { conversationTurns, conversations, memoryRecords, people as people_ } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
+import { NO_RECORD_BUDGET, __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 import { FAILURE_COPY, partialReplyNote } from "@/lib/generationFailure";
@@ -96,6 +96,10 @@ async function withStub<T>(
   opts: { reply?: (request: ChatCompletionRequest) => string; calls?: (request: ChatCompletionRequest) => { id: string; name: string; args: string }[] | undefined },
   fn: () => Promise<T>,
 ): Promise<T> {
+  // Older fixtures mutate the catalog's deprecated list to force one tool.
+  // Translate that fixture intent to the derivation's test-only override.
+  const forced = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")?.turn_budget?.tools_offered ?? [];
+  __setToolOfferOverridesForTests(forced);
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
   const stub = startStubLlmServer(0, {
     scriptedChatReply: opts.reply,
@@ -116,6 +120,7 @@ async function withStub<T>(
   try {
     return await fn();
   } finally {
+    __setToolOfferOverridesForTests(null);
     proxy.stop();
     await stub.stop();
   }

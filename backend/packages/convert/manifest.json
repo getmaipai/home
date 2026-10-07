@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Convert",
   "description": "Convert between units of length, weight, temperature, and volume.",
+  "offer": {"mode":"base","priority":2},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

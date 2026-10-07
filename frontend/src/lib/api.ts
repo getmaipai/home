@@ -352,6 +352,8 @@ export interface SkillRow {
   status: "enabled" | "disabled";
   /** Offered in the signed-in person's written chat today. */
   used_in_chat: boolean;
+  /** Explicit reason a package tool is not offered, when known. */
+  offer_label: string | null;
 }
 
 // GET /api/store/installs/:id's response (backend/src/routes/store.ts's

@@ -4,9 +4,9 @@
 // once with a fixed line, fetches beside the answer, and the `images` event
 // lands at a paragraph boundary of released text (never above it); the stored
 // turn carries the same set; a failed fetch places nothing and the answer is
-// whole. The model's own catalog record still leaves the tool out
-// (ANSWER-IMG-05 turns it on), so these tests offer it the way the record will.
-import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+// whole. The manifest offer policy currently keeps the tool off after its
+// measured recall remained below the offering bar; pipeline tests inject it.
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { AssistantStream, DataStreamDecoder, type AssistantStreamChunk } from "assistant-stream";
 import { resetDb } from "../reset-db";
@@ -16,7 +16,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
-import * as budgetModule from "@/lib/turnMachine/budget";
+import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { streamTurnEvents } from "@/routes/turn";
 import { listConversationTurns } from "@/lib/conversationHistory";
 import { __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
@@ -58,13 +58,10 @@ afterEach(() => {
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
 
-/** The model's record offering show_images, as ANSWER-IMG-05 will make it. */
+/** Makes the normally-off candidate available for the answer-image pipeline tests. */
 function offerShowImages(): void {
-  const original = budgetModule.resolveTurnBudgetWithStack;
-  restore.push(spyOn(budgetModule, "resolveTurnBudgetWithStack").mockImplementation(async (...args) => {
-    const budget = await original(...args);
-    return { ...budget, tools_offered: [...budget.tools_offered, "show_images"] };
-  }));
+  __setToolOfferOverridesForTests(["show_images"]);
+  restore.push({ mockRestore: () => __setToolOfferOverridesForTests(null) });
 }
 
 const toolNames = (request: ChatCompletionRequest | undefined) => (request?.tools ?? []).map((t) => (t as { function: { name: string } }).function.name);
@@ -102,41 +99,32 @@ describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
     return names;
   }
 
-  test("offered on an adult's written chat when the model's record offers it", async () => {
-    offerShowImages();
-    expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "what does the Eiffel Tower look like"))).toContain("show_images");
-  });
-
-  test("the record leaves it out until ANSWER-IMG-05: not offered by default", async () => {
+  test("the off policy keeps it out even when answer images are otherwise allowed", async () => {
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "what does the Eiffel Tower look like"))).not.toContain("show_images");
   });
 
   test("never offered on a spoken turn, a glance surface or a temporary chat", async () => {
-    offerShowImages();
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "who is the president of chile", { spoken: true }))).not.toContain("show_images");
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "overlay", "who is the president of chile"))).not.toContain("show_images");
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "who is the president of chile", { temporary: true }))).not.toContain("show_images");
   });
 
-  test("a child is off by default, a parent turns it on, and the child cannot turn it on themselves", async () => {
-    offerShowImages();
+  test("a child's preference can be parent-set but cannot override the off offer policy", async () => {
     expect(await toolsSeen(people.child, (a) => runTurnNext(a, "chat", "what does a koala look like"))).not.toContain("show_images");
     expect(setValue(people.child, `person:${people.child.id}`, "reference.images", true).ok).toBe(false);
     expect(setValue(people.owner, `person:${people.child.id}`, "reference.images", true).ok).toBe(true);
-    expect(await toolsSeen(people.child, (a) => runTurnNext(a, "chat", "what does a koala look like"))).toContain("show_images");
+    expect(await toolsSeen(people.child, (a) => runTurnNext(a, "chat", "what does a koala look like"))).not.toContain("show_images");
   });
 
   test("an adult who turned pictures off is not offered the tool", async () => {
-    offerShowImages();
     expect(setValue(people.owner, `person:${people.owner.id}`, "reference.images", false).ok).toBe(true);
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "what does the Eiffel Tower look like"))).not.toContain("show_images");
   });
 
-  test("a teen is on by default", async () => {
-    offerShowImages();
+  test("teen picture preferences do not override the off offer policy", async () => {
     db.update(peopleTable).set({ role: "teen" }).where(eq(peopleTable.id, people.child.id)).run();
     const teen = db.select().from(peopleTable).where(eq(peopleTable.id, people.child.id)).get()!;
-    expect(await toolsSeen(teen, (a) => runTurnNext(a, "chat", "what does a red panda look like"))).toContain("show_images");
+    expect(await toolsSeen(teen, (a) => runTurnNext(a, "chat", "what does a red panda look like"))).not.toContain("show_images");
     // A teen controls their own setting; an adult cannot change it (owner ruling 2026-09-30).
     expect(setValue(people.owner, `person:${teen.id}`, "reference.images", false).ok).toBe(false);
     expect(setValue(teen, `person:${teen.id}`, "reference.images", false).ok).toBe(true);

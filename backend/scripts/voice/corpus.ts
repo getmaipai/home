@@ -745,10 +745,9 @@ interface ToolSourceRow {
 // on import, so importing it here is unsafe. Its two small hand-written
 // row sets, reproduced literally (kept in sync by hand, same as
 // STEERING_SPIKE_EXCHANGES above); WRITE_DOCUMENT_ROWS is left out on
-// purpose - write_document is not in modelCatalog.ts's shipped
-// tools_offered today (that file's own comment: its row "reads
-// 0/REPEATS on every run until that follow-up lands"), so it would
-// never produce a real native tool call to freeze.
+// purpose - write_document's manifest policy marks it off after the
+// measured rows stayed below the offering bar, so it would never produce
+// a real native tool call to freeze without a separate measurement override.
 const ROUTE01_ROWS: readonly ToolSourceRow[] = [
   { id: "route01-0", utterance: "the plumber's number is 555 9876 extension 12, please remember it", expect_calls: ["remember"] },
   { id: "route01-1", utterance: "Friday is pizza night, please remember", expect_calls: ["remember"] },

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { CATALOG, fitsWithin, kvCacheBytes, weightsBytes, recommend } from "@/lib/modelCatalog";
+import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import type { HardwareInfo } from "@/lib/hardware";
 
 const GB = 1_000_000_000;
@@ -106,15 +107,11 @@ describe("recommend", () => {
   });
 });
 
-describe("TOOLSET-01: recall leaves the offered set", () => {
-  // dev.md "U6: the flip verdict" regression B: nodes/context.ts
-  // already calls recall() on every turn and puts the matches in
-  // context, so the tool duplicated a retrieval the model already
-  // held - no budget offers it anymore.
-  test("no chat model's turn_budget offers recall", () => {
+describe("TOOL-OFFER-01: recall remains explicitly off", () => {
+  test("no chat model's derived offer set contains recall", () => {
     for (const model of CATALOG) {
       if (model.role !== "chat" || !model.turn_budget) continue;
-      expect(model.turn_budget.tools_offered).not.toContain("recall");
+      expect(resolveTurnBudget(model.id, "adult").tools_offered).not.toContain("recall");
     }
   });
 });

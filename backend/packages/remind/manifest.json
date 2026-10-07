@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Reminders",
   "description": "Set a reminder for a later time.",
+  "offer": {"mode":"base","priority":5},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

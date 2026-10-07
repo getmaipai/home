@@ -82,7 +82,7 @@ describe("Used in chat matches the turn", () => {
   test("GET /api/plugins/skills marks what each person's chat offers, lists every skill kind, and says bundled", async () => {
     const client = new TestClient();
     expect((await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).status).toBe(201);
-    const rows = (await (await client.get("/api/plugins/skills")).json()) as Array<{ id: string; kind: string; origin: string; used_in_chat: boolean }>;
+    const rows = (await (await client.get("/api/plugins/skills")).json()) as Array<{ id: string; kind: string; origin: string; used_in_chat: boolean; offer_label: string | null }>;
     const owner = db.select().from(people).where(eq(people.role, "owner")).get()!;
     const offered = await writtenChatToolIds(owner);
     expect(offered.size).toBeGreaterThan(0);
@@ -92,6 +92,8 @@ describe("Used in chat matches the turn", () => {
     }
     expect(rows.find((r) => r.id === "weather")?.used_in_chat).toBe(true);
     expect(rows.find((r) => r.id === "joke")?.used_in_chat).toBe(false);
+    expect(rows.find((r) => r.id === "currency")?.offer_label).toBe("not offered: not measured");
+    expect(rows.find((r) => r.id === "recall")?.offer_label).toBe("not offered: Memory is already supplied as context; a separate recall call duplicated retrieval.");
     // Handler, SKILL.md and plan.json packages are skills too, and a companion is not.
     expect(rows.find((r) => r.id === "almanac-date")?.used_in_chat).toBe(true);
     expect(rows.find((r) => r.id === "storytime-style")?.kind).toBe("skill");
@@ -106,6 +108,20 @@ describe("Used in chat matches the turn", () => {
     const childOffered = await writtenChatToolIds(db.select().from(people).where(eq(people.id, childId)).get()!);
     expect(childRows.length).toBeGreaterThan(0);
     for (const row of childRows) if (row.kind === "plugin") expect(row.used_in_chat).toBe(childOffered.has(row.id));
+  });
+
+  test("every base tool appears on an adult written request for each catalog chat model", async () => {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const owner = db.select().from(people).where(eq(people.role, "owner")).get()!;
+    const { CATALOG } = await import("@/lib/modelCatalog");
+    const base = ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "start_project", "timer", "weather", "websearch"];
+    for (const model of CATALOG.filter((entry) => entry.role === "chat" && entry.turn_budget)) {
+      setHouseholdSettingValue("chat.model_id", model.id);
+      const sent = await toolsSentOnATurn(owner);
+      for (const id of base) expect(sent, `${id} for ${model.id}`).toContain(id);
+      expect(sent, `off policy for ${model.id}`).not.toContain("show_images");
+    }
   });
 
   test("a package its smoke test disabled is never used in chat", async () => {

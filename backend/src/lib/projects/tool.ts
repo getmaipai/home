@@ -22,7 +22,24 @@ import type { PersonRow } from "@/types";
 import { getProjectType, listProjectTypes, type ProjectType, type ProjectTypeParamsSchema } from "./projectTypes";
 import { start as startProject } from "./runner";
 
-export const START_PROJECT_TOOL_ID = "start_project";
+export interface VirtualToolOffer {
+  mode: "base" | "conditional" | "off";
+  gate?: string;
+  bench_row?: string;
+  priority?: number;
+  reason?: string;
+}
+
+export interface VirtualToolRegistration {
+  id: string;
+  offer: VirtualToolOffer;
+  spec: () => ToolSpec;
+}
+
+export const VIRTUAL_TOOL_REGISTRY: VirtualToolRegistration[] = [
+  { id: "start_project", offer: { mode: "base", priority: 6 }, spec: startProjectToolSpec },
+];
+export const START_PROJECT_TOOL_ID = VIRTUAL_TOOL_REGISTRY[0]!.id;
 
 const ajv = new Ajv2020({ strict: false });
 

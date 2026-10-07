@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Web Search",
   "description": "You can search the web for news, prices, or current events; read the top pages for anything that may have changed.",
+  "offer": {"mode":"base","priority":9},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
