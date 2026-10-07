@@ -99,3 +99,49 @@ describe("scripts/ui-rules-precommit.sh", () => {
     expect(r.out).toContain("the gate still runs it");
   });
 });
+
+describe("scripts/install-hooks.sh", () => {
+  const repo = (withScript: boolean) => {
+    const d = mkdtempSync(join(tmpdir(), "uihook-"));
+    mkdirSync(join(d, "scripts"), { recursive: true });
+    cpSync(join(REPO, "scripts/install-hooks.sh"), join(d, "scripts/install-hooks.sh"));
+    if (withScript) writeFileSync(join(d, "scripts/ui-rules-precommit.sh"), "exit 1\n");
+    const sh = (...c: string[]) => Bun.spawnSync(c, { cwd: d, env: { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@example.com", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@example.com" }, stdout: "pipe", stderr: "pipe" });
+    sh("git", "init", "-q");
+    sh("bash", "scripts/install-hooks.sh");
+    writeFileSync(join(d, "a.txt"), "a\n");
+    if (withScript) rmSync(join(d, "scripts/install-hooks.sh"));
+    sh("git", "add", "a.txt");
+    return { d, sh };
+  };
+
+  test("a commit succeeds in a tree that has no scripts/ui-rules-precommit.sh", () => {
+    const { d, sh } = repo(false);
+    expect(sh("git", "commit", "-qm", "x").exitCode).toBe(0);
+    rmSync(d, { recursive: true, force: true });
+  });
+
+  test("a tree that has the script runs it, and its failure blocks the commit", () => {
+    const { d, sh } = repo(true);
+    expect(sh("git", "commit", "-qm", "x").exitCode).toBe(1);
+    rmSync(d, { recursive: true, force: true });
+  });
+
+  test("it repairs the older failing form and stays idempotent", () => {
+    const d = mkdtempSync(join(tmpdir(), "uihook-"));
+    const sh = (...c: string[]) => Bun.spawnSync(c, { cwd: d, stdout: "pipe", stderr: "pipe" });
+    mkdirSync(join(d, "scripts"));
+    cpSync(join(REPO, "scripts/install-hooks.sh"), join(d, "scripts/install-hooks.sh"));
+    sh("git", "init", "-q");
+    writeFileSync(join(d, ".git/hooks/pre-commit"), "#!/usr/bin/env bash\n# maipai ui-rules\n[ -f scripts/ui-rules-precommit.sh ] && { bash scripts/ui-rules-precommit.sh || exit 1; }\n");
+    sh("bash", "scripts/install-hooks.sh");
+    const once = Bun.file(join(d, ".git/hooks/pre-commit")).text();
+    return once.then(async (a) => {
+      expect(a).toContain("exit 0");
+      expect(a).not.toContain("&& {");
+      sh("bash", "scripts/install-hooks.sh");
+      expect(await Bun.file(join(d, ".git/hooks/pre-commit")).text()).toBe(a);
+      rmSync(d, { recursive: true, force: true });
+    });
+  });
+});
