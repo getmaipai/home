@@ -95,6 +95,23 @@ describe("FilesPage", () => {
     } finally { restore(); }
   });
 
+  test("kit row actions stay attached to the selected file row", async () => {
+    const { restore } = mockFetch([
+      file("file-first123", "person-abc123"),
+      file("file-second123", "person-abc123", false, "document"),
+    ]);
+    try {
+      renderWithQueryClient(<FilesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("application/pdf"));
+      const row = Array.from(document.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'))
+        .find((candidate) => candidate.textContent?.includes("application/pdf")) as HTMLElement;
+      fireEvent.click(row.querySelector('[aria-label="More actions"]')!);
+      fireEvent.click(await waitFor(() => document.querySelector('[role="menuitem"]')!));
+      await waitFor(() => expect(document.body.textContent).toContain("file-second123"));
+      expect(document.body.textContent).not.toContain("file-first123");
+    } finally { restore(); }
+  });
+
   test("File parts show name, size and the Library download route for every file kind", async () => {
     const kinds: FileKind[] = ["image", "video", "audio", "document", "story", "other"];
     for (const kind of kinds) {
