@@ -158,6 +158,7 @@ const chatContinueReview = process.argv.includes("--chat-continue-review");
 const fitVerdictReview = process.argv.includes("--fit-verdict-review");
 const chatReview = process.argv.includes("--chat-review") || chatFocusReview || chatTemporaryReview;
 const chatStatsReview = process.argv.includes("--chat-stats-review");
+const liveVoiceSessionReview = process.argv.includes("--live-voice-session-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
 // spec.md "Acceptance for an implementation": the three states with no
 // existing dedicated capture (sources card + memory chip + image
@@ -321,7 +322,7 @@ const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const projectPageReview = process.argv.includes("--projects-page-review");
-const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview;
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -1706,6 +1707,69 @@ async function captureChatStatsReview(browser: Browser, sessionValue: string): P
     dedicatedScreenshots.push({ file: screenshot, route: "chat-turn-stats", viewport: viewport.slug, theme: "light" });
   } finally {
     await context.close();
+  }
+}
+
+/** ELT-T1-12: open the real composer control, hold the scripted STT
+ * connection at its connecting state, and capture the kit Dialog plus
+ * VoiceConversation at desktop and phone sizes in both themes. No mic is
+ * requested and no audio is sent. */
+async function captureLiveVoiceSessionReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots", "live-voice-session");
+  mkdirSync(outDir, { recursive: true });
+  for (const viewport of [VIEWPORTS.find((v) => v.slug === "desktop")!, VIEWPORTS.find((v) => v.slug === "phone")!]) {
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.route("**/api/engines", async (route) => {
+          const response = await route.fetch();
+          const body = await response.json() as { roles?: Array<{ id: string }>; [key: string]: unknown };
+          const role = (id: "stt" | "tts") => ({
+            id,
+            label: id === "stt" ? "Speech recognition" : "Speech",
+            wire: id === "stt" ? "transcription" : "speech",
+            residency: "installed",
+            endpoints: [],
+            quality: [],
+            sharesModelWith: null,
+            state: { state: "ready", since: "screenshot" },
+            reason: null,
+            model: null,
+            check: { state: "passed", at: null, reason: null, stale: false },
+          });
+          const roles = Array.isArray(body.roles) ? body.roles : [];
+          await route.fulfill({ response, json: { ...body, roles: [...roles.filter((item) => item.id !== "stt" && item.id !== "tts"), role("stt"), role("tts")] } });
+        });
+        await page.routeWebSocket("**/api/stt/stream", () => {
+          // No ready message: the real session stays in Connecting and
+          // never starts microphone capture in this visual fixture.
+        });
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("heading").first().waitFor();
+        const start = page.getByRole("button", { name: "Start a voice conversation", exact: true });
+        await start.waitFor();
+        await start.click();
+        const dialog = page.getByRole("dialog", { name: "Voice conversation" });
+        await dialog.waitFor();
+        await dialog.getByText("Connecting", { exact: true }).waitFor();
+        await page.mouse.move(0, 0);
+        await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+        await settleAnimations(page);
+        const axe = await new AxeBuilder({ page }).include('[role="dialog"]').analyze();
+        if (axe.violations.length) {
+          throw new Error(`live voice dialog a11y failed at ${viewport.slug}/${theme}: ${axe.violations.map((item) => `${item.id} (${item.impact})`).join(", ")}`);
+        }
+        const filename = `live-voice-session-${viewport.width}-${theme}.png`;
+        const path = join(outDir, filename);
+        await page.screenshot({ path, fullPage: true });
+        dedicatedScreenshots.push({ file: filename, route: "live-voice-session-open", viewport: viewport.slug, theme });
+        console.log(`Wrote ${path}`);
+      } finally {
+        await context.close();
+      }
+    }
   }
 }
 
@@ -9712,6 +9776,12 @@ async function main() {
       }
     }
 
+    if (!a11yOnly && liveVoiceSessionReview) {
+      await captureLiveVoiceSessionReview(browser, sessionValue);
+      console.log("completed named review: --live-voice-session-review");
+      return;
+    }
+
     if (!a11yOnly && chatStatsReview) await captureChatStatsReview(browser, sessionValue);
 
     if (!a11yOnly && chatResearchReview) await captureChatResearchReview(browser, sessionValue);
@@ -9856,7 +9926,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview) {
+    if (!a11yOnly && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -9887,7 +9957,7 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview
+    const combos = notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview || liveVoiceSessionReview
       ? []
       : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
         ? A11Y_ONLY_COMBOS

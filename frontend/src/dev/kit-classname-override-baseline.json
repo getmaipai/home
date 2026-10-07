@@ -164,22 +164,6 @@
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     }
   },
-  "apps/chat/liveVoiceSession.tsx": {
-    "TooltipIconButton": {
-      "tokens": [
-        "absolute",
-        "before:-inset-3",
-        "before:absolute",
-        "before:content-['']",
-        "right-4",
-        "sm:-right-2",
-        "sm:-top-2",
-        "top-4"
-      ],
-      "ed": "ED-027",
-      "reason": "Kit voice-conversation lacked an extra slot (added in ui-v0.5.116); ELT-T1-12."
-    }
-  },
   "apps/memory/PeopleAndThings.tsx": {
     "Button": {
       "tokens": [

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useMatch, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
@@ -26,6 +26,9 @@ import { CanvasSplit, CanvasSplitBody, CanvasSplitDocument, CanvasSplitHeader, C
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
+import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
+import { VoiceConversation } from "@maipai/ui/src/elements/voice-conversation";
+import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -49,7 +52,7 @@ import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice, useVoiceAvailable } from "@/apps/chat/useChatAvailability";
-import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
+import { useLiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { photoUploadsEnabledForBand } from "@/apps/chat/photoUploadAccess";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
@@ -74,6 +77,7 @@ import { projectConversationRows, projectSourcesVisible } from "@/shell/pages/ch
 // the phone row's sheet control uses the same glyph as the desktop
 // column's show control (ChatColumn.tsx).
 const ColumnOpenIcon = getIcon("panel-left-open");
+const VoiceSettingsIcon = getIcon("settings");
 const LazyProjectHomeHeader = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeHeader })));
 const LazyProjectHomeTabs = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeTabs })));
 
@@ -328,17 +332,17 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   // `pendingSpeechRef` above - `consumeAskAnswer` below reads and clears it.
   const askAnswerRef = useRef<{ turnId: string; approved: boolean } | undefined>(undefined);
   // VOICE-LIVE-02: chatModelAdapter.ts's own onSpeakingChange, relayed as
-  // real state so LiveVoiceSession (a sibling component, not inside this
-  // hook) can react to the live scheduler's own start/end - nothing else
+  // real state so useLiveVoiceSession (a sibling hook, not inside this
+  // runtime hook) can react to the live scheduler's own start/end - nothing else
   // in this file reads it today, so no other caller changes.
   const [isSpeaking, setIsSpeaking] = useState(false);
   // A code review caught this: `isSpeaking` alone misses the case where a
   // reply never spoke at all (empty, or every sentence's TTS failed) -
   // onFirstAudio never fires, so onSpeakingChange(false) arrives with
   // React state ALREADY false, a same-value setState that never
-  // re-renders and never re-runs LiveVoiceSession's own effect, leaving
+  // re-renders and never re-runs useLiveVoiceSession's own effect, leaving
   // the call stuck on "Thinking" forever. Bumped on every `false` call
-  // regardless of the previous value, so LiveVoiceSession can depend on
+  // regardless of the previous value, so useLiveVoiceSession can depend on
   // this instead of `isSpeaking` alone to notice "speaking is over."
   const [speakingEndedAt, setSpeakingEndedAt] = useState(0);
   const [connection, setConnection] = useState<ConnectionState>({ phase: "online" });
@@ -1155,8 +1159,7 @@ export function ChatPage({ person }: { person: Roster }) {
   // VOICE-LIVE-02: owned here (not inside useChatRuntime) since both
   // the composer's own waveform button (via VoiceSessionProvider,
   // composerVoiceControls.tsx's zero-prop slot needs a context to reach
-  // it) and LiveVoiceSession itself (a direct prop, mounted below) read
-  // the identical state.
+  // it) and useLiveVoiceSession read the identical state.
   const [voiceOpen, setVoiceOpen] = useState(false);
   // COLUMN-01: the history column's open/hidden state (remembered per
   // browser), its thread search, and the phone sheet. lg (960px) is where
@@ -1299,6 +1302,16 @@ export function ChatPage({ person }: { person: Roster }) {
     setOpenArtifactId(null);
     setCompareTarget(null);
   }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, projectPage?.folderId);
+  const voiceSession = useLiveVoiceSession({
+    composer: runtime.thread.composer,
+    open: voiceOpen,
+    onOpenChange: setVoiceOpen,
+    turnSchedulerRef,
+    liveVoiceActiveRef,
+    pendingSpeechRef,
+    isSpeaking,
+    speakingEndedAt,
+  });
   const [pageSearchParams] = useSearchParams();
   const requestedConversationId = pageSearchParams.get("conversation") ?? undefined;
   const openingConversationId = requestedConversationId !== unopenableConversationId ? requestedConversationId : undefined;
@@ -1355,15 +1368,24 @@ export function ChatPage({ person }: { person: Roster }) {
         <ChatMemoryPoll incognito={temporaryNext} />
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
         <ProjectResultReload />
-        <LiveVoiceSession
-          open={voiceOpen}
-          onOpenChange={setVoiceOpen}
-          turnSchedulerRef={turnSchedulerRef}
-          liveVoiceActiveRef={liveVoiceActiveRef}
-          pendingSpeechRef={pendingSpeechRef}
-          isSpeaking={isSpeaking}
-          speakingEndedAt={speakingEndedAt}
-        />
+        <Dialog open={voiceOpen} onOpenChange={setVoiceOpen}>
+          <DialogContent variant="call" showCloseButton={false} aria-label="Voice conversation">
+            <VoiceConversation
+              mode={voiceSession.mode}
+              amplitude={voiceSession.amplitude}
+              muted={voiceSession.muted}
+              onToggleMute={voiceSession.onToggleMute}
+              onEnd={voiceSession.onEnd}
+              extra={(
+                <TooltipIconButton asChild tooltip="Voice settings">
+                  <Link to="/settings/voices" aria-label="Voice settings">
+                    <VoiceSettingsIcon />
+                  </Link>
+                </TooltipIconButton>
+              )}
+            />
+          </DialogContent>
+        </Dialog>
         <h1 className="sr-only">Chat</h1>
         {/* CHAT-UI-01 finding 3: `overflow-hidden` keeps this box's own
             height a hard ceiling, not a floor a growing composer or a

@@ -39,9 +39,6 @@
   "apps/chat/composerDictationWaveform.tsx": [
     "ComposerDictationWaveform"
   ],
-  "apps/chat/liveVoiceSession.tsx": [
-    "LiveVoiceSession"
-  ],
   "shell/pages/ChatColumn.tsx": [
     "ChatColumnToggle",
     "ChatHistoryPanel"

@@ -57,11 +57,10 @@ export const ReloadMainThreadContext = createContext<() => void>(() => {});
 // (assistant-ui's per-message/part context), not the thread-level
 // composer - `aui.composer.send()` there threw "Composer is not
 // available" every time. `ConfirmAskAnswerProvider` (below, mounted at
-// the same root level `LiveVoiceSession` already proves works for this
-// exact same "send from outside the composer's own click handler"
-// need - ChatPage.tsx's own `SttAutoSend` comment has the fuller
-// reasoning) calls `useAui()` once, correctly scoped, and hands down the
-// closure instead.
+// the root level of `AssistantRuntimeProvider`) calls `useAui()` once,
+// correctly scoped, and hands down the closure for this same
+// "send from outside the composer's own click handler" need. ChatPage's
+// voice-session hook instead receives the runtime's thread composer.
 export const ConfirmAskAnswerContext = createContext<(turnId: string, approved: boolean) => void>(() => {});
 
 // ADMIN-COMPARE-01: the same two-context shape as the artifact panel

@@ -7,9 +7,14 @@
 // runtime adapter that just records what it received.
 import { describe, expect, test, afterEach } from "bun:test";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { useRef } from "react";
+import { Link, MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
-import { LiveVoiceSession } from "@/apps/chat/liveVoiceSession";
+import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
+import { VoiceConversation } from "@maipai/ui/src/elements/voice-conversation";
+import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
+import { getIcon } from "@maipai/ui/src/icons";
+import { useLiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { createMockSttSocket, type SttFixtureStep } from "@/lib/voice/sttSocket";
 import type { MicCaptureHandle, MicCaptureOptions } from "@/lib/voice/mic-capture";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
@@ -28,6 +33,8 @@ function fakeStartCapture(): (options: MicCaptureOptions) => Promise<MicCaptureH
   };
 }
 
+const SettingsIcon = getIcon("settings");
+
 function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sentTexts }: { open: boolean; onOpenChange: (open: boolean) => void; isSpeaking: boolean; speakingEndedAt: number; fixture: readonly SttFixtureStep[]; sentTexts: string[] }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
@@ -39,29 +46,60 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
   };
   const runtime = useLocalRuntime(adapter, { unstable_enableMessageQueue: !open });
   voiceRuntime = runtime;
+  const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
+  const liveVoiceActiveRef = useRef(false);
+  const pendingSpeechRef = useRef(false);
+  const session = useLiveVoiceSession({
+    composer: runtime.thread.composer,
+    open,
+    onOpenChange,
+    turnSchedulerRef,
+    liveVoiceActiveRef,
+    pendingSpeechRef,
+    isSpeaking,
+    speakingEndedAt,
+    createSocket: (handlers) => createMockSttSocket(fixture, handlers),
+    startCapture: fakeStartCapture(),
+  });
   return (
     <MemoryRouter initialEntries={["/chat"]}>
       <AssistantRuntimeProvider runtime={runtime}>
-        <LiveVoiceSession
-          open={open}
-          onOpenChange={onOpenChange}
-          turnSchedulerRef={{ current: null as SentenceSpeechScheduler | null }}
-          liveVoiceActiveRef={{ current: false }}
-          pendingSpeechRef={{ current: false }}
-          isSpeaking={isSpeaking}
-          speakingEndedAt={speakingEndedAt}
-          createSocket={(handlers) => createMockSttSocket(fixture, handlers)}
-          startCapture={fakeStartCapture()}
-        />
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent variant="call" showCloseButton={false} aria-label="Voice conversation">
+            <VoiceConversation
+              mode={session.mode}
+              amplitude={session.amplitude}
+              muted={session.muted}
+              onToggleMute={session.onToggleMute}
+              onEnd={session.onEnd}
+              extra={(
+                <TooltipIconButton asChild tooltip="Voice settings">
+                  <Link to="/settings/voices" aria-label="Voice settings">
+                    <SettingsIcon />
+                  </Link>
+                </TooltipIconButton>
+              )}
+            />
+          </DialogContent>
+        </Dialog>
       </AssistantRuntimeProvider>
     </MemoryRouter>
   );
 }
 
-describe("LiveVoiceSession", () => {
+describe("live voice session", () => {
   test("renders nothing while closed", () => {
     const view = render(<Harness open={false} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} />);
     expect(view.container).toBeEmptyDOMElement();
+  });
+
+  test("opening the session presents the voice call dialog", async () => {
+    const props = { onOpenChange: () => {}, isSpeaking: false, speakingEndedAt: 0, fixture: [] as SttFixtureStep[], sentTexts: [] as string[] };
+    const view = render(<Harness open={false} {...props} />);
+    expect(view.queryByRole("dialog")).toBeNull();
+    view.rerender(<Harness open={true} {...props} />);
+    await waitFor(() => expect(view.getByRole("dialog", { name: "Voice conversation" })).toBeTruthy());
+    expect(view.getByText("Connecting")).toBeTruthy();
   });
 
   test("listens, sends the final transcript through the real composer, and shows listening then speaking then listening again", async () => {
@@ -138,22 +176,28 @@ describe("LiveVoiceSession", () => {
     expect(view.getByText("Listening")).toBeTruthy();
   });
 
-  test("onEnd closes the overlay", async () => {
+  test("onEnd requests that the voice call dialog close", async () => {
     const fixture: SttFixtureStep[] = [{ delayMs: 0, message: { t: "ready" } }];
-    let open = true;
-    const onOpenChange = (value: boolean) => {
-      open = value;
-    };
-    const view = render(<Harness open={open} onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
+    const openChanges: boolean[] = [];
+    const onOpenChange = (value: boolean) => openChanges.push(value);
+    const view = render(<Harness open={true} onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
     act(() => view.getByRole("button", { name: "End the call" }).click());
-    expect(open).toBe(false);
+    expect(openChanges).toEqual([false]);
   });
 
-  // VOICE-LIVE-05: the gear is the one way back into Settings > Voice
-  // from the live session (VOICE-LIVE-03b's own note: voice/microphone
-  // choice moved there, this is the only control outside Settings now).
-  test("the settings gear links to Settings > Voice", async () => {
+  test("mute toggles the kit control and its accessible state", async () => {
+    const fixture: SttFixtureStep[] = [{ delayMs: 0, message: { t: "ready" } }];
+    const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    const mute = view.getByRole("button", { name: "Turn the microphone off" });
+    expect(mute.getAttribute("aria-pressed")).toBe("false");
+    act(() => mute.click());
+    const unmute = view.getByRole("button", { name: "Turn the microphone on" });
+    expect(unmute.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  test("the extra Settings link points to Settings > Voice", async () => {
     const fixture: SttFixtureStep[] = [{ delayMs: 0, message: { t: "ready" } }];
     const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());

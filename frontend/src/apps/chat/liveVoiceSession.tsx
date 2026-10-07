@@ -1,12 +1,12 @@
 "use client";
 
 // VOICE-LIVE-02 (docs/plans/hardware-tiers-2026-09-23.md section 1;
-// BACKLOG.md's own row). Press the waveform and talk: this component
-// drives the shipped `VoiceConversation` Element end to end - opens the
+// BACKLOG.md's own row). Press the waveform and talk: this hook manages
+// the live voice session behind the shipped `VoiceConversation` Element - opens the
 // same real STT session dictation already uses (sttSocket.ts,
 // mic-capture.ts), sends the final transcript as a real turn with
 // `spoken: true` through the SAME composer send path a typed message
-// uses (`aui.composer.setText()` + `.send()`, so the transcript lands in
+// uses (`runtime.thread.composer.setText()` + `.send()`, so the transcript lands in
 // the thread exactly like any other message - no second message-
 // creation path), and lets chatModelAdapter.ts's own already-built
 // sentence-by-sentence TTS pipeline (SentenceSpeechScheduler,
@@ -26,19 +26,14 @@
 // finishes speaking - the whole state machine is a value the mount
 // effect reacts to, never a manually chained callback tree.
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
-import { useAui } from "@assistant-ui/react";
-import { VoiceConversation, type VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
-import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
-import { getIcon } from "@maipai/ui/src/icons";
+import type { VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
 import { createSttSocket, type SttSocket, type SttSocketHandlers } from "@/lib/voice/sttSocket";
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 
-const SettingsIcon = getIcon("settings");
-
 export interface LiveVoiceSessionProps {
+  composer: { setText: (text: string) => void; send: () => void };
   open: boolean;
   onOpenChange: (open: boolean) => void;
   turnSchedulerRef: { current: SentenceSpeechScheduler | null };
@@ -53,8 +48,8 @@ export interface LiveVoiceSessionProps {
    * implementation. */
   startCapture?: typeof startMicCapture;
   /** chatModelAdapter.ts's own onSpeakingChange, relayed through
-   * useChatRuntime as real state - the only way this component (a
-   * sibling of the runtime hook, not inside it) learns the live
+   * useChatRuntime as real state - the only way this hook (a
+   * sibling of that runtime hook) learns the live
    * scheduler's own start/end. */
   isSpeaking: boolean;
   /** A code review caught this: `isSpeaking` alone misses a reply that
@@ -68,8 +63,7 @@ export interface LiveVoiceSessionProps {
   speakingEndedAt: number;
 }
 
-export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
-  const aui = useAui();
+export function useLiveVoiceSession({ composer, open, onOpenChange, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -162,8 +156,8 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
             }
             setMode("thinking");
             pendingSpeechRef.current = true;
-            aui.composer.setText(text);
-            void Promise.resolve(aui.composer.send());
+            composer.setText(text);
+            void Promise.resolve(composer.send());
             break;
           }
           case "no_speech":
@@ -239,42 +233,11 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
     };
   }, [open, liveVoiceActiveRef, turnSchedulerRef]);
 
-  if (!open) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 sm:p-4">
-      {/* VOICE-LIVE-05 follow-up (Jesse's own live read, 2026-09-23):
-          "the phone call look" - the card itself now grows to fill this
-          overlay on the phone (VoiceConversation's own h-full/w-full
-          below sm), so this wrapper does too; at sm and up it's back to
-          the small floating card. */}
-      <div className="relative h-full w-full sm:h-auto sm:max-w-xs">
-        {/* VOICE-LIVE-05: the gear into Settings > Voice - the Element
-            itself has no slot for an extra control (VoiceConversation's
-            own props are mode/amplitude/mute/interrupt/end, nothing
-            else), so this sits just outside its own card, composed
-            here rather than forked into the shipped Element.
-            VOICE-LIVE-03b already moved voice/microphone choice into
-            Settings > Voice's own VoiceCatalogSection - this is the one
-            way back into it from the live session, per that item's own
-            note that it's the only voice control outside Settings now.
-            On the phone the card fills the overlay, so "just outside
-            its own card" has no edge to sit past - inset from the
-            surface's own corner instead; at sm and up, back to sitting
-            just outside the smaller floating card's own corner. */}
-        <TooltipIconButton asChild tooltip="Voice settings" className="absolute top-4 right-4 z-10 before:absolute before:-inset-3 before:content-[''] sm:-top-2 sm:-right-2">
-          <Link to="/settings/voices" aria-label="Voice settings">
-            <SettingsIcon />
-          </Link>
-        </TooltipIconButton>
-        <VoiceConversation
-          mode={mode}
-          amplitude={amplitude}
-          muted={muted}
-          onToggleMute={() => setMuted((value) => !value)}
-          onEnd={() => onOpenChange(false)}
-        />
-      </div>
-    </div>
-  );
+  return {
+    mode,
+    amplitude,
+    muted,
+    onToggleMute: () => setMuted((value) => !value),
+    onEnd: () => onOpenChange(false),
+  };
 }

@@ -348,9 +348,9 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
 
 
 // APPROVE-CARD-01: computes the actual send callback and provides it
-// through `ConfirmAskAnswerContext` - mounted at the SAME root level as
-// `LiveVoiceSession` below (a sibling of `Thread`, never nested inside
-// it), the one place `useAui()` resolves to the thread-level composer
+// through `ConfirmAskAnswerContext` - mounted at the top of
+// `AssistantRuntimeProvider` as a sibling of `Thread`, never nested
+// inside it, the place `useAui()` resolves to the thread-level composer
 // rather than a message/part-scoped one (`ConfirmAskAnswerContext`'s own
 // doc comment has the live "Composer is not available" failure this
 // fixed). `askAnswerRef` is armed here, synchronously, before the

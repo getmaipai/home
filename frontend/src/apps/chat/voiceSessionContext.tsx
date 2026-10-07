@@ -8,10 +8,9 @@
 // reference is not - chatHeaderData.tsx's own header comment explains
 // why this matters). A zero-prop component can't receive the
 // `open`/`onOpenChange` state ChatPage.tsx owns directly, so this
-// context carries exactly that one pair - nothing else. `LiveVoiceSession`
-// itself is mounted directly by ChatPage's own JSX (like
-// `ChatHeaderDataBridge`), so it takes every other piece (the refs, the
-// speaking flag) as ordinary props, never through this context.
+// context carries exactly that one pair - nothing else. ChatPage calls
+// `useLiveVoiceSession` with the runtime composer, refs and speaking
+// state, then renders the kit Dialog and VoiceConversation there.
 import { createContext, useContext } from "react";
 
 interface VoiceSessionContextValue {

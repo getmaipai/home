@@ -109,12 +109,6 @@
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
     }
   },
-  "apps/chat/liveVoiceSession.tsx": {
-    "LiveVoiceSession": {
-      "ed": "ED-027",
-      "reason": "Kit voice-conversation lacked an extra slot (added in ui-v0.5.116); ELT-T1-12."
-    }
-  },
   "apps/people/FaceEnrollmentCard.tsx": {
     "FaceEnrollmentCard": {
       "ed": "ED-038",
