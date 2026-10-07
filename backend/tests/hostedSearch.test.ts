@@ -12,7 +12,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { createHost, __resetSearchCacheForTests, __resetSearchRotationForTests, __resetSearxngEnginesCacheForTests } from "@/lib/packageHost";
 import { HOSTED_SEARCH_KEY_SETTING, __setHostedSearchEndpointForTests } from "@/lib/hostedSearch";
-import { setHouseholdSettingValue, resetValue } from "@/lib/settings";
+import { setHouseholdSettingValue, setValue, resetValue } from "@/lib/settings";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 
 const SECRET = "BSA-test-key-do-not-log";
@@ -21,6 +21,7 @@ let searxng: ReturnType<typeof Bun.serve>;
 let provider: ReturnType<typeof Bun.serve>;
 let searxngHits = 0;
 let providerHits: { key: string | null; query: string | null }[] = [];
+let providerSafeSearch: string[] = [];
 
 beforeEach(() => {
   resetDb();
@@ -31,6 +32,7 @@ beforeEach(() => {
   __resetSearxngEnginesCacheForTests();
   searxngHits = 0;
   providerHits = [];
+  providerSafeSearch = [];
   searxng = Bun.serve({ hostname: "127.0.0.1", port: 0,
     fetch: (req) => {
       if (new URL(req.url).pathname === "/search") searxngHits += 1;
@@ -41,6 +43,7 @@ beforeEach(() => {
     fetch: (req) => {
       const url = new URL(req.url);
       providerHits.push({ key: req.headers.get("x-subscription-token"), query: url.searchParams.get("q") });
+      providerSafeSearch.push(url.searchParams.get("safesearch") ?? "");
       return Response.json({ web: { results: [{ title: "Hosted", url: "https://hosted.example/", description: "from the provider" }] } });
     },
   });
@@ -88,6 +91,14 @@ describe("hosted search key (THIN-4H)", () => {
     expect(providerHits).toEqual([{ key: SECRET, query: "node.js runtime" }]);
     expect(result.rows[0]?.title).toBe("Hosted");
     expect(searxngHits).toBe(0);
+  });
+
+  test("an adult's hosted query uses their stored per-person safe-search level", async () => {
+    const adult = await owner();
+    expect(setValue(adult, `person:${adult.id}`, "search.safe_search", "moderate").ok).toBe(true);
+    setHouseholdSettingValue(HOSTED_SEARCH_KEY_SETTING, SECRET);
+    await search(adult);
+    expect(providerSafeSearch).toEqual(["moderate"]);
   });
 
   test("a child with a key set: the provider is never called, SearXNG answers", async () => {

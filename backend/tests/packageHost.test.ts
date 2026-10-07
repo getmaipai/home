@@ -1071,11 +1071,10 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     }
   });
 
-  // An explicit person-level override (set through the real settings
-  // write path, PUT /api/settings's own lib.setValue()) stands as
-  // given, whatever the speaker's band - here an admin loosening a
-  // child down to "moderate", the admin's own call to make.
-  test("an explicit override on the person's own setting stands over the band default", async () => {
+  // The person's own setting remains the source of the requested level,
+  // but the gate's spec-declared floor keeps a child's effective request
+  // at strict even when an admin stored "moderate".
+  test("an explicit override cannot lower a child's request below the band default", async () => {
     let seenUrl = new URL("http://placeholder.invalid");
     const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
@@ -1097,7 +1096,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       const host = createHost(childRow, manifest({ permissions: ["integration:searxng"] }));
       await host.integration.call("searxng", "search", { query: "is it going to rain" });
-      expect(seenUrl.searchParams.get("safesearch")).toBe("1");
+      expect(seenUrl.searchParams.get("safesearch")).toBe("2");
     } finally {
       server.stop(true);
     }

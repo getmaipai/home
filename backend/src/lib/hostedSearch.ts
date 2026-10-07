@@ -7,8 +7,10 @@
 // query never reaches it, whatever is set, and the age gate is checked
 // here, first, before the key is even read.
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { assertGated, decide } from "@/lib/gate/decide";
 import type { AgeBand } from "@/lib/ageBand";
-import type { SafeSearchLevel } from "@/lib/safeSearch";
+import { applySafeSearchLimits, type SafeSearchLevel } from "@/lib/safeSearch";
+import type { Role } from "@/middleware/auth";
 
 export const HOSTED_SEARCH_KEY_SETTING = "search.brave_api_key";
 /** What the status and privacy pages name: who gets the query. */
@@ -76,7 +78,17 @@ function cleanUrl(value: unknown): string | null {
  * video search, or any provider failure). Null means "use SearXNG": a
  * failed provider never fails the answer (rule 6). */
 export async function hostedSearch(query: string, band: AgeBand, safeLevel: SafeSearchLevel, category: unknown, role?: string, parentSignal?: AbortSignal): Promise<HostedSearchResult | null> {
+  const gateRole: Role = role === "owner" || role === "admin" || role === "adult" || role === "teen" || role === "child" || role === "guest" ? role : band;
+  const decision = decide({
+    who: { personId: "hosted-search", role: gateRole, band },
+    what: { capabilities: ["search.hosted"] },
+    context: { provenance: "person" },
+  });
+  if (decision.kind !== "allow" && decision.kind !== "allow_with_limits") return null;
+  assertGated(decision);
+  // Keep the pre-gate check as a defense until the broader GATE-08 cleanup.
   if (!hostedSearchAllowed(band)) return null;
+  const effectiveSafeLevel = applySafeSearchLimits(safeLevel, band, decision.kind === "allow_with_limits" ? decision.limits : []);
   // A guest carries no age or identity signal (the band reads "adult" for
   // lack of a minor signal), so a guest's query stays on the household's SearXNG.
   if (role === "guest") return null;
@@ -94,7 +106,9 @@ export async function hostedSearch(query: string, band: AgeBand, safeLevel: Safe
     const url = new URL(endpoint);
     url.searchParams.set("q", query);
     url.searchParams.set("count", String(ROW_CAP));
-    url.searchParams.set("safesearch", safeLevel);
+    // The gate keeps the explicit person's setting while enforcing the
+    // spec-declared band floor.
+    url.searchParams.set("safesearch", effectiveSafeLevel);
     const response = await fetch(url, {
       headers: { accept: "application/json", "x-subscription-token": key },
       signal: controller.signal,

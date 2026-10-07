@@ -8885,7 +8885,7 @@
     "band": "adult",
     "provenance": "person",
     "context": "normal",
-    "result": "allow"
+    "result": "allow_with_limits:safe_search:at_least_band_default"
   },
   {
     "id": "search.hosted",
@@ -8893,7 +8893,7 @@
     "band": "adult",
     "provenance": "person",
     "context": "temporary",
-    "result": "allow"
+    "result": "allow_with_limits:safe_search:at_least_band_default"
   },
   {
     "id": "search.hosted",
@@ -8909,7 +8909,7 @@
     "band": "adult",
     "provenance": "untrusted",
     "context": "normal",
-    "result": "allow"
+    "result": "allow_with_limits:safe_search:at_least_band_default"
   },
   {
     "id": "search.hosted",
@@ -8917,7 +8917,7 @@
     "band": "adult",
     "provenance": "untrusted",
     "context": "temporary",
-    "result": "allow"
+    "result": "allow_with_limits:safe_search:at_least_band_default"
   },
   {
     "id": "search.hosted",
@@ -8926,6 +8926,150 @@
     "provenance": "untrusted",
     "context": "crisis",
     "result": "deny:crisis_state"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
+  },
+  {
+    "id": "search.safe_search",
+    "capability": "search.safe_search",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "allow_with_limits:safe_search:at_least_band_default"
   },
   {
     "id": "search.household_subject",

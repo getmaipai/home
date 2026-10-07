@@ -8,11 +8,13 @@
 // loosen your own" check) and `packageHost.ts` (the real SearXNG
 // request) so the two can never drift apart.
 import type { AgeBand } from "@/lib/ageBand";
+import { decide } from "@/lib/gate/decide";
 
 export type SafeSearchLevel = "off" | "moderate" | "strict";
 
 const STRICTNESS: Record<SafeSearchLevel, number> = { off: 0, moderate: 1, strict: 2 };
 const NUMERIC: Record<SafeSearchLevel, 0 | 1 | 2> = { off: 0, moderate: 1, strict: 2 };
+const BAND_DEFAULT_LIMIT = "safe_search:at_least_band_default";
 
 /** child strict, teen moderate, adult off - never an image floor on top
  * (the first cut's own floor is withdrawn by this same ruling: images
@@ -25,14 +27,24 @@ export function safeSearchStrictness(level: SafeSearchLevel): number {
   return STRICTNESS[level];
 }
 
-/** The stored choice resolved against a band: "default" (or anything
- * not a real choice - a defensive fallback, never reachable through a
- * real write once `validateSelectorValue` guards the key) takes the
- * band's own default; an explicit `off`/`moderate`/`strict` stands as
- * given, whatever the band. */
+/** Resolve the person's stored choice through the capability gate. The
+ * spec-declared floor is never weaker than the band's own default, even
+ * when an administrator stored a lower value for a child or teen. */
+export function applySafeSearchLimits(stored: unknown, band: AgeBand, limits: readonly string[]): SafeSearchLevel {
+  const requested = stored === "off" || stored === "moderate" || stored === "strict" ? stored : safeSearchDefaultFor(band);
+  const declaresBandFloor = limits.includes(BAND_DEFAULT_LIMIT);
+  if (!declaresBandFloor) return band === "adult" ? requested : safeSearchDefaultFor(band);
+  const bandFloor = safeSearchDefaultFor(band);
+  return safeSearchStrictness(requested) < safeSearchStrictness(bandFloor) ? bandFloor : requested;
+}
+
 export function resolveSafeSearchLevel(stored: unknown, band: AgeBand): SafeSearchLevel {
-  if (stored === "off" || stored === "moderate" || stored === "strict") return stored;
-  return safeSearchDefaultFor(band);
+  const decision = decide({
+    who: { personId: "safe-search", role: band, band },
+    what: { capabilities: ["search.safe_search"] },
+    context: { provenance: "person" },
+  });
+  return applySafeSearchLimits(stored, band, decision.kind === "allow_with_limits" ? decision.limits : []);
 }
 
 export function safeSearchNumericLevel(level: SafeSearchLevel): 0 | 1 | 2 {
