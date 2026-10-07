@@ -327,7 +327,8 @@ const chatShellReview = process.argv.includes("--chat-shell-review") || shellNav
 // COLUMN-01 (owner, 2026-10-06): the chat history column, every state.
 const elementsReview = process.argv.includes("--elements-review");
 // PROJECTS-01b: projects in the chat column (seeded, open, moving a chat, a child's view).
-const chatProjectsReview = process.argv.includes("--chat-projects-review");
+const projectSettingsOnlyReview = process.argv.includes("--project-settings-review");
+const chatProjectsReview = process.argv.includes("--chat-projects-review") || projectSettingsOnlyReview;
 // SKILLS-PAGE-01: the Skills section of Chat settings, an adult and a teen, 1440 and 390, both themes.
 const chatSkillsReview = process.argv.includes("--chat-skills-review");
 // ENGINE-DOWN-UI-01: a reply with its action row while chat is ready and while it is paused.
@@ -2783,6 +2784,14 @@ async function captureChatProjectsReview(browser: Browser, ownerSession: string)
         if (measured.overflow) throw new Error(`projects review ${slug} ${theme} scrolls sideways`);
         if (!phone && measured.projectRow !== measured.chatRow) throw new Error(`project row ${measured.projectRow}px differs from chat row ${measured.chatRow}px`);
         await shoot(page, `projects-open-${viewport.width}-${theme}`);
+        if (theme === "light") {
+          const projectRow = column.locator('[data-slot="aui_thread-list-project"]', { hasText: "Garden plans" });
+          await projectRow.getByRole("button", { name: "Project options" }).click();
+          await page.getByRole("menuitem", { name: "Edit project" }).click();
+          await page.locator('[data-slot="project-settings"]').waitFor();
+          await shoot(page, `project-settings-adult-${viewport.width}`);
+          await page.keyboard.press("Escape");
+        }
         if (!phone) {
           const row = column.locator('[data-slot="aui_thread-list-item"]', { hasText: "Dinner ideas" });
           await row.hover();
@@ -2794,8 +2803,15 @@ async function captureChatProjectsReview(browser: Browser, ownerSession: string)
           await column.getByRole("button", { name: "New project" }).click();
           await column.getByPlaceholder("Project name").fill("Recipes");
           await shoot(page, `projects-new-field-${viewport.width}-${theme}`);
-          await page.keyboard.press("Escape");
-          if (theme === "light") {
+          if (projectSettingsOnlyReview && theme === "light") {
+            await page.keyboard.press("Enter");
+            await page.locator('[data-slot="project-settings"]').waitFor();
+            await shoot(page, `project-settings-create-${viewport.width}`);
+            await page.keyboard.press("Escape");
+          } else {
+            await page.keyboard.press("Escape");
+          }
+          if (theme === "light" && !projectSettingsOnlyReview) {
             // New chat in project, end to end: the first message lands the chat in the project.
             const projectRow = column.locator('[data-slot="aui_thread-list-project"]', { hasText: "Science fair" });
             await projectRow.hover();
@@ -2824,17 +2840,22 @@ async function captureChatProjectsReview(browser: Browser, ownerSession: string)
   const selected = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
   const childSession = selected.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
   if (!childSession) throw new Error("projects review: the child sign-in carried no session cookie");
-  const context = await newContext(browser, VIEWPORTS.find((v) => v.slug === "desktop")!, "light", childSession);
-  try {
-    const page = await context.newPage();
-    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-    await openChat(page);
-    const column = panel(page, false);
-    await column.getByText("Homework").waitFor();
-    if (await column.getByRole("button", { name: "New project" }).count()) throw new Error("a child's column offers New project");
-    await shoot(page, "projects-child-1440-light");
-  } finally {
-    await context.close();
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    const phone = slug === "phone";
+    const context = await newContext(browser, viewport, "light", childSession);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+      await openChat(page);
+      if (phone) await page.getByRole("button", { name: "Show threads" }).click();
+      const column = panel(page, phone);
+      await column.getByText("Homework").waitFor();
+      if (await column.getByRole("button", { name: "New project" }).count()) throw new Error("a child's column offers New project");
+      await shoot(page, `projects-child-${viewport.width}-light`);
+    } finally {
+      await context.close();
+    }
   }
 }
 

@@ -2382,11 +2382,19 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
 
 describe("ChatPage (PROJECTS-01b: projects in the column)", () => {
   const column = () => document.getElementById("next-chat-rail")!;
-  const stubProjects = (folders: Array<{ id: string; name: string }>, chats: Array<{ id: string; title: string; folder_id: string | null }>) => {
+  const stubProjects = (folders: Array<{ id: string; name: string; access?: "manage" | "edit" | "use"; icon?: string; color?: string; pinned?: boolean }>, chats: Array<{ id: string; title: string; folder_id: string | null }>) => {
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url.includes("/api/chat-folders")) return Promise.resolve(Response.json(folders.map((folder) => ({ ...folder, person: "person-abc123" }))));
+      if (url.includes("/api/chat-folders")) return Promise.resolve(Response.json(folders.map((folder) => ({
+        id: folder.id, name: folder.name, person: "person-abc123", access: folder.access ?? "manage",
+        icon: folder.icon ?? "folder", color: folder.color ?? "neutral", pinned: folder.pinned ?? false,
+        description: "", instructions: "", memory_mode: "project_only", shares: [], sort_order: 0,
+        source: "hub", provenance: "person-abc123 (self)", hlc: "1:0:personabc123",
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null,
+        pinned_at: null, archived_at: null, last_activity_at: new Date().toISOString(),
+        counts: { chats: 0, files: 0, artifacts: 0 },
+      }))));
       if (url.includes("/api/conversations")) {
         return Promise.resolve(Response.json(chats.map((chat) => ({ ...chat, surface: "chat", pinned: false, archived: false, created_at: new Date().toISOString(), last_turn_at: new Date().toISOString(), turn_count: 2, companion_id: null }))));
       }
@@ -2421,8 +2429,80 @@ describe("ChatPage (PROJECTS-01b: projects in the column)", () => {
     }
   });
 
+  test("an adult can open kit project settings, save fields, and pin a project", async () => {
+    const original = globalThis.fetch;
+    const patches: Array<{ url: string; body: unknown }> = [];
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/chat-folders") && init?.method === "PATCH") {
+        patches.push({ url, body: JSON.parse(String(init.body)) as unknown });
+        return Promise.resolve(Response.json({}));
+      }
+      if (url.includes("/api/chat-folders")) return Promise.resolve(Response.json([{
+        id: "folder-garden1", name: "Garden", person: "person-abc123", access: "manage", icon: "leaf", color: "green", pinned: false,
+        description: "", instructions: "", memory_mode: "project_only", shares: [], sort_order: 0, source: "hub", provenance: "self", hlc: "1:0:personabc123",
+        created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, pinned_at: null, archived_at: null,
+        last_activity_at: new Date().toISOString(), counts: { chats: 0, files: 0, artifacts: 0 },
+      }]));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderAs();
+      await within(column()).findByText("Garden");
+      expect(within(column()).getByText("Garden").closest('[data-slot="aui_thread-list-project"]')?.querySelector('[data-slot="project-mark"]')?.getAttribute("data-hue")).toBe("green");
+      const more = within(column()).getByRole("button", { name: "Project options" });
+      fireEvent.pointerDown(more, { button: 0, pointerType: "mouse" });
+      fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Edit project" }));
+      const name = await within(document.body).findByRole("textbox", { name: "Project name" });
+      fireEvent.change(name, { target: { value: "Patio" } });
+      expect(within(document.body).queryByLabelText("Memory")).toBeNull();
+      fireEvent.click(within(document.body).getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(patches).toContainEqual({ url: expect.stringContaining("folder-garden1"), body: { name: "Patio" } }));
+
+      fireEvent.pointerDown(more, { button: 0, pointerType: "mouse" });
+      fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Pin project" }));
+      await waitFor(() => expect(patches.some((patch) => JSON.stringify(patch.body) === '{"pinned":true}')).toBe(true));
+      view.unmount();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
+  test("Create makes a project and opens its kit settings dialog", async () => {
+    const original = globalThis.fetch;
+    const created = {
+      id: "folder-recipes1", name: "Recipes", person: "person-abc123", access: "manage", icon: "folder", color: "neutral", pinned: false,
+      description: "", instructions: "", memory_mode: "project_only", shares: [], sort_order: 0, source: "hub", provenance: "self", hlc: "1:0:personabc123",
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(), deleted_at: null, pinned_at: null, archived_at: null,
+      last_activity_at: new Date().toISOString(), counts: { chats: 0, files: 0, artifacts: 0 },
+    };
+    let exists = false;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/chat-folders") && init?.method === "POST") {
+        exists = true;
+        return Promise.resolve(Response.json(created, { status: 201 }));
+      }
+      if (url.includes("/api/chat-folders")) return Promise.resolve(Response.json(exists ? [created] : []));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      renderAs();
+      fireEvent.click(await within(column()).findByRole("button", { name: "New project" }));
+      const name = await within(column()).findByPlaceholderText("Project name");
+      fireEvent.change(name, { target: { value: "Recipes" } });
+      fireEvent.keyDown(name, { key: "Enter" });
+      expect(await within(document.body).findByText("Project settings")).toBeTruthy();
+      expect(within(document.body).getByRole("textbox", { name: "Project name" })).toHaveValue("Recipes");
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   test("a child sees a parent's projects but cannot make, rename or delete one", async () => {
-    const restore = stubProjects([{ id: "folder-homework", name: "Homework" }], [{ id: "conv-child001", title: "Spelling", folder_id: null }]);
+    const restore = stubProjects([{ id: "folder-homework", name: "Homework", access: "use" }], [{ id: "conv-child001", title: "Spelling", folder_id: null }]);
     try {
       renderAs({ role: "child", age_band: "child" });
       await within(column()).findByText("Homework");
@@ -2430,6 +2510,8 @@ describe("ChatPage (PROJECTS-01b: projects in the column)", () => {
       const project = within(column()).getByText("Homework").closest('[data-slot="aui_thread-list-project"]') as HTMLElement;
       fireEvent.pointerDown(project.querySelector('[data-slot="aui_thread-list-project-more"]')!, { button: 0, pointerType: "mouse" });
       expect(await within(document.body).findByRole("menuitem", { name: "New chat in project" })).toBeTruthy();
+      expect(within(document.body).queryByRole("menuitem", { name: "Edit project" })).toBeNull();
+      expect(within(document.body).queryByRole("menuitem", { name: "Pin project" })).toBeNull();
       expect(within(document.body).queryByRole("menuitem", { name: "Rename" })).toBeNull();
       expect(within(document.body).queryByRole("menuitem", { name: "Delete" })).toBeNull();
     } finally {

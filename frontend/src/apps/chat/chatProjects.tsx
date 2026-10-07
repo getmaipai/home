@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAui, useAuiState } from "@assistant-ui/react";
 import { toast } from "sonner";
 import type { ThreadListProjects } from "@maipai/ui/src/elements/thread-list.aui";
-import { api, type Roster } from "@/lib/api";
+import { ProjectSettingsDialog, type ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
+import { api, type ChatFolderView, type Roster } from "@/lib/api";
 import { pendingChatFolderId, setPendingChatFolder, takeCreatedChatFolder } from "@/apps/chat/chatThreadListAdapter";
 
 // PROJECTS-01b (CHAT-PROJECT-01): the person's projects for the kit thread
@@ -16,11 +17,12 @@ export const chatFoldersQueryKey = (personId: string) => ["chat-folders", person
 
 /** The projects mode for the signed-in person's column, or undefined in
  * Incognito. `onNewChatStarted` closes the phone sheet, the same as New chat. */
-export function useChatProjects({ person, temporary, onNewChatStarted }: { person: Roster; temporary: boolean; onNewChatStarted: () => void }): ThreadListProjects | undefined {
+export function useChatProjects({ person, temporary, onNewChatStarted }: { person: Roster; temporary: boolean; onNewChatStarted: () => void }): { projects: ThreadListProjects | undefined; settingsDialog: ReactNode } {
   const aui = useAui();
   const queryClient = useQueryClient();
   const foldersQuery = useQuery({ queryKey: chatFoldersQueryKey(person.id), queryFn: () => api.chatFolders(), enabled: !temporary });
   const refresh = () => queryClient.invalidateQueries({ queryKey: chatFoldersQueryKey(person.id) });
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // A chat "New chat in project" just created: put its project on the
   // thread's own metadata so it lists under the project at once (the hub
@@ -48,37 +50,32 @@ export function useChatProjects({ person, temporary, onNewChatStarted }: { perso
     if (scopeRef.current === scope) return;
     scopeRef.current = scope;
     setPendingChatFolder(null);
+    setEditingId(null);
   }, [scope]);
 
-  const folders = foldersQuery.data;
-  return useMemo<ThreadListProjects | undefined>(() => {
+  const folders: ChatFolderView[] = Array.isArray(foldersQuery.data) ? foldersQuery.data : [];
+  const editing = temporary ? null : folders.find((folder) => folder.id === editingId) ?? null;
+  const projects = useMemo<ThreadListProjects | undefined>(() => {
     if (temporary) return undefined;
     const canManage = person.role !== "child";
+    const allManage = folders.length > 0 && folders.every((folder) => folder.access === "manage");
+    const allEditable = folders.length > 0 && folders.every((folder) => folder.access === "manage" || folder.access === "edit");
     return {
-      folders: (Array.isArray(folders) ? folders : []).map((folder) => ({ id: folder.id, name: folder.name })),
+      folders: folders.map((folder) => ({ id: folder.id, name: folder.name, icon: folder.icon, color: folder.color, pinned: folder.pinned })),
       canManage,
       canMove: true,
       onCreate: canManage
         ? async (name) => {
             try {
-              await api.createChatFolder(name);
+              const created = await api.createChatFolder(name);
               await refresh();
+              setEditingId(created.id);
             } catch {
               toast.error("Could not make that project. Try again.");
             }
           }
         : undefined,
-      onRename: canManage
-        ? async (id, name) => {
-            try {
-              await api.renameChatFolder(id, name);
-              await refresh();
-            } catch {
-              toast.error("Could not rename that project. Try again.");
-            }
-          }
-        : undefined,
-      onDelete: canManage
+      onDelete: canManage && allManage
         ? async (id) => {
             try {
               if (pendingChatFolderId() === id) setPendingChatFolder(null);
@@ -92,6 +89,17 @@ export function useChatProjects({ person, temporary, onNewChatStarted }: { perso
             }
           }
         : undefined,
+      onEdit: allEditable ? (id) => setEditingId(id) : undefined,
+      onPin: allManage
+        ? async (id, pinned) => {
+            try {
+              await api.updateChatFolder(id, { pinned });
+              await refresh();
+            } catch {
+              toast.error("Could not update that project. Try again.");
+            }
+          }
+        : undefined,
       onNewChat: async (id) => {
         // Awaited: the pending project is keyed to the new thread the switch
         // opens, read only once the switch has finished.
@@ -102,4 +110,48 @@ export function useChatProjects({ person, temporary, onNewChatStarted }: { perso
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh only closes over stable values
   }, [temporary, person.role, folders, aui, onNewChatStarted]);
+
+  const value: ProjectSettingsValue | null = editing ? {
+    name: editing.name,
+    icon: editing.icon,
+    color: editing.color,
+    description: editing.description,
+    instructions: editing.instructions,
+    memory_mode: editing.memory_mode,
+  } : null;
+  const canEdit = editing?.access === "manage" || editing?.access === "edit";
+  const settingsDialog = editing && value ? (
+    <ProjectSettingsDialog
+      open
+      onOpenChange={(open) => { if (!open) setEditingId(null); }}
+      value={value}
+      memoryModes={[]}
+      readOnly={!canEdit}
+      onSave={async (patch) => {
+        try {
+          await api.updateChatFolder(editing.id, patch);
+          await refresh();
+        } catch (error) {
+          toast.error("Could not save that project. Try again.");
+          throw error;
+        }
+      }}
+      onDelete={editing.access === "manage" ? async () => {
+        try {
+          if (pendingChatFolderId() === editing.id) setPendingChatFolder(null);
+          await api.deleteChatFolder(editing.id);
+          await refresh();
+          await aui.threads().reload();
+        } catch (error) {
+          toast.error("Could not delete that project. Try again.");
+          throw error;
+        }
+      } : undefined}
+      labels={{
+        instructionsHelp: "These instructions shape answers in this project.",
+        confirmDelete: "Its chats stay.",
+      }}
+    />
+  ) : null;
+  return { projects, settingsDialog };
 }

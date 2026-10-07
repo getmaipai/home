@@ -313,7 +313,7 @@ export function ChatHistoryPanel({
 }) {
   const aui = useAui();
   // PROJECTS-01b: the person's projects in the kit thread list.
-  const projects = useChatProjects({ person, temporary, onNewChatStarted: onNewThread });
+  const { projects, settingsDialog } = useChatProjects({ person, temporary, onNewChatStarted: onNewThread });
   const { search, setSearch, searchOpen, setSearchOpen, searchFocusKey } = state;
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
   const isLoading = useAuiState((s) => s.threads.isLoading);
@@ -375,6 +375,7 @@ export function ChatHistoryPanel({
   };
 
   return (
+    <>
     <ThreadListRoot data-slot="chat-column-panel" data-variant={variant} className="flex h-full min-h-0 flex-col gap-0">
       <div data-slot="chat-column-top" data-scrolled={scrolled || undefined} className="shrink-0">
         {searchOpen && hasThreads ? (
@@ -457,5 +458,7 @@ export function ChatHistoryPanel({
         ) : null}
       </div>
     </ThreadListRoot>
+    {settingsDialog}
+    </>
   );
 }
