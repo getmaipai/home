@@ -3442,7 +3442,7 @@ describe("ChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
   // UPLOAD-IMG-02: `photos` is the person's resolved chat.photo_uploads
   // (the hub's own GET /api/settings shape); on by default, as the hub
   // resolves it for an adult.
-  function stubAddMenuFetch(streamBody?: ReadableStream<Uint8Array>, imageRoleReady = false, width = 390, photos: { value: boolean; source: string } = { value: true, source: "default" }): () => void {
+  function stubAddMenuFetch(streamBody?: ReadableStream<Uint8Array>, imageRoleReady = false, width = 390, photos: { value: boolean; source: string } = { value: true, source: "default" }, imageParts: boolean | (() => boolean) = true): () => void {
     const original = globalThis.fetch;
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
@@ -3450,6 +3450,7 @@ describe("ChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/settings?scope=person")) return Promise.resolve(Response.json([{ key: "chat.photo_uploads", value: photos.value, source: photos.source }]));
+      if (url.includes("/api/host/chat-capabilities")) return Promise.resolve(Response.json({ image_parts: typeof imageParts === "function" ? imageParts() : imageParts, thinking: "switchable", thinking_modes: {} }));
       if (url.includes("/api/attachments/upload")) {
         const file = (init?.body as FormData).get("file") as File;
         return Promise.resolve(Response.json({ conversation_id: "conv-addmenu1", turn_id: String((init?.body as FormData).get("turn_id")), image: { id: "file-robot0001", name: file.name, width: 640, height: 480, media_type: "image/jpeg" } }, { status: 201 }));
@@ -3670,6 +3671,51 @@ describe("ChatPage (SHELL-02 slice 6: the composer's + menu)", () => {
       expect(within(addMenu()).getByText("Take a photo")).toBeTruthy();
     } finally {
       restore();
+    }
+  });
+
+  test("a live picture capability refresh enables image attachments without reloading chat", async () => {
+    let imageParts = false;
+    const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
+    const restore = stubAddMenuFetch(undefined, false, 390, { value: true, source: "user" }, () => imageParts);
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
+      await view.findByLabelText("Message input");
+      fireEvent.click(addButton());
+      const menu = within(addMenu());
+      await menu.findByText("Add files");
+      expect(menu.getByText("Pictures need a ready vision model.")).toBeTruthy();
+      const captureFilePicker = async (label: string) => {
+        const appended: HTMLInputElement[] = [];
+        const appendChild = document.body.appendChild.bind(document.body);
+        document.body.appendChild = (<T extends Node>(node: T): T => {
+          if (node instanceof HTMLInputElement) appended.push(node);
+          return appendChild(node);
+        }) as typeof document.body.appendChild;
+        try {
+          fireEvent.click(await within(addMenu()).findByText(label));
+        } finally {
+          document.body.appendChild = appendChild;
+        }
+        return appended[0]!;
+      };
+      const filesOnlyInput = await captureFilePicker("Add files");
+      expect(filesOnlyInput.accept).not.toContain("image/*");
+      filesOnlyInput.remove();
+
+      imageParts = true;
+      fireEvent(window, new Event("visibilitychange"));
+      await waitFor(() => expect((globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls.filter((call: unknown[]) => String(call[0]).includes("chat-capabilities")).length).toBeGreaterThan(1));
+      fireEvent.click(addButton());
+      await within(addMenu()).findByText("Add photos and files");
+      const imageInput = await captureFilePicker("Add photos and files");
+      expect(imageInput.accept).toContain("image/*");
+      imageInput.remove();
+    } finally {
+      restore();
+      if (visibilityDescriptor) Object.defineProperty(document, "visibilityState", visibilityDescriptor);
+      else delete (document as unknown as { visibilityState?: string }).visibilityState;
     }
   });
 

@@ -46,6 +46,11 @@ describe("local image attachment adapter", () => {
     await expect(adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) })).rejects.toThrow("Photo uploads are turned off");
   });
 
+  test("reports the picture-capability reason when the upload setting is on but the model is not ready", async () => {
+    const adapter = createLocalImageAttachmentAdapter({ enabled: () => false, disabledMessage: () => "Pictures need a ready vision model." });
+    await expect(adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) })).rejects.toThrow("Pictures need a ready vision model.");
+  });
+
   test("stages images even when the chat engine cannot read them yet", async () => {
     const adapter = createLocalImageAttachmentAdapter();
     const pending = await adapter.add({ file: new File(["hi"], "photo.jpg", { type: "image/jpeg" }) }) as PendingAttachment;

@@ -107,12 +107,12 @@ function GroupLabel({ children }: { children: string }) {
  * attachments adapter declares - images, text/Markdown and PDF/office
  * `useChatRuntime`'s own `CompositeAttachmentAdapter`), styled as a
  * menu row via `asChild` instead of its own bare button. */
-function AddPhotosAndFilesItem({ onSelect, photos }: { onSelect: () => void; photos: boolean }) {
+function AddPhotosAndFilesItem({ onSelect, photos, reason }: { onSelect: () => void; photos: boolean; reason: string }) {
   return (
     <ComposerPrimitive.AddAttachment asChild>
       {photos
         ? <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description="Images, text, PDF, Office" onClick={onSelect} />
-        : <ComposerAddMenuItem icon={FileTextIcon} name="Add files" description="Text, PDF, Office" onClick={onSelect} />}
+        : <ComposerAddMenuItem icon={FileTextIcon} name="Add files" description={reason} onClick={onSelect} />}
     </ComposerPrimitive.AddAttachment>
   );
 }
@@ -122,25 +122,27 @@ function AddPhotosAndFilesItem({ onSelect, photos }: { onSelect: () => void; pho
  * built from (chat.photo_uploads; a child stays off until a parent turns it
  * on). Passed down as-is, never recomputed here. Off by default so a menu
  * outside the chat page never offers a photo control it cannot honour. */
-export const PhotoUploadsContext = createContext(false);
+export type PhotoUploadsState = { settingAllowed: boolean; modelCanReadPictures: boolean };
+export const PhotoUploadsContext = createContext<PhotoUploadsState>({ settingAllowed: false, modelCanReadPictures: false });
 
 /** UPLOAD-IMG-02: the plain line for a refused file. assistant-ui reports a
  * refused add as an event, never a tile, so without this a fifth picture,
  * a 12 MB one or a child's pasted photo would silently do nothing. The
  * adapter's own messages are already plain (CHAT_IMAGE_REFUSAL and the
  * photo-uploads line); the runtime's own "not accepted" text is not. */
-export function attachmentAddErrorMessage(error: { reason: string; message: string; contentType?: string }, photosAllowed: boolean): string {
+export function attachmentAddErrorMessage(error: { reason: string; message: string; contentType?: string }, photosAllowed: boolean, modelCanReadPictures = true): string {
   if (error.reason === "not-accepted") {
     if (!photosAllowed && error.contentType?.toLowerCase().startsWith("image/")) return "Photo uploads are turned off for this profile.";
+    if (!modelCanReadPictures && error.contentType?.toLowerCase().startsWith("image/")) return "Pictures need a ready vision model.";
     return "That kind of file can't be added here.";
   }
   return error.message || "That file could not be added.";
 }
 
 /** Shows the plain line for a refused file, once, as a toast. */
-function useAttachmentAddErrorToast(photosAllowed: boolean): void {
+function useAttachmentAddErrorToast(photosAllowed: boolean, modelCanReadPictures: boolean): void {
   useAuiEvent("composer.attachmentAddError", (error) => {
-    toast.error(attachmentAddErrorMessage(error, photosAllowed), { id: "composer-attachment-add-error" });
+    toast.error(attachmentAddErrorMessage(error, photosAllowed, modelCanReadPictures), { id: "composer-attachment-add-error" });
   });
 }
 
@@ -252,10 +254,14 @@ function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) 
 export function ComposerAddMenu() {
   const [open, setOpen] = useState(false);
   const { setScope } = useContext(PackageScopeContext);
-  const photosAllowed = useContext(PhotoUploadsContext);
-  useAttachmentAddErrorToast(photosAllowed);
+  const photoAccess = useContext(PhotoUploadsContext);
+  const photosAllowed = photoAccess.settingAllowed && photoAccess.modelCanReadPictures;
+  const photoDisabledReason = !photoAccess.settingAllowed
+    ? "Photo uploads are turned off for this profile."
+    : "Pictures need a ready vision model.";
+  useAttachmentAddErrorToast(photoAccess.settingAllowed, photoAccess.modelCanReadPictures);
   const breakpoint = useBreakpoint();
-  const directAttachment = breakpoint.atLeast(640);
+  const directAttachment = breakpoint.atLeast(640) && photosAllowed;
   const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: !directAttachment });
   const close = () => setOpen(false);
   if (directAttachment) {
@@ -281,7 +287,7 @@ export function ComposerAddMenu() {
           start-aligned menu opened past the phone's right edge. */}
       <ComposerMenu open={open} inert={!open} align="end">
         <GroupLabel>Add</GroupLabel>
-        <AddPhotosAndFilesItem onSelect={close} photos={photosAllowed} />
+        <AddPhotosAndFilesItem onSelect={close} photos={photosAllowed} reason={photoDisabledReason} />
         {photosAllowed && <TakeAPhotoItem onSelect={close} />}
         <CreateImageItem overview={enginesQuery.data} onSelect={close} />
         <WebSearchItem onSelect={close} />

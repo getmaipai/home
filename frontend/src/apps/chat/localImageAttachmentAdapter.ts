@@ -20,6 +20,7 @@ export interface LocalImageAttachmentRecord {
 
 export interface LocalImageAttachmentAdapterOptions {
   enabled?: () => boolean;
+  disabledMessage?: () => string;
   onRecord?(record: LocalImageAttachmentRecord): void;
   onRemove?(id: string): void;
 }
@@ -71,10 +72,10 @@ function validateImage(file: File): void {
  * (UPLOAD-IMG-02). Checked here instead - a photo is refused the moment
  * it's picked, with the real reason, never a silently dead Send button. */
 export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentAdapterOptions = {}): AttachmentAdapter {
-
-  const imagesEnabled = options.enabled?.() !== false;
   return {
-    accept: imagesEnabled ? "image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp" : ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp",
+    get accept() {
+      return options.enabled?.() !== false ? "image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp" : ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp";
+    },
 
     async add({ file }): Promise<PendingAttachment> {
       if (DOCUMENT_TYPES.has(file.type.toLowerCase())) {
@@ -84,7 +85,7 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
         return { id, type: "file", name: file.name, contentType: file.type, file, status: { type: "requires-action", reason: "composer-send" } };
       }
       validateImage(file);
-      if (options.enabled?.() === false) throw new Error("Photo uploads are turned off for this profile.");
+      if (options.enabled?.() === false) throw new Error(options.disabledMessage?.() ?? "Photo uploads are turned off for this profile.");
       if (stagedRecords.size >= MAX_CHAT_IMAGES) throw new Error(CHAT_IMAGE_REFUSAL);
       const bytes = await file.arrayBuffer();
       const digest = await sha256(bytes);
@@ -111,7 +112,7 @@ export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentA
     async send(attachment: PendingAttachment): Promise<CompleteAttachment> {
       const doc = stagedDocuments.get(attachment.id);
       if (doc) return { ...attachment, status: { type: "complete" }, content: [{ type: "text", text: `Document: ${doc.name}` }] };
-      if (options.enabled?.() === false) throw new Error("Photo uploads are turned off for this profile.");
+      if (options.enabled?.() === false) throw new Error(options.disabledMessage?.() ?? "Photo uploads are turned off for this profile.");
       validateImage(attachment.file);
       return {
         ...attachment,

@@ -388,8 +388,28 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   // exists server-side but nothing wires it to a route or the turn
   // (COMPOSER-DOC-ATTACH-01, docs/BACKLOG.md) - a real gap, not this
   // slice's UI-composition scope.
-  const imageAttachmentAdapter = useMemo(() => createLocalImageAttachmentAdapter({ enabled: () => photoUploadsEnabled }), [photoUploadsEnabled]);
-  const attachmentsAdapter = useMemo(() => new CompositeAttachmentAdapter([imageAttachmentAdapter, new SimpleTextAttachmentAdapter()]), [imageAttachmentAdapter]);
+  const imageAttachmentAllowedRef = useRef(photoUploadsEnabled && imagePartsAvailable);
+  imageAttachmentAllowedRef.current = photoUploadsEnabled && imagePartsAvailable;
+  const imageDisabledMessageRef = useRef("Pictures need a ready vision model.");
+  imageDisabledMessageRef.current = !photoUploadsEnabled ? "Photo uploads are turned off for this profile." : "Pictures need a ready vision model.";
+  const imageAttachmentAdapter = useMemo(() => createLocalImageAttachmentAdapter({
+    enabled: () => imageAttachmentAllowedRef.current,
+    disabledMessage: () => imageDisabledMessageRef.current,
+  }), []);
+  const textAttachmentAdapter = useMemo(() => new SimpleTextAttachmentAdapter(), []);
+  const attachmentsAdapter = useMemo(() => {
+    const composite = new CompositeAttachmentAdapter([imageAttachmentAdapter, textAttachmentAdapter]);
+    // CompositeAttachmentAdapter snapshots child accept strings in its
+    // constructor. Expose the union through a live getter so the shipped
+    // file primitive can follow Stack capability changes without replacing
+    // the active chat runtime.
+    Object.defineProperty(composite, "accept", {
+      configurable: true,
+      enumerable: true,
+      get: () => `${imageAttachmentAdapter.accept},${textAttachmentAdapter.accept}`,
+    });
+    return composite;
+  }, [imageAttachmentAdapter, textAttachmentAdapter]);
   // DICT-01: read fresh (not cached at mount) since an install can finish
   // while this page is already open - `sttInstalled` below reads
   // `sttStatusQuery.data` live on every mic click, not this render's
@@ -1147,6 +1167,18 @@ export function ChatPage({ person }: { person: Roster }) {
     setOpenArtifactId(null);
     setCompareTarget(null);
   }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, projectPage?.folderId);
+  const previousImagePartsAvailable = useRef(imagePartsAvailable);
+  useEffect(() => {
+    if (previousImagePartsAvailable.current === imagePartsAvailable) return;
+    previousImagePartsAvailable.current = imagePartsAvailable;
+    // assistant-ui snapshots attachmentAccept and does not notify its
+    // composer when only an existing adapter's accept list changes. Its
+    // public run-config setter emits that notification; a shallow copy keeps
+    // the request config's value exactly the same while refreshing the file
+    // picker's accepted types.
+    const currentRunConfig = runtime.thread.composer.getState().runConfig;
+    runtime.thread.composer.setRunConfig({ ...currentRunConfig });
+  }, [imagePartsAvailable, runtime]);
   const voiceSession = useLiveVoiceSession({
     composer: runtime.thread.composer,
     open: voiceOpen,

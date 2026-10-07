@@ -9,6 +9,10 @@ describe("attachmentAddErrorMessage", () => {
     expect(attachmentAddErrorMessage({ reason: "not-accepted", message: "File type image/png is not accepted. Accepted types: .pdf", contentType: "image/png" }, false)).toBe("Photo uploads are turned off for this profile.");
   });
 
+  test("a permitted photo is refused with the live-model reason while picture input is unavailable", () => {
+    expect(attachmentAddErrorMessage({ reason: "not-accepted", message: "File type image/png is not accepted. Accepted types: .pdf", contentType: "image/png" }, true, false)).toBe("Pictures need a ready vision model.");
+  });
+
   test("an unsupported file type gets a plain line, not the accept list", () => {
     const line = attachmentAddErrorMessage({ reason: "not-accepted", message: "File type application/zip is not accepted. Accepted types: image/*,.pdf", contentType: "application/zip" }, true);
     expect(line).toBe("That kind of file can't be added here.");
