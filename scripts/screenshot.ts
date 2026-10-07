@@ -3825,9 +3825,29 @@ async function sessionFor(sessionValue: string, displayName: string | null): Pro
 }
 
 async function seedTurnFor(session: string, text: string): Promise<{ conversation_id: string; turn_id: string }> {
-  const turn = await fetch(`${BASE_URL}/api/turn`, { method: "POST", headers: { "Content-Type": "application/json", Cookie: `session=${session}` }, body: JSON.stringify({ surface: "chat", text }) });
-  if (!turn.ok) throw new Error(`elements wave 2: seeding a turn failed: ${turn.status} ${await turn.text()}`);
-  return (await turn.json()) as { conversation_id: string; turn_id: string };
+  // These are review fixtures, not a model-quality test. A live POST /api/turn
+  // made the screenshot depend on conversation creation and the engine path;
+  // on the throwaway hub that endpoint can fail validation before rendering.
+  // Seed spec-shaped rows directly, as the other screenshot fixtures do.
+  const who = await fetch(`${BASE_URL}/api/auth/me`, { headers: { Cookie: `session=${session}` } });
+  if (!who.ok) throw new Error(`elements wave 2: reading the review person failed: ${who.status} ${await who.text()}`);
+  const me = await who.json() as { id?: string; person?: { id: string } };
+  const personId = me.person?.id ?? me.id;
+  if (!personId) throw new Error("elements wave 2: the review session has no person id");
+
+  const suffix = crypto.randomUUID().replaceAll("-", "").toLowerCase();
+  const conversationId = `conv-${suffix}`;
+  const turnId = `turn-${suffix}`;
+  const now = new Date().toISOString();
+  const hlc = `${Date.now()}:0:screenshot`;
+  const source = `import { Database } from "bun:sqlite";
+const db = new Database(${JSON.stringify(join(DATA_DIR, "hub.db"))});
+db.query("INSERT INTO conversations (id, person_id, surface, mode, hlc, created_at, updated_at) VALUES (?, ?, 'chat', 'chat', ?, ?, ?)").run(${JSON.stringify(conversationId)}, ${JSON.stringify(personId)}, ${JSON.stringify(hlc)}, ${JSON.stringify(now)}, ${JSON.stringify(now)});
+db.query("INSERT INTO conversation_turns (id, person_id, surface, conversation_id, user_text, reply_text, source, safety_action, created_at, hlc, status, routing_tier, routing_score, branch_chosen) VALUES (?, ?, 'chat', ?, ?, ?, 'model', 'allow', ?, ?, 'done', 'chat', 1.0, 1)").run(${JSON.stringify(turnId)}, ${JSON.stringify(personId)}, ${JSON.stringify(conversationId)}, ${JSON.stringify(text)}, "It opens at nine, and the garden volunteers are welcome too.", ${JSON.stringify(now)}, ${JSON.stringify(`${Date.now()}:1:screenshot`)});
+db.close();`;
+  const seeded = Bun.spawnSync({ cmd: ["bun", "-e", source], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "pipe", stderr: "pipe" });
+  if (seeded.exitCode !== 0) throw new Error(`elements wave 2: inserting a review turn failed: ${seeded.stderr.toString()}`);
+  return { conversation_id: conversationId, turn_id: turnId };
 }
 
 type Wave2Shot = { name?: string; band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; live?: boolean; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
@@ -3851,8 +3871,8 @@ function wave2Shots(part: string): Wave2Shot[] {
     };
     return [
       { band: "adult", person: null, prompt: "When does the library open on Saturday?", combos: ALL_COMBOS, drive },
-      { band: "teen", person: "Marlow", prompt: "When does the library open on Saturday?", combos: TWO_COMBOS, drive },
-      { band: "child", person: "Nova", prompt: "When does the library open on Saturday?", combos: TWO_COMBOS, drive },
+      { band: "teen", person: "Marlow", prompt: "When does the library open on Saturday?", combos: ALL_COMBOS, drive },
+      { band: "child", person: "Nova", prompt: "When does the library open on Saturday?", combos: ALL_COMBOS, drive },
     ];
   }
   if (part === "feedback-cancel") {
