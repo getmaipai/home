@@ -118,8 +118,17 @@ describe("StoragePage", () => {
     }));
     try {
       renderWithQueryClient(<MemoryRouter><StoragePage person={makePerson()} /></MemoryRouter>);
-      const table = await waitFor(() => document.querySelector('[role="table"][aria-label="Storage usage by person"]')!);
-      fireEvent.click(table.querySelector('button[aria-label="Sort by Person"]')!);
+      const table = await waitFor(() => {
+        const element = document.querySelector('[role="table"][aria-label="Storage usage by person"]');
+        expect(element).not.toBeNull();
+        return element!;
+      });
+      const sortButton = await waitFor(() => {
+        const button = table.querySelector('button[aria-label="Sort by Person"]');
+        expect(button).not.toBeNull();
+        return button!;
+      });
+      fireEvent.click(sortButton);
       await waitFor(() => {
         const rows = Array.from(table.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'));
         expect(rows[0]?.textContent).toContain("Ada");

@@ -105,8 +105,17 @@ describe("PerformancePage", () => {
     }));
     try {
       renderWithQueryClient(<MemoryRouter><PerformancePage /></MemoryRouter>);
-      const table = await waitFor(() => document.querySelector('[role="table"][aria-label="Turn routes"]')!);
-      fireEvent.click(table.querySelector('button[aria-label="Sort by Route"]')!);
+      const table = await waitFor(() => {
+        const element = document.querySelector('[role="table"][aria-label="Turn routes"]');
+        expect(element).not.toBeNull();
+        return element!;
+      });
+      const sortButton = await waitFor(() => {
+        const button = table.querySelector('button[aria-label="Sort by Route"]');
+        expect(button).not.toBeNull();
+        return button!;
+      });
+      fireEvent.click(sortButton);
       await waitFor(() => {
         const rows = Array.from(table.querySelectorAll('[data-slot="data-table-body"] [data-slot="data-table-row"]'));
         expect(rows[0]?.textContent).toContain("alpha");
