@@ -36,14 +36,22 @@ describe("POST /api/voice/hf-token", () => {
   });
 
   test("a non-admin adult is refused: voice.hf_token is a household setting", async () => {
-    const owner = await ownerClient();
-    const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
-    const adult = (await adultRes.json()) as { id: string };
-    const adultClient = new TestClient();
-    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
+    const unavailable = startStackFixture({
+      "POST /stack/v1/settings/apply": () => offlineResponse("tts", "the test Stack is unavailable"),
+    });
+    __setStackClientForTests(unavailable.client);
+    try {
+      const owner = await ownerClient();
+      const adultRes = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+      const adult = (await adultRes.json()) as { id: string };
+      const adultClient = new TestClient();
+      await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
 
-    const res = await adultClient.post("/api/voice/hf-token", { token: "hf_x" });
-    expect(res.status).toBe(503);
+      const res = await adultClient.post("/api/voice/hf-token", { token: "hf_x" });
+      expect(res.status).toBe(503);
+    } finally {
+      unavailable.stop();
+    }
   });
 
   test("rejects a missing token", async () => {
@@ -59,8 +67,16 @@ describe("POST /api/voice/hf-token", () => {
   });
 
   test("requires the Stack when no speech service is configured", async () => {
-    const owner = await ownerClient();
-    expect((await owner.post("/api/voice/hf-token", { token: "hf_realtoken123" })).status).toBe(503);
+    const unavailable = startStackFixture({
+      "POST /stack/v1/settings/apply": () => offlineResponse("tts", "the test Stack is unavailable"),
+    });
+    __setStackClientForTests(unavailable.client);
+    try {
+      const owner = await ownerClient();
+      expect((await owner.post("/api/voice/hf-token", { token: "hf_realtoken123" })).status).toBe(503);
+    } finally {
+      unavailable.stop();
+    }
   });
 });
 

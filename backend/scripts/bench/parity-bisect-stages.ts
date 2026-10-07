@@ -34,8 +34,9 @@ export interface Stage {
 export function buildStages(persona: Persona, plan: ReplyPlan, signal: TurnSignal, tools: ToolSpec[]): Stage[] {
   const stage1Messages: LlmMessage[] = [{ role: "system", content: buildStablePrefix(persona, "written") }, { role: "user", content: QUESTION }];
   const stage3Messages = contextToMessages([], QUESTION, persona, plan, signal, "written");
-  const mergedSystemContent = stage3Messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
-  const stage4Messages: LlmMessage[] = [{ role: "system", content: mergedSystemContent }, { role: "user", content: QUESTION }];
+  // G1 places volatile context at the start of the final user message;
+  // there are no volatile system messages left to merge for this row.
+  const stage4Messages = stage3Messages;
 
   return [
     { name: "0a-bare-thinking-on", messages: [{ role: "user", content: QUESTION }], opts: { temperature: ENGINE_DEFAULT_TEMPERATURE, thinking: true } },
@@ -43,10 +44,8 @@ export function buildStages(persona: Persona, plan: ReplyPlan, signal: TurnSigna
     { name: "1-stable-prefix", messages: stage1Messages, opts: { temperature: ENGINE_DEFAULT_TEMPERATURE, thinking: false } },
     { name: "2-plus-tools", messages: stage1Messages, opts: { temperature: ENGINE_DEFAULT_TEMPERATURE, thinking: false, tools, tool_choice: "auto" } },
     { name: "3-plus-volatile", messages: stage3Messages, opts: { temperature: ENGINE_DEFAULT_TEMPERATURE, thinking: false, tools, tool_choice: "auto" } },
-    // A side comparison against stage 3's own shape (merging its two
-    // system messages into one), not a further stack - stages 5 and 6
-    // continue from stage 3's own two-message split, which is what the
-    // real new path sends.
+    // The former system-message merge is now a no-op comparison; stage 3
+    // carries volatile context in the final user message.
     { name: "4-merged-system", messages: stage4Messages, opts: { temperature: ENGINE_DEFAULT_TEMPERATURE, thinking: false, tools, tool_choice: "auto" } },
     { name: "5-chat-sampling", messages: stage3Messages, opts: { thinking: false, tools, tool_choice: "auto" } },
     { name: "6-thinking-off-confirm", messages: stage3Messages, opts: { thinking: false, tools, tool_choice: "auto" } },

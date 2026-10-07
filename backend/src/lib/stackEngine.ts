@@ -59,12 +59,21 @@ let cachedClient: StackClient | null = null;
 let cachedUrl: string | null = null;
 let testClient: StackClient | null = null;
 let defaultTestClient: StackClient | null = null;
+let defaultTestClientEnabled = false;
 
 /** Lazily builds (and reuses) one client per URL - a URL change (a rare
  * admin action, never mid-turn) invalidates the cache the same way a
  * generation bump invalidates llmSupervisor.ts's own cached backend. */
 export function getStackClient(): StackClient {
   if (testClient) return testClient;
+  // A backend test may clear the preload's scripted client to exercise
+  // unconfigured behavior, but it must never turn a household URL into a
+  // real network client. Tests that need Stack behavior install an
+  // explicit fixture client with __setStackClientForTests().
+  if (process.env.NODE_ENV === "test") {
+    if (defaultTestClient) return defaultTestClient;
+    throw new Error("backend tests must inject a Stack fixture before resolving getStackClient()");
+  }
   const url = getStackUrl();
   if (!url) throw new Error("no MaiPai Stack is configured (engines.stack.url is empty)");
   if (!cachedClient || cachedUrl !== url) {
@@ -79,6 +88,7 @@ export function getStackClient(): StackClient {
  * already use. */
 export function __setStackClientForTests(client: StackClient | null): void {
   testClient = client;
+  defaultTestClientEnabled = false;
   cachedClient = null;
   cachedUrl = null;
 }
@@ -91,12 +101,20 @@ export function __setDefaultStackClientForTests(client: StackClient): void {
   __setStackClientForTests(client);
 }
 
+export function __enableDefaultStackClientForTests(): void {
+  testClient = defaultTestClient;
+  defaultTestClientEnabled = true;
+  cachedClient = null;
+  cachedUrl = null;
+}
+
 export function __hasInjectedStackClientForTests(): boolean {
   return testClient !== null;
 }
 
 export function __resetStackEngineForTests(): void {
   testClient = defaultTestClient;
+  defaultTestClientEnabled = false;
   cachedClient = null;
   cachedUrl = null;
   stackChatIdentity = null;

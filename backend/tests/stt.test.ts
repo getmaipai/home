@@ -47,6 +47,7 @@ describe("POST /api/stt/transcribe", () => {
   test("returns the scripted transcription for a fixture WAV", async () => {
     fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => Response.json({ text: "the fixture said this" }, { headers: IDENTITY_HEADERS }) });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
     const client = await owner();
     const res = await client.postBytes("/api/stt/transcribe", fixtureWav(), "audio/wav");
     expect(res.status).toBe(200);
@@ -71,6 +72,7 @@ describe("GET /api/voice/stt/status", () => {
   test("reports ready state for the configured Stack role and keeps legacy asset fields false", async () => {
     fixture = startStackFixture({ "GET /stack/v1/roles": async () => Response.json({ roles: [{ id: "stt", state: { state: "ready" } }] }) });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
     const client = await owner();
     const res = await client.get("/api/voice/stt/status");
     expect(res.status).toBe(200);
@@ -85,6 +87,7 @@ describe("GET /api/voice/stt/status", () => {
   test("reports an offline Stack role state as not installed", async () => {
     fixture = startStackFixture({ "GET /stack/v1/roles": async () => Response.json({ roles: [{ id: "stt", state: { state: "offline", reason: "worker stopped" } }] }) });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
     const client = await owner();
     const res = await client.get("/api/voice/stt/status");
     const body = (await res.json()) as { installed: boolean; stackState: string };
@@ -133,6 +136,7 @@ describe("lib/stt.ts routed through a configured Stack", () => {
   test("configured Stack routes listening through its client", async () => {
     fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => Response.json({ text: "Stack heard this" }) });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
     expect(await transcribeUtterance(new Float32Array(1600), 16_000)).toBe("Stack heard this");
     expect(fixture.calls).toEqual(["POST /v1/audio/transcriptions"]);
   });

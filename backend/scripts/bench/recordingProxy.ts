@@ -1,13 +1,13 @@
 // The baseline conversation bench's recording proxy: a Bun.serve() in
 // front of the chat engine that forwards every request and keeps, per
-// completion request, the system messages the model saw and the tool
-// names offered, so "recall in context" is read from what the model
-// was actually given, never from the reply. No database import on
+// completion request, the system messages and final user message the
+// model saw plus the tool names offered, so "recall in context" is read
+// from what the model was actually given, never from the reply. No database import on
 // purpose: conversationLive.ts starts it before setup.ts (which must
 // load before anything reaches "@/db") reads MAIPAI_LLAMA_SERVER_URL.
 
 export interface RecordedRequest {
-  systemText: string;
+  contextText: string;
   tools: string[];
   messages: number;
   /** The model's own raw text for this request (the SSE deltas'
@@ -184,7 +184,10 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
           const parsed = JSON.parse(body) as NonNullable<typeof parsedBody>;
           parsedBody = parsed;
           recorded = {
-            systemText: (parsed.messages ?? []).filter((m) => m.role === "system").map((m) => m.content).join("\n"),
+            contextText: [
+              ...(parsed.messages ?? []).filter((m) => m.role === "system").map((m) => m.content),
+              (parsed.messages ?? []).filter((m) => m.role === "user").at(-1)?.content,
+            ].filter((content): content is string => typeof content === "string").join("\n"),
             tools: (parsed.tools ?? []).map((t) => t.function?.name ?? "?"),
             messages: parsed.messages?.length ?? 0,
             responseText: "",

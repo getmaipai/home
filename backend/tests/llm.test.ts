@@ -13,12 +13,14 @@ import { __setStackClientForTests, __resetStackEngineForTests, getActiveChatEngi
 import { listIssues } from "@/lib/issues";
 import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
 import { useDefaultScriptedStack } from "./stackFixture";
+import { getDefaultScriptedStack } from "./stackFixture";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetRateLimiterForTests();
   useDefaultScriptedStack();
+  __setStackClientForTests(getDefaultScriptedStack().client);
 });
 
 afterEach(() => {

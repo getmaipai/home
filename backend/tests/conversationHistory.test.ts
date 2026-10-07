@@ -1825,18 +1825,25 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
   });
 
   test("skips entirely on the stub model - a canned reply is worse than no summary", async () => {
-    __setStackClientForTests(null);
-    setHouseholdSettingValue("engines.stack.url", "");
-    const { actor } = await owner();
-    const conv = resolveOrCreateConversation(actor, "chat");
-    if (!conv.ok) throw new Error(conv.error);
-    for (let i = 0; i < 8; i++) {
-      logTurn(actor, "chat", `msg ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-stub${i}` });
+    const unavailable = makeStackFixture({
+      "POST /v1/chat/completions": () => offlineResponse("judge", "the test engine is unavailable"),
+    });
+    __setStackClientForTests(unavailable.client);
+    try {
+      setHouseholdSettingValue("engines.stack.url", "");
+      const { actor } = await owner();
+      const conv = resolveOrCreateConversation(actor, "chat");
+      if (!conv.ok) throw new Error(conv.error);
+      for (let i = 0; i < 8; i++) {
+        logTurn(actor, "chat", `msg ${i}`, { reply: { text: `reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-stub${i}` });
+      }
+      await maybeRefreshConversationSummary(conv.value.id);
+      const row = getConversation(actor, conv.value.id);
+      if (!row.ok) throw new Error(row.error);
+      expect(row.value.summary).toBeNull();
+    } finally {
+      unavailable.stop();
     }
-    await maybeRefreshConversationSummary(conv.value.id);
-    const row = getConversation(actor, conv.value.id);
-    if (!row.ok) throw new Error(row.error);
-    expect(row.value.summary).toBeNull();
   });
 
   test("runs once the history passes its fold mark, folding the oldest turns as one block, using a real (if stub-shaped) completion", async () => {

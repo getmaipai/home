@@ -56,11 +56,15 @@ lock_holder() {
 foreign_hub() {
   holder=""
   lock_holder && return 0
-  # Not `lsof -i`: it scans every open file on the machine and can hang for
-  # minutes. netstat (macOS) and ss (Linux) answer from the socket table.
+  # Prefer the socket table, not a machine-wide `lsof -i` scan. Some macOS
+  # environments return an empty netstat table even for a listening socket;
+  # in that case, ask lsof only about this port.
   if [ "$(uname -s)" = "Darwin" ]; then
     holder="$(netstat -anv -p tcp 2>/dev/null | awk -v p="$port" '
       $6 == "LISTEN" && $4 ~ ("[.:]" p "$") { n = split($11, a, ":"); print a[n]; exit }' || true)"
+    if [ -z "$holder" ] && command -v lsof >/dev/null 2>&1; then
+      holder="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null | head -n 1 || true)"
+    fi
   elif command -v ss >/dev/null 2>&1; then
     holder="$(ss -ltnpH "sport = :$port" 2>/dev/null | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | head -n 1 || true)"
   fi

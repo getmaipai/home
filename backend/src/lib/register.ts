@@ -247,8 +247,8 @@ export function planLineForTurnMachine(plan: ReplyPlan, signal: TurnSignal, surf
     computed: "the calculation",
   }[signal.target];
   const line = planLineAbout(plan, signal, surfaceClass, about);
-  // THIN-0B: the age projection held a record back from this child or
-  // teen, so the model is told, and told where to send the question.
+  // THIN-0B: a mode control held a record back, so the model is told, and
+  // told where to send the question.
   // Turn-machine path only; planLine() above keeps the frozen wording.
-  return plan.content_disclosure === "some_withheld" ? `${line} Something you know is held back at this person's age: do not guess at it or hint at it, say it is one for a parent or trusted adult, and offer to ask them.` : line;
+  return plan.content_disclosure === "some_withheld" ? `${line} Something you know is held back by this person's controls: do not guess at it or hint at it, say it is one for a parent or trusted adult, and offer to ask them.` : line;
 }

@@ -57,8 +57,11 @@ describe("THIN-7C: continuation on the default path", () => {
       expect(value.reply.text).toBe("tuck in fresh soil and water it well.");
       const request = seen.at(-1)!;
       const tail = request.messages.slice(-3).map((m) => ({ role: m.role, content: String(m.content ?? "") }));
-      expect(tail).toEqual([
-        { role: "user", content: "continue" },
+      expect(tail[0]?.role).toBe("user");
+      expect(tail[0]?.content).toStartWith("Context for this turn (background data first; the person's words follow):");
+      expect(tail[0]?.content).toContain("How to answer this one:");
+      expect(tail[0]?.content).toEndWith("The person's words:\ncontinue");
+      expect(tail.slice(1)).toEqual([
         { role: "assistant", content: PARTIAL },
         { role: "user", content: INSTRUCTION },
       ]);
