@@ -578,7 +578,7 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
     let offeredNames: string[] = [];
     const stub = startStubLlmServer(0, {
       scriptedChatReply: (request) => {
-        contextMessage = request.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+        contextMessage = request.messages.map((m) => typeof m.content === "string" ? m.content : JSON.stringify(m.content)).join("\n");
         return reply;
       },
       scriptedToolCalls: (request) => {
@@ -1706,7 +1706,7 @@ describe("RECALL-02b: the prompt the model sees", () => {
     try {
       const result = await runTurnNext(actor, "chat", utterance, { conversationId });
       if (!result.ok) throw new Error(result.error);
-      const context = captured!.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+      const context = captured!.messages.map((m) => typeof m.content === "string" ? m.content : JSON.stringify(m.content)).join("\n");
       return { context, value: result.value };
     } finally {
       await stub.stop();
@@ -1835,7 +1835,7 @@ describe("JOIN-01: recalled episodes reach the prompt and the guards", () => {
         // nothing grounding "dentist" and "Thursday", and it stands only
         // because the recalled episode grounds both. "It's on Thursday."
         // would pass with no sources at all and prove nothing here.
-        return request.messages.at(-1)?.content === "what day is my dentist appointment" ? "My guess is your dentist is Thursday." : "Okay, noted.";
+        return String(request.messages.at(-1)?.content).endsWith("The person's words:\nwhat day is my dentist appointment") ? "My guess is your dentist is Thursday." : "Okay, noted.";
       },
     });
     process.env.MAIPAI_LLAMA_SERVER_URL = stub.url;
@@ -1853,8 +1853,8 @@ describe("JOIN-01: recalled episodes reach the prompt and the guards", () => {
       if (!result.ok) return;
 
       const messages = captured!.messages;
-      const context = messages.at(-2);
-      expect(context?.role).toBe("system");
+      const context = messages.at(-1);
+      expect(context?.role).toBe("user");
       expect(context?.content).toContain("From earlier conversations (what was said, not necessarily true):");
       expect(context?.content).toMatch(/said: "my dentist appointment is on Thursday"/);
       // The guards saw the episode: the household guess stands as-is,
@@ -1959,7 +1959,7 @@ describe("POST /api/turn", () => {
     const body = (await res.json()) as { reply: { text: string; speech?: string } };
     const first = body.reply.text.split(/[.!?](?:\s|$)/, 1)[0] ?? "";
     const mark = body.reply.text.match(/[.!?]/)?.[0] ?? "";
-    expect(body.reply.speech).toBe(first + mark);
+    expect(body.reply.speech).toBe(first.replace(/\s+/g, " ") + mark);
     expect(body.reply.speech).not.toContain("http");
   });
 
@@ -2939,7 +2939,7 @@ describe("#92: a lookup miss falls through to the model, and a literal pattern y
     __resetLlmSupervisorForTests();
     const stub = startStubLlmServer(0, {
       scriptedChatReply: (request) => {
-        context = request.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+        context = request.messages.map((m) => typeof m.content === "string" ? m.content : JSON.stringify(m.content)).join("\n");
         return "Peanuts.";
       },
     });

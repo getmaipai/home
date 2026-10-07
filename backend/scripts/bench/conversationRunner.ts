@@ -827,7 +827,7 @@ export async function runConversation(conv: BenchConversation, deps: RunDeps): P
       crisisResources: Boolean(driven.value?.crisis_resources),
       memoryRows: memoryRowsFor(turnId),
       storedUserText: row?.userText ?? null,
-      contextMessage: requests.length ? requests.map((r) => r.systemText).join("\n") : null,
+      contextMessage: requests.length ? requests.map((r) => r.contextText).join("\n") : null,
       offeredTools: requests[0]?.tools ?? route?.offered ?? [],
       attempts: attemptsIn(conversationId),
       answered: driven.value !== null && driven.error === null,

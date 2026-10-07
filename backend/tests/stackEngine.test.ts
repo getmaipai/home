@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { __resetStackEngineForTests, __setStackClientForTests, isStackRoleEnabled, getHomeOwnedRoles, recordStackChatIdentity, getActiveChatEngineIdentity, type StackRole } from "@/lib/stackEngine";
+import { __resetStackEngineForTests, __setStackClientForTests, getStackClient, isStackRoleEnabled, getHomeOwnedRoles, recordStackChatIdentity, getActiveChatEngineIdentity, type StackRole } from "@/lib/stackEngine";
 
 const roles: StackRole[] = ["chat", "embeddings", "stt", "tts"];
 
@@ -28,6 +28,12 @@ describe("Stack role routing", () => {
     expect(getActiveChatEngineIdentity()).toEqual(identity);
     expect(getActiveChatEngineIdentity()).toEqual(identity);
   });
+
+  test("a cleared test client cannot resolve the household Stack URL into a network client", () => {
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    expect(() => getStackClient()).toThrow("backend tests must inject a Stack fixture");
+  });
+
 });
 
 describe("computer memory role ownership", () => {

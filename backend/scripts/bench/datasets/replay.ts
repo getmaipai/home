@@ -378,7 +378,7 @@ async function runLongMemEval(questions: readonly LongMemEvalQuestion[], convers
         const asked = await askQuestion(actor, created.value.id, q.question);
         await proxy.settled();
         const { guardReason, source } = await turnGuardAndSource(asked.turnId);
-        const contextMessage = proxy.requests.length ? proxy.requests.map((r) => r.systemText).join("\n") : null;
+        const contextMessage = proxy.requests.length ? proxy.requests.map((r) => r.contextText).join("\n") : null;
         const recallHits = computeRecallHits(longMemEvalEvidenceTurns(conv), contextMessage);
         const verdict = await gradeLongMemEvalReply(q.question, q.answer, asked.reply);
         const row: LongMemEvalResult = { questionId: q.questionId, questionType: q.questionType, isAbstention: q.isAbstention, question: q.question, referenceAnswer: q.answer, reply: asked.reply, grader: "4b", verdict, contextMessage, recallHits, judgeWrittenRecords, guardReason, source };
@@ -434,7 +434,7 @@ async function runLocomo(conversations: readonly DatasetConversation[], question
             const asked = await askQuestion(actor, created.value.id, q.question);
             await proxy.settled();
             const { guardReason, source } = await turnGuardAndSource(asked.turnId);
-            const contextMessage = proxy.requests.length ? proxy.requests.map((r) => r.systemText).join("\n") : null;
+            const contextMessage = proxy.requests.length ? proxy.requests.map((r) => r.contextText).join("\n") : null;
             const recallHits = computeRecallHits(locomoEvidenceTurns(conv, q.evidenceTurnIds), contextMessage);
             const diagnostics: RecallDiagnostics = { contextMessage, recallHits, judgeWrittenRecords, guardReason, source };
             const scored = scoreLocomo(conv.id, q.category, q.question, asked.reply, q.answer, q.adversarialAnswer, diagnostics);

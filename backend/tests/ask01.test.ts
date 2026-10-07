@@ -84,7 +84,7 @@ const varied = (base: string): ((request: ChatCompletionRequest) => string) => {
   let n = 0;
   return () => (n++ === 0 ? base : "That's a new one on me, tell me more.");
 };
-const contextOf = (request: ChatCompletionRequest) => request.messages.filter((m) => m.role === "system").map((m) => (typeof m.content === "string" ? m.content : "")).join("\n");
+const contextOf = (request: ChatCompletionRequest) => request.messages.map((m) => typeof m.content === "string" ? m.content : JSON.stringify(m.content)).join("\n");
 const entityNamed = (name: string) => db.select().from(entities).where(and(eq(entities.name, name), isNull(entities.deletedAt))).get();
 const subjectsOfTurn = (turnId: string) => turnSubjectsOf(db.select({ subjects: conversationTurns.subjects }).from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!);
 

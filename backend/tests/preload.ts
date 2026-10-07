@@ -69,7 +69,6 @@ const [{ __setDefaultStackClientForTests }, { startDefaultScriptedStack, setDefa
 ]);
 defaultScriptedStack = startDefaultScriptedStack();
 setDefaultScriptedStackFixture(defaultScriptedStack);
-__setDefaultStackClientForTests(defaultScriptedStack.client);
 
 // Everything above is only a guarantee while it stays set. Found live
 // 2026-09-07: a test file's own afterEach deleted MAIPAI_LLAMA_SERVER_PORT

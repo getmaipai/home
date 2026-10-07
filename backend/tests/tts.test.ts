@@ -146,6 +146,7 @@ describe("lib/tts.ts routed through a configured Stack", () => {
     let calls = 0;
     fixture = startStackFixture({ "POST /v1/audio/speech": async () => { calls++; return new Response(new Uint8Array(44)); } });
     setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
     const result = await synthesizeSpeech("good morning");
     expect(result.ok).toBe(true);
     expect(calls).toBe(1);

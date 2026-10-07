@@ -54,10 +54,12 @@ describe("UPLOAD-IMG-02: sent pictures while the model cannot see them", () => {
       expect(prompt).toContain("2 pictures");
       expect(prompt).toContain("You cannot see pictures yet");
       expect(prompt).toContain("You cannot tell who a person in a photo is.");
-      // The person's own words stay the final user message, unchanged.
+      // The person's own words remain raw at the end of the final user
+      // message; request-local context leads it, and image parts stay attached.
       const last = seen.at(-1)!.messages.at(-1)!;
       expect(last.role).toBe("user");
-      expect(String(last.content)).toBe("can you see these files?");
+      expect(String(last.content)).toContain("The person's words:\ncan you see these files?");
+      expect(String(last.content)).toContain("2 pictures");
     });
   });
 

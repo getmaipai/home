@@ -530,7 +530,7 @@ describe("recall and the prompt know whose fact it is", () => {
     expect(matches[0]!.record.text).toBe("Quill likes seltzer");
     const context = await promptFor(actor, "what does Quill drink");
     expect(context).toMatch(/\[remembered \([\d-]+\)\] Quill likes seltzer/);
-    expect(context).toContain("[subjects] About: Quill (your coworker).");
+    expect(context).toContain("<untrusted_data>\nAbout: Quill (your coworker).\n</untrusted_data>");
   });
 
   test("an unconfirmed inferred relation is never said to the model (the name alone), and is plain once an adult confirms it", async () => {

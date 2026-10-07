@@ -28,7 +28,7 @@ export function startStackFixture(routes: Record<string, StackFixtureHandler>): 
       req.signal.addEventListener("abort", () => { aborted++; }, { once: true });
       const url = new URL(req.url);
       calls.push(`${req.method} ${url.pathname}`);
-      const handler = routes[`${req.method} ${url.pathname}`];
+      const handler = routes[`${req.method} ${url.pathname}`] ?? routes["*"];
       if (!handler) return Response.json({ error: `no fixture route for ${req.method} ${url.pathname}` }, { status: 404 });
       return handler(req);
     },
@@ -52,6 +52,15 @@ export function offlineResponse(role: string, offline_reason: string): Response 
  * stubs, while the wrapper adds Stack identity headers. */
 export function startDefaultScriptedStack(): StackFixture {
   const engine = startStubLlmServer(0);
+  const now = new Date().toISOString();
+  const scriptedJob = (id: string, state: "queued" | "done" | "cancelled" = "done") => ({
+    id, kind: "image", role: "image", state, percent: state === "done" ? 100 : 0,
+    completedBytes: 0, totalBytes: 0, status: state, position: null,
+    input: { prompt: "a scripted image" }, result: state === "done" ? { images: [{ b64_json: "aGVsbG8=" }] } : null,
+    reason: null, createdAt: now, updatedAt: now,
+  });
+  const unknownRange = { low: null, high: null, source: "unknown", as_of: now.slice(0, 10) };
+  const updates = { checksEnabled: false, engines: [], models: { lastChecked: null, entries: [] }, recommendations: [] };
   const delayedStream = (req: Request): Response => {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -97,12 +106,44 @@ export function startDefaultScriptedStack(): StackFixture {
       if (body?.messages?.some((message) => typeof message.content === "string" && message.content.includes("wait for me"))) return delayedStream(req);
       return withIdentity("/v1/chat/completions", req);
     },
-    "POST /v1/embeddings": (req) => withIdentity("/v1/embeddings", req),
+    "POST /v1/embeddings": async (req) => {
+      const body = await req.json().catch(() => null) as { input?: string | string[] } | null;
+      const inputs = Array.isArray(body?.input) ? body.input : [body?.input ?? ""];
+      return Response.json({ object: "list", model: "scripted-embedding", data: inputs.map((_text, index) => ({ object: "embedding", index, embedding: Array.from({ length: 8 }, (_, i) => (index + i + 1) / 100) })) }, { headers: IDENTITY_HEADERS });
+    },
     // THIN-3B: the Stack's token count, answered by the spec stub's own
     // deterministic template and tokenizer.
     "POST /v1/tokenize": (req) => withIdentity("/v1/tokenize", req),
+    "POST /v1/audio/transcriptions": async () => Response.json({ text: "the scripted transcription" }, { headers: IDENTITY_HEADERS }),
+    "POST /v1/audio/speech": async () => new Response(new Uint8Array(44), { headers: { "content-type": "audio/wav", ...IDENTITY_HEADERS } }),
+    "POST /v1/images/generations": async () => Response.json({ created: 1, job: "scripted-image", data: [] }, { status: 202, headers: IDENTITY_HEADERS }),
     "GET /stack/v1/roles": async () => Response.json({ roles: ["chat", "embed", "judge", "stt", "tts"].map((id) => ({ id, state: { state: "ready", since: "scripted-test" }, reason: null })) }),
     "GET /stack/v1/health": async () => Response.json({ health: [] }),
+    "*": async (req) => {
+      const { pathname } = new URL(req.url);
+      const method = req.method;
+      if (pathname === "/healthz") return Response.json({ ok: true, version: "scripted-test", uptimeSeconds: 1 });
+      if (pathname === "/stack/v1/jobs" && method === "GET") return Response.json({ jobs: [] });
+      if (pathname === "/stack/v1/jobs" && method === "POST") return Response.json({ job: scriptedJob("scripted-job", "queued") }, { status: 202 });
+      if (pathname.startsWith("/stack/v1/jobs/")) {
+        const id = decodeURIComponent(pathname.slice("/stack/v1/jobs/".length));
+        return Response.json({ job: scriptedJob(id, method === "DELETE" ? "cancelled" : "done") });
+      }
+      if (pathname === "/stack/v1/engines") return Response.json({ engines: [] });
+      if (pathname === "/stack/v1/models") return Response.json({ models: [] });
+      if (pathname === "/stack/v1/health") return Response.json({ health: [] });
+      if (pathname === "/stack/v1/settings" || pathname === "/stack/v1/settings/apply") return Response.json({ sections: [], settings: [] });
+      if (pathname === "/stack/v1/search/preview" || pathname === "/stack/v1/search/revert") return Response.json({ ok: true, enabled: false });
+      if (pathname === "/stack/v1/hardware/budget") return Response.json({ totalMemoryBytes: 0, capBytes: 0, freeMemoryBytes: 0, availablePercent: 0, pressure: "normal", memoryReadingDegraded: true, loaded: [], queue: [] });
+      if (pathname === "/stack/v1/hardware") return Response.json({});
+      if (pathname === "/stack/v1/fit-plan") return Response.json({ schema: 1, model: "scripted-model", context_tokens: 1, kv_cache_type: "f16", roles: [], total: unknownRange, cap: unknownRange, margin: unknownRange, paths: [{ path: "cpu", fits: false, verdict: "unknown" }], verdict: "unknown", bottleneck: "unknown" });
+      if (pathname === "/stack/v1/updates" || pathname === "/stack/v1/updates/check") return Response.json(updates);
+      if (/^\/stack\/v1\/updates\/engines\/[^/]+\/(apply|rollback)$/.test(pathname)) return Response.json(pathname.endsWith("/apply") ? { applied: true, tag: "scripted", previous: null } : { ok: true, tag: "scripted" });
+      if (pathname === "/stack/v1/storage/sweep") return Response.json({ removed: [] });
+      if (pathname === "/stack/v1/check") return Response.json({ at: now, ok: true, results: [], fitTogether: { ok: true, reason: null }, reason: null, generation: 1 });
+      if (pathname.startsWith("/stack/v1/")) return Response.json({ ok: true });
+      return Response.json({ error: `no scripted Stack route for ${method} ${pathname}` }, { status: 404 });
+    },
   });
   return { ...fixture, stop: () => { fixture.stop(); void engine.stop(); } };
 }
