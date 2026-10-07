@@ -13,6 +13,8 @@ import type { PersonRow } from "@/types";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import type { TurnState } from "@/lib/turnMachine/contract";
 import { getPersonSettingSource, getPersonSettingValue } from "@/lib/settings";
+import { decide } from "@/lib/gate/decide";
+import type { Role } from "@/middleware/auth";
 import { selectAnswerImages, type AnswerImageSelection, type AnswerImageTrace } from "./select";
 
 /** The model-facing tool name; the bundled package `backend/packages/show_images`
@@ -54,6 +56,11 @@ export const SHOW_IMAGES_UNAVAILABLE_LINE = "Photos cannot be shown here. Answer
  * or adult unless they turned it off. */
 export function answerImagesAllowed(input: { actor: PersonRow; band: AgeBand; surfaceClass: SurfaceClass; spoken: boolean; temporary: boolean; bare: boolean; ephemeral: boolean }): boolean {
   if (input.surfaceClass !== "written" || input.spoken || input.temporary || input.bare || input.ephemeral) return false;
+  const gate = decide({
+    who: { personId: input.actor.id, role: input.actor.role as Role, band: input.band },
+    what: { capabilities: ["tool.offer:show_images"] },
+  });
+  if (gate.kind !== "allow") return false;
   const value = getPersonSettingValue(input.actor, "reference.images");
   if (input.band === "child") return Boolean(getPersonSettingSource(input.actor.id, "reference.images")) && value === true;
   return value !== false;
