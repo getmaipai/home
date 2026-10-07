@@ -6,6 +6,11 @@ const ROOT = join(import.meta.dir, "..");
 const OUTPUT_PATH = join(ROOT, "frontend/src/dev/elements-adoption.json");
 type PlanItem = { file: string; name?: string; group?: string; verdict: string; verdictReason?: string; [key: string]: unknown };
 export type AdoptionItem = { file: string; name: string; group: string; verdict: string; verdictReason: string; implemented: boolean; reading?: string };
+export type AdoptionInventory = { generatedAt?: string; kitTag: string; items: AdoptionItem[] };
+
+export function sameAdoptionInventory(expected: AdoptionInventory, actual: AdoptionInventory): boolean {
+  return JSON.stringify({ kitTag: actual.kitTag, items: actual.items }) === JSON.stringify({ kitTag: expected.kitTag, items: expected.items });
+}
 
 async function filesUnder(dir: string): Promise<string[]> {
   const found: string[] = [];
@@ -122,6 +127,15 @@ export async function scanElements(options: { root?: string; tag?: string } = {}
 
 if (import.meta.main) {
   const { output, planOnly } = await scanElements();
+  if (process.argv.includes("--check")) {
+    const current = await Bun.file(OUTPUT_PATH).json().catch(() => null) as AdoptionInventory | null;
+    if (!current || !sameAdoptionInventory(output, current)) {
+      console.error("elements-adoption.json is stale; run 'bun run elements:scan' and commit the generated file.");
+      process.exit(1);
+    }
+    console.log(`Elements adoption inventory is current for ${output.kitTag}.`);
+    process.exit(0);
+  }
   if (process.argv.includes("--status")) {
     console.log(`Elements implemented: ${output.items.filter((item) => item.implemented).length} / ${output.items.length}`);
     process.exit(0);

@@ -25,17 +25,56 @@
 # scope runs instead and says so, rather than silently under-checking.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+GATE_COMMON_DIR="$(git rev-parse --git-common-dir)"
+case "$GATE_COMMON_DIR" in /*) ;; *) GATE_COMMON_DIR="$(cd "$GATE_COMMON_DIR" && pwd)" ;; esac
+GATE_HOME_ROOT="$(cd "$GATE_COMMON_DIR/.." && pwd)"
+GATE_STATS_OUTPUT="${MAIPAI_GATE_STATS_OUTPUT:-$GATE_HOME_ROOT/data-scratch/gate-stats/runs.jsonl}"
 
 FULL_FORCED=0
 DOCS_REQUESTED=0
+PRE_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --full) FULL_FORCED=1 ;;
     --docs) DOCS_REQUESTED=1 ;;
+    --pre) PRE_ONLY=1 ;;
   esac
 done
 
-stage() { now=$(date +%s); [ -n "${STAGE_T:-}" ] && echo "   (${STAGE_NAME}: $((now-STAGE_T))s)" >&2; STAGE_T=$now; STAGE_NAME="$1"; echo "== $1"; }
+GATE_START_EPOCH=$(date +%s)
+GATE_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+GATE_STAGE_LOG="$(mktemp)"
+GATE_FAILURE_LOG="$(mktemp)"
+GATE_FIRST_RED=""
+GATE_LOAD=""
+GATE_LOCK_WAIT=0
+GATE_RUN_KIND=gate
+record_stage() {
+  local now elapsed
+  now=$(date +%s)
+  if [ -n "${STAGE_T:-}" ]; then
+    elapsed=$((now-STAGE_T))
+    echo "   (${STAGE_NAME}: ${elapsed}s)" >&2
+    printf '%s\t%s\n' "$STAGE_NAME" "$elapsed" >> "$GATE_STAGE_LOG"
+  fi
+}
+stage() { record_stage; STAGE_T=$(date +%s); STAGE_NAME="$1"; echo "== $1"; }
+stage_end() { record_stage; unset STAGE_T STAGE_NAME; }
+record_failure() {
+  local stage_name="${STAGE_NAME:-gate setup}"
+  [ -n "$GATE_FIRST_RED" ] || GATE_FIRST_RED="$stage_name"
+  printf 'fail\t%s\t%s\n' "$stage_name" "$1" >> "$GATE_FAILURE_LOG"
+}
+child_exit() {
+  local rc=$?
+  if [ "$rc" -ne 0 ]; then
+    record_failure "$rc"
+    record_stage
+    tests_kill 2>/dev/null || true
+  fi
+  if [ -n "${GATE_CHILD_DONE:-}" ]; then : > "$GATE_CHILD_DONE"; fi
+  exit "$rc"
+}
 
 # The run's one EXIT handler: bash keeps a single EXIT trap, so the scope
 # temp files (compute_scope() below) and the full-gate lock (taken once
@@ -53,6 +92,7 @@ GATE_LOCK="${MAIPAI_GATE_LOCK:-../.github/standards/bin/gate-lock.sh}"
 GATE_LOCK_LABEL=""
 BACKEND_PID=""
 FRONTEND_PID=""
+GATE_LEG_DONE_DIR=""
 descendants() { local c; for c in $(pgrep -P "$1" 2>/dev/null); do echo "$c"; descendants "$c"; done; }
 stop_tree() {
   local tree
@@ -60,14 +100,26 @@ stop_tree() {
   kill "$1" $tree 2>/dev/null || true
 }
 on_exit() {
+  local rc=$?
+  if [ "$rc" -ne 0 ] && [ -z "$GATE_FIRST_RED" ] && [ ! -s "$GATE_FAILURE_LOG" ]; then record_failure "$rc"; fi
+  record_stage
   tests_kill 2>/dev/null || true
   if [ -n "$BACKEND_PID" ]; then stop_tree "$BACKEND_PID"; fi
   if [ -n "$FRONTEND_PID" ]; then stop_tree "$FRONTEND_PID"; fi
   wait 2>/dev/null || true
   rm -f "$SCOPE_CHANGED_FILE" "$SCOPE_IMPORTED_FILE"
+  [ -z "$GATE_LEG_DONE_DIR" ] || rm -rf "$GATE_LEG_DONE_DIR"
   if [ -n "$GATE_LOCK_LABEL" ]; then
     bash "$GATE_LOCK" release "$GATE_LOCK_LABEL" >/dev/null 2>&1 || true
   fi
+  if [ -n "${GATE_STATS_OUTPUT:-}" ]; then
+    GATE_STATS_EXIT="$rc" GATE_STATS_START_EPOCH="$GATE_START_EPOCH" GATE_STATS_TS="$GATE_STARTED_AT" \
+      GATE_STATS_WORKTREE="$(pwd -P)" GATE_STATS_SCOPE="${SCOPE:-unknown}" GATE_STATS_SCOPE_REASON="${SCOPE_WHY:-unknown}" \
+      GATE_STATS_LOAD="$GATE_LOAD" GATE_STATS_LOCK_WAIT="$GATE_LOCK_WAIT" GATE_STATS_HEAD="$(git rev-parse HEAD 2>/dev/null || echo unknown)" \
+      GATE_STATS_MERGE_BASE="${GATE_DIFF_BASE:-}" GATE_STATS_LANE="${GATE_LOCK_LABEL:-none}" GATE_STATS_KIND="$GATE_RUN_KIND" \
+      bun scripts/gate/stats.ts "$GATE_STATS_OUTPUT" "$GATE_STAGE_LOG" "$GATE_FAILURE_LOG" || echo "gate stats append failed" >&2
+  fi
+  rm -f "$GATE_STAGE_LOG" "$GATE_FAILURE_LOG"
 }
 trap on_exit EXIT
 
@@ -121,6 +173,7 @@ SCOPE_WHY=""
 compute_scope() {
   local base files=() f
   base="$(gate_diff_base)"
+  GATE_DIFF_BASE="$base"
 
   # Tracked, changed files first - an untracked file never WIDENS this
   # (found live: another session's own stray output sitting in this
@@ -226,6 +279,13 @@ else
   fi
 fi
 echo "== scope: $SCOPE ($SCOPE_WHY)"
+if [ -z "${GATE_DIFF_BASE:-}" ]; then GATE_DIFF_BASE="$(gate_diff_base 2>/dev/null || true)"; fi
+
+if [ "$PRE_ONLY" != 1 ]; then
+  stage "preflight"
+  bash scripts/check.sh --pre
+  stage_end
+fi
 
 # One full gate at a time on this machine (org CLAUDE.md > Verification;
 # getmaipai/.github docs/DECISIONS.md, 2026-09-27): every non-docs scope
@@ -236,7 +296,7 @@ echo "== scope: $SCOPE ($SCOPE_WHY)"
 # tag below: it is one machine resource every caller must agree on,
 # whatever tag each pins. GATE_LOCK_ITEM, when a caller sets it, names
 # the item in `gate-lock.sh status`.
-if [ "$SCOPE" != "docs" ]; then
+if [ "$SCOPE" != "docs" ] && [ "$PRE_ONLY" != 1 ]; then
   if [ ! -f "$GATE_LOCK" ]; then
     echo "== gate-lock: $GATE_LOCK is missing (getmaipai/.github checkout older than gate-lock.sh, or set MAIPAI_GATE_LOCK); not running a $SCOPE gate without the machine-wide lock"
     exit 1
@@ -249,11 +309,14 @@ if [ "$SCOPE" != "docs" ]; then
   # This lane must remain queued through long concurrent work. Extend the
   # lock's normal cap for this invocation; load is diagnostic only.
   export GATE_LOCK_PER_POSITION_SECONDS=86400 GATE_LOCK_MAX_SECONDS=86400
+  LOCK_START=$(date +%s)
   if ! GATE_LOCK_PID=$$ bash "$GATE_LOCK" acquire "$GATE_LOCK_LABEL" "${GATE_LOCK_ITEM:-}"; then
     echo "== gate-lock: could not take the machine-wide full-gate lock (see above); not running the $SCOPE gate"
     exit 1
   fi
-  echo "== system load: $(sysctl -n vm.loadavg 2>/dev/null || uptime)"
+  GATE_LOCK_WAIT=$(($(date +%s)-LOCK_START))
+  GATE_LOAD=$(sysctl -n vm.loadavg 2>/dev/null || uptime)
+  echo "== system load: $GATE_LOAD"
 fi
 
 STANDARDS_REPO="${MAIPAI_STANDARDS_DIR:-../.github}"
@@ -327,11 +390,72 @@ if [ "$SCOPE" != "docs" ]; then
   SPEC_DIR="$(ensure_pin spec "$SPEC_TAG")"
 fi
 
+preflight_stage() { stage "$1"; }
+run_preflight() {
+  local settings_scratch
+  if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
+    preflight_stage "pre: settings registry generated files"
+    settings_scratch="$(mktemp -d)"
+    mkdir -p "$settings_scratch/spec/settings"
+    git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json > "$settings_scratch/spec/settings/keys.json"
+    if ! (cd backend && MAIPAI_COMMONS_DIR="$settings_scratch" bun run gen:settings >/dev/null) || \
+      ! diff -q "$settings_scratch/spec/settings/keys.json" <(git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json) >/dev/null; then
+      echo "backend settings registry is stale against $SPEC_TAG"
+      rm -rf "$settings_scratch"
+      return 1
+    fi
+    rm -rf "$settings_scratch"
+  fi
+
+  if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
+    preflight_stage "pre: API docs generated files"
+    (cd backend && bun run gen:api-docs >/dev/null)
+    if ! git diff --quiet -- docs/api; then
+      echo "docs/api/ is out of date; run 'bun run gen:api-docs' in backend/ and commit the result."
+      return 1
+    fi
+  fi
+
+  preflight_stage "pre: elements adoption generated file"
+  bun run scripts/elementsAdoption.ts --check
+
+  preflight_stage "pre: UI rules and shrinking baselines"
+  (cd frontend && env -u MAIPAI_SKIP_UI_RULES bun run lint:ui-rules >/dev/null)
+
+  if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
+    preflight_stage "pre: backend and scripts typecheck"
+    (cd backend && bunx tsc --noEmit)
+    (cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json)
+  fi
+  if [ "$SCOPE" = "frontend" ] || [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
+    preflight_stage "pre: frontend typecheck"
+    (cd frontend && bunx tsc --noEmit)
+  fi
+
+  preflight_stage "pre: secrets scan"
+  if command -v gitleaks >/dev/null 2>&1; then
+    gitleaks dir --no-banner --redact .
+  else
+    echo "WARN: gitleaks not installed (brew install gitleaks)"
+  fi
+  preflight_stage "pre: PII wordlist"
+  bash "$STANDARDS_DIR/standards/bin/pii-scan.sh" "$(pwd)"
+  stage_end
+}
+
+if [ "$PRE_ONLY" = 1 ]; then
+  GATE_RUN_KIND=pre
+  run_preflight
+  exit 0
+fi
+
 # One root-level install covers both workspaces (bun's own workspace
 # resolution) - needed once for whichever scope actually runs code.
 if [ "$SCOPE" != "docs" ]; then
   stage "install"
   bun install --silent
+  record_stage
+  unset STAGE_T STAGE_NAME
 fi
 
 # stage_end() closes out whichever stage a leg's own subshell last
@@ -341,8 +465,6 @@ fi
 # subshell to print that stage's own elapsed time - printed here
 # explicitly instead, since the per-stage numbers are what this item's
 # own measurement reads.
-stage_end() { local now; now=$(date +%s); [ -n "${STAGE_T:-}" ] && echo "   (${STAGE_NAME}: $((now-STAGE_T))s)" >&2; }
-
 # GATE-SPEED-01 (a): test suites run as parallel bun processes split by
 # measured file duration (scripts/gate/shardTests.ts): same pass/fail
 # meaning, fail fast, one exit code, temp folders removed at the end.
@@ -389,6 +511,10 @@ tests_finish() {
   local label="$1" pidvar="TESTS_PID_$1" logvar="TESTS_LOG_$1" rc=0
   wait "${!pidvar}" || rc=$?
   cat "${!logvar}"
+  if [ "$rc" -ne 0 ]; then
+    record_failure "$rc"
+    sed -n 's/.*(fail) /test\t(fail) /p' "${!logvar}" >> "$GATE_FAILURE_LOG"
+  fi
   rm -f "${!logvar}"
   return "$rc"
 }
@@ -436,7 +562,8 @@ run_backend_suite() {
   (cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json)
 
   stage "scripts: bun test"
-  run_tests scripts . 1
+  tests_start scripts scripts . 1
+  tests_finish scripts
 
   stage "backend: bun test (started first, running beside the steps above)"
   tests_finish backend
@@ -448,10 +575,12 @@ if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
   # resolve from, so two concurrent installs would race the same files.
   BACKEND_LOG="$(mktemp)"
   FRONTEND_LOG="$(mktemp)"
+  GATE_LEG_DONE_DIR="$(mktemp -d)"
+  BOTH_LEGS_START=$(date +%s)
 
-  ( trap tests_kill EXIT; run_backend_suite; stage_end ) > "$BACKEND_LOG" 2>&1 &
+  ( export GATE_CHILD_DONE="$GATE_LEG_DONE_DIR/backend.done"; trap child_exit EXIT; run_backend_suite; stage_end ) > "$BACKEND_LOG" 2>&1 &
   BACKEND_PID=$!
-  ( trap tests_kill EXIT
+  ( export GATE_CHILD_DONE="$GATE_LEG_DONE_DIR/frontend.done"; trap child_exit EXIT
     tests_start frontend frontend . "${MAIPAI_GATE_FRONTEND_SHARDS:-3}"
     stage "frontend: ui rules (same script as the pre-commit hook; MAIPAI_SKIP_UI_RULES is ignored here)"
     (cd frontend && env -u MAIPAI_SKIP_UI_RULES bun run lint:ui-rules >/dev/null)
@@ -477,9 +606,21 @@ if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
   # Each leg's PID is cleared once it is reaped: nothing left for
   # on_exit() to stop, and a PID the OS may reuse is never signalled.
   BACKEND_RC=0
+  FRONTEND_RC=0
+  while [ ! -f "$GATE_LEG_DONE_DIR/backend.done" ] || [ ! -f "$GATE_LEG_DONE_DIR/frontend.done" ]; do
+    if [ -s "$GATE_FAILURE_LOG" ]; then
+      if [ -f "$GATE_LEG_DONE_DIR/backend.done" ] && [ ! -f "$GATE_LEG_DONE_DIR/frontend.done" ]; then
+        stop_tree "$FRONTEND_PID"
+        break
+      elif [ -f "$GATE_LEG_DONE_DIR/frontend.done" ] && [ ! -f "$GATE_LEG_DONE_DIR/backend.done" ]; then
+        stop_tree "$BACKEND_PID"
+        break
+      fi
+    fi
+    sleep 1
+  done
   wait "$BACKEND_PID" || BACKEND_RC=$?
   BACKEND_PID=""
-  FRONTEND_RC=0
   wait "$FRONTEND_PID" || FRONTEND_RC=$?
   FRONTEND_PID=""
 
@@ -489,21 +630,18 @@ if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
   cat "$FRONTEND_LOG"
   rm -f "$BACKEND_LOG" "$FRONTEND_LOG"
 
-  # stage()'s own STAGE_T/STAGE_NAME were last set for "install" in this
-  # (parent) process, right before both legs forked - every stage() call
-  # since then happened inside a subshell, whose STAGE_T/STAGE_NAME never
-  # propagate back here. Left alone, the next stage() call in this
-  # process (docs: reading-level lint) would print the whole concurrent
-  # block's wall time mislabeled as "(install: Ns)" - reproduced live
-  # during this item's own measurement. Print the real number under its
-  # own name instead, then clear STAGE_T so the next stage() call starts
-  # a fresh clock silently rather than also printing a second, redundant
-  # "(both legs: 0s)" line for the same reset point.
+  # The parallel workers have independent stage clocks. Measure their
+  # shared wall time separately before the parent starts its next stage.
   now=$(date +%s)
-  echo "   (both legs: $((now-STAGE_T))s)" >&2
-  unset STAGE_T STAGE_NAME
+  BOTH_LEGS_SECONDS=$((now-BOTH_LEGS_START))
+  echo "   (both legs: ${BOTH_LEGS_SECONDS}s)" >&2
+  printf 'both legs\t%s\n' "$BOTH_LEGS_SECONDS" >> "$GATE_STAGE_LOG"
 
   if [ "$BACKEND_RC" -ne 0 ] || [ "$FRONTEND_RC" -ne 0 ]; then
+    FIRST_RED_EXIT="$(awk -F '\t' '$1 == "fail" { print $3; exit }' "$GATE_FAILURE_LOG")"
+    if [ -n "$FIRST_RED_EXIT" ] && [ "$FIRST_RED_EXIT" -gt 0 ] 2>/dev/null; then
+      exit "$FIRST_RED_EXIT"
+    fi
     WORSE_RC=$BACKEND_RC
     [ "$FRONTEND_RC" -gt "$WORSE_RC" ] && WORSE_RC=$FRONTEND_RC
     exit "$WORSE_RC"

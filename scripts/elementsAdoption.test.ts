@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scanElements } from "./elementsAdoption";
+import { sameAdoptionInventory, scanElements } from "./elementsAdoption";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
@@ -32,6 +32,17 @@ async function fixture() {
 }
 
 describe("elements adoption scanner", () => {
+  test("freshness ignores only the generation time", () => {
+    expect(sameAdoptionInventory(
+      { generatedAt: "new", kitTag: "ui-v1.2.3", items: [] },
+      { generatedAt: "old", kitTag: "ui-v1.2.3", items: [] },
+    )).toBe(true);
+    expect(sameAdoptionInventory(
+      { generatedAt: "new", kitTag: "ui-v1.2.3", items: [] },
+      { generatedAt: "old", kitTag: "ui-v1.2.3", items: [{ file: "x", name: "x", group: "x", verdict: "later", verdictReason: "reason", implemented: true }] },
+    )).toBe(false);
+  });
+
   test("an Element imported by chat source counts as in use", async () => {
     const root = await fixture();
     await writeFile(join(root, "frontend/src/apps/chat/thread.tsx"), 'import "@maipai/ui/src/elements/chat-panel";');

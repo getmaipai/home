@@ -36145,6 +36145,12 @@ The earlier 465 s full-gate number was the same suite on a more loaded machine. 
 5. Scope widening. `origin/main` was only as fresh as the last fetch, so a stale ref made the merge-base old and other people's already-pushed commits (a `scripts/` file, a lockfile) counted as this change and widened a docs diff to full. `check.sh` now runs one `git fetch origin main` (8 s cap, failure ignored) before the merge-base. The scope line already names the widening file: `== scope: full (scripts/ changed (scripts/check.sh) - ...)`.
 6. Escape hatches: `MAIPAI_GATE_SHARDED=0` (one plain `bun test`), `MAIPAI_GATE_NO_STAMPS=1`, `MAIPAI_GATE_NO_FETCH=1`.
 
+### Preflight (`check.sh --pre`)
+
+The full gate runs `bash scripts/check.sh --pre` before taking the machine-wide gate lock. The preflight has no lock of its own and checks generated settings and API docs for backend scope, the Elements adoption inventory, UI rules and shrinking baselines, the applicable TypeScript projects, secrets, and the PII wordlist in that order. `--pre` stops on its first failed command and records a `run_kind: "pre"` timing row; it is useful feedback, not a gate pass or a commit-hook stamp. The full gate scans secrets and PII again in standards core after its build and test stages.
+
+The Elements inventory freshness check ignores only its `generatedAt` field. It compares the kit tag and every inventory item, so a timestamp alone does not make an otherwise current inventory stale.
+
 ### Before and after
 
 | Gate | Before | After | Note |
