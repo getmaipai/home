@@ -58,10 +58,6 @@
       "ed": "ED-034",
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
     },
-    "ComposerModelSelector": {
-      "ed": "ED-029",
-      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
-    },
     "ChatThinkingIndicator": {
       "ed": "ED-034",
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."

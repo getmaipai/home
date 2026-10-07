@@ -152,6 +152,7 @@ const TRAIL_THUMBNAIL_PNG_BASE64 =
 const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
 const chatFocusReview = process.argv.includes("--chat-focus-review");
+const chatModeReview = process.argv.includes("--chat-mode-review");
 const chatTemporaryReview = process.argv.includes("--chat-temporary-review");
 const chatContinueReview = process.argv.includes("--chat-continue-review");
 const fitVerdictReview = process.argv.includes("--fit-verdict-review");
@@ -1632,43 +1633,49 @@ async function captureChatEngineNotReady(browser: Browser, sessionValue: string,
   }
 }
 
-/** CHAT-PARITY-01's focused review: the seeded demo machine does not have a
- * multi-gigabyte model installed, so this capture supplies the compact,
- * already-reachable model-list response at the browser boundary. The real
- * ChatModelPicker, responsive header, disclosure, and owner-only naming are
- * still exercised by the built app; the backend route has its own contract
- * tests for the unmocked safe/available shapes. */
-async function captureChatModelPicker(browser: Browser, sessionValue: string): Promise<void> {
-  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
-  const context = await newContext(browser, viewport, "light", sessionValue);
-  try {
-    const page = await context.newPage();
-    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-    await page.route("**/api/host/chat-models", (route) => route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        models: [{ id: "qwen3-8b-instruct-q4-k-m", label: "Qwen3 8B Instruct" }],
-        selectedModel: { id: "qwen3-8b-instruct-q4-k-m", label: "Qwen3 8B Instruct", available: true },
-        canSelect: true,
-      }),
-    }));
-    await page.goto(`${BASE_URL}/chat`);
-    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    // ModelPicker.tsx's HeaderPicker trigger, not the deleted
-    // ChatModelPicker.tsx's own accessible name - found stale by review
-    // (step 5b's rebuild switched components but left this selector
-    // untouched, so this capture silently stopped matching anything).
-    const trigger = page.getByRole("button", { name: "Chat model: Qwen3 8B Instruct" });
-    await trigger.waitFor();
-    await trigger.click();
-    await page.getByRole("menuitem", { name: "Open AI models", exact: true }).waitFor();
-    await settleAnimations(page);
-    const screenshot = "chat-model-picker-desktop-light.png";
-    await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
-    dedicatedScreenshots.push({ file: screenshot, route: "chat-model-picker", viewport: viewport.slug, theme: "light" });
-  } finally {
-    await context.close();
+/** ELT-MODE-01's focused review: capture the shipped composer mode picker
+ * open on desktop and phone in both themes. The capability response is a
+ * deterministic catalog-backed switchable result for the active seeded model. */
+async function captureChatThinkingMode(browser: Browser, sessionValue: string): Promise<void> {
+  const viewports = VIEWPORTS.filter((viewport) => viewport.slug === "desktop" || viewport.slug === "phone");
+  for (const viewport of viewports) {
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.route("**/api/host/chat-capabilities", (route) => route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ image_parts: false, thinking: "switchable", thinking_modes: { "capture-model": "switchable" } }),
+        }));
+        await page.route("**/api/engines", (route) => route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            configured: true,
+            roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-10-06T00:00:00.000Z" }, reason: null, model: { id: "capture-model", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true }, models: [{ id: "capture-model", name: "Private capture model" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null,
+          }),
+        }));
+        await page.route("**/api/host/chat-models", (route) => route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ models: [{ id: "capture-model", label: "Private capture model" }], selectedModel: { id: "capture-model", label: "Private capture model", available: true }, canSelect: false }),
+        }));
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+        const trigger = page.getByRole("combobox", { name: "Thinking mode" });
+        await trigger.waitFor();
+        await trigger.click();
+        await page.getByRole("radio", { name: "Thinking", exact: true }).waitFor();
+        await settleAnimations(page);
+        const screenshot = `chat-thinking-mode-${viewport.width}-${theme}.png`;
+        await page.screenshot({ path: join(SCREENS_DIR, screenshot), fullPage: true });
+        dedicatedScreenshots.push({ file: screenshot, route: "chat-thinking-mode-open", viewport: viewport.slug, theme });
+      } finally {
+        await context.close();
+      }
+    }
   }
 }
 
@@ -9242,6 +9249,11 @@ async function main() {
       console.log("completed named review: --trace-review");
       return;
     }
+    if (chatModeReview) {
+      await captureChatThinkingMode(browser, sessionValue);
+      console.log("completed named review: --chat-mode-review");
+      return;
+    }
     if (chatMissingStatesReview) {
       await captureChatMissingStates(browser, sessionValue);
       console.log("completed named review: --chat-missing-states-review");
@@ -9625,7 +9637,7 @@ async function main() {
     }
 
     if (!a11yOnly && chatReview) {
-      if (chatFocusReview) await captureChatModelPicker(browser, sessionValue);
+      if (chatFocusReview) await captureChatThinkingMode(browser, sessionValue);
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
         if (!viewport) throw new Error(`unknown viewport ${combo.viewport}`);

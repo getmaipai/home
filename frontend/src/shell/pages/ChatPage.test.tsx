@@ -628,7 +628,7 @@ describe("ChatPage (SHELL-02's slice 2: the thread list)", () => {
       await waitFor(() => expect(view.getByTestId("conversation-location").textContent).toBe("?conversation=conv-archive123"));
       const thinkingTrigger = view.container.querySelector('[data-slot="model-selector-trigger"]') as HTMLButtonElement;
       fireEvent.click(thinkingTrigger);
-      await view.findByRole("listbox");
+      await view.findByRole("radio", { name: "Thinking" });
       fireEvent.click(await view.findByRole("radio", { name: "Thinking" }));
       expect(thinkingTrigger).toHaveTextContent("Thinking");
 
@@ -2679,63 +2679,68 @@ describe("ChatPage (slice 5(d): Details, the stats reveal)", () => {
   });
 });
 
-describe("ChatPage (MODEL-SEL-01: session model picker)", () => {
-  const CHAT_ROLE = { id: "chat", label: "chat", wire: "chat" as const, residency: "resident" as const, endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready" as const, since: "2026-09-27T00:00:00.000Z" }, reason: null, model: { id: "llama-default", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true }, models: [{ id: "llama-default", name: "Llama Default" }, { id: "qwen-fast", name: "Qwen Fast" }], check: { state: "not checked" as const, at: null, reason: null, stale: false } };
-
-  function stubModelPickerFetch(configured: boolean, modelCount: number): () => void {
+describe("ChatPage (ELT-MODE-01: catalog-backed composer mode control)", () => {
+  test.each(["child", "teen"] as const)("hides the mode control for a %s", async (age_band) => {
     const original = globalThis.fetch;
-    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
-    const models = CHAT_ROLE.models.slice(0, modelCount);
-    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
-      if (url === "/api/conversations" && init?.method === "POST") return Promise.resolve(Response.json({ id: "conv-modelpick1", status: "open", surface: "chat" }));
+      if (url.includes("/api/host/chat-capabilities")) return Promise.resolve(Response.json({ image_parts: false, thinking: "none", thinking_modes: {} }));
       if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured, roles: configured ? [{ ...CHAT_ROLE, models }] : [], engines: [], budget: null }));
-      if (url.includes("/api/turn/stream")) return Promise.resolve(new Response(ndjsonStream([
-        { type: "delta", text: "Chosen." },
-        { type: "done", value: { turn_id: "turn-modelpick1", reply: { text: "Chosen." }, source: "model", safety: SAFETY } },
-      ]), { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;
-    return () => { globalThis.fetch = original; };
-  }
-
-  async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
-    fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
-    const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
-    await waitFor(() => expect(send.disabled).toBe(false));
-    fireEvent.click(send);
-  }
-
-  test("hides without Stack configuration and with fewer than two selectable models", async () => {
-    for (const [configured, count] of [[false, 0], [true, 1]] as const) {
-      const restore = stubModelPickerFetch(configured, count);
-      try {
-        const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
-        await view.findByLabelText("Message input");
-        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
-        expect(view.queryByLabelText("Choose model")).toBeNull();
-      } finally { restore(); cleanup(); }
-    }
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson({ role: age_band, age_band })} /></MemoryRouter>);
+      await view.findByLabelText("Message input");
+      expect(view.queryByRole("button", { name: "Thinking mode" })).toBeNull();
+      expect(view.queryByText("Instant")).toBeNull();
+    } finally { globalThis.fetch = original; }
   });
 
-  test("renders the shipped picker and sends its explicit choice on the turn", async () => {
-    const restore = stubModelPickerFetch(true, 2);
+  test("a single non-thinking model renders accessible, non-focusable Instant text", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-09-27T00:00:00.000Z" }, reason: null, model: { id: "catalog-model", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true }, models: [{ id: "catalog-model", name: "Secret model name" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
+      if (url.includes("/api/host/chat-capabilities")) return Promise.resolve(Response.json({ image_parts: false, thinking: "none", thinking_modes: { "catalog-model": "none" } }));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
     try {
       const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
-      const trigger = await view.findByRole("combobox", { name: "Choose model" });
-      expect(trigger.textContent).toContain("Llama Default");
+      await view.findByText("Instant");
+      const label = view.container.querySelector('[data-slot="model-selector-value"]');
+      expect(label).toBeTruthy();
+      expect(label?.textContent).toBe("Instant");
+      expect(label?.closest("button")).toBeNull();
+      expect(view.queryByRole("button", { name: "Thinking mode" })).toBeNull();
+      expect(view.queryByText("Secret model name")).toBeNull();
+    } finally { globalThis.fetch = original; }
+  });
+
+  test("a switchable catalog model exposes only Instant and Thinking choices", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-09-27T00:00:00.000Z" }, reason: null, model: { id: "catalog-model", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true }, models: [{ id: "catalog-model", name: "Secret model name" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
+      if (url.includes("/api/host/chat-capabilities")) return Promise.resolve(Response.json({ image_parts: false, thinking: "switchable", thinking_modes: { "catalog-model": "switchable" } }));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
+      const trigger = await view.findByRole("combobox", { name: "Thinking mode" });
+      expect(trigger).toHaveTextContent("Instant");
+      expect(trigger).not.toHaveTextContent("Secret model name");
       fireEvent.click(trigger);
-      fireEvent.click(await view.findByText("Qwen Fast"));
-      await sendMessage(view, "use the faster model");
-      await view.findByText("Chosen.");
-      expect(turnRequestBodies()[0]!.model).toBe("qwen-fast");
-    } finally { restore(); }
+      expect(await view.findByRole("radio", { name: "Thinking" })).toBeTruthy();
+      fireEvent.click(view.getByRole("radio", { name: "Thinking" }));
+      expect(trigger).toHaveTextContent("Thinking");
+    } finally { globalThis.fetch = original; }
   });
 });
 
-describe("ChatPage (COMPOSER-01: the model label sits just left of the mic)", () => {
-  test("one model selector, in the trailing group before voice and Send", async () => {
+describe("ChatPage (ELT-MODE-01: the mode label sits just left of the mic)", () => {
+  test("one mode selector, in the trailing group before voice and Send", async () => {
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -2745,7 +2750,7 @@ describe("ChatPage (COMPOSER-01: the model label sits just left of the mic)", ()
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
-      const trigger = await view.findByRole("combobox", { name: "Choose model" });
+      const trigger = await view.findByRole("combobox", { name: "Thinking mode" });
       expect(document.querySelectorAll('[data-slot="model-selector-trigger"]').length).toBe(1);
       const groups = document.querySelectorAll(".aui-composer-action-wrapper > div");
       expect(groups.length).toBe(2);
@@ -2757,7 +2762,7 @@ describe("ChatPage (COMPOSER-01: the model label sits just left of the mic)", ()
   });
 });
 
-describe("ChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode picker)", () => {
+describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () => {
   async function sendMessage(view: ReturnType<typeof render>, text: string): Promise<void> {
     fireEvent.change(await view.findByLabelText("Message input"), { target: { value: text } });
     const send = (await view.findByLabelText("Send message")) as HTMLButtonElement;
@@ -2780,7 +2785,7 @@ describe("ChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode pi
     return () => { globalThis.fetch = original; };
   }
 
-  test("the trigger defaults to the active model and offers Instant/Thinking effort choices", async () => {
+  test("the trigger hides model identity and offers Instant/Thinking choices", async () => {
     const restore = fetchWithPicker();
     try {
       const view = renderPage(
@@ -2789,7 +2794,7 @@ describe("ChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode pi
         </MemoryRouter>,
       );
       await view.findByLabelText("Message input");
-      expect(trigger()).toHaveTextContent("Family");
+      expect(trigger()).toHaveTextContent("Instant");
       fireEvent.click(trigger());
       const items = within(menu()).getAllByRole("radio");
       expect(items).toHaveLength(2);
@@ -2884,7 +2889,7 @@ describe("ChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode pi
       const first = page();
       await first.findByLabelText("Message input");
       await waitFor(() => expect(first.getAllByRole("button", { name: "Conversation actions" })[0]).toBeTruthy());
-      await waitFor(() => expect(trigger()).toHaveTextContent("Family"));
+      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
       fireEvent.click(trigger());
       fireEvent.click(menuItems()[1]!);
       await waitFor(() => expect(saved.settings).toEqual({ thinking: true }));
@@ -3008,7 +3013,7 @@ describe("ChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode pi
       fireEvent.pointerDown(input, { bubbles: true, button: 0, ctrlKey: false, pointerId: 1, pointerType: "mouse" });
       fireEvent.click(input, { bubbles: true, button: 0 });
       await waitFor(() => expect(trigger()).toHaveAttribute("aria-expanded", "false"));
-      expect(trigger()).toHaveTextContent("Family");
+      expect(trigger()).toHaveTextContent("Instant");
     } finally {
       restore();
     }
@@ -3027,7 +3032,7 @@ describe("ChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode pi
       expect(menu()).toBeTruthy();
       fireEvent.keyDown(document, { key: "Escape" });
       expect(menu()).toBeNull();
-      expect(trigger()).toHaveTextContent("Family");
+      expect(trigger()).toHaveTextContent("Instant");
     } finally {
       restore();
     }
@@ -3151,17 +3156,17 @@ describe("ChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode pi
 
       // A new conversation keeps the active engine default.
       fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New chat" }));
-      await waitFor(() => expect(trigger()).toHaveTextContent("Family"));
+      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
     } finally {
       globalThis.fetch = originalFetch;
     }
   });
 
-  test("model choice saves for a new conversation, reloads, and follows each conversation", async () => {
+  test("saved conversation model settings select the turn model for each conversation", async () => {
     const original = globalThis.fetch;
     (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
     const conversations: Record<string, { id: string; settings?: { model?: string }; surface: string; status: string; title: string; person: string; mode: string; companion_id: null; pinned: boolean; source: string; hlc: string; created_at: string; updated_at: string }> = {
-      "conv-model-a": { id: "conv-model-a", surface: "chat", status: "open", title: "A", person: "person-abc123", mode: "chat", companion_id: null, pinned: false, source: "hub", hlc: "1788000000000:0:test", created_at: "2026-09-27T00:00:00Z", updated_at: "2026-09-27T00:00:00Z" },
+      "conv-model-a": { id: "conv-model-a", settings: { model: "fast.gguf" }, surface: "chat", status: "open", title: "A", person: "person-abc123", mode: "chat", companion_id: null, pinned: false, source: "hub", hlc: "1788000000000:0:test", created_at: "2026-09-27T00:00:00Z", updated_at: "2026-09-27T00:00:00Z" },
       "conv-model-b": { id: "conv-model-b", settings: { model: "family.gguf" }, surface: "chat", status: "open", title: "B", person: "person-abc123", mode: "chat", companion_id: null, pinned: false, source: "hub", hlc: "1788000000000:0:test", created_at: "2026-09-27T00:00:00Z", updated_at: "2026-09-27T00:00:00Z" },
     };
     let turnCount = 0;
@@ -3169,8 +3174,8 @@ describe("ChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode pi
       const url = typeof input === "string" ? input : input.toString();
       const method = init?.method ?? "GET";
       if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
-      if (url === "/api/conversations" && method === "POST") return Promise.resolve(Response.json(conversations["conv-model-a"]));
-      if (url.endsWith("/api/conversations") && method === "GET") return Promise.resolve(Response.json(Object.values(conversations).map((row) => ({ ...row, surface: "chat", created_at: "2026-09-27T00:00:00Z", pinned: false }))));
+      if (url.endsWith("/api/conversations") && method === "POST") return Promise.resolve(Response.json(conversations["conv-model-a"]));
+      if (url.split("?")[0]?.endsWith("/api/conversations") && method === "GET") return Promise.resolve(Response.json(Object.values(conversations).map((row) => ({ ...row, surface: "chat", created_at: "2026-09-27T00:00:00Z", pinned: false }))));
       const match = url.match(/\/api\/conversations\/(conv-model-[ab])(?:\/(resume|turns))?$/);
       if (match) {
         const id = match[1]!;
@@ -3198,25 +3203,26 @@ describe("ChatPage (MODEL-SEL-01 / RESP-04 (f): the composer's model and mode pi
       </MemoryRouter>,
     );
     try {
-      const first = open();
+      const first = open("conv-model-a");
       await first.findByLabelText("Message input");
-      fireEvent.click(trigger());
-      fireEvent.click(await first.findByText("Fast"));
+      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
       await sendMessage(first, "use fast");
       await first.findByText("Reply 1.");
-      await waitFor(() => expect(conversations["conv-model-a"]!.settings).toEqual({ model: "fast.gguf" }));
       const sent = turnRequestBodies().at(-1)!;
       expect(sent.model).toBe("fast.gguf");
       first.unmount();
 
       const reopened = open("conv-model-a");
       await reopened.findByLabelText("Message input");
-      await waitFor(() => expect(trigger()).toHaveTextContent("Fast"));
+      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
       reopened.unmount();
 
       const other = open("conv-model-b");
       await other.findByLabelText("Message input");
-      await waitFor(() => expect(trigger()).toHaveTextContent("Family"));
+      await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
+      await sendMessage(other, "use family");
+      await other.findByText("Reply 2.");
+      expect(turnRequestBodies().at(-1)!.model).toBe("family.gguf");
     } finally {
       globalThis.fetch = original;
     }

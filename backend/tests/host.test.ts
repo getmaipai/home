@@ -2,7 +2,8 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
+import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 
 beforeEach(() => {
   resetDb();
@@ -88,6 +89,40 @@ describe("GET /api/host/chat-models", () => {
     await childClient.post("/api/auth/select", { personId: child.id });
 
     const res = await childClient.get("/api/host/chat-models");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ models: [], selectedModel: null, canSelect: false });
+  });
+
+  test("an adult member can see the current model without host diagnostics or selection", async () => {
+    const owner = await ownerClient();
+    const created = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const adult = (await created.json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    __setStackClientForTests({ roles: async () => ({ roles: [{ id: "chat", state: { state: "ready", since: "" }, model: { id: "model-a" }, models: [{ id: "model-a", name: "Model A" }, { id: "model-b", name: "Model B" }] }] }) } as never);
+    try {
+      const res = await adultClient.get("/api/host/chat-models");
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        models: [{ id: "model-a", label: "Model A" }, { id: "model-b", label: "Model B" }],
+        selectedModel: { id: "model-a", label: "Model A", available: true },
+        canSelect: false,
+      });
+    } finally {
+      __resetStackEngineForTests();
+      setHouseholdSettingValue("engines.stack.url", "");
+    }
+  });
+
+  test("a teen receives the same calm empty shape as a child", async () => {
+    const owner = await ownerClient();
+    const created = await owner.post("/api/people", { displayName: "Sprout", role: "teen" });
+    const teen = (await created.json()) as { id: string };
+    const teenClient = new TestClient();
+    await teenClient.post("/api/auth/select", { personId: teen.id });
+
+    const res = await teenClient.get("/api/host/chat-models");
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ models: [], selectedModel: null, canSelect: false });
   });

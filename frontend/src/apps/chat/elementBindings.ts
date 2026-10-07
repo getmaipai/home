@@ -28,7 +28,7 @@ import {
   ChatMessageQueue,
   ChatThinkingIndicator,
   ComposerExtraControls,
-  ComposerTrailingWithModelSelector,
+  ComposerTrailingWithThinkingMode,
   MessageFooterExtra,
   ChatWelcome,
   ReasoningGroup,
@@ -121,8 +121,7 @@ export const THREAD_SLOTS = {
   ReasoningGroup: ReasoningGroup,
 } as const;
 
-// The composer's model selector renders nothing under two models, so the
-// showcase (no model list) shows no picker; the chat page gates it further on
-// its own `modelPickerAllowed`. It sits in the trailing slot, just left of the
-// mic (COMPOSER-01), so this replaces THREAD_SLOTS' own ComposerExtraEnd.
-export const MODEL_TRAILING_SLOT = ComposerTrailingWithModelSelector;
+// The composer mode control occupies the trailing slot just left of the mic.
+// The chat page gates this slot for adult users with an active model; its
+// visible label and choices are only Instant and Thinking.
+export const MODEL_TRAILING_SLOT = ComposerTrailingWithThinkingMode;

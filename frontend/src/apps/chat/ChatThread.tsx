@@ -37,13 +37,13 @@ function DataElementBinding({ binding }: { binding: DataBinding }) {
 /** getmaipai/home#206: the longest Send waits for a saved chat to open. */
 const OPENING_HOLD_MS = 15_000;
 
-export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, canUseIncognito = false, onOpenSettings, openingConversationId }: {
+export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false, canUseIncognito = false, onOpenSettings, openingConversationId }: {
   /** Incognito: the kit's temporary-thread styling. */
   temporary?: boolean;
   /** Called with the superseded turn id when an edited message is sent. */
   onEditSend?: (messageId: string, turnId?: string) => void;
-  /** Gate for the composer's model selector (it also hides itself under two models). */
-  modelPickerAllowed?: boolean;
+  /** Gate for the composer's thinking mode control. */
+  thinkingModeVisible?: boolean;
   /** The signed-in person can use Incognito. */
   canUseIncognito?: boolean;
   /** Open the app's Settings route. */
@@ -143,7 +143,7 @@ export function ChatThread({ temporary, onEditSend, modelPickerAllowed = true, c
               scrollToBottomOnInitialize: true,
               scrollToBottomOnThreadSwitch: true,
             },
-            ...(modelPickerAllowed ? { ComposerExtraEnd: MODEL_TRAILING_SLOT } : {}),
+            ...(thinkingModeVisible ? { ComposerExtraEnd: MODEL_TRAILING_SLOT } : {}),
           }}
         />
       </ChatExtrasContext.Provider>

@@ -115,6 +115,9 @@ export const ThinkingModeContext = createContext<{
   setMode: (mode: "instant" | "thinking") => void;
 }>({ mode: "instant", setMode: () => {} });
 
+/** The active catalog model's declared thinking capability. */
+export const ThinkingModeCapabilityContext = createContext<"switchable" | "none" | "always">("none");
+
 export const ModelPickerContext = createContext<{
   models: readonly ModelOption[];
   value: string | undefined;

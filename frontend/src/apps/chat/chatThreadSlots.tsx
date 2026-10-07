@@ -30,7 +30,7 @@ import { GenerationLoader } from "@maipai/ui/src/elements/loading-state";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
-import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorSearch, ModelSelectorList, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
+import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
 import { RegenerateMenu } from "@maipai/ui/src/elements/regenerate-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
@@ -56,7 +56,7 @@ import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { ChatActivityCard } from "@/apps/chat/ChatActivityCard";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
-import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/shell/pages/TurnErrorDetails";
 
@@ -164,37 +164,36 @@ export function ChatMessageQueue() {
 
 export const MODEL_EFFORTS = [{ id: "instant", name: "Instant" }, { id: "thinking", name: "Thinking" }] as const;
 
-export function ComposerModelSelector() {
-  const { models, value, setValue } = useContext(ModelPickerContext);
-  const { mode, setMode } = useContext(ThinkingModeContext);
-  if (models.length < 2) return null;
-  return (
-    <ModelSelectorRoot
-      models={models}
-      value={value}
-      onValueChange={setValue}
-      effort={mode}
-      onEffortChange={(effort) => setMode(effort === "thinking" ? "thinking" : "instant")}
-    >
-      <ModelSelectorTrigger variant="ghost" size="sm" aria-label="Choose model">
-        <ModelSelectorValue showEffort />
-      </ModelSelectorTrigger>
-      <ModelSelectorContent side="top" align="start">
-        <ModelSelectorSearch />
-        <ModelSelectorList />
-        <ModelSelectorEffort label="Mode" />
-      </ModelSelectorContent>
-    </ModelSelectorRoot>
-  );
-}
-
 /** COMPOSER-01: ChatGPT puts the model label just left of the mic, so the one
  * selector rides the trailing ComposerExtraEnd slot in front of the existing
  * trailing controls instead of the leading ComposerExtra slot beside Add. */
-export function ComposerTrailingWithModelSelector() {
+export function ComposerTrailingWithThinkingMode() {
+  const { mode, setMode } = useContext(ThinkingModeContext);
+  const capability = useContext(ThinkingModeCapabilityContext);
   return (
     <>
-      <ComposerModelSelector />
+      {capability === "none" || capability === "always" ? (
+        <ModelSelectorRoot
+          models={[{ id: "mode", name: capability === "always" ? "Thinking" : "Instant" }]}
+          value="mode"
+        >
+          <ModelSelectorValue showEffort={false} />
+        </ModelSelectorRoot>
+      ) : null}
+      {capability === "switchable" ? (
+        <ModelSelectorRoot
+          models={[{ id: "mode", name: "", efforts: MODEL_EFFORTS }]}
+          value="mode"
+          onValueChange={() => {}}
+          effort={mode}
+          onEffortChange={(effort) => setMode(effort === "thinking" ? "thinking" : "instant")}
+        >
+          <ModelSelectorTrigger variant="ghost" size="sm" aria-label="Thinking mode" />
+          <ModelSelectorContent side="top" align="start">
+            <ModelSelectorEffort label="Mode" />
+          </ModelSelectorContent>
+        </ModelSelectorRoot>
+      ) : null}
       <ComposerExtraControls />
     </>
   );
