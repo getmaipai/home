@@ -1,6 +1,40 @@
 {
   "version": 2,
-  "flakes": [],
+  "flakes": [
+    {
+      "workspace": "backend",
+      "file": "tests/turnMachine/modelDeadline.test.ts",
+      "test": "DEADLINE-02: written replies do not have a wall-clock cap > (a) a reply that keeps producing text for far longer than the old model deadline completes",
+      "owner": "codex-a lane",
+      "date_added": "2026-10-07",
+      "deadline": "2026-10-09",
+      "cause": "unknown",
+      "log": "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/queue/logs/sec1-backend-flakes-2026-10-07.log",
+      "issue": 123
+    },
+    {
+      "workspace": "backend",
+      "file": "tests/partialRestore.test.ts",
+      "test": "restorePersonFromBackup() > brings back memories, conversation history and settings, then loses everything live, then restores it",
+      "owner": "codex-a lane",
+      "date_added": "2026-10-07",
+      "deadline": "2026-10-09",
+      "cause": "unknown",
+      "log": "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/queue/logs/sec1-backend-flakes-2026-10-07.log",
+      "issue": 123
+    },
+    {
+      "workspace": "backend",
+      "file": "tests/partialRestore.test.ts",
+      "test": "restorePersonFromBackup() > never touches another person's data in the same backup",
+      "owner": "codex-a lane",
+      "date_added": "2026-10-07",
+      "deadline": "2026-10-09",
+      "cause": "unknown",
+      "log": "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/queue/logs/sec1-backend-flakes-2026-10-07.log",
+      "issue": 123
+    }
+  ],
   "serial": {
     "backend": [
       {
