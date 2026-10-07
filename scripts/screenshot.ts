@@ -3481,7 +3481,7 @@ async function seedTurnFor(session: string, text: string): Promise<{ conversatio
   return (await turn.json()) as { conversation_id: string; turn_id: string };
 }
 
-type Wave2Shot = { band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; live?: boolean; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
+type Wave2Shot = { name?: string; band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; live?: boolean; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
 
 const ALL_COMBOS = [["desktop", "light"], ["desktop", "dark"], ["phone", "light"], ["phone", "dark"]] as const;
 const TWO_COMBOS = [["desktop", "light"], ["phone", "dark"]] as const;
@@ -3505,6 +3505,33 @@ function wave2Shots(part: string): Wave2Shot[] {
       { band: "teen", person: "Marlow", prompt: "When does the library open on Saturday?", combos: TWO_COMBOS, drive },
       { band: "child", person: "Nova", prompt: "When does the library open on Saturday?", combos: TWO_COMBOS, drive },
     ];
+  }
+  if (part === "feedback-cancel") {
+    // FEEDBACK-CANCEL-01: the form open with Cancel, then after Cancel (the
+    // thumbs-down stays lit), then after tapping the lit thumb (cleared).
+    const open = async (page: Page) => {
+      await page.getByRole("button", { name: "Not helpful" }).last().click();
+      await page.locator('[data-slot="feedback-dialog"]').waitFor();
+      await page.getByRole("button", { name: "Cancel" }).waitFor();
+      await page.getByRole("button", { name: "Wrong" }).click();
+    };
+    const lit = (page: Page) => page.getByRole("button", { name: "Not helpful" }).last().getAttribute("data-submitted");
+    const afterCancel = async (page: Page) => {
+      await open(page);
+      await page.getByRole("button", { name: "Cancel" }).click();
+      await page.locator('[data-slot="feedback-dialog"]').waitFor({ state: "detached" });
+      if ((await lit(page)) !== "true") throw new Error("feedback cancel: Cancel un-lit the thumbs-down");
+    };
+    const afterClear = async (page: Page) => {
+      await afterCancel(page);
+      await page.getByRole("button", { name: "Not helpful" }).last().click();
+      await page.waitForTimeout(500);
+      if ((await lit(page)) === "true") throw new Error("feedback cancel: tapping the lit thumb did not clear it");
+    };
+    const shot = (name: string, drive: (page: Page) => Promise<void>): Wave2Shot => ({
+      name, band: "adult", person: null, prompt: "When does the library open on Saturday?", combos: ALL_COMBOS, drive: (page) => drive(page),
+    });
+    return [shot("-open", open), shot("-cancelled", afterCancel), shot("-cleared", afterClear)];
   }
   if (part === "memory") {
     // The reply saved one memory, filed under its turn the way "Remember
@@ -3574,7 +3601,7 @@ async function captureElementsWave2Review(browser: Browser, sessionValue: string
         await shot.drive(page, shot.band);
         await settleAnimations(page);
         const variant = part === "safety" ? `-${shot.prompt.includes("crisis cut") ? "crisis-cut" : shot.prompt.includes("plain cut") ? "plain-cut" : "crisis-reply"}` : "";
-        const file = `${part}${variant}-${shot.band}-${viewport.width}-${theme}.png`;
+        const file = `${part}${shot.name ?? ""}${variant}-${shot.band}-${viewport.width}-${theme}.png`;
         await page.screenshot({ path: join(outDir, file) });
         console.log(`Wrote ${join(outDir, file)}`);
       } finally {

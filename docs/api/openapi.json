@@ -7170,6 +7170,55 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Clear my label for an assistant turn",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "turn-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cleared (null), whether or not a label existed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Turn not found or not visible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/conversations/turns/{id}/document": {

@@ -49,6 +49,9 @@ export function useReplyFeedbackForm() {
     onToggleReason: (label: string) =>
       update(turnId, { selected: form.selected.includes(label) ? form.selected.filter((item) => item !== label) : [...form.selected, label] }),
     onNoteChange: (value: string) => update(turnId, { note: value.slice(0, 1000) }),
+    // FEEDBACK-CANCEL-01: closes the form and keeps the thumbs-down already
+    // stored; tapping the lit thumb is what takes the rating back.
+    onCancel: () => close(turnId),
     onSubmit: () => {
       const reasons = FEEDBACK_REASONS.filter((reason) => form.selected.includes(reason.label)).map((reason) => reason.value);
       const trimmed = form.note.trim();

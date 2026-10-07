@@ -33,7 +33,7 @@ import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
 import { createChatThreadListAdapter, needsTitleCatchUp } from "@/apps/chat/chatThreadListAdapter";
-import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
+import { clearSubmittedFeedback, createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
@@ -535,6 +535,9 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     [sttStatusQuery.data],
   );
 
+  // FEEDBACK-CANCEL-01: the feedback adapter un-lights a thumb through the
+  // thread it belongs to.
+  const runtimeRef = useRef<ReturnType<typeof useLocalRuntime>>(undefined);
   // A named, `use`-prefixed function, not an inline arrow - ChatPage.tsx's
   // own comment on why: `useRemoteThreadListRuntime` calls `runtimeHook`
   // from inside its own render, so react-hooks/rules-of-hooks needs the
@@ -671,7 +674,13 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     // window it was meant to cover.
     const adapters = useMemo(
       () => ({
-        feedback: createChatFeedbackAdapter(),
+        feedback: createChatFeedbackAdapter({
+          clearRating: (messageId) => {
+            const thread = runtimeRef.current?.thread;
+            // Never re-import the thread under a reply that is still streaming.
+            if (thread && !thread.getState().isRunning) clearSubmittedFeedback(thread, messageId);
+          },
+        }),
         ...(ttsAvailable ? { speech: createChatSpeechAdapter() } : {}),
         attachments: attachmentsAdapter,
         dictation: dictationAdapter,
@@ -679,7 +688,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
       // eslint-disable-next-line react-hooks/exhaustive-deps -- the rule's own static analysis can't see that dictationAdapter's *own* useMemo deps (sttStatusQuery.data) genuinely change across renders, and calls the dependencies "unnecessary" on that mistaken belief; removing them is exactly the bug named above, verified live by ChatPage.test.tsx's DICT-01 describe block. The `ttsAvailable` dependency is also essential: it adds/removes the speech adapter so the shipped Speak action follows real TTS readiness.
       [attachmentsAdapter, dictationAdapter, ttsAvailable],
     );
-    return useLocalRuntime(chatModelAdapter, {
+    const local = useLocalRuntime(chatModelAdapter, {
       adapters,
       // The live voice session sends its transcript directly through the
       // same runtime. Keep its written-message queue off while it is open.
@@ -690,6 +699,8 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
       // the next normal send, as CHAT-QUEUE-01 requires.
       unstable_queueClearOnCancel: false,
     });
+    runtimeRef.current = local;
+    return local;
   }
 
   // `onThreadIdChange` fires for two different reasons: a deliberate
