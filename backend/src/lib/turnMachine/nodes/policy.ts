@@ -8,14 +8,16 @@
 // purpose (RULES-AND-LEARNED-COMPONENTS.md); this node only decides
 // WHETHER to ask, never reads a "yes" itself (turnNext.ts's own
 // continuation handling does, before `safety`, per the state record).
-import { loadManifestOnly, meetsMinRole } from "@/lib/plugins";
+import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
 import { tokenize, isBarePronoun } from "@/lib/text";
 import { START_PROJECT_TOOL_ID, projectParamsOf, projectTypeForArgs, validateProjectParams, type StartProjectArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
-import { speakerIsAnonymous, touchesMemory } from "../speaker";
+import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { modelFacingArgs } from "./tool";
+import { decide } from "@/lib/gate/decide";
+import type { Role } from "@/middleware/auth";
 
 export interface PolicyInput {
   calls: readonly ToolCall[];
@@ -41,6 +43,16 @@ export interface PolicyEntry {
 
 export interface PolicyOutput {
   entries: PolicyEntry[];
+}
+
+function gateRefusalReason(reason: import("@/lib/gate/types").DenyReason): Extract<PolicyDecision, { allow: false }>["reason"] {
+  if (reason === "crisis_state") return "crisis_state";
+  if (reason === "anonymous_speaker") return "anonymous_speaker";
+  if (reason === "temporary_mode") return "temporary_mode";
+  if (reason === "needs_parent_unavailable") return "parent_required";
+  // Keep the legacy policy line for both a role floor and a capability
+  // the band may never use; no new parent-approval path is implied.
+  return "min_role";
 }
 
 /** The owner's ruling (state record, "Grounding, stated exactly",
@@ -234,14 +246,11 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       }
       const args = (call.args ?? {}) as Record<string, unknown>;
       const proposal: ActionProposal = { kind: projectType.consequential ? "side_effecting" : "read_only", request: { tool: call.tool, args, callId: call.id ?? call.tool } };
-      if (state.crisis) {
-        noteRefusal("crisis_state");
-        entries.push({ proposal, decision: { allow: false, reason: "crisis_state" } });
-        continue;
-      }
-      if (!meetsMinRole(state.actor.role, projectType.minRole)) {
-        noteRefusal("min_role");
-        entries.push({ proposal, decision: { allow: false, reason: "min_role" } });
+      const gate = decide({ who: { personId: state.actor.id, role: state.actor.role as Role, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()), anonymous: speakerIsAnonymous(state) }, what: { capabilities: ["artifact:write"], consequential: projectType.consequential, minRole: projectType.minRole }, context: { crisis: state.crisis, temporary: state.temporary } });
+      if (gate.kind === "deny") {
+        const reason = gateRefusalReason(gate.reason);
+        noteRefusal(reason);
+        entries.push({ proposal, decision: { allow: false, reason } });
         continue;
       }
       // Live 2026-10-06: a runaway generation sent { title, author } for a
@@ -258,7 +267,12 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       // temporary thread is ALLOWED ("its artifact is the point and is
       // durably wanted"), never blocked the way saving a fact is.
       const isPreConfirmed = input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
-      if (!isPreConfirmed && projectType.consequential && paramsValid) {
+      if (gate.kind === "ask_parent") {
+        noteRefusal("parent_required");
+        entries.push({ proposal, decision: { allow: false, reason: "parent_required" } });
+        continue;
+      }
+      if (!isPreConfirmed && gate.kind === "ask_self" && paramsValid) {
         noteRefusal("confirm_needed");
         // Jesse found live (2026-09-27): "Start Bedtime storybook?" reads
         // as a bare yes/no with no reason given - `consequential` is
@@ -269,7 +283,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         // purpose: the params passed the schema check above, but the plan
         // is only built when the project starts, and tool.ts's own real,
         // ceiling-backed `durationLabel()` names the honest number then.
-        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `${sentenceInitial(projectType.title)} can take a few minutes to put together. Want me to create it?` } } });
+        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `${sentenceInitial(projectType.title)} can take a few minutes to put together. Want me to create it?`, capabilities: ["artifact:write"], consequential: projectType.consequential } } });
         continue;
       }
       entries.push({ proposal, decision: { allow: true } });
@@ -312,31 +326,24 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       request: { tool: call.tool, args, callId: call.id ?? call.tool },
     };
 
-    if (state.crisis) {
-      noteRefusal("crisis_state");
-      entries.push({ proposal, decision: { allow: false, reason: "crisis_state" } });
-      continue;
-    }
-    if (!meetsMinRole(state.actor.role, manifest.min_role)) {
-      noteRefusal("min_role");
-      entries.push({ proposal, decision: { allow: false, reason: "min_role" } });
-      continue;
-    }
-    if (speakerIsAnonymous(state) && touchesMemory(manifest)) {
-      noteRefusal("anonymous_speaker");
-      entries.push({ proposal, decision: { allow: false, reason: "anonymous_speaker" } });
-      continue;
-    }
-    if (state.temporary && manifest.permissions?.includes("memory:write")) {
-      noteRefusal("temporary_mode");
-      entries.push({ proposal, decision: { allow: false, reason: "temporary_mode" } });
-      continue;
-    }
     const isPreConfirmed = input.preConfirmed?.request.tool === call.tool && JSON.stringify(input.preConfirmed.request.args) === JSON.stringify(args);
     if (!isPreConfirmed) {
-      if (call.tool === "websearch" && roster.length > 0 && speakerNamedAny(JSON.stringify(args), roster)) {
+      const householdSubject = call.tool === "websearch" && roster.length > 0 && speakerNamedAny(JSON.stringify(args), roster);
+      const gate = decide({ who: { personId: state.actor.id, role: state.actor.role as Role, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()), anonymous: speakerIsAnonymous(state) }, what: { capabilities: householdSubject ? ["search.household_subject"] : manifest.permissions ?? [], summary: "Search the web for this request.", consequential: manifest.consequential, minRole: manifest.min_role }, context: { crisis: state.crisis, temporary: state.temporary } });
+      if (gate.kind === "deny") {
+        const reason = gateRefusalReason(gate.reason);
+        noteRefusal(reason);
+        entries.push({ proposal, decision: { allow: false, reason } });
+        continue;
+      }
+      if (gate.kind === "ask_parent") {
+        noteRefusal("parent_required");
+        entries.push({ proposal, decision: { allow: false, reason: "parent_required" } });
+        continue;
+      }
+      if (householdSubject && gate.kind === "ask_self") {
         noteRefusal("consent_needed");
-        entries.push({ proposal, decision: { allow: false, reason: "consent_needed", ask: { prompt: `Want me to look that up?` } } });
+        entries.push({ proposal, decision: { allow: false, reason: "consent_needed", ask: { prompt: `Want me to look that up?`, capabilities: ["search.household_subject"], consequential: false } } });
         continue;
       }
       // Grounded on the arguments the call will actually run with: a stray
@@ -348,9 +355,9 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         entries.push({ proposal, decision: { allow: false, reason: "ungrounded_args" } });
         continue;
       }
-      if (manifest.consequential) {
+      if (gate.kind === "ask_self") {
         noteRefusal("confirm_needed");
-        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `Go ahead and ${manifest.display.toLowerCase()}?` } } });
+        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `Go ahead and ${manifest.display.toLowerCase()}?`, capabilities: manifest.permissions ?? [], consequential: manifest.consequential } } });
         continue;
       }
     }

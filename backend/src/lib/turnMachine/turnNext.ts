@@ -21,7 +21,7 @@ import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
 import { resolveOrCreateConversation, resolveSupersedes, getPendingAsk, setPendingAsk, logTurn, appendTemporaryTurn, isTemporaryConversation, type PendingAsk } from "@/lib/conversationHistory";
 import { classifyTurnSignal } from "@/lib/turnSignal";
-import { turnAgeBand } from "./speaker";
+import { speakerIsAnonymous, turnAgeBand } from "./speaker";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
 import { isOwnerOrAdmin } from "@/lib/access";
@@ -51,6 +51,8 @@ import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { AnswerImagePlacer, answerImagesAllowed, settleAnswerImages } from "@/lib/answerImages/turn";
+import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
+import type { GateDecision } from "@/lib/gate/types";
 
 export interface RunTurnNextOpts {
   conversationId?: string;
@@ -289,8 +291,12 @@ function failureDetailFor(state: TurnState, value: TurnValue): TurnErrorDetail {
  * ids DO match: the ask is cleared and nothing resumes, exactly like a
  * typed "no". When `askAnswer` is absent (a typed or spoken reply, no
  * button), the AFFIRMATIVE_RE path is unchanged. */
-function resumesAsk(ask: PendingAsk, utterance: string, askAnswer?: { turn_id: string; approved: boolean }): ActionProposal | null {
+function resumesAsk(ask: PendingAsk, utterance: string, askAnswer: { turn_id: string; approved: boolean } | undefined, decision: GateDecision | null, isMinor: boolean): ActionProposal | null {
   if (ask.kind !== "confirm") return null;
+  // Re-checks the stored request's gate decision made in beginTurn() for
+  // this answer. Only a current self-approval decision may resume here;
+  // a copied/legacy parent ask never turns a child's yes into consent.
+  if (!decision || decision.kind === "deny" || decision.kind === "ask_parent" || (isMinor && decision.kind !== "ask_self")) return null;
   if (askAnswer) {
     if (ask.turnId !== askAnswer.turn_id || !askAnswer.approved) return null;
   } else if (!AFFIRMATIVE_RE.test(utterance)) {
@@ -373,26 +379,36 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // stored, so a refused request leaves no provisional row or file behind.
   // THIN-7C: an edit never resumes an ask (the old path cleared it first).
   const pendingAsk = temporary || opts.bare === true || supersedes || continuation || opts.ephemeral === true ? null : getPendingAsk(conversation.id);
-  // APPROVE-CARD-01: a tapped card's own `ask_answer` must match the
-  // conversation's CURRENT pending ask by turn id, or it's stale (a
-  // second ask parked since the card was shown, the ask was already
-  // answered, or there was never one) - reported as a real 409, never
-  // silently run through ordinary text processing (resumesAsk()'s own
-  // turn-id check is belt-and-braces, not the primary gate: without
-  // this early return a mismatch would just fall through to routing
-  // whatever "Yes"/"No" text rode along with it, exactly like an
-  // unrelated new statement, with no way for the caller to tell a real
-  // answer from a stale one). The existing pending ask, if any, is for
-  // a DIFFERENT turn than this stale tap named - left untouched, not
-  // cleared: this request doesn't get to answer someone else's live
-  // question by accident.
+  const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
+  const speaker = { surface, actor, speakerEvidence: opts.speakerEvidence ?? null };
+  const pendingAskDecision = pendingAsk?.kind === "confirm" ? decidePendingAsk(pendingAsk, actor, { band, anonymous: speakerIsAnonymous(speaker) }) : null;
   if (opts.ask_answer && (!pendingAsk || pendingAsk.turnId !== opts.ask_answer.turn_id)) {
     return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This confirmation is no longer waiting for an answer." } };
   }
-  // THIN-7C: the model, the safety check and the signal read the message with
-  // its documents; logResult() is given the typed text, as the old path did.
+  const blockedPendingAnswer = pendingAsk?.kind === "confirm" && (
+    pendingAskDecision?.kind === "deny"
+    || pendingAskDecision?.kind === "ask_parent"
+    || (band !== "adult" && pendingAskDecision?.kind !== "ask_self")
+  );
+  if (blockedPendingAnswer) {
+    setPendingAsk(conversation.id, null);
+    if (opts.ask_answer || AFFIRMATIVE_RE.test(text)) {
+      if (pendingAskDecision?.kind === "ask_parent") {
+        return { ok: false, result: { ok: false, status: 403, code: "parent_required", error: "This needs a parent to decide. I haven't asked one." } };
+      }
+      const error = pendingAskDecision?.kind === "deny" && pendingAskDecision.reason === "crisis_state"
+        ? "Let's stay with this for now. I'm here."
+        : pendingAskDecision?.kind === "deny" && pendingAskDecision.reason === "anonymous_speaker"
+          ? "I don't know who's talking yet, so I can't use anyone's memories."
+          : pendingAskDecision?.kind === "deny" && pendingAskDecision.reason === "temporary_mode"
+            ? "I can't save anything in a temporary chat."
+            : pendingAskDecision?.kind === "deny" && (pendingAskDecision.reason === "min_band" || pendingAskDecision.reason === "never_for_band")
+              ? "That one needs a grown-up."
+              : "That confirmation can't be answered here.";
+      return { ok: false, result: { ok: false, status: 403, code: "ask_not_allowed", error } };
+    }
+  }
   text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary || opts.ephemeral === true);
-  const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
   // old path (the old engine file's own commandOpeners(effectiveLoaded)) - a
   // clause opening with a bundled package's own command verb ("look",
@@ -514,7 +530,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // safety state runs first, then the pending ask is consumed before
   // commands") still holds, now with one safety evaluation, traced
   // once, for every turn including a resumed one.
-  const preConfirmed = pendingAsk ? (resumesAsk(pendingAsk, text, opts.ask_answer) ?? undefined) : undefined;
+  const preConfirmed = pendingAsk ? (resumesAsk(pendingAsk, text, opts.ask_answer, pendingAskDecision, band !== "adult") ?? undefined) : undefined;
   // THIN-7E (ASK-01): a standing `who` question is read as an answer by the commands node
   // (askNames.ts), so it is kept on the state although the stored ask is cleared just below.
   if (pendingAsk?.kind === "who") state.pendingWho = pendingAsk;
@@ -629,7 +645,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     if (ask) {
       state.outcomes.push(outcomeOf({ callId: `${state.turnId}:confirm`, packageId: ask.packageId, status: "pending", args: ask.args, via: "confirm", userMessage: promptText }));
     }
-    if (ask && !temporary && !state.ephemeral) setPendingAsk(conversationId, { ...ask, turnId: state.turnId });
+    if (ask && !temporary && !state.ephemeral) setPendingAsk(conversationId, { ...ask, turnId: state.turnId, capabilities: ask.capabilities, consequential: ask.consequential });
     value = buildTurnValue(state, startedAt, "confirm", promptText);
     if (ask && !temporary && !state.ephemeral) value.confirm = { package_id: ask.packageId, open: true };
   } else if (finalState === "refused") {

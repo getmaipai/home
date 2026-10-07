@@ -107,7 +107,7 @@ export function decide(request: GateRequest): GateDecision {
   const deny = (reason: DenyReason): GateDecision => result({ kind: "deny", reason, audit });
 
   if (request.context?.crisis && what.capabilities.some((id) => ["lookup", "chosen_destination", "action", "spend"].includes(capabilityPolicy(id)?.risk ?? ""))) return deny("crisis_state");
-  if (who.anonymous && what.capabilities.some((id) => id === "memory:read" || id === "memory:write")) return deny("anonymous_speaker");
+  if (who.anonymous && what.capabilities.some((id) => id.startsWith("memory:") || id.startsWith("memory."))) return deny("anonymous_speaker");
   if ((request.context?.temporary || request.context?.incognito) && (request.context.incognitoBlocked || what.capabilities.includes("memory:write"))) return deny("temporary_mode");
   if (what.minRole && !roleMeetsFloor(who.role, what.minRole)) return deny("min_band");
   if (what.denied) return deny("grant_denied");

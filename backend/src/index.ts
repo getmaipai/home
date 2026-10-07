@@ -33,6 +33,7 @@ import { recordBootGap, recordStatusSample, pruneStatusEvents } from "@/lib/stat
 import { runConfiguredInternetProbe } from "@/lib/internetProbe";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
+import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
 
 const configuredPort = Number(process.env.PORT ?? 8787);
 initSafetyAlarm();
@@ -164,6 +165,7 @@ registerAllPackageNotificationTypes();
 // manifest + plan.json becomes a real, registered project type before
 // the first turn could ever offer start_project.
 registerAllPackageProjectTypes();
+migratePendingAsksThroughGate();
 void runAllSmokeTests().then(({ ran, failed }) => {
   if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);
 });

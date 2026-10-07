@@ -40,6 +40,7 @@ describe("GATE-01 band matrix", () => {
   test("hard refusals precede capability policies", () => {
     expect(decide({ ...request("adult", ["home:light"]), context: { crisis: true } })).toMatchObject({ kind: "deny", reason: "crisis_state" });
     expect(decide({ ...request("child", ["memory:read"]), who: { personId: "person", role: "child", band: "child", anonymous: true } })).toMatchObject({ kind: "deny", reason: "anonymous_speaker" });
+    expect(decide({ ...request("child", ["memory.write_household"]), who: { personId: "person", role: "child", band: "child", anonymous: true } })).toMatchObject({ kind: "deny", reason: "anonymous_speaker" });
     expect(decide({ ...request("adult", ["memory:write"]), context: { temporary: true } })).toMatchObject({ kind: "deny", reason: "temporary_mode" });
     expect(decide({ ...request("adult", ["net:api.open-meteo.com"], { denied: true }) })).toMatchObject({ kind: "deny", reason: "grant_denied" });
     expect(decide({ ...request("adult", ["home:light"], { minRole: "admin" }) })).toMatchObject({ kind: "deny", reason: "min_band" });

@@ -77,6 +77,7 @@ export interface AnswerOutput {
  * (no such package, the ordinary case of a model inventing a tool
  * name) keeps the honesty line - GROUND-01's ruling stands. */
 function policyRefusalLine(reason: PolicyRefusedReason): string {
+  if (reason === "parent_required") return "This needs a parent to decide. I haven't asked one.";
   if (reason === "min_role") return "That one needs a grown-up.";
   if (reason === "temporary_mode") return "I can't save anything in a temporary chat.";
   if (reason === "anonymous_speaker") return "I don't know who's talking yet, so I can't use anyone's memories.";
