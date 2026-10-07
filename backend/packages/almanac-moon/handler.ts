@@ -44,6 +44,13 @@ export function moonPhase(now: Date = new Date()): { text: string; speech: strin
   return { text, speech: text };
 }
 
+export type AlmanacMoonData = { phase: typeof MOON_PHASE_NAMES[number] };
+export function moonPhaseData(now: Date = new Date()): AlmanacMoonData {
+  const daysSinceNew = (now.getTime() - REFERENCE_NEW_MOON_MS) / 86_400_000;
+  const fraction = (((daysSinceNew % SYNODIC_MONTH_DAYS) + SYNODIC_MONTH_DAYS) % SYNODIC_MONTH_DAYS) / SYNODIC_MONTH_DAYS;
+  return { phase: MOON_PHASE_NAMES[Math.round(fraction * MOON_PHASE_NAMES.length) % MOON_PHASE_NAMES.length]! };
+}
+
 function handlerNow(args: Record<string, unknown>): Date {
   const value = args.__now;
   if (typeof value === "string") {
@@ -56,7 +63,8 @@ function handlerNow(args: Record<string, unknown>): Date {
 if (import.meta.main) {
   const server = new McpServer({ name: "almanac-moon", version: "0.1.0" });
   server.registerTool("handle", { inputSchema: z.object({ __now: z.string().optional() }).passthrough() }, async (args: Record<string, unknown>) => {
-    return { content: [{ type: "text", text: JSON.stringify({ reply: moonPhase(handlerNow(args)), actions: [] }) }] };
+    const now = handlerNow(args);
+    return { content: [{ type: "text", text: JSON.stringify({ reply: moonPhase(now), actions: [], data: moonPhaseData(now) }) }] };
   });
   const transport = new StdioServerTransport();
   await server.connect(transport);

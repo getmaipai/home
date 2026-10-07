@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { parseCurrencyExpression, summarizeConversion } from "./handler.ts";
+import { parseCurrencyExpression, summarizeConversion, conversionData } from "./handler.ts";
 
 Deno.test("parses an amount and two currency words, joined by 'to'", () => {
   const parsed = parseCurrencyExpression("100 dollars to euros");
@@ -30,6 +30,9 @@ Deno.test("returns null when a currency word isn't recognized and isn't a bare t
 Deno.test("summarizes a real rate, rounded to two decimals", () => {
   const result = summarizeConversion({ amount: 5, rates: { EUR: 4.30219 } }, { amount: 5, from: "USD", to: "EUR" });
   assertEquals(result.text, "5 USD is about 4.3 EUR.");
+  const data = conversionData({ rates: { EUR: 4.30219 } }, { amount: 5, from: "USD", to: "EUR" })!;
+  assertEquals(data, { amount: 5, from: "USD", to: "EUR", converted: 4.3 });
+  assertEquals(result.text.includes(`${data.amount} ${data.from}`), true);
 });
 
 // frankfurter.dev's real behavior for a same-currency pair: a 200 with

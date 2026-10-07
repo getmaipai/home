@@ -9,3 +9,7 @@ All notable changes to the Current Time package, in [Keep a Changelog](https://k
 - The current time, spoken naturally (session-d-packages-and-store.md
   step 7). One of the almanac's five small lookups. Pure local
   computation, no network.
+
+### Added
+
+- Typed, bounded result data for CHAT-16.

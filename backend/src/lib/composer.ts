@@ -36,6 +36,7 @@ import { randomSuffix } from "@/lib/id";
 import { TurnArtifact as TurnArtifactSchema, type TurnArtifact as TurnArtifactValue } from "@maipai/spec/gen/ts/turn-artifact.js";
 import type { AgeBand } from "@/lib/ageBand";
 import type { StructuredPart } from "@/wire";
+import { evaluateSafety, forOutput } from "@/lib/safety";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 
@@ -583,11 +584,14 @@ export function projectDocumentForChild(document: TurnArtifactValue): ChildTurnA
  * until it is converted) yields no structured part - its reply text is
  * still delivered normally, nothing is lost, there is just nothing
  * beyond prose to show yet. */
-export function structuredPartForOutcomes(outcomes: readonly ToolExecutionOutcome[]): StructuredPart | null {
+export function structuredPartForOutcomes(outcomes: readonly ToolExecutionOutcome[], band: AgeBand = "adult"): StructuredPart | null {
   const succeeded = outcomes.filter((outcome): outcome is Succeeded => outcome.status === "succeeded");
   for (const outcome of succeeded) {
     const part = outcome.packageId === "weather" ? weatherSpecSheet(outcome) : outcome.packageId === "almanac-date" ? almanacDateSpecSheet(outcome) : null;
-    if (part) return { ...part, tool_id: outcome.packageId };
+    if (part) {
+      const rows = part.rows.filter((row) => forOutput(evaluateSafety(row.value, band)).action !== "refuse");
+      return rows.length ? { ...part, rows, tool_id: outcome.packageId } : null;
+    }
   }
   return null;
 }

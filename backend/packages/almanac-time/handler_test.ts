@@ -1,9 +1,12 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { currentTime } from "./handler.ts";
+import { currentTime, currentTimeData } from "./handler.ts";
 
 Deno.test("formats a real time as h:mm AM/PM", () => {
   const result = currentTime(new Date(2026, 0, 1, 14, 5));
   assertEquals(result.text, "It's 2:05 PM.");
+  const data = currentTimeData(new Date(2026, 0, 1, 14, 5));
+  assertEquals(data, { time: "2:05 PM", place: null });
+  assertEquals(result.text.includes(data.time), true);
 });
 
 Deno.test("formats midnight correctly, not as 0:00", () => {

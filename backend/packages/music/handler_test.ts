@@ -1,9 +1,12 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { summarizeArtist } from "./handler.ts";
+import { summarizeArtist, artistData } from "./handler.ts";
 
 Deno.test("describes a band, formed year and country", () => {
   const data = { artists: [{ name: "Radiohead", type: "Group", area: { name: "United Kingdom" }, "life-span": { begin: "1991", ended: null } }] };
   const result = summarizeArtist(data, "radiohead");
+  const shaped = artistData(data)!;
+  assertEquals(shaped.name, "Radiohead");
+  assertEquals(result.text.includes(shaped.name), true);
   assertEquals(result.text, "Radiohead is a band from United Kingdom, formed in 1991.");
 });
 

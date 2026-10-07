@@ -10,3 +10,7 @@ All notable changes to the Next Holiday package, in [Keep a Changelog](https://k
   7), via date.nager.at's free, keyless public holiday API. One of the
   almanac's five small lookups. US only for now - no household-country
   setting exists yet.
+
+### Added
+
+- Typed, bounded result data for CHAT-16.

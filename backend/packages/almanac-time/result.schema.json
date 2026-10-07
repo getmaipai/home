@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AlmanacTimeData",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "time",
+    "place"
+  ],
+  "properties": {
+    "time": {
+      "type": "string"
+    },
+    "place": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

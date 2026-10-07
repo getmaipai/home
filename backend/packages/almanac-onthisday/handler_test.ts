@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { summarizeOnThisDay } from "./handler.ts";
+import { summarizeOnThisDay, firstEventData } from "./handler.ts";
 
 Deno.test("picks the first real event and names its year", () => {
   const result = summarizeOnThisDay({
@@ -9,6 +9,7 @@ Deno.test("picks the first real event and names its year", () => {
     ],
   });
   assertEquals(result.text, "In 1926, The first television broadcast took place.");
+  assertEquals(firstEventData({ events: [{ text: "The first television broadcast took place.", year: 1926 }] }), { year: 1926 });
 });
 
 Deno.test("reads no events at all as not found, not a wrong answer", () => {

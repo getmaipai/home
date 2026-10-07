@@ -38,7 +38,7 @@ interface MbSearchResult {
   artists?: MbArtist[];
 }
 
-function describeType(type: string | undefined): string {
+function describeType(type: string | undefined): MusicData["kind"] {
   if (type === "Group") return "a band";
   if (type === "Person") return "a solo artist";
   if (type === "Orchestra") return "an orchestra";
@@ -67,6 +67,15 @@ export function summarizeArtist(data: unknown, query: string): Reply {
     text += isPerson ? ` They passed away in ${ended}.` : ` They disbanded in ${ended}.`;
   }
   return { text, speech: text };
+}
+
+export interface MusicData { name: string; kind: "a band" | "a solo artist" | "an orchestra" | "a choir" | "an artist"; area: string | null; begin: string | null; ended: string | null }
+export function artistData(input: unknown): MusicData | null {
+  const artist = (input as MbSearchResult | null)?.artists?.[0];
+  if (!artist || typeof artist.name !== "string") return null;
+  return { name: artist.name, kind: describeType(artist.type), area: typeof artist.area?.name === "string" ? artist.area.name : null,
+    begin: typeof artist["life-span"]?.begin === "string" ? artist["life-span"]!.begin : null,
+    ended: typeof artist["life-span"]?.ended === "string" ? artist["life-span"]!.ended : null };
 }
 
 async function hostFetch(
@@ -102,7 +111,8 @@ if (import.meta.main) {
         const url = `https://musicbrainz.org/ws/2/artist/?query=${encodeURIComponent(`artist:${args.query}`)}&fmt=json&limit=1`;
         const data = await hostFetch(extra, url);
         const reply = summarizeArtist(data, args.query);
-        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+        const shaped = artistData(data);
+        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [], ...(shaped ? { data: shaped } : {}) }) }] };
       } catch (err) {
         const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
         return { content: [{ type: "text", text: JSON.stringify({ error }) }] };

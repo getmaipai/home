@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CurrencyData",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "amount",
+    "from",
+    "to",
+    "converted"
+  ],
+  "properties": {
+    "amount": {
+      "type": "number"
+    },
+    "from": {
+      "type": "string"
+    },
+    "to": {
+      "type": "string"
+    },
+    "converted": {
+      "type": "number"
+    }
+  }
+}

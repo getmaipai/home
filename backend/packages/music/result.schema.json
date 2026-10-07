@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MusicData",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "kind",
+    "area",
+    "begin",
+    "ended"
+  ],
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "a band",
+        "a solo artist",
+        "an orchestra",
+        "a choir",
+        "an artist"
+      ]
+    },
+    "area": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "begin": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ended": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

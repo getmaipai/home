@@ -1,11 +1,12 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { moonPhase } from "./handler.ts";
+import { moonPhase, moonPhaseData } from "./handler.ts";
 
 Deno.test("names a real reference new moon as New Moon", () => {
   // 2000-01-06 18:14 UTC is this file's own reference epoch - the moon
   // is new BY DEFINITION at that instant.
   const result = moonPhase(new Date(Date.UTC(2000, 0, 6, 18, 14)));
   assertEquals(result.text, "The moon is in its New Moon phase.");
+  assertEquals(moonPhaseData(new Date(Date.UTC(2000, 0, 6, 18, 14))), { phase: "New Moon" });
 });
 
 Deno.test("names a full moon roughly half a synodic month later", () => {

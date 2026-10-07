@@ -10,3 +10,7 @@ All notable changes to the Moon Phase package, in [Keep a Changelog](https://kee
   the almanac's five small lookups. A standard astronomical
   approximation (days since a known reference new moon, divided by the
   synodic month), accurate to within about a day - no network call.
+
+### Added
+
+- Typed, bounded result data for CHAT-16.

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AlmanacMoonData",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "phase"
+  ],
+  "properties": {
+    "phase": {
+      "enum": [
+        "New Moon",
+        "Waxing Crescent",
+        "First Quarter",
+        "Waxing Gibbous",
+        "Full Moon",
+        "Waning Gibbous",
+        "Last Quarter",
+        "Waning Crescent"
+      ]
+    }
+  }
+}

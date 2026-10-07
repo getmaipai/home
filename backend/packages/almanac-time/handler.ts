@@ -38,6 +38,12 @@ export function currentTime(now: Date = new Date(), zone?: string, place?: strin
   return { text, speech: text };
 }
 
+export interface AlmanacTimeData { time: string; place: string | null }
+export function currentTimeData(now: Date = new Date(), zone?: string, place?: string): AlmanacTimeData {
+  const formatted = now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", ...(zone ? { timeZone: zone } : {}) });
+  return { time: formatted, place: place ?? null };
+}
+
 function handlerNow(args: Record<string, unknown>): Date {
   const value = args.__now;
   if (typeof value === "string") {
@@ -61,9 +67,11 @@ if (import.meta.main) {
       // the deterministic floor) - so the honest answer is the fixed
       // line, never a websearch this package has no business doing.
       if (!zone) return { content: [{ type: "text", text: JSON.stringify({ reply: { text: UNKNOWN_PLACE_LINE, speech: UNKNOWN_PLACE_LINE }, actions: [] }) }] };
-      return { content: [{ type: "text", text: JSON.stringify({ reply: currentTime(handlerNow(args), zone, place), actions: [] }) }] };
+      const now = handlerNow(args);
+      return { content: [{ type: "text", text: JSON.stringify({ reply: currentTime(now, zone, place), actions: [], data: currentTimeData(now, zone, place) }) }] };
     }
-    return { content: [{ type: "text", text: JSON.stringify({ reply: currentTime(handlerNow(args)), actions: [] }) }] };
+    const now = handlerNow(args);
+    return { content: [{ type: "text", text: JSON.stringify({ reply: currentTime(now), actions: [], data: currentTimeData(now) }) }] };
   });
   const transport = new StdioServerTransport();
   await server.connect(transport);

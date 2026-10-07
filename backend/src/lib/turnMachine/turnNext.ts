@@ -168,7 +168,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // called here, so the new path built no structured part (the
     // weather/almanac card) and no artifact (write_document's own
     // outcome) for anything, on any turn. Same functions, same input.
-    structured_part: structuredPartForOutcomes(state.outcomes) ?? undefined,
+    structured_part: structuredPartForOutcomes(state.outcomes, turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date())) ?? undefined,
     artifact: artifactForOutcomes(state.outcomes) ?? undefined,
     // PROJECT-PROGRESS-01: a start_project outcome names the project id
     // it just launched, the same unconditional-line, no-new-dispatch

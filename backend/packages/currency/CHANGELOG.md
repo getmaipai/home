@@ -13,3 +13,7 @@ All notable changes to the Currency package, in [Keep a Changelog](https://keepa
   goes to whichever package sorts first by id, so this package answers
   to "exchange *" instead - documented in its own README rather than
   silently failing on "convert 5 dollars to euros".
+
+### Added
+
+- Typed, bounded result data for CHAT-16.

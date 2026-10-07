@@ -48,6 +48,13 @@ export function summarizeNextHoliday(data: unknown): Reply {
   return { text, speech: text };
 }
 
+export interface AlmanacHolidayData { date: string; name: string }
+export function nextHolidayData(input: unknown): AlmanacHolidayData | null {
+  const next = (input as NagerHoliday[] | null)?.[0];
+  if (!next || typeof next.name !== "string" || typeof next.date !== "string" || Number.isNaN(new Date(`${next.date}T00:00:00`).getTime())) return null;
+  return { date: next.date, name: next.name };
+}
+
 async function hostFetch(
   extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> },
   url: string,
@@ -70,7 +77,8 @@ if (import.meta.main) {
       try {
         const data = await hostFetch(extra, "https://date.nager.at/api/v3/NextPublicHolidays/US");
         const reply = summarizeNextHoliday(data);
-        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+        const shaped = nextHolidayData(data);
+        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [], ...(shaped ? { data: shaped } : {}) }) }] };
       } catch (err) {
         const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
         return { content: [{ type: "text", text: JSON.stringify({ error }) }] };

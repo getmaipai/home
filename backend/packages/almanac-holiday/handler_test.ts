@@ -1,5 +1,5 @@
 import { assertEquals, assert } from "jsr:@std/assert@1";
-import { summarizeNextHoliday } from "./handler.ts";
+import { summarizeNextHoliday, nextHolidayData } from "./handler.ts";
 
 Deno.test("names the first (soonest) holiday in the list", () => {
   const result = summarizeNextHoliday([
@@ -8,6 +8,11 @@ Deno.test("names the first (soonest) holiday in the list", () => {
   ]);
   assert(result.text.includes("Christmas Day"));
   assert(result.text.includes("December"));
+  const fixture = [{ date: "2026-12-25", localName: "Christmas Day", name: "Christmas Day" }];
+  const data = nextHolidayData(fixture)!;
+  assertEquals(data, { date: "2026-12-25", name: "Christmas Day" });
+  assertEquals(result.text.includes(data.name), true);
+  assertEquals("synopsis" in data, false);
 });
 
 Deno.test("reads an empty list as not found, not a wrong answer", () => {

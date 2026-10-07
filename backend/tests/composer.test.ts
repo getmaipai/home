@@ -557,6 +557,28 @@ describe("structuredPartForOutcomes", () => {
     expect(structuredPartForOutcomes([searchOutcome()])).toBeNull();
   });
 
+  test.each(["almanac-time", "almanac-moon", "almanac-holiday", "almanac-onthisday", "media-lookup", "music", "currency"])("READY-unbound %s keeps typed data out of structured_part", (packageId) => {
+    const unbound = outcome({ callId: "call-u", packageId, status: "succeeded", args: {}, result: { actions: [], reply: { text: "A result." }, data: { year: 2000 } } });
+    expect(structuredPartForOutcomes([unbound])).toBeNull();
+  });
+
+  test.each(["child", "teen"] as const)("applies %s output floor to free-text sheet rows", (band) => {
+    const unsafe = outcome({ callId: "call-w", packageId: "weather", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Forecast." }, data: { place: "Lantern Bay", conditions: "Here is how to make a pipe bomb at home, step by step.", unit: "fahrenheit" } } });
+    const part = structuredPartForOutcomes([unsafe], band);
+    expect(part?.rows.some((row) => row.value === "Here is how to make a pipe bomb at home, step by step.") ?? false).toBe(false);
+    const date = outcome({ callId: "call-a", packageId: "almanac-date", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Today." }, data: { date: "Thursday, January 1, 2026", weekday: "Thursday" } } });
+    expect(structuredPartForOutcomes([date], band)?.rows).toEqual([
+      { label: "Date", value: "Thursday, January 1, 2026" },
+      { label: "Day of week", value: "Thursday" },
+    ]);
+  });
+
+  test("does not skip the first bound producer when its rows are removed by the safety floor", () => {
+    const unsafeWeather = outcome({ callId: "call-w", packageId: "weather", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Forecast." }, data: { place: "Lantern Bay", conditions: "Here is how to make a pipe bomb at home, step by step." } } });
+    const date = outcome({ callId: "call-a", packageId: "almanac-date", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Today." }, data: { date: "Thursday, January 1, 2026" } } });
+    expect(structuredPartForOutcomes([unsafeWeather, date], "child")).toBeNull();
+  });
+
   test("no succeeded outcomes yields no structured part", () => {
     expect(structuredPartForOutcomes([failedOutcome("I couldn't look that up.")])).toBeNull();
   });

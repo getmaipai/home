@@ -33,6 +33,12 @@ export function summarizeOnThisDay(data: unknown): Reply {
   return { text, speech: text };
 }
 
+export interface AlmanacOnThisDayData { year: number }
+export function firstEventData(input: unknown): AlmanacOnThisDayData | null {
+  const event = (input as { events?: OnThisDayEvent[] } | null)?.events?.[0];
+  return event && typeof event.text === "string" && typeof event.year === "number" ? { year: event.year } : null;
+}
+
 function handlerNow(args: Record<string, unknown>): Date {
   const value = args.__now;
   if (typeof value === "string") {
@@ -67,7 +73,8 @@ if (import.meta.main) {
         const day = String(now.getDate()).padStart(2, "0");
         const data = await hostFetch(extra, `https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${month}/${day}`);
         const reply = summarizeOnThisDay(data);
-        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+        const shaped = firstEventData(data);
+        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [], ...(shaped ? { data: shaped } : {}) }) }] };
       } catch (err) {
         const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
         return { content: [{ type: "text", text: JSON.stringify({ error }) }] };

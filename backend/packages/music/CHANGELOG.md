@@ -42,3 +42,7 @@ All notable changes to the Music Lookup package, in [Keep a Changelog](https://k
   yet - deferred to docs/BACKLOG.md rather than built on settings
   infrastructure that doesn't exist. Songs and albums (not just artists)
   are the same "not yet, scoped down honestly" call.
+
+### Added
+
+- Typed, bounded result data for CHAT-16.

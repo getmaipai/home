@@ -93,6 +93,13 @@ export function summarizeConversion(data: unknown, parsed: ParsedConversion): Re
   return { text, speech: text };
 }
 
+export interface CurrencyData extends ParsedConversion { converted: number }
+export function conversionData(input: unknown, parsed: ParsedConversion): CurrencyData | null {
+  const rate = (input as FrankfurterResponse | null)?.rates?.[parsed.to];
+  return typeof rate === "number" && Number.isFinite(rate)
+    ? { ...parsed, converted: Math.round(rate * 100) / 100 } : null;
+}
+
 async function hostFetch(
   extra: { sendRequest: (req: unknown, schema: unknown) => Promise<{ value: unknown }> },
   url: string,
@@ -128,7 +135,8 @@ if (import.meta.main) {
         const url = `https://api.frankfurter.dev/v1/latest?from=${parsed.from}&to=${parsed.to}&amount=${parsed.amount}`;
         const data = await hostFetch(extra, url);
         const reply = summarizeConversion(data, parsed);
-        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+        const shaped = conversionData(data, parsed);
+        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [], ...(shaped ? { data: shaped } : {}) }) }] };
       } catch (err) {
         const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
         return { content: [{ type: "text", text: JSON.stringify({ error }) }] };

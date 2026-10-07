@@ -9,3 +9,7 @@ All notable changes to the On This Day package, in [Keep a Changelog](https://ke
 - What happened on this day in history (session-d-packages-and-store.md
   step 7), via Wikipedia's own free public "on this day" feed. One of
   the almanac's five small lookups.
+
+### Added
+
+- Typed, bounded result data for CHAT-16.
