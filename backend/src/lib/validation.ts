@@ -5,6 +5,8 @@
 
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
+export const MIN_SECRET_LENGTH = 4;
+
 export function validateDisplayName(value: unknown): ValidationResult<string> {
   const trimmed = typeof value === "string" ? value.trim() : "";
   if (trimmed.length < 1 || trimmed.length > 80) {
@@ -14,8 +16,8 @@ export function validateDisplayName(value: unknown): ValidationResult<string> {
 }
 
 export function validateSecret(value: unknown): ValidationResult<string> {
-  if (typeof value !== "string" || value.length < 4 || value.length > 128) {
-    return { ok: false, error: "secret must be 4-128 characters" };
+  if (typeof value !== "string" || value.length < MIN_SECRET_LENGTH || value.length > 128) {
+    return { ok: false, error: `secret must be ${MIN_SECRET_LENGTH}-128 characters` };
   }
   return { ok: true, value };
 }

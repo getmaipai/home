@@ -129,6 +129,16 @@ export type Role = Person["role"];
 export interface StatusBoardNote { id: string; body: string; posted_at: string; posted_by_name: string }
 export interface StatusMaintenance { id: string; title: string; description: string; components: string[]; starts_at: string; ends_at: string; rrule?: string; until?: string; status: "scheduled" | "in_progress" | "completed" | "cancelled" }
 export interface StatusBoard { note: StatusBoardNote | null; maintenance: StatusMaintenance[] }
+export type ProtectionCheckState = "on" | "off" | "unknown";
+export interface ProtectionStatus {
+  diskEncryption: ProtectionCheckState;
+  swapEncryption: ProtectionCheckState;
+  https: boolean;
+  dataDirectoryOwnerOnly: ProtectionCheckState;
+  keyFileInsideData: boolean;
+  profilesWithoutPasscode: number;
+  minimumPasscodeLength: number;
+}
 
 // PROJECT-PROGRESS-01: routes/projects.ts's own GET response, a real
 // Project (@maipai/spec) plus the one derived sibling field that route
@@ -1167,6 +1177,7 @@ export const api = {
   health: () => request<HealthStatus>("/api/health", { timeoutMs: 8_000 }),
   statusBoard: () => request<StatusBoard>("/api/status/board"),
   statusApps: () => request<StatusAppsResponse>("/api/status/apps"),
+  protectionStatus: () => request<ProtectionStatus>("/api/status/protection"),
   statusHistory: async (days = 90) => {
     const history = await request<StatusHistory>(`/api/status/history?days=${days}`);
     if (!Array.isArray(history.components) || !Array.isArray(history.incidents)) throw new Error("Status history is not available.");

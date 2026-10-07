@@ -4,7 +4,7 @@ import { lt } from "drizzle-orm";
 import { randomBytes, createHash } from "node:crypto";
 import { db } from "@/db";
 import { sessions } from "@/db/schema";
-import { TRUST_PROXY } from "@/lib/trustProxy";
+import { requestUsesHttps } from "@/lib/trustProxy";
 import type { AppEnv } from "@/types";
 
 // Adapted from the legacy hub's lib/session.ts (principle 8).
@@ -55,14 +55,10 @@ export function issueSession(c: Context<AppEnv>, personId: string, deviceId?: st
   // (lib/trustProxy.ts): a code review (2026-09-04) found this trusted the
   // header unconditionally, letting a direct client flip its own cookie's
   // Secure flag by forging the header.
-  const proto =
-    (TRUST_PROXY ? c.req.header("x-forwarded-proto")?.split(",")[0]?.trim() : undefined) ??
-    new URL(c.req.url).protocol.replace(":", "");
-
   setCookie(c, "session", token, {
     httpOnly: true,
     sameSite: "Strict",
-    secure: proto === "https",
+    secure: requestUsesHttps(c.req.url, c.req.header("x-forwarded-proto")),
     expires: expiresAt,
     path: "/",
   });

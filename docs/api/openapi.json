@@ -13205,6 +13205,96 @@
         }
       }
     },
+    "/api/status/protection": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Read machine protection checks",
+        "responses": {
+          "200": {
+            "description": "Machine protection checks and aggregate credential counts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "diskEncryption": {
+                      "type": "string",
+                      "enum": [
+                        "on",
+                        "off",
+                        "unknown"
+                      ]
+                    },
+                    "swapEncryption": {
+                      "type": "string",
+                      "enum": [
+                        "on",
+                        "off",
+                        "unknown"
+                      ]
+                    },
+                    "https": {
+                      "type": "boolean"
+                    },
+                    "dataDirectoryOwnerOnly": {
+                      "type": "string",
+                      "enum": [
+                        "on",
+                        "off",
+                        "unknown"
+                      ]
+                    },
+                    "keyFileInsideData": {
+                      "type": "boolean"
+                    },
+                    "profilesWithoutPasscode": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "minimumPasscodeLength": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "exclusiveMinimum": true
+                    }
+                  },
+                  "required": [
+                    "diskEncryption",
+                    "swapEncryption",
+                    "https",
+                    "dataDirectoryOwnerOnly",
+                    "keyFileInsideData",
+                    "profilesWithoutPasscode",
+                    "minimumPasscodeLength"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner/admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/voice/wakewords": {
       "get": {
         "tags": [

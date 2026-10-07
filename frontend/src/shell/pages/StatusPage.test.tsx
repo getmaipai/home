@@ -28,6 +28,7 @@ function mockStatus(includeNeeds: boolean, history: StatusHistory = { generated_
     }));
     if (url.includes("/api/status/history")) return Promise.resolve(Response.json(history));
     if (url.includes("/api/status/board")) return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+    if (url.includes("/api/status/protection")) return Promise.resolve(Response.json({ diskEncryption: "on", swapEncryption: "unknown", https: true, dataDirectoryOwnerOnly: "on", keyFileInsideData: true, profilesWithoutPasscode: 2, minimumPasscodeLength: 4 }));
     return Promise.resolve(Response.json({}));
   }) as unknown as typeof fetch;
   return { paths, restore: () => { globalThis.fetch = original; } };
@@ -49,6 +50,7 @@ describe("StatusPage app-first view", () => {
       expect(paths).toContain("/api/status/apps");
       expect(paths).not.toContain("/api/health");
       expect(paths).not.toContain("/api/status/history");
+      expect(paths).not.toContain("/api/status/protection");
     } finally { restore(); }
   });
 
@@ -64,6 +66,10 @@ describe("StatusPage app-first view", () => {
       expect(view.getAllByRole("button", { name: "Restart" })).toHaveLength(4);
       expect(paths).toContain("/api/health");
       expect(paths).toContain("/api/status/history");
+      expect(paths).toContain("/api/status/protection");
+      expect(await view.findByText("Protection on this hub")).toBeTruthy();
+      expect(view.getByText("2 profiles have no passcode.")).toBeTruthy();
+      expect(view.getByText("Minimum passcode length")).toBeTruthy();
       const appsCard = view.getByText("Apps").closest("[data-slot='card']");
       const scenesHeading = view.getByText("Behind the scenes");
       expect(appsCard !== null && Boolean(appsCard?.compareDocumentPosition(scenesHeading) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);

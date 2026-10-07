@@ -11,3 +11,9 @@
 export const TRUST_PROXY =
   process.env.TRUST_PROXY === "1" ||
   !!(process.env.APP_ORIGIN ?? process.env.PUBLIC_ORIGIN);
+
+export function requestUsesHttps(url: string, forwardedProto?: string, trustProxy = TRUST_PROXY): boolean {
+  const forwarded = trustProxy ? forwardedProto?.split(",")[0]?.trim().toLowerCase() : undefined;
+  const protocol = forwarded ?? new URL(url).protocol.slice(0, -1).toLowerCase();
+  return protocol === "https";
+}
