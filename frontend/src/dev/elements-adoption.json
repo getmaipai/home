@@ -1,13 +1,29 @@
 {
-  "generatedAt": "2026-10-07T10:10:04.790Z",
-  "kitTag": "ui-v0.5.165",
+  "generatedAt": "2026-10-07T10:41:11.667Z",
+  "kitTag": "ui-v0.5.168",
   "items": [
+    {
+      "file": "ActivityCardsShowcase.tsx",
+      "name": "ActivityCardsShowcase",
+      "group": "ActivityCardsShowcase",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
     {
       "file": "DataTableMinWidthShowcase.tsx",
       "name": "DataTableMinWidthShowcase",
       "group": "data-table",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for ELT-T1-13b, covered by the Commons data-table prop test; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "K02bShowcase.tsx",
+      "name": "K02bShowcase",
+      "group": "K02bShowcase",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -24,6 +40,22 @@
       "group": "project",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for PROJECTS-KIT-02, covered by the Commons showcase test; it is not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "ThreadListSidebarShowcase.tsx",
+      "name": "ThreadListSidebarShowcase",
+      "group": "ThreadListSidebarShowcase",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "ThreadQuoteSlotsShowcase.tsx",
+      "name": "ThreadQuoteSlotsShowcase",
+      "group": "ThreadQuoteSlotsShowcase",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {
@@ -114,7 +146,7 @@
       "group": "agent/workflow",
       "verdict": "wire-after",
       "verdictReason": "NEEDS-YOU-01 uses background-inbox when its additive route and source records are ready.",
-      "implemented": false,
+      "implemented": true,
       "reading": "NEEDS-YOU-01 uses background-inbox when its additive route and source records are ready."
     },
     {
@@ -1005,7 +1037,7 @@
       "group": "agent/workflow",
       "verdict": "no-fit",
       "verdictReason": "No current Home feature needs this Element’s specific data and interaction; the audit records the current scope decision.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "task.ts",
@@ -1037,6 +1069,14 @@
       "group": "thread",
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": false
+    },
+    {
+      "file": "thread-list-sidebar.aui.tsx",
+      "name": "thread-list-sidebar.aui",
+      "group": "thread",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
       "implemented": false
     },
     {

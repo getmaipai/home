@@ -1,7 +1,4 @@
 {
-  "apps/chat/ChatActivityCard.tsx": [
-    "ChatActivityCard"
-  ],
   "apps/chat/ChatThread.tsx": [
     "ChatThread"
   ],

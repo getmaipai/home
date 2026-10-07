@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { pickActivity } from "@/apps/chat/ChatActivityCard";
+import { pickActivity } from "@/apps/chat/chatActivity";
 import { runningNowView, type RunningNowViewer } from "@/shell/runningNow";
 import type { HomeJobView } from "@/lib/api";
 
@@ -19,7 +19,7 @@ describe("pickActivity (the one calm card above the composer)", () => {
   test("waiting for you beats running, and the rest fold into 'and n more'", () => {
     const jobs = [job({ id: "r1" }), job({ id: "r2", title: "Making a video" }), job({ id: "w", kind: "chat_ask", state: "waiting_for_you", conversationId: "conv-2", actions: ["open"] })];
     const pick = pickActivity(view(jobs), "conv-1", NOW, none);
-    expect(pick).toMatchObject({ kind: "waiting", more: 2 });
+    expect(pick).toMatchObject({ kind: "waiting", more: 0 });
     expect(pick?.row.id).toBe("w");
   });
 

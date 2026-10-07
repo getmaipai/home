@@ -29,6 +29,8 @@ import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
 import { StoppedRun } from "@maipai/ui/src/elements/stopped-run";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
+import { BackgroundInbox } from "@maipai/ui/src/elements/background-inbox";
+import { TaskCard } from "@maipai/ui/src/elements/task-card";
 import { ComposerModelPicker } from "@maipai/ui/src/elements/composer-model-picker.aui";
 import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
 import { RegenerateMenu } from "@maipai/ui/src/elements/regenerate-menu";
@@ -54,7 +56,7 @@ import { messageText } from "@/apps/chat/chatMessageText";
 import { useStoppedRun } from "@/apps/chat/chatStoppedRun";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
-import { ChatActivityCard } from "@/apps/chat/ChatActivityCard";
+import { useChatActivity } from "@/apps/chat/chatActivity";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
@@ -152,12 +154,56 @@ function ChatQueueRow() {
   );
 }
 
-/** The ComposerQueue footer slot holds both calm rows above the field: the
- * activity card (ChatActivityCard) and the queued messages. */
+/** The ComposerQueue footer slot holds activity Elements and queued messages. */
 export function ChatMessageQueue() {
+  const { pick, backgroundRuns, announcement, busy, act, dismiss } = useChatActivity();
+  const row = pick?.row;
+  const actions = row ? [
+    ...row.actions.map((key) => (
+      <KitButton
+        key={key}
+        type="button"
+        variant={key === "approve" ? "default" : "outline"}
+        disabled={busy && key !== "open"}
+        aria-label={`${key === "stop" ? "Stop" : key === "approve" ? "Approve" : key === "deny" ? "Deny" : "Open"} ${row.title}`}
+        onClick={() => act(key)}
+      >
+        {key === "stop" ? "Stop" : key === "approve" ? "Approve" : key === "deny" ? "Deny" : "Open"}
+      </KitButton>
+    )),
+    ...(pick.kind === "done" || pick.kind === "failed"
+      ? [<KitButton key="dismiss" type="button" variant="ghost" onClick={dismiss}>Dismiss</KitButton>]
+      : []),
+  ] : [];
+  const result = pick && row
+    ? [row.detail, pick.more > 0 ? `and ${pick.more} more` : undefined].filter(Boolean).join(" · ")
+    : undefined;
+  const state = pick?.kind === "waiting"
+    ? "waiting"
+    : pick?.kind === "running"
+      ? "working"
+      : pick?.kind === "failed"
+        ? "failed"
+        : pick?.kind === "done" && row?.status === "Stopped"
+          ? "cancelled"
+          : pick?.kind === "done"
+            ? "done"
+            : undefined;
   return (
     <>
-      <ChatActivityCard />
+      <span role="status" aria-live="polite" className="sr-only">{announcement}</span>
+      {pick && row && state ? (
+        <TaskCard
+          label={row.title}
+          state={state}
+          meta={row.status || undefined}
+          calm
+          size="comfortable"
+          actions={actions.length > 0 ? actions : undefined}
+          result={result || undefined}
+        />
+      ) : null}
+      {backgroundRuns.length > 0 ? <BackgroundInbox runs={backgroundRuns} calm size="comfortable" /> : null}
       <ChatQueueRow />
     </>
   );
