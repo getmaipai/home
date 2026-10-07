@@ -1093,7 +1093,7 @@
       "group": "thread/navigation",
       "verdict": "later",
       "verdictReason": "Defer the kit sidebar Element until Home's permanent app rail and chat navigation can adopt it without duplicating the shell navigation.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "thread-list.aui.tsx",

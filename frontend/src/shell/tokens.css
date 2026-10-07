@@ -227,21 +227,20 @@ html.dark body {
   background: color-mix(in oklab, var(--page), var(--foreground) 2.5%);
 }
 
-/* COLUMN-01 history column (owner, 2026-10-06: calm, ChatGPT-shaped).
- * No borders or buttons inside it: a 52px header row (the app name, thread
- * search, the hide control), New chat as a quiet 36px row,
- * 12px subdued section labels, then 36px title-only rows. Hover is a soft
- * fill, the open conversation a slightly stronger one, and a row's "..."
- * shows only on hover or keyboard focus. Shared by the desktop column and
- * the phone sheet (`chat-column-panel`). The one divider is the column's
- * right edge. */
-[data-slot="chat-column-inner"] {
-  border-inline-end: 1px solid var(--shell-divider, var(--border));
+/* COLUMN-01/02: the shipped compact ThreadListSidebar owns rows, search,
+ * projects and peek geometry. Home supplies only the history tone and the
+ * small title and control row in its empty header slot. */
+[data-slot="next-chat-rail"],
+[data-chat-column-mobile] {
+  --sidebar: var(--shell-history);
+  --border: var(--shell-divider);
+  --column-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
+  --column-subdued: color-mix(in srgb, var(--foreground) 48%, transparent);
+  --aui-thread-list-row-hover: color-mix(in srgb, var(--foreground) 5%, transparent);
 }
-/* COLUMN-02 hover peek: the same 288px panel, out of flow over the
- * conversation, on the column's own tone with a soft edge shadow. */
+/* COLUMN-02 hover peek: the kit panel overlays the conversation without
+ * moving it; the outer wrapper is positioned by ChatPage. */
 [data-slot="next-chat-rail"][data-state="peek"] {
-  background: var(--shell-history);
   box-shadow: 8px 0 24px -12px color-mix(in oklab, var(--foreground) 35%, transparent);
   animation: chat-column-peek-in 160ms ease-out;
 }
@@ -252,22 +251,7 @@ html.dark body {
 @media (prefers-reduced-motion: reduce) {
   [data-slot="next-chat-rail"][data-state="peek"] { animation: none; }
 }
-[data-slot="chat-column-panel"] {
-  --column-hover: color-mix(in oklab, var(--foreground) 5%, transparent);
-  --column-selected: color-mix(in oklab, var(--foreground) 8%, transparent);
-  /* Subdued, but at least 4.5:1 on the column's own tone in both themes. */
-  --column-subdued: color-mix(in oklab, var(--foreground) 68%, var(--background));
-  /* PROJECTS-01b: the kit's project rows read these tokens, so they match
-   * the chat rows above them (rule 9: tokens only, never shape). */
-  --aui-thread-list-row-hover: var(--column-hover);
-  --aui-thread-list-row-radius: 8px;
-  --aui-thread-list-row-padding-x: 10px;
-  --aui-thread-list-row-font-size: 14px;
-  font-size: 14px;
-  line-height: 20px;
-}
 [data-slot="chat-column-top"] {
-  padding: 0 8px 6px;
   position: relative;
   z-index: 1;
   transition: box-shadow 150ms ease-out;
@@ -276,133 +260,19 @@ html.dark body {
 [data-slot="chat-column-top"][data-scrolled] {
   box-shadow: 0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent), 0 8px 12px -12px color-mix(in oklab, var(--foreground) 22%, transparent);
 }
-[data-slot="chat-column-header"] {
-  height: 52px;
-  padding-inline-start: 10px;
-}
-[data-slot="chat-column-panel"][data-variant="sheet"] [data-slot="chat-column-header"] {
-  padding-inline-end: 40px;
-}
 [data-slot="chat-column-title"] {
   font-size: 15px;
   font-weight: 500;
 }
-[data-slot="chat-column-panel"] [data-slot="chat-column-icon"],
+[data-slot="next-chat-rail"] [data-slot="chat-column-icon"],
 [data-slot="chat-column-toggle"] {
   color: var(--column-subdued, var(--muted-foreground));
   border-radius: 8px;
 }
-[data-slot="chat-column-panel"] [data-slot="chat-column-icon"]:hover,
+[data-slot="next-chat-rail"] [data-slot="chat-column-icon"]:hover,
 [data-slot="chat-column-toggle"]:hover {
   color: var(--foreground);
   background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-new"] {
-  position: relative;
-  display: flex;
-  justify-content: flex-start;
-  gap: 10px;
-  width: 100%;
-  height: 36px;
-  min-height: 36px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  box-shadow: none;
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--foreground);
-  transition: background-color 120ms ease-out;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-new"]:hover {
-  background-color: var(--column-hover);
-}
-/* The 48px touch floor (SHELL-09) on a 36px row: a transparent overhang,
- * the kit's own hitArea() technique. */
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-new"]::before {
-  content: "";
-  position: absolute;
-  inset: -6px 0;
-}
-[data-slot="chat-column-header"] [data-slot="thread-search"] > div {
-  height: 36px;
-  border: 0;
-  border-radius: 8px;
-  padding-inline: 10px;
-  background-color: var(--column-hover);
-  box-shadow: none;
-}
-[data-slot="chat-column-header"] [data-slot="thread-search"] svg {
-  width: 16px;
-  height: 16px;
-}
-[data-slot="chat-column-header"] [data-slot="thread-search"] input {
-  font-size: 14px;
-}
-[data-slot="chat-column-list"] {
-  padding: 0 8px 12px;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-items"] {
-  gap: 0;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-group-label"] {
-  font-size: 12px;
-  line-height: 16px;
-  font-weight: 500;
-  color: var(--column-subdued);
-  padding: 16px 10px 4px;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-items"] > [data-slot="aui_thread-list-group-label"]:first-child {
-  padding-top: 8px;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-item"] {
-  border-radius: 8px;
-  transition: background-color 120ms ease-out;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-item-trigger"] {
-  padding-inline: 10px;
-  font-size: 14px;
-  font-weight: 400;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-item"]:hover {
-  background-color: var(--column-hover);
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-item"][data-active="true"] {
-  background-color: var(--column-selected);
-}
-/* The row menu only on hover, keyboard focus or while it is open; the
- * open conversation's title keeps its full width otherwise. */
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-item"]:not(:hover):not(:has(:focus-visible)):not(:has([data-state="open"])) [data-slot="aui_thread-list-item-more"] {
-  opacity: 0;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-item"]:not(:hover):not(:has(:focus-visible)):not(:has([data-state="open"])) [data-slot="aui_thread-list-item-trigger"] {
-  padding-inline-end: 10px;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-item-more"] {
-  border-radius: 6px;
-}
-[data-slot="chat-column-panel"] [data-slot="aui_thread-list-skeleton-wrapper"] {
-  height: 36px;
-  padding-inline: 10px;
-}
-[data-slot="chat-column-empty"] {
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--column-subdued);
-}
-/* PROJECTS-01b: project rows at the chat rows' 36px on a mouse. */
-@media (pointer: fine) {
-  [data-slot="chat-column-panel"] {
-    --aui-thread-list-row-min-height: 36px;
-  }
-}
-@media (pointer: fine) {
-  [data-slot="chat-column-panel"] [data-slot="aui_thread-list-item"],
-  [data-slot="chat-column-panel"] [data-slot="aui_thread-list-item-trigger"] {
-    min-height: 36px;
-    height: 36px;
-  }
 }
 
 /* RAIL-01 conversation: assistant text sits on the surface at 15/24;

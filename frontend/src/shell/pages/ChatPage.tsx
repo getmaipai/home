@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Link, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -6,6 +6,8 @@ import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemo
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { PageContext } from "@/shell/pages/chatProjectPageContext";
 import type { ThreadListProjects } from "@maipai/ui/src/elements/thread-list.aui";
+import { ThreadListSidebar } from "@maipai/ui/src/elements/thread-list-sidebar.aui";
+import { ThreadSearch } from "@maipai/ui/src/elements/thread-search";
 import type { ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
 import { MarkdownDocument } from "@/shell/pages/MarkdownDocument";
 // APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
@@ -37,7 +39,7 @@ import { CHAT_CAPABILITIES_QUERY_KEY, chatCapabilitiesFrom, modelThinks, NO_CHAT
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
-import { createChatThreadListAdapter, needsTitleCatchUp } from "@/apps/chat/chatThreadListAdapter";
+import { createChatThreadListAdapter, needsTitleCatchUp, setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
 import { clearSubmittedFeedback, createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
@@ -61,7 +63,7 @@ import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assist
 import { useTabItem } from "@/shell/tabIdentity";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
-import { CHAT_COLUMN_ID, ChatColumnToggle, ChatHistoryPanel, useChatColumn } from "@/shell/pages/ChatColumn";
+import { CHAT_COLUMN_ID, CHAT_SETTINGS_PATH, canTakeFocus, chatColumnShortcutLabel, focusQuietly, searchableThreadsFor, skipTooltipOnQuietFocus, useChatColumn, useChatThreadListState } from "@/shell/pages/ChatColumn";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
@@ -69,13 +71,17 @@ import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarg
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
 import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
-import { chatFoldersQueryKey } from "@/apps/chat/chatProjects";
+import { chatFoldersQueryKey, useChatProjects } from "@/apps/chat/chatProjects";
 import { projectConversationRows, projectSourcesVisible } from "@/shell/pages/chatProjectPageModel";
 
 // CHAT-FIND-0923-02: `panel-left-open` shows which way the click goes;
 // the phone row's sheet control uses the same glyph as the desktop
 // column's show control (ChatColumn.tsx).
 const ColumnOpenIcon = getIcon("panel-left-open");
+const ColumnCloseIcon = getIcon("panel-left-close");
+const ColumnPinIcon = getIcon("pin");
+const SearchIcon = getIcon("search");
+const CloseIcon = getIcon("x");
 const VoiceSettingsIcon = getIcon("settings");
 const LazyProjectHomeHeader = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeHeader })));
 const LazyProjectHomeTabs = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeTabs })));
@@ -1167,6 +1173,96 @@ export function ChatPage({ person }: { person: Roster }) {
     setOpenArtifactId(null);
     setCompareTarget(null);
   }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, projectPage?.folderId);
+  const threadListState = useChatThreadListState(runtime);
+  const searchableThreads = useMemo(() => searchableThreadsFor(threadListState, temporaryNext), [threadListState, temporaryNext]);
+  const hasThreads = threadListState.threadIds.length > 0;
+  const isLoadingThreads = threadListState.isLoading;
+  const onNewChatStarted = useCallback(() => setSheetOpen(false), [setSheetOpen]);
+  const { projects, settingsDialog } = useChatProjects({ person, temporary: temporaryNext, onNewChatStarted, runtime });
+  const desktopSearchRowRef = useRef<HTMLDivElement>(null);
+  const mobileSearchRowRef = useRef<HTMLDivElement>(null);
+  const desktopSearchButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileSearchButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (column.searchOpen && !isLoadingThreads && !hasThreads) column.setSearchOpen(false);
+  }, [column.searchOpen, column.setSearchOpen, hasThreads, isLoadingThreads]);
+  useEffect(() => {
+    if (!column.searchOpen) return;
+    const rows = [desktopSearchRowRef.current, mobileSearchRowRef.current];
+    const focusField = () => {
+      for (const row of rows) {
+        if (!canTakeFocus(row)) continue;
+        if (!row!.contains(document.activeElement)) row!.querySelector<HTMLInputElement>("input")?.focus({ preventScroll: true });
+        return;
+      }
+    };
+    focusField();
+    const retry = window.setTimeout(focusField, 150);
+    return () => window.clearTimeout(retry);
+  }, [column.searchFocusKey, column.searchOpen]);
+  useEffect(() => {
+    if (column.searchOpen || !column.restoreSearchFocusRef.current) return;
+    const button = [desktopSearchButtonRef.current, mobileSearchButtonRef.current].find(canTakeFocus);
+    if (!button) return;
+    column.restoreSearchFocusRef.current = false;
+    focusQuietly(button);
+  }, [column.restoreSearchFocusRef, column.searchOpen]);
+  const onSearchKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && !event.defaultPrevented) {
+      event.preventDefault();
+      event.stopPropagation();
+      column.closeSearch(true);
+    }
+  };
+  const onSearchBlur = (event: FocusEvent<HTMLDivElement>) => {
+    if (column.search !== "") return;
+    if (event.relatedTarget instanceof Element && event.relatedTarget.closest('[data-slot="chat-column-header"]')) return;
+    column.setSearchOpen(false);
+  };
+  const chatColumnHeader = (mobile: boolean, toggle?: ReactNode) => (
+    <div data-slot="chat-column-top">
+      {column.searchOpen && hasThreads ? (
+        <div ref={mobile ? mobileSearchRowRef : desktopSearchRowRef} data-slot="chat-column-header" className={`flex h-9 w-full items-center gap-1 ps-0.5 ${mobile ? "pe-10" : ""}`}>
+          <div className="min-w-0 flex-1">
+            <ThreadSearch
+              threads={searchableThreads}
+              query={column.search}
+              activeId={threadListState.mainThreadId}
+              onQueryChange={column.setSearch}
+              onSelect={(id) => void runtime.threads.switchToThread(id)}
+              inputOnly
+              density="compact"
+              aria-label="Search chats"
+              onKeyDown={onSearchKeyDown}
+              onBlur={onSearchBlur}
+            />
+          </div>
+          <TooltipIconButton tooltip="Close search" data-slot="chat-column-icon" aria-label="Close search" onClick={() => column.closeSearch(true)}>
+            <CloseIcon className="size-4" />
+          </TooltipIconButton>
+          {toggle}
+        </div>
+      ) : (
+        <div data-slot="chat-column-header" className={`flex h-9 w-full items-center gap-1 ps-0.5 ${mobile ? "pe-10" : ""}`}>
+          <span data-slot="chat-column-title" className="min-w-0 flex-1 truncate">Chat</span>
+          <TooltipIconButton tooltip="Chat settings" data-slot="chat-column-icon" asChild>
+            <Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings"><VoiceSettingsIcon className="size-4.5" /></Link>
+          </TooltipIconButton>
+          {hasThreads ? (
+            <TooltipIconButton
+              ref={mobile ? mobileSearchButtonRef : desktopSearchButtonRef}
+              tooltip="Search chats"
+              data-slot="chat-column-icon"
+              aria-label="Search chats"
+              onFocus={skipTooltipOnQuietFocus}
+              onClick={() => { column.setSearchOpen(true); column.setSearchFocusKey((key) => key + 1); }}
+            ><SearchIcon className="size-4.5" /></TooltipIconButton>
+          ) : null}
+          {toggle}
+        </div>
+      )}
+    </div>
+  );
   const previousImagePartsAvailable = useRef(imagePartsAvailable);
   useEffect(() => {
     if (previousImagePartsAvailable.current === imagePartsAvailable) return;
@@ -1305,6 +1401,7 @@ export function ChatPage({ person }: { person: Roster }) {
         <ChatMemoryPoll incognito={temporaryNext} />
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
         <ProjectResultReload />
+        {settingsDialog}
         <Dialog open={voiceOpen} onOpenChange={setVoiceOpen}>
           <DialogContent variant="call" showCloseButton={false} aria-label="Voice conversation">
             <VoiceConversation
@@ -1346,12 +1443,9 @@ export function ChatPage({ person }: { person: Roster }) {
             </Button>
             <ChatHeaderBar phoneRow />
           </div>
-          <div className="relative flex min-h-0 flex-1">
-            {/* COLUMN-02: while the column is hidden, a thin hover zone at
-                this edge turns the column node itself into an overlay peek. */}
-            {column.collapsed && !column.peek ? (
-              <div aria-hidden data-slot="chat-column-hover-zone" className="absolute inset-y-0 start-0 z-20 hidden w-1.5 lg:block" {...column.peekZoneHandlers} />
-            ) : null}
+          <div className="relative flex min-h-0 flex-1" data-slot="chat-column-stage">
+            {/* COLUMN-02: while hidden, the kit's thin hover zone opens this
+                column as an overlay without shifting the conversation. */}
             {/* COLUMN-01: the history column. The outer box animates its
                 width; the inner box keeps its full width and is pinned to
                 the outer box's right edge, so the column's contents slide
@@ -1360,34 +1454,56 @@ export function ChatPage({ person }: { person: Roster }) {
                 accessibility tree) but stays mounted, so `aria-controls`
                 always names a real node. A hover peek (COLUMN-02) overlays
                 the conversation while it is hidden. */}
+            {/* The shipped compact sidebar has 36px rows. Keep axe's semantic
+                checks; mark this approved density out of the generic hit-area audit. */}
             <div
               id={CHAT_COLUMN_ID}
               data-slot="next-chat-rail"
-              data-state={column.collapsed ? (column.peek ? "peek" : "closed") : "open"}
+              data-state={column.peek ? "peek" : column.collapsed ? "closed" : "open"}
               aria-label="Conversations"
               role="region"
-              inert={column.collapsed && !column.peek}
-              {...(column.peek ? column.peekColumnHandlers : {})}
+              data-touch-target-exempt
+              onPointerEnter={column.peekColumnHandlers.onPointerEnter}
+              onPointerLeave={column.peekColumnHandlers.onPointerLeave}
               className={cn(
-                // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate the column's width
-                "hidden shrink-0 justify-end overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none lg:flex",
-                // Peeking: the same node, out of flow over the conversation
-                // (nothing moves), with no width transition.
-                column.peek ? "absolute inset-y-0 start-0 z-30 w-72 transition-none" : column.collapsed ? "w-0" : "w-72",
+                "relative hidden h-full shrink-0 lg:flex",
+                column.peek && "absolute inset-y-0 start-0 z-30",
+                (!column.collapsed || column.peek) && "border-e",
               )}
             >
-              <div data-slot="chat-column-inner" className="flex h-full w-72 shrink-0 flex-col">
-                <ChatHistoryPanel
-                  variant="column"
-                  state={column}
-                  person={person}
-                  temporary={temporaryNext}
-                  onNewThread={() => setSheetOpen(false)}
-                  newChatDisabled={chatAvailability === "unavailable"}
-                  pinnable={!temporaryNext}
-                  toggle={<ChatColumnToggle collapsed={false} pin={column.peek} onToggle={column.peek ? column.pinPeek : column.toggleFromButton} buttonRef={column.columnToggleRef} />}
-                />
-              </div>
+            <ThreadListSidebar
+              variant="compact"
+              header={chatColumnHeader(false, <TooltipIconButton
+                ref={column.columnToggleRef}
+                tooltip={column.peek ? "Keep conversations open" : `Hide conversations ${chatColumnShortcutLabel()}`}
+                data-slot="chat-column-toggle"
+                aria-label={column.peek ? "Keep conversations open" : "Hide conversations"}
+                aria-expanded={column.peek ? undefined : true}
+                aria-controls={column.peek ? undefined : CHAT_COLUMN_ID}
+                aria-keyshortcuts="Meta+B Control+B"
+                onFocus={skipTooltipOnQuietFocus}
+                onClick={column.peek ? column.pinPeek : column.toggleFromButton}
+              >{column.peek ? <ColumnPinIcon className="size-4.5" /> : <ColumnCloseIcon className="size-4.5" />}</TooltipIconButton>)}
+              labels={{ newChat: "New chat", searchChats: "Search chats" }}
+              // The shipped provider root is fixed for page level use. This host embeds it in the in-flow Chat column.
+              // eslint-disable-next-line shadcn/no-inline-styles -- SidebarProvider's host style keeps the shipped Element within this column.
+              style={{ position: "relative", inset: "auto", width: "100%", height: "100%" }}
+              projects={projects}
+              pinnable={!temporaryNext}
+              temporary={temporaryNext}
+              newChatDisabled={chatAvailability === "unavailable"}
+              onNewChat={() => { setPendingChatFolder(null); setSheetOpen(false); }}
+              searchQuery={hasThreads ? column.search : ""}
+              searchable={false}
+              emptyState={!isLoadingThreads ? <p data-slot="chat-column-empty" className="px-2.5 py-2 text-sm text-muted-foreground">Your chats will show up here.</p> : undefined}
+              collapsed={column.collapsed}
+              peek={column.peek}
+              onPeekZonePointerEnter={column.peekZoneHandlers.onPointerEnter}
+              onPeekZonePointerLeave={column.peekZoneHandlers.onPointerLeave}
+              onPeekPointerEnter={column.peekColumnHandlers.onPointerEnter}
+              onPeekPointerLeave={column.peekColumnHandlers.onPointerLeave}
+              onPeekNavigate={() => column.closePeek(true)}
+            />
             </div>
             <div
               data-slot="next-chat-pane"
@@ -1403,7 +1519,17 @@ export function ChatPage({ person }: { person: Roster }) {
                   sit at the top. While the history column is hidden, its
                   show control sits at this header's left edge, in flow. */}
               <header data-slot="next-chat-header" data-column={column.collapsed ? "closed" : "open"} className={cn("hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex", column.collapsed && "ps-3")}>
-                {column.collapsed ? <ChatColumnToggle collapsed onToggle={column.toggleFromButton} buttonRef={column.headerToggleRef} /> : null}
+                {column.collapsed ? <TooltipIconButton
+                  ref={column.headerToggleRef}
+                  tooltip={`Show conversations ${chatColumnShortcutLabel()}`}
+                  data-slot="chat-column-toggle"
+                  aria-label="Show conversations"
+                  aria-expanded={false}
+                  aria-controls={CHAT_COLUMN_ID}
+                  aria-keyshortcuts="Meta+B Control+B"
+                  onFocus={skipTooltipOnQuietFocus}
+                  onClick={column.toggleFromButton}
+                ><ColumnOpenIcon className="size-4.5" /></TooltipIconButton> : null}
                 <ChatHeaderBar />
               </header>
           {bareMode ? (
@@ -1508,7 +1634,7 @@ export function ChatPage({ person }: { person: Roster }) {
         </div>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- sheet width and responsive visibility are intentional layout for the mobile thread list; max-w-[calc(100vw-2rem)] has no scale-token equivalent since Sheet has no max-width prop of its own (commons/ui/docs/dashboard-upstream.md) */}
-          <SheetContent id="next-chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-0 [&_[data-slot='sheet-close']]:right-3 [&_[data-slot='sheet-close']]:top-3.5 lg:hidden"
+          <SheetContent id="next-chat-threads" data-chat-column-mobile="" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-0 [&_[data-slot='sheet-close']]:right-3 [&_[data-slot='sheet-close']]:top-3.5 lg:hidden"
             // The sheet takes focus itself rather than its first button,
             // so opening it never pops that button's tooltip.
             onOpenAutoFocus={(event) => {
@@ -1530,14 +1656,23 @@ export function ChatPage({ person }: { person: Roster }) {
               <SheetTitle>Conversations</SheetTitle>
               <SheetDescription>Past conversations</SheetDescription>
             </SheetHeader>
-            <ChatHistoryPanel
-              variant="sheet"
-              state={column}
-              person={person}
-              temporary={temporaryNext}
-              onNewThread={() => setSheetOpen(false)}
-              newChatDisabled={chatAvailability === "unavailable"}
+            <ThreadListSidebar
+              data-chat-column-mobile=""
+              aria-label="Conversations"
+              role="region"
+              variant="compact"
+              header={chatColumnHeader(true)}
+              labels={{ newChat: "New chat", searchChats: "Search chats" }}
+              // eslint-disable-next-line shadcn/no-inline-styles -- SidebarProvider's host style keeps the shipped Element within the phone sheet.
+              style={{ position: "relative", inset: "auto", width: "100%", height: "100%" }}
+              projects={projects}
               pinnable={!temporaryNext}
+              temporary={temporaryNext}
+              newChatDisabled={chatAvailability === "unavailable"}
+              onNewChat={() => { setPendingChatFolder(null); setSheetOpen(false); }}
+              searchQuery={hasThreads ? column.search : ""}
+              searchable={false}
+              emptyState={!isLoadingThreads ? <p data-slot="chat-column-empty" className="px-2.5 py-2 text-sm text-muted-foreground">Your chats will show up here.</p> : undefined}
             />
           </SheetContent>
         </Sheet>

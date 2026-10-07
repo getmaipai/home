@@ -31,10 +31,6 @@
     "GroupLabel",
     "AppsGroup"
   ],
-  "shell/pages/ChatColumn.tsx": [
-    "ChatColumnToggle",
-    "ChatHistoryPanel"
-  ],
   "shell/pages/ChatShortcutReference.tsx": [
     "ChatShortcutReference"
   ],

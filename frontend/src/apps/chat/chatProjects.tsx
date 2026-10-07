@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAui, useAuiState } from "@assistant-ui/react";
+import type { AssistantRuntime } from "@assistant-ui/react";
 import { toast } from "sonner";
 import type { ThreadListProjects } from "@maipai/ui/src/elements/thread-list.aui";
 import { ProjectSettingsDialog, type ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
@@ -17,8 +17,11 @@ export const chatFoldersQueryKey = (personId: string) => ["chat-folders", person
 
 /** The projects mode for the signed-in person's column, or undefined in
  * Incognito. `onNewChatStarted` closes the phone sheet, the same as New chat. */
-export function useChatProjects({ person, temporary, onNewChatStarted }: { person: Roster; temporary: boolean; onNewChatStarted: () => void }): { projects: ThreadListProjects | undefined; settingsDialog: ReactNode } {
-  const aui = useAui();
+export function useChatProjects({ person, temporary, onNewChatStarted, runtime }: { person: Roster; temporary: boolean; onNewChatStarted: () => void; runtime: AssistantRuntime }): { projects: ThreadListProjects | undefined; settingsDialog: ReactNode } {
+  const threads = runtime.threads;
+  const subscribeThreads = useCallback((notify: () => void) => threads.subscribe(notify), [threads]);
+  const getThreadsSnapshot = useCallback(() => threads.getState(), [threads]);
+  const threadList = useSyncExternalStore(subscribeThreads, getThreadsSnapshot, getThreadsSnapshot);
   const queryClient = useQueryClient();
   const foldersQuery = useQuery({ queryKey: chatFoldersQueryKey(person.id), queryFn: () => api.chatFolders(), enabled: !temporary });
   const refresh = () => queryClient.invalidateQueries({ queryKey: chatFoldersQueryKey(person.id) });
@@ -27,23 +30,23 @@ export function useChatProjects({ person, temporary, onNewChatStarted }: { perso
   // A chat "New chat in project" just created: put its project on the
   // thread's own metadata so it lists under the project at once (the hub
   // already stored it; the adapter knows, so nothing is sent again).
-  const mainRemoteId = useAuiState((s) => s.threads.threadItems.find((item) => item.id === s.threads.mainThreadId)?.remoteId);
+  const mainRemoteId = threadList.threadItems[threadList.mainThreadId]?.remoteId;
   useEffect(() => {
     if (!mainRemoteId) return;
     const folderId = takeCreatedChatFolder(mainRemoteId);
     if (!folderId) return;
-    const item = aui.threads().item("main");
+    const item = threads.mainItem;
     void item.updateCustom({ ...item.getState().custom, folder_id: folderId });
-  }, [aui, mainRemoteId]);
+  }, [mainRemoteId, threads]);
 
   // A pending "New chat in project" applies only to the new chat it opened:
   // opening any other chat, Incognito, and another person drop it.
-  const onNewThread = useAuiState((s) => s.threads.mainThreadId === s.threads.newThreadId);
+  const onNewThread = threadList.mainThreadId === threadList.newThreadId;
   useEffect(() => {
     if (!onNewThread) setPendingChatFolder(null);
   }, [onNewThread]);
-  // Only on a real change: the panel exists twice (the column and the phone
-  // sheet), so a mount or unmount of one copy must not drop the other's.
+  // Only on a real change, so a rerender or search-state change never drops
+  // a pending project selection.
   const scope = `${person.id}:${temporary}`;
   const scopeRef = useRef(scope);
   useEffect(() => {
@@ -83,7 +86,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted }: { perso
               await refresh();
               // Its chats are kept, out of any project: reload the list so
               // each chat's own metadata says so.
-              await aui.threads().reload();
+              await threads.reload();
             } catch {
               toast.error("Could not delete that project. Try again.");
             }
@@ -103,13 +106,13 @@ export function useChatProjects({ person, temporary, onNewChatStarted }: { perso
       onNewChat: async (id) => {
         // Awaited: the pending project is keyed to the new thread the switch
         // opens, read only once the switch has finished.
-        await Promise.resolve(aui.threads().switchToNewThread());
-        setPendingChatFolder({ threadId: aui.threads().getState().mainThreadId, folderId: id });
+        await Promise.resolve(threads.switchToNewThread());
+        setPendingChatFolder({ threadId: threads.getState().mainThreadId, folderId: id });
         onNewChatStarted();
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh only closes over stable values
-  }, [temporary, person.role, folders, aui, onNewChatStarted]);
+  }, [temporary, person.role, folders, runtime, threads, onNewChatStarted]);
 
   const value: ProjectSettingsValue | null = editing ? {
     name: editing.name,
@@ -141,7 +144,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted }: { perso
           if (pendingChatFolderId() === editing.id) setPendingChatFolder(null);
           await api.deleteChatFolder(editing.id);
           await refresh();
-          await aui.threads().reload();
+          await threads.reload();
         } catch (error) {
           toast.error("Could not delete that project. Try again.");
           throw error;

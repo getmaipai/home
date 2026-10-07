@@ -157,16 +157,6 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "shell/pages/ChatColumn.tsx": {
-    "ChatColumnToggle": {
-      "ed": "ED-031",
-      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
-    },
-    "ChatHistoryPanel": {
-      "ed": "ED-031",
-      "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
-    }
-  },
   "shell/pages/ChatShortcutReference.tsx": {
     "ChatShortcutReference": {
       "ed": "ED-038",

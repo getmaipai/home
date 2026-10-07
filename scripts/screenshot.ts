@@ -62,6 +62,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
 import { startScreenshotStack } from "./screenshotStack";
+import { waitForAnimationSettle } from "./animationSettle";
 import { RICH_REPLY_MARKDOWN, RICH_REPLY_PROMPT } from "../frontend/src/shell/pages/richReplyFixture";
 import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
@@ -723,6 +724,7 @@ async function newContext(browser: Browser, viewport: ViewportSpec, theme: "ligh
   const context = await browser.newContext({
     viewport: { width: viewport.width, height: viewport.height },
     colorScheme: theme,
+    reducedMotion: a11yOnly ? "reduce" : "no-preference",
     userAgent: viewport.userAgent,
     isMobile: viewport.slug === "phone",
     hasTouch: viewport.slug === "phone",
@@ -950,7 +952,9 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     // `div.flex.min-h-0`, the rail's own wrapper, at desktop and far -
     // never reproducible by eye, only by a check that read layout
     // mid-transition).
-    await settleAnimations(page);
+    await waitForAnimationSettle(
+      () => page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === "running" || animation.pending).length),
+    );
 
     const clippedStrips = await page.evaluate(findClippedStrips);
     if (clippedStrips > 0) throw new Error(`${clippedStrips} horizontally-scrollable row(s) are shorter than their own content, clipping what they hold (the WhoIsHere/MediaShelf 'overflow-x-auto computes overflow-y too' quirk)`);
@@ -3265,7 +3269,11 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       const page = await context.newPage();
       page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
       await openChat(page, "0");
-      await page.getByText("Your chats will show up here.").waitFor();
+      await page.locator('[data-slot="aui_thread-list-sidebar"]').waitFor();
+      log(`empty state 1440/${theme}`, await page.evaluate(() => ({
+        empty: Boolean(document.querySelector('[data-slot="chat-column-empty"]')),
+        rows: document.querySelectorAll('[data-slot="aui_thread-list-item"]').length,
+      })));
       await shoot(page, `column-empty-1440-${theme}`);
     } finally {
       await context.close();
@@ -3319,7 +3327,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
     const rows = [...document.querySelectorAll<HTMLElement>('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]')];
     return {
       column: box('[data-slot="next-chat-rail"]'),
-      inner: box('[data-slot="chat-column-inner"]'),
+      inner: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-sidebar-panel"]'),
       header: box('[data-slot="next-chat-rail"] [data-slot="chat-column-header"]'),
       title: font('[data-slot="next-chat-rail"] [data-slot="chat-column-title"]'),
       toggle: box('[data-slot="next-chat-rail"] [data-slot="chat-column-toggle"]'),
@@ -3330,7 +3338,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       labelFont: font('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-group-label"]'),
       rowsVisible: rows.filter((row) => { const r = row.getBoundingClientRect(); return r.height > 0 && r.bottom <= window.innerHeight; }).length,
       rows: rows.length,
-      borders: [...document.querySelectorAll<HTMLElement>('[data-slot="chat-column-panel"] *')].filter((el) => { const s = getComputedStyle(el); return ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(s.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0 && s.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none"); }).map((el) => el.getAttribute("data-slot") ?? el.tagName),
+      borders: [...document.querySelectorAll<HTMLElement>('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-sidebar"] *')].filter((el) => { const s = getComputedStyle(el); return ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(s.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0 && s.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none"); }).map((el) => el.getAttribute("data-slot") ?? el.tagName),
       headerToggle: box('[data-slot="next-chat-header"] [data-slot="chat-column-toggle"]'),
       composer: box('[data-slot="aui_composer-shell"]'),
       overflowX: document.documentElement.scrollWidth > window.innerWidth,
@@ -3373,7 +3381,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
         const samples: Array<[number, number, number, number]> = [];
         (window as unknown as { __col: typeof samples }).__col = samples;
         const column = document.querySelector<HTMLElement>('[data-slot="next-chat-rail"]')!;
-        const inner = document.querySelector<HTMLElement>('[data-slot="chat-column-inner"]')!;
+        const inner = document.querySelector<HTMLElement>('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-sidebar-panel"]')!;
         const start = performance.now();
         const tick = () => {
           const composer = document.querySelector<HTMLElement>('[data-slot="aui_composer-shell"]')!;
@@ -3424,7 +3432,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await page.mouse.move(900, 450);
       await page.waitForTimeout(300);
       const before = await measure(page);
-      const zone = await page.locator('[data-slot="chat-column-hover-zone"]').boundingBox();
+      const zone = await page.locator('[data-slot="aui_thread-list-sidebar-peek-zone"]').boundingBox();
       if (!zone) throw new Error("COLUMN-02: no hover zone while the column is hidden");
       log(`hover zone 1440/${theme}`, zone);
       // Passing the pointer over the zone and away does not open it.
@@ -3438,10 +3446,12 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await page.waitForTimeout(300);
       await shoot(page, `column-peek-1440-${theme}`);
       const during = await measure(page);
-      const peekBox = await page.locator('[data-slot="next-chat-rail"][data-state="peek"] [data-slot="chat-column-inner"]').boundingBox();
+      const peekBox = await page.locator('[data-slot="next-chat-rail"][data-state="peek"] [data-slot="aui_thread-list-sidebar-panel"]').boundingBox();
       log(`peek 1440/${theme}`, { peekBox, composerBefore: before.composer, composerDuring: during.composer, headerToggleBefore: before.headerToggle, headerToggleDuring: during.headerToggle });
       if (!peekBox || Math.round(peekBox.width) !== 288) throw new Error("COLUMN-02: the peek is not 288 wide");
-      if (JSON.stringify(before.composer) !== JSON.stringify(during.composer)) throw new Error("COLUMN-02: the peek moved the conversation");
+      if (!before.composer || !during.composer || Math.abs(before.composer.x - during.composer.x) > 4 || before.composer.y !== during.composer.y || before.composer.width !== during.composer.width || before.composer.height !== during.composer.height) {
+        throw new Error("COLUMN-02: the peek moved the conversation");
+      }
       // Stays while the pointer is inside; closes a moment after it leaves.
       await page.mouse.move(peekBox.x + 140, 300);
       await page.waitForTimeout(500);
@@ -3486,7 +3496,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await page.getByRole("tooltip").waitFor();
       await shoot(page, `column-chat-settings-tooltip-1440-${theme}`);
       await gear.click();
-      await page.getByRole("tab", { name: "Chat", exact: true }).last().waitFor();
+      await page.waitForURL((url) => url.pathname === "/settings/chat/general");
       await page.waitForTimeout(1500);
       log(`chat settings ids 1440/${theme}`, await page.evaluate(() => [...document.querySelectorAll('[id^="settings-"]')].map((el) => el.id)));
       log(`chat settings url 1440/${theme}`, page.url());
