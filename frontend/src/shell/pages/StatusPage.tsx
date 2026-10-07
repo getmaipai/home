@@ -47,7 +47,7 @@ export function StatusPage({ person }: { person: Roster }) {
       <StatusIncident level={summary.level} problems={summary.problems} history={historyQuery.data} appReason={appReason} />
       {appsQuery.data ? <StatusApps person={person} apps={apps} behindTheScenes={canSeeParts && healthQuery.data ? <StatusComponents person={person} health={healthQuery.data} maintenance={maintenance} history={historyQuery.data} /> : undefined} /> : null}
       </div>
-      {canSeeParts && incidentEvents.length ? <><h3 className="mt-4 mb-2 text-sm font-semibold">Recent problems</h3><Timeline events={incidentEvents} visibleCount={incidentEvents.length} /></> : null}
+      {canSeeParts && incidentEvents.length ? <><h3 className="mt-4 mb-2 text-sm font-semibold">Recent problems</h3><Timeline events={incidentEvents} visibleCount={incidentEvents.length} animate={false} /></> : null}
       {boardData || isOwnerOrAdminRole(person.role) ? <div className="mt-4"><StatusMaintenanceCard person={person} windows={boardData?.maintenance ?? []} /></div> : null}
     </>
   );
