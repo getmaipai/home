@@ -584,9 +584,8 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     // .StopSpeaking with no Home-side plumbing beyond these two - the
     // feedback adapter is the old chat's own (chatActionBar.tsx, its
     // real POST /api/conversations/turns/:id/feedback route), unchanged;
-    // the speech adapter is new (chatSpeechAdapter.ts), the identical
-    // POST /api/tts pieces chatListenStore.ts's own "Listen" replay
-    // already uses, wired through the runtime instead of a second store.
+    // the speech adapter uses Home's POST /api/tts route through the
+    // runtime capability.
     // DICT-01: an empty deps array here used to be harmless only because
     // every adapter was itself already stably memoized forever - true of
     // `attachmentsAdapter`, no longer true of `dictationAdapter` once it

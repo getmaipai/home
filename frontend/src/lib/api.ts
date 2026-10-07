@@ -1195,16 +1195,13 @@ export const api = {
   // the full reasoning). A short timeout: this only waits for the "yes,
   // I got your request" response, never for the restart itself to finish.
   restartServer: () => request<{ ok: true; restarting: true }>("/api/host/restart", { method: "POST", timeoutMs: 15_000 }),
-  // Returns the raw Response so the caller (sentenceSpeechScheduler.ts,
-  // chatListenStore.ts) can read the streamed audio/wav body directly.
+  // Returns the raw Response so the caller (sentenceSpeechScheduler.ts or
+  // chatSpeechAdapter.ts) can read the streamed audio/wav body directly.
   // 185s: a first spawn of the Pocket TTS sidecar can take a while
   // Stack's speech request wait); only bounds waiting for the
-  // response to begin, per rawStreamPost's own doc comment. `signal`
-  // (step 4, a code review 2026-09-05): chatListenStore.ts's own
-  // requestId guard stops updating state for a superseded "Listen"
-  // click, but never actually cancelled the earlier click's in-flight
-  // fetch/reader loop - it kept running in the background until it
-  // finished or timed out. Optional so sentenceSpeechScheduler.ts's
+  // response to begin, per rawStreamPost's own doc comment. A speech
+  // adapter passes its AbortSignal so cancellation stops the
+  // in-flight fetch/reader loop. Optional so the sentence scheduler's
   // existing calls (which have no per-sentence abort concept) are
   // unaffected.
   streamSpeech: (text: string, signal?: AbortSignal) =>

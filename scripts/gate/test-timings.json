@@ -286,7 +286,6 @@
   "src/apps/chat/chatCitations.test.ts": 0,
   "src/apps/chat/chatHeaderBar.test.tsx": 0.1,
   "src/apps/chat/chatHistoryAdapter.test.ts": 0,
-  "src/apps/chat/chatListenStore.test.ts": 0.06,
   "src/apps/chat/chatMedia.test.tsx": 0,
   "src/apps/chat/chatMemoryActions.test.ts": 0.01,
   "src/apps/chat/chatMemoryState.test.ts": 6.75,

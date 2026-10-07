@@ -5,18 +5,14 @@ import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js"
 
 /** slice 5(e): the shipped ActionBarPrimitive.Speak/StopSpeaking (kit
  * commons ui-v0.5.23) wired to Home's own real speech route, POST
- * /api/tts - the same low-level pieces chatListenStore.ts's own "Listen"
- * replay already uses (StreamingWavPlayer, api.streamSpeech,
- * normalizeForSpeech), reused here rather than duplicated, but through
- * assistant-ui's own adapter/capability mechanism instead of a second,
+ * /api/tts using StreamingWavPlayer, api.streamSpeech and
+ * normalizeForSpeech through assistant-ui's own adapter/capability
+ * mechanism instead of a second,
  * hand-rolled button and store: once this is passed to useLocalRuntime's
  * `adapters.speech`, the runtime itself tracks which message is
  * currently speaking (`s.message.speech`), the same way `feedback`
  * already tracks submitted feedback, so the kit's own Speak/StopSpeaking
- * primitives just work without Home re-implementing that bookkeeping.
- * chatListenStore.ts/chatActionBar.tsx's own ListenButton stay exactly
- * as they are - the old (non-/next) chat's own composition, out of
- * scope until SHELL-09 retires it. */
+ * primitives just work without Home re-implementing that bookkeeping. */
 export function createChatSpeechAdapter(): SpeechSynthesisAdapter {
   return {
     speak(text: string): SpeechSynthesisAdapter.Utterance {

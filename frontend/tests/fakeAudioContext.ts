@@ -5,7 +5,7 @@
  * own dependency, unlike streamingWavPlayer.ts's hand-rolled decode) just
  * returns a fixed-duration fake buffer - nothing asserts on real decoded
  * sample data. Shared by every test that exercises TTS playback
- * (chatModelAdapter.test.ts, chatListenStore.test.ts) - previously
+ * (chatModelAdapter.test.ts, chatSpeechAdapter.test.ts) - previously
  * duplicated per test file (ChatPage.test.tsx, pre-assistant-ui). */
 export class FakeAudioContext {
   currentTime = 0;

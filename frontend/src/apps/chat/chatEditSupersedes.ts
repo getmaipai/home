@@ -4,9 +4,8 @@
 // runs a primitive's own onClick before the wrapped send callback), read
 // once by chatModelAdapter.ts's run() via consumeSupersedes() below.
 //
-// A plain module-scope ref, not React state or an event (chatListenStore.ts's
-// own comment on why a ref beats a second parallel channel applies here
-// too): assistant-ui never threads an edit's original message id into
+// A plain module-scope ref, not React state or an event: assistant-ui never
+// threads an edit's original message id into
 // ChatModelRunOptions, and the one place that DOES carry it - the
 // `composer.send` event ComposerEvents documents ("`messageId` is set when
 // the send came from an edit composer") - turned out to fire from a
