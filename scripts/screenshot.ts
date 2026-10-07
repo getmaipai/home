@@ -327,10 +327,11 @@ const nextChatQueueBeforeReview = process.argv.includes("--next-chat-queue-befor
 const nextChatAuditReview = process.argv.includes("--next-chat-audit-review");
 const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audit");
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
+const chatNoticeDegradedReview = process.argv.includes("--chat-notice-degraded-review");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const projectPageReview = process.argv.includes("--projects-page-review");
-const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview;
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview || chatNoticeDegradedReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -3649,6 +3650,45 @@ async function captureElementsReview(browser: Browser, sessionValue: string): Pr
           await page.getByText("Explain how rainbows form, in plain words.").first().waitFor({ timeout: 15000 });
           console.log("elements-review: the Explain chip sent its prompt");
         }
+      } finally {
+        await context.close();
+      }
+    }
+  }
+  console.log(`Wrote captures to ${outDir}`);
+}
+
+/** CHAT-NOTICE-DEGRADED-01: capture the fixed, plain search-limited line while chat remains ready. */
+async function captureChatNoticeDegradedReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "chat-notice-degraded-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const conversation = await seedTitledConversation("captureChatNoticeDegradedReview", cookie, "Homework helper notes");
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.route("**/api/health", async (route) => {
+          const response = await route.fetch();
+          const body = await response.json();
+          body.engines = { ...(body.engines ?? {}), chat: { ...(body.engines?.chat ?? {}), availability: "ready" } };
+          await route.fulfill({ response, json: body });
+        });
+        await page.route("**/api/status/apps", (route) => route.fulfill({ json: [
+          { id: "chat", name: "Chat", state: "degraded", reason: "Household web search is limiting requests from this home for a while.", paused: false, history: [], uptimePercent: 99 },
+        ] }));
+        await openStoredConversation(page, conversation.id, "Homework helper notes");
+        const notice = page.locator("[data-chat-notice]");
+        await notice.waitFor();
+        if ((await notice.innerText()).trim() !== "Searches may be limited right now.") throw new Error(`unexpected degraded notice: ${await notice.innerText()}`);
+        await page.getByRole("textbox", { name: "Message input" }).fill("A message while search is limited");
+        const send = page.locator('[aria-label="Send message"]');
+        if (await send.isDisabled()) throw new Error("search limitation disabled Chat's Send control");
+        await settleAnimations(page);
+        await page.screenshot({ path: join(outDir, `search-limited-${viewport.width}-${theme}.png`) });
       } finally {
         await context.close();
       }
@@ -10109,6 +10149,12 @@ async function main() {
         await captureChatStreaming(browser, sessionValue, viewport, combo.theme);
         await captureChatEngineNotReady(browser, sessionValue, viewport, combo.theme);
       }
+    }
+
+    if (chatNoticeDegradedReview) {
+      await captureChatNoticeDegradedReview(browser, sessionValue);
+      console.log("completed named review: --chat-notice-degraded-review");
+      return;
     }
 
     if (engineDownReview) {

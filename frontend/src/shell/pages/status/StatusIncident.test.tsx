@@ -22,4 +22,12 @@ describe("StatusIncident", () => {
     expect(render(<StatusIncident level="online" problems={[]} />).container.firstChild).toBeNull();
     expect(render(<StatusIncident level="maintenance" problems={[]} />).container.firstChild).toBeNull();
   });
+
+  test("search trouble keeps Chat amber and says Chat still works", () => {
+    const view = render(<StatusIncident level="degraded" problems={["Chat"]} appReason="Chat is working, but search is limited right now." />);
+    expect(view.getByText("Chat is working")).toBeTruthy();
+    expect(view.getByText("Search is limited right now.")).toBeTruthy();
+    expect(view.container.querySelector(".text-attention-fg")).toBeTruthy();
+    expect(view.container.querySelector(".text-destructive")).toBeNull();
+  });
 });

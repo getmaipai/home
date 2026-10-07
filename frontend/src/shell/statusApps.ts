@@ -37,7 +37,18 @@ export function statusAppsSummary(apps: readonly { id?: string; name: string; st
   const level = affected.some((app) => app.state === "down") ? "offline" as const : "degraded" as const;
   const messages = affected.map((app) => app.reason).filter((reason): reason is string => Boolean(reason));
   const names = affected.map((app) => app.name);
+  if (affected.length === 1 && affected[0] && isSearchLimitedChat(affected[0])) {
+    return { level, text: pillText(affected, level), problems: names, message: "Chat is working, but search is limited right now." };
+  }
   return { level, text: pillText(affected, level), problems: names, message: messages.join(" ") || `${names.join(", ")} need attention.` };
+}
+
+/** The public Chat reason is only used as a signal. The exact safe wording
+ * stays here, while raw service details remain on the admin status page. */
+export function isSearchLimitedChat(app: { id?: string; name: string; state: StatusAppState; reason: string | null }): boolean {
+  return app.state === "degraded"
+    && (app.id === "chat" || app.name.toLocaleLowerCase() === "chat")
+    && /search/i.test(app.reason ?? "");
 }
 
 // CHAT-CALM-ERRORS-01d (design section 6): when chat is the one part
@@ -81,6 +92,7 @@ export function summarizeStatusApp(app: StatusApp, includeNeedNames = true): str
   const needs = app.needs;
   if (!includeNeedNames || !needs) {
     if (app.state === "operational") return "All fine.";
+    if (isSearchLimitedChat(app)) return "Chat is working, but search is limited right now.";
     return app.reason ?? `${app.name} needs attention.`;
   }
 
@@ -97,6 +109,9 @@ export function summarizeStatusApp(app: StatusApp, includeNeedNames = true): str
   }
 
   const cause = needProblemWords(problem);
+  if (app.id === "chat" && !problem.required && plainNeedName(problem) === "search") {
+    return "Chat is working, but search is limited right now.";
+  }
   if (!problem.required) return `${app.name} is working, but ${cause}.`;
   if (problem.state === "down") return `${app.name} isn't working: ${cause}.`;
   if (problem.kind === "engine") return `${app.name} is slow to start: ${cause}.`;

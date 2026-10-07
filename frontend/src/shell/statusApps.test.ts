@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { appStatusPresentation, appStatusSentence, appStatusToSidebar, sidebarItemStatus, summarizeStatusApp } from "@/shell/statusApps";
+import { appStatusPresentation, appStatusSentence, appStatusToSidebar, isSearchLimitedChat, sidebarItemStatus, statusAppsSummary, summarizeStatusApp } from "@/shell/statusApps";
 import type { StatusApp, StatusAppNeed } from "@/lib/api";
 
 const appWithNeeds = (needs: StatusAppNeed[]): StatusApp => ({
@@ -44,7 +44,7 @@ describe("status app summary", () => {
     ["all needs fine", [{ kind: "engine", id: "chat", name: "MaiPai's AI", purpose: "Answer chat turns", state: "operational", required: true }], "All fine."],
     ["required down", [{ kind: "engine", id: "chat", name: "MaiPai's AI", purpose: "Answer chat turns", state: "down", required: true }, { kind: "service", id: "musicbrainz.org", name: "MusicBrainz", purpose: "Look up music", state: "unknown", required: false }], "Chat isn't working: MaiPai's AI isn't running."],
     ["required degraded", [{ kind: "engine", id: "chat", name: "MaiPai's AI", purpose: "Answer chat turns", state: "degraded", required: true }], "Chat is slow to start: MaiPai's AI is still starting."],
-    ["optional degraded", [{ kind: "service", id: "searxng", name: "Household web search", purpose: "Search the web", state: "degraded", required: false }], "Chat is working, but search is having trouble."],
+    ["optional degraded", [{ kind: "service", id: "searxng", name: "Household web search", purpose: "Search the web", state: "degraded", required: false }], "Chat is working, but search is limited right now."],
     ["internet waiting", [{ kind: "internet", id: "internet", name: "Internet", purpose: "Reach outside services", state: "waiting", required: true }], "Chat is waiting for the internet."],
     ["unknown only", [{ kind: "service", id: "musicbrainz.org", name: "MusicBrainz", purpose: "Look up music", state: "unknown", required: false }, { kind: "service", id: "en.wikipedia.org", name: "Wikipedia", purpose: "Look up facts", state: "unknown", required: false }], "No recent problems."],
   ] as const)("summarizes %s", (_name, needs, expected) => {
@@ -56,5 +56,19 @@ describe("status app summary", () => {
       { kind: "service", id: "searxng", name: "Household web search", purpose: "Search the web", state: "down", required: false },
       { kind: "engine", id: "chat", name: "MaiPai's AI", purpose: "Answer chat turns", state: "degraded", required: true },
     ]))).toBe("Chat is slow to start: MaiPai's AI is still starting.");
+  });
+
+  test("a degraded optional search need says Chat still works and search is limited", () => {
+    const app = { id: "chat", name: "Chat", state: "degraded" as const, reason: "Household web search is limiting requests from this home for a while." };
+    expect(isSearchLimitedChat(app)).toBe(true);
+    expect(statusAppsSummary([app])).toEqual({ level: "degraded", text: "Degraded", problems: ["Chat"], message: "Chat is working, but search is limited right now." });
+    expect(summarizeStatusApp({ ...appWithNeeds([
+      { kind: "service", id: "searxng", name: "Household web search", purpose: "Search", state: "degraded", required: false },
+    ]), ...app })).toBe("Chat is working, but search is limited right now.");
+  });
+
+  test("does not classify a Chat outage or a different optional need as search-limited", () => {
+    expect(isSearchLimitedChat({ id: "chat", name: "Chat", state: "down", reason: "Search is unavailable." })).toBe(false);
+    expect(isSearchLimitedChat({ id: "chat", name: "Chat", state: "degraded", reason: "Chat is working, but Voice is having trouble." })).toBe(false);
   });
 });

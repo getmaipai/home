@@ -35,6 +35,7 @@ const PAUSED = composerNotice("unavailable")!;
 const SAFETY = { flagged: false, categories: [], action: "allow" as const, notify_parent: false, matched_signals: [], checked_at: "2026-10-06T00:00:00.000Z" };
 const READY = { engines: { chat: { kind: "none", pid: null, alive: null, availability: "ready" } } };
 const DOWN = { engines: { chat: { kind: "failed", pid: null, alive: false, availability: "unavailable", reason: "failed_start", notice: PAUSED } } };
+const SEARCH_LIMITED = [{ id: "chat", name: "Chat", state: "degraded", reason: "Household web search is limiting requests from this home for a while.", paused: false, history: [], uptimePercent: 99 }];
 
 function makePerson(role: Roster["role"]): Roster {
   const age_band = role === "child" ? "child" : role === "teen" ? "teen" : "adult";
@@ -236,6 +237,31 @@ describe("(e) each band gets its own words; only an owner or admin gets the Repa
       const repairs = shown.querySelector('a[href="/repairs"]');
       if (link) expect(repairs?.textContent).toBe(PAUSED.repairs_link!);
       else expect(repairs).toBeNull();
+      expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
+    } finally {
+      stubbed.restore();
+    }
+  });
+});
+
+describe("CHAT-NOTICE-DEGRADED-01: search trouble leaves chat available", () => {
+  test.each(["owner", "admin", "adult", "teen", "child"] as const)("%s sees plain search wording without controls disabled or raw details", async (role) => {
+    const stubbed = stub({ health: () => READY, apps: () => SEARCH_LIMITED });
+    try {
+      const view = openChat(role);
+      const shown = await waitFor(() => {
+        const found = notice(view.container);
+        expect(found?.textContent.trim()).toBe("Searches may be limited right now.");
+        return found!;
+      });
+      expect(shown.textContent).not.toContain("Household web search");
+      expect(shown.textContent).not.toContain("access wall");
+      expect(shown.querySelector("a")).toBeNull();
+      const input = (await view.findByLabelText("Message input")) as HTMLTextAreaElement;
+      expect(input.disabled).toBe(false);
+      fireEvent.change(input, { target: { value: "hello" } });
+      const button = (await view.findByLabelText("Send message")) as HTMLButtonElement;
+      expect(button.disabled).toBe(false);
       expect(view.queryByRole("button", { name: "Error details" })).toBeNull();
     } finally {
       stubbed.restore();

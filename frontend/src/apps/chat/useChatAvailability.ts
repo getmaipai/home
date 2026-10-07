@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { api, isOwnerOrAdminRole, type HealthStatus, type Roster } from "@/lib/api";
 import { chatAvailability } from "@/apps/chat/chatAvailability";
 import type { ChatComposerNoticeValue } from "@/apps/chat/chatThreadContexts";
+import { useStatusApps } from "@/shell/useStatusApps";
+import { isSearchLimitedChat } from "@/shell/statusApps";
 
 export const ChatAvailabilityContext = createContext<"ready" | "starting" | "unavailable">("ready");
 
@@ -45,6 +47,10 @@ export function useChatAvailability() {
 export function useChatComposerNotice(person: Pick<Roster, "role" | "age_band">): ChatComposerNoticeValue | null {
   const health = useHealthQuery().data?.engines?.chat;
   const notice = health?.notice;
+  const apps = useStatusApps().data;
+  if (chatAvailability(health) === "ready" && Array.isArray(apps) && apps.some(isSearchLimitedChat)) {
+    return { text: "Searches may be limited right now.", repairsLink: null };
+  }
   if (!notice || chatAvailability(health) === "ready") return null;
   const text = person.age_band === "child" ? notice.child : person.age_band === "teen" ? notice.teen : person.age_band === "adult" ? notice.adult : null;
   return text === null ? null : { text, repairsLink: isOwnerOrAdminRole(person.role) ? notice.repairs_link : null };
