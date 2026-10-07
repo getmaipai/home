@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, mock, test } from "bun:test";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { THREAD_SLOTS, TOOL_BINDINGS } from "@/apps/chat/elementBindings";
-import { AdminContext, ConnectionStateContext, TemporaryChatContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
+import { AdminContext, ChatAgeBandContext, ConnectionStateContext, TemporaryChatContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { EngineStartingLoader } from "@/apps/chat/chatThreadSlots";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -47,10 +47,10 @@ function WelcomeHarness({ availability }: { availability: "ready" | "starting" |
 }
 
 let queuedRuntime: { thread: { composer: { setText(text: string): void; send(): void; getState(): { text: string; queue: readonly { id: string; prompt: string; parts: readonly { type: string; text?: string }[] }[] } } } } | undefined;
-function QueuedHarness({ adapter, history, temporary = false }: { adapter: ChatModelAdapter; history?: ThreadHistoryAdapter; temporary?: boolean }) {
+function QueuedHarness({ adapter, history, temporary = false, band = "child" }: { adapter: ChatModelAdapter; history?: ThreadHistoryAdapter; temporary?: boolean; band?: "child" | "teen" | "adult" }) {
   const runtime = useLocalRuntime(adapter, { initialMessages: [], ...(history ? { adapters: { history } } : {}), unstable_enableMessageQueue: true, unstable_queueClearOnCancel: false });
   queuedRuntime = runtime;
-  return <AssistantRuntimeProvider runtime={runtime}><TemporaryChatContext.Provider value={{ on: temporary }}><ChatThread /></TemporaryChatContext.Provider></AssistantRuntimeProvider>;
+  return <AssistantRuntimeProvider runtime={runtime}><ChatAgeBandContext.Provider value={band}><TemporaryChatContext.Provider value={{ on: temporary }}><ChatThread /></TemporaryChatContext.Provider></ChatAgeBandContext.Provider></AssistantRuntimeProvider>;
 }
 
 const realFetch = globalThis.fetch;
@@ -169,6 +169,42 @@ describe("ChatThread", () => {
     await waitFor(() => expect(queuedRuntime!.thread.composer.getState().queue.map((item) => item.prompt)).toEqual(["keep after stop"]));
     expect(view.container.textContent).toContain("keep after stop");
     releaseFirst();
+  });
+
+  test("running thinking elapsed ticks for adults and stays hidden from children and teens", async () => {
+    for (const band of ["child", "teen", "adult"] as const) {
+      let release!: () => void;
+      const waiting = new Promise<void>((resolve) => { release = resolve; });
+      const adapter: ChatModelAdapter = { run: async function* () {
+        await waiting;
+        yield { content: [{ type: "text", text: "Finished." }] };
+      } };
+      jest.useFakeTimers();
+      let view: ReturnType<typeof renderWithQueryClient> | undefined;
+      try {
+        view = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={adapter} band={band} /></MemoryRouter>);
+        act(() => queuedRuntime!.thread.composer.setText("Please think about this"));
+        act(() => queuedRuntime!.thread.composer.send());
+        await waitFor(() => expect(view!.getByRole("button", { name: "Stop generating" })).toBeTruthy());
+
+        const indicator = view.container.querySelector('[data-slot="thinking-indicator"]');
+        if (band === "adult") {
+          expect(indicator).not.toBeNull();
+          expect(indicator?.textContent).toContain("Thinking…");
+          expect(indicator?.textContent).toContain("0s");
+          act(() => jest.advanceTimersByTime(1_000));
+          expect(view.container.querySelector('[data-slot="thinking-indicator"]')?.textContent).toContain("1s");
+        } else {
+          expect(indicator).toBeNull();
+          expect(view.container.textContent).not.toContain("Thinking…");
+          expect(view.container.textContent).not.toMatch(/\b\d+s\b/);
+        }
+      } finally {
+        release();
+        view?.unmount();
+        jest.useRealTimers();
+      }
+    }
   });
 
   test("a temporary chat does not persist a message while it is queued", async () => {

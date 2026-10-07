@@ -343,25 +343,36 @@ export function AssistantMoreItems() {
 // just never got this port. The kit's own `ThinkingIndicator` Element
 // (thinking-indicator.tsx) replaces its bare pulsing dot via the new
 // `Indicator` slot (ui-v0.5.29) - ported, not reinvented: same signal,
-// same 45s threshold, real Element instead of hand-drawn `<span>●</span>`
-// prose. No `elapsed`: Home has no turn-elapsed source for a running
-// message today (the message-timing row owns finished-turn timing) - a
-// named gap, not invented data.
+// same 45s threshold, and the Element's elapsed slot reads only the live
+// message's own creation time. Minors do not receive the indicator or its
+// elapsed value.
 export function ChatThinkingIndicator() {
+  const band = useContext(ChatAgeBandContext);
   const running = useAuiState((s) => s.message.status?.type === "running");
+  const createdAt = useAuiState((s) => s.message.createdAt);
   const activity = useTurnActivity();
   const [slow, setSlow] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     setSlow(false);
     if (!running) return;
     const timer = setTimeout(() => setSlow(true), 45_000);
     return () => clearTimeout(timer);
   }, [running]);
+  useEffect(() => {
+    if (!running || band !== "adult" || !createdAt) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [band, createdAt, running]);
+  if (!running || band !== "adult") return null;
+  const elapsedSeconds = createdAt ? Math.max(0, Math.floor((now - createdAt.getTime()) / 1_000)) : undefined;
   return (
     <ThinkingIndicator
       role="status"
       aria-live="polite"
       label={slow ? "Still working. This is taking longer than usual." : (activity ?? "Thinking…")}
+      elapsed={elapsedSeconds === undefined ? undefined : `${elapsedSeconds}s`}
     />
   );
 }
@@ -712,6 +723,7 @@ export function MessageDetailsContextBar({ stats }: { stats: TurnStats }) {
 export function MessageDetailsReveal() {
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   const stats = useAuiState((s) => s.message.metadata?.custom?.stats as TurnStats | undefined);
+  const streaming = useAuiState((s) => s.message.status?.type === "running");
   const { isOpen } = useContext(DetailsOpenContext);
   if (!turnId || !stats || !isOpen(turnId)) return null;
   const timingStats = buildTimingStats(stats);
@@ -719,7 +731,7 @@ export function MessageDetailsReveal() {
   if (timingStats.length === 0) return null;
   return (
     <div className="ms-2 flex flex-col gap-1.5 pb-2">
-      <MessageTiming stats={timingStats} />
+      <MessageTiming stats={timingStats} streaming={streaming} />
       <MessageDetailsContextBar stats={stats} />
     </div>
   );
