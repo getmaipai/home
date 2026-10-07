@@ -600,8 +600,10 @@ async function seedHousehold(): Promise<string> {
   const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((person) => person.display_name === "Sage");
   if (!sage) throw new Error("seed people lookup did not return Sage");
   SCREENSHOT_FILE_OWNER_ID = sage.id;
-  seedChatHistoryRows(sage.id);
-  seedTraceReviewTurn(sage.id);
+  if (!chatColumnReview) {
+    seedChatHistoryRows(sage.id);
+    seedTraceReviewTurn(sage.id);
+  }
   if (chatArtifactCapture) attachWriteDocumentRoutingStats(sage.id);
   for (const person of [
     { displayName: "Marlow", role: "teen" },
@@ -3271,6 +3273,11 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
     }
   }
 
+  // Take the empty-column state before the shared accessibility/trace rows
+  // are added; both are synthetic screenshot fixtures for later review steps.
+  seedChatHistoryRows(SCREENSHOT_FILE_OWNER_ID);
+  seedTraceReviewTurn(SCREENSHOT_FILE_OWNER_ID);
+
   const titles = [
     "Weekend garden plans", "Shopping list ideas", "Science fair volcano", "Bedtime story about a fox", "Packing for the beach",
     "Birthday party games", "Fixing the bike chain", "Spanish homework help", "Soup recipes for winter", "Cleaning the fish tank",
@@ -3317,19 +3324,23 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
     };
     const rows = [...document.querySelectorAll<HTMLElement>('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]')];
     return {
-      column: box('[data-slot="next-chat-rail"]'),
-      inner: box('[data-slot="chat-column-inner"]'),
+      column: box('[data-slot="aui_thread-list-sidebar"]'),
+      inner: box('[data-slot="aui_thread-list-sidebar-panel"]'),
       header: box('[data-slot="next-chat-rail"] [data-slot="chat-column-header"]'),
+      headerRowHeight: box('[data-slot="next-chat-rail"] [data-slot="chat-column-header"]')?.height ?? null,
       title: font('[data-slot="next-chat-rail"] [data-slot="chat-column-title"]'),
       toggle: box('[data-slot="next-chat-rail"] [data-slot="chat-column-toggle"]'),
       newChat: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-new"]'),
+      searchField: box('[data-slot="next-chat-rail"] [data-slot="thread-search"] > div'),
+      searchIcon: box('[data-slot="next-chat-rail"] [data-slot="thread-search"] svg'),
+      searchInputFont: font('[data-slot="next-chat-rail"] [data-slot="thread-search"] input'),
       row: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]'),
       rowFont: font('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item-title"]'),
       label: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-group-label"]'),
       labelFont: font('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-group-label"]'),
       rowsVisible: rows.filter((row) => { const r = row.getBoundingClientRect(); return r.height > 0 && r.bottom <= window.innerHeight; }).length,
       rows: rows.length,
-      borders: [...document.querySelectorAll<HTMLElement>('[data-slot="chat-column-panel"] *')].filter((el) => { const s = getComputedStyle(el); return ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(s.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0 && s.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none"); }).map((el) => el.getAttribute("data-slot") ?? el.tagName),
+      borders: [...document.querySelectorAll<HTMLElement>('[data-slot="next-chat-rail"] *')].filter((el) => { const s = getComputedStyle(el); return ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(s.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0 && s.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none"); }).map((el) => el.getAttribute("data-slot") ?? el.tagName),
       headerToggle: box('[data-slot="next-chat-header"] [data-slot="chat-column-toggle"]'),
       composer: box('[data-slot="aui_composer-shell"]'),
       overflowX: document.documentElement.scrollWidth > window.innerWidth,
@@ -3350,6 +3361,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       log(`open 1440/${theme}`, open);
       if (open.overflowX) throw new Error(`captureChatColumnReview: horizontal overflow at 1440/${theme}`);
       if (open.borders.length) throw new Error(`captureChatColumnReview: borders inside the column: ${open.borders.join(", ")}`);
+      if (open.newChat?.height !== 36 || open.row?.height !== 36) throw new Error(`captureChatColumnReview: compact list rows are not 36px at 1440/${theme}`);
 
       // A hovered row beside the selected one.
       await page.locator('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]', { hasText: "Science fair volcano" }).hover();
@@ -3362,6 +3374,19 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await shoot(page, `column-search-1440-${theme}`);
       const focusedInSearch = await page.evaluate(() => document.activeElement?.getAttribute("aria-label"));
       log(`search focus 1440/${theme}`, focusedInSearch);
+      const searchGeometry = await page.evaluate(() => {
+        const field = document.querySelector<HTMLElement>('[data-slot="thread-search"] > div');
+        const icon = field?.querySelector<SVGElement>("svg");
+        const input = field?.querySelector<HTMLInputElement>("input");
+        return {
+          fieldHeight: field ? Math.round(field.getBoundingClientRect().height) : null,
+          radius: field ? getComputedStyle(field).borderRadius : null,
+          textSize: input ? getComputedStyle(input).fontSize : null,
+          iconWidth: icon ? Math.round(icon.getBoundingClientRect().width) : null,
+        };
+      });
+      log(`search geometry 1440/${theme}`, searchGeometry);
+      if (searchGeometry.fieldHeight !== 36 || searchGeometry.radius !== "8px" || searchGeometry.textSize !== "14px" || searchGeometry.iconWidth !== 16) throw new Error(`captureChatColumnReview: compact ThreadSearch geometry mismatch at 1440/${theme}`);
       await page.keyboard.press("Escape");
       await page.keyboard.press("Escape");
       log(`search closed focus 1440/${theme}`, await page.evaluate(() => document.activeElement?.getAttribute("aria-label")));
@@ -3371,8 +3396,8 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       const startedAt = await page.evaluate(() => {
         const samples: Array<[number, number, number, number]> = [];
         (window as unknown as { __col: typeof samples }).__col = samples;
-        const column = document.querySelector<HTMLElement>('[data-slot="next-chat-rail"]')!;
-        const inner = document.querySelector<HTMLElement>('[data-slot="chat-column-inner"]')!;
+        const column = document.querySelector<HTMLElement>('[data-slot="aui_thread-list-sidebar"]')!;
+        const inner = document.querySelector<HTMLElement>('[data-slot="aui_thread-list-sidebar-panel"]')!;
         const start = performance.now();
         const tick = () => {
           const composer = document.querySelector<HTMLElement>('[data-slot="aui_composer-shell"]')!;
@@ -3423,7 +3448,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await page.mouse.move(900, 450);
       await page.waitForTimeout(300);
       const before = await measure(page);
-      const zone = await page.locator('[data-slot="chat-column-hover-zone"]').boundingBox();
+      const zone = await page.locator('[data-slot="aui_thread-list-sidebar-peek-zone"]').boundingBox();
       if (!zone) throw new Error("COLUMN-02: no hover zone while the column is hidden");
       log(`hover zone 1440/${theme}`, zone);
       // Passing the pointer over the zone and away does not open it.
@@ -3437,7 +3462,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await page.waitForTimeout(300);
       await shoot(page, `column-peek-1440-${theme}`);
       const during = await measure(page);
-      const peekBox = await page.locator('[data-slot="next-chat-rail"][data-state="peek"] [data-slot="chat-column-inner"]').boundingBox();
+      const peekBox = await page.locator('[data-slot="aui_thread-list-sidebar"][data-state="peek"] [data-slot="aui_thread-list-sidebar-panel"]').boundingBox();
       log(`peek 1440/${theme}`, { peekBox, composerBefore: before.composer, composerDuring: during.composer, headerToggleBefore: before.headerToggle, headerToggleDuring: during.headerToggle });
       if (!peekBox || Math.round(peekBox.width) !== 288) throw new Error("COLUMN-02: the peek is not 288 wide");
       if (JSON.stringify(before.composer) !== JSON.stringify(during.composer)) throw new Error("COLUMN-02: the peek moved the conversation");
@@ -3535,6 +3560,22 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
         return { width: Math.round(dialog.getBoundingClientRect().width), row: Math.round(row.height), overflowX: document.documentElement.scrollWidth > window.innerWidth };
       });
       log(`phone sheet 390/${theme}`, sheet);
+      await page.getByRole("dialog").getByRole("button", { name: "Search chats" }).click();
+      await page.getByRole("dialog").getByRole("textbox", { name: "Search threads" }).waitFor();
+      await shoot(page, `column-phone-search-sheet-390-${theme}`);
+      const phoneSearch = await page.getByRole("dialog").evaluate((dialog) => {
+        const field = dialog.querySelector<HTMLElement>('[data-slot="thread-search"] > div');
+        const icon = field?.querySelector<SVGElement>("svg");
+        const input = field?.querySelector<HTMLInputElement>("input");
+        return {
+          fieldHeight: field ? Math.round(field.getBoundingClientRect().height) : null,
+          radius: field ? getComputedStyle(field).borderRadius : null,
+          textSize: input ? getComputedStyle(input).fontSize : null,
+          iconWidth: icon ? Math.round(icon.getBoundingClientRect().width) : null,
+        };
+      });
+      log(`phone search geometry 390/${theme}`, phoneSearch);
+      if (phoneSearch.fieldHeight !== 36 || phoneSearch.radius !== "8px" || phoneSearch.textSize !== "14px" || phoneSearch.iconWidth !== 16) throw new Error(`captureChatColumnReview: compact ThreadSearch geometry mismatch at 390/${theme}`);
     } finally {
       await context.close();
     }

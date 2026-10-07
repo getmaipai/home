@@ -62,7 +62,7 @@ import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assist
 import { useTabItem } from "@/shell/tabIdentity";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
-import { CHAT_COLUMN_ID, ChatColumnToggle, ChatHistoryPanel, useChatColumn } from "@/shell/pages/ChatColumn";
+import { CHAT_COLUMN_ID, ChatColumnContent, chatColumnShortcutLabel, skipTooltipOnQuietFocus, useChatColumn } from "@/shell/pages/ChatColumn";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
@@ -77,6 +77,8 @@ import { projectConversationRows, projectSourcesVisible } from "@/shell/pages/ch
 // the phone row's sheet control uses the same glyph as the desktop
 // column's show control (ChatColumn.tsx).
 const ColumnOpenIcon = getIcon("panel-left-open");
+const ColumnCloseIcon = getIcon("panel-left-close");
+const ColumnPinIcon = getIcon("pin");
 const VoiceSettingsIcon = getIcon("settings");
 const LazyProjectHomeHeader = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeHeader })));
 const LazyProjectHomeTabs = lazy(() => import("@maipai/ui/src/elements/project-home-page").then((module) => ({ default: module.ProjectHomeTabs })));
@@ -1376,9 +1378,6 @@ export function ChatPage({ person }: { person: Roster }) {
           <div className="relative flex min-h-0 flex-1">
             {/* COLUMN-02: while the column is hidden, a thin hover zone at
                 this edge turns the column node itself into an overlay peek. */}
-            {column.collapsed && !column.peek ? (
-              <div aria-hidden data-slot="chat-column-hover-zone" className="absolute inset-y-0 start-0 z-20 hidden w-1.5 lg:block" {...column.peekZoneHandlers} />
-            ) : null}
             {/* COLUMN-01: the history column. The outer box animates its
                 width; the inner box keeps its full width and is pinned to
                 the outer box's right edge, so the column's contents slide
@@ -1387,34 +1386,28 @@ export function ChatPage({ person }: { person: Roster }) {
                 accessibility tree) but stays mounted, so `aria-controls`
                 always names a real node. A hover peek (COLUMN-02) overlays
                 the conversation while it is hidden. */}
-            <div
-              id={CHAT_COLUMN_ID}
-              data-slot="next-chat-rail"
-              data-state={column.collapsed ? (column.peek ? "peek" : "closed") : "open"}
-              aria-label="Conversations"
-              role="region"
-              inert={column.collapsed && !column.peek}
-              {...(column.peek ? column.peekColumnHandlers : {})}
-              className={cn(
-                // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate the column's width
-                "hidden shrink-0 justify-end overflow-hidden transition-[width] duration-200 ease-out motion-reduce:transition-none lg:flex",
-                // Peeking: the same node, out of flow over the conversation
-                // (nothing moves), with no width transition.
-                column.peek ? "absolute inset-y-0 start-0 z-30 w-72 transition-none" : column.collapsed ? "w-0" : "w-72",
-              )}
-            >
-              <div data-slot="chat-column-inner" className="flex h-full w-72 shrink-0 flex-col">
-                <ChatHistoryPanel
-                  variant="column"
-                  state={column}
-                  person={person}
-                  temporary={temporaryNext}
-                  onNewThread={() => setSheetOpen(false)}
-                  newChatDisabled={chatAvailability === "unavailable"}
-                  pinnable={!temporaryNext}
-                  toggle={<ChatColumnToggle collapsed={false} pin={column.peek} onToggle={column.peek ? column.pinPeek : column.toggleFromButton} buttonRef={column.columnToggleRef} />}
-                />
-              </div>
+            <div data-slot="chat-column-layout" data-state={column.peek ? "peek" : column.collapsed ? "closed" : "open"} className={cn("hidden h-full shrink-0 lg:flex", (!column.collapsed || column.peek) && "border-e", column.peek && "absolute inset-y-0 start-0 z-30")}>
+            <ChatColumnContent
+              state={column}
+              person={person}
+              temporary={temporaryNext}
+              onNewThread={() => setSheetOpen(false)}
+              newChatDisabled={chatAvailability === "unavailable"}
+              pinnable={!temporaryNext}
+              collapsed={column.collapsed}
+              peek={column.peek}
+              toggle={<TooltipIconButton
+                ref={column.columnToggleRef}
+                tooltip={column.peek ? "Keep conversations open" : `Hide conversations ${chatColumnShortcutLabel()}`}
+                data-slot="chat-column-toggle"
+                aria-label={column.peek ? "Keep conversations open" : "Hide conversations"}
+                aria-expanded={column.peek ? undefined : true}
+                aria-controls={column.peek ? undefined : CHAT_COLUMN_ID}
+                aria-keyshortcuts="Meta+B Control+B"
+                onFocus={skipTooltipOnQuietFocus}
+                onClick={column.peek ? column.pinPeek : column.toggleFromButton}
+              >{column.peek ? <ColumnPinIcon className="size-4.5" /> : <ColumnCloseIcon className="size-4.5" />}</TooltipIconButton>}
+            />
             </div>
             <div
               data-slot="next-chat-pane"
@@ -1430,7 +1423,17 @@ export function ChatPage({ person }: { person: Roster }) {
                   sit at the top. While the history column is hidden, its
                   show control sits at this header's left edge, in flow. */}
               <header data-slot="next-chat-header" data-column={column.collapsed ? "closed" : "open"} className={cn("hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex", column.collapsed && "ps-3")}>
-                {column.collapsed ? <ChatColumnToggle collapsed onToggle={column.toggleFromButton} buttonRef={column.headerToggleRef} /> : null}
+                {column.collapsed ? <TooltipIconButton
+                  ref={column.headerToggleRef}
+                  tooltip={`Show conversations ${chatColumnShortcutLabel()}`}
+                  data-slot="chat-column-toggle"
+                  aria-label="Show conversations"
+                  aria-expanded={false}
+                  aria-controls={CHAT_COLUMN_ID}
+                  aria-keyshortcuts="Meta+B Control+B"
+                  onFocus={skipTooltipOnQuietFocus}
+                  onClick={column.toggleFromButton}
+                ><ColumnOpenIcon className="size-4.5" /></TooltipIconButton> : null}
                 <ChatHeaderBar />
               </header>
           {bareMode ? (
@@ -1535,7 +1538,7 @@ export function ChatPage({ person }: { person: Roster }) {
         </div>
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- sheet width and responsive visibility are intentional layout for the mobile thread list; max-w-[calc(100vw-2rem)] has no scale-token equivalent since Sheet has no max-width prop of its own (commons/ui/docs/dashboard-upstream.md) */}
-          <SheetContent id="next-chat-threads" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-0 [&_[data-slot='sheet-close']]:right-3 [&_[data-slot='sheet-close']]:top-3.5 lg:hidden"
+          <SheetContent id="next-chat-threads" data-chat-column-mobile="" side="left" className="w-80 max-w-[calc(100vw-2rem)] gap-0 p-0 [&_[data-slot='sheet-close']]:right-3 [&_[data-slot='sheet-close']]:top-3.5 lg:hidden"
             // The sheet takes focus itself rather than its first button,
             // so opening it never pops that button's tooltip.
             onOpenAutoFocus={(event) => {
@@ -1557,14 +1560,14 @@ export function ChatPage({ person }: { person: Roster }) {
               <SheetTitle>Conversations</SheetTitle>
               <SheetDescription>Past conversations</SheetDescription>
             </SheetHeader>
-            <ChatHistoryPanel
-              variant="sheet"
+            <ChatColumnContent
               state={column}
               person={person}
               temporary={temporaryNext}
               onNewThread={() => setSheetOpen(false)}
               newChatDisabled={chatAvailability === "unavailable"}
               pinnable={!temporaryNext}
+              mobile
             />
           </SheetContent>
         </Sheet>

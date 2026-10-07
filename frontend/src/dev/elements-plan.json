@@ -69,6 +69,23 @@
       "verdictReason": "Developer-only story fixture for K07, covered by the Commons showcase tests; not a standalone Home product surface."
     },
     {
+      "file": "ThreadSearchDensityShowcase.tsx",
+      "name": "ThreadSearchDensityShowcase",
+      "group": "thread/showcase",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Developer-only story fixture for ELT-T1-20 ThreadSearch density, covered by the Commons showcase tests; not a standalone Home product surface."
+    },
+    {
       "file": "thread-list-sidebar.aui.tsx",
       "name": "thread-list-sidebar.aui",
       "group": "thread/navigation",
