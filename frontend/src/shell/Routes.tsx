@@ -15,6 +15,7 @@ import { CustomizeRedirect, SettingsEntryRedirect } from "@/shell/pages/settings
 import { StoragePage } from "@/shell/pages/StoragePage";
 import { EnginesPage } from "@/shell/pages/EnginesPage";
 import { PerformancePage } from "@/shell/pages/PerformancePage";
+import { TurnTracePage } from "@/shell/pages/TurnTracePage";
 import { UpdatesPage } from "@/shell/pages/UpdatesPage";
 import { RepairsPage } from "@/shell/pages/RepairsPage";
 import { StatusPage } from "@/shell/pages/StatusPage";
@@ -194,6 +195,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="storage" element={<StoragePage person={person} />} />
             <Route path="engines" element={<EnginesPage person={person} />} />
             <Route path="performance" element={<PerformancePage />} />
+            <Route path="trace/:turnId" element={<TurnTracePage />} />
             <Route path="updates" element={<UpdatesPage person={person} />} />
             <Route path="repairs" element={<RepairsPage person={person} />} />
             <Route path="status" element={<StatusPage person={person} />} />

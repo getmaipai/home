@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-07T03:46:35.158Z",
-  "kitTag": "ui-v0.5.154",
+  "generatedAt": "2026-10-07T04:30:43.078Z",
+  "kitTag": "ui-v0.5.155",
   "items": [
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
@@ -1126,7 +1126,7 @@
       "group": "agent/workflow",
       "verdict": "later",
       "verdictReason": "Deferred until TurnStats.nodes.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "typing-indicator.tsx",

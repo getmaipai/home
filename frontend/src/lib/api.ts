@@ -869,6 +869,7 @@ export const api = {
   performance: (days?: number) => request<Performance>(`/api/performance${days ? `?days=${days}` : ""}`),
   // GET /api/turn-error-detail/:id (THIN-1E): owner/admin only, the stored raw detail of a failed turn.
   turnErrorDetail: (turnId: string) => request<TurnErrorDetail>(`/api/turn-error-detail/${encodeURIComponent(turnId)}`),
+  turnTrace: (turnId: string) => request<{ spans: { id: string; name: string; depth: number; startMs: number; durationMs: number; status: "running" | "completed" | "failed" | "skipped"; error_code?: string }[]; totalMs: number; visibleCount: number }>(`/api/admin/turns/${encodeURIComponent(turnId)}/trace`),
   // GET /api/storage/usage (STORE-PAGE-01): every signed-in person may
   // call this - an owner/admin gets every person's row plus the
   // household total, anyone else gets a single row (themself) and a

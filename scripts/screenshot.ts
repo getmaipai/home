@@ -336,6 +336,7 @@ const engineDownReview = process.argv.includes("--engine-down-review");
 const appSettingsReview = process.argv.includes("--app-settings-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
 const noticeStyleReview = process.argv.includes("--notice-style-review");
+const traceReview = process.argv.includes("--trace-review");
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
@@ -373,6 +374,7 @@ const ROUTES: RouteSpec[] = [
   // before the settings areas (the shell's own phone start is a column list).
   { slug: "settings", path: "/settings/home/general" },
   { slug: "status", path: "/status" },
+  { slug: "turn-trace", path: "/trace/screenshot-trace-turn" },
   { slug: "settings-models", path: "/models" },
   { slug: "settings-backups", path: "/backups" },
   { slug: "settings-voices", path: "/voices" },
@@ -579,6 +581,7 @@ async function seedHousehold(): Promise<string> {
   const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((person) => person.display_name === "Sage");
   if (!sage) throw new Error("seed people lookup did not return Sage");
   seedChatHistoryRows(sage.id);
+  seedTraceReviewTurn(sage.id);
   if (chatArtifactCapture) attachWriteDocumentRoutingStats(sage.id);
   for (const person of [
     { displayName: "Marlow", role: "teen" },
@@ -639,6 +642,20 @@ function seedChatHistoryRows(personId: string): void {
     const hlc = `${now}:${index}:screenshot`;
     db.query("INSERT INTO conversations (id, person_id, surface, mode, hlc, created_at, updated_at, title) VALUES (?, ?, 'chat', 'chat', ?, ?, ?, ?)").run(row.id, personId, hlc, now, now, row.title);
   }
+  db.close();
+}
+
+function seedTraceReviewTurn(personId: string): void {
+  const db = new Database(join(DATA_DIR, "hub.db"));
+  const now = new Date().toISOString();
+  const conversationId = "screenshot-trace-conversation";
+  db.query("INSERT OR IGNORE INTO conversations (id, person_id, surface, mode, hlc, created_at, updated_at, title) VALUES (?, ?, 'chat', 'chat', ?, ?, ?, ?)").run(conversationId, personId, `${now}:0:screenshot-trace`, now, now, "Trace review");
+  const nodes = ["safety", "commands", "context", "model", "policy", "tool", "answer", "output_gate"].map((node, index) => ({
+    node, impl: `${node}-node`, version: "v1", startMs: index * 12, endMs: index * 12 + 8,
+    outcome: node === "commands" ? { skipped: true, reason: "not needed" } : { ok: true },
+  }));
+  const stats = { generations: [{ reason: "answer", request_sent_ms: 36, first_delta_ms: 51, predicted_ms: 15, error: null }], nodes };
+  db.query("INSERT OR IGNORE INTO conversation_turns (id, person_id, conversation_id, surface, user_text, reply_text, source, safety_action, minor_speaker, created_at, hlc, status, stats) VALUES ('screenshot-trace-turn', ?, ?, 'chat', 'fixture utterance', 'fixture answer', 'model', 'allow', 0, ?, ?, 'done', ?)").run(personId, conversationId, now, `${now}:1:screenshot-trace-turn`, JSON.stringify(stats));
   db.close();
 }
 
@@ -4425,6 +4442,38 @@ async function captureNextDashboardReview(browser: Browser, sessionValue: string
         await page.screenshot({ path, fullPage: slug === "phone" });
         console.log(`Wrote ${path}`);
         await page.close();
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
+async function captureTurnTraceReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "trace-shots");
+  mkdirSync(outDir, { recursive: true });
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        const failures: string[] = [];
+        page.on("pageerror", (error) => failures.push(error.message));
+        page.on("response", (response) => { if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
+        await page.goto(`${BASE_URL}/trace/screenshot-trace-turn`);
+        await page.getByRole("heading", { name: "Turn trace" }).waitFor();
+        await page.locator('[data-slot="trace-waterfall"]').waitFor();
+        await page.getByRole("img", { name: "skipped, starts at 12ms, runs 8ms" }).waitFor();
+        const body = await page.locator("body").innerText();
+        if (/fixture utterance|fixture answer|screenshot-trace-turn|screenshot-trace-conversation/.test(body)) {
+          throw new Error(`turn trace review exposed non-timing fixture data at ${slug}/${theme}`);
+        }
+        if (failures.length) throw new Error(`turn trace browser errors at ${slug}/${theme}: ${failures.join(" | ")}`);
+        await settleAnimations(page);
+        const path = join(outDir, `turn-trace-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: true });
+        console.log(`Wrote ${path}`);
       } finally {
         await context.close();
       }
@@ -9103,6 +9152,11 @@ async function main() {
       throw error;
     }
     browser = launchedBrowser;
+    if (traceReview) {
+      await captureTurnTraceReview(browser, sessionValue);
+      console.log("completed named review: --trace-review");
+      return;
+    }
     if (chatMissingStatesReview) {
       await captureChatMissingStates(browser, sessionValue);
       console.log("completed named review: --chat-missing-states-review");

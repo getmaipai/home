@@ -6406,6 +6406,119 @@
         }
       }
     },
+    "/api/admin/turns/{id}/trace": {
+      "get": {
+        "tags": [
+          "turn"
+        ],
+        "summary": "Read one turn's timing trace (owner/admin only)",
+        "description": "Returns names and timings only. Turn content, tool arguments, result text, and identity are omitted.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timing-only trace spans.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "spans": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "depth": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "startMs": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "durationMs": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "running",
+                              "completed",
+                              "failed",
+                              "skipped"
+                            ]
+                          },
+                          "error_code": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "depth",
+                          "startMs",
+                          "durationMs",
+                          "status"
+                        ]
+                      }
+                    },
+                    "totalMs": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "visibleCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "spans",
+                    "totalMs",
+                    "visibleCount"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown, temporary, or Incognito turn",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations": {
       "post": {
         "tags": [
