@@ -165,6 +165,10 @@ async function main(): Promise<{ executed: number; engine: string }> {
     const budgetOnly = await budgetOfferedPass();
     return { executed: budgetOnly, engine };
   }
+  if (process.env.MAIPAI_BENCH_PASS === "answer-images") {
+    const imageOnly = await answerImagesPass();
+    return { executed: imageOnly, engine };
+  }
   console.log(`Running ${corpus.length} tool-call-corpus rows, ${REPEATS} repeats each...\n`);
 
   let falseCallAttempts = 0; // every repeat of a negative row (expect_calls: [])
@@ -257,8 +261,9 @@ async function answerImagesPass(): Promise<number> {
     console.log("\nAnswer-images rows skipped: show_images is not offered (set MAIPAI_BENCH_OFFER=show_images to measure it before it ships).");
     return 0;
   }
+  const only = new Set((process.env.MAIPAI_BENCH_IMAGES_ONLY ?? "").split(",").map((id) => id.trim()).filter(Boolean));
   const rows = (answerImageRows.rows as { id: string; label: string; person: string; text: string; setup?: string; spoken?: boolean }[])
-    .filter((row) => row.person === "owner" && !row.setup && !row.spoken && (row.label === "V" || row.label === "N"));
+    .filter((row) => row.person === "owner" && !row.setup && !row.spoken && (row.label === "V" || row.label === "N") && (!only.size || only.has(row.id)));
   console.log(`\nAnswer-images pass: ${rows.length} rows, ${REPEATS} repeats each...\n`);
   let executed = 0, visualRuns = 0, visualCalls = 0, otherRuns = 0, otherCalls = 0;
   for (const row of rows) {

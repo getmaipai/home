@@ -460,8 +460,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const resolvedBudget = await resolveTurnBudgetWithStack(opts.model, band);
   const thinkingBudget: TurnBudget = opts.thinking === true || bare ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
   // ANSWER-IMG-02 (rules 0 and 8): `show_images` is offered only when the
-  // model's own record offers it AND this turn may show pictures; the
-  // record keeps it out until ANSWER-IMG-05's bench passes.
+  // model's own record offers it AND this turn may show pictures.
   const answerImagesOk = answerImagesAllowed({ actor, band, surfaceClass, spoken: opts.spoken === true, temporary, bare, ephemeral: opts.ephemeral === true });
   const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk);
 

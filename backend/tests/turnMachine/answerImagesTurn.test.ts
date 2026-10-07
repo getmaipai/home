@@ -4,9 +4,9 @@
 // once with a fixed line, fetches beside the answer, and the `images` event
 // lands at a paragraph boundary of released text (never above it); the stored
 // turn carries the same set; a failed fetch places nothing and the answer is
-// whole. The model's own catalog record still leaves the tool out
-// (ANSWER-IMG-05 turns it on), so these tests offer it the way the record will.
-import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+// whole. The catalog offers it on eligible written turns, while per-person
+// and surface gates remain authoritative.
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { AssistantStream, DataStreamDecoder, type AssistantStreamChunk } from "assistant-stream";
 import { resetDb } from "../reset-db";
@@ -16,7 +16,6 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
-import * as budgetModule from "@/lib/turnMachine/budget";
 import { streamTurnEvents } from "@/routes/turn";
 import { listConversationTurns } from "@/lib/conversationHistory";
 import { __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
@@ -37,7 +36,6 @@ const CALL = { id: "call-img", name: "show_images", args: JSON.stringify({ subje
 const TWO_PARAGRAPHS = "The Eiffel Tower is an iron tower in Paris.\n\nIt was finished in 1889 for a world fair.";
 
 let people: BenchPeople;
-const restore: Array<{ mockRestore(): void }> = [];
 
 beforeEach(() => {
   resetDb();
@@ -51,21 +49,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const r of restore.splice(0)) r.mockRestore();
   __setAnswerImageDepsForTests(null);
   __resetLlmSupervisorForTests();
   __resetPortOwnershipForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
 });
-
-/** The model's record offering show_images, as ANSWER-IMG-05 will make it. */
-function offerShowImages(): void {
-  const original = budgetModule.resolveTurnBudgetWithStack;
-  restore.push(spyOn(budgetModule, "resolveTurnBudgetWithStack").mockImplementation(async (...args) => {
-    const budget = await original(...args);
-    return { ...budget, tools_offered: [...budget.tools_offered, "show_images"] };
-  }));
-}
 
 const toolNames = (request: ChatCompletionRequest | undefined) => (request?.tools ?? []).map((t) => (t as { function: { name: string } }).function.name);
 const isPhrasing = (request: ChatCompletionRequest) => request.messages.some((m) => m.role === "tool");
@@ -102,24 +90,32 @@ describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
     return names;
   }
 
-  test("offered on an adult's written chat when the model's record offers it", async () => {
-    offerShowImages();
+  test("offered on the requested pictures, appearance follow-up, and poster turns", async () => {
+    for (const text of [
+      "show me a picture of Michael Jackson",
+      "what does he look like",
+      "show me the latest poster for the new Exorcist movie",
+    ]) {
+      expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", text))).toContain("show_images");
+    }
+  });
+
+  test("offered on an adult's written chat", async () => {
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "what does the Eiffel Tower look like"))).toContain("show_images");
   });
 
-  test("the record leaves it out until ANSWER-IMG-05: not offered by default", async () => {
-    expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "what does the Eiffel Tower look like"))).not.toContain("show_images");
+  test("offered by the vision model's matching turn budget", async () => {
+    setHouseholdSettingValue("chat.model_id", "qwen3-vl-8b-instruct-q4-k-m");
+    expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "show me the latest poster for the new Exorcist movie"))).toContain("show_images");
   });
 
   test("never offered on a spoken turn, a glance surface or a temporary chat", async () => {
-    offerShowImages();
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "who is the president of chile", { spoken: true }))).not.toContain("show_images");
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "overlay", "who is the president of chile"))).not.toContain("show_images");
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "who is the president of chile", { temporary: true }))).not.toContain("show_images");
   });
 
   test("a child is off by default, a parent turns it on, and the child cannot turn it on themselves", async () => {
-    offerShowImages();
     expect(await toolsSeen(people.child, (a) => runTurnNext(a, "chat", "what does a koala look like"))).not.toContain("show_images");
     expect(setValue(people.child, `person:${people.child.id}`, "reference.images", true).ok).toBe(false);
     expect(setValue(people.owner, `person:${people.child.id}`, "reference.images", true).ok).toBe(true);
@@ -127,13 +123,11 @@ describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
   });
 
   test("an adult who turned pictures off is not offered the tool", async () => {
-    offerShowImages();
     expect(setValue(people.owner, `person:${people.owner.id}`, "reference.images", false).ok).toBe(true);
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "what does the Eiffel Tower look like"))).not.toContain("show_images");
   });
 
   test("a teen is on by default", async () => {
-    offerShowImages();
     db.update(peopleTable).set({ role: "teen" }).where(eq(peopleTable.id, people.child.id)).run();
     const teen = db.select().from(peopleTable).where(eq(peopleTable.id, people.child.id)).get()!;
     expect(await toolsSeen(teen, (a) => runTurnNext(a, "chat", "what does a red panda look like"))).toContain("show_images");
@@ -145,7 +139,6 @@ describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
 
 describe("ANSWER-IMG-02: the turn with pictures", () => {
   test("pictures ready before the answer starts lead it; the stored turn and the done value carry the same set", async () => {
-    offerShowImages();
     __setAnswerImageDepsForTests(fixtureWorld([TOWER]).deps);
     await withStub(script(TWO_PARAGRAPHS, { replyDelayMs: 1_500 }), async (seen) => {
       const { events } = await streamEvents();
@@ -180,7 +173,6 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
   });
 
   test("a slow picture host never delays the first text, and pictures that miss the answer go after it", async () => {
-    offerShowImages();
     __setAnswerImageDepsForTests(fixtureWorld([TOWER], { pictureDelayMs: 800 }).deps);
     await withStub(script("The Eiffel Tower is an iron tower in Paris."), async () => {
       const { events, startedAt } = await streamEvents();
@@ -197,7 +189,6 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
   });
 
   test("a failed fetch emits no pictures and the answer completes whole", async () => {
-    offerShowImages();
     __setAnswerImageDepsForTests(fixtureWorld([TOWER], { failPictures: true }).deps);
     await withStub(script(TWO_PARAGRAPHS), async () => {
       const { events } = await streamEvents();
@@ -211,7 +202,6 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
   });
 
   test("a non-visual turn with no call has no pictures and no images event", async () => {
-    offerShowImages();
     const world = fixtureWorld([TOWER]);
     __setAnswerImageDepsForTests(world.deps);
     await withStub(script("A mortgage is a loan for a home.", { call: false }), async () => {
@@ -225,7 +215,6 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
   test("a call the turn may not make (pictures off) runs nothing and tells the model so", async () => {
     // The record offers it, but this adult turned pictures off; a model that
     // calls it anyway gets the plain line and nothing is fetched.
-    offerShowImages();
     setValue(people.owner, `person:${people.owner.id}`, "reference.images", false);
     const world = fixtureWorld([TOWER]);
     __setAnswerImageDepsForTests(world.deps);

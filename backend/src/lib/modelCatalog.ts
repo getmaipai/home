@@ -100,7 +100,9 @@ export const CATALOG: ModelCapabilities[] = [
       // virtual tool (tool.ts's own header), never a bundled package, so
       // it's added here by hand rather than discovered from
       // backend/packages/ the way a real one would be.
-      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "start_project", "timer", "weather", "websearch"],
+      // IMG-REQUEST-01: written turns can offer pictures. The shared turn
+      // gate still enforces each person's image setting, age band and surface.
+      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "show_images", "start_project", "timer", "weather", "websearch"],
       // THIN-2B (rule 1): deprecated and ignored. Home no longer reads it;
       // the pinned spec still requires the field, and a later spec tag
       // removes it.
@@ -181,7 +183,7 @@ export const CATALOG: ModelCapabilities[] = [
     thinking_mode: "none",
     turn_budget: {
       rounds: 1,
-      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "start_project", "timer", "weather", "websearch"],
+      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "show_images", "start_project", "timer", "weather", "websearch"],
       always_search: true,
       model_transitions: true,
       context_tokens: 2048,

@@ -2,6 +2,9 @@
   "about": "ANSWER-IMG-05: section 13's labelled rows (data-scratch/research/chat-images-in-answers.md). label V = visual (show_images expected), N = not visual (no show_images), either = may call, zero pictures expected, n/a = the tool must not be offered. Person: owner (adult), teen, childOff (reference.images at its default, off), childOn (an adult turned reference.images on), household is the adult household member the household-name row asks about. Roster persona names only for private people.",
   "household_member": "Juniper",
   "rows": [
+    { "id": "v-michael-jackson", "label": "V", "person": "owner", "text": "show me a picture of Michael Jackson" },
+    { "id": "v-michael-jackson-look", "label": "V", "person": "owner", "setup": "show me a picture of Michael Jackson", "text": "what does he look like", "subject": "Michael Jackson" },
+    { "id": "v-exorcist-poster", "label": "V", "person": "owner", "text": "show me the latest poster for the new Exorcist movie" },
     { "id": "v-feldman", "label": "V", "person": "owner", "text": "who is Corey Feldman" },
     { "id": "v-blaine", "label": "V", "person": "owner", "text": "who is David Blaine" },
     { "id": "v-blaine-look", "label": "V", "person": "owner", "setup": "who is David Blaine", "text": "what does he look like", "subject": "David Blaine" },

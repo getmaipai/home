@@ -4,12 +4,14 @@
   "kind": "plugin",
   "category": "Info",
   "display": "Show Pictures",
-  "description": "Show photos whenever someone asks about or mentions a famous person, place, film, show, game, animal, car or product.",
+  "description": "Show pictures for picture, photo, poster or looks-like requests. Also use for well-known people, places, films, shows, games, animals, cars and products. Never for household people.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
   "routing": {
     "examples": [
+      "show me a picture of Michael Jackson",
+      "show me the latest poster for the new Exorcist movie",
       "what does the Eiffel Tower look like",
       "what does a koala look like",
       "show me the Golden Gate Bridge",
@@ -27,7 +29,7 @@
       "subject": {
         "type": "string",
         "minLength": 1,
-        "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Use this when they ask what something looks like, ask who or what a well-known thing is, or are chatting about a thing whose look matters (artwork too), for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\", \"I just watched Jaws again\" means subject \"Jaws\" and \"what is the PlayStation 5\" means subject \"PlayStation 5\"; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. Call it in short, casual replies too. The app shows the photos itself; never mention them."
+        "description": "The thing to show, by its full proper name as in the conversation, for example \"Michael Jackson\", \"The Exorcist\", \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Use this when they explicitly ask to see a picture, photo, or poster, ask what a well-known thing looks like, or are chatting about a thing whose look matters (artwork too), for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\", and \"I just watched Jaws again\" means subject \"Jaws\". Do not use for advice, how-to, maths, code, news facts, feelings, or a mention with no visual intent. Call it in short, casual replies too. The app shows the photos itself; never mention them."
       },
       "kind": {
         "type": "string",
