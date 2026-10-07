@@ -5,7 +5,8 @@
     {
       "op": "remember",
       "text": "{fact}",
-      "category": "fact"
+      "category": "fact",
+      "scope": "person"
     },
     {
       "op": "format",

@@ -2816,7 +2816,7 @@ describe("step 2: person-scoped remember and provenance (via the real remember p
     expect(rows[0]!.person).toBe(actor.id);
   });
 
-  test("a non-first-person statement still writes household scope, unchanged", async () => {
+  test("a non-first-person statement writes person scope", async () => {
     const { actor } = await owner();
     const result = await runTurnNext(actor, "chat", "remember that Friday is pizza night");
     expect(result.ok).toBe(true);
@@ -2824,8 +2824,8 @@ describe("step 2: person-scoped remember and provenance (via the real remember p
 
     const rows = db.select().from(memoryRecords).where(eq(memoryRecords.text, "Friday is pizza night")).all();
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.scope).toBe("household");
-    expect(rows[0]!.person).toBeNull();
+    expect(rows[0]!.scope).toBe("person");
+    expect(rows[0]!.person).toBe(actor.id);
   });
 
   test("provenance: the written record's source is the exact conversation_turns id logged for this same turn", async () => {

@@ -109,12 +109,12 @@ describe("packageHost memory.remember", () => {
   test("writes through to the real memory store when permitted", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
-    const id = host.memory.remember("the wifi password is on the fridge", "fact", "household");
+    const id = host.memory.remember("I like green tea", "fact", "person");
     await __drainBackgroundWorkForTests();
     expect(typeof id).toBe("string");
 
-    const listed = await createHost(actor, manifest({ permissions: ["memory:read"] })).memory.recall("wifi password");
-    expect(listed.some((r) => r.text.includes("wifi password"))).toBe(true);
+    const listed = await createHost(actor, manifest({ permissions: ["memory:read"] })).memory.recall("green tea");
+    expect(listed.some((r) => r.text.includes("green tea"))).toBe(true);
   });
 
   test("throws permission_denied when the manifest didn't declare memory:write", async () => {
@@ -129,45 +129,38 @@ describe("packageHost memory.remember", () => {
     }
   });
 
-  // Step 2: when a recipe step leaves `scope` unset (backend/packages/
-  // remember/recipe.json now does), the host auto-detects first-person
-  // scope instead of always defaulting to household.
-  test("no scope given, first-person text: writes scope person attributed to the actor", async () => {
+  test("remember writes person scope for the actor even without first-person wording", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
-    const id = host.memory.remember("I'm allergic to peanuts", "fact");
+    const id = host.memory.remember("Friday is pizza night", "fact");
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
     expect(row.scope).toBe("person");
     expect(row.person).toBe(actor.id);
   });
 
-  // A code review (2026-09-05) found the plain word-boundary check
-  // misattributed a THIRD PARTY's fact to the speaker's own private
-  // scope: "my sister's allergy" contains "my", so it wrote person scope
-  // for the actor, filing the sister's allergy as the parent's own secret.
-  test("a third party's possessive ('my <noun>'s ...') does not trigger first-person scope on its own", async () => {
+  test("an adult household write is refused until its confirmation card exists", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
-    const id = host.memory.remember("my sister's allergy is peanuts", "fact");
-    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
-    expect(row.scope).toBe("household");
+    expect(() => host.memory.remember("Friday is pizza night", "fact", "household")).toThrow(/confirmation card/);
+    expect(db.select().from(memoryRecords).all()).toHaveLength(0);
   });
 
-  test("no scope given, no first-person marker: still defaults to household, unchanged", async () => {
-    const actor = await owner();
-    const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
-    const id = host.memory.remember("Friday is pizza night", "fact");
-    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
-    expect(row.scope).toBe("household");
-    expect(row.person).toBeNull();
+  test("a child's household write is refused for the unavailable adult review queue", async () => {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const childId = ((await created.json()) as { id: string }).id;
+    const child = db.select().from(people).where(eq(people.id, childId)).get()!;
+    const host = createHost(child, manifest({ permissions: ["memory:write"] }));
+    expect(() => host.memory.remember("Friday is pizza night", "fact", "household")).toThrow(/adult review queue is not available yet/);
+    expect(db.select().from(memoryRecords).all()).toHaveLength(0);
   });
 
-  test("an explicit scope from the recipe step always wins over auto-detection", async () => {
+  test("a 501-character remembered text is refused with a reason", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
-    const id = host.memory.remember("I'm allergic to peanuts", "fact", "household");
-    const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
-    expect(row.scope).toBe("household");
+    expect(() => host.memory.remember("x".repeat(501), "fact")).toThrow(/500 characters or fewer/);
+    expect(db.select().from(memoryRecords).all()).toHaveLength(0);
   });
 
   // Step 2 provenance: source is the turn id when createHost() was given
@@ -176,7 +169,7 @@ describe("packageHost memory.remember", () => {
   test("with a turnId, source is the turn id, not the package id", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["memory:write"] }), [], { id: "turn-faketest01" });
-    const id = host.memory.remember("the calendar rule about pizza night", "fact", "household");
+    const id = host.memory.remember("the calendar rule about pizza night", "fact", "person");
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
     expect(row.source).toBe("turn-faketest01");
   });
@@ -184,7 +177,7 @@ describe("packageHost memory.remember", () => {
   test("with no turnId, source falls back to the package id, unchanged", async () => {
     const actor = await owner();
     const host = createHost(actor, manifest({ permissions: ["memory:write"] }));
-    const id = host.memory.remember("the calendar rule about pizza night", "fact", "household");
+    const id = host.memory.remember("the calendar rule about pizza night", "fact", "person");
     const row = db.select().from(memoryRecords).where(eq(memoryRecords.id, id)).get()!;
     expect(row.source).toBe("package:test-pkg");
   });

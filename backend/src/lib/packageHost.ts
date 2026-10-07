@@ -76,6 +76,7 @@ import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
+import { CREDENTIAL_SAFE_MESSAGE, detectCredential } from "@/lib/memoryContentPolicy";
 import { hostedSearch } from "@/lib/hostedSearch";
 import { resolveSafeSearchLevel, safeSearchNumericLevel, type SafeSearchLevel } from "@/lib/safeSearch";
 import { getPersonSettingValue } from "@/lib/settings";
@@ -1703,36 +1704,9 @@ export async function homeCallService(domain: string, service: string, target: u
   await callHomeAssistantService(baseUrl, accessToken, domain, service, target, data);
 }
 
-// First-person scope detection for Host.memory.remember (step 2). A
-// leading "I"/"my"/"me"/"mine" is enough of a signal for a package like
-// `remember` whose whole job is transcribing what the speaker just said
-// about themself - deliberately simple, matched on the whole captured
-// utterance the same way `remember`'s own routing.patterns capture it
-// (word-boundary so "my" doesn't fire on "army", and "\bi\b" alone also
-// matches the leading "i" in "i'm"/"i've"/"i'll"/"i'd" since the
-// apostrophe is itself a word-boundary character).
-//
-// A code review (2026-09-05) found the plain version misattributed a
-// THIRD PARTY's fact to the speaker's own private scope: "remember my
-// sister's allergy is peanuts" contains "my", so it wrote scope person,
-// person actor.id - the sister's allergy, filed as the parent's own
-// secret, and (combined with the retired turn engine's selfOnly recall) invisible
-// to everyone else including the sister. `my <word>'s` names someone
-// ELSE's thing, not the speaker's own, so it's stripped before the
-// first-person check runs; a bare "i"/"me"/"mine" elsewhere still
-// counts, which doesn't fully resolve every case ("my son's teacher
-// emailed me" still has a standalone "me") - fully resolving possessives
-// from the speaker's own point of view needs real language
-// understanding, exactly what step 6's real judge is for
-// ("possessives resolved from the speaker's view... never 'likely your
-// daughter'"). This deterministic floor only ever closes the clearest,
-// most common failure shape a household member's own phrasing produces.
-const THIRD_PARTY_POSSESSIVE = /\bmy\s+\S+'s\b/gi;
-const FIRST_PERSON_PATTERN = /\b(i|my|mine|me)\b/i;
-
-function isFirstPersonStatement(text: string): boolean {
-  return FIRST_PERSON_PATTERN.test(text.replace(THIRD_PARTY_POSSESSIVE, ""));
-}
+const REMEMBER_TEXT_MAX_CHARS = 500;
+const HOUSEHOLD_REMEMBER_MINOR_REFUSAL = "A household memory needs an adult's review. The adult review queue is not available yet, so nothing was saved.";
+const HOUSEHOLD_REMEMBER_ADULT_REFUSAL = "A household memory needs an adult confirmation card. That card is not available yet, so nothing was saved.";
 
 function mapWriteFailure(status: number, error: string): never {
   // A permission check above only proves the manifest declared the
@@ -1915,17 +1889,28 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           .recall(actor, query, { ...listOpts, queryVector })
           .map(({ record }) => ({ id: record.id, text: record.text, category: record.category, scope: record.scope, person: record.person }));
       },
-      remember(text: string, category?: string, scope?: string, person?: string | null): string {
+      remember(text: string, category?: string, scope?: string, _person?: string | null): string {
         requirePermission("memory:write");
-        // Step 2: "the remember recipe writes scope: person and person:
-        // actor.id for first-person statements... and household
-        // otherwise." A recipe step that already declares its own scope
-        // (recall's own "recall" step, or a future package with a real
-        // reason to write household explicitly) is left alone; auto-
-        // detection only applies when the step left scope unset, which
-        // is what backend/packages/remember/recipe.json now does.
-        const resolvedScope = scope ?? (isFirstPersonStatement(text) ? "person" : "household");
-        const resolvedPerson = resolvedScope === "person" ? (person ?? actor.id) : undefined;
+        if ([...text].length > REMEMBER_TEXT_MAX_CHARS) {
+          mapWriteFailure(400, "Remembered text must be 500 characters or fewer.");
+        }
+        // Preserve the established credential refusal copy before the
+        // household-scope refusal below.
+        if (detectCredential(text).detected) mapWriteFailure(400, CREDENTIAL_SAFE_MESSAGE);
+        // Household writes need a confirmation card for adults and a
+        // review queue for minors. Neither exists yet, so nothing may be
+        // widened beyond the speaking person's own memory.
+        if (scope === "household") {
+          const reason = speakerAgeBand(actor, new Date()) === "adult"
+            ? HOUSEHOLD_REMEMBER_ADULT_REFUSAL
+            : HOUSEHOLD_REMEMBER_MINOR_REFUSAL;
+          mapWriteFailure(403, reason);
+        }
+        // The tool has one target: the speaking person's own scope. A
+        // supplied person id is ignored so recipes cannot write for a
+        // different household member.
+        const resolvedScope = "person";
+        const resolvedPerson = actor.id;
         // Provenance: the turn id when this call is happening inside a
         // turn (see createHost()'s own comment on why there's no second
         // field for the package id), package id otherwise.
