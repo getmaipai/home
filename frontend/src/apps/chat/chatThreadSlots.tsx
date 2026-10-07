@@ -29,6 +29,7 @@ import { STARTER_SUGGESTIONS } from "@/apps/chat/chatStarterSuggestions";
 import { GenerationLoader } from "@maipai/ui/src/elements/loading-state";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
+import { StoppedRun } from "@maipai/ui/src/elements/stopped-run";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
 import { ComposerModelPicker } from "@maipai/ui/src/elements/composer-model-picker.aui";
 import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
@@ -52,6 +53,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
 import { messageText } from "@/apps/chat/chatMessageText";
+import { useStoppedRun } from "@/apps/chat/chatStoppedRun";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { ChatActivityCard } from "@/apps/chat/ChatActivityCard";
@@ -779,6 +781,7 @@ export function BareModelBadge() {
 // state and rendering (or not) on its own, so this wrapper is pure
 // composition, no shared logic between them.
 export function MessageFooterExtra() {
+  const stoppedRun = useStoppedRun();
   // ELEMENTS-ADOPT-02: the kit feedback-dialog as it ships, fed by a hook.
   const feedbackForm = useReplyFeedbackForm();
   // ELEMENTS-ADOPT-02: the kit memory-chips as it ships, fed by a hook.
@@ -792,6 +795,7 @@ export function MessageFooterExtra() {
       <SourcesFooterContent />
       <MessageDetailsReveal />
       {memoryChips ? <MemoryChips {...memoryChips} /> : null}
+      {stoppedRun ? <StoppedRun {...stoppedRun} /> : null}
       {crisisSupport ? <GuardrailNotice tone="support" title={crisisSupport.title} explanation={crisisSupport.text} actions={crisisSupport.actions} alternatives={[]} /> : null}
       {feedbackForm ? <FeedbackDialog {...feedbackForm} /> : null}
     </>

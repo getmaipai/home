@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-07T08:55:04.524Z",
-  "kitTag": "ui-v0.5.160",
+  "generatedAt": "2026-10-07T09:05:20.003Z",
+  "kitTag": "ui-v0.5.161",
   "items": [
     {
       "file": "ProjectHomePageShowcase.tsx",
@@ -956,7 +956,7 @@
       "group": "errors/states",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "streaming-text.tsx",
