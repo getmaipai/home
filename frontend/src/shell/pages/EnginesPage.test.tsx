@@ -130,9 +130,40 @@ describe("EnginesPage", () => {
       expect(document.body.textContent).toContain("Critical");
       expect(document.body.textContent).not.toContain("No Stack configured");
       expect(document.body.textContent).not.toContain("Employee Data Table");
-      expect(document.querySelectorAll('[data-slot="table"]').length).toBe(3);
-      const engineRow = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((row) => row.textContent?.includes("llama.cpp server"))!;
+      expect(document.querySelectorAll('[data-slot="data-table"]').length).toBe(3);
+      const engineRow = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((row) => row.textContent?.includes("llama.cpp server"))!;
       expect(within(engineRow as HTMLElement).getByRole("button", { name: "More actions" })).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+
+  test("role sorting is page-controlled and adds no fetch", async () => {
+    const { fetchMock, restore } = mockEnginesFetch(
+      {
+        configured: true,
+        roles: [makeRole({ label: "Embedding" }), makeRole({ id: "chat", label: "Chat" })],
+        engines: [],
+        budget: null,
+      },
+      { configured: true, health: [] },
+    );
+    try {
+      const view = renderWithQueryClient(<EnginesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Embedding"));
+      const roleTable = view.container.querySelector<HTMLElement>("[aria-label='Engine roles']")!;
+      const headerRow = roleTable.querySelector<HTMLElement>("[data-slot='data-table-header-row']")!;
+      const roleHeader = within(headerRow).getByRole("columnheader", { name: "Role" });
+      expect(roleHeader.getAttribute("aria-sort")).toBe("none");
+      fireEvent.click(within(roleHeader).getByRole("button", { name: "Sort by Role" }));
+      expect(roleHeader.getAttribute("aria-sort")).toBe("ascending");
+      const bodyRows = Array.from(roleTable.querySelectorAll("[data-slot='data-table-body'] [data-slot='data-table-row']"));
+      expect(bodyRows[0]?.textContent).toContain("Chat");
+      const overviewReads = fetchMock.mock.calls.filter(([input]) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+        return url.endsWith("/api/engines");
+      });
+      expect(overviewReads).toHaveLength(1);
     } finally {
       restore();
     }
@@ -196,7 +227,7 @@ describe("EnginesPage", () => {
       renderWithQueryClient(<EnginesPage person={makePerson({ role: "adult" })} />);
       await waitFor(() => expect(document.body.textContent).toContain("Only an owner or admin can manage engines."));
       expect(fetchMock).not.toHaveBeenCalled();
-      expect(document.body.querySelector('[data-slot="table"]')).toBeNull();
+      expect(document.body.querySelector('[data-slot="data-table"]')).toBeNull();
     } finally {
       restore();
     }
@@ -217,7 +248,7 @@ describe("EnginesPage", () => {
       await waitFor(() => expect(document.body.textContent).toContain("Install display label"));
 
       async function openActions(label: string) {
-        const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((candidate) => candidate.textContent?.includes(label))!;
+        const row = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((candidate) => candidate.textContent?.includes(label))!;
         fireEvent.click(within(row as HTMLElement).getByRole("button", { name: "More actions" }));
       }
       async function performAction(label: string, actionLabel: string, name: string, action: string) {

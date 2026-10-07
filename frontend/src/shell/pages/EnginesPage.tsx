@@ -1,39 +1,27 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
-import { DataTable } from "@/shell/components/DataTable";
+import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError, isOwnerOrAdminRole, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
+import { useDataTableControls } from "@/shell/pages/dataTableControls";
 
-/** /engines: SHELL-06's own row (docs/plans/shell-on-shadcndashboard-
- * 2026-09-21.md's plan row) - `GET /api/engines` and `GET /api/engines/
- * health` (HOME-STACK-04a, owner/admin only), the first frontend this
- * API has ever had: `docs/BACKLOG.md`'s own "Old file it retires: none
- * (new)" for this row, and a grep of the whole frontend for `/api/
- * engines` before writing this file came back empty. Three real
- * tables through Home's shared read-only table: roles by address (`endpoints`), engine
- * state, and Stack health severities - the exact three things this
- * row asks for, nothing invented.
- *
- * The honest empty state, not an error: `routes/engines.ts`'s own
- * `overview`/`health` handlers now check `isStackConfigured()` before
- * ever calling the Stack, returning `configured: false` with empty/
- * null fields (200, never a 503) when no Stack is set up - the same
- * "null is the real answer, not a fabricated one" posture `dashboard.
- * ts`'s own `engineStatusCounts()` already takes, extended here since
- * neither route drew that distinction before this row needed it
- * (found landing this row, 2026-09-21: a household with no Stack
- * configured - Jesse's own - hit the Stack-unreachable branch and read
- * as a real error, not the calm, ordinary state it actually is). */
-// Exported: CHAT-HEADER-02's own pageHeaderTitle.tsx imports this
-// directly for the header's left slot rather than re-declaring the
-// icon name a second time - one definition, this page's own.
+/** /engines: SHELL-06's own row - `GET /api/engines` and
+ * `GET /api/engines/health`, through the kit DataTable and its slots. */
 export const EnginesIcon = getIcon("cpu");
 const RolesIcon = getIcon("server");
 const HealthIcon = getIcon("activity");
+const MoreHorizontal = getIcon("more-horizontal");
 
 const ROLE_STATE_LABEL: Record<StackRoleInfo["state"]["state"], string> = {
   notInstalled: "Not installed",
@@ -49,6 +37,13 @@ interface RoleRow extends Record<string, unknown> {
   model: string;
   address: string;
 }
+
+const ROLE_COLUMNS: readonly DataTableColumn<RoleRow>[] = [
+  { id: "role", header: "Role" },
+  { id: "status", header: "Status", minWidth: 128 },
+  { id: "model", header: "Model", minWidth: 200 },
+  { id: "address", header: "Address", minWidth: 240 },
+];
 
 function toRoleRow(role: StackRoleInfo): RoleRow {
   return {
@@ -66,15 +61,16 @@ interface EngineRow extends Record<string, unknown> {
   name: string;
 }
 
+const ENGINE_COLUMNS: readonly DataTableColumn<EngineRow>[] = [
+  { id: "engine", header: "Engine" },
+  { id: "version", header: "Version", minWidth: 120 },
+  { id: "status", header: "Status", minWidth: 160 },
+];
+
 function toEngineRow(engine: StackEngineInfo): EngineRow {
   const row = {
     engine: engine.label,
     version: engine.currentTag ?? "-",
-    // `needsRestart` is its own real field, not derived from
-    // `stateReason` (a review caught a first draft string-matching
-    // stateReason === "newer installed" instead - the two can disagree
-    // during a transition, and a future third reason string would have
-    // silently fallen through to "Update available").
     status: engine.needsRestart ? "Needs restart" : engine.state === "current" ? "Current" : "Update available",
   };
   Object.defineProperty(row, "name", { value: engine.name });
@@ -87,6 +83,12 @@ interface HealthRow extends Record<string, unknown> {
   since: string;
 }
 
+const HEALTH_COLUMNS: readonly DataTableColumn<HealthRow>[] = [
+  { id: "item", header: "Issue" },
+  { id: "status", header: "Severity", minWidth: 128 },
+  { id: "since", header: "Since", minWidth: 176 },
+];
+
 function toHealthRow(item: StackHealthItem): HealthRow {
   return { item: item.title, status: item.severity.charAt(0).toUpperCase() + item.severity.slice(1), since: new Date(item.since).toLocaleString() };
 }
@@ -98,6 +100,12 @@ export function EnginesPage({ person }: { person: Roster }) {
   const healthQuery = useQuery<EnginesHealth>({ queryKey: ["engines-health"], queryFn: () => api.enginesHealth(), enabled: canManage });
   const queryClient = useQueryClient();
   const [busyNames, setBusyNames] = useState<ReadonlySet<string>>(new Set());
+  const roles = useMemo(() => overviewQuery.data?.roles.map(toRoleRow) ?? [], [overviewQuery.data]);
+  const engines = useMemo(() => overviewQuery.data?.engines.map(toEngineRow) ?? [], [overviewQuery.data]);
+  const health = useMemo(() => healthQuery.data?.health.map(toHealthRow) ?? [], [healthQuery.data]);
+  const rolesTable = useDataTableControls(roles, ROLE_COLUMNS);
+  const enginesTable = useDataTableControls(engines, ENGINE_COLUMNS);
+  const healthTable = useDataTableControls(health, HEALTH_COLUMNS);
 
   async function runAction(name: string, action: "start" | "stop" | "restart" | "install") {
     setBusyNames((previous) => new Set(previous).add(name));
@@ -123,7 +131,7 @@ export function EnginesPage({ person }: { person: Roster }) {
   const firstError = overviewQuery.error ?? healthQuery.error;
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       <CardHeader className="p-0">
         <CardTitle className="flex items-center gap-2">
           <EnginesIcon size={16} className="text-muted-foreground" />
@@ -148,7 +156,7 @@ export function EnginesPage({ person }: { person: Roster }) {
         errorMessage={firstError instanceof ApiError ? firstError.message : "Could not load engines."}
         loadingLabel="Loading engines"
       >
-        {({ overview, health }: { overview: EnginesOverview; health: EnginesHealth }) =>
+        {({ overview }: { overview: EnginesOverview; health: EnginesHealth }) =>
           !overview.configured ? (
             <Card>
               <CardContent className="flex items-center gap-3 p-6">
@@ -163,54 +171,92 @@ export function EnginesPage({ person }: { person: Roster }) {
             </Card>
           ) : (
             <>
-              <div className="flex flex-col gap-4">
+              <section className="mb-4 flex flex-col gap-4" aria-labelledby="engine-roles-heading">
                 <CardHeader className="p-0">
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle id="engine-roles-heading" className="flex items-center gap-2">
                     <RolesIcon size={16} className="text-muted-foreground" />
                     Roles
                   </CardTitle>
                 </CardHeader>
-                <DataTable data={overview.roles.map(toRoleRow)} />
-              </div>
+                <DataTable
+                  rows={rolesTable.rows}
+                  columns={rolesTable.columns}
+                  caption="Engine roles"
+                  sort={rolesTable.sort}
+                  onSortChange={rolesTable.onSortChange}
+                  toolbar={rolesTable.toolbar}
+                  emptyLabel={rolesTable.emptyLabel}
+                />
+              </section>
 
-              <div className="flex flex-col gap-4">
+              <section className="mb-4 flex flex-col gap-4" aria-labelledby="installed-engines-heading">
                 <CardHeader className="p-0">
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle id="installed-engines-heading" className="flex items-center gap-2">
                     <EnginesIcon size={16} className="text-muted-foreground" />
                     Installed engines
                   </CardTitle>
                 </CardHeader>
                 <DataTable
-                  data={overview.engines.map(toEngineRow)}
-                  rowKey={(row) => row.name}
+                  rows={enginesTable.rows}
+                  columns={enginesTable.columns}
+                  getRowId={(row) => row.name}
+                  caption="Installed engines"
+                  sort={enginesTable.sort}
+                  onSortChange={enginesTable.onSortChange}
+                  toolbar={enginesTable.toolbar}
+                  emptyLabel={enginesTable.emptyLabel}
+                  rowActionsLabel="Engine actions"
                   rowActions={(row) => {
                     const engine = overview.engines.find((candidate) => candidate.name === row.name);
-                    if (!engine) return [];
+                    if (!engine) return null;
                     const busy = busyNames.has(engine.name);
                     const actions = engine.installed
                       ? [
-                          ...(engine.running === null ? [{ label: "Start", onClick: () => runAction(engine.name, "start"), disabled: busy }] : [{ label: "Stop", onClick: () => runAction(engine.name, "stop"), disabled: busy }]),
-                          { label: "Restart", onClick: () => runAction(engine.name, "restart"), disabled: busy },
+                          ...(engine.running === null ? [{ label: "Start", action: "start" as const }] : [{ label: "Stop", action: "stop" as const }]),
+                          { label: "Restart", action: "restart" as const },
                         ]
-                      : [{ label: "Install", onClick: () => runAction(engine.name, "install"), disabled: busy }];
-                    return actions;
+                      : [{ label: "Install", action: "install" as const }];
+                    return (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger render={
+                          <Button type="button" variant="ghost" size="icon-lg" aria-label="More actions">
+                            <MoreHorizontal aria-hidden="true" size={16} />
+                          </Button>
+                        } />
+                        <DropdownMenuContent align="end">
+                          {actions.map(({ label, action }) => (
+                            <DropdownMenuItem key={label} disabled={busy} onClick={() => void runAction(engine.name, action)}>
+                              {label}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    );
                   }}
                 />
-              </div>
+              </section>
 
-              <div className="flex flex-col gap-4">
+              <section className="flex flex-col gap-4" aria-labelledby="engine-health-heading">
                 <CardHeader className="p-0">
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle id="engine-health-heading" className="flex items-center gap-2">
                     <HealthIcon size={16} className="text-muted-foreground" />
                     Health
                   </CardTitle>
                 </CardHeader>
-                <DataTable data={health.health.map(toHealthRow)} />
-              </div>
+                <DataTable
+                  rows={healthTable.rows}
+                  columns={healthTable.columns}
+                  caption="Engine health"
+                  sort={healthTable.sort}
+                  onSortChange={healthTable.onSortChange}
+                  toolbar={healthTable.toolbar}
+                  emptyLabel={healthTable.emptyLabel}
+                />
+              </section>
             </>
           )
         }
       </AsyncState>}
-    </div>
+    </>
   );
 }

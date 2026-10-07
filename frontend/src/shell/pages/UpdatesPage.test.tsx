@@ -91,7 +91,7 @@ describe("UpdatesPage", () => {
       await waitFor(() => expect(document.body.textContent).toContain("MaiPai Home"));
       expect(document.body.textContent).toContain("0.2.0");
       expect(document.body.textContent).toContain("Up to date");
-      const homeRow = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((row) => row.textContent?.includes("MaiPai Home"))!;
+      const homeRow = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((row) => row.textContent?.includes("MaiPai Home"))!;
       expect(within(homeRow as HTMLElement).queryByRole("button", { name: "More actions" })).toBeNull();
     } finally {
       restore();
@@ -104,8 +104,33 @@ describe("UpdatesPage", () => {
       renderWithQueryClient(<UpdatesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("llama-server"));
       expect(document.body.textContent).toContain("Update available");
-      const engineRow = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((row) => row.textContent?.includes("llama-server"))!;
+      const engineRow = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((row) => row.textContent?.includes("llama-server"))!;
       expect(within(engineRow as HTMLElement).getByRole("button", { name: "More actions" })).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+
+  test("updates sorting is controlled by the page and does not fetch again", async () => {
+    const { fetchMock, restore } = mockUpdatesFetch(stackUpdateProjection());
+    try {
+      const view = renderWithQueryClient(<UpdatesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("llama-server"));
+      const headerRow = view.container.querySelector<HTMLElement>("[data-slot='data-table-header-row']")!;
+      const nameHeader = within(headerRow).getByRole("columnheader", { name: "Name" });
+      expect(nameHeader.getAttribute("aria-sort")).toBe("none");
+      fireEvent.click(within(nameHeader).getByRole("button", { name: "Sort by Name" }));
+      expect(nameHeader.getAttribute("aria-sort")).toBe("ascending");
+      const bodyRows = Array.from(view.container.querySelectorAll("[data-slot='data-table-body'] [data-slot='data-table-row']"));
+      expect(bodyRows[0]?.textContent).toContain("llama-server");
+      expect(fetchMock.mock.calls.filter(([input]) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+        return url.endsWith("/api/updates");
+      })).toHaveLength(1);
+      expect(view.getByRole("searchbox", { name: "Search table rows" })).toBeTruthy();
+      expect(view.getByRole("button", { name: "Download table as CSV" })).toBeTruthy();
+      expect(view.getByRole("button", { name: "Next" })).toBeTruthy();
+      expect(view.getByRole("combobox", { name: "Rows per page" })).toBeTruthy();
     } finally {
       restore();
     }
@@ -128,7 +153,7 @@ describe("UpdatesPage", () => {
     try {
       renderWithQueryClient(<UpdatesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Riff"));
-      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((candidate) => candidate.textContent?.includes("Riff"))! as HTMLElement;
+      const row = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((candidate) => candidate.textContent?.includes("Riff"))! as HTMLElement;
       expect(row.textContent).toContain("0.1.0");
       expect(row.textContent).toContain("v0.2.0");
       expect(row.textContent).toContain("body software 1.4.2");
@@ -145,7 +170,7 @@ describe("UpdatesPage", () => {
     try {
       renderWithQueryClient(<UpdatesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Riff"));
-      const row = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((candidate) => candidate.textContent?.includes("Riff"))! as HTMLElement;
+      const row = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((candidate) => candidate.textContent?.includes("Riff"))! as HTMLElement;
       expect(row.textContent).toContain("Unknown");
       expect(row.textContent).not.toContain("Update available");
     } finally {
@@ -198,7 +223,7 @@ describe("UpdatesPage", () => {
     try {
       const view = renderWithQueryClient(<UpdatesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("llama-server"));
-      const engineRow = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((row) => row.textContent?.includes("llama-server"))!;
+      const engineRow = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((row) => row.textContent?.includes("llama-server"))!;
       fireEvent.click(within(engineRow as HTMLElement).getByRole("button", { name: "More actions" }));
       fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Apply" }));
 
@@ -221,12 +246,12 @@ describe("UpdatesPage", () => {
     try {
       renderWithQueryClient(<UpdatesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("llama-server"));
-      let engineRow = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((row) => row.textContent?.includes("llama-server"))!;
+      let engineRow = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((row) => row.textContent?.includes("llama-server"))!;
       fireEvent.click(within(engineRow as HTMLElement).getByRole("button", { name: "More actions" }));
       fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Apply" }));
       await waitFor(() => expect(document.body.textContent).toContain("Go back"));
 
-      engineRow = Array.from(document.querySelectorAll('[data-slot="table-row"]')).find((row) => row.textContent?.includes("llama-server"))!;
+      engineRow = Array.from(document.querySelectorAll('[data-slot="data-table-row"]')).find((row) => row.textContent?.includes("llama-server"))!;
       fireEvent.click(within(engineRow as HTMLElement).getByRole("button", { name: "More actions" }));
       fireEvent.click(await within(document.body).findByRole("menuitem", { name: "Go back" }));
       expect(await within(document.body).findByRole("alertdialog")).toBeTruthy();

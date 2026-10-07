@@ -1,6 +1,23 @@
 {
   "items": [
     {
+      "file": "DataTableMinWidthShowcase.tsx",
+      "name": "DataTableMinWidthShowcase",
+      "group": "data-table",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Developer-only story fixture for ELT-T1-13b, covered by the Commons data-table prop test; not a standalone Home product surface."
+    },
+    {
       "file": "ProjectHomePageShowcase.tsx",
       "name": "ProjectHomePageShowcase",
       "group": "project",
@@ -767,7 +784,7 @@
       "file": "data-table.tsx",
       "name": "data-table",
       "group": "charts/data",
-      "verdict": "wire-after",
+      "verdict": "wire-now",
       "backendNeeded": "none for markdown; StructuredPart kind \"table\" only if a package returns rows",
       "effort": "MEDIUM",
       "specTagNeeded": false,
@@ -781,7 +798,7 @@
       "batch": 5,
       "replacesHandBuilt": [],
       "realTurnToday": true,
-      "verdictReason": "Deferred until none for markdown; StructuredPart kind \"table\" only if a package returns rows."
+      "verdictReason": "Selected for ELT-T1-13b: UpdatesPage and EnginesPage render the kit DataTable with their route data, controlled sorting, and page-owned toolbar controls."
     },
     {
       "file": "day-separator.test.tsx",

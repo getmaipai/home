@@ -8072,13 +8072,9 @@ async function captureShell09DocsMatrixReview(browser: Browser, sessionValue: st
   console.log("completed SHELL-09 Phase 5 docs screenshot matrix");
 }
 
-/** SHELL-06's own acceptance ("1440 and 390... captures"): both
- * viewports, both themes, of `/engines`. This seeded demo
- * household has no Stack configured (the same state the acceptance
- * asks to prove is honest, not an error), so the real, expected
- * capture is the calm "No Stack configured" empty state - waited on
- * directly, since a configured-Stack row table has nothing to seed a
- * fake one from here. */
+/** ELT-T1-13b's responsive review: synthetic browser-only rows make the
+ * 1440 captures exercise the table and the 390 captures exercise the
+ * kit's card view, without changing household data or adding API calls. */
 async function captureNextEnginesReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -8087,11 +8083,38 @@ async function captureNextEnginesReview(browser: Browser, sessionValue: string):
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     for (const theme of THEMES) {
-      const context = await newContext(browser, viewport, theme, sessionValue);
+        const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
+        await page.route("**/api/engines**", async (route) => {
+          const pathname = new URL(route.request().url()).pathname;
+          if (pathname.endsWith("/health")) {
+            await route.fulfill({ json: {
+              configured: true,
+              health: [
+                { code: "engine.crashed.chat", severity: "warning", title: "Chat engine restarting", text: "The engine is coming back online.", since: "2026-10-06T10:30:00.000Z", cause: "Planned update" },
+                { code: "engine.memory.pressure", severity: "info", title: "Memory use is high", text: "A model is using most available memory.", since: "2026-10-06T10:10:00.000Z", cause: "Model loaded" },
+              ],
+            } });
+            return;
+          }
+          await route.fulfill({ json: {
+            configured: true,
+            roles: [
+              { id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: ["/v1/chat/completions"], quality: ["everyday"], sharesModelWith: null, state: { state: "ready", since: "2026-10-06T09:00:00.000Z" }, reason: null, model: { id: "qwen3-8b-instruct", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true } },
+              { id: "embed", label: "Embeddings", wire: "openai", residency: "resident", endpoints: ["/v1/embeddings"], quality: ["search"], sharesModelWith: null, state: { state: "installed", since: "2026-10-06T09:00:00.000Z" }, reason: null, model: { id: "bge-small-en-v1.5", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: null, estimated: true } },
+            ],
+            engines: [
+              { id: "llama-server", name: "llama-server", label: "llama.cpp server", platform: "darwin", arch: "arm64", verified: true, installed: true, matchesThisMachine: true, running: "1234", currentTag: "b10797", newestTag: "b10797", current: true, notCurrent: false, needsRestart: false, state: "current", stateReason: null, directory: "/synthetic/llama-server", roleState: "ready", roleReason: null },
+              { id: "whisper", name: "whisper", label: "Whisper speech engine", platform: "darwin", arch: "arm64", verified: true, installed: true, matchesThisMachine: true, running: null, currentTag: "v1.8.0", newestTag: "v1.8.2", current: false, notCurrent: true, needsRestart: false, state: "update available", stateReason: null, directory: "/synthetic/whisper", roleState: "installed", roleReason: null },
+              { id: "piper", name: "piper", label: "Piper voice engine", platform: "darwin", arch: "arm64", verified: true, installed: false, matchesThisMachine: true, running: null, currentTag: null, newestTag: "v1.4.0", current: false, notCurrent: true, needsRestart: false, state: "not installed", stateReason: null, directory: null, roleState: "notInstalled", roleReason: null },
+            ],
+            budget: null,
+          } });
+        });
         await page.goto(`${BASE_URL}/engines`);
-        await page.locator("text=No Stack configured").first().waitFor({ timeout: 15000 });
+        const engineRows = page.locator(slug === "phone" ? "[data-slot='data-table-cards']" : "[data-slot='data-table-body']");
+        await engineRows.getByText("llama.cpp server", { exact: true }).first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Engines");
         await settleAnimations(page);
         const path = join(outDir, `next-engines-${viewport.width}-${theme}.png`);
@@ -8718,13 +8741,41 @@ async function captureNextUpdatesReview(browser: Browser, sessionValue: string):
       const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
+        await page.route("**/api/updates", (route) => route.fulfill({ json: {
+          installed: "0.3.0",
+          latest: "0.4.0",
+          summary: null,
+          url: null,
+          checkedAt: "2026-10-06T10:00:00.000Z",
+          error: null,
+          stackError: null,
+          stack: {
+            checksEnabled: true,
+            engines: [
+              { name: "llama-server", installed: "b10797", available: "b10820", availableKnown: true, lastChecked: "2026-10-06T10:00:00.000Z", notes: null },
+              { name: "whisper", installed: "v1.8.0", available: "v1.8.2", availableKnown: true, lastChecked: "2026-10-06T10:00:00.000Z", notes: null },
+            ],
+            models: { lastChecked: "2026-10-06T10:00:00.000Z", entries: [
+              { id: "qwen3-8b-instruct", installed: "4.1", available: "4.2" },
+              { id: "bge-small-en-v1.5", installed: "1.5", available: "1.5" },
+              { id: "piper-en_US", installed: "1.2", available: "1.3" },
+            ] },
+          },
+          reference: { lastChecked: "2026-10-06T10:00:00.000Z", entries: [
+            { id: "reference-demo", name: "Household reference set", installed: "2026.09", available: "2026.10", lastChecked: "2026-10-06T10:00:00.000Z", notes: null },
+          ] },
+          robots: [],
+          robotsError: null,
+          referenceError: null,
+        } }));
         await page.goto(`${BASE_URL}/updates`);
         // Not a substring match: the app's own generic boot skeleton
         // shows "Loading MaiPai Home" before anything mounts, which a
         // plain `text=MaiPai Home` locator matches too - found live,
         // the first version of this capture fired on that skeleton
         // instead of the real row.
-        await page.getByText("MaiPai Home", { exact: true }).first().waitFor({ timeout: 15000 });
+        const updateRows = page.locator(slug === "phone" ? "[data-slot='data-table-cards']" : "[data-slot='data-table-body']");
+        await updateRows.getByText("MaiPai Home", { exact: true }).first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Updates");
         await settleAnimations(page);
         const path = join(outDir, `next-updates-${viewport.width}-${theme}.png`);
@@ -9827,6 +9878,8 @@ async function main() {
 
     if (nextEnginesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview) {
       await captureNextEnginesReview(browser, sessionValue);
+      console.log("completed named review: --next-engines-review");
+      return;
     }
 
     if (nextChatToolsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
