@@ -5,6 +5,9 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Select } from "@maipai/ui/src/primitives/Select";
+import { File } from "@maipai/ui/src/elements/file";
 import { DataTable } from "@/shell/components/DataTable";
 import { api, ApiError, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
@@ -14,20 +17,10 @@ export const FilesIcon = getIcon("folder");
 const KIND_LABELS: Record<string, string> = { image: "Image", video: "Video", audio: "Audio", document: "Document", story: "Story", other: "File" };
 const kindLabel = (kind: string) => KIND_LABELS[kind] ?? KIND_LABELS.other!;
 
-function formatBytes(size: number): string {
-  if (size < 1024) return `${size} B`;
-  const units = ["KB", "MB", "GB"];
-  let value = size / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit += 1; }
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unit]}`;
-}
-
 interface FileRow extends Record<string, unknown> {
   file: string;
   owner: string;
   kind: string;
-  size: string;
   id: string;
 }
 
@@ -66,7 +59,6 @@ export function FilesPage({ person }: { person: Roster }) {
       file: row.file.media_type,
       owner: ownerLabel(row),
       kind: kindLabel(row.file.kind),
-      size: formatBytes(row.file.size),
     };
     Object.defineProperty(visible, "id", { value: row.file.id });
     return visible as FileRow;
@@ -90,58 +82,55 @@ export function FilesPage({ person }: { person: Roster }) {
 
   return (
     <div className="flex flex-col gap-4 pb-4">
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2"><FilesIcon size={16} className="text-muted-foreground" />Library</CardTitle>
+      <CardHeader>
+        <CardTitle><span className="flex items-center gap-2"><FilesIcon size={16} className="text-muted-foreground" />Library</span></CardTitle>
       </CardHeader>
       <AsyncState data={filesQuery.data} error={filesQuery.isError} isFetching={filesQuery.isFetching} onRetry={() => filesQuery.refetch()} errorMessage={filesQuery.error instanceof ApiError ? filesQuery.error.message : "Could not load your Library."} loadingLabel="Loading your files">
         {() => <>
           <Card>
-            <CardContent className="grid gap-4 p-4 sm:grid-cols-3">
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-3">
               <div className="flex flex-col gap-2">
                 <label htmlFor="library-search" className="text-sm font-medium">Search your Library</label>
-                <input id="library-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search files" className="h-12 rounded-md border border-input bg-background px-3 text-sm" />
+                <Input id="library-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search files" />
               </div>
               <div className="flex flex-col gap-2">
                 <label htmlFor="library-source" className="text-sm font-medium">Whose</label>
-                <select id="library-source" value={source} onChange={(event) => setSource(event.target.value)} className="h-12 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="all">Everyone</option><option value="mine">Mine</option><option value="shared">Shared with me</option>
-                </select>
+                <Select aria-label="Whose" value={source} onValueChange={setSource} options={["all", "mine", "shared"]} getLabel={(value) => ({ all: "Everyone", mine: "Mine", shared: "Shared with me" })[value as "all" | "mine" | "shared"] ?? value} />
               </div>
               <div className="flex flex-col gap-2">
                 <label htmlFor="library-kind" className="text-sm font-medium">Kind</label>
-                <select id="library-kind" value={kind} onChange={(event) => setKind(event.target.value)} className="h-12 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="all">All kinds</option>{Object.entries(KIND_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-                </select>
+                <Select aria-label="Kind" value={kind} onValueChange={setKind} options={["all", ...Object.keys(KIND_LABELS)]} getLabel={(value) => value === "all" ? "All kinds" : kindLabel(value)} />
+              </div>
               </div>
             </CardContent>
           </Card>
           <DataTable data={tableRows} rowKey={(row) => row.id} rowActions={(row) => [{ label: "View details", onClick: () => setSelectedId(row.id) }]} emptyMessage="Nothing here yet. Stories, pictures and documents you make in chat are kept here." />
           {tableRows.length > 0 ? (
             <Card>
-              <CardHeader className="border-b border-border"><CardTitle>File details</CardTitle></CardHeader>
-              <CardContent className="flex flex-col gap-3 p-4">
+              <CardHeader><CardTitle>File details</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-3">
                 <label htmlFor="library-file" className="text-sm font-medium">Select a file</label>
-                <select id="library-file" value={selectedId ?? "none"} onChange={(event) => setSelectedId(event.target.value === "none" ? null : event.target.value)} className="h-12 rounded-md border border-input bg-background px-3 text-sm">
-                  <option value="none">Choose a file</option>{filtered.map((row) => <option key={row.file.id} value={row.file.id}>{row.file.media_type}, {ownerLabel(row)}</option>)}
-                </select>
+                <Select aria-label="Select a file" value={selectedId ?? "none"} onValueChange={(value) => setSelectedId(value === "none" ? null : value)} options={["none", ...filtered.map((row) => row.file.id)]} getLabel={(value) => {
+                  const row = rows.find((entry) => entry.file.id === value);
+                  return value === "none" ? "Choose a file" : row ? `${row.file.media_type}, ${ownerLabel(row)}` : value;
+                }} />
                 {selected ? <>
+                  <FileDetails file={selected} ownerLabel={ownerLabel(selected)} kindLabel={kindLabel(selected.file.kind)} />
                   <dl className="grid gap-2 text-sm sm:grid-cols-2">
-                    <div><dt className="text-muted-foreground">Owner</dt><dd>{ownerLabel(selected)}</dd></div>
-                    <div><dt className="text-muted-foreground">Kind</dt><dd>{kindLabel(selected.file.kind)}</dd></div>
-                    <div><dt className="text-muted-foreground">Size</dt><dd>{formatBytes(selected.file.size)}</dd></div>
                     <div><dt className="text-muted-foreground">Retention</dt><dd>{selected.file.retention === "kept" ? "Kept until deleted" : "Follows the conversation"}</dd></div>
                   </dl>
                   {canManageSelected ? <div className="flex flex-col gap-3 border-t border-border pt-3">
                     <h2 className="text-sm font-medium">Shared with</h2>
-                    {(sharesQuery.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Not shared with anyone yet.</p> : (sharesQuery.data ?? []).map((share) => <div key={share.id} className="flex items-center justify-between gap-2"><span className="truncate text-sm">{share.to === "household" ? "The whole household" : nameFor(share.to)}</span><Button variant="outline" className="min-h-12" onClick={() => void unshare(share.id)}>Unshare</Button></div>)}
+                    {(sharesQuery.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Not shared with anyone yet.</p> : (sharesQuery.data ?? []).map((share) => <div key={share.id} className="flex items-center justify-between gap-2"><span className="truncate text-sm">{share.to === "household" ? "The whole household" : nameFor(share.to)}</span><Button variant="outline" size="row" onClick={() => void unshare(share.id)}>Unshare</Button></div>)}
                     <div className="flex flex-col gap-2 sm:flex-row">
-                      <select aria-label="Share with" value={shareTarget} onChange={(event) => setShareTarget(event.target.value)} className="h-12 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm">
-                        <option value="household">The whole household</option>{shareTargets.map((entry) => <option key={entry.id} value={entry.id}>{entry.display_name}</option>)}
-                      </select>
-                      <Button className="min-h-12" onClick={() => void shareSelected()}>Share</Button>
+                      <Select aria-label="Share with" value={shareTarget} onValueChange={setShareTarget} options={["household", ...shareTargets.map((entry) => entry.id)]} getLabel={(value) => value === "household" ? "The whole household" : shareTargets.find((entry) => entry.id === value)?.display_name ?? value} />
+                      <Button size="row" onClick={() => void shareSelected()}>Share</Button>
                     </div>
                   </div> : null}
                 </> : null}
+                </div>
               </CardContent>
             </Card>
           ) : null}
@@ -149,4 +138,19 @@ export function FilesPage({ person }: { person: Roster }) {
       </AsyncState>
     </div>
   );
+}
+
+function FileDetails({ file, ownerLabel, kindLabel }: { file: VisibleFile; ownerLabel: string; kindLabel: string }) {
+  return <>
+    <File.Root>
+      <File.Icon mimeType={file.file.media_type} />
+      <File.Name>{file.file.id}</File.Name>
+      <File.Size bytes={file.file.size} />
+      <File.Download data={new URL(api.fileContentUrl(file.file.id), window.location.origin === "null" ? "http://localhost" : window.location.origin).href} sourceType="url" mimeType={file.file.media_type} filename={file.file.id} hitArea48 />
+    </File.Root>
+    <dl className="grid gap-2 text-sm sm:grid-cols-2">
+      <div><dt className="text-muted-foreground">Owner</dt><dd>{ownerLabel}</dd></div>
+      <div><dt className="text-muted-foreground">Kind</dt><dd>{kindLabel}</dd></div>
+    </dl>
+  </>;
 }
