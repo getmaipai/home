@@ -15,7 +15,6 @@ import { MarkdownDocument } from "@/shell/pages/MarkdownDocument";
 // it ships, never a hand-built card (the kit's own `approval-card.tsx`
 // is built for a terminal command and can't be relabeled, per the org's
 // "no hand-built UI" rule).
-import { type ModelOption } from "@maipai/ui/src/elements/model-selector";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -66,9 +65,9 @@ import { CHAT_COLUMN_ID, ChatColumnToggle, ChatHistoryPanel, useChatColumn } fro
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
-import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
+import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
-import { CompareIcon, MODEL_EFFORTS, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
+import { CompareIcon, toolCallPartFromMessage } from "@/apps/chat/chatThreadSlots";
 import { discardDraft } from "@/apps/chat/draftStore";
 import { chatFoldersQueryKey } from "@/apps/chat/chatProjects";
 import { projectConversationRows, projectSourcesVisible } from "@/shell/pages/chatProjectPageModel";
@@ -213,21 +212,21 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   // VISION-02d (rule 8): what each chat model can do, from its record
   // through the backend. A model with no thinking mode offers no
   // Instant/Thinking control and its turns never ask for thinking.
-  const capabilitiesQuery = useQuery({ queryKey: CHAT_CAPABILITIES_QUERY_KEY, queryFn: async () => chatCapabilitiesFrom(await api.chatCapabilities().catch(() => undefined)) });
+  const capabilitiesQuery = useQuery({
+    queryKey: CHAT_CAPABILITIES_QUERY_KEY,
+    queryFn: async () => chatCapabilitiesFrom(await api.chatCapabilities().catch(() => undefined)),
+    staleTime: 0,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
+  });
   const chatCapabilities = capabilitiesQuery.data ?? NO_CHAT_PICTURES;
-  const modelOptions = useMemo<ModelOption[]>(() => {
-    const models = isOwnerOrAdmin
-      ? (enginesQuery.data?.configured ? chatRole?.models ?? [] : [])
-      : (chatModelsQuery.data?.models ?? []).map(({ id, label }) => ({ id, name: label }));
-    return models.map((model) => ({ ...model, efforts: modelThinks(chatCapabilities, model.id) ? MODEL_EFFORTS : undefined }));
-  }, [isOwnerOrAdmin, chatRole?.models, enginesQuery.data?.configured, chatModelsQuery.data?.models, chatCapabilities]);
+  const imagePartsAvailable = chatCapabilities.image_parts;
   // ENGINE-DOWN-UI-01: the voice service's own health row (any person), not the
   // admin-only engines overview and never the chat engine.
   const ttsAvailable = useVoiceAvailable();
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
   const pendingSpeechRef = useRef(false);
-  const selectedModelRef = useRef<string | undefined>(undefined);
   // APPROVE-CARD-01: armed by ConfirmAskAnswerProvider's own `respond`
   // callback (ConfirmToolRender's respondToApproval, via
   // ConfirmAskAnswerContext), the same single-shot shape as
@@ -269,18 +268,16 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     previousThreadIdRef.current = remoteId;
     setSearchParamsRef.current({ conversation: remoteId }, { replace: true });
   }, [setDraftConversationId]);
-  // PERSIST-CONV-01 / RESP-04: Thinking and the selected model hydrate
-  // from the active conversation settings and save when changed. Refs
-  // keep the memoized model adapter on their current values.
+  // PERSIST-CONV-01 / RESP-04: Thinking hydrates from the active
+  // conversation settings and saves when changed. The model comes from
+  // Stack and is not a chat-facing choice.
   const [thinking, setThinkingState] = useState(false);
   const thinkingRef = useRef(false);
   thinkingRef.current = thinking;
   const thinkingDirtyRef = useRef(false);
   const autoReadRepliesDirtyRef = useRef(false);
-  const selectedModelDirtyRef = useRef(false);
   const pendingNewConversationReadAloudRef = useRef<boolean | undefined>(undefined);
   const pendingNewConversationThinkingRef = useRef<boolean | undefined>(undefined);
-  const pendingNewConversationModelRef = useRef<string | undefined>(undefined);
   const settingsWriteRef = useRef<Promise<void>>(Promise.resolve());
   const queueReadAloudWrite = useCallback((conversationId: string, value: boolean) => {
     settingsWriteRef.current = settingsWriteRef.current
@@ -333,30 +330,6 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
         }
       });
   }, [applyConversationThinking]);
-  const [selectedModel, setSelectedModelState] = useState<string | undefined>();
-  const applySelectedModel = useCallback((value: string | undefined) => {
-    selectedModelRef.current = value;
-    setSelectedModelState(value);
-  }, []);
-  const setSelectedModel = useCallback((value: string) => {
-    selectedModelDirtyRef.current = true;
-    applySelectedModel(value);
-    const conversationId = visibleConversationIdRef.current;
-    if (!conversationId) {
-      pendingNewConversationModelRef.current = value;
-      return;
-    }
-    pendingNewConversationModelRef.current = undefined;
-    settingsWriteRef.current = settingsWriteRef.current
-      .catch(() => {})
-      .then(async () => {
-        try {
-          await api.setConversationSettings(conversationId, { model: value });
-        } catch {
-          toast.error("Could not save this chat's settings. Try again.");
-        }
-      });
-  }, [applySelectedModel]);
   const onConversationSettingsLoaded = useCallback((conversationId: string, settings: Conversation["settings"]) => {
     if (visibleConversationIdRef.current !== conversationId) {
       if (visibleConversationIdRef.current === undefined) {
@@ -366,30 +339,20 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     }
     if (!thinkingDirtyRef.current) applyConversationThinking(settings?.thinking ?? false);
     if (!autoReadRepliesDirtyRef.current) applyAutoReadReplies(settings?.read_aloud ?? false);
-    if (!selectedModelDirtyRef.current) applySelectedModel(settings?.model);
-  }, [applyAutoReadReplies, applyConversationThinking, applySelectedModel]);
+  }, [applyAutoReadReplies, applyConversationThinking]);
   const hydrateConversationSettings = useCallback(async (conversationId: string) => {
     const conversation = await api.conversation(conversationId);
     onConversationSettingsLoaded(conversationId, conversation.settings);
     return conversation;
   }, [onConversationSettingsLoaded]);
   const currentModelId = isOwnerOrAdmin ? chatRole?.model?.id : chatModelsQuery.data?.selectedModel?.id;
-  const selectedModelValue = modelOptions.length >= 1
-    ? (modelOptions.some((model) => model.id === selectedModel) ? selectedModel : modelOptions.some((model) => model.id === currentModelId) ? currentModelId : modelOptions[0]?.id)
-    : undefined;
-  const modelPickerAllowed = thinkingAllowed && modelOptions.length >= 2 && (isOwnerOrAdmin ? enginesQuery.data?.configured === true : chatModelsQuery.data?.canSelect === true);
-  const activeModelId = selectedModelValue ?? currentModelId;
+  const activeModelId = currentModelId;
   const thinkingModeCapability = activeModelId
     ? chatCapabilities.thinking_modes[activeModelId] ?? chatCapabilities.thinking
     : chatCapabilities.thinking;
   const thinkingModeVisible = isAdultBand && activeModelId !== undefined;
-  selectedModelRef.current = modelPickerAllowed ? selectedModelValue : undefined;
-  // The model this person's next turn runs on: the picked one, or the
-  // household's current one.
   const currentModelThinksRef = useRef(true);
-  currentModelThinksRef.current = modelThinks(chatCapabilities, selectedModelRef.current ?? activeModelId);
-  const modelPickerAllowedRef = useRef(false);
-  modelPickerAllowedRef.current = modelPickerAllowed;
+  currentModelThinksRef.current = modelThinks(chatCapabilities, activeModelId);
   // ADMIN-COMPARE-01 (b): bare mode. Deliberately session-local, never
   // consumed/reset per turn the way `thinking` is - it stays on for
   // every send until the admin turns it off, or the conversation
@@ -499,21 +462,6 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
               if (pendingReadAloud) queueReadAloudWrite(remoteId, true);
             }
             if (!autoReadRepliesDirtyRef.current) applyAutoReadReplies(conversation.settings?.read_aloud ?? false);
-            const pendingModel = pendingNewConversationModelRef.current;
-            if (pendingModel !== undefined) {
-              pendingNewConversationModelRef.current = undefined;
-              selectedModelDirtyRef.current = false;
-              await settingsWriteRef.current;
-              try {
-                await api.setConversationSettings(remoteId, { model: pendingModel });
-                await settingsWriteRef.current;
-                applySelectedModel(pendingModel);
-              } catch {
-                toast.error("Could not save this chat's settings. Try again.");
-              }
-            } else {
-              if (!selectedModelDirtyRef.current) applySelectedModel(conversation.settings?.model);
-            }
             await settingsWriteRef.current;
             return remoteId;
           },
@@ -526,7 +474,6 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           // current value is hydrated from the conversation settings,
           // saved by its setter, and used on every send until changed.
           getThinking: () => (thinkingAllowed && currentModelThinksRef.current ? thinkingRef.current : undefined),
-          getModel: () => (modelPickerAllowedRef.current ? selectedModelRef.current : undefined),
           getAgeBand: () => person.age_band,
           consumeSupersedes,
           consumePackageScope: () => {
@@ -694,17 +641,14 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
         thinkingDirtyRef.current = false;
         pendingNewConversationThinkingRef.current = undefined;
         autoReadRepliesDirtyRef.current = false;
-        selectedModelDirtyRef.current = false;
         pendingNewConversationReadAloudRef.current = undefined;
-        pendingNewConversationModelRef.current = undefined;
         applyAutoReadReplies(false);
-        applySelectedModel(undefined);
       }
       if (id) void hydrateConversationSettings(id).catch(() => {});
     },
   });
 
-  return { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingAllowed, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1198,7 +1142,7 @@ export function ChatPage({ person }: { person: Roster }) {
   // inside useChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, photoUploadsEnabled, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, modelOptions, selectedModelValue, setSelectedModel, modelPickerAllowed, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useChatRuntime(person, () => {
+  const { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1228,7 +1172,6 @@ export function ChatPage({ person }: { person: Roster }) {
     }),
     [thinking, setThinking],
   );
-  const modelPickerValue = useMemo(() => ({ models: modelOptions, value: selectedModelValue, setValue: setSelectedModel }), [modelOptions, selectedModelValue, setSelectedModel]);
   const bareModeValue = useMemo(() => ({ on: bareMode, toggle: () => setBareMode((value) => !value) }), [bareMode, setBareMode]);
   const packageScopeValue = useMemo(() => ({ scope: packageScope, setScope: setPackageScope }), [packageScope, setPackageScope]);
   const temporaryChatValue = useMemo(() => ({ on: temporaryNext }), [temporaryNext]);
@@ -1313,13 +1256,11 @@ export function ChatPage({ person }: { person: Roster }) {
       <DetailsOpenContext.Provider value={detailsOpenValue}>
       <ThinkingModeContext.Provider value={thinkingModeValue}>
       <ThinkingModeCapabilityContext.Provider value={thinkingModeCapability}>
-      <ModelPickerContext.Provider value={modelPickerValue}>
-      <ModelChoiceAllowedContext.Provider value={modelPickerAllowed}>
       <BareModeContext.Provider value={bareModeValue}>
       <TemporaryChatContext.Provider value={temporaryChatValue}>
       <DraftConversationContext.Provider value={draftConversationId}>
       <PackageScopeContext.Provider value={packageScopeValue}>
-      <PhotoUploadsContext.Provider value={photoUploadsEnabled}>
+      <PhotoUploadsContext.Provider value={{ settingAllowed: photoUploadsEnabled, modelCanReadPictures: imagePartsAvailable }}>
       <VoiceSessionProvider value={{ open: voiceOpen, setOpen: setVoiceOpen }}>
       <WakeWordPersonContext.Provider value={person}>
       <DictationLevelMeterProvider value={dictationLevelMeter}>
@@ -1607,8 +1548,6 @@ export function ChatPage({ person }: { person: Roster }) {
       </DraftConversationContext.Provider>
       </TemporaryChatContext.Provider>
       </BareModeContext.Provider>
-      </ModelChoiceAllowedContext.Provider>
-      </ModelPickerContext.Provider>
       </ThinkingModeCapabilityContext.Provider>
       </ThinkingModeContext.Provider>
       </DetailsOpenContext.Provider>

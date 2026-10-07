@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type SpeechSynthesisAdapter, type SuggestionAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
-import { AdminContext, ModelChoiceAllowedContext, ModelPickerContext } from "@/apps/chat/chatThreadContexts";
+import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
@@ -25,22 +25,17 @@ const MESSAGES: ThreadMessageLike[] = [
   { role: "assistant", content: [{ type: "text", text: "First answer." }], status: done, metadata: { custom: { turnId: "turn-1" } } },
   { role: "user", content: [{ type: "text", text: "Second question" }] },
 ];
-const MODELS = [{ id: "model-a", name: "Model A" }, { id: "model-b", name: "Model B" }];
 
 const speak = mock((_text: string): SpeechSynthesisAdapter.Utterance => ({ status: { type: "running" }, cancel: () => {}, subscribe: () => () => {} }));
 const suggestion: SuggestionAdapter = { generate: async function* () { yield [{ prompt: "Tell me more" }]; } };
 
-function Harness({ availability, initialMessages = MESSAGES, adapter = NOOP, models = false }: { availability: Availability; initialMessages?: ThreadMessageLike[]; adapter?: ChatModelAdapter; models?: boolean }) {
+function Harness({ availability, initialMessages = MESSAGES, adapter = NOOP }: { availability: Availability; initialMessages?: ThreadMessageLike[]; adapter?: ChatModelAdapter }) {
   const runtime = useLocalRuntime(adapter, { initialMessages, adapters: { feedback: createChatFeedbackAdapter(), speech: { speak }, suggestion } });
   harnessRuntime = runtime;
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <AdminContext.Provider value>
-        <ModelChoiceAllowedContext.Provider value={models}>
-          <ModelPickerContext.Provider value={{ models: models ? MODELS : [], value: models ? "model-a" : undefined, setValue: () => {} }}>
-            <ChatAvailabilityContext.Provider value={availability}><ChatThread /></ChatAvailabilityContext.Provider>
-          </ModelPickerContext.Provider>
-        </ModelChoiceAllowedContext.Provider>
+        <ChatAvailabilityContext.Provider value={availability}><ChatThread /></ChatAvailabilityContext.Provider>
       </AdminContext.Provider>
     </AssistantRuntimeProvider>
   );
@@ -138,14 +133,11 @@ describe("engine-dependent reply controls", () => {
     await waitFor(() => expect(isDisabled(chip()!)).toBe(true));
   });
 
-  test("branch regenerate (the regenerate-with-model trigger) is disabled while chat is paused", async () => {
-    const view = renderThread("unavailable", { models: true });
+  test("chat actions never expose a model-specific regenerate choice", async () => {
+    const view = renderThread("unavailable");
     await rows(view);
-    const trigger = view.container.querySelector<HTMLButtonElement>('[aria-label^="Regenerate with a different model"]');
-    expect(trigger).not.toBeNull();
-    expect(isDisabled(trigger!)).toBe(true);
-    view.set("ready");
-    await waitFor(() => expect(isDisabled(view.container.querySelector<HTMLButtonElement>('[aria-label^="Regenerate with a different model"]')!)).toBe(false));
+    expect(view.container.querySelector('[aria-label^="Regenerate with a different model"]')).toBeNull();
+    expect(view.queryByText("Model A")).toBeNull();
   });
 });
 

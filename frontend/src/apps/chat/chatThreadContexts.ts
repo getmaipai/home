@@ -9,7 +9,6 @@ import { createContext } from "react";
 // it ships, never a hand-built card (the kit's own `approval-card.tsx`
 // is built for a terminal command and can't be relabeled, per the org's
 // "no hand-built UI" rule).
-import { type ModelOption } from "@maipai/ui/src/elements/model-selector";
 import type { ConnectionPhase } from "@maipai/ui/src/elements/connection-state";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
@@ -116,13 +115,6 @@ export const ThinkingModeContext = createContext<{
 
 /** The active catalog model's declared thinking capability. */
 export const ThinkingModeCapabilityContext = createContext<"switchable" | "none" | "always">("none");
-
-export const ModelPickerContext = createContext<{
-  models: readonly ModelOption[];
-  value: string | undefined;
-  setValue: (model: string) => void;
-}>({ models: [], value: undefined, setValue: () => {} });
-export const ModelChoiceAllowedContext = createContext(false);
 
 /** ADMIN-COMPARE-01 (b): the compare-with-bare-model switch, a
  * conversation-wide sibling to feature (a)'s one-message

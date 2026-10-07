@@ -2714,6 +2714,32 @@ describe("ChatPage (ELT-MODE-01: catalog-backed composer mode control)", () => {
   });
 });
 
+describe("ChatPage (ELT-MODE-01: model names stay out of chat)", () => {
+  test.each(["child", "teen", "adult"] as const)("does not render model names in the composer for a %s", async (band) => {
+    const original = globalThis.fetch;
+    const names = ["Private qwen vision name", "Private qwen text name"];
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: true, roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "2026-10-07T00:00:00.000Z" }, reason: null, model: { id: "private-qwen-vision", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "private-qwen-vision", name: names[0] }, { id: "private-qwen-text", name: names[1] }], check: { state: "not checked", at: null, reason: null, stale: false } }], engines: [], budget: null }));
+      if (url.includes("/api/host/chat-models")) return Promise.resolve(Response.json({ models: [{ id: "private-qwen-vision", label: names[0] }, { id: "private-qwen-text", label: names[1] }], selectedModel: { id: "private-qwen-vision", label: names[0], available: true }, canSelect: true }));
+      if (url.includes("/api/host/chat-capabilities")) return Promise.resolve(Response.json({ image_parts: true, thinking: "switchable", thinking_modes: { "private-qwen-vision": "switchable", "private-qwen-text": "switchable" } }));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      const person = band === "adult" ? makePerson() : makePerson({ role: band, age_band: band });
+      const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={person} /></MemoryRouter>);
+      await view.findByLabelText("Message input");
+      if (band === "adult") await view.findByRole("combobox", { name: "Thinking mode" });
+      for (const name of names) expect(view.queryByText(name)).toBeNull();
+      expect(view.container.querySelector('[data-slot="composer-model-picker"]')).toBeNull();
+      expect(view.container.querySelector('[aria-label^="Regenerate with a different model"]')).toBeNull();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+});
+
 describe("ChatPage (ELT-MODE-01: the mode label sits just left of the mic)", () => {
   test("one mode selector, in the trailing group before voice and Send", async () => {
     const original = globalThis.fetch;
@@ -3137,7 +3163,7 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
     }
   });
 
-  test("saved conversation model settings select the turn model for each conversation", async () => {
+  test("saved conversation model overrides do not select the turn model", async () => {
     const original = globalThis.fetch;
     (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
     const conversations: Record<string, { id: string; settings?: { model?: string }; surface: string; status: string; title: string; person: string; mode: string; companion_id: null; pinned: boolean; source: string; hlc: string; created_at: string; updated_at: string }> = {
@@ -3184,7 +3210,9 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
       await sendMessage(first, "use fast");
       await first.findByText("Reply 1.");
       const sent = turnRequestBodies().at(-1)!;
-      expect(sent.model).toBe("fast.gguf");
+      // Composer model choice was removed for every band; historical per-chat
+      // model settings are ignored so only Settings -> Models selects it.
+      expect(sent.model).toBeUndefined();
       first.unmount();
 
       const reopened = open("conv-model-a");
@@ -3197,7 +3225,7 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
       await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
       await sendMessage(other, "use family");
       await other.findByText("Reply 2.");
-      expect(turnRequestBodies().at(-1)!.model).toBe("family.gguf");
+      expect(turnRequestBodies().at(-1)!.model).toBeUndefined();
     } finally {
       globalThis.fetch = original;
     }

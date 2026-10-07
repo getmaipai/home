@@ -31,9 +31,7 @@ import { StoppedRun } from "@maipai/ui/src/elements/stopped-run";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
 import { BackgroundInbox } from "@maipai/ui/src/elements/background-inbox";
 import { TaskCard } from "@maipai/ui/src/elements/task-card";
-import { ComposerModelPicker } from "@maipai/ui/src/elements/composer-model-picker.aui";
 import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
-import { RegenerateMenu } from "@maipai/ui/src/elements/regenerate-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -59,7 +57,7 @@ import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { useChatActivity } from "@/apps/chat/chatActivity";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
-import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
+import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
 import { TurnErrorDetails, hasErrorFacts } from "@/shell/pages/TurnErrorDetails";
 
@@ -212,30 +210,13 @@ export function ChatMessageQueue() {
 
 export const MODEL_EFFORTS = [{ id: "instant", name: "Instant" }, { id: "thinking", name: "Thinking" }] as const;
 
-/** COMPOSER-01: ChatGPT puts the model label just left of the mic, so the one
- * selector rides the trailing ComposerExtraEnd slot in front of the existing
- * trailing controls instead of the leading ComposerExtra slot beside Add. */
+/** ELT-MODE-01: the trailing composer slot contains the mode control only;
+ * model names and model choice stay out of the chat surface. */
 export function ComposerTrailingWithThinkingMode() {
   const { mode, setMode } = useContext(ThinkingModeContext);
   const capability = useContext(ThinkingModeCapabilityContext);
-  const band = useContext(ChatAgeBandContext);
-  const modelChoiceAllowed = useContext(ModelChoiceAllowedContext);
-  const { models, value, setValue } = useContext(ModelPickerContext);
-  const selected = models.find((model) => model.id === value) ?? models[0];
-  const composerModels = models.map((model) => ({ name: model.name, meta: model.description ?? model.id }));
   return (
     <>
-      {band === "adult" && modelChoiceAllowed && models.length >= 2 && selected ? (
-        <ComposerModelPicker
-          key={selected.id}
-          models={composerModels}
-          defaultModel={selected.name}
-          onChange={(name) => {
-            const choice = models.find((model) => model.name === name);
-            if (choice) setValue(choice.id);
-          }}
-        />
-      ) : null}
       {capability === "none" || capability === "always" ? (
         <ModelSelectorRoot
           models={[{ id: "mode", name: capability === "always" ? "Thinking" : "Instant" }]}
@@ -571,29 +552,7 @@ export function FailedTurnErrorDetailsAction() {
 
 /** Compose both controls in the kit's single action-bar append point. */
 export function FailedTurnActionBarExtras() {
-  const { models, value } = useContext(ModelPickerContext);
-  const aui = useAui();
-  const eligible = useContext(ModelChoiceAllowedContext);
-  const engineDown = useEngineDownReason();
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      {eligible && models.length >= 2 && value ? (
-        <RegenerateMenu
-          options={models.map((model) => ({ id: model.id, label: model.name, detail: model.description ?? model.id }))}
-          open={open}
-          currentId={value}
-          disabled={engineDown}
-          onOpenChange={setOpen}
-          onPick={(model) => {
-            setOpen(false);
-            aui.message().reload({ runConfig: { custom: { model } } });
-          }}
-        />
-      ) : null}
-      <FailedTurnErrorDetailsAction />
-    </>
-  );
+  return <FailedTurnErrorDetailsAction />;
 }
 
 export function buildTimingStats(stats: TurnStats): TimingStat[] {
