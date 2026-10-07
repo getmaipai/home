@@ -13,7 +13,8 @@ describe("chat streaming markdown", () => {
     // STREAMING-TEXT-01: the pinned kit names the Element-look keyframe; Home
     // passes no animation of its own through the markdown slot.
     expect(STREAMING_TEXT_ANIMATION).toEqual({ animation: "streamingText", duration: 500 });
-    expect(Object.keys(THREAD_SLOTS.markdown).sort()).toEqual(["components", "preprocess", "remend"]);
+    expect(Object.keys(THREAD_SLOTS.markdown).sort()).toEqual(["components", "preprocess", "remend", "trustedLinks"]);
+    expect(typeof THREAD_SLOTS.markdown.trustedLinks).toBe("function");
   });
 
   test("only a trailing partial numeric citation is held", () => {
