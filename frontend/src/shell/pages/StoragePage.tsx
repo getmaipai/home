@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
+import { QuotaBanner } from "@maipai/ui/src/elements/quota-banner";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { DataTable } from "@/shell/components/DataTable";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
@@ -28,12 +29,6 @@ function capLabel(capBytes: number): string {
   // 0 is every cap key's own "no cap enforced at this level" (usage.ts's
   // own comment) - shown as a plain fact, never a fabricated number.
   return capBytes > 0 ? formatBytes(capBytes) : "No cap set";
-}
-
-function usageLine(usageBytes: number, capBytes: number): string {
-  if (capBytes <= 0) return `${formatBytes(usageBytes)} used, no cap set`;
-  const percent = Math.round((usageBytes / capBytes) * 100);
-  return `${formatBytes(usageBytes)} of ${formatBytes(capBytes)} used (${percent}%)`;
 }
 
 function toRow(row: PersonStorageRow): PersonUsageRow {
@@ -110,13 +105,23 @@ export function StoragePage({ person }: { person: Roster }) {
               Storage
             </CardTitle>
           </CardHeader>
-          {data.household ? (
+          {data.household?.capBytes && data.household.capBytes > 0 ? (
+            <>
+              <CardTitle>Household total</CardTitle>
+              <QuotaBanner
+                used={data.household.usageBytes}
+                limit={data.household.capBytes}
+                unit="bytes"
+                formatAmount={formatBytes}
+              />
+            </>
+          ) : data.household ? (
             <Card>
               <CardHeader className="border-b border-border">
                 <CardTitle>Household total</CardTitle>
               </CardHeader>
               <CardContent className="p-5">
-                <p className="text-sm text-muted-foreground">{usageLine(data.household.usageBytes, data.household.capBytes)}</p>
+                <p className="text-sm text-muted-foreground">{formatBytes(data.household.usageBytes)} used, no cap set</p>
               </CardContent>
             </Card>
           ) : null}

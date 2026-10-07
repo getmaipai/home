@@ -8579,6 +8579,12 @@ async function captureNextPerformanceReview(browser: Browser, sessionValue: stri
 async function captureNextStorageReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
+  const cap = await fetch(`${BASE_URL}/api/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+    body: JSON.stringify({ scope: "household", key: "storage.household.cap_bytes", value: 20 * 1024 ** 3 }),
+  });
+  if (!cap.ok) throw new Error(`storage review: setting the screenshot household cap failed: ${cap.status} ${await cap.text()}`);
 
 
   for (const slug of ["desktop", "phone"] as const) {
@@ -8589,6 +8595,7 @@ async function captureNextStorageReview(browser: Browser, sessionValue: string):
         const page = await context.newPage();
         await page.goto(`${BASE_URL}/storage`);
         await page.locator("text=Household total").first().waitFor({ timeout: 15000 });
+        await page.getByRole("meter", { name: "bytes used" }).waitFor({ timeout: 15000 });
         await page.locator("text=Household storage cap").first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Storage");
         await settleAnimations(page);
@@ -9697,6 +9704,7 @@ async function main() {
 
     if (nextStorageReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview) {
       await captureNextStorageReview(browser, sessionValue);
+      return;
     }
 
     if (peopleProfileMediaReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview && !nextStorageReview) {
