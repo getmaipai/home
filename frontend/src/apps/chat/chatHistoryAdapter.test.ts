@@ -43,6 +43,14 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message).toMatchObject({ role: "assistant", content: "first reply", status: { type: "complete", reason: "stop" } });
   });
 
+  test("a sent quote reloads from its stored markdown text without rebuilding quote metadata", () => {
+    const row = { ...makeRow("row-quote", "answer"), userText: "> quoted words\n\nCan you explain?" };
+    const user = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"))[0]!.message;
+
+    expect(user.content).toBe("> quoted words\n\nCan you explain?");
+    expect(user.metadata?.custom?.quote).toBeUndefined();
+  });
+
   // SAFETY-NOTICE-01: crisis resources a reply carried stay beside it after a reload.
   test("a reply that carried crisis resources gets its support block back on reload; others get none", () => {
     const support = { title: "Support is available", text: "Call or text 988.", actions: [{ label: "Call 988", href: "tel:988" }] };

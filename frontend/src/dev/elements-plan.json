@@ -69,6 +69,20 @@
       "verdictReason": "Developer-only story fixture for K07, covered by the Commons showcase tests; not a standalone Home product surface."
     },
     {
+      "file": "ThreadSearchDensityShowcase.tsx",
+      "name": "ThreadSearchDensityShowcase",
+      "group": "thread/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for ui-v0.5.172 ThreadSearch density; not a standalone Home product surface."
+    },
+    {
+      "file": "TraceWaterfallShowcase.tsx",
+      "name": "TraceWaterfallShowcase",
+      "group": "thread/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for ELT-T1-22 TraceWaterfall contrast; not a standalone Home product surface."
+    },
+    {
       "file": "thread-list-sidebar.aui.tsx",
       "name": "thread-list-sidebar.aui",
       "group": "thread/navigation",
@@ -2111,7 +2125,7 @@
       "file": "quote.aui.tsx",
       "name": "quote.aui",
       "group": "composer",
-      "verdict": "later",
+      "verdict": "wire-now",
       "backendNeeded": null,
       "effort": null,
       "specTagNeeded": false,
@@ -2122,7 +2136,7 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null,
-      "verdictReason": "Vendored by ELT-T1-K01a; wired by an ELEMENTS-ADOPT-01 batch, not yet."
+      "verdictReason": "ELT-T1-22 wires SelectionToolbar and ComposerQuotePreview into Home's Thread and folds the selected quote into sent text."
     },
     {
       "file": "range.ts",
