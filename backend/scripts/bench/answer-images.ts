@@ -209,7 +209,7 @@ process.env.MAIPAI_EMBED_URL = standInUrl;
 
 const setup = await import("./setup");
 const { setHouseholdSettingValue, setValue } = await import("@/lib/settings");
-const { CATALOG } = await import("@/lib/modelCatalog");
+const { resolveTurnBudget, __setToolOfferOverridesForTests } = await import("@/lib/turnMachine/budget");
 const { createConversation, outcomesForConversation } = await import("@/lib/conversationHistory");
 const { runTurnNextStream } = await import("@/lib/turnMachine/turnNext");
 const { streamTurnEvents } = await import("@/routes/turn");
@@ -226,11 +226,9 @@ setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
 const searchSet = setHouseholdSettingValue("search.searxng_url", tee.url.toString().replace(/\/$/, ""));
 if (!searchSet.ok) throw new Error(`search setting: ${searchSet.error}`);
 
-const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
-if (!entry?.turn_budget) throw new Error("the 8B has no turn_budget");
-const shipped = entry.turn_budget.tools_offered.filter((id) => id !== SHOW);
+const shipped = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult").tools_offered.filter((id) => id !== SHOW);
 function useArm(arm: Arm): void {
-  entry!.turn_budget!.tools_offered = arm === "ON" ? [...shipped, SHOW].sort() : [...shipped];
+  __setToolOfferOverridesForTests(arm === "ON" ? [SHOW] : []);
 }
 
 function insertPerson(name: string, role: string) {

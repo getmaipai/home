@@ -6,10 +6,12 @@
 // adult's turn on a model without a record gets tools and thinking.
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { CATALOG, thinkingModeFor } from "@/lib/modelCatalog";
+import { listInstalledManifests } from "@/lib/plugins";
+import { allPackageStatuses } from "@/lib/smoke";
+import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { chatWindowContext, MINIMUM_CHAT_WINDOW_TOKENS } from "@/lib/roleHealth";
 import type { AgeBand } from "@/lib/ageBand";
 import type { TurnBudget } from "./contract";
-import { SHOW_IMAGES_TOOL_ID } from "@/lib/answerImages/turn";
 
 /** DEADLINE-02: the stream watchdog's defaults, used when a model's record
  * (which carries only model, tool and total) names none. */
@@ -17,6 +19,13 @@ export const FIRST_TOKEN_DEADLINE_MS = 90000;
 export const STALL_DEADLINE_MS = 20000;
 
 type RecordedDeadlines = { model: number; tool: number; total: number; first_token_ms?: number; stall_ms?: number };
+let offerOverridesForTests = new Set<string>();
+
+/** Lets a focused test or benchmark measure a candidate while its manifest
+ * remains off in production. Status and model-cap checks still apply. */
+export function __setToolOfferOverridesForTests(ids: string[] | null): void {
+  offerOverridesForTests = new Set(ids ?? []);
+}
 
 /** A catalog record's budget with the two stream fields filled in; the old
  * keys read exactly as measured. */
@@ -30,6 +39,7 @@ function withStreamDeadlines(budget: Omit<TurnBudget, "deadlines_ms"> & { deadli
  * gets. Never mutated; returned as-is by resolveTurnBudget() below. */
 export const NO_RECORD_BUDGET: TurnBudget = {
   rounds: 0,
+  max_tools: 0,
   tools_offered: [],
   model_transitions: false,
   context_tokens: MINIMUM_CHAT_WINDOW_TOKENS,
@@ -56,7 +66,17 @@ export const NO_RECORD_BUDGET: TurnBudget = {
 function unmeasuredAdultBudget(): TurnBudget {
   const reference = CATALOG.find((m) => m.role === "chat" && m.turn_budget)?.turn_budget;
   if (!reference) return NO_RECORD_BUDGET;
-  return withStreamDeadlines({ ...reference, measured: { ...NO_RECORD_BUDGET.measured } });
+  return withStreamDeadlines({ ...internalBudgetFromRecord(reference), measured: { ...NO_RECORD_BUDGET.measured } });
+}
+
+type CatalogTurnBudget = NonNullable<(typeof CATALOG)[number]["turn_budget"]>;
+
+/** Catalog tool ids are migration-only data. Convert every other measured
+ * field into the turn contract and leave the live offer empty until the
+ * manifest-derived policy below fills it. */
+function internalBudgetFromRecord(record: CatalogTurnBudget): Omit<TurnBudget, "deadlines_ms"> & { deadlines_ms: RecordedDeadlines } {
+  const { tools_offered: _deprecatedToolsOffered, max_tools, ...rest } = record;
+  return { ...rest, max_tools: max_tools ?? 0, tools_offered: [] } as Omit<TurnBudget, "deadlines_ms"> & { deadlines_ms: RecordedDeadlines };
 }
 
 /** Reads the household's selected chat model id (chat.model_id, the
@@ -76,14 +96,15 @@ export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget 
     try {
       id = getHouseholdSettingValue("chat.model_id") as string | undefined;
     } catch {
-      return band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
+      return band === "adult" ? withTurnToolGates(unmeasuredAdultBudget(), false) : NO_RECORD_BUDGET;
     }
   }
   const entry = id ? CATALOG.find((m) => m.role === "chat" && m.id === id) : undefined;
-  const base = entry?.turn_budget ? withStreamDeadlines(entry.turn_budget) : band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
+  const base = entry?.turn_budget ? withStreamDeadlines(internalBudgetFromRecord(entry.turn_budget)) : band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
   // VISION-02d (rule 8): a model whose record declares no thinking mode is
   // never asked to think, whatever the person's toggle says.
-  return thinkingModeFor(id) === "none" ? { ...base, thinking_budget_tokens: 0, thinking_budget_tokens_toggled: 0 } : base;
+  const resolved = thinkingModeFor(id) === "none" ? { ...base, thinking_budget_tokens: 0, thinking_budget_tokens_toggled: 0 } : base;
+  return withTurnToolGates(resolved, false);
 }
 
 export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBand): Promise<TurnBudget> {
@@ -97,13 +118,47 @@ export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBan
   return { ...base, ...thinking, context_tokens: context.tokens, context_window_tokens: context.reported ? context.tokens : null };
 }
 
-/** The per-turn adjustment of the offered tool set, in one place
- * (SKILLS-PAGE-01): the turn (turnNext.ts) and the Customize page's
- * "Used in chat" state (routes/plugins.ts) both call it, so the page never
- * claims a tool the turn would not offer. ANSWER-IMG-02 (rules 0 and 8):
- * `show_images` stays only when the model's record offers it AND this
- * turn may show pictures. Never mutates `budget`. */
+function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean): boolean {
+  if (offer.mode === "base") return true;
+  return offer.mode === "conditional" && offer.gate === "answerImagesAllowed" && Boolean(offer.bench_row) && answerImagesOk;
+}
+
+export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?: { mode: string; reason?: string; gate?: string } }, status: "enabled" | "disabled", usedInChat = false): string | null {
+  if (manifest.kind !== "plugin") return null;
+  if (status === "disabled") return "not offered: package disabled";
+  if (manifest.offer?.mode === "off") return `not offered: ${manifest.offer.reason ?? "off"}`;
+  if (manifest.offer?.mode === "conditional" && !usedInChat) return `not offered: ${manifest.offer.gate ?? "gate not met"}`;
+  if (manifest.args !== undefined && !manifest.offer) return "not offered: not measured";
+  return null;
+}
+
+/** Derives the one live offer set used by turns, token counting, warmup,
+ * and the Customize page. Installed manifests and the virtual registry
+ * are the only sources; disabled or smoke-failed packages are excluded,
+ * off and unmeasured tools stay out, and exceeding the model cap is a
+ * configuration error rather than a silently shortened offer. */
 export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean): TurnBudget {
-  if (answerImagesOk || !budget.tools_offered.includes(SHOW_IMAGES_TOOL_ID)) return budget;
-  return { ...budget, tools_offered: budget.tools_offered.filter((id) => id !== SHOW_IMAGES_TOOL_ID) };
+  const cap = budget.max_tools ?? 0;
+  if (budget === NO_RECORD_BUDGET) return budget;
+  if (cap === 0) return budget.tools_offered.length === 0 ? budget : { ...budget, tools_offered: [] };
+
+  const statuses = allPackageStatuses();
+  const candidates = new Map<string, { id: string; priority: number }>();
+  for (const manifest of listInstalledManifests()) {
+    const offer = manifest.offer;
+    const forcedForMeasurement = offerOverridesForTests.has(manifest.id);
+    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk))) continue;
+    const status = statuses.get(manifest.id);
+    if (status && (status.status !== "enabled" || status.smokeOk === false)) continue;
+    candidates.set(manifest.id, { id: manifest.id, priority: offer?.priority ?? 1000 });
+  }
+  for (const tool of VIRTUAL_TOOL_REGISTRY) {
+    if (offerPassesGate(tool.offer, answerImagesOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
+  }
+
+  const ordered = [...candidates.values()].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));
+  if (ordered.length > cap) {
+    throw new Error(`Derived tool offer set (${ordered.length}) exceeds the model cap (${cap}).`);
+  }
+  return { ...budget, tools_offered: ordered.map(({ id }) => id) };
 }

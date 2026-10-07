@@ -33,7 +33,7 @@ import { getEngineStatus, __resetLlmSupervisorForTests } from "@/lib/llmSupervis
 import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
 import { SPEC_DIR } from "@/lib/specDir";
-import { CATALOG } from "@/lib/modelCatalog";
+import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import answerImageRows from "./datasets/answer-images.json";
 
 interface ToolCallCorpusRow {
@@ -104,9 +104,8 @@ const WRITE_DOCUMENT_ROWS: ToolCallCorpusRow[] = [
 const EXTRA_OFFERED = (process.env.MAIPAI_BENCH_OFFER ?? "").split(",").map((id) => id.trim()).filter(Boolean);
 
 function budgetOfferedTools(): ToolSpec[] {
-  const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
-  if (!entry?.turn_budget) throw new Error("qwen3-8b-instruct-q4-k-m has no turn_budget in modelCatalog.ts");
-  return [...new Set([...entry.turn_budget.tools_offered, ...EXTRA_OFFERED])]
+  const budget = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+  return [...new Set([...budget.tools_offered, ...EXTRA_OFFERED])]
     .slice()
     .sort()
     .map((id) => {
@@ -201,11 +200,10 @@ async function main(): Promise<{ executed: number; engine: string }> {
   return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted, engine };
 }
 
-/** PHRASE-02's coordinator follow-up (CHAT-RICH-01), kept for the next
- * attempt (not current behavior - `write_document` is not in
- * `modelCatalog.ts`'s shipped `tools_offered` today, so its own row
- * below reads 0/REPEATS until that lands; dev.md has the numbers this
- * measured when it briefly was). Measures `write_document`'s own effect
+/** PHRASE-02's coordinator follow-up (CHAT-RICH-01), kept for a future
+ * measurement pass (`write_document` is marked off by its manifest's
+ * current offer policy, so the row below reads 0/REPEATS unless explicitly
+ * added for measurement). Measures `write_document`'s own effect
  * on tool choice as a number, never assumed, once it does join the
  * offered set. The full corpus rides along so a regression on an
  * EXISTING row (the added tenth candidate changing what the model picks

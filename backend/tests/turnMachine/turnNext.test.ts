@@ -35,7 +35,7 @@ import { listPending } from "@/lib/notifications";
 import { db } from "@/db";
 import { conversationTurns, conversations, memoryRecords, people as people_ } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
+import { NO_RECORD_BUDGET, __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
 import { partialReplyNote } from "@/lib/generationFailure";
@@ -92,7 +92,7 @@ afterEach(() => {
 });
 
 async function withStub<T>(
-  opts: { reply?: (request: ChatCompletionRequest) => string; calls?: (request: ChatCompletionRequest) => { id: string; name: string; args: string }[] | undefined },
+  opts: { reply?: (request: ChatCompletionRequest) => string; calls?: (request: ChatCompletionRequest) => { id: string; name: string; args: string }[] | undefined; forceOfferedTools?: string[] },
   fn: () => Promise<T>,
 ): Promise<T> {
   const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
@@ -105,6 +105,7 @@ async function withStub<T>(
   });
   const proxy = startRecordingProxy(stub.url);
   process.env.MAIPAI_LLAMA_SERVER_URL = proxy.url;
+  if (opts.forceOfferedTools) __setToolOfferOverridesForTests(opts.forceOfferedTools);
   // llmSupervisor.ts caches the resolved chat client against the URL
   // seen on its first call; a test that starts a second stub on a new
   // port (a resumed continuation, a second turn) needs a fresh
@@ -115,6 +116,7 @@ async function withStub<T>(
   try {
     return await fn();
   } finally {
+    if (opts.forceOfferedTools) __setToolOfferOverridesForTests(null);
     proxy.stop();
     await stub.stop();
   }
@@ -450,52 +452,39 @@ describe("turnNext.ts: the interim rule", () => {
 // structuredPartForOutcomes() reads the outcome the identical way for
 // both packages (composer.test.ts's own "structuredPartForOutcomes"
 // describe block proves the function itself; this proves the wiring).
-// Forcing it into tools_offered and scripting the call (the
-// "consequential proposal" test's own technique, above) sidesteps the
+// almanac-date's base offer decision and a scripted call sidestep the
 // routing question entirely - a real, separate finding, reported but
 // not fixed here, same as the issue's own text draws that line.
 describe("turnNext.ts: structured_part and artifact reach TurnValue (home#147)", () => {
   test("a successful almanac-date outcome carries a structured_part spec sheet on the new path", async () => {
-    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "almanac-date"] };
-    try {
-      const result = await withStub(
-        {
-          calls: (request) => (request.tools?.some((t) => t.function.name === "almanac-date") ? [{ id: "call-1", name: "almanac-date", args: "{}" }] : undefined),
-          reply: () => "unused",
-        },
-        () => runTurnNext(people.owner, "chat", "what's today's date"),
-      );
-      expect(result.ok).toBe(true);
-      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(result.value.source).toBe("plugin");
-      expect(result.value.plugin_id).toBe("almanac-date");
-      expect(result.value.structured_part).toBeDefined();
-      expect(result.value.structured_part?.kind).toBe("spec_sheet");
-      expect(result.value.structured_part?.tool_id).toBe("almanac-date");
-      expect(result.value.structured_part?.rows.some((r) => r.label === "Date")).toBe(true);
-    } finally {
-      CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
-    }
+    const result = await withStub(
+      {
+        calls: (request) => (request.tools?.some((t) => t.function.name === "almanac-date") ? [{ id: "call-1", name: "almanac-date", args: "{}" }] : undefined),
+        reply: () => "unused",
+      },
+      () => runTurnNext(people.owner, "chat", "what's today's date"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.plugin_id).toBe("almanac-date");
+    expect(result.value.structured_part).toBeDefined();
+    expect(result.value.structured_part?.kind).toBe("spec_sheet");
+    expect(result.value.structured_part?.tool_id).toBe("almanac-date");
+    expect(result.value.structured_part?.rows.some((r) => r.label === "Date")).toBe(true);
   });
 
   test("a package's own reply (no phrasing round) is not tagged routing tier \"tool\", so the window keeps noting it as the package's words", async () => {
-    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "almanac-date"] };
-    try {
-      const result = await withStub(
-        {
-          calls: (request) => (!request.messages.some((m) => m.role === "tool") && request.tools?.some((t) => t.function.name === "almanac-date") ? [{ id: "call-1", name: "almanac-date", args: "{}" }] : undefined),
-          reply: () => "It is a Saturday.",
-        },
-        () => runTurnNext(people.owner, "chat", "what's today's date"),
-      );
-      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(result.value.source).toBe("plugin");
-      expect(result.value.routing).toBeUndefined();
-    } finally {
-      CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
-    }
+    const result = await withStub(
+      {
+        calls: (request) => (!request.messages.some((m) => m.role === "tool") && request.tools?.some((t) => t.function.name === "almanac-date") ? [{ id: "call-1", name: "almanac-date", args: "{}" }] : undefined),
+        reply: () => "It is a Saturday.",
+      },
+      () => runTurnNext(people.owner, "chat", "what's today's date"),
+    );
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.source).toBe("plugin");
+    expect(result.value.routing).toBeUndefined();
   });
 
   test("a turn with no structured-part-bearing outcome carries no structured_part", async () => {
@@ -587,7 +576,7 @@ describe("turnNext.ts: a matched bundled package reports plugin_id, never comman
 
 describe("turnNext.ts: budget.model_transitions false", () => {
   test("no tool call is ever offered, whatever the model would otherwise choose", async () => {
-    const noToolsBudget = { ...NO_RECORD_BUDGET, background_turns: false, always_search: false, model_transitions: false, rounds: 0 as const };
+    const noToolsBudget = { ...NO_RECORD_BUDGET, background_turns: false, always_search: false, model_transitions: false, rounds: 0 as const, max_tools: 0 };
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
     CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = noToolsBudget;
     let sawTools = false;
@@ -615,19 +604,17 @@ describe("turnNext.ts: consent and confirmation", () => {
     // set (ORDINARY_DEFAULT_ORDER); a real household's ranked offer
     // (routing.ts, gone with the old path) has no new-path replacement
     // yet (BACKLOG's own open gap for the household's non-ordinary
-    // packages), so this test offers it directly via the budget the
-    // same way a future ranked set would, to exercise policy's own
+    // packages), so this test enables it through the measurement-only
+    // override, to exercise policy's own
     // consent gate for a real consequential manifest.
-    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "lock-doors"] };
     const parked = await withStub(
       {
+        forceOfferedTools: ["lock-doors"],
         calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
         reply: () => "locking",
       },
       () => runTurnNext(people.owner, "chat", "lock the doors"),
     );
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
     expect(parked.ok).toBe(true);
     if (!parked.ok || parked.kind !== "immediate") throw new Error("expected an immediate result");
     expect(parked.value.source).toBe("confirm");
@@ -652,45 +639,32 @@ describe("turnNext.ts: consent and confirmation", () => {
 
   test("PARENT-ASK-01a: bedtime-storybook remains a child self-confirmation", async () => {
     registerProjectType({ id: "bedtime-storybook", title: "Bedtime storybook", description: "A bedtime storybook.", minRole: "child", consequential: true, paramsSchema: { type: "object", required: ["topic"], properties: { topic: { type: "string" } }, additionalProperties: false }, buildPlan: () => ({ steps: [{ id: "a", kind: "text", needs: [], params: { role: "chat", promptTemplate: "write a gentle story", inputs: [] } }], ceilings: { maxWallSeconds: 30, maxGeneratorJobs: 1 } }) });
-    const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
-    const original = entry.turn_budget;
-    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, START_PROJECT_TOOL_ID] };
     try {
       const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === START_PROJECT_TOOL_ID) ? [{ id: "storybook", name: START_PROJECT_TOOL_ID, args: JSON.stringify({ type: "bedtime-storybook", params: { topic: "a moon rabbit" } }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "make a bedtime storybook about a moon rabbit"));
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.source).toBe("confirm");
-    } finally { entry.turn_budget = original; __resetProjectTypesForTests(); }
+    } finally { __resetProjectTypesForTests(); }
   });
 
   test("PARENT-ASK-01a: a child's family-name search is refused without claiming a parent was asked", async () => {
-    const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
-    const original = entry.turn_budget;
-    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "websearch"] };
-    try {
-      const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "websearch") ? [{ id: "search", name: "websearch", args: JSON.stringify({ expression: "Jesse Torres news" }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "search the web for Jesse Torres news"));
-      expect(result.ok).toBe(true);
-      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(result.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
-      expect(result.value.confirm).toBeUndefined();
-      expect(getPendingAsk(result.value.conversation_id)).toBeNull();
-    } finally { entry.turn_budget = original; }
+    const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "websearch") ? [{ id: "search", name: "websearch", args: JSON.stringify({ expression: "Jesse Torres news" }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "search the web for Jesse Torres news"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+    expect(result.value.confirm).toBeUndefined();
+    expect(getPendingAsk(result.value.conversation_id)).toBeNull();
   });
 
   test("PARENT-ASK-01a: a teen lock request is refused before it can be parked", async () => {
-    const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
-    const original = entry.turn_budget;
-    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "lock-doors"] };
-    try {
-      const actor = { ...people.child, role: "teen" };
-      const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "lock", name: "lock-doors", args: "{}" }] : undefined, reply: () => "unused" }, () => runTurnNext(actor, "chat", "lock the doors"));
-      expect(result.ok).toBe(true);
-      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(result.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
-      expect(result.value.confirm).toBeUndefined();
-      expect(getPendingAsk(result.value.conversation_id)).toBeNull();
-      expect(result.value.plugin_id).toBeUndefined();
-    } finally { entry.turn_budget = original; }
+    const actor = { ...people.child, role: "teen" };
+    const result = await withStub({ forceOfferedTools: ["lock-doors"], calls: (request) => request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "lock", name: "lock-doors", args: "{}" }] : undefined, reply: () => "unused" }, () => runTurnNext(actor, "chat", "lock the doors"));
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+    expect(result.value.confirm).toBeUndefined();
+    expect(getPendingAsk(result.value.conversation_id)).toBeNull();
+    expect(result.value.plugin_id).toBeUndefined();
   });
 
   test("PARENT-ASK-01a: a teen's yes cannot resume a legacy lock confirmation", async () => {
@@ -745,19 +719,14 @@ describe("turnNext.ts: consent and confirmation", () => {
 // unchanged.
 describe("turnNext.ts: APPROVE-CARD-01, the confirm card's wire shape and its structured resume", () => {
   async function parkLockDoorsAsk(opts: { temporary?: boolean } = {}) {
-    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "lock-doors"] };
-    try {
-      return await withStub(
-        {
-          calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
-          reply: () => "locking",
-        },
-        () => runTurnNext(people.owner, "chat", "lock the doors", opts.temporary ? { temporary: true } : {}),
-      );
-    } finally {
-      CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
-    }
+    return await withStub(
+      {
+        forceOfferedTools: ["lock-doors"],
+        calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
+        reply: () => "locking",
+      },
+      () => runTurnNext(people.owner, "chat", "lock the doors", opts.temporary ? { temporary: true } : {}),
+    );
   }
 
   test("the asked turn's own TurnValue.confirm and the persisted PendingAsk.turnId are set, matching this turn's own id, plus a real pending/via:confirm outcome (a gap this path had entirely before)", async () => {
@@ -1128,20 +1097,14 @@ describe("turnNext.ts: policy refusals without a parked ask", () => {
     // parked" exit (policyAllRefused) - it fell through to an empty
     // model_text reply where the state table promises "the refusal
     // line for min_role."
-    const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "lock-doors"] };
-    let result: Awaited<ReturnType<typeof runTurnNext>>;
-    try {
-      result = await withStub(
-        {
-          calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
-          reply: () => "locking",
-        },
-        () => runTurnNext(people.child, "chat", "lock the doors"),
-      );
-    } finally {
-      CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = original;
-    }
+    const result = await withStub(
+      {
+        forceOfferedTools: ["lock-doors"],
+        calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
+        reply: () => "locking",
+      },
+      () => runTurnNext(people.child, "chat", "lock the doors"),
+    );
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toBe("That one needs a grown-up.");

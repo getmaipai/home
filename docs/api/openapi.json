@@ -4891,6 +4891,11 @@
                       "used_in_chat": {
                         "type": "boolean",
                         "description": "Offered in the asking person's written chat today."
+                      },
+                      "offer_label": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Why an unoffered tool is not available, when its offer is off, not measured, or disabled."
                       }
                     },
                     "required": [
@@ -4900,7 +4905,8 @@
                       "description",
                       "origin",
                       "status",
-                      "used_in_chat"
+                      "used_in_chat",
+                      "offer_label"
                     ]
                   }
                 }

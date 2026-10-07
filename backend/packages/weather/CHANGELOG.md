@@ -19,6 +19,16 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
   tool description the chat model sees, and the confirm prompt's own
   wording (getmaipai/home FAST-03).
 
+- All six `routing.patterns` entries are gone ("what's the weather in
+  \*", "weather in \*", "how's the weather in \*", "what's the weather
+  like in \*", "is it going to rain in \*", "will it rain in \*") - each
+  opened with a question word, so the hub's own commands node fired on
+  any matching question and handed the remainder to this package before
+  the model ever saw the words (getmaipai/home OPENER-01, dev.md "The
+  knowledge hijack"). This package stays reachable as a model-chosen
+  tool call and through its own `examples`, never a blind pattern match
+  on a question's opening words.
+
 ## [0.1.0] - 2026-09-05
 
 ### Added

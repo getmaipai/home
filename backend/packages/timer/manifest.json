@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Timers",
   "description": "Set a timer for a length of time.",
+  "offer": {"mode":"base","priority":7},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

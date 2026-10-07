@@ -16,12 +16,18 @@
       "make me laugh",
       "know any good jokes"
     ],
-    "patterns": ["tell me a joke", "tell me a dad joke", "got any jokes"]
+    "patterns": [
+      "tell me a joke",
+      "tell me a dad joke",
+      "got any jokes"
+    ]
   },
-  "incognito": "unaffected",
   "requires": [],
   "optional": [],
-  "platforms": ["home", "bot"],
+  "platforms": [
+    "home",
+    "bot"
+  ],
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
@@ -37,7 +43,9 @@
       "retention": "unknown, see icanhazdadjoke.com's own policy"
     }
   ],
-  "permissions": ["net:icanhazdadjoke.com"],
+  "permissions": [
+    "net:icanhazdadjoke.com"
+  ],
   "notifications": [],
   "backup": "exclude",
   "background": false,
@@ -45,5 +53,9 @@
   "min_app": "0.1.0",
   "tier": 0,
   "quality_scale": "bronze",
-  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  },
+  "incognito": "unaffected"
 }

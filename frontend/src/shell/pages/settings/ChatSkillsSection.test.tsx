@@ -37,6 +37,7 @@ const skill = (id: string, name: string, extra: Record<string, unknown> = {}) =>
   kind: "plugin",
   origin: "bundled",
   used_in_chat: false,
+  offer_label: null,
   status: "enabled",
   ...extra,
 });
@@ -75,6 +76,15 @@ describe("ChatSkillsSection", () => {
       const view = renderWithQueryClient(<ChatSkillsSection person={makePerson("adult")} />);
       await view.findByText("No skills added yet");
       expect(view.getByText(/Skills added from the MaiPai Catalog will show up here/)).toBeTruthy();
+    });
+  });
+
+  test("an unmeasured package tool says why it is not offered", async () => {
+    await withSkills([skill("joke", "Joke", { offer_label: "not offered: not measured" })], async () => {
+      const view = renderWithQueryClient(<ChatSkillsSection person={makePerson("adult")} />);
+      await view.findByText("Joke");
+      const row = view.container.querySelector('[data-skill-id="joke"]') as HTMLElement;
+      expect(within(row).getByText("not offered: not measured")).toBeTruthy();
     });
   });
 

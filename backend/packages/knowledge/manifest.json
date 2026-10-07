@@ -16,19 +16,25 @@
       "what's the capital of Australia",
       "who invented the telephone"
     ],
-    "patterns": ["who was *", "what is *", "tell me about *", "what's the capital of *", "who invented *"]
+    "patterns": []
   },
   "args": {
     "type": "object",
-    "required": ["topic"],
+    "required": [
+      "topic"
+    ],
     "properties": {
-      "topic": { "type": "string", "minLength": 1 }
+      "topic": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   },
-  "incognito": "unaffected",
   "requires": [],
   "optional": [],
-  "platforms": ["home"],
+  "platforms": [
+    "home"
+  ],
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
@@ -44,9 +50,16 @@
       "retention": "unknown, see Wikimedia's own policy"
     }
   ],
-  "permissions": ["net:en.wikipedia.org"],
+  "permissions": [
+    "net:en.wikipedia.org"
+  ],
   "notifications": [],
-  "cache": { "key_template": "knowledge:{topic}", "ttl_s": 3600, "stale_ok_s": 86400, "max_bytes": 100000 },
+  "cache": {
+    "key_template": "knowledge:{topic}",
+    "ttl_s": 3600,
+    "stale_ok_s": 86400,
+    "max_bytes": 100000
+  },
   "fallback_reply": {
     "text": "Sorry, I'm having trouble looking that up right now.",
     "speech": "Sorry, I'm having trouble looking that up right now."
@@ -58,5 +71,8 @@
   "timeout_ms": 8000,
   "tier": 1,
   "quality_scale": "bronze",
-  "smoke": { "kind": "deno_test" }
+  "smoke": {
+    "kind": "deno_test"
+  },
+  "incognito": "unaffected"
 }

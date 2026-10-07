@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Recall",
   "description": "Tell you what it knows or remembers about something you ask.",
+  "offer": {"mode":"off","reason":"Memory is already supplied as context; a separate recall call duplicated retrieval."},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

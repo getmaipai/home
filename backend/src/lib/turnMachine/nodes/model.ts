@@ -8,7 +8,7 @@ import { startCompleteStreamPieces, envelopeToolCall, StackStreamError } from "@
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
 import { loadManifestOnly } from "@/lib/plugins";
-import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool";
+import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { isBarePronoun } from "@/lib/text";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnShared";
@@ -143,7 +143,8 @@ export function toolSpecFor(id: string): ToolSpec | null {
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
   // header) - it never has a backend/packages/start_project manifest.json
   // for loadManifestOnly() to find below.
-  if (id === START_PROJECT_TOOL_ID) return startProjectToolSpec();
+  const virtual = VIRTUAL_TOOL_REGISTRY.find((tool) => tool.id === id);
+  if (virtual) return virtual.spec();
   const loaded = loadManifestOnly(id);
   if (!loaded.ok) return null;
   return { id, description: loaded.value.description, args: loaded.value.args };

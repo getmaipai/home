@@ -38,7 +38,9 @@ function skillRow(skill: SkillRow, minor: boolean) {
         <ItemDescription>{skill.description}</ItemDescription>
       </ItemContent>
       <ItemActions>
-        {skill.used_in_chat ? (
+        {skill.offer_label ? (
+          <Badge variant="outline">{skill.offer_label}</Badge>
+        ) : skill.used_in_chat ? (
           <Badge variant="secondary">Used in chat</Badge>
         ) : (
           <Badge variant="outline">{minor ? "Not used in your chats" : "Not used in chat yet"}</Badge>

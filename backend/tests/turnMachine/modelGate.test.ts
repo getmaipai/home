@@ -100,7 +100,10 @@ describe("resolveTurnBudget: a model with no measured record", () => {
 
   test("a model with a record keeps its record for every band", () => {
     const record = CATALOG.find((m) => m.id === RECORDED_MODEL)?.turn_budget;
-    for (const band of ["child", "teen", "adult"] as const) expect(resolveTurnBudget(RECORDED_MODEL, band)).toEqual({ ...record!, deadlines_ms: { ...record!.deadlines_ms, first_token_ms: FIRST_TOKEN_DEADLINE_MS, stall_ms: STALL_DEADLINE_MS } });
+    for (const band of ["child", "teen", "adult"] as const) {
+      const resolved = resolveTurnBudget(RECORDED_MODEL, band);
+      expect(resolved).toEqual({ ...record!, max_tools: record!.max_tools, tools_offered: resolved.tools_offered, deadlines_ms: { ...record!.deadlines_ms, first_token_ms: FIRST_TOKEN_DEADLINE_MS, stall_ms: STALL_DEADLINE_MS } });
+    }
   });
 });
 

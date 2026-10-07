@@ -1,37 +1,37 @@
 {
   "define": {
-    "sha256": "4a3ae365e151137374ecf4a0a04fb8fc0f1a33401bbfca9f34fd69aaa1a8ccb1",
-    "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
+    "sha256": "e5a144f10315cc22555adc21ddda8f367e2d301826bf4459bac4c5cda1b3fb1b",
+    "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "plugins/utilities/define"
   },
   "joke": {
-    "sha256": "83338bfc7cd18798eab177b79e8ae797402e6580e8ee9a3a1ce4f2faee5d89e6",
-    "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
+    "sha256": "12ad2f0a107dbe90d6ade5a062995df009236464dee278766183c5a4fe2834a2",
+    "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "plugins/fun/joke"
   },
   "knowledge": {
-    "sha256": "dcb3b18b0b306414f06d9fc707142f9716af0d79c07dcdefb6005f238ce91b77",
-    "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
+    "sha256": "1fe2380097087e7ce8a8366bb2a5a59ff000e8ad20cfe39e6be3a2cedebf4c50",
+    "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "plugins/info/knowledge"
   },
   "media-lookup": {
-    "sha256": "9cafe8c28034424a0c67055b4a54c98490d04ab38ab3834ecd7fc763f0a26e64",
-    "source_commit": "d077bc1a73ce76e4552bf14a0d4bcffad97f5f9d",
+    "sha256": "7abfa6653c77a02c67a66ca1ae1a8202e64b888f38f7e49d460722d7179fc88e",
+    "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "plugins/info/media-lookup"
   },
   "storytime-style": {
-    "sha256": "a4ac07f0711f0663712837e222c9c1ff79972673b9656c40467e0424d6811bb0",
-    "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
+    "sha256": "aea745f9cb83564dbc6fd738c784a9f5447e0703255c7269a57ab9100808d21a",
+    "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "skills/family/storytime-style"
   },
   "trivia": {
-    "sha256": "43f6878d3024c1659a186c82eaf3f56d94e87261ef466bd7682bc49acb8346d2",
-    "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
+    "sha256": "8697609b69ba16955e67db52adce482b2cdba514f3542eb76cb7f2214e728f97",
+    "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "plugins/fun/trivia"
   },
   "weather": {
-    "sha256": "79422e9907aa905d1b0447e84ce461445e93eee0d2509769d11e30604541bfb6",
-    "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
+    "sha256": "dd60fb7fac626ca7d782de16bb3afd4758956f4b37bf150118c9aec3e7c1bac7",
+    "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "plugins/utilities/weather"
   }
 }

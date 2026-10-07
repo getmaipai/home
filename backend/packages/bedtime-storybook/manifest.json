@@ -5,6 +5,7 @@
   "category": "Family",
   "display": "Bedtime storybook",
   "description": "A three-chapter bedtime storybook written in the background, for a child's story that is longer than one reply.",
+  "offer": {"mode":"off","reason":"Project parameters are invoked through the registered start_project tool."},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

@@ -5,6 +5,7 @@
   "category": "Utilities",
   "display": "Write a Document",
   "description": "Write a document someone asked to have written, not to save a fact, answer a question, or search the web.",
+  "offer": {"mode":"off","reason":"Measured adult written-chat rows remained below the offering bar."},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

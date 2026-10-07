@@ -103,6 +103,7 @@ export type PolicyDecision =
  * resolves to this at runtime, and the fallback for a model with none. */
 export interface TurnBudget {
   rounds: 0 | 1 | 2;
+  max_tools?: number;
   tools_offered: string[];
   model_transitions: boolean;
   context_tokens: number;

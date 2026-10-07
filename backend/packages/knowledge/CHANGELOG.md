@@ -6,6 +6,18 @@ All notable changes to the Knowledge package, in [Keep a Changelog](https://keep
 
 ### Changed
 
+- All five `routing.patterns` entries ("who was \*", "what is \*", "tell
+  me about \*", "what's the capital of \*", "who invented \*") are gone.
+  Each opened with a question word, so the hub's own commands node fired
+  it on ANY matching question and handed the whole remainder to this
+  package as a page title before the model ever saw the words - a real
+  household turn ("what is technical benchmarking and why do you need
+  it") became a failed Wikipedia lookup instead of a real answer
+  (getmaipai/home OPENER-01, dev.md "The knowledge hijack"). This
+  package stays reachable the same way every other tool the hub offers
+  is: as a model-chosen tool call, through its own `examples`, never a
+  blind pattern match on a question's opening words.
+
 - A page with no extract, a disambiguation page, or a summary the
   encyclopedia does not have (HTTP 404) is reported as the typed
   `not_found` error instead of being spoken as "I couldn't find a clear

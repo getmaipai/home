@@ -3,7 +3,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
-import { resolveTurnBudgetWithStack, withTurnToolGates } from "@/lib/turnMachine/budget";
+import { resolveTurnBudgetWithStack, toolOfferLabel, withTurnToolGates } from "@/lib/turnMachine/budget";
 import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
 import { getProjectType } from "@/lib/projects/projectTypes";
@@ -65,6 +65,7 @@ const SkillRow = z.object({
   origin: z.enum(["bundled", "store"]).describe("bundled: ships with Home. store: added to this home from the catalog."),
   status: z.enum(["enabled", "disabled"]).describe("disabled: its last smoke test failed."),
   used_in_chat: z.boolean().describe("Offered in the asking person's written chat today."),
+  offer_label: z.string().nullable().describe("Why an unoffered tool is not available, when its offer is off, not measured, or disabled."),
 });
 
 const skillsRoute = createRoute({
@@ -100,6 +101,7 @@ pluginsRoutes.openapi(skillsRoute, async (c) => {
     .map((manifest) => {
       const status = statuses.get(manifest.id)?.status ?? "enabled";
       const offeredHere = manifest.kind === "project" ? offered.has(START_PROJECT_TOOL_ID) && getProjectType(manifest.id) !== undefined : offered.has(manifest.id);
+      const usedInChat = status === "enabled" && offeredHere;
       return {
         id: manifest.id,
         kind: manifest.kind as "plugin" | "skill" | "project",
@@ -107,7 +109,8 @@ pluginsRoutes.openapi(skillsRoute, async (c) => {
         description: manifest.description,
         origin: isDirectory(join(PACKAGES_DIR, manifest.id)) ? ("bundled" as const) : ("store" as const),
         status,
-        used_in_chat: status === "enabled" && offeredHere,
+        used_in_chat: usedInChat,
+        offer_label: toolOfferLabel(manifest, status, usedInChat),
       };
     });
   return c.json(rows, 200);

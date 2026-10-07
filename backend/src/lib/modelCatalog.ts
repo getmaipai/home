@@ -68,39 +68,7 @@ export const CATALOG: ModelCapabilities[] = [
     // repeats (0 false calls in 50, 19 fitting searches in 50).
     turn_budget: {
       rounds: 1,
-      // TOOLSET-01 (dev.md 2026-09-23, "U6: the flip verdict"
-      // regression B): recall left out on purpose - nodes/context.ts
-      // already calls recall(actor, utterance) on every turn and puts
-      // up to eight matches in the context as source: "memory", so the
-      // recall tool is a second implementation of a retrieval the
-      // model already holds; at temperature 0.7 the model reached for
-      // it one time in three on small talk and doubled the turn for
-      // nothing new (control-negative-spiderman: 10,873ms against
-      // 5,283ms clean). Memory reaches the model through context only.
-      // SIGNAL-02: math, convert, almanac-time and almanac-date added
-      // (sorted, U1) so a computed phrasing the deterministic openers
-      // miss (OPENER-01's own wildcard resolvers, nodes/commands.ts) is
-      // still answered by the model choosing the right tool under
-      // `auto`, never forced into a search - nodes/model.ts's own
-      // isWorldQuestion stays `target === "world"` only, so a
-      // `computed` target is never forced, just offered.
-      // DOC-TOOL-01 (dev.md "DOC-TOOL-01: the rewritten description
-      // didn't recover the three rows, 2026-09-24"): write_document's
-      // manifest description was rewritten to rule out saving a fact,
-      // answering a question, or searching (per the coordinator's own
-      // ruling that the ambiguous old wording, not "more tools," was the
-      // likely cause of CHAT-RICH-01's regression) and re-measured with
-      // write_document back in this budget - the three previously-0/5
-      // rows stayed at 0/5 (two of them now calling nothing at all,
-      // worse than before), so the offering does not land; the
-      // description's own three rows still held perfectly (5/5, 5/5,
-      // 5/5). Kept out of the budget on that gate.
-      // PROJECT-START-01: start_project offered alongside the rest,
-      // "the tool offered per the model's budget" (docs/BACKLOG.md) - a
-      // virtual tool (tool.ts's own header), never a bundled package, so
-      // it's added here by hand rather than discovered from
-      // backend/packages/ the way a real one would be.
-      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "start_project", "timer", "weather", "websearch"],
+      max_tools: 16,
       // THIN-2B (rule 1): deprecated and ignored. Home no longer reads it;
       // the pinned spec still requires the field, and a later spec tag
       // removes it.
@@ -181,7 +149,7 @@ export const CATALOG: ModelCapabilities[] = [
     thinking_mode: "none",
     turn_budget: {
       rounds: 1,
-      tools_offered: ["almanac-date", "almanac-time", "convert", "math", "remember", "remind", "start_project", "timer", "weather", "websearch"],
+      max_tools: 16,
       always_search: true,
       model_transitions: true,
       context_tokens: 2048,
