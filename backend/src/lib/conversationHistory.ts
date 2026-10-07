@@ -2895,6 +2895,8 @@ const SAFETY_FLAGGED_MINOR_FLOOR_DAYS = 90;
 const DAY_MS = 86_400_000;
 
 const MAX_SUMMARY_INPUT_CHARS = 8_000;
+/** PI-MEM-00: a stored retention summary is 2-4 sentences; anything longer is cut. */
+export const RETENTION_SUMMARY_MAX_CHARS = 1_000;
 
 /** Turns a batch of one person's about-to-expire turns into one real
  * `record_kind: "episode"` memory record (household 3.1's shape already
@@ -2963,9 +2965,19 @@ export async function summarizeBeforeDelete(rows: ConversationTurnRow[]): Promis
         console.log(`[conversationHistory] retention summary skipped for ${personId}: unavailable`);
         continue;
       }
+      // PI-MEM-00 (F7): the stored summary is model output built from a
+      // transcript that may hold injected text, and it is read into later
+      // turns. It passes the same output floor as a reply before it is kept
+      // (a refused one is dropped, not stored), and is length capped.
+      const summaryText = redactCredentials(result.text).trim().slice(0, RETENTION_SUMMARY_MAX_CHARS);
+      if (!summaryText) continue;
+      if (!passesFloor(summaryText, speakerAgeBand(person, new Date()))) {
+        console.log(`[conversationHistory] retention summary for ${personId} dropped: failed the output floor`);
+        continue;
+      }
       const written = remember(person, {
         record_kind: "episode",
-        text: result.text,
+        text: summaryText,
         category: "event",
         tier: "durable",
         scope: "person",

@@ -163,6 +163,13 @@ export interface TurnState {
   speakerEvidence?: SpeakerEvidence | null;
   present?: readonly PresentPerson[] | null;
   utterance: string;
+  /** PI-MEM-00: what the person typed, without any attached document text
+   * (`utterance` carries the documents too). Grounds a household memory write. */
+  typedText?: string;
+  /** PI-MEM-00: true once the turn holds text the person did not write (an
+   * attached document or picture, or a web result read this turn). A stand-in
+   * for the taint state PI-TAINT-01 builds; the tool node sets it. */
+  untrustedInput?: boolean;
   images?: import("@/wire").ChatImagePart[];
   /** VISION-02c: the turn's pictures as picture parts for a chat model
    * that reads them (the context node decides, from the Stack's chat row

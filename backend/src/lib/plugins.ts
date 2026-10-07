@@ -21,7 +21,7 @@ import { Project } from "@maipai/spec/gen/ts/project.js";
 import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
-import { createHost } from "@/lib/packageHost";
+import { createHost, type HostTurn } from "@/lib/packageHost";
 import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { registerProjectType } from "@/lib/projects/projectTypes";
@@ -528,7 +528,7 @@ export async function runPlugin(
   id: string,
   actor: PersonRow,
   inputs: Record<string, unknown>,
-  turn?: { id: string; conversationId?: string },
+  turn?: HostTurn,
   options: { signal?: AbortSignal; deadlineAt?: number } = {},
 ): Promise<PluginOpResult<PluginResult>> {
   const manifestResult = loadManifestOnly(id);

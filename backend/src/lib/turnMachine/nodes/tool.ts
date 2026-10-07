@@ -69,6 +69,8 @@ function failureKindOf(code: string | undefined): FailureKind {
 
 const MAX_DETAIL_CHARS = 2000;
 
+const UNTRUSTED_SOURCE_TOOLS: ReadonlySet<string> = new Set(["websearch", "news", "knowledge", "media-lookup"]);
+
 export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal) => {
   const outcomes: ToolExecutionOutcome[] = [];
   const toolEvents: ToolStreamEvent[] = [];
@@ -79,6 +81,10 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const call = input.proposals.find((p) => p.request.tool === SHOW_IMAGES_TOOL_ID && typeof p.request.args.subject === "string" && p.request.args.subject.trim().length > 0);
     if (call) startAnswerImages(state, (call.request.args.subject as string).trim(), typeof call.request.args.kind === "string" ? call.request.args.kind.trim() : "");
   }
+  // PI-MEM-00: a web search or page read in this batch, or earlier in the turn,
+  // puts text the person did not write in the turn; a memory write beside it
+  // is treated as from an untrusted turn (stand-in until PI-TAINT-01).
+  if (input.proposals.some((p) => UNTRUSTED_SOURCE_TOOLS.has(p.request.tool))) state.untrustedInput = true;
   for (const proposal of input.proposals) {
     const { tool, callId } = proposal.request;
     // LIVE-0923-01 (home/docs/dev.md): the old path's own forced-search
@@ -178,7 +184,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const spokenSearch = (state.planBasis?.surfaceClass ?? "spoken") === "spoken";
     const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}) } : args;
     const startedAt = Date.now();
-    const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt }), signal);
+    const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId, ...(state.typedText !== undefined ? { typedText: state.typedText } : {}), ...(state.untrustedInput ? { untrusted: true } : {}) }, { signal, deadlineAt: input.deadlineAt }), signal);
     const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });

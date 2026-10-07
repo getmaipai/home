@@ -150,7 +150,7 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
         }
       }
       const args = captured ? { [firstArgName(manifest)]: captured } : {};
-      const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId });
+      const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId, ...(state.typedText !== undefined ? { typedText: state.typedText } : {}), ...(state.untrustedInput ? { untrusted: true } : {}) });
       // COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): a failed
       // pattern outcome used to return `matched: true` with the raw
       // `result.error` as the reply text (an MCP error string, a

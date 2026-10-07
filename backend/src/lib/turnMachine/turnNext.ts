@@ -391,6 +391,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   }
   // THIN-7C: the model, the safety check and the signal read the message with
   // its documents; logResult() is given the typed text, as the old path did.
+  const typedText = text;
   text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary || opts.ephemeral === true);
   const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
@@ -456,6 +457,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     surface,
     ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
     utterance: text,
+    typedText,
+    ...(text !== typedText || opts.images?.length ? { untrustedInput: true } : {}),
     // VISION-02c: only the five stored fields come from a caller; the
     // shown-to-model mark is the hub's own (model.ts), never a client's.
     ...(opts.images?.length ? { images: opts.images.map(({ id, name, width, height, media_type }) => ({ id, name, width, height, media_type })) } : {}),

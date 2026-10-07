@@ -64,6 +64,7 @@ import { recordSearchHealth } from "@/lib/searchHealthState";
 import { classifyServiceOutcome, recordServiceOutcome } from "@/lib/serviceHealth";
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
 import * as memory from "@/lib/memory";
+import { rejectUngrounded, type ExtractedFact } from "@/lib/memoryJudge";
 import { deleteAttachmentsForPerson } from "@/lib/attachments";
 import * as settings from "@/lib/settings";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -1734,6 +1735,23 @@ function isFirstPersonStatement(text: string): boolean {
   return FIRST_PERSON_PATTERN.test(text.replace(THIRD_PARTY_POSSESSIVE, ""));
 }
 
+/** PI-MEM-00 (F5): the longest text a package's `memory.remember` may store.
+ * The model-offered remember tool takes a sentence, never a pasted page, and
+ * what it stores is read into later turns. */
+export const REMEMBER_MAX_CHARS = 500;
+
+/** The turn a host call runs inside. `typedText` is the person's own typed
+ * words (never an attached document); `untrusted` is true when the turn holds
+ * text the person did not write (an attached document or picture, or a web
+ * result already read this turn). Until a real taint state exists
+ * (PI-TAINT-01) this is the stand-in signal. */
+export interface HostTurn {
+  id: string;
+  conversationId?: string;
+  typedText?: string;
+  untrusted?: boolean;
+}
+
 function mapWriteFailure(status: number, error: string): never {
   // A permission check above only proves the manifest declared the
   // right permission; memory.remember/forget still apply their own
@@ -1768,7 +1786,7 @@ function mapWriteFailure(status: number, error: string): never {
  * together in scope (the conversation a turn belongs to), so building
  * one object at the call site is the natural shape, not friction added
  * for its own sake. */
-export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number } = {}): Host {
+export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: HostTurn, runtime: { signal?: AbortSignal; deadlineAt?: number } = {}): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
   function requirePermission(perm: string): void {
@@ -1917,6 +1935,15 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       },
       remember(text: string, category?: string, scope?: string, person?: string | null): string {
         requirePermission("memory:write");
+        // PI-MEM-00 (F5): a length cap on every package write, and household
+        // memory (read into every other person's turn, children included)
+        // only from the person's own words. A model-offered call inside a
+        // turn must be grounded in what the person typed, and a turn that
+        // holds untrusted text never writes household scope. Person scope
+        // stays open (it reaches only that person).
+        if (text.length > REMEMBER_MAX_CHARS) {
+          throw new HostError("invalid_input", `a memory is at most ${REMEMBER_MAX_CHARS} characters; save the short version`);
+        }
         // Step 2: "the remember recipe writes scope: person and person:
         // actor.id for first-person statements... and household
         // otherwise." A recipe step that already declares its own scope
@@ -1926,11 +1953,22 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // is what backend/packages/remember/recipe.json now does.
         const resolvedScope = scope ?? (isFirstPersonStatement(text) ? "person" : "household");
         const resolvedPerson = resolvedScope === "person" ? (person ?? actor.id) : undefined;
+        if (turn && resolvedScope === "household") {
+          if (turn.untrusted) {
+            logEntry("warn", "household memory refused: turn holds untrusted text", { turn_id: turn.id, outcome: "untrusted_write_refused" });
+            throw new HostError("permission_denied", "I won't save a household memory from a turn that includes a document, picture or web page. Ask me again in your own words.");
+          }
+          const fact = { text } as ExtractedFact;
+          if (rejectUngrounded([fact], actor.displayName ?? "", new Date().toISOString().slice(0, 10), turn.typedText ?? "").kept.length === 0) {
+            logEntry("warn", "household memory refused: not grounded in the person's own words", { turn_id: turn.id, outcome: "ungrounded_write_refused" });
+            throw new HostError("permission_denied", "I only save a household memory that you said yourself in this message.");
+          }
+        }
         // Provenance: the turn id when this call is happening inside a
         // turn (see createHost()'s own comment on why there's no second
         // field for the package id), package id otherwise.
         const source = turn?.id ?? `package:${manifest.id}`;
-        if (turn?.id) logEntry("info", "remembered via turn", { turn_id: turn.id });
+        if (turn?.id) logEntry("info", "remembered via turn", { turn_id: turn.id, origin: "model_tool", scope: resolvedScope });
         const result = memory.remember(actor, {
           text,
           category: category ?? "fact",
