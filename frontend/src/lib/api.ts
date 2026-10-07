@@ -727,7 +727,16 @@ export const api = {
   // PROJECTS-01a: `folderId` starts the chat inside one of the person's projects.
   createConversation: (mode?: Conversation["mode"], carryFrom?: string, folderId?: string) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}), ...(folderId ? { folder_id: folderId } : {}) }) }),
   // PROJECTS-01a: a person's projects (chat folders) in the chat column.
-  chatFolders: (person?: string) => request<ChatFolderView[]>(`/api/chat-folders${person ? `?person=${encodeURIComponent(person)}` : ""}`),
+  chatFolders: (person?: string, options?: { scope?: "mine" | "shared" | "all"; sort?: "order" | "updated" }) => {
+    const params = new URLSearchParams();
+    if (person) params.set("person", person);
+    if (options?.scope) params.set("scope", options.scope);
+    if (options?.sort) params.set("sort", options.sort);
+    const query = params.toString();
+    return request<ChatFolderView[]>(`/api/chat-folders${query ? `?${query}` : ""}`);
+  },
+  createChatProject: (input: { name: string; icon?: string; color?: string; description?: string; instructions?: string }) =>
+    request<ChatFolderView>("/api/chat-folders", { method: "POST", body: JSON.stringify(input) }),
   createChatFolder: (name: string, person?: string) =>
     request<ChatFolderView>("/api/chat-folders", { method: "POST", body: JSON.stringify({ name, ...(person ? { person } : {}) }) }),
   renameChatFolder: (id: string, name: string) =>

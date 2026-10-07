@@ -9,6 +9,7 @@ import { useAppearance } from "@/shell/useAppearance";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { ChatPage } from "@/shell/pages/ChatPage";
+import { ProjectsPage } from "@/shell/pages/ProjectsPage";
 import { FamilyPage } from "@/shell/pages/FamilyPage";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
 import { CustomizeRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
@@ -180,6 +181,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             beside the history column. */}
         <Route element={<FullLayout rail activeAppHref={selectedAppHref} headerSearchRemote={api.search} railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
+          <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           {/* APP-SET-02 (RULES S4): the settings areas draw no slim title bar,
               like ChatGPT's own settings page: the column title is the page's
               heading, so these routes sit beside chat, outside

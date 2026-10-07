@@ -329,6 +329,7 @@ const elementsReview = process.argv.includes("--elements-review");
 // PROJECTS-01b: projects in the chat column (seeded, open, moving a chat, a child's view).
 const projectSettingsOnlyReview = process.argv.includes("--project-settings-review");
 const chatProjectsReview = process.argv.includes("--chat-projects-review") || projectSettingsOnlyReview;
+const projectsListingReview = process.argv.includes("--projects-listing-review");
 // SKILLS-PAGE-01: the Skills section of Chat settings, an adult and a teen, 1440 and 390, both themes.
 const chatSkillsReview = process.argv.includes("--chat-skills-review");
 // ENGINE-DOWN-UI-01: a reply with its action row while chat is ready and while it is paused.
@@ -2857,6 +2858,69 @@ async function captureChatProjectsReview(browser: Browser, ownerSession: string)
       await context.close();
     }
   }
+}
+
+/** PROJECTS-UI-03: the Projects index, as an adult and child see it, at
+ * desktop and phone widths in both themes. */
+async function captureProjectsListingReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "projects-shots");
+  mkdirSync(outDir, { recursive: true });
+  const cookie = { Cookie: `session=${ownerSession}` };
+  const json = { "Content-Type": "application/json", ...cookie };
+  const makeFolder = async (name: string, person?: string, fields: Record<string, unknown> = {}) => {
+    const res = await fetch(`${BASE_URL}/api/chat-folders`, {
+      method: "POST",
+      headers: json,
+      body: JSON.stringify({ name, ...(person ? { person } : {}), ...fields }),
+    });
+    if (!res.ok) throw new Error(`projects listing review: making ${name} failed: ${res.status} ${await res.text()}`);
+    return (await res.json()) as { id: string };
+  };
+  await makeFolder("Garden plans", undefined, { icon: "leaf", color: "green", description: "The backyard beds" });
+  await makeFolder("Science fair", undefined, { icon: "graduation-cap", color: "violet", pinned: true });
+  await makeFolder("Family recipes", undefined, { icon: "chef-hat", color: "orange" });
+
+  const capturePerson = async (session: string, slug: "adult" | "child") => {
+    for (const viewportSlug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((entry) => entry.slug === viewportSlug)!;
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          await page.goto(`${BASE_URL}/chat/projects`);
+          await page.getByRole("heading", { name: "Projects" }).waitFor();
+          await page.getByRole("navigation", { name: "Primary navigation" }).waitFor();
+          const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+          if (overflow) throw new Error(`projects listing ${slug} ${viewport.width} ${theme} scrolls sideways`);
+          if (slug === "child" && await page.getByRole("button", { name: "Create" }).count()) throw new Error("child project listing offers Create");
+          const file = join(outDir, `projects-listing-${slug}-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path: file });
+          console.log(`Wrote ${file}`);
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  };
+  await capturePerson(ownerSession, "adult");
+
+  const childRes = await fetch(`${BASE_URL}/api/people`, {
+    method: "POST",
+    headers: json,
+    body: JSON.stringify({ displayName: "Pippa", role: "child" }),
+  });
+  if (!childRes.ok) throw new Error(`projects listing review: child setup failed: ${childRes.status}`);
+  const child = (await childRes.json()) as { id: string };
+  await makeFolder("Homework", child.id, { icon: "book", color: "teal" });
+  const selected = await fetch(`${BASE_URL}/api/auth/select`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ personId: child.id }),
+  });
+  const childSession = selected.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("projects listing review: the child sign-in carried no session cookie");
+  await capturePerson(childSession, "child");
 }
 
 /** COLUMN-01 (owner, 2026-10-06): the chat history column, open, hidden,
@@ -9614,6 +9678,12 @@ async function main() {
     if (chatProjectsReview) {
       await captureChatProjectsReview(browser, sessionValue);
       console.log("completed named review: --chat-projects-review");
+      return;
+    }
+
+    if (projectsListingReview) {
+      await captureProjectsListingReview(browser, sessionValue);
+      console.log("completed named review: --projects-listing-review");
       return;
     }
 

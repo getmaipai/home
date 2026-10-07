@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T05:17:53.902Z",
+  "generatedAt": "2026-10-07T05:34:58.726Z",
   "kitTag": "ui-v0.5.155",
   "items": [
     {
@@ -698,7 +698,7 @@
       "group": "project",
       "verdict": "no-fit",
       "verdictReason": "Home's project pages use the kit's project blocks; the standalone assistant-ui project Element is not used on this non-chat surface.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "project-settings.tsx",
