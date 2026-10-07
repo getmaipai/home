@@ -13,7 +13,14 @@ describe("gate run statistics", () => {
     expect(parseFailures("fail\tbackend: bun test\t1\ntest\t(fail) sample > rejects bad input\ntest\t(fail) sample > rejects bad input\n")).toEqual({
       stage: "backend: bun test",
       tests: ["(fail) sample > rejects bad input"],
+      flakes: [],
     });
+  });
+
+  test("records a listed rerun in per-run flake stats", () => {
+    expect(parseFailures("flaky\tbackend/tests/a.test.ts > retry me\tcodex-a\t2026-10-14\t(fail) retry me [2ms]\n").flakes).toEqual([
+      { test: "backend/tests/a.test.ts > retry me", owner: "codex-a", deadline: "2026-10-14", first_failure: "(fail) retry me [2ms]" },
+    ]);
   });
 
   test("records one run with timing, scope, lock and failure details", () => {

@@ -13,6 +13,7 @@ export type GateRun = {
   exit: number;
   first_red_stage: string | null;
   failing_test_names: string[];
+  flaky_tests: { test: string; owner: string; deadline: string; first_failure: string }[];
   load_at_lock_time: string | null;
   lock_wait_seconds: number;
   head: string;
@@ -21,7 +22,7 @@ export type GateRun = {
   stages: GateStage[];
 };
 
-export type GateRunInput = Omit<GateRun, "run_kind" | "seconds" | "first_red_stage" | "failing_test_names" | "stages"> & {
+export type GateRunInput = Omit<GateRun, "run_kind" | "seconds" | "first_red_stage" | "failing_test_names" | "flaky_tests" | "stages"> & {
   run_kind: "gate" | "pre";
   start_epoch: number;
   stages_log: string;
@@ -44,15 +45,17 @@ export function parseStages(source: string): GateStage[] {
   });
 }
 
-export function parseFailures(source: string): { stage: string | null; tests: string[] } {
+export function parseFailures(source: string): { stage: string | null; tests: string[]; flakes: { test: string; owner: string; deadline: string; first_failure: string }[] } {
   let stage: string | null = null;
   const tests: string[] = [];
+  const flakes: { test: string; owner: string; deadline: string; first_failure: string }[] = [];
   for (const line of source.split(/\r?\n/)) {
-    const [kind, value] = line.split("\t");
+    const [kind, value, owner, deadline, first_failure] = line.split("\t");
     if (kind === "fail" && stage === null) stage = value || null;
     if (kind === "test" && value && !tests.includes(value)) tests.push(value);
+    if (kind === "flaky" && value) flakes.push({ test: value, owner: owner ?? "unknown", deadline: deadline ?? "", first_failure: first_failure ?? "" });
   }
-  return { stage, tests };
+  return { stage, tests, flakes };
 }
 
 export function makeGateRun(input: GateRunInput, endedAt = new Date()): GateRun {
@@ -70,6 +73,7 @@ export function makeGateRun(input: GateRunInput, endedAt = new Date()): GateRun 
     exit: input.exit,
     first_red_stage: failures.stage,
     failing_test_names: failures.tests,
+    flaky_tests: failures.flakes,
     load_at_lock_time: input.load_at_lock_time || null,
     lock_wait_seconds: input.lock_wait_seconds,
     head: input.head,

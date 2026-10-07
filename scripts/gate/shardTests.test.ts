@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { balance, chooseShardCount, discoverTests, failedTests, junitFileSeconds, parseSummary, readShardLog, run } from "./shardTests";
+import { balance, chooseShardCount, discoverTests, failedTests, FlakeLedger, junitFileSeconds, parseSummary, readShardLog, run } from "./shardTests";
 
 describe("balance", () => {
   test("every file lands in exactly one shard", () => {
@@ -91,6 +91,25 @@ describe("run: the gate's pass/fail meaning", () => {
     return dir;
   }
 
+  function ledger(dir: string, testName: string, file = "tests/a.test.ts"): FlakeLedger {
+    const today = new Date().toISOString().slice(0, 10);
+    const deadline = new Date(Date.parse(`${today}T00:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10);
+    return { version: 2, flakes: [{ workspace: dir.split("/").at(-1)!, file, test: testName, owner: "codex-a", date_added: today, deadline, cause: "unknown", log: "/tmp/flake.log", issue: 1 }], serial: {}, skipped: [] };
+  }
+
+  async function quietRun(options: Parameters<typeof run>[0]): Promise<number> {
+    const stdout = process.stdout.write;
+    const stderr = process.stderr.write;
+    const log = console.log;
+    const error = console.error;
+    process.stdout.write = (() => true) as typeof process.stdout.write;
+    process.stderr.write = (() => true) as typeof process.stderr.write;
+    console.log = () => {};
+    console.error = () => {};
+    try { return await run(options); }
+    finally { process.stdout.write = stdout; process.stderr.write = stderr; console.log = log; console.error = error; }
+  }
+
   test("discoverTests finds test files under the root only", () => {
     const dir = fixture({ "a.test.ts": "", "helper.ts": "" });
     try {
@@ -118,9 +137,75 @@ describe("run: the gate's pass/fail meaning", () => {
       "b.test.ts": `import {test,expect} from "bun:test"; test("deliberately red",()=>expect(1).toBe(2));`,
     });
     try {
-      expect(await run({ dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json") })).not.toBe(0);
+      expect(await quietRun({ dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json") })).not.toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  test("an unlisted failure stops the other shards", async () => {
+    const dir = fixture({ "a.test.ts": "", "b.test.ts": "" });
+    const marker = join(dir, "sibling-finished");
+    writeFileSync(join(dir, "tests/a.test.ts"), `import {test,expect} from "bun:test"; test("unlisted red",()=>expect(1).toBe(2));`);
+    writeFileSync(join(dir, "tests/b.test.ts"), `import {test} from "bun:test"; import {writeFileSync} from "node:fs"; test("long sibling",async()=>{await Bun.sleep(1000);writeFileSync(${JSON.stringify(marker)},"done")});`);
+    try {
+      expect(await quietRun({ dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json"), changedFiles: [] })).not.toBe(0);
+      expect(existsSync(marker)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("a listed failure lets all shards finish, reruns that test once, and records FLAKY", async () => {
+    const dir = fixture({ "a.test.ts": "", "b.test.ts": "" });
+    const marker = join(dir, "first-run");
+    const other = join(dir, "other-ran");
+    const aPath = join(dir, "tests/a.test.ts");
+    const bPath = join(dir, "tests/b.test.ts");
+    writeFileSync(aPath, `import {test,expect} from "bun:test"; import {existsSync,writeFileSync} from "node:fs"; test("flaky once",()=>{if(!existsSync(${JSON.stringify(marker)})){writeFileSync(${JSON.stringify(marker)},"seen"); expect(1).toBe(2)} expect(1).toBe(1)});`);
+    writeFileSync(bPath, `import {test} from "bun:test"; import {writeFileSync} from "node:fs"; test("other shard runs",()=>writeFileSync(${JSON.stringify(other)},"ran"));`);
+    const log = join(dir, "events.tsv");
+    const messages: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => messages.push(args.join(" "));
+    try {
+      expect(await run({ dir, root: "tests", shards: 2, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "flaky once"), failureLog: log, changedFiles: [] })).toBe(0);
+      expect(existsSync(other)).toBe(true);
+      expect(readFileSync(log, "utf8")).toContain("flaky\t");
+      expect(messages.join("\n")).toContain("FLAKY");
+    } finally { console.log = originalLog; rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("an expired listed failure is treated as unlisted and red", async () => {
+    const dir = fixture({ "a.test.ts": `import {test,expect} from "bun:test"; test("expired red",()=>expect(1).toBe(2));` });
+    const l = ledger(dir, "expired red");
+    l.flakes[0]!.date_added = "2026-01-01";
+    l.flakes[0]!.deadline = "2026-01-08";
+    try { expect(await quietRun({ dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: l, changedFiles: [] })).not.toBe(0); }
+    finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("a listed failure that fails again on its one rerun stays red", async () => {
+    const dir = fixture({ "a.test.ts": `import {test,expect} from "bun:test"; test("still red",()=>expect(1).toBe(2));` });
+    try { expect(await quietRun({ dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "still red"), changedFiles: [] })).not.toBe(0); }
+    finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("a changed test file is not eligible for the ledger rerun", async () => {
+    const dir = fixture({ "a.test.ts": `import {test,expect} from "bun:test"; test("changed red",()=>expect(1).toBe(2));` });
+    const log = join(dir, "events.tsv");
+    try {
+      expect(await quietRun({ dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "changed red"), changedFiles: ["tests/a.test.ts"], failureLog: log })).not.toBe(0);
+      expect(existsSync(log)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("a matching test title in another file is ambiguous and stays red", async () => {
+    const dir = fixture({ "a.test.ts": "", "b.test.ts": "" });
+    const log = join(dir, "events.tsv");
+    writeFileSync(join(dir, "tests/a.test.ts"), `import {test,expect} from "bun:test"; test("same title",()=>expect(1).toBe(2));`);
+    writeFileSync(join(dir, "tests/b.test.ts"), `import {test,expect} from "bun:test"; test("same title",()=>expect(1).toBe(3));`);
+    try {
+      expect(await quietRun({ dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "same title"), changedFiles: [], failureLog: log })).not.toBe(0);
+      expect(existsSync(log)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

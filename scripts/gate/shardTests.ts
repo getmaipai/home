@@ -19,18 +19,39 @@
 //                from the junit reports of this run
 import { Glob } from "bun";
 import { cpus, freemem, tmpdir, totalmem } from "node:os";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import flakes from "./flakes.json";
+import flakesFile from "./flakes.json";
 
 export type Timings = Record<string, number>;
 
 const TEST_GLOB = "**/*{.test,_test,.spec,_spec}.{ts,tsx,js,jsx,mjs,cjs,mts,cts}";
+export type FlakeEntry = { workspace: string; file: string; test: string; owner: string; date_added: string; deadline: string; cause: string; log: string; issue: number };
+export type FlakeLedger = { version: 2; flakes: FlakeEntry[]; serial: Record<string, { file: string; reason: string }[]>; skipped: { workspace: string; file: string }[] };
+
+export function validateLedger(value: unknown, today = new Date().toISOString().slice(0, 10)): FlakeLedger {
+  if (!value || typeof value !== "object") throw new Error("flake ledger must be an object");
+  const ledger = value as FlakeLedger;
+  if (ledger.version !== 2 || !Array.isArray(ledger.flakes) || !ledger.serial || !Array.isArray(ledger.skipped)) throw new Error("flake ledger must use schema version 2 with flakes, serial, and skipped");
+  if (ledger.skipped.length !== 0) throw new Error("flake ledger skipped must stay empty");
+  const causes = new Set(["clock", "port", "network", "shared-state", "load-timeout", "order", "random", "unknown"]);
+  const live = ledger.flakes.filter((entry) => entry.deadline >= today);
+  if (live.length > 8) throw new Error(`flake ledger has ${live.length} live entries; maximum is 8`);
+  for (const entry of ledger.flakes) {
+    if (!entry.workspace || !entry.file || !entry.test || !entry.owner || !entry.log || !Number.isInteger(entry.issue) || entry.issue < 1 || !causes.has(entry.cause)) throw new Error(`invalid flake ledger entry: ${JSON.stringify(entry)}`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date_added) || !/^\d{4}-\d{2}-\d{2}$/.test(entry.deadline)) throw new Error(`flake dates must be YYYY-MM-DD: ${entry.file} ${entry.test}`);
+    const days = (Date.parse(`${entry.deadline}T00:00:00Z`) - Date.parse(`${entry.date_added}T00:00:00Z`)) / 86400000;
+    if (days < 0 || days > 7 || entry.date_added > today) throw new Error(`flake deadline must be within seven days of a non-future date: ${entry.file} ${entry.test}`);
+  }
+  return ledger;
+}
+
+const flakes = validateLedger(flakesFile);
 const SERIAL_FILES: Record<string, string[]> = Object.fromEntries(
   Object.entries(flakes.serial).map(([workspace, entries]) => [workspace, entries.map(({ file }) => file)]),
 );
 const SKIPPED_FILES: Record<string, string[]> = Object.fromEntries(
-  Object.entries((flakes.skipped as { workspace: string; file: string }[]).reduce<Record<string, string[]>>((byWorkspace, entry) => {
+  Object.entries(flakes.skipped.reduce<Record<string, string[]>>((byWorkspace, entry) => {
     (byWorkspace[entry.workspace] ??= []).push(entry.file);
     return byWorkspace;
   }, {})).map(([workspace, files]) => [workspace, files]),
@@ -170,6 +191,9 @@ export interface RunOptions {
   record?: boolean;
   extraArgs?: string[];
   timingsPath?: string;
+  ledger?: FlakeLedger;
+  failureLog?: string;
+  changedFiles?: string[];
 }
 
 export async function run(opts: RunOptions): Promise<number> {
@@ -178,6 +202,7 @@ export async function run(opts: RunOptions): Promise<number> {
   const timingsPath = opts.timingsPath ?? join(import.meta.dir, "test-timings.json");
   const allTimings: Record<string, Timings> = existsSync(timingsPath) ? JSON.parse(readFileSync(timingsPath, "utf8")) : {};
   const discovered = discoverTests(dir, opts.root ?? ".");
+  const ledger = validateLedger(opts.ledger ?? flakes);
   const serial = SERIAL_FILES[label] ?? [];
   const skipped = SKIPPED_FILES[label] ?? [];
   const files = discovered.filter((f) => !serial.includes(f) && !skipped.includes(f));
@@ -202,7 +227,25 @@ export async function run(opts: RunOptions): Promise<number> {
     files: string[];
   }
   const live: Live[] = [];
-  let firstFail: { shard: Live; code: number } | null = null;
+  let firstFail: { shard: Live; code: number; line?: string } | null = null;
+  const flakyCandidates = new Map<string, { entry: FlakeEntry; line: string }>();
+  const liveEntries = ledger.flakes.filter((entry) => entry.deadline >= new Date().toISOString().slice(0, 10));
+  const changedFiles = opts.changedFiles ?? changedTestFiles(dir, liveEntries);
+  const eligible = (entry: FlakeEntry) => entry.workspace === label && !changedFiles.includes(entry.file);
+  const uniqueTestFile = (entry: FlakeEntry) => {
+    const leaf = entry.test.split(" > ").at(-1) ?? entry.test;
+    const quotedTitle = new RegExp(`\\b(?:test|it)\\s*\\(\\s*(["'\x60])${leaf.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\1`);
+    return discovered.filter((file) => quotedTitle.test(readFileSync(join(dir, file), "utf8")));
+  };
+  const recordFlaky = (entry: FlakeEntry, line: string) => {
+    if (opts.failureLog ?? process.env.GATE_FAILURE_LOG) appendFileSync(opts.failureLog ?? process.env.GATE_FAILURE_LOG as string, `flaky\t${entry.workspace}/${entry.file} > ${entry.test}\t${entry.owner}\t${entry.deadline}\t${line}\n`);
+  };
+  const cleanFailureName = (line: string) => line.replace(/^\(fail\)\s*/, "").replace(/\s+\[[^\]]+\]\s*$/, "").trim();
+  const isListed = (line: string, shardFiles: string[]) => {
+    const name = cleanFailureName(line);
+    const found = liveEntries.filter((entry) => eligible(entry) && shardFiles.includes(entry.file) && entry.test === name && uniqueTestFile(entry).length === 1 && uniqueTestFile(entry)[0] === entry.file);
+    return found.length === 1 ? found[0] : undefined;
+  };
   const stopAll = (except?: Live) => {
     for (const s of live) if (s !== except) killTree(s.proc.pid);
   };
@@ -212,7 +255,7 @@ export async function run(opts: RunOptions): Promise<number> {
     Bun.spawnSync(["mkdir", "-p", tmp]);
     const logPath = join(scratch, `s${index}.log`);
     const junit = join(scratch, `s${index}.xml`);
-    const args = ["test", "--bail", ...(opts.record ? [`--reporter=junit`, `--reporter-outfile=${junit}`] : []), ...(opts.extraArgs ?? []), ...shardFiles.map((f) => (f.startsWith("./") ? f : `./${f}`))];
+    const args = ["test", ...(opts.record ? [`--reporter=junit`, `--reporter-outfile=${junit}`] : []), ...(opts.extraArgs ?? []), ...shardFiles.map((f) => (f.startsWith("./") ? f : `./${f}`))];
     const proc = Bun.spawn(["bun", ...args], {
       cwd: dir,
       env: { ...process.env, TMPDIR: tmp },
@@ -220,15 +263,42 @@ export async function run(opts: RunOptions): Promise<number> {
       // other (a test that prints to stdout clobbered bun's own summary on
       // stderr, so a green shard read as "ran 1 of 9 files"): stdout gets
       // its own file and readShardLog() joins them, the summary last.
-      stdout: Bun.file(`${logPath}.out`),
-      stderr: Bun.file(logPath),
+      stdout: "pipe",
+      stderr: "pipe",
     });
     const shard: Live = { index, proc, logPath, junit, files: shardFiles, done: Promise.resolve(0) };
-    shard.done = proc.exited.then((code) => {
-      if (code !== 0 && !firstFail) {
-        firstFail = { shard, code };
-        stopAll(shard);
+    const drain = async (stream: ReadableStream<Uint8Array>, path: string) => {
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let pending = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        appendFileSync(path, chunk);
+        pending += chunk;
+        const lines = pending.split(/\r?\n/);
+        pending = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("(fail)")) continue;
+          const entry = isListed(line, shardFiles);
+          if (entry) flakyCandidates.set(`${entry.workspace}/${entry.file}\0${entry.test}`, { entry, line });
+          else if (!firstFail) {
+            firstFail = { shard, code: 1, line };
+            stopAll(shard);
+          }
+        }
       }
+      if (pending.startsWith("(fail)")) {
+        const entry = isListed(pending, shardFiles);
+        if (entry) flakyCandidates.set(`${entry.workspace}/${entry.file}\0${entry.test}`, { entry, line: pending });
+        else if (!firstFail) { firstFail = { shard, code: 1, line: pending }; stopAll(shard); }
+      }
+    };
+    shard.done = Promise.all([drain(proc.stdout, `${logPath}.out`), drain(proc.stderr, logPath), proc.exited]).then(([, , code]) => {
+      const failures = failedTests(readShardLog(logPath));
+      const allListed = failures.length > 0 && failures.every((line) => isListed(line, shardFiles));
+      if (code !== 0 && !allListed && !firstFail) { firstFail = { shard, code }; stopAll(shard); }
       return code;
     });
     live.push(shard);
@@ -248,22 +318,48 @@ export async function run(opts: RunOptions): Promise<number> {
   // avoid cross-file multicast and process-global fetch interference.
   for (const file of serialFiles) {
     if (firstFail) break;
-    const proc = Bun.spawn(["bun", "test", "--bail", file.startsWith("./") ? file : `./${file}`], {
+    const proc = Bun.spawn(["bun", "test", file.startsWith("./") ? file : `./${file}`], {
       cwd: dir,
       env: process.env,
-      stdout: "inherit",
-      stderr: "inherit",
+      stdout: "pipe",
+      stderr: "pipe",
     });
+    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
     const code = await proc.exited;
-    if (code !== 0) firstFail = { shard: { index: plan.length, proc, logPath: "", junit: "", files: [file], done: Promise.resolve(code) }, code };
+    process.stdout.write(stdout);
+    process.stderr.write(stderr);
+    if (code !== 0) {
+      const failures = failedTests(`${stdout}\n${stderr}`);
+      const allListed = failures.length > 0 && failures.every((line) => isListed(line, [file]));
+      if (allListed) for (const line of failures) { const entry = isListed(line, [file]); if (entry) flakyCandidates.set(`${entry.workspace}/${entry.file}\0${entry.test}`, { entry, line }); }
+      else firstFail = { shard: { index: plan.length, proc, logPath: "", junit: "", files: [file], done: Promise.resolve(code) }, code, line: failures[0] };
+    }
+  }
+
+  // Rerun each listed, unchanged test once, by its exact name, after all
+  // shards have finished. Expired entries were excluded above and therefore
+  // fail fast as ordinary failures.
+  if (!firstFail) for (const { entry, line } of flakyCandidates.values()) {
+    const exactName = `^${entry.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
+    const proc = Bun.spawn(["bun", "test", entry.file, "-t", exactName], { cwd: dir, env: process.env, stdout: "pipe", stderr: "pipe" });
+    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+    const rerunCode = await proc.exited;
+    if (rerunCode !== 0) {
+      process.stdout.write(stdout);
+      process.stderr.write(stderr);
+      firstFail = { shard: { index: plan.length, proc, logPath: "", junit: "", files: [entry.file], done: Promise.resolve(rerunCode) }, code: rerunCode, line };
+      break;
+    }
+    console.log(`FLAKY ${entry.workspace}/${entry.file} > ${entry.test} (passed on one isolated rerun)`);
+    recordFlaky(entry, line);
   }
 
   const elapsed = (Date.now() - started) / 1000;
   let code = 0;
-  const failure = firstFail as { shard: Live; code: number } | null;
+  const failure = firstFail as { shard: Live; code: number; line?: string } | null;
   if (failure) {
     code = failure.code;
-    const out = readShardLog(failure.shard.logPath);
+    const out = failure.shard.logPath ? readShardLog(failure.shard.logPath) : (failure.line ?? "");
     const lines = out.split("\n");
     console.log(`== shard ${failure.shard.index + 1}/${plan.length} FAILED (exit ${code}); the other shards were stopped. Its last 120 lines:`);
     console.log(lines.slice(-120).join("\n"));
@@ -299,6 +395,16 @@ export async function run(opts: RunOptions): Promise<number> {
   }
   rmSync(scratch, { recursive: true, force: true });
   return code;
+}
+
+function changedTestFiles(dir: string, entries: FlakeEntry[]): string[] {
+  if (!entries.length) return [];
+  const base = process.env.GATE_DIFF_BASE;
+  if (!base) return entries.map((entry) => entry.file);
+  const result = Bun.spawnSync(["git", "diff", "--name-only", base, "--", ...entries.map((entry) => entry.file)], { cwd: dir });
+  const untracked = Bun.spawnSync(["git", "ls-files", "--others", "--exclude-standard", "--", ...entries.map((entry) => entry.file)], { cwd: dir });
+  if (result.exitCode !== 0 || untracked.exitCode !== 0) return entries.map((entry) => entry.file);
+  return [...new Set([...result.stdout.toString().split(/\r?\n/), ...untracked.stdout.toString().split(/\r?\n/)].filter(Boolean))];
 }
 
 /** Reclaimable memory in GB (free + inactive + speculative pages on macOS, MemAvailable on Linux). */

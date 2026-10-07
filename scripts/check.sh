@@ -475,7 +475,7 @@ run_tests() {
   if [ "${MAIPAI_GATE_SHARDED:-1}" = 0 ]; then
     (cd "$dir" && bun test)
   else
-    bun scripts/gate/shardTests.ts --dir "$dir" --root "$root" ${shards:+--shards "$shards"}
+    GATE_FAILURE_LOG="$GATE_FAILURE_LOG" GATE_DIFF_BASE="${GATE_DIFF_BASE:-}" bun scripts/gate/shardTests.ts --dir "$dir" --root "$root" ${shards:+--shards "$shards"}
   fi
 }
 
