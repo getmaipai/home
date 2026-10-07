@@ -148,6 +148,67 @@ describe("StoragePage", () => {
     }
   });
 
+  test("household quota banner shows remaining storage and the meter near cap, at cap and at a normal level", async () => {
+    const cap = 20 * 1024 ** 3;
+    for (const scenario of [
+      { title: "near cap", used: 19 * 1024 ** 3, left: "1 GB left", percent: "95" },
+      { title: "at cap", used: cap, left: "0 B left", percent: "100" },
+      { title: "normal", used: 4 * 1024 ** 3, left: "16 GB left", percent: "20" },
+    ]) {
+      const restore = mockFetch(makeOverview({ household: { usageBytes: scenario.used, capBytes: cap, inherited: { files: 0, bytes: 0 } } }));
+      try {
+        const { getByRole, unmount } = renderWithQueryClient(
+          <MemoryRouter>
+            <StoragePage person={makePerson()} />
+          </MemoryRouter>,
+        );
+        await waitFor(() => expect(document.body.textContent).toContain("Household total"));
+        expect(document.body.textContent).toContain(scenario.left);
+        expect(getByRole("meter", { name: "bytes used" }).getAttribute("aria-valuenow")).toBe(scenario.percent);
+        unmount();
+      } finally {
+        restore();
+      }
+    }
+  });
+
+  test("a zero or negative household cap keeps the no-cap copy and hides the banner", async () => {
+    for (const capBytes of [0, -1]) {
+      const restore = mockFetch(makeOverview({ household: { usageBytes: 1024, capBytes, inherited: { files: 0, bytes: 0 } } }));
+      try {
+        const { container, unmount } = renderWithQueryClient(
+          <MemoryRouter>
+            <StoragePage person={makePerson()} />
+          </MemoryRouter>,
+        );
+        await waitFor(() => expect(document.body.textContent).toContain("1 KB used, no cap set"));
+        expect(container.querySelector('[data-slot="quota-banner"]')).toBeNull();
+        unmount();
+      } finally {
+        restore();
+      }
+    }
+  });
+
+  test("a teen sees only the teen's returned row", async () => {
+    const restore = mockFetch(makeOverview({
+      people: [{ personId: "teen-1", displayName: "Robin", role: "teen", usageBytes: 2048, capBytes: 20 * 1024 ** 3, byKind: [] }],
+      household: null,
+    }));
+    try {
+      renderWithQueryClient(
+        <MemoryRouter>
+          <StoragePage person={makePerson({ id: "teen-1", role: "teen" })} />
+        </MemoryRouter>,
+      );
+      await waitFor(() => expect(document.body.textContent).toContain("Robin"));
+      expect(document.body.textContent).not.toContain("Nova");
+      expect(document.body.textContent).not.toContain("Household total");
+    } finally {
+      restore();
+    }
+  });
+
   test("a failed fetch shows an error and a retry button, never a stuck loading state", async () => {
     const restore = mockFetch({ status: 500 });
     try {
