@@ -1,0 +1,95 @@
+"use client";
+
+// CHAT-HEADER-02: the header's left slot (CHAT-HEADER-01's
+// `HeaderExtraLeft`) shows the current app's icon before its title on
+// every /next page, drawn from the one definition the sidebar already
+// reads - never a second icon table. `SidebarContent` (commons
+// `sidebaritems.ts`) is that definition for the four pages it lists
+// (Home, Chat, Tools, People). The five "Manage" pages plus Settings
+// (`sidebaritems.ts`'s own comment: ui-v0.5.23's ruling moved them off
+// the rail entirely; Settings lives in `NavUser.tsx`'s bottom-of-rail
+// slot instead, an inline array with no exported constant) have no
+// sidebar entry to mirror at all - a review (2026-09-23) caught the
+// first version of this file re-declaring each of those six pages'
+// own icon choice a second time here, exactly the second table the
+// objective says to avoid, with nothing keeping the two copies in
+// sync. Each of those six pages now exports its own icon constant
+// instead (`EnginesIcon`, `SettingsIcon`, `PerformanceIcon`,
+// `UpdatesIcon`, `RepairsIcon`, `BackupsIcon`), imported here directly -
+// one definition, that page's own, not a copy of it.
+import { useLocation } from "react-router-dom";
+import type { Icon } from "@maipai/ui/src/icons";
+import SidebarContent from "@maipai/ui/src/dashboard/layouts/full/vertical/sidebar/sidebaritems";
+import { EnginesIcon } from "@/shell/pages/EnginesPage";
+import { PerformanceIcon } from "@/shell/pages/PerformancePage";
+import { UpdatesIcon } from "@/shell/pages/UpdatesPage";
+import { RepairsIcon } from "@/shell/pages/RepairsPage";
+import { BackupsIcon } from "@/shell/pages/BackupsPage";
+import { StorageIcon } from "@/shell/pages/StoragePage";
+import { VoicesIcon } from "@/shell/pages/VoicesPage";
+import { CommandsIcon } from "@/shell/pages/CommandsPage";
+import { DevicesIcon } from "@/shell/pages/DevicesPage";
+import { PrivacyIcon } from "@/shell/pages/PrivacyPage";
+import { UsersIcon } from "@/shell/pages/UsersPage";
+import { ModelsIcon } from "@/shell/pages/ModelsPage";
+import { FilesIcon } from "@/shell/pages/FilesPage";
+import { StatusIcon } from "@/shell/pages/StatusPage";
+
+interface PageHeaderEntry {
+  icon: Icon;
+  label: string;
+}
+
+const sidebarEntries = new Map<string, PageHeaderEntry>();
+for (const group of SidebarContent) {
+  for (const item of group.items ?? []) {
+    if (item.url && item.icon && item.name) {
+      const path = item.url.replace(/^\/next(?=\/|$)/, "") || "/";
+      sidebarEntries.set(path, { icon: item.icon, label: item.name });
+    }
+  }
+}
+
+const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
+  "/storage": { icon: StorageIcon, label: "Storage" },
+  "/status": { icon: StatusIcon, label: "Status" },
+  "/engines": { icon: EnginesIcon, label: "Engines" },
+  "/performance": { icon: PerformanceIcon, label: "Performance" },
+  "/updates": { icon: UpdatesIcon, label: "Updates" },
+  "/repairs": { icon: RepairsIcon, label: "Repairs" },
+  "/backups": { icon: BackupsIcon, label: "Backups" },
+  "/voices": { icon: VoicesIcon, label: "Voices" },
+  "/commands": { icon: CommandsIcon, label: "Commands" },
+  "/devices": { icon: DevicesIcon, label: "Devices" },
+  "/privacy": { icon: PrivacyIcon, label: "Privacy" },
+  "/users": { icon: UsersIcon, label: "Users" },
+  "/models": { icon: ModelsIcon, label: "AI models" },
+  "/files": { icon: FilesIcon, label: "Library" },
+};
+
+function entryFor(pathname: string): PageHeaderEntry | undefined {
+  if (pathname.startsWith("/people/")) return sidebarEntries.get("/people");
+  return sidebarEntries.get(pathname) ?? MANAGE_PAGE_ENTRIES[pathname];
+}
+
+/** Mounted once per non-chat `/` page (`PageHeaderLayout` in
+ * `Routes.tsx`) - a stable module-level reference (`useHeaderExtra`'s
+ * own requirement), reading the current route itself via `useLocation()`
+ * rather than needing a fresh identity per page. Chat has its own icon,
+ * prepended directly in `chatHeaderBar.tsx` instead of through this
+ * lookup - it never mounts this component at all. */
+export function PageHeaderTitle() {
+  const location = useLocation();
+  const entry = entryFor(location.pathname);
+  // Unreachable in practice - PageHeaderLayout only wraps the exact
+  // routes this table covers - but a route added to one and not the
+  // other should read as a blank header slot, never a crash.
+  if (!entry) return null;
+  const PageIcon = entry.icon;
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-2 px-2">
+      <PageIcon className="text-muted-foreground size-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate text-base font-medium">{entry.label}</span>
+    </div>
+  );
+}

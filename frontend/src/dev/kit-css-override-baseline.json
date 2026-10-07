@@ -1,5 +1,5 @@
 {
-  "next/pages/nextChatTouchTargets.css": {
+  "shell/pages/chatTouchTargets.css": {
     "[data-slot=\"next-chat-pane\"] .aui-assistant-action-bar-root button": {
       "properties": [
         "position"

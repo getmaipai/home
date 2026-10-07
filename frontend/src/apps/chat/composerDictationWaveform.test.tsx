@@ -67,7 +67,7 @@ describe("ComposerDictationWaveform", () => {
 
   // CHAT-CALM-ERRORS-01d (design section 7): while chat is paused or
   // starting the field stays usable so a thought is not lost; the composer
-  // line says why (NextChatPage.calmErrors.test.tsx), and Enter sends nothing.
+  // line says why (ChatPage.calmErrors.test.tsx), and Enter sends nothing.
   test.each(["unavailable", "starting"] as const)("%s keeps the input usable with the plain placeholder, and Enter sends nothing", async (availability) => {
     runs = 0;
     const { getByLabelText } = render(<Harness meter={null} availability={availability} />);

@@ -22,7 +22,7 @@
   ],
   "apps/chat/chatThreadSlots.tsx": [
     "ChatComposerNotice",
-    "NextChatWelcome",
+    "ChatWelcome",
     "SourcesActionBarTrigger",
     "SourcesFooterContent",
     "MessageDetailsReveal"
@@ -42,21 +42,21 @@
   "apps/chat/liveVoiceSession.tsx": [
     "LiveVoiceSession"
   ],
-  "next/pages/ChatColumn.tsx": [
+  "shell/pages/ChatColumn.tsx": [
     "ChatColumnToggle",
     "ChatHistoryPanel"
   ],
-  "next/pages/ChatShortcutReference.tsx": [
+  "shell/pages/ChatShortcutReference.tsx": [
     "ChatShortcutReference"
   ],
-  "next/pages/NextChatPage.tsx": [
-    "NextChatPage"
+  "shell/pages/ChatPage.tsx": [
+    "ChatPage"
   ],
-  "next/pages/NextUiShowcasePage.tsx": [
+  "shell/pages/UiShowcasePage.tsx": [
     "ShowcaseWorkspace",
-    "NextUiShowcasePage"
+    "UiShowcasePage"
   ],
-  "next/pages/TurnErrorDetails.tsx": [
+  "shell/pages/TurnErrorDetails.tsx": [
     "DetailBody",
     "StoredDetail"
   ]

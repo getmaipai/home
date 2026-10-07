@@ -221,7 +221,7 @@ describe("ChatThread", () => {
     // spec-sheet tool binding
     expect(view.container.textContent).toContain("Weather in Springfield");
     expect(view.container.textContent).toContain("21 C");
-    // reasoning group slot (NextReasoningGroup)
+    // reasoning group slot (ReasoningGroup)
     expect(view.container.textContent?.toLowerCase()).toContain("reasoning");
     // The "sources" binding keeps the fallback tool card out of the message body.
     expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();

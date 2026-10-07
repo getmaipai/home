@@ -704,7 +704,7 @@ describe("createChatModelAdapter reasoning (SHELL-02)", () => {
 // SHELL-02 slice 3: weather's and almanac-date's own structured result
 // (wire.ts's `structured_part`) becomes a real ToolCallMessagePart, not
 // Home-drawn prose - `toolName` is the producing package's own real
-// id (`structured_part.tool_id`), so NextChatPage.tsx's registered
+// id (`structured_part.tool_id`), so ChatPage.tsx's registered
 // spec-sheet render (and, for anything else, Thread's own built-in
 // ToolFallback) both key on something honest.
 describe("createChatModelAdapter structured results (SHELL-02 slice 3)", () => {
@@ -749,7 +749,7 @@ describe("createChatModelAdapter structured results (SHELL-02 slice 3)", () => {
 // that just parked a confirm_needed/consent_needed ask (turnNext.ts's
 // finishTurn() "asked" branch) - becomes a real ToolCallMessagePart the
 // same way structured_part/artifact above do, `toolName: "confirm"`
-// (ConfirmTool's own registration, NextChatPage.tsx), card before the
+// (ConfirmTool's own registration, ChatPage.tsx), card before the
 // prose that carries the actual question text.
 describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
   test("confirm on the done event becomes a real tool-call part, under the prose that asks (APPROVE-CALM-01)", async () => {
@@ -790,7 +790,7 @@ describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
   // The same single-shot shape consumeSpoken()/consumeTemporary()/
   // consumePackageScope() already establish - consumeAskAnswer() is the
   // one place `ask_answer` ever reaches the wire (ConfirmTool's own
-  // respondToApproval handler, NextChatPage.tsx).
+  // respondToApproval handler, ChatPage.tsx).
   test("consumeAskAnswer() arms ask_answer on the request, once, then resets", async () => {
     const env = stubEnvironment(
       ndjsonStream([
@@ -822,7 +822,7 @@ describe("createChatModelAdapter confirm results (APPROVE-CARD-01)", () => {
 
 // PROJECT-PROGRESS-01: `start_project`'s own outcome names the project id
 // it just launched (wire.ts's `TurnValue.project`) - a real
-// ToolCallMessagePart here, `toolName: "project"` (NextChatPage.tsx's
+// ToolCallMessagePart here, `toolName: "project"` (ChatPage.tsx's
 // registered JobProgress render polls GET /api/projects/:id for the rest).
 // AFTER the text, not before, since 2026-09-27 (Jesse found live): a
 // project's card is a "here's what came of that" footer like sources, the
@@ -881,7 +881,7 @@ describe("createChatModelAdapter project progress (PROJECT-PROGRESS-01)", () => 
 // be the default when generating an artifact that requires the
 // canvas" - `onArtifactReady` fires exactly once, right where `artifact`
 // (chatModelAdapter.ts) is known non-null on the turn's own terminal
-// event, so NextChatPage.tsx can open the canvas with no click needed.
+// event, so ChatPage.tsx can open the canvas with no click needed.
 describe("createChatModelAdapter onArtifactReady", () => {
   test("a write_document reply calls onArtifactReady with the new artifact's id", async () => {
     const env = stubEnvironment(

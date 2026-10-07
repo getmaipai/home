@@ -22,7 +22,7 @@
 // whenever it changes, a second effect watches `isSpeaking` (relayed
 // from chatModelAdapter.ts's own onSpeakingChange, since a live
 // SentenceSpeechScheduler's start/end events happen inside
-// useNextChatRuntime, not here) and bumps the generation once a reply
+// useChatRuntime, not here) and bumps the generation once a reply
 // finishes speaking - the whole state machine is a value the mount
 // effect reacts to, never a manually chained callback tree.
 import { useEffect, useRef, useState } from "react";
@@ -53,7 +53,7 @@ export interface LiveVoiceSessionProps {
    * implementation. */
   startCapture?: typeof startMicCapture;
   /** chatModelAdapter.ts's own onSpeakingChange, relayed through
-   * useNextChatRuntime as real state - the only way this component (a
+   * useChatRuntime as real state - the only way this component (a
    * sibling of the runtime hook, not inside it) learns the live
    * scheduler's own start/end. */
   isSpeaking: boolean;
@@ -61,7 +61,7 @@ export interface LiveVoiceSessionProps {
    * never spoke at all (empty, or every sentence's TTS synthesis
    * failed) - onFirstAudio never fires, so the "speaking ended" call
    * arrives with `isSpeaking` already false, a same-value React update
-   * that never re-runs the effect below. Bumped by useNextChatRuntime
+   * that never re-runs the effect below. Bumped by useChatRuntime
    * on every "false" call regardless of the previous value - depended
    * on instead of `isSpeaking` alone so "speaking is over" is never
    * missed. */
@@ -205,7 +205,7 @@ export function LiveVoiceSession({ open, onOpenChange, turnSchedulerRef, liveVoi
   }, [open, listenGeneration]);
 
   // The speaking half of the loop: chatModelAdapter.ts's own scheduler
-  // fires this through useNextChatRuntime's state. Its own onEnded also
+  // fires this through useChatRuntime's state. Its own onEnded also
   // fires when NOTHING was ever scheduled at all (an empty reply, or
   // every sentence's synthesis failed) - checked against "thinking" too,
   // not only "speaking", so that case still resumes listening instead of

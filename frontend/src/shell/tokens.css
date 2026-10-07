@@ -13,7 +13,7 @@
  * `md:`/`lg:`/`xl:` responsive variant on every /next page). Imported
  * first, so its `@theme`/`:root`/`.dark` land before this file's own
  * `@import`ed tokens.css and Home's own overrides below, which both
- * still need to win the cascade. `/next`'s own `NextRoutes.tsx` used to
+ * still need to win the cascade. `/next`'s own `Routes.tsx` used to
  * import `globals.css` a second time as its own lazy chunk - that
  * import is gone; this is the only place it's ever loaded now. */
 @import "@maipai/ui/src/dashboard/css/globals.css";
@@ -746,7 +746,7 @@ header nav a:has(> img[alt="logo"]) {
  * collapses and frees more width than the cap uses - found live,
  * 2026-09-21, "New Thread" sitting ~75px into empty space instead of
  * flush against the rail. `:has()` targets the one page that needs the
- * cap gone (NextChatPage.tsx's own `data-slot="next-chat-shell"` marks
+ * cap gone (ChatPage.tsx's own `data-slot="next-chat-shell"` marks
  * it) without touching the vendored layout file or any other page -
  * the kit wraps and composes, so this reaches through the one surface
  * it already exposes (a CSS class) rather than forking the component
@@ -759,7 +759,7 @@ header nav a:has(> img[alt="logo"]) {
   margin-inline: 0;
 }
 
-/* CHAT-UI-01 finding 3, the other half (NextChatPage.tsx's own
+/* CHAT-UI-01 finding 3, the other half (ChatPage.tsx's own
  * `overflow-hidden` on `next-chat-shell` stops the page from growing
  * taller than the fixed viewport; this stops the browser's own scroll
  * chaining once it's already at that boundary): FullLayout.tsx's

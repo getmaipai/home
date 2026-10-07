@@ -81,7 +81,7 @@ describe("createSttDictationAdapter", () => {
   // DICT-01 acceptance, coordinator's own words: "with STT assets
   // missing, clicking the mic shows the not-installed message and the
   // composer still sends text." The composer-still-sends half is
-  // NextChatPage.test.tsx's job (nothing here touches the composer at
+  // ChatPage.test.tsx's job (nothing here touches the composer at
   // all); this is the adapter's own half - no socket, no mic prompt, a
   // session that's already over the instant `listen()` returns.
   test("STT not installed: no socket opens, no mic prompt, onNotInstalled fires, session ends immediately", () => {

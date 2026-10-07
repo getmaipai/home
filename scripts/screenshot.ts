@@ -59,7 +59,7 @@ import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
 import { startScreenshotStack } from "./screenshotStack";
 import { assistantStreamBody } from "../frontend/tests/assistantStreamBody";
-import { RICH_REPLY_MARKDOWN, RICH_REPLY_PROMPT } from "../frontend/src/next/pages/richReplyFixture";
+import { RICH_REPLY_MARKDOWN, RICH_REPLY_PROMPT } from "../frontend/src/shell/pages/richReplyFixture";
 import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
 // getmaipai/home#114: each backend asks Bun.serve() to bind port 0 atomically and reports

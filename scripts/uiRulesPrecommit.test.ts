@@ -55,31 +55,31 @@ describe("scripts/ui-rules-precommit.sh", () => {
   });
 
   test("a clean frontend change passes", () => {
-    stage("frontend/src/next/Clean.tsx", `import { Button } from "@maipai/ui/src/ui/button";\nexport const kit = { Button };\n`);
+    stage("frontend/src/shell/Clean.tsx", `import { Button } from "@maipai/ui/src/ui/button";\nexport const kit = { Button };\n`);
     expect(hook().code).toBe(0);
     run(["git", "reset", "-q"]);
   });
 
   test("a className override on a kit part is rejected with the file, element and the remedy", () => {
-    stage("frontend/src/next/Seed.tsx", `import { Button } from "@maipai/ui/src/ui/button";\nexport const Seed = () => <Button className="rounded-full p-4">x</Button>;\n`);
+    stage("frontend/src/shell/Seed.tsx", `import { Button } from "@maipai/ui/src/ui/button";\nexport const Seed = () => <Button className="rounded-full p-4">x</Button>;\n`);
     const r = hook();
     expect(r.code).toBe(1);
     expect(r.out).toContain("commit refused");
-    expect(r.out).toContain("next/Seed.tsx");
+    expect(r.out).toContain("shell/Seed.tsx");
     expect(r.out).toContain("<Button>");
     expect(r.out).toContain("Use the Element as it ships");
     run(["git", "reset", "-q"]);
-    rmSync(join(dir, "frontend/src/next/Seed.tsx"));
+    rmSync(join(dir, "frontend/src/shell/Seed.tsx"));
   });
 
   test("a new wrapper around a kit Element is rejected", () => {
-    stage("frontend/src/next/SeedPanel.tsx", `import { Card } from "@maipai/ui/src/dashboard/components/ui/card";\nexport function SeedPanel() { return <Card />; }\n`);
+    stage("frontend/src/shell/SeedPanel.tsx", `import { Card } from "@maipai/ui/src/dashboard/components/ui/card";\nexport function SeedPanel() { return <Card />; }\n`);
     const r = hook();
     expect(r.code).toBe(1);
     expect(r.out).toContain("SeedPanel");
     expect(r.out).toContain("wrapper");
     run(["git", "reset", "-q"]);
-    rmSync(join(dir, "frontend/src/next/SeedPanel.tsx"));
+    rmSync(join(dir, "frontend/src/shell/SeedPanel.tsx"));
   });
 
   test("a baseline that grew is rejected before the scan", () => {
@@ -93,7 +93,7 @@ describe("scripts/ui-rules-precommit.sh", () => {
   });
 
   test("the documented skip lets the hook pass, and says so", () => {
-    stage("frontend/src/next/Seed2.tsx", `import { Button } from "@maipai/ui/src/ui/button";\nexport const S = () => <Button className="rounded-full">x</Button>;\n`);
+    stage("frontend/src/shell/Seed2.tsx", `import { Button } from "@maipai/ui/src/ui/button";\nexport const S = () => <Button className="rounded-full">x</Button>;\n`);
     const r = hook({ MAIPAI_SKIP_UI_RULES: "1" });
     expect(r.code).toBe(0);
     expect(r.out).toContain("the gate still runs it");

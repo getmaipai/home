@@ -104,7 +104,7 @@
       "showcaseScenario": "NEW: confirm-ask (open and answered)",
       "batch": 3,
       "replacesHandBuilt": [
-        "frontend/src/next/pages/NextChatPage.tsx:421-480"
+        "frontend/src/shell/pages/ChatPage.tsx:421-480"
       ],
       "realTurnToday": true,
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
@@ -681,7 +681,7 @@
       "showcaseScenario": "NEW: empty-state (adult, child)",
       "batch": 2,
       "replacesHandBuilt": [
-        "frontend/src/next/pages/NextChatPage.tsx:780-816"
+        "frontend/src/shell/pages/ChatPage.tsx:780-816"
       ],
       "realTurnToday": true,
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
@@ -994,7 +994,7 @@
       "showcaseScenario": "search",
       "batch": 5,
       "replacesHandBuilt": [
-        "frontend/src/next/pages/NextChatPage.tsx:986-1040"
+        "frontend/src/shell/pages/ChatPage.tsx:986-1040"
       ],
       "realTurnToday": true,
       "verdictReason": "Deferred until THIN-4B [n] to source mapping (chatCitations.ts)."
@@ -1210,7 +1210,7 @@
       "batch": 3,
       "replacesHandBuilt": [
         "frontend/src/apps/chat/chatActionBar.tsx:116-265",
-        "frontend/src/next/pages/NextChatPage.tsx:284-372"
+        "frontend/src/shell/pages/ChatPage.tsx:284-372"
       ],
       "realTurnToday": true,
       "verdictReason": "No-fit as a standalone demo; the kit Thread renders its runtime AssistantActionBar.",
@@ -1301,7 +1301,7 @@
       "batch": 1,
       "replacesHandBuilt": [
         "frontend/src/apps/chat/chatTurnStats.tsx:24-61",
-        "frontend/src/next/pages/NextChatPage.tsx:1041-1100"
+        "frontend/src/shell/pages/ChatPage.tsx:1041-1100"
       ],
       "realTurnToday": true,
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
@@ -1842,7 +1842,7 @@
       "showcaseScenario": "search",
       "batch": 3,
       "replacesHandBuilt": [
-        "frontend/src/next/pages/NextChatPage.tsx:929-1040",
+        "frontend/src/shell/pages/ChatPage.tsx:929-1040",
         "frontend/src/apps/chat/chatSourceCaption.tsx:19-67"
       ],
       "realTurnToday": true,
@@ -2175,7 +2175,7 @@
       "showcaseScenario": "NEW: thread-search",
       "batch": 4,
       "replacesHandBuilt": [
-        "frontend/src/next/pages/NextChatPage.tsx:1372-1875"
+        "frontend/src/shell/pages/ChatPage.tsx:1372-1875"
       ],
       "realTurnToday": true,
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."

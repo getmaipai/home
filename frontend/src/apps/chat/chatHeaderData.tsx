@@ -4,14 +4,14 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
  * `useHeaderExtra(Component)`) takes a stable COMPONENT reference, mounted
  * by FullLayout's own Header - a sibling of `/next/chat`'s own Outlet
  * content, never a descendant of it. That means `ChatHeaderBar` (the
- * component NextChatPage.tsx hands to `useHeaderExtra`) renders OUTSIDE
- * NextChatPage's own AssistantRuntimeProvider tree, so it can't call
+ * component ChatPage.tsx hands to `useHeaderExtra`) renders OUTSIDE
+ * ChatPage's own AssistantRuntimeProvider tree, so it can't call
  * `useAui()`/`useAuiState()` directly - there is no runtime in its own
  * ancestry to read.
  *
- * This context bridges the gap: NextRoutesInner (NextRoutes.tsx) provides
+ * This context bridges the gap: RoutesInner (Routes.tsx) provides
  * it, wrapping every `/next/*` page; a small always-mounted component
- * INSIDE NextChatPage's own runtime tree (which does have real access)
+ * INSIDE ChatPage's own runtime tree (which does have real access)
  * pushes fresh data into it on every relevant change; `ChatHeaderBar`
  * reads it back out. Plain data and callbacks, never JSX or a component
  * reference - a data context is exactly what the shipped slot's own
@@ -33,8 +33,8 @@ const ChatHeaderDataContext = createContext<{
   setData: (data: ChatHeaderData | null) => void;
 }>({ data: null, setData: () => {} });
 
-// One page (NextChatPage) writes, one component (ChatHeaderBar) reads -
-// a plain useState here is exactly what that needs; NextRoutesInner
+// One page (ChatPage) writes, one component (ChatHeaderBar) reads -
+// a plain useState here is exactly what that needs; RoutesInner
 // wraps every /next page, but only a chat page ever calls the setter
 // below, so a non-chat page's own render is never touched by this.
 export function ChatHeaderDataProvider({ children }: { children: ReactNode }) {
@@ -50,12 +50,12 @@ export function useChatHeaderData(): ChatHeaderData | null {
  * mounted; clears it on unmount.
  *
  * An infinite render loop, found live wiring a real
- * `ChatHeaderDataProvider` around `NextChatPage` in a test for the
+ * `ChatHeaderDataProvider` around `ChatPage` in a test for the
  * first time (every prior test rendered the page with no real
  * provider in its ancestry, so `setData` was the context's own
  * default no-op and this never actually ran): `data` is a fresh object
  * literal built on every render of the caller (`ChatHeaderDataBridge`,
- * `NextChatPage.tsx`), never memoized - depending on its reference
+ * `ChatPage.tsx`), never memoized - depending on its reference
  * directly re-runs this effect, and therefore calls `setData`, on
  * every single render. `setData` changes `ChatHeaderDataProvider`'s
  * own state, which re-renders every consumer of this context

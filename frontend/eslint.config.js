@@ -191,7 +191,7 @@ export default tseslint.config(
     // is .tsx only, so it never reaches src/shell/tokens.css or
     // @maipai/ui itself, exactly where a real color value has to be
     // declared once.
-    files: ["src/apps/**/*.tsx", "src/shell/**/*.tsx"],
+    files: ["src/apps/**/*.tsx", "src/shell/*.tsx", "src/shell/search/**/*.tsx"],
     plugins: {
       "better-tailwindcss": betterTailwindcss,
     },
@@ -236,13 +236,15 @@ export default tseslint.config(
   },
   {
     // LINT-UI-01: @shadcn/lint's six rules are the org's no-hand-built-UI
-    // rule made mechanical. Scoped to src/next only: the old shell
-    // retires with SHELL-09 and is not worth fixing, and the vendored
+    // rule made mechanical. Scoped to src/shell and the chat Elements that own Home wiring; the vendored
     // trees live in the kit and are never linted.
     // SHARED-THREAD-01: the chat thread pieces moved out of
-    // NextChatPage.tsx into src/apps/chat keep the same rules.
+    // ChatPage.tsx now lives in src/shell/pages and keeps these rules.
     files: [
-      "src/next/**/*.{ts,tsx}",
+      "src/shell/pages/**/*.{ts,tsx}",
+      "src/shell/components/**/*.{ts,tsx}",
+      "src/shell/Routes.tsx",
+      "src/shell/LegacyShellRedirect.tsx",
       "src/apps/chat/ChatThread.tsx",
       "src/apps/chat/elementBindings.ts",
       "src/apps/chat/chatThreadContexts.ts",

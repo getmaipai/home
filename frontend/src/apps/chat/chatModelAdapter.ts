@@ -82,7 +82,7 @@ export interface ChatModelAdapterDeps {
   // ADMIN-COMPARE-01 (b): a plain read, never consumed/reset - unlike
   // `consumeThinking()`, bare mode is meant to stay on across every send
   // in the conversation until the admin turns it off themselves
-  // (NextChatPage.tsx's own ephemeral, session-local switch). Undefined
+  // (ChatPage.tsx's own ephemeral, session-local switch). Undefined
   // for any surface that never offers it.
   isBareMode?(): boolean;
   // getmaipai/home#60: reads AND resets the "which turn is this Update
@@ -110,7 +110,7 @@ export interface ChatModelAdapterDeps {
   // any surface with no temporary-chat entry.
   consumeTemporary?(): boolean | undefined;
   // APPROVE-CARD-01: reads AND resets the confirm card's own tapped
-  // approve/deny (ConfirmTool, NextChatPage.tsx), the same single-shot
+  // approve/deny (ConfirmTool, ChatPage.tsx), the same single-shot
   // shape as `consumeSupersedes()`/`consumePackageScope()` - only
   // meaningful on the one send the card's own Yes/No click makes (which
   // also sets the composer text to that label before sending, so the
@@ -163,7 +163,7 @@ export interface ChatModelAdapterDeps {
   // call rather than have a turn autoplay audio nothing can cut off.
   // Defaults true: ChatPage.tsx's own established behavior, unchanged.
   // VOICE-LIVE-02: also accepts a getter, read fresh every send - the
-  // live voice session flips this on only while it's open (NextChatPage
+  // live voice session flips this on only while it's open (ChatPage
   // passes `false` today; a live call needs the identical scheduler this
   // adapter already drives, on only for the turn it itself sent, off
   // again the moment the call ends, never a second speech pipeline).
@@ -357,7 +357,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // concept at all (ChatPage.tsx's own adapter never sets
             // isBareMode) - `false` would still ride the request body
             // (JSON.stringify only drops `undefined`), a field on every
-            // surface's request that only NextChatPage's own admin
+            // surface's request that only ChatPage's own admin
             // diagnostic ever means anything.
             bare: bare || undefined,
             assistantStream: true,
@@ -542,7 +542,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // `toolName` the producing package's own real id
             // (`structured_part.tool_id`, wire.ts), never a name this
             // file invents, so the Elements' registered spec-sheet
-            // render (NextChatPage.tsx) and the generic ToolFallback
+            // render (ChatPage.tsx) and the generic ToolFallback
             // (any other tool) both key on something honest. No
             // `args`/`argsText`: the wire never carries the tool's own
             // call arguments, only its result.
@@ -554,7 +554,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // ToolCallMessagePart here, `toolName: "write_document"`
             // (the one bundled package that writes this record today),
             // so the Elements' registered artifact-card render
-            // (NextChatPage.tsx) can fetch the full version and open
+            // (ChatPage.tsx) can fetch the full version and open
             // it in canvas-split on click.
             const artifact = event.value.artifact;
             if (artifact) deps.onArtifactReady?.(artifact.id);
@@ -562,7 +562,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // on the turn that just parked a confirm_needed/consent_needed
             // ask (turnNext.ts's finishTurn() "asked" branch). A real
             // ToolCallMessagePart here, `toolName: "confirm"`
-            // (ConfirmTool's own registration, NextChatPage.tsx), the
+            // (ConfirmTool's own registration, ChatPage.tsx), the
             // same "package result, not model text" composition as
             // structuredPart/artifact above. `turn_id` rides in the
             // result (not just the toolCallId) because the approve/deny
@@ -575,7 +575,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // `TurnValue.project` - the same "name it, don't inline it"
             // shape `artifact` just above already is for a version) - a
             // real ToolCallMessagePart here, `toolName: "project"`,
-            // registered in NextChatPage.tsx to poll GET /api/projects/
+            // registered in ChatPage.tsx to poll GET /api/projects/
             // :id and render the shipped JobProgress element while it's
             // live. A code review caught this never checking `artifact`
             // the way conversationHistory.ts's own reload-path gate
@@ -600,7 +600,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // name (`weather` is already SpecSheet's registration;
             // WEATHER-GEN-01 will give the weather package its own
             // `sources` structured part later, a real collision
-            // otherwise). NextChatPage.tsx maps spec's `Source{site,
+            // otherwise). ChatPage.tsx maps spec's `Source{site,
             // title, ...}` onto the kit Element's own `{domain, title}`
             // at render time, so this array is passed through exactly as
             // the wire gives it.

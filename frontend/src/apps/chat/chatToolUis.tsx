@@ -1,5 +1,5 @@
 // The chat thread's tool-call renderers (spec sheet, artifact card, confirm,
-// project, tool timeline), moved verbatim out of NextChatPage.tsx
+// project, tool timeline), moved verbatim out of ChatPage.tsx
 // (SHARED-THREAD-01). elementBindings.ts maps tool ids to these.
 import { useCallback, useContext, useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
@@ -399,7 +399,7 @@ export function ReloadMainThreadProvider({ children }: { children: ReactNode }) 
 // name list `weather`/`almanac-date`/`sources` already keep (never a
 // package's own id). Nothing in the running app emits it yet (the
 // backend half of TOOL-EVENTS-01 hasn't landed), so this renders nothing
-// live today - covered by chatModelAdapter.test.ts and NextChatPage.
+// live today - covered by chatModelAdapter.test.ts and ChatPage.
 // test.tsx's own scripted-stream cases instead.
 // `label` (COORDINATOR, 2026-09-22): spec-v0.1.17 will add an optional
 // human label to `tool_call` (a manifest's own `tool_label`, "Checking

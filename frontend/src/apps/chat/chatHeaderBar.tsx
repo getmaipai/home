@@ -4,9 +4,9 @@
 // shell header - beside the sidebar trigger (ui-v0.5.35's headerExtra
 // slot), never a second row (the owner's own rejected pattern,
 // 2026-09-21). Mounted via useHeaderExtra(ChatHeaderBar) from
-// NextChatPage.tsx; reads everything through chatHeaderData.tsx's
+// ChatPage.tsx; reads everything through chatHeaderData.tsx's
 // bridge context, since this renders as Header's own child (FullLayout),
-// a sibling of NextChatPage's own AssistantRuntimeProvider tree, not a
+// a sibling of ChatPage's own AssistantRuntimeProvider tree, not a
 // descendant of it - see that file's own header comment for why a data
 // context, not the runtime itself, crosses that gap.
 //

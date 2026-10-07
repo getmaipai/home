@@ -1,4 +1,4 @@
-// The chat thread's lifted contexts, moved verbatim out of NextChatPage.tsx (SHARED-THREAD-01).
+// The chat thread's lifted contexts, moved verbatim out of ChatPage.tsx (SHARED-THREAD-01).
 // Every slot and tool UI reads these with a safe default, so the same
 // composition renders in the chat page and in the /dev/ui showcase.
 import { createContext } from "react";
@@ -79,7 +79,7 @@ export type CompareTarget = { turnId: string; conversationId: string; ourText: s
 export const CompareOpenContext = createContext<(target: CompareTarget) => void>(() => {});
 
 /** Shared by `SourcesActionBarTrigger` and `SourcesFooterContent` below -
- * the lifted open/closed state, keyed by `turnId` (see `NextChatPage`'s
+ * the lifted open/closed state, keyed by `turnId` (see `ChatPage`'s
  * own `sourcesOpenValue`). `close` (not just `toggle`) exists for
  * `SourcesActionBarTrigger`'s own unmount cleanup: `AssistantActionBar`
  * sits inside `ActionBarPrimitive.Root`'s `autohide="not-last"`
@@ -127,7 +127,7 @@ export const ModelChoiceAllowedContext = createContext(false);
  * `CompareOpenContext` above - same menu, same concept family
  * (COORDINATOR, 2026-09-22: "(a) is 'compare this one message', (b) is
  * 'compare everything from here on'"). Session-local only; see
- * `useNextChatRuntime`'s own `bareMode` state for why. */
+ * `useChatRuntime`'s own `bareMode` state for why. */
 export const BareModeContext = createContext<{ on: boolean; toggle: () => void }>({ on: false, toggle: () => {} });
 
 /** Carries the session-wide Incognito state into the kit's bare Welcome

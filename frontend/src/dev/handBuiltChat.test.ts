@@ -15,7 +15,11 @@ const baseline = JSON.parse(readFileSync(BASELINE_PATH, "utf8")) as HandBuiltBas
 function baselineAtHead(): HandBuiltBaseline | null {
   try {
     const out = execFileSync("git", ["show", "HEAD:frontend/src/dev/hand-built-chat-baseline.json"], { cwd: SRC, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-    return JSON.parse(out) as HandBuiltBaseline;
+    const baseline = JSON.parse(out) as HandBuiltBaseline;
+    return Object.fromEntries(Object.entries(baseline).map(([file, names]) => [
+      file.replace(/(^|\/)next\//g, "$1shell/").replace(/(^|\/)Next([A-Z])/g, "$1$2"),
+      names.map((name) => name.replace(/^Next([A-Z])/, "$1")),
+    ])) as HandBuiltBaseline;
   } catch {
     return null;
   }
@@ -26,8 +30,8 @@ const count = (b: HandBuiltBaseline) => Object.values(b).reduce((sum, names) => 
 describe("hand-built chat components (ELEMENTS-LINT-01)", () => {
   test("generic kit Elements do not classify non-chat pages as chat source", () => {
     const files = chatSourceFiles(SRC);
-    expect(files).not.toContain("next/pages/NextDashboardPage.tsx");
-    expect(files).not.toContain("next/pages/NextStatusPage.tsx");
+    expect(files).not.toContain("shell/pages/DashboardPage.tsx");
+    expect(files).not.toContain("shell/pages/StatusPage.tsx");
   });
 
   test("no chat component draws its own markup unless it is in the shrinking baseline", () => {

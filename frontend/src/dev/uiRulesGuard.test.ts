@@ -3,7 +3,8 @@ import { BASELINES, guardProblems, LEDGER, type Reader } from "./uiRulesGuard";
 
 // PRECOMMIT-RULES-01: the staged-vs-HEAD guard refuses growth and lost reasons.
 const ledger = (rows: string[]) => rows.map((id) => `| ${id} | a | b | c | d | e | active exception |`).join("\n");
-const wrap = (entries: Record<string, { ed?: string; reason?: string }>) => JSON.stringify({ "next/a.tsx": entries });
+const wrap = (entries: Record<string, { ed?: string; reason?: string }>) => JSON.stringify({ "shell/a.tsx": entries });
+const oldWrap = (entries: Record<string, { ed?: string; reason?: string }>) => JSON.stringify({ "next/a.tsx": entries });
 const reader = (staged: Record<string, string>, head: Record<string, string>): Reader => (p, side) => (side === "staged" ? staged : head)[p] ?? null;
 
 describe("ui-rules pre-commit guard", () => {
@@ -11,12 +12,12 @@ describe("ui-rules pre-commit guard", () => {
   const L = ledger(["ED-001"]);
 
   test("a clean staged tree passes", () => {
-    const r = reader({ [BASELINES.wrapper]: wrap({ A: ok }), [LEDGER]: L }, { [BASELINES.wrapper]: wrap({ A: ok }), [LEDGER]: L });
+    const r = reader({ [BASELINES.wrapper]: wrap({ A: ok }), [LEDGER]: L }, { [BASELINES.wrapper]: oldWrap({ A: ok }), [LEDGER]: L });
     expect(guardProblems(r, [BASELINES.wrapper])).toEqual([]);
   });
 
   test("a baseline that grew is refused with the entry named", () => {
-    const r = reader({ [BASELINES.wrapper]: wrap({ A: ok, NewPanel: ok }), [LEDGER]: L }, { [BASELINES.wrapper]: wrap({ A: ok }), [LEDGER]: L });
+    const r = reader({ [BASELINES.wrapper]: wrap({ A: ok, NewPanel: ok }), [LEDGER]: L }, { [BASELINES.wrapper]: oldWrap({ A: ok }), [LEDGER]: L });
     const p = guardProblems(r, [BASELINES.wrapper]);
     expect(p.join("\n")).toContain("grew");
     expect(p.join("\n")).toContain("NewPanel");
@@ -30,7 +31,7 @@ describe("ui-rules pre-commit guard", () => {
   });
 
   test("an entry that loses its reason, or drops to NO-REASON-REMOVE, is refused", () => {
-    const head = { [BASELINES.wrapper]: wrap({ A: ok, B: ok }), [LEDGER]: L };
+    const head = { [BASELINES.wrapper]: oldWrap({ A: ok, B: ok }), [LEDGER]: L };
     const r = reader({ [BASELINES.wrapper]: wrap({ A: { ed: "ED-001", reason: "" }, B: { ed: "NO-REASON-REMOVE", reason: "NO REASON: x" } }), [LEDGER]: L }, head);
     const p = guardProblems(r, [BASELINES.wrapper]).join("\n");
     expect(p).toContain("lost its reason");

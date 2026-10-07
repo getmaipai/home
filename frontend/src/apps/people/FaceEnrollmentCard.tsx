@@ -6,7 +6,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { api, type BiometricPrintSummary, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { canManagePerson } from "@/apps/people/roles";
 import { canEnrollFace } from "@/apps/people/faceEnrollmentGate";
-import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
+import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 
 type Profile = PersonRosterEntry | Roster;
 export function FaceEnrollmentCard({ viewer, profile, viewingSelf = viewer.id === profile.id }: { viewer: Roster; profile: Profile; viewingSelf?: boolean }) {
@@ -25,7 +25,7 @@ export function FaceEnrollmentCard({ viewer, profile, viewingSelf = viewer.id ==
           return <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">{label}</p>{canEnroll ? <Link to={`/people/${profile.id}/enroll-face`}><Button type="button" variant="outline" className="min-h-12">{faces.length ? "Re-enroll" : "Enroll"}</Button></Link> : viewingSelf && profile.role === "child" ? <p className="text-sm text-muted-foreground">Ask an admin to set this up.</p> : null}</div>;
         }}
       </AsyncState>
-      {canEnroll ? <NextSettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={["person.profile"]} includeKeys={["ui.enrollment_sounds"]} plainRows /> : null}
+      {canEnroll ? <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={["person.profile"]} includeKeys={["ui.enrollment_sounds"]} plainRows /> : null}
     </CardContent>
   </Card>;
 }

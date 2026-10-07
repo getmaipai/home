@@ -7,7 +7,7 @@ import { messagesForSearch, useScrollToMessage, useVisibleMessageIds } from "@ma
 import { ChatExtrasContext } from "@/apps/chat/ChatThread";
 import { buildChatCommands, type ChatCommandAction } from "@/apps/chat/chatCommands";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
-import { useIncognitoContext } from "@/next/incognitoContext";
+import { useIncognitoContext } from "@/shell/incognitoContext";
 import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
 
 const StableConversationMap = memo(ConversationMap);

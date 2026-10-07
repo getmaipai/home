@@ -468,7 +468,7 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "next/components/NextDataTable.tsx": {
+  "shell/components/DataTable.tsx": {
     "Card": {
       "tokens": [
         "flex",
@@ -476,7 +476,7 @@
         "gap-0!"
       ],
       "ed": "ED-018",
-      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built NextDataTable until K02 and ELT-T1-13a to 13d."
+      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built DataTable until K02 and ELT-T1-13a to 13d."
     },
     "CardContent": {
       "tokens": [
@@ -484,7 +484,7 @@
         "px-0!"
       ],
       "ed": "ED-018",
-      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built NextDataTable until K02 and ELT-T1-13a to 13d."
+      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built DataTable until K02 and ELT-T1-13a to 13d."
     },
     "Input": {
       "tokens": [
@@ -493,7 +493,7 @@
         "sm:max-w-96"
       ],
       "ed": "ED-018",
-      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built NextDataTable until K02 and ELT-T1-13a to 13d."
+      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built DataTable until K02 and ELT-T1-13a to 13d."
     },
     "Button": {
       "tokens": [
@@ -504,7 +504,7 @@
         "size-12"
       ],
       "ed": "ED-018",
-      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built NextDataTable until K02 and ELT-T1-13a to 13d."
+      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built DataTable until K02 and ELT-T1-13a to 13d."
     },
     "TableRow": {
       "tokens": [
@@ -513,7 +513,7 @@
         "hover:bg-transparent"
       ],
       "ed": "ED-018",
-      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built NextDataTable until K02 and ELT-T1-13a to 13d."
+      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built DataTable until K02 and ELT-T1-13a to 13d."
     },
     "TableCell": {
       "tokens": [
@@ -522,7 +522,7 @@
         "w-10"
       ],
       "ed": "ED-018",
-      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built NextDataTable until K02 and ELT-T1-13a to 13d."
+      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built DataTable until K02 and ELT-T1-13a to 13d."
     },
     "DropdownMenuItem": {
       "tokens": [
@@ -530,7 +530,7 @@
         "min-w-12!"
       ],
       "ed": "ED-018",
-      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built NextDataTable until K02 and ELT-T1-13a to 13d."
+      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built DataTable until K02 and ELT-T1-13a to 13d."
     },
     "SelectTrigger": {
       "tokens": [
@@ -538,10 +538,10 @@
         "w-20"
       ],
       "ed": "ED-018",
-      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built NextDataTable until K02 and ELT-T1-13a to 13d."
+      "reason": "Kit data-table is a fixed ModelUsage demo; hand-built DataTable until K02 and ELT-T1-13a to 13d."
     }
   },
-  "next/pages/ChatColumn.tsx": {
+  "shell/pages/ChatColumn.tsx": {
     "ThreadListRoot": {
       "tokens": [
         "flex",
@@ -561,7 +561,7 @@
       "reason": "Kit thread list has no compact variant; ELT-T1-20, cleanup item 3."
     }
   },
-  "next/pages/NextBackupsPage.tsx": {
+  "shell/pages/BackupsPage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -595,7 +595,7 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "next/pages/NextChatPage.tsx": {
+  "shell/pages/ChatPage.tsx": {
     "CanvasSplit": {
       "tokens": [
         "border-0",
@@ -631,7 +631,7 @@
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     }
   },
-  "next/pages/NextCommandsPage.tsx": {
+  "shell/pages/CommandsPage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -649,7 +649,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextDevicesPage.tsx": {
+  "shell/pages/DevicesPage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -667,7 +667,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextEnginesPage.tsx": {
+  "shell/pages/EnginesPage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -695,7 +695,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextFamilyPage.tsx": {
+  "shell/pages/FamilyPage.tsx": {
     "CardContent": {
       "tokens": [
         "flex",
@@ -732,7 +732,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextFilesPage.tsx": {
+  "shell/pages/FilesPage.tsx": {
     "CardHeader": {
       "tokens": [
         "border-b",
@@ -772,7 +772,7 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "next/pages/NextModelsPage.tsx": {
+  "shell/pages/ModelsPage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -797,7 +797,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextPersonProfilePage.tsx": {
+  "shell/pages/PersonProfilePage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -851,7 +851,7 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "next/pages/NextPrivacyPage.tsx": {
+  "shell/pages/PrivacyPage.tsx": {
     "CardHeader": {
       "tokens": [
         "border-b",
@@ -878,7 +878,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextRepairsPage.tsx": {
+  "shell/pages/RepairsPage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -903,7 +903,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextSignInPage.tsx": {
+  "shell/pages/SignInPage.tsx": {
     "Card": {
       "tokens": [
         "border-none",
@@ -935,7 +935,7 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "next/pages/NextStoragePage.tsx": {
+  "shell/pages/StoragePage.tsx": {
     "CardHeader": {
       "tokens": [
         "border-b",
@@ -962,7 +962,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextUpdatesPage.tsx": {
+  "shell/pages/UpdatesPage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -987,7 +987,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextUsersPage.tsx": {
+  "shell/pages/UsersPage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -1012,7 +1012,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/NextVoicesPage.tsx": {
+  "shell/pages/VoicesPage.tsx": {
     "CardHeader": {
       "tokens": [
         "p-0"
@@ -1030,7 +1030,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/dashboard/StatCard.tsx": {
+  "shell/pages/dashboard/StatCard.tsx": {
     "CardContent": {
       "tokens": [
         "flex",
@@ -1050,7 +1050,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/performance/DiskHardwareCard.tsx": {
+  "shell/pages/performance/DiskHardwareCard.tsx": {
     "Card": {
       "tokens": [
         "flex",
@@ -1088,7 +1088,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/performance/EnginesHealthCard.tsx": {
+  "shell/pages/performance/EnginesHealthCard.tsx": {
     "Card": {
       "tokens": [
         "flex",
@@ -1124,7 +1124,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/performance/LabelsCard.tsx": {
+  "shell/pages/performance/LabelsCard.tsx": {
     "Card": {
       "tokens": [
         "flex",
@@ -1162,7 +1162,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/performance/LayersCard.tsx": {
+  "shell/pages/performance/LayersCard.tsx": {
     "Card": {
       "tokens": [
         "flex",
@@ -1198,7 +1198,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/performance/QueuesCard.tsx": {
+  "shell/pages/performance/QueuesCard.tsx": {
     "Card": {
       "tokens": [
         "flex",
@@ -1236,7 +1236,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/performance/RoutesCard.tsx": {
+  "shell/pages/performance/RoutesCard.tsx": {
     "Card": {
       "tokens": [
         "flex",
@@ -1271,7 +1271,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/performance/TurnsByEngineTable.tsx": {
+  "shell/pages/performance/TurnsByEngineTable.tsx": {
     "Card": {
       "tokens": [
         "flex",
@@ -1306,7 +1306,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/performance/TurnsChart.tsx": {
+  "shell/pages/performance/TurnsChart.tsx": {
     "Card": {
       "tokens": [
         "flex",
@@ -1352,7 +1352,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/settings/NextSettingField.tsx": {
+  "shell/pages/settings/SettingField.tsx": {
     "Input": {
       "tokens": [
         "min-h-12",
@@ -1390,7 +1390,7 @@
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
     }
   },
-  "next/pages/settings/NextSettingsRenderer.tsx": {
+  "shell/pages/settings/SettingsRenderer.tsx": {
     "CardContent": {
       "tokens": [
         "divide-border",
@@ -1413,7 +1413,7 @@
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
     }
   },
-  "next/pages/settings/PersonMultiSelect.tsx": {
+  "shell/pages/settings/PersonMultiSelect.tsx": {
     "ComboboxChips": {
       "tokens": [
         "w-64"
@@ -1422,7 +1422,7 @@
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
     }
   },
-  "next/pages/status/StatusApps.tsx": {
+  "shell/pages/status/StatusApps.tsx": {
     "CollapsibleTrigger": {
       "tokens": [
         "flex",
@@ -1447,7 +1447,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/status/StatusBanner.tsx": {
+  "shell/pages/status/StatusBanner.tsx": {
     "Badge": {
       "tokens": [
         "bg-destructive/10",
@@ -1459,7 +1459,7 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "next/pages/status/StatusBoard.tsx": {
+  "shell/pages/status/StatusBoard.tsx": {
     "Alert": {
       "tokens": [
         "bg-primary/10",
@@ -1515,7 +1515,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/status/StatusComponents.tsx": {
+  "shell/pages/status/StatusComponents.tsx": {
     "CardContent": {
       "tokens": [
         "divide-border",
@@ -1537,7 +1537,7 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "next/pages/status/StatusIncident.tsx": {
+  "shell/pages/status/StatusIncident.tsx": {
     "CardHeader": {
       "tokens": [
         "flex",

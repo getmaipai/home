@@ -738,7 +738,7 @@ export const api = {
   // needs this, not the bare per-version GET.
   artifactCurrent: (id: string) => request<Artifact>(`/api/artifacts/${encodeURIComponent(id)}/current`),
   // PROJECT-PROGRESS-01: the `project` reserved tool-call part
-  // (NextChatPage.tsx) polls this - the stored plan, each step's own
+  // (ChatPage.tsx) polls this - the stored plan, each step's own
   // state, and (once posted) the finished artifact's id/version, so the
   // live card can show it without a reload (routes/projects.ts's own
   // `posted_artifact` sibling field).
@@ -1214,7 +1214,7 @@ export const api = {
       // `spoken`: VOICE-LIVE-02's live voice session - RESP-01's flag,
       // read by the new path only (U6a); the frozen path ignores it.
       // `ask_answer` (APPROVE-CARD-01): a tapped approve/deny card
-      // (ConfirmTool, NextChatPage.tsx) - read by the new path only
+      // (ConfirmTool, ChatPage.tsx) - read by the new path only
       // (routes/turn.ts's own `askAnswer` zod schema), matched against
       // the conversation's live pending ask by `turn_id`
       // (turnMachine/turnNext.ts's `resumesAsk()`).

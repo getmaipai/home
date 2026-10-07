@@ -4,7 +4,7 @@ import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type 
 import { MemoryRouter } from "react-router-dom";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { CHAT_COMMAND_SHORTCUTS, buildChatCommands, type ChatCommandAction } from "@/apps/chat/chatCommands";
-import { CHAT_SHORTCUTS } from "@/next/pages/chatShortcuts";
+import { CHAT_SHORTCUTS } from "@/shell/pages/chatShortcuts";
 import { canHaveTemporaryChatRole, type Roster } from "@/lib/api";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 

@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 // composition (apps/chat/ChatThread.tsx), so an Element wired for one is wired
 // for the other. These are source-scan guards; ChatThread.test.tsx renders it.
 const read = (rel: string) => readFileSync(new URL(rel, import.meta.url), "utf8");
-const PAGES = { chat: "../../next/pages/NextChatPage.tsx", showcase: "../../next/pages/NextUiShowcasePage.tsx" } as const;
+const PAGES = { chat: "../../shell/pages/ChatPage.tsx", showcase: "../../shell/pages/UiShowcasePage.tsx" } as const;
 const KIT_THREAD = /from\s+["']@maipai\/ui\/src\/elements\/thread\.aui["']/;
 
 describe("one chat thread composition", () => {
@@ -27,7 +27,7 @@ describe("one chat thread composition", () => {
 
   test("the showcase imports no slot component from the chat page", () => {
     const source = read(PAGES.showcase);
-    expect(source).not.toMatch(/from\s+["']@\/next\/pages\/NextChatPage["']/);
+    expect(source).not.toMatch(/from\s+["']@\/next\/pages\/ChatPage["']/);
   });
 
   test("ChatThread reads the registry and is the only importer of the kit Thread in apps/chat", () => {

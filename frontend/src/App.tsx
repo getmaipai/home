@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useState, type ComponentProps, type ComponentType } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes as RouterRoutes, Route, Navigate } from "react-router-dom";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
-import { LegacyNextRedirect } from "@/next/LegacyNextRedirect";
+import { LegacyShellRedirect } from "@/shell/LegacyShellRedirect";
 import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
@@ -31,18 +31,18 @@ const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWi
   "SetupWizard",
 );
 // FACE-02: another Wizard-driven, shell-less full-page route (the same
-// reason /setup lives here instead of under NextRoutes - Wizard.tsx's
+// reason /setup lives here instead of under Routes - Wizard.tsx's
 // own <main> would double up on FullLayout's landmark if nested inside
-// it), so it's registered directly here rather than as a NextRoutes
-// child even though its entry point lives on the (NextRoutes-hosted)
+// it), so it's registered directly here rather than as a Routes
+// child even though its entry point lives on the (Routes-hosted)
 // profile page.
 const FaceEnrollmentPage = lazyNamed<ComponentProps<typeof import("@/apps/people/FaceEnrollmentPage")["FaceEnrollmentPage"]>>(
   () => import("@/apps/people/FaceEnrollmentPage"),
   "FaceEnrollmentPage",
 );
-const NextRoutes = lazyNamed<ComponentProps<typeof import("@/next/NextRoutes")["NextRoutes"]>>(
-  () => import("@/next/NextRoutes"),
-  "NextRoutes",
+const Routes = lazyNamed<ComponentProps<typeof import("@/shell/Routes")["Routes"]>>(
+  () => import("@/shell/Routes"),
+  "Routes",
 );
 
 // One QueryClient for the app's lifetime (docs/plans/session-b-ui.md
@@ -96,7 +96,7 @@ export function App() {
             <TooltipProvider>
               <SessionLockGate person={person ?? null}>
                 <BrowserRouter>
-                  <Routes>
+                  <RouterRoutes>
                     <Route
                       path="/setup"
                       element={
@@ -123,17 +123,17 @@ export function App() {
                     />
                     <Route
                       path="/next/*"
-                      element={<LegacyNextRedirect />}
+                      element={<LegacyShellRedirect />}
                     />
-                    <Route path="/conversations" element={<LegacyNextRedirect />} />
-                    <Route path="/settings/users" element={<LegacyNextRedirect />} />
-                    <Route path="/settings/models" element={<LegacyNextRedirect />} />
-                    <Route path="/settings/backups" element={<LegacyNextRedirect />} />
-                    <Route path="/settings/voices" element={<LegacyNextRedirect />} />
-                    <Route path="/settings/commands" element={<LegacyNextRedirect />} />
-                    <Route path="/settings/devices" element={<LegacyNextRedirect />} />
-                    <Route path="/settings/repairs" element={<LegacyNextRedirect />} />
-                    <Route path="/settings/updates" element={<LegacyNextRedirect />} />
+                    <Route path="/conversations" element={<LegacyShellRedirect />} />
+                    <Route path="/settings/users" element={<LegacyShellRedirect />} />
+                    <Route path="/settings/models" element={<LegacyShellRedirect />} />
+                    <Route path="/settings/backups" element={<LegacyShellRedirect />} />
+                    <Route path="/settings/voices" element={<LegacyShellRedirect />} />
+                    <Route path="/settings/commands" element={<LegacyShellRedirect />} />
+                    <Route path="/settings/devices" element={<LegacyShellRedirect />} />
+                    <Route path="/settings/repairs" element={<LegacyShellRedirect />} />
+                    <Route path="/settings/updates" element={<LegacyShellRedirect />} />
                     <Route
                       path="/*"
                       element={
@@ -143,12 +143,12 @@ export function App() {
                           </div>
                         ) : (
                           <Suspense fallback={<RouteSkeleton />}>
-                            <NextRoutes person={person} onSignedIn={loadPerson} onPersonChange={revalidatePerson} />
+                            <Routes person={person} onSignedIn={loadPerson} onPersonChange={revalidatePerson} />
                           </Suspense>
                         )
                       }
                     />
-                  </Routes>
+                  </RouterRoutes>
                 </BrowserRouter>
               </SessionLockGate>
             </TooltipProvider>

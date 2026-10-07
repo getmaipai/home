@@ -2,7 +2,7 @@
 
 // VOICE-LIVE-04: while dictation records, the composer's own text field
 // gives way to a live bar waveform of the microphone (ChatGPT's own
-// dictation look). Mounted as NextChatPage.tsx's own
+// dictation look). Mounted as ChatPage.tsx's own
 // `ComposerInputOverride` (VOICE-LIVE-04b, ui-v0.5.40 - the vendored
 // kit's own slot cut for exactly this, `elements/thread.aui.tsx`'s own
 // Composer; /next/chat's real composer lives there, never in this

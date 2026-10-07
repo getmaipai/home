@@ -1,6 +1,6 @@
 // SHARED-THREAD-01: the ONE registry of which Element renders what in the chat
 // thread. ChatThread.tsx reads it, and ChatThread is the only thing the chat
-// page (NextChatPage) and the /dev/ui showcase (NextUiShowcasePage) render for
+// page (ChatPage) and the /dev/ui showcase (UiShowcasePage) render for
 // the thread, so a binding added here shows up in both with no second edit.
 //
 // How to add an Element:
@@ -10,7 +10,7 @@
 //      message footer, action bar, composer pieces).
 //   2. Add a showcase fixture for it (backend/src/lib/uiFixtures.ts) so the
 //      playground has a scenario that exercises it.
-//   Nothing else: not NextChatPage, not NextUiShowcasePage. The guard test
+//   Nothing else: not ChatPage, not UiShowcasePage. The guard test
 //   (chatThreadShared.test.ts) fails if either page imports the kit's Thread.
 //   A new renderer component goes in chatToolUis.tsx (tool results) or
 //   chatThreadSlots.tsx (slots); a new context it reads needs a safe default in
@@ -30,8 +30,8 @@ import {
   ComposerExtraControls,
   ComposerTrailingWithModelSelector,
   MessageFooterExtra,
-  NextChatWelcome,
-  NextReasoningGroup,
+  ChatWelcome,
+  ReasoningGroup,
   FailedTurnActionBarExtras,
 } from "@/apps/chat/chatThreadSlots";
 import { ChatMessageError } from "@/apps/chat/chatErrorSlot";
@@ -94,7 +94,7 @@ export const THREAD_SLOTS = {
     remend: { links: false, linkMode: "text-only" },
     trustedLinks: ({ message, messages }: MarkdownLinkContext) => trustedChatLinks(message, messages),
   },
-  Welcome: NextChatWelcome,
+  Welcome: ChatWelcome,
   // ELEMENTS-ADOPT-01 E4: the kit DayDivider before a message that opens a new day or follows a long pause.
   MessageBefore: ChatDateDivider,
   AssistantMoreItems,
@@ -118,7 +118,7 @@ export const THREAD_SLOTS = {
   // ELT-COMPOSER-KIT-01: the kit's slim ChatGPT-shaped composer; Home sets only
   // its colour tokens (shell/tokens.css), the layout lives in the kit.
   composerDensity: "compact",
-  ReasoningGroup: NextReasoningGroup,
+  ReasoningGroup: ReasoningGroup,
 } as const;
 
 // The composer's model selector renders nothing under two models, so the

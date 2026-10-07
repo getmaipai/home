@@ -9,7 +9,7 @@
     ],
     "frontend": [
       {
-        "file": "src/next/pages/NextModelsPage.test.tsx",
+        "file": "src/shell/pages/NextModelsPage.test.tsx",
         "reason": "The fetch mock observes process-global fetch and has shown cross-file interference."
       }
     ]

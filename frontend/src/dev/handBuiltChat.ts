@@ -4,7 +4,7 @@
 // shrink (RULES.md rule 9). A component that only composes kit Elements and
 // primitives is not flagged. handBuiltChat.test.ts holds the baseline check.
 import ts from "typescript";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 export type HandBuiltBaseline = Record<string, string[]>;
@@ -18,12 +18,12 @@ function tsxUnder(src: string, dir: string): string[] {
 const CHAT_IMPORT = /from\s*["'](?:@assistant-ui\/|@maipai\/ui\/src\/elements\/(?:thread-list(?:\.aui)?|thread-search|markdown-text|model-selector|canvas-split|hooks\/use-copy-to-clipboard)(?:["'/]|$))/;
 
 /** The chat screen's own source, relative to `frontend/src`: everything
- * under `apps/chat/`, plus every `next/` file that draws with assistant-ui
+ * under `apps/chat/`, plus every `shell/pages/` file that draws with assistant-ui
  * or the kit's Elements (the chat page, its error details, the markdown
  * document view, the shortcut sheet). Tests are excluded. */
 export function chatSourceFiles(src: string): string[] {
-  const next = tsxUnder(src, "next").filter((rel) => CHAT_IMPORT.test(readFileSync(join(src, rel), "utf8")));
-  return [...tsxUnder(src, "apps/chat"), ...next].sort();
+  const shellPages = existsSync(join(src, "shell/pages")) ? tsxUnder(src, "shell/pages").filter((rel) => CHAT_IMPORT.test(readFileSync(join(src, rel), "utf8"))) : [];
+  return [...tsxUnder(src, "apps/chat"), ...shellPages].sort();
 }
 
 function firstIntrinsicTag(node: ts.Node): string | undefined {

@@ -31,7 +31,7 @@ const QUERY_KEY = NOTIFICATIONS_QUERY_KEY;
 // react-query already dedupes identical queryKeys to one fetch/poll
 // regardless of how many components call this, so this exists for one
 // definition, not for caching.
-// getmaipai/home#181: NextChatPage.tsx's own ProjectResultReload consumes
+// getmaipai/home#181: ChatPage.tsx's own ProjectResultReload consumes
 // this exact query too (React Query dedupes an identical queryKey to one
 // fetch/poll, this file's own header comment) - a background project's
 // `project.done`/`project.failed` delivery is what tells the open chat

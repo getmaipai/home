@@ -8,7 +8,7 @@
 // assistant-ui runtime primitives), `elements/composer.tsx`'s
 // `ComposerMenu`/`ComposerMenuItem`/`ComposerAttachButton` (the same
 // presentational primitives `ComposerThinkingControl` in
-// NextChatPage.tsx already composes, same `DismissableLayer` dismiss
+// ChatPage.tsx already composes, same `DismissableLayer` dismiss
 // pattern - a design-resolver ruling, 2026-09-22, docs/dev.md, after
 // Popover was found to fight `ComposerMenu`'s own positioning), and the
 // kit's `IconTile`/`getIcon` (the same icon source
@@ -63,7 +63,7 @@ export function __setUnwiredControlsForTests(enabled: boolean): void {
 }
 
 /** Lifted the same way `ThinkingModeContext`/`BareModeContext` are
- * (NextChatPage.tsx): `useChatRuntimeHook`'s adapter deps read this via
+ * (ChatPage.tsx): `useChatRuntimeHook`'s adapter deps read this via
  * a ref, single-shot, the same `consumeSupersedes()` shape - chosen
  * once, ridden on the next send, then cleared, never a mode that
  * outlives the turn it was picked for. */
@@ -105,7 +105,7 @@ function GroupLabel({ children }: { children: string }) {
 /** Add photos and files: the shipped `ComposerPrimitive.AddAttachment`
  * (opens the native file picker, accepts whatever the runtime's
  * attachments adapter declares - images, text/Markdown and PDF/office
- * `useNextChatRuntime`'s own `CompositeAttachmentAdapter`), styled as a
+ * `useChatRuntime`'s own `CompositeAttachmentAdapter`), styled as a
  * menu row via `asChild` instead of its own bare button. */
 function AddPhotosAndFilesItem({ onSelect, photos }: { onSelect: () => void; photos: boolean }) {
   return (
@@ -117,7 +117,7 @@ function AddPhotosAndFilesItem({ onSelect, photos }: { onSelect: () => void; pho
   );
 }
 
-/** UPLOAD-IMG-02: whether this person may send pictures - NextChatPage's
+/** UPLOAD-IMG-02: whether this person may send pictures - ChatPage's
  * own `photoUploadsEnabled`, the same value its image attachment adapter is
  * built from (chat.photo_uploads; a child stays off until a parent turns it
  * on). Passed down as-is, never recomputed here. Off by default so a menu
@@ -223,7 +223,7 @@ function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) 
   // is the query's own way to not run at all, not just discard the result.
   const query = useQuery<InstalledPackage[]>({ queryKey: ["plugins"], queryFn: () => api.plugins(), enabled: unwiredControlsAreEnabled() });
   if (!unwiredControlsAreEnabled()) return null;
-  // Every other NextChatPage test's own fetch stub answers an endpoint
+  // Every other ChatPage test's own fetch stub answers an endpoint
   // it doesn't know about with a bare `{}` (its own established
   // convention, e.g. `stubFetch()` above) - this menu now mounts on
   // every one of those renders, so a non-array response here is a real

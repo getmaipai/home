@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "@/App";
 import { installHiddenReloadOnNewServiceWorker, installStaleChunkRetry, runBootWatchdog } from "@/lib/pwaBoot";
 import "@/shell/tokens.css";
-import { readShellNextCache } from "@/next/shellNextCache";
+import { readShellCache } from "@/shell/shellCache";
 
 installStaleChunkRetry(window, sessionStorage);
 if ("serviceWorker" in navigator) {
@@ -12,8 +12,8 @@ if ("serviceWorker" in navigator) {
 
 /** Paint the migrated shell's palette before React mounts from the
  * per-browser cache. Its appearance hooks reconcile after loading. */
-function applyCachedNextPalette(): void {
-  const cached = readShellNextCache();
+function applyCachedPalette(): void {
+  const cached = readShellCache();
   if (!cached) return;
   document.body.classList.add(`style-${cached.look}`);
   document.documentElement.classList.toggle("dark", cached.dark);
@@ -53,7 +53,7 @@ runBootWatchdog(
   (confirmBooted) => {
     const rootEl = document.getElementById("root");
     if (!rootEl) throw new Error("#root element missing from index.html");
-    applyCachedNextPalette();
+    applyCachedPalette();
     createRoot(rootEl).render(
       <StrictMode>
         <BootConfirm onConfirmed={confirmBooted} />

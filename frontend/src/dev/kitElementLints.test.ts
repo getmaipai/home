@@ -49,7 +49,24 @@ function baselineAtBase<T>(name: string): T | null {
   }
   try {
     const out = git(["show", `${base}:frontend/src/dev/${name}`]);
-    return JSON.parse(out) as T;
+    const baseline = JSON.parse(out) as Record<string, unknown>;
+    // NEXT-RETIRE-01: normalize the merge-base's keys across the git mv
+    // so the shrink-only check compares the same tracked entries at their
+    // new shell paths and symbol names.
+    function normalize(value: unknown): unknown {
+      if (Array.isArray(value)) return value.map(normalize);
+      if (!value || typeof value !== "object") return value;
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
+        const moved = key
+          .replace(/(^|\/)next\//g, "$1shell/")
+          .replace(/(^|\/)Next([A-Z])/g, "$1$2")
+          .replace(/^Next([A-Z])/, "$1")
+          .replace(/nextPage/g, "page")
+          .replace(/nextChat/g, "chat");
+        return [moved, normalize(entry)];
+      }));
+    }
+    return normalize(baseline) as T;
   } catch {
     return null;
   }
@@ -221,7 +238,7 @@ describe("Home wrappers around kit Elements (ELEMENTS-LINT-03)", () => {
 
   test("the scanner flags seeded wrappers and leaves a page that only passes data alone", () => {
     const findings = wrapperFindings(SRC, {
-      "next/pages/SeededPanel.tsx": `
+      "shell/pages/SeededPanel.tsx": `
         import { CanvasSplit } from "@maipai/ui/src/elements/canvas-split";
         import { CommandPalette } from "@maipai/ui/src/elements/command-palette";
         import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -235,7 +252,7 @@ describe("Home wrappers around kit Elements (ELEMENTS-LINT-03)", () => {
         function Outer() { const InnerPane = () => <CanvasSplit />; return <section><InnerPane /></section>; }
         export function SeededPanel() { return <Page title="Seeded"><Card /></Page>; }
       `,
-      "next/pages/SeededPage.tsx": `
+      "shell/pages/SeededPage.tsx": `
         import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
         import { Page } from "@maipai/ui/src/primitives/Page";
         export function SeededPage() { return <Page title="Seeded"><Card /></Page>; }

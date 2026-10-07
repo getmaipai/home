@@ -57,7 +57,7 @@ export function ComposerVoiceControls({ disabled = false, engineDown }: { disabl
   const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
   const overview = enginesQuery.data;
   // VOICE-LIVE-02: `null` here (no VoiceSessionProvider in this tree)
-  // means this component was mounted somewhere other than NextChatPage's
+  // means this component was mounted somewhere other than ChatPage's
   // own composer - the waveform still renders (readyRole alone still
   // gates it), but presses nothing, the same "absent, not a crash"
   // posture the rest of this file already takes for a role that isn't

@@ -2,7 +2,7 @@
 // preference (the same class as a remembered tab), never a household
 // setting - the dictation adapter and the live session read this to
 // know which device to open, but nothing here ever reaches the server.
-// Mirrors shellNextCache.ts's own shape exactly (a plain read/write
+// Mirrors shellCache.ts's own shape exactly (a plain read/write
 // function pair, not a hook; try/catch around both, since localStorage
 // can throw in a private window) - the one existing per-browser-
 // preference precedent in this frontend, not a second pattern invented

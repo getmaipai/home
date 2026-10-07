@@ -12,7 +12,7 @@ const NewChatIcon = getIcon("message-square");
  * conversation up to this reply into a new chat and opens it. The kit's
  * BranchPicker flips between regenerated or edited answers; this is the
  * other half of "branch", an independent copy. Same menu-item shape as
- * NextChatPage's Compare entry (ActionBarMorePrimitive.Item). */
+ * ChatPage's Compare entry (ActionBarMorePrimitive.Item). */
 export function BranchInNewChatMenuItem() {
   const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
   const [, setSearchParams] = useSearchParams();

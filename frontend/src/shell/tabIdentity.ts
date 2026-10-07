@@ -1,7 +1,7 @@
 import { createContext, createElement, useContext, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { useLocation } from "react-router-dom";
 import { useStatusSummary } from "@/shell/StatusIndicator";
-import { readIncognitoCache } from "@/next/incognitoCache";
+import { readIncognitoCache } from "@/shell/incognitoCache";
 import { useSessionLocked } from "@/shell/sessionLockContext";
 
 export type TabStatus = { level: "online" | "degraded" | "offline" | "maintenance"; text: string };

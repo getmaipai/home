@@ -3,7 +3,7 @@ import { cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { FaceEnrollmentPage } from "@/apps/people/FaceEnrollmentPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import { readShellNextCache } from "@/next/shellNextCache";
+import { readShellCache } from "@/shell/shellCache";
 import type { Roster } from "@/lib/api";
 
 afterEach(() => {
@@ -52,7 +52,7 @@ describe("FaceEnrollmentPage theme", () => {
     ["light", true, "light", "dark", false],
     ["system", true, "dark", "light", true],
   ] as const)("ui.appearance=%s (OS prefers dark=%p) resolves to %s", async (setting, osPrefersDark, expectedClass, otherClass, expectedCacheDark) => {
-    // Saved and restored in `finally`, never deleted (NextRoutes.test.tsx's
+    // Saved and restored in `finally`, never deleted (Routes.test.tsx's
     // own pattern): happy-dom's real `matchMedia` has to still exist for
     // every OTHER test file sharing this test process, and an earlier
     // version of this test that did `delete window.matchMedia` in an
@@ -93,12 +93,12 @@ describe("FaceEnrollmentPage theme", () => {
       // The regression itself (a review caught this before it shipped):
       // the per-browser cache `main.tsx` pre-paints from on the NEXT
       // page's own reload must hold the resolved value, not a stale or
-      // default-false one. `useNextLook`'s own cache write only
+      // default-false one. `useLook`'s own cache write only
       // preserves whatever is already cached - if the appearance hook
       // above never wrote the real value first, this stays wrong
       // forever after a single visit here.
       await waitFor(() => {
-        expect(readShellNextCache()).toEqual({ look: "neutral", dark: expectedCacheDark });
+        expect(readShellCache()).toEqual({ look: "neutral", dark: expectedCacheDark });
       });
     } finally {
       window.matchMedia = originalMatchMedia;

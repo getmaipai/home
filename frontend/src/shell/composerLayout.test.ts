@@ -11,7 +11,7 @@ import { join } from "node:path";
 // structural rule against the kit's composer.
 const read = (path: string) => readFileSync(join(import.meta.dir, path), "utf8");
 const tokens = read("tokens.css");
-const touchTargets = read("../next/pages/nextChatTouchTargets.css");
+const touchTargets = read("../shell/pages/chatTouchTargets.css");
 
 describe("composer in Home (ELT-COMPOSER-KIT-01)", () => {
   test("the chat selects the kit's compact composer density", () => {

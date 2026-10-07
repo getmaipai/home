@@ -16,7 +16,7 @@ import { api, ApiError, type SignedInPerson } from "@/lib/api";
  * never signs the person out or discards anything, unlike the forced-
  * wipe idle timeout an earlier design draft proposed and Jesse rejected
  * (2026-09-25). Unlocking reuses /api/auth/verify-secret exactly as the
- * real sign-in flow does (NextSignInPage.tsx's own secret-entry
+ * real sign-in flow does (SignInPage.tsx's own secret-entry
  * fragment, composed from the same shipped kit primitives) rather than
  * a second, parallel PIN-check implementation. */
 const SessionLockedContext = createContext(false);

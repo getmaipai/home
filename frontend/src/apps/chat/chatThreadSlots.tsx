@@ -1,6 +1,6 @@
 // The chat thread's slot components (more-menu items, composer extras,
 // thinking indicator, welcome, reasoning group, sources and message footer),
-// moved verbatim out of NextChatPage.tsx (SHARED-THREAD-01). ChatThread.tsx
+// moved verbatim out of ChatPage.tsx (SHARED-THREAD-01). ChatThread.tsx
 // hands them to the kit Thread.
 import { useReplyFeedbackForm } from "@/apps/chat/chatFeedbackDialog";
 import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
@@ -58,7 +58,7 @@ import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ModelPickerContext, ModelChoiceAllowedContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext, useEngineDownReason } from "@/apps/chat/useChatAvailability";
-import { TurnErrorDetails, hasErrorFacts } from "@/next/pages/TurnErrorDetails";
+import { TurnErrorDetails, hasErrorFacts } from "@/shell/pages/TurnErrorDetails";
 
 // ADMIN-COMPARE-01: no icon in the kit's own registry reads as "compare"
 // specifically - grid-2x2 (a two-pane split) is the closest already-
@@ -389,7 +389,7 @@ export function EngineStartingLoader({ Loader = GenerationLoader }: {
 
 // Incognito is controlled from the global /next header; this welcome
 // slot only reflects the shared state and does not add a second toggle.
-export function NextChatWelcome() {
+export function ChatWelcome() {
   const { on } = useContext(TemporaryChatContext);
   const aui = useAui();
   const engineDown = useEngineDownReason();
@@ -431,7 +431,7 @@ export function NextChatWelcome() {
 // through the documented `components.ReasoningGroup` slot (never a
 // fork of the vendored file): the shipped Root/Trigger/Content/Text
 // primitives, unstyled beyond the variant choice.
-export function NextReasoningGroup({ children, group }: PropsWithChildren<{ group: ThreadGroupPart }>) {
+export function ReasoningGroup({ children, group }: PropsWithChildren<{ group: ThreadGroupPart }>) {
   const running = group.status.type === "running";
   return (
     <ReasoningRoot streaming={running} defaultOpen={false} variant="ghost">
