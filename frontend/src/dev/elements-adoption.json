@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T09:58:11.115Z",
+  "generatedAt": "2026-10-07T10:10:04.790Z",
   "kitTag": "ui-v0.5.165",
   "items": [
     {
@@ -931,7 +931,7 @@
       "group": "sources/citations",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "sources.tsx",
@@ -939,7 +939,7 @@
       "group": "sources/citations",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "speaker-identity.tsx",

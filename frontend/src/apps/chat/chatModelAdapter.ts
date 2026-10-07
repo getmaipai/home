@@ -10,6 +10,7 @@ import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/tu
 import { messageText } from "@/apps/chat/chatMessageText";
 import { stagedDocumentPayload, clearStagedImageAttachment } from "@/apps/chat/localImageAttachmentAdapter";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
+import { sourceMessageParts } from "@/apps/chat/chatSources";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
 import { textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
 import type { AnswerImageSet, CrisisSupport } from "@maipai/home-backend/src/wire";
@@ -592,19 +593,11 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // computed once so both the array-spread check and the part
             // itself read the identical value.
             const timelinePart = toolTimelinePart(event.value.turn_id);
-            // Slice 5(a): `TurnValue.sources` (wire.ts) is a real, typed
-            // field now (CHAT-16 landed) - a real ToolCallMessagePart
-            // here, the same composition slices 3/4/5(e) already use for
-            // a reply-level extra Thread has no slot for - fixed
-            // `toolName: "sources"`, never the producing package's own
-            // name (`weather` is already SpecSheet's registration;
-            // WEATHER-GEN-01 will give the weather package its own
-            // `sources` structured part later, a real collision
-            // otherwise). ChatPage.tsx maps spec's `Source{site,
-            // title, ...}` onto the kit Element's own `{domain, title}`
-            // at render time, so this array is passed through exactly as
-            // the wire gives it.
+            // TurnValue.sources (CHAT-16) becomes assistant-ui's native
+            // source parts in source order below. The same parts are
+            // rebuilt by chatHistoryAdapter.ts after a reload.
             const sources = event.value.sources;
+            const sourceParts = sourceMessageParts(sources);
             // Fix B4 (docs/dev.md's "Chat reliability" B4): the same
             // metadata shape chatHistoryAdapter.ts attaches on reload, so
             // the retired caption rendered identically whether a message
@@ -653,12 +646,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // reference reads ("...so it waits for your approval", then
                 // the card), and the same place on reload (chatHistoryAdapter.ts).
                 ...(confirm ? [toolCallPart(`${event.value.turn_id}-confirm`, "confirm", { package_id: confirm.package_id, open: confirm.open, turn_id: event.value.turn_id })] : []),
-                // Slice 5(a): AFTER the text part, not before - spec.md's
-                // own "a compact card UNDER the reply." The "tool parts
-                // before text" rule above was about the structured
-                // reference card specifically (a weather card reads
-                // above its own sentence), not every tool part; sources
-                // are a footer, not a header.
+                // Native source parts stay after the reply text. The
+                // footer's static Sources card and [n] citation mapper
+                // both read them in this same order.
                 //
                 // `project` moved down here from the "before text" group
                 // above, 2026-09-27 (Jesse found live): chatHistoryAdapter.ts's
@@ -675,7 +665,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // landed - the live and reload paths now agree on the
                 // one position from the start, so nothing has to jump.
                 ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
-                ...(sources?.length ? [toolCallPart(`${event.value.turn_id}-sources`, "sources", sources)] : []),
+                ...sourceParts,
               ],
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),
               metadata: {
@@ -692,12 +682,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                   failedTool,
                   conversationId,
                   documentAvailable: event.value.document_available === true,
-                  // A real TurnValue field now (CHAT-16 landed) - kept
-                  // on metadata.custom for the retired caption's
-                  // page read and for symmetry with
-                  // chatHistoryAdapter.ts's reload-path row, alongside
-                  // the real tool-call part above.
-                  sources,
                   media: event.value.media,
                   media_items: (event.value as TurnWithMedia).media_items,
                   stats: event.value.stats,

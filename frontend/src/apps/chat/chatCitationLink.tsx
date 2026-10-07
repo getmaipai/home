@@ -3,7 +3,7 @@ import type { ComponentProps } from "react";
 import { useAuiState } from "@assistant-ui/react";
 import { Citation } from "@maipai/ui/src/elements/inline-citation";
 import { parseCitationHref } from "@/apps/chat/chatCitations";
-import { sourcesFromMessage } from "@/apps/chat/chatThreadSlots";
+import { sourcesFromMessage } from "@/apps/chat/chatSources";
 
 export function ChatCitationLink({ href, children, ...props }: ComponentProps<"a">) {
   const sources = useAuiState((state) => sourcesFromMessage(state.message));

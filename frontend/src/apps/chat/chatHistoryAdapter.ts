@@ -2,6 +2,7 @@ import { ExportedMessageRepository, type CompleteAttachment, type ThreadHistoryA
 import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
+import { sourceMessageParts } from "@/apps/chat/chatSources";
 import { textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
 
 export type FeedbackVerdict = "positive" | "negative";
@@ -173,12 +174,8 @@ export function rowsToBranchableMessages(
       // same order chatModelAdapter.ts's own live "done" event now uses -
       // a reloaded reply with an artifact should read identically to one
       // that just streamed in, card first, prose after.
-      // slice 5(a) resolved (getmaipai/home#130): `structured_part` now
-      // survives reload the same way `artifact` and `sources` do - the
-      // column exists (`row.structured_part`) and the same tool-call
-      // part chatModelAdapter.ts builds live from the done event is
-      // rebuilt here, in the identical order that adapter's own content
-      // array uses: reasoning, structured, artifact, text, sources.
+      // Native source parts survive reload in the same order as the live
+      // adapter, after the reply text, preserving citation numbering.
       // REASONING-04 (safety ruling, 2026-09-22): a reload renders a
       // stored reasoning value through the same Reasoning Element a live
       // turn just streamed into - reasoning-part-first, the identical
@@ -216,7 +213,7 @@ export function rowsToBranchableMessages(
               // before, since 2026-09-27 (a code review caught this): a
               // still-running project's own card is a "here's what's
               // happening with that" footer, the same "compact card
-              // under the reply" reasoning as `sources` and the finished
+              // under the reply" reasoning as native source parts and the finished
               // project artifact right above - chatModelAdapter.ts's own
               // live "done" event moved its `project` part to match
               // (Jesse found the two disagreeing live, the card visibly
@@ -226,7 +223,7 @@ export function rowsToBranchableMessages(
               // project still running.
               ...(row.project ? [toolCallPart(`${row.id}-project`, "project", row.project)] : []),
               ...(row.artifact && row.pluginId === PROJECT_START_PLUGIN_ID ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
-              ...(row.sources?.length ? [toolCallPart(`${row.id}-sources`, "sources", row.sources)] : []),
+              ...sourceMessageParts(row.sources),
             ]
           : row.replyText,
       createdAt,
@@ -253,7 +250,6 @@ export function rowsToBranchableMessages(
           pluginId: row.pluginId,
           commandId: row.commandId,
           documentAvailable: Boolean(row.document),
-          sources: row.sources,
           media: row.media,
           media_items: row.media_items,
           stats: row.stats,

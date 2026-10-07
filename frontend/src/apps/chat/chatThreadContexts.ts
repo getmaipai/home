@@ -77,14 +77,14 @@ export const ChatAgeBandContext = createContext<"child" | "teen" | "adult">("chi
 export type CompareTarget = { turnId: string; conversationId: string; ourText: string };
 export const CompareOpenContext = createContext<(target: CompareTarget) => void>(() => {});
 
-/** Shared by `SourcesActionBarTrigger` and `SourcesFooterContent` below -
+/** Shared by the source action button and its footer card -
  * the lifted open/closed state, keyed by `turnId` (see `ChatPage`'s
  * own `sourcesOpenValue`). `close` (not just `toggle`) exists for
- * `SourcesActionBarTrigger`'s own unmount cleanup: `AssistantActionBar`
+ * the button's own unmount cleanup: `AssistantActionBar`
  * sits inside `ActionBarPrimitive.Root`'s `autohide="not-last"`
  * (thread.aui.tsx), which truly unmounts the whole bar - trigger
  * included - on any earlier message once the pointer/focus leaves it.
- * Without closing on that unmount, `SourcesFooterContent` (a plain
+ * Without closing on that unmount, the footer card (a plain
  * sibling outside the bar, so it doesn't autohide) would keep the panel
  * open with its own trigger gone - a review-caught orphaned-open state. */
 export const SourcesOpenContext = createContext<{

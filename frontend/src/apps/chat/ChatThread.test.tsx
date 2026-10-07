@@ -10,8 +10,7 @@ import { EngineStartingLoader } from "@/apps/chat/chatThreadSlots";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 
-// SHARED-THREAD-01: one assistant message carrying every part type the
-// registry binds (reasoning, text, a spec-sheet tool, a tool timeline, sources)
+// SHARED-THREAD-01: one assistant message carrying the native source part alongside tool parts and text
 // renders through ChatThread alone, the same component both pages mount.
 const NOOP: ChatModelAdapter = { run: async function* () { /* the message is seeded */ } };
 const MESSAGES: ThreadMessageLike[] = [
@@ -21,8 +20,8 @@ const MESSAGES: ThreadMessageLike[] = [
     content: [
       { type: "reasoning", text: "Considering the forecast." },
       { type: "tool-call", toolCallId: "w1", toolName: "weather", args: {}, result: { title: "Weather in Springfield", subtitle: "Today", rows: [{ label: "High", value: "21 C" }] } },
-      { type: "tool-call", toolCallId: "s1", toolName: "sources", args: {}, result: [{ title: "Forecast", url: "https://example.com/f", domain: "example.com" }] },
       { type: "text", text: "It will be mild." },
+      { type: "source", sourceType: "url", id: "s1", title: "Forecast", url: "https://example.com/f" },
     ],
     status: { type: "complete", reason: "stop" },
   },
@@ -235,7 +234,7 @@ describe("ChatThread", () => {
   test("binds every tool id once, each to a renderer", () => {
     const ids = TOOL_BINDINGS.map((binding) => binding.toolName);
     expect(new Set(ids).size).toBe(ids.length);
-    for (const id of ["weather", "almanac-date", "write_document", "confirm", "project", "tool_timeline", "sources"]) expect(ids).toContain(id);
+    for (const id of ["weather", "almanac-date", "write_document", "confirm", "project", "tool_timeline"]) expect(ids).toContain(id);
     for (const binding of TOOL_BINDINGS) expect(typeof binding.render).toBe("function");
     expect(TOOL_BINDINGS.find((binding) => binding.toolName === "tool_timeline")?.display).toBe("inline");
     expect(TOOL_BINDINGS.filter((binding) => binding.toolName !== "tool_timeline").every((binding) => binding.display === undefined || binding.display === "standalone")).toBe(true);
@@ -313,7 +312,7 @@ describe("ChatThread", () => {
     expect(view.container.textContent).toContain("21 C");
     // reasoning group slot (ReasoningGroup)
     expect(view.container.textContent?.toLowerCase()).toContain("reasoning");
-    // The "sources" binding keeps the fallback tool card out of the message body.
+    // Native sources render in the message footer without a synthetic tool card.
     expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
   });
 

@@ -832,16 +832,9 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     }
   });
 
-  // SRC-ICON-01 (2026-09-22, supersedes the CHAT-UI-03 sources follow-up
-  // this test used to cover): a turn's `sources` render through the
-  // vendored `Source`/`SourceIcon`/`SourceTitle` (elements/sources.aui.tsx),
-  // its trigger in the assistant message's own action bar, collapsed by
-  // default per spec.md - the same synthetic-tool-call-part composition
-  // this describe block's own weather case already proves for the
-  // structured card. The owner's whole ask: a source opens its own page,
-  // and shows the site's icon fetched through the hub, never the
-  // browser calling the site directly.
-  test("a turn's sources render as a link to their own page with the hub's own favicon, collapsed by default", async () => {
+  // Native sources render through the shipped Sources card. D15 forbids
+  // third-party favicon requests, so the kit's glyph is used without images.
+  test("a turn's native sources render in the Sources card without third-party favicon requests", async () => {
     const SOURCE = { id: "src-tide123", kind: "web" as const, title: "Lantern Bay tide chart", url: "https://example.com/tides", site: "example.com", snippet: null, source: "turn-tide123", created_at: "2026-09-22T00:00:00.000Z", hlc: "1788000000000:0:test" };
     const restore = stubTurnFetch(
       ndjsonStream([
@@ -849,27 +842,6 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
         { type: "done", value: { turn_id: "turn-tide123", reply: { text: "High tide is at 4pm [1]. More [9]; code `[1]`." }, source: "model", safety: SAFETY, sources: [SOURCE] } },
       ]),
     );
-    // happy-dom has no real image decoder - `<img src>` always ends up
-    // "failed" (SourceIcon's own letter-fallback branch), same class of
-    // gap `sttSocket.test.ts`'s own header names for a real WebSocket.
-    // Fighting that (stubbing `complete`, blocking the error event) still
-    // lands on the fallback, so this captures the `src` the component
-    // actually assigned instead of reading it back off a real `<img>` -
-    // proves the SAME thing (SourceIcon was handed the hub's own favicon
-    // URL, never the shipped third-party default), without depending on
-    // an image decoder this environment doesn't have. Restored after so
-    // no later test's own `<img>` inherits this.
-    const capturedImgSrcs: string[] = [];
-    const originalSrcDescriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, "src")!;
-    Object.defineProperty(HTMLImageElement.prototype, "src", {
-      configurable: true,
-      get() {
-        return capturedImgSrcs.at(-1) ?? "";
-      },
-      set(value: string) {
-        capturedImgSrcs.push(value);
-      },
-    });
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/chat"]}>
@@ -884,30 +856,18 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       expect(markdown.querySelector("code")?.textContent).toBe("[1]");
       const citation = view.getByRole("link", { name: /^1$/ });
       expect(citation).toHaveAttribute("href", "https://example.com/tides");
-      // The inline chip resolves through ChatCitationLink's existing source
-      // hook, while the Sources card below keeps its collapsed-by-default
-      // behavior.
+      // The inline chip resolves through ChatCitationLink's native-source hook.
       expect(view.queryByText("Lantern Bay tide chart")).toBeNull();
-      // Issue #205: the visible label carries the real count; with the icon's
-      // fallback letter beside it, a bare "Sources" read as "NSources".
       const trigger = view.getByRole("button", { name: "1 Source" });
       expect(trigger).toBeVisible();
       fireEvent.click(trigger);
-      const row = view.container.querySelector('[data-slot="sources-list"] a[href="https://example.com/tides"]');
+      const row = view.container.querySelector('[data-slot="sources-list"]');
       expect(row).not.toBeNull();
-      // Opens the source's own page - the privacy promise on
-      // source.schema.json's own `url` field: `rel`/`referrerPolicy`
-      // both withhold the referrer, `target="_blank"` never navigates
-      // the chat away.
-      expect(row).toHaveAttribute("href", "https://example.com/tides");
-      expect(row).toHaveAttribute("target", "_blank");
-      expect(row).toHaveAttribute("rel", "noopener noreferrer");
-      expect(row).toHaveAttribute("referrerpolicy", "no-referrer");
-      // The site's icon through the hub's own route, never the site's
-      // own URL or the shipped default (a third-party favicon service).
-      expect(capturedImgSrcs).toContain(`/api/favicon?domain=${encodeURIComponent("example.com")}`);
+      expect(row).toHaveTextContent("Lantern Bay tide chart");
+      expect(row).toHaveTextContent("example.com");
+      expect(view.container.querySelector('[data-slot="sources-list"] img')).toBeNull();
+      expect(view.container.innerHTML).not.toContain("icons.duckduckgo.com");
     } finally {
-      Object.defineProperty(HTMLImageElement.prototype, "src", originalSrcDescriptor);
       restore();
     }
   });
@@ -1065,10 +1025,7 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
   });
 
   // TOOL-EVENTS-02: a search step's `tool_result.outcome.sites` renders
-  // as chips under that step (host + link), through the shipped
-  // `Source`/`SourceIcon` the message-level Sources card already uses -
-  // same favicon-proxy and privacy-attribute proof as the sources test
-  // above, at the step level instead of the reply's footer.
+  // as chips under that step through the shipped tool-timeline Element.
   test("a search step's tool_result sites render as chips under that step", async () => {
     const restore = stubTurnFetch(
       ndjsonStream([

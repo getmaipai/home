@@ -66,14 +66,6 @@
       "ed": "ED-034",
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
     },
-    "SourcesActionBarTrigger": {
-      "ed": "ED-024",
-      "reason": "Sources drawn by hand around Element parts, synthetic sources tool part; ELT-T1-23."
-    },
-    "SourcesFooterContent": {
-      "ed": "ED-024",
-      "reason": "Sources drawn by hand around Element parts, synthetic sources tool part; ELT-T1-23."
-    },
     "MessageDetailsContextBar": {
       "ed": "ED-034",
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."

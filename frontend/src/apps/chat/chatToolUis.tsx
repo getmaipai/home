@@ -449,18 +449,8 @@ export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string,
       // today (the kit's own upstream use is a coding-agent timeline) -
       // a named gap, not invented data.
       stats={[]}
-      // SRC-ICON-01's own proxy (never the shipped default) - the same
-      // function `SourcesFooterContent` below already passes to `SourceIcon`.
+      // SRC-ICON-01's own proxy (never the shipped default).
       faviconUrl={faviconUrl}
     />
   );
 };
-
-
-
-// The "sources" tool call still needs SOME registration or assistant-ui's own
-// fallback UI renders it inline in the message content - same no-op shape as
-// ChatPage.tsx's `SuppressLegacySourcesFallback` (`623878a6`), for the
-// identical reason: the real render happens in the action-bar trigger and
-// message-footer slots (chatThreadSlots.tsx), not in the message body.
-export const SourcesNoopRender: ToolCallMessagePartComponent = () => null;

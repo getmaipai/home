@@ -89,19 +89,6 @@ describe("rowsToBranchableMessages", () => {
     expect(items[5]!.message.metadata!.custom).toMatchObject({ failedGeneration: false, failedTool: false });
   });
 
-  // Lane 10 item 1: ConversationTurnRow doesn't have `sources` yet
-  // (CHAT-16/Session A adds the column) - proves the reload path already
-  // carries it forward the moment a row has one, same key
-  // chatModelAdapter.ts's live path uses, so SourcesCard/the [N] chip
-  // render identically whether the message just streamed in or came back
-  // from a reload.
-  test("a row carrying sources passes them into the reply's metadata.custom.sources", () => {
-    const sources: Source[] = [{ id: "src-1", kind: "web", title: "A page", url: "https://example.com/a", site: "example.com", snippet: null, source: "row-1", created_at: "2026-09-13T00:00:00Z", hlc: "1757000000000:0:abc123" }];
-    const row = { ...makeRow("row-1", "a reply"), sources };
-    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
-    expect(items[1]!.message.metadata!.custom!.sources).toEqual(sources);
-  });
-
   // SHELL-02 slice 4: canvas-split's own acceptance ("this slice must
   // survive reload") - a row carrying `artifact` ({id, version},
   // conversationHistory.ts's own reload-path twin of the live `done`
@@ -254,19 +241,13 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.content).toBe("17 times 24 is 408.");
   });
 
-  // Slice 5(a): `sources` survives reload the same way `structured_part`
-  // and `artifact` now do (getmaipai/home#130 resolved) - the column
-  // already exists on the row - so the same real tool-call part
-  // chatModelAdapter.ts builds live rides here too, AFTER the reply text
-  // (spec.md's "a compact card under the reply," the opposite order from
-  // the structured/artifact cards above).
-  test("a row carrying sources becomes a real tool-call part after the reply text", () => {
+  test("a row carrying sources becomes native source parts after the reply text", () => {
     const sources: Source[] = [{ id: "src-1", kind: "web", title: "A page", url: "https://example.com/a", site: "example.com", snippet: null, source: "row-1", created_at: "2026-09-13T00:00:00Z", hlc: "1757000000000:0:abc123" }];
     const row = { ...makeRow("row-1", "High tide is at 4pm."), sources };
     const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
     expect(items[1]!.message.content).toEqual([
       { type: "text", text: "High tide is at 4pm." },
-      { type: "tool-call", toolCallId: "row-1-sources", toolName: "sources", args: {}, argsText: "", result: sources },
+      { type: "source", sourceType: "url", id: "src-1", url: "https://example.com/a", title: "A page" },
     ]);
   });
 
@@ -276,9 +257,9 @@ describe("rowsToBranchableMessages", () => {
     expect(items[1]!.message.content).toBe("just a reply");
   });
 
-  test("a row without sources leaves metadata.custom.sources undefined, not a crash", () => {
+  test("a row without sources maps without source parts and does not crash", () => {
     const items = flatten(rowsToBranchableMessages([makeRow("row-1", "a reply")], "Nova", "conv-example123"));
-    expect(items[1]!.message.metadata!.custom!.sources).toBeUndefined();
+    expect(items[1]!.message.content).toBe("a reply");
   });
 
   test("a reloaded feedback verdict marks the matching assistant message selected", () => {

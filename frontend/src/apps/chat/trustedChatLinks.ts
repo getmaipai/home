@@ -1,5 +1,5 @@
 import type { ThreadMessage } from "@assistant-ui/react";
-import { sourcesFromMessage } from "@/apps/chat/chatThreadSlots";
+import { sourcesFromMessage } from "@/apps/chat/chatSources";
 import type { MarkdownLinkContext } from "@maipai/ui/src/elements/markdown-text";
 
 const URL_RE = /https?:\/\/[^\s<>"'`]+/g;

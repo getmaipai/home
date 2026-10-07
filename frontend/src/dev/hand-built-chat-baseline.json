@@ -23,8 +23,6 @@
   "apps/chat/chatThreadSlots.tsx": [
     "ChatComposerNotice",
     "ChatWelcome",
-    "SourcesActionBarTrigger",
-    "SourcesFooterContent",
     "MessageDetailsReveal"
   ],
   "apps/chat/chatToolUis.tsx": [

@@ -926,14 +926,11 @@ describe("createChatModelAdapter onArtifactReady", () => {
   });
 });
 
-// Slice 5(a): CHAT-16's `TurnValue.sources` becomes a real ToolCallMessagePart
-// too - `toolName: "sources"`, AFTER the text part (spec.md's "a compact card
-// under the reply," the opposite order from the structured card above, which
-// reads before the prose).
-describe("createChatModelAdapter sources (slice 5(a))", () => {
+// Native source parts preserve the search result order used by numbered citations.
+describe("createChatModelAdapter sources", () => {
   const SOURCE = { id: "src-abc123", kind: "web" as const, title: "Lantern Bay tide chart", url: "https://example.com/tides", site: "example.com", snippet: null, source: "turn-tide123", created_at: "2026-09-22T00:00:00.000Z", hlc: "1788000000000:0:test" };
 
-  test("sources on the done event become a real tool-call part after the text part", async () => {
+  test("sources on the done event become native source parts after the text part", async () => {
     const env = stubEnvironment(
       ndjsonStream([
         { type: "delta", text: "High tide is at 4pm." },
@@ -943,13 +940,13 @@ describe("createChatModelAdapter sources (slice 5(a))", () => {
     try {
       const { yields } = await collect([fakeUserMessage("when's high tide")]);
       const last = yields[yields.length - 1];
-      expect(last?.content).toEqual([{ type: "text", text: "High tide is at 4pm." }, { type: "tool-call", toolCallId: "turn-tide123-sources", toolName: "sources", args: {}, argsText: "", result: [SOURCE] }]);
+      expect(last?.content).toEqual([{ type: "text", text: "High tide is at 4pm." }, { type: "source", sourceType: "url", id: SOURCE.id, url: SOURCE.url, title: SOURCE.title }]);
     } finally {
       env.restore();
     }
   });
 
-  test("a reply with no sources yields no sources tool-call part", async () => {
+  test("a reply with no sources yields no source parts", async () => {
     const env = stubEnvironment(
       ndjsonStream([
         { type: "delta", text: "Basil and parsley are easy herbs." },
@@ -965,7 +962,7 @@ describe("createChatModelAdapter sources (slice 5(a))", () => {
     }
   });
 
-  test("a structured_part and sources on the same reply: structured card first, text, then sources", async () => {
+  test("a structured_part and sources on the same reply: structured card first, text, then native sources", async () => {
     const structuredPart = { kind: "spec_sheet" as const, tool_id: "weather", title: "Lantern Bay", rows: [{ label: "Temperature", value: "61°F" }] };
     const env = stubEnvironment(
       ndjsonStream([
@@ -979,7 +976,7 @@ describe("createChatModelAdapter sources (slice 5(a))", () => {
       expect(last?.content).toEqual([
         { type: "tool-call", toolCallId: "turn-weather789-structured", toolName: "weather", args: {}, argsText: "", result: structuredPart },
         { type: "text", text: "It's 61°F in Lantern Bay." },
-        { type: "tool-call", toolCallId: "turn-weather789-sources", toolName: "sources", args: {}, argsText: "", result: [SOURCE] },
+        { type: "source", sourceType: "url", id: SOURCE.id, url: SOURCE.url, title: SOURCE.title },
       ]);
     } finally {
       env.restore();

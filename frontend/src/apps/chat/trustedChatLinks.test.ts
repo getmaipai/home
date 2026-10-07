@@ -6,10 +6,7 @@ const user = {
   id: "user-1", role: "user", content: [{ type: "text", text: "I typed https://example.com/page?q=1, and (https://example.com/paren_(x))." }],
 } as unknown as ThreadMessage;
 const assistant = {
-  id: "assistant-1", role: "assistant", content: [{
-    type: "tool-call", toolCallId: "sources-1", toolName: "sources", args: {},
-    result: [{ url: "https://source.example/article", site: "source.example", title: "Article" }],
-  }],
+  id: "assistant-1", role: "assistant", content: [{ type: "source", sourceType: "url", id: "sources-1", url: "https://source.example/article", title: "Article" }],
 } as unknown as ThreadMessage;
 
 describe("trustedChatLinks", () => {

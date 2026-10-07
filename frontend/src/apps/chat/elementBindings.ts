@@ -36,7 +36,7 @@ import {
 } from "@/apps/chat/chatThreadSlots";
 import { ChatMessageError } from "@/apps/chat/chatErrorSlot";
 import { ChatCitationLink } from "@/apps/chat/chatCitationLink";
-import { ArtifactCardToolRender, ConfirmToolRender, ProjectToolRender, SourcesNoopRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
+import { ArtifactCardToolRender, ConfirmToolRender, ProjectToolRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
 import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
 import { ChatDateDivider } from "@/apps/chat/chatDateDivider";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
@@ -69,7 +69,6 @@ export const TOOL_BINDINGS: readonly ToolBinding[] = [
   { toolName: "confirm", element: "tool-fallback (Approval)", render: ConfirmToolRender },
   { toolName: "project", element: "job-progress", render: ProjectToolRender },
   { toolName: "tool_timeline", element: "tool-timeline", render: ToolTimelineToolRender, display: "inline" },
-  { toolName: "sources", element: "sources", render: SourcesNoopRender },
 ];
 
 export type DataBinding = {

@@ -20,9 +20,7 @@ import { type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
 // is built for a terminal command and can't be relabeled, per the org's
 // "no hand-built UI" rule).
 import { ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "@maipai/ui/src/elements/reasoning.aui";
-import { Source, SourceIcon, SourceTitle } from "@maipai/ui/src/elements/sources.aui";
-import { Collapsible, CollapsibleContent } from "@maipai/ui/src/ui/collapsible";
-import { collapsePanel } from "@maipai/ui/src/elements/surfaces";
+import { Sources as SourcesCard } from "@maipai/ui/src/elements/sources";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { EmptyState, EmptyStateGreeting, EmptyStateSuggestion, EmptyStateSuggestions } from "@maipai/ui/src/elements/empty-state";
 import { STARTER_SUGGESTIONS } from "@/apps/chat/chatStarterSuggestions";
@@ -51,7 +49,7 @@ import { useStatusApps } from "@/shell/useStatusApps";
 import { appStatusToSidebar } from "@/shell/statusApps";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import type { Source as SpecSource } from "@maipai/spec/gen/ts/source.js";
+import { sourcesFromMessage } from "@/apps/chat/chatSources";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { useStoppedRun } from "@/apps/chat/chatStoppedRun";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
@@ -480,139 +478,18 @@ export function ReasoningGroup({ children, group }: PropsWithChildren<{ group: T
   );
 }
 
-// SRC-ICON-01: `elements/sources.tsx`'s own `Sources` card (Slice 5(a))
-// had no `href` (a source could never be opened) and rendered a bare
-// letter glyph for every row, never the site's real icon - both filed
-// as kit asks in docs/dev.md. Fixed at the source: `sources.aui.tsx`
-// (vendored from assistant-ui, c-99e5a) gives `Source` (a real `<a
-// target="_blank" rel="noopener noreferrer">`) and `SourceIcon` (a
-// favicon `<img>` with a letter fallback on error), composed by hand
-// below inside the kit's own `Collapsible` - see `SourcesFooterContent`.
-// `domain` still reads spec's `site` field (source.schema.json's own
-// description: "the hostname a citation chip shows"); `url` now carries
-// straight through instead of being dropped. Keyed by `url`, not index or
-// domain: `composer.ts`'s `sourceRows()` already dedupes by `url`
-// (`byUrl.has(source.url)`), so it's a stable, collision-free key, unlike
-// `domain` (two pages on the same site) or index (would miskey across a
-// re-render that reorders).
-// Reads the CURRENT message's own "sources" tool-call result straight off
-// message state (not a prop) - `SourcesActionBarTrigger` and
-// `SourcesFooterContent` below are both bare `ComponentType` slots (the
-// same `AssistantMoreItems`/`CompareWithBareModelMenuItem` shape a few
-// lines up), rendered by the kit with no props of their own.
-// `.find()`, not `.filter()`: `chatModelAdapter.ts`/`chatHistoryAdapter.ts`
-// both emit at most one "sources" tool-call part per message, from the
-// turn's own single `sources`/`row.sources` array field (never two calls
-// in one turn) - the same "complete snapshot" invariant the comment
-// above cites for the index-key fix.
-// `useAuiState` is a `useSyncExternalStore` selector: it needs the SAME
-// call, with the SAME underlying content, to return the SAME reference,
-// or React sees "changed on every read" and loops rather than settling
-// (found live: this shipped without the cache first and threw "Maximum
-// update depth exceeded" the moment any assistant message rendered).
-// `messageText` a few lines up gets away with no cache because it
-// returns a primitive string, equal by value; an array needs one.
-// Keyed by the tool-call part itself (stable across renders unless its
-// own content changes, same as any other assistant-ui message part) -
-// a cache miss just recomputes, so a wrong assumption about that
-// stability would cost renders, never wrong data.
-// A code review caught this (2026-09-27): ProjectResultReload's own
-// artifact lookup (below) duplicated this exact find-by-toolName shape
-// with a different toolName and no caching - one definition instead,
-// used by both. The caching this file's own WeakMaps add (sourcesCache
-// just below) is specific to each CALLER's own transform, not to the
-// find itself, so it stays out of this shared helper.
+// Read the current message's native source parts; no synthetic tool call
+// or cached transform is needed.
 export function toolCallPartFromMessage(message: ThreadMessage | undefined, toolName: string): Extract<ThreadAssistantMessagePart, { type: "tool-call" }> | undefined {
   return message?.content.find(
     (p): p is Extract<ThreadAssistantMessagePart, { type: "tool-call" }> => p.type === "tool-call" && p.toolName === toolName,
   );
 }
 
-interface ChatSource {
-  domain: string;
-  title: string;
-  url: string;
-}
-export const sourcesCache = new WeakMap<object, ChatSource[]>();
-export const NO_SOURCES: ChatSource[] = [];
-export function sourcesFromMessage(message: ThreadMessage | undefined): ChatSource[] {
-  const part = toolCallPartFromMessage(message, "sources");
-  if (!part) return NO_SOURCES;
-  const cached = sourcesCache.get(part);
-  if (cached) return cached;
-  const result = (part.result as SpecSource[] | undefined)?.map((source) => ({ domain: source.site, title: source.title, url: source.url })) ?? NO_SOURCES;
-  sourcesCache.set(part, result);
-  return result;
-}
-
-// The hub's own favicon route (SRC-ICON-01 part 2, backend/src/routes/
-// favicon.ts): never the upstream Element's default (a third-party
-// `icons.duckduckgo.com` call straight from the browser, exactly what
-// the privacy promise on source.schema.json's own `url` field rules
-// out) - `SourceIcon`'s `faviconUrl` prop swaps that default for this.
+// The hub's own favicon route for the tool timeline (never the upstream
+// Element's default third-party favicon service).
 export function faviconUrl(domain: string): string {
   return `/api/favicon?domain=${encodeURIComponent(domain)}`;
-}
-
-// Jesse's own screenshots (2026-09-22): the trigger moves INTO the
-// assistant message's action bar, as the last item after "..." - subtle,
-// the bar's own ghost style, stacked favicons of the first few sources
-// plus the word "Sources", no pill, no count badge, no chevron (the
-// count lives in the tooltip instead). Splitting the trigger and the
-// open content across two DOM locations (this bar row vs. the block-
-// level space below the whole footer) means composing the kit's own
-// `Collapsible` directly here rather than the shipped `Sources` card's
-// own bundled trigger+content - `SourceIcon` is the same kit export the
-// open content list below uses, not a second hand-rolled glyph.
-// `Tooltip`/`TooltipTrigger`/`TooltipContent` and the Elements' own
-// `Button` directly, not the kit's `TooltipIconButton` its bar siblings
-// (Copy, Reload, More) use: that wrapper is a fixed square icon button
-// with an sr-only label, and this trigger needs a visible text label
-// ("Sources") beside the icon stack at its own natural width - the same
-// reasoning `inlineToggle`/`collapsedToggle` above already give for not
-// using it on the rail toggle, just on this file's other side of the
-// page. Still every piece a shipped primitive, composed, not forked.
-export function SourcesActionBarTrigger() {
-  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
-  const sources = useAuiState((s) => sourcesFromMessage(s.message));
-  const { isOpen, toggle, close } = useContext(SourcesOpenContext);
-  // A review caught this: `AssistantActionBar` sits inside
-  // `ActionBarPrimitive.Root`'s `autohide="not-last"` (thread.aui.tsx),
-  // which truly unmounts the whole bar - this trigger included - on any
-  // earlier message once the pointer/focus leaves it. `SourcesFooterContent`
-  // below is a plain sibling outside that root, so it doesn't autohide -
-  // without this, the panel it renders would stay open with its own
-  // trigger gone, no visible way left to close it. Closing on unmount
-  // matches the rest of the bar: every other control in this row already
-  // disappears on the same condition.
-  useEffect(() => {
-    return () => {
-      if (turnId) close(turnId);
-    };
-  }, [turnId, close]);
-  if (!turnId || !sources.length) return null;
-  const open = isOpen(turnId);
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <ElementsButton
-          variant="ghost"
-          size="xs"
-          aria-expanded={open}
-          onClick={() => toggle(turnId)}
-          className="text-foreground/60 hover:text-foreground/90"
-        >
-          <span className="flex items-center" aria-hidden="true">
-            {sources.slice(0, 3).map((source, index) => (
-              <SourceIcon key={source.url} url={source.url} faviconUrl={faviconUrl} className={index === 0 ? "ring-2 ring-background" : "-ml-1.5 ring-2 ring-background"} />
-            ))}
-          </span>
-          <span>{sources.length === 1 ? "1 Source" : `${sources.length} Sources`}</span>
-        </ElementsButton>
-      </TooltipTrigger>
-      <TooltipContent>Show sources</TooltipContent>
-    </Tooltip>
-  );
 }
 
 /** Failed-turn diagnostics are appended by the shipped action-bar slot, so
@@ -667,49 +544,8 @@ export function FailedTurnActionBarExtras() {
           }}
         />
       ) : null}
-      <SourcesActionBarTrigger />
       <FailedTurnErrorDetailsAction />
     </>
-  );
-}
-
-// SRC-ICON-01: composed straight from the vendored Elements, no hand-
-// built row - `Source` (a real `<a>`, target `_blank`, `rel="noopener
-// noreferrer"` by default) plus an explicit `referrerPolicy="no-referrer"`
-// (source.schema.json's own privacy promise on `url`: "a cited site
-// learns nothing from the click but the click" - `rel="noreferrer"`
-// alone already withholds the Referer header in every evergreen
-// browser, but the schema names both attributes and this sets both
-// rather than leaning on the overlap), `SourceIcon` pointed at the
-// hub's own favicon route (never the shipped default, `faviconUrl`
-// above), `SourceTitle`. The chip look (`variant`/`size` untouched) is
-// the shipped Element's own, not a custom row shape - the kit's
-// `Collapsible`/`CollapsibleContent` (the same primitive the old
-// `Sources` card built on) gives the open/close chrome, styled with the
-// same `collapsePanel` token that card's own content panel used.
-export function SourcesFooterContent() {
-  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
-  const sources = useAuiState((s) => sourcesFromMessage(s.message));
-  const { isOpen, toggle } = useContext(SourcesOpenContext);
-  if (!turnId || !sources.length) return null;
-  return (
-    <div className="ms-2 pb-2">
-      <Collapsible open={isOpen(turnId)} onOpenChange={() => toggle(turnId)}>
-        <CollapsibleContent
-          // eslint-disable-next-line shadcn/require-static-classes -- collapsePanel is a stable module-level constant, not a runtime-computed string
-          className={collapsePanel}
-        >
-          <div className="flex flex-wrap gap-1.5 pt-2.5" data-slot="sources-list">
-            {sources.map((source) => (
-              <Source key={source.url} href={source.url} referrerPolicy="no-referrer" variant="secondary">
-                <SourceIcon url={source.url} faviconUrl={faviconUrl} />
-                <SourceTitle>{source.title}</SourceTitle>
-              </Source>
-            ))}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
   );
 }
 
@@ -781,6 +617,10 @@ export function BareModelBadge() {
 // state and rendering (or not) on its own, so this wrapper is pure
 // composition, no shared logic between them.
 export function MessageFooterExtra() {
+  const message = useAuiState((s) => s.message);
+  const turnId = message.metadata?.custom?.turnId as string | undefined;
+  const sources = sourcesFromMessage(message);
+  const sourceOpen = useContext(SourcesOpenContext);
   const stoppedRun = useStoppedRun();
   // ELEMENTS-ADOPT-02: the kit feedback-dialog as it ships, fed by a hook.
   const feedbackForm = useReplyFeedbackForm();
@@ -792,7 +632,21 @@ export function MessageFooterExtra() {
   return (
     <>
       <BareModelBadge />
-      <SourcesFooterContent />
+      {turnId && sources.length ? (
+        <>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <ElementsButton type="button" variant="ghost" size="icon" aria-label={`${sources.length} ${sources.length === 1 ? "Source" : "Sources"}`} aria-expanded={sourceOpen.isOpen(turnId)} onClick={() => sourceOpen.toggle(turnId)}>
+                {sources.length}
+              </ElementsButton>
+            </TooltipTrigger>
+            <TooltipContent>{sources.length} {sources.length === 1 ? "Source" : "Sources"}</TooltipContent>
+          </Tooltip>
+          <SourcesCard sources={sources} open={sourceOpen.isOpen(turnId)} onOpenChange={(open) => {
+            if (sourceOpen.isOpen(turnId) !== open) sourceOpen.toggle(turnId);
+          }} layout="list" hideTrigger />
+        </>
+      ) : null}
       <MessageDetailsReveal />
       {memoryChips ? <MemoryChips {...memoryChips} /> : null}
       {stoppedRun ? <StoppedRun {...stoppedRun} /> : null}

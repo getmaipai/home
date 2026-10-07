@@ -109,13 +109,6 @@
       "ed": "ED-035",
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     },
-    "SourceIcon": {
-      "tokens": [
-        "-ml-1.5"
-      ],
-      "ed": "ED-024",
-      "reason": "Sources drawn by hand around Element parts, synthetic sources tool part; ELT-T1-23."
-    },
     "Badge": {
       "tokens": [
         "mb-1"
