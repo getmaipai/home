@@ -26,7 +26,7 @@ export const ChatExtrasContext = createContext<ChatExtrasContextValue | null>(nu
 // sources panel, ...) wraps this in the page; the contexts default safely.
 
 function ElementBinding({ binding }: { binding: ToolBinding }) {
-  useAssistantToolUI({ toolName: binding.toolName, render: binding.render, display: "standalone" });
+  useAssistantToolUI({ toolName: binding.toolName, render: binding.render, display: binding.display ?? "standalone" });
   return null;
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, mock, test } from "bun:test";
-import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
@@ -28,8 +28,8 @@ const MESSAGES: ThreadMessageLike[] = [
   },
 ];
 
-function Harness({ admin, connection = { phase: "online" }, adapter = NOOP }: { admin: boolean; connection?: ConnectionState; adapter?: ChatModelAdapter }) {
-  const runtime = useLocalRuntime(adapter, { initialMessages: MESSAGES });
+function Harness({ admin, connection = { phase: "online" }, adapter = NOOP, messages = MESSAGES }: { admin: boolean; connection?: ConnectionState; adapter?: ChatModelAdapter; messages?: ThreadMessageLike[] }) {
+  const runtime = useLocalRuntime(adapter, { initialMessages: messages });
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <AdminContext.Provider value={admin}>
@@ -237,6 +237,8 @@ describe("ChatThread", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ["weather", "almanac-date", "write_document", "confirm", "project", "tool_timeline", "sources"]) expect(ids).toContain(id);
     for (const binding of TOOL_BINDINGS) expect(typeof binding.render).toBe("function");
+    expect(TOOL_BINDINGS.find((binding) => binding.toolName === "tool_timeline")?.display).toBe("inline");
+    expect(TOOL_BINDINGS.filter((binding) => binding.toolName !== "tool_timeline").every((binding) => binding.display === undefined || binding.display === "standalone")).toBe(true);
     for (const [name, slot] of Object.entries(THREAD_SLOTS)) {
       if (name === "markdown") {
         const markdown = slot as typeof THREAD_SLOTS.markdown;
@@ -249,6 +251,58 @@ describe("ChatThread", () => {
         expect(typeof slot).toBe("function");
       }
     }
+  });
+
+  test("the tool timeline uses Thread's shipped tool-group disclosure", async () => {
+    const message: ThreadMessageLike[] = [{
+      role: "assistant",
+      content: [{ type: "tool-call", toolCallId: "timeline-3", toolName: "tool_timeline", args: {}, result: [
+        { callId: "call-1", packageId: "websearch", state: "ok", sites: [{ host: "example.com", url: "https://example.com" }] },
+        { callId: "call-2", packageId: "weather", state: "ok" },
+        { callId: "call-3", packageId: "almanac-date", state: "ok" },
+      ] }],
+      status: { type: "complete", reason: "stop" },
+    }];
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    await waitFor(() => expect(view.container.querySelector('[data-slot="tool-group-root"]')).not.toBeNull());
+    await view.getByRole("button", { name: /1 tool call/ }).click();
+    expect(view.container.querySelector('[data-slot="tool-timeline"]')).not.toBeNull();
+  });
+
+  async function expectFailedToolPrivacy(band: "child" | "teen" | "adult") {
+    const message: ThreadMessageLike[] = [{
+      role: "assistant",
+      content: [{ type: "tool-call", toolCallId: `timeline-${band}`, toolName: "tool_timeline", args: {}, result: [
+        { callId: "failed-call", packageId: "websearch", state: "error", failureKind: "private raw failure text" },
+      ] }],
+      metadata: { custom: { turnId: "turn-failed-tool", failedTool: true } },
+      status: { type: "complete", reason: "stop" },
+    }];
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    await waitFor(() => expect(view.container.querySelector('[data-slot="tool-group-root"]')).not.toBeNull());
+    await view.getByRole("button", { name: /1 tool call/ }).click();
+    const timeline = view.container.querySelector('[data-slot="tool-timeline"]');
+    expect(timeline).not.toBeNull();
+    await within(timeline as HTMLElement).getByRole("button").click();
+    expect(view.container.textContent).toContain("Failed");
+    expect(view.container.textContent).not.toContain("private raw failure text");
+  }
+
+  test("a child sees failed-tool status without raw error text", async () => expectFailedToolPrivacy("child"));
+  test("a teen sees failed-tool status without raw error text", async () => expectFailedToolPrivacy("teen"));
+  test("an adult sees failed-tool status without raw error text", async () => expectFailedToolPrivacy("adult"));
+
+  test("an admin sees the failed-tool error indicator", async () => {
+    const message: ThreadMessageLike[] = [{
+      role: "assistant",
+      content: [{ type: "tool-call", toolCallId: "timeline-admin", toolName: "tool_timeline", args: {}, result: [
+        { callId: "failed-call", packageId: "websearch", state: "error", failureKind: "timeout" },
+      ] }],
+      metadata: { custom: { turnId: "turn-failed-tool", failedTool: true } },
+      status: { type: "complete", reason: "stop" },
+    }];
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin messages={message} /></MemoryRouter>);
+    await waitFor(() => expect(view.getByRole("button", { name: "Error details" })).toBeTruthy());
   });
 
   test("a message with every bound part type renders its Elements", async () => {

@@ -771,6 +771,20 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
     fireEvent.click(send);
   }
 
+  async function openToolGroup(view: ReturnType<typeof render>): Promise<void> {
+    fireEvent.click(await view.findByRole("button", { name: /1 tool call/ }));
+    await waitFor(() => expect(view.container.querySelector('[data-slot="tool-group-root"]')?.getAttribute("data-state")).toBe("open"));
+  }
+
+  async function openTimeline(view: ReturnType<typeof render>): Promise<void> {
+    const trigger = await waitFor(() => {
+      const button = view.container.querySelector('[data-slot="tool-timeline"] button');
+      expect(button).not.toBeNull();
+      return button as HTMLButtonElement;
+    });
+    fireEvent.click(trigger);
+  }
+
   test("a weather turn's structured result renders through the spec-sheet Element, not prose", async () => {
     const structuredPart = { kind: "spec_sheet" as const, tool_id: "weather", title: "Lantern Bay", rows: [{ label: "Temperature", value: "61°F" }] };
     const restore = stubTurnFetch(
@@ -965,8 +979,9 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       await view.findByText("High tide is at 4pm.");
       const trigger = view.getByRole("button", { name: /1 tool call/ });
       expect(trigger).toBeVisible();
+      await openToolGroup(view);
       expect(view.queryByText("websearch")).toBeNull();
-      fireEvent.click(trigger);
+      await openTimeline(view);
       expect(await view.findByText("websearch")).toBeVisible();
     } finally {
       restore();
@@ -990,8 +1005,8 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       );
       await sendMessage(view, "when's high tide");
       await view.findByText("I could not look that up.");
-      const trigger = view.getByRole("button", { name: /1 tool call/ });
-      fireEvent.click(trigger);
+      await openToolGroup(view);
+      await openTimeline(view);
       expect(await view.findByText("websearch")).toBeVisible();
       expect(view.queryByText(/lookup failed/)).toBeNull();
     } finally {
@@ -1016,6 +1031,7 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       );
       await sendMessage(view, "when's high tide");
       await view.findByText("High tide is at 4pm.");
+      await openToolGroup(view);
       expect(await view.findByRole("button", { name: "Worked for 12 seconds, 1 step" })).toBeVisible();
     } finally {
       restore();
@@ -1041,6 +1057,7 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       );
       await sendMessage(view, "when's high tide");
       await view.findByText("High tide is at 4pm.");
+      await openToolGroup(view);
       expect(await view.findByRole("button", { name: "Worked for 4 minutes, 2 steps" })).toBeVisible();
     } finally {
       restore();
@@ -1079,10 +1096,10 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       );
       await sendMessage(view, "who won the mariners game");
       await view.findByText("The Mariners won 4-2.");
-      const trigger = view.getByRole("button", { name: /1 tool call/ });
       // Collapsed by default - a site chip isn't in the DOM yet either.
+      await openToolGroup(view);
       expect(view.queryByText("mlb.com")).toBeNull();
-      fireEvent.click(trigger);
+      await openTimeline(view);
       const row = (await view.findByText("mlb.com")).closest("a");
       expect(row).not.toBeNull();
       expect(row).toHaveAttribute("href", "https://www.mlb.com/mariners");
@@ -1109,7 +1126,8 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       );
       await sendMessage(view, "what's the weather in portland");
       await view.findByText("It's 58°F and overcast in Portland.");
-      fireEvent.click(view.getByRole("button", { name: /1 tool call/ }));
+      await openToolGroup(view);
+      await openTimeline(view);
       expect(await view.findByText("weather")).toBeVisible();
       // The conversation, not the history column (whose settings gear is a link).
       expect(within(document.querySelector<HTMLElement>('[data-slot="next-chat-pane"]')!).queryByRole("link")).toBeNull();

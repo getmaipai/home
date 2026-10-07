@@ -165,6 +165,7 @@ const chatReview = process.argv.includes("--chat-review") || chatFocusReview || 
 const chatStatsReview = process.argv.includes("--chat-stats-review");
 const liveVoiceSessionReview = process.argv.includes("--live-voice-session-review");
 const canvasPaneReview = process.argv.includes("--canvas-pane-review");
+const chatToolsRowReview = process.argv.includes("--chat-tools-row-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
 // spec.md "Acceptance for an implementation": the three states with no
 // existing dedicated capture (sources card + memory chip + image
@@ -328,7 +329,7 @@ const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const projectPageReview = process.argv.includes("--projects-page-review");
-const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview;
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -7106,6 +7107,60 @@ async function captureCanvasPaneReview(browser: Browser, sessionValue: string): 
   }
 }
 
+/** ELT-T1-17: a three-call timeline rendered through Thread's shipped
+ * tool-group disclosure, at desktop and phone sizes in both themes. */
+async function captureChatToolsRowReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots", "chat-tools-row");
+  mkdirSync(outDir, { recursive: true });
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.route("**/api/turn/stream", async (route) => {
+          const reply = "I checked three sources and put the results together.";
+          const stream = assistantStreamBody([
+            { type: "turn_meta", conversation_id: "conv-tools-row", turn_id: "turn-tools-row", resume_token: "resume-tools-row" },
+            { t: "tool_call", package_id: "websearch", args: {}, call_id: "call-search" },
+            { t: "tool_result", package_id: "websearch", call_id: "call-search", outcome: { sites: [{ host: "example.com", url: "https://example.com/article" }] } },
+            { t: "tool_call", package_id: "weather", args: {}, call_id: "call-weather" },
+            { t: "tool_result", package_id: "weather", call_id: "call-weather", outcome: { text: "Mild and sunny" } },
+            { t: "tool_call", package_id: "almanac-date", args: {}, call_id: "call-date" },
+            { t: "tool_result", package_id: "almanac-date", call_id: "call-date", outcome: { text: "Today is Tuesday" } },
+            { type: "delta", text: reply },
+            { type: "done", value: { turn_id: "turn-tools-row", reply: { text: reply }, source: "model", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-10-07T00:00:00.000Z" } } },
+          ]);
+          const body = Buffer.from(await new Response(stream).arrayBuffer());
+          await route.fulfill({ status: 200, headers: { "content-type": "text/plain; charset=utf-8", "x-vercel-ai-data-stream": "v1" }, body });
+        });
+        await page.goto(`${BASE_URL}/chat`);
+        const input = page.getByRole("textbox", { name: "Message input" });
+        await input.fill("Compare today's weather and date with a web search");
+        await page.getByRole("button", { name: "Send message", exact: true }).click();
+        await page.getByText("I checked three sources and put the results together.").waitFor({ timeout: 15000 });
+        const group = page.locator('[data-slot="tool-group-root"]');
+        await group.waitFor({ state: "visible", timeout: 15000 });
+        await group.getByRole("button").click();
+        const timeline = page.locator('[data-slot="tool-timeline"]');
+        await timeline.waitFor({ state: "visible" });
+        await timeline.getByRole("button").click();
+        await page.getByText("websearch", { exact: true }).waitFor();
+        await page.getByText("weather", { exact: true }).waitFor();
+        await page.getByText("almanac-date", { exact: true }).waitFor();
+        await settleAnimations(page);
+        const filename = `chat-tools-row-${viewport.width}-${theme}.png`;
+        const path = join(outDir, filename);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        dedicatedScreenshots.push({ file: filename, route: "chat-tools-row", viewport: slug, theme });
+        console.log(`Wrote ${path}`);
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureNextShellFoldReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
@@ -9923,6 +9978,12 @@ async function main() {
       return;
     }
 
+    if (!a11yOnly && chatToolsRowReview) {
+      await captureChatToolsRowReview(browser, sessionValue);
+      console.log("completed named review: --chat-tools-row-review");
+      return;
+    }
+
     if (!a11yOnly && chatStatsReview) await captureChatStatsReview(browser, sessionValue);
 
     if (!a11yOnly && chatResearchReview) await captureChatResearchReview(browser, sessionValue);
@@ -10067,7 +10128,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatFindComposerShiftReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview) {
+    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -10100,7 +10161,7 @@ async function main() {
     // browser contexts that would only ever iterate zero routes below.
     const combos = filesReview
       ? FILES_REVIEW_COMBOS
-      : notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview
+      : notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview
         ? []
         : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
           ? A11Y_ONLY_COMBOS
