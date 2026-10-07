@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-07T17:41:26.481Z",
+  "generatedAt": "2026-10-07T18:33:12.046Z",
   "kitTag": "ui-v0.5.174",
   "items": [
     {
@@ -63,15 +63,15 @@
       "name": "ThreadSearchDensityShowcase",
       "group": "thread/showcase",
       "verdict": "support",
-      "verdictReason": "Developer-only showcase fixture for the kit's ThreadSearch density variants; it is not a standalone Home adoption target.",
+      "verdictReason": "Developer-only story fixture for ELT-T1-20, covered by the Commons ThreadSearch tests; not a standalone Home product surface.",
       "implemented": false
     },
     {
       "file": "TraceWaterfallShowcase.tsx",
       "name": "TraceWaterfallShowcase",
-      "group": "agent/workflow/showcase",
+      "group": "trace/showcase",
       "verdict": "support",
-      "verdictReason": "Developer-only showcase fixture for the kit's TraceWaterfall variants; it is not a standalone Home adoption target.",
+      "verdictReason": "Developer-only story fixture for ELT-T1-22, covered by the Commons TraceWaterfall tests; not a standalone Home product surface.",
       "implemented": false
     },
     {
