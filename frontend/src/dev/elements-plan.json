@@ -3307,6 +3307,23 @@
       "replacesHandBuilt": [],
       "realTurnToday": null,
       "verdictReason": "Not an Element: a kit test, snapshot or stylesheet that the scan lists."
+    },
+    {
+      "file": "ThreadListPageRowsShowcase.tsx",
+      "name": "ThreadListPageRowsShowcase",
+      "group": "project",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Developer-only story fixture for PROJECTS-KIT-02, covered by the Commons showcase test; it is not a standalone Home product surface."
     }
   ]
 }

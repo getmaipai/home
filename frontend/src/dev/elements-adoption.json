@@ -1,7 +1,15 @@
 {
-  "generatedAt": "2026-10-07T05:34:58.726Z",
-  "kitTag": "ui-v0.5.155",
+  "generatedAt": "2026-10-07T06:25:18.463Z",
+  "kitTag": "ui-v0.5.156",
   "items": [
+    {
+      "file": "ThreadListPageRowsShowcase.tsx",
+      "name": "ThreadListPageRowsShowcase",
+      "group": "project",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for PROJECTS-KIT-02, covered by the Commons showcase test; it is not a standalone Home product surface.",
+      "implemented": false
+    },
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
       "name": "activity-graph",
