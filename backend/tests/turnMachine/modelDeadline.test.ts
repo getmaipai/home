@@ -113,7 +113,7 @@ async function adultTurn(text = "explain how a heat pump works in detail", opts:
   return result.value;
 }
 
-describe("DEADLINE-02: an adult's written reply has no wall-clock cap", () => {
+describe("DEADLINE-02: written replies do not have a wall-clock cap", () => {
   test("(a) a reply that keeps producing text for far longer than the old model deadline completes", async () => {
     // Scaled: model 150 ms and total 300 ms in place of 20 s and 45 s; the
     // reply streams for about 700 ms, a delta every 50 ms (the real case is a
