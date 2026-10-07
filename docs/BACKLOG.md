@@ -29,6 +29,10 @@ Design: [settings redesign plan](plans/settings-redesign-2026-09-30.md).
 - [x] **S6: Household shell: six grouped sections with the existing cards and link cards** (committed, live check pending): Household grouped.
 - [x] **S7: Screenshot review, fixes, and dead code review** (committed, live check pending): the Settings and Status polish pass is complete. See `docs/dev.md`.
 
+## Settings and copy polish
+
+- [x] **SETTINGS-SAVE-01: show save results for profile edits and settings** (S, 2026-10-07): the profile form marks drafts, warns before route or page exit, confirms a save, reports errors, and removes the inactive photo switch. Registry settings keep their immediate apply behavior and show a saved status after success. Remaining explicit-save forms are inventoried in the H1 report.
+
 ## Thin chat path
 
 - [x] **NEXT-RETIRE-01: leave the preview-era shell name behind** (M, 2026-10-06, owner: "completely get off of the old next"). Slices 1 and 2 are complete in this branch: the source tree and symbols are renamed, and docs and references now use the current shell paths. The preview bookmark redirect remains active for existing links. Slice 3 deletes `LegacyShellRedirect` and its route after one release, pending the owner’s release window. Full acceptance (source and docs free of preview-era names, green gate, restarted hub and app click-through) is held for slice 3.

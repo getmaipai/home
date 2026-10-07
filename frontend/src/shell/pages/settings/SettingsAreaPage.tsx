@@ -25,6 +25,7 @@ import { SettingsSectionContent, beforeSettingChange } from "@/shell/pages/setti
 import { SettingsView } from "@/shell/pages/settings/settingsViews";
 import { baseViewer, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
+import { confirmRouteLeave } from "@/shell/routeLeaveGuard";
 
 /** The kit's `lg` breakpoint: from here the column and the content sit side
  * by side; below it the shell drills in (the column alone, then a section). */
@@ -151,10 +152,10 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
       honouredBy="home"
       activeSection={active?.id}
       sectionHref={(id) => settingsPath(area.id, id)}
-      onNavigate={(to) => navigate(to.kind === "link" ? to.href : settingsPath(area.id, to.sectionId))}
+      onNavigate={(to) => { if (confirmRouteLeave()) navigate(to.kind === "link" ? to.href : settingsPath(area.id, to.sectionId)); }}
       searchQuery={query}
       onSearchChange={(next) => setParams((current) => { const updated = new URLSearchParams(current); if (next) updated.set("q", next); else updated.delete("q"); return updated; }, { replace: true })}
-      onBack={() => navigate(settingsPath(area.id))}
+      onBack={() => { if (confirmRouteLeave()) navigate(settingsPath(area.id)); }}
     >
       {content}
     </SettingsShell>

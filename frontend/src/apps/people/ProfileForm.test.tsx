@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, mock } from "bun:test";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import type { Roster } from "@/lib/api";
 
@@ -26,10 +26,11 @@ function makePerson(overrides: Partial<Roster> = {}): Roster {
 
 describe("ProfileForm", () => {
   test("renders the person's current profile values", () => {
-    const { getByLabelText, getByText } = render(<ProfileForm person={makePerson()} canEdit />);
+    const { getByLabelText, getByText, queryByLabelText } = render(<ProfileForm person={makePerson()} canEdit />);
     expect((getByLabelText("Name") as HTMLInputElement).value).toBe("Avery");
     expect((getByLabelText("Bio") as HTMLTextAreaElement).value).toBe("Likes books");
     expect(getByText("Blue")).toBeTruthy();
+    expect(queryByLabelText("Use a real photo")).toBeNull();
   });
 
   test("saving a changed name sends only the changed field to this person's API route", async () => {
@@ -47,6 +48,69 @@ describe("ProfileForm", () => {
       expect(requests[0]).toEqual({ url: "/api/people/person-abc123", method: "PATCH", body: { displayName: "Avery Lane" } });
     } finally {
       globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("save writes the edited values and a refetch keeps them", async () => {
+    const originalFetch = globalThis.fetch;
+    let saved = makePerson();
+    let patchBody: unknown;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input) !== "/api/people/person-abc123" || init?.method !== "PATCH") throw new Error("Unexpected request");
+      patchBody = JSON.parse(String(init.body));
+      saved = { ...saved, display_name: "Avery Lane", bio: "Loves art", accent: "teal" };
+      return Promise.resolve(new Response(JSON.stringify(saved), { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = render(<ProfileForm person={saved} canEdit layout="page" />);
+      fireEvent.change(view.getByLabelText("Name"), { target: { value: "Avery Lane" } });
+      fireEvent.change(view.getByLabelText("Bio"), { target: { value: "Loves art" } });
+      await act(async () => { fireEvent.click(view.getByRole("combobox", { name: "Accent color" })); });
+      const teal = await view.findByRole("option", { name: "Teal" });
+      await act(async () => {
+        fireEvent.pointerDown(teal, { pointerId: 1, pointerType: "mouse", button: 0 });
+        fireEvent.pointerUp(teal, { pointerId: 1, pointerType: "mouse", button: 0 });
+        fireEvent.click(teal);
+      });
+      await waitFor(() => expect(view.getByRole("combobox", { name: "Accent color" }).textContent).toContain("Teal"));
+      fireEvent.click(view.getByRole("button", { name: "Save" }));
+
+      await view.findByText("Saved.");
+      expect(patchBody).toEqual({ displayName: "Avery Lane", bio: "Loves art", accent: "teal" });
+      expect(view.queryByText("Unsaved changes.")).toBeNull();
+
+      view.rerender(<ProfileForm person={{ ...saved }} canEdit layout="page" />);
+      await waitFor(() => {
+        expect((view.getByLabelText("Name") as HTMLInputElement).value).toBe("Avery Lane");
+        expect((view.getByLabelText("Bio") as HTMLTextAreaElement).value).toBe("Loves art");
+        expect(view.getByRole("combobox", { name: "Accent color" }).textContent).toContain("Teal");
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("dirty page forms ask before following a route link or leaving the page", () => {
+    const originalConfirm = window.confirm;
+    window.confirm = mock(() => false);
+    try {
+      const view = render(
+        <>
+          <ProfileForm person={makePerson()} canEdit layout="page" />
+          <a href="/settings/account/privacy">Privacy</a>
+        </>,
+      );
+      fireEvent.change(view.getByLabelText("Name"), { target: { value: "Avery Lane" } });
+      expect(view.getByText("Unsaved changes.")).toBeTruthy();
+      const routeClick = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+      view.getByText("Privacy").dispatchEvent(routeClick);
+      expect(routeClick.defaultPrevented).toBe(true);
+      expect(window.confirm).toHaveBeenCalledWith("Leave without saving?");
+      const unload = new Event("beforeunload", { cancelable: true });
+      window.dispatchEvent(unload);
+      expect(unload.defaultPrevented).toBe(true);
+    } finally {
+      window.confirm = originalConfirm;
     }
   });
 
@@ -89,7 +153,7 @@ describe("ProfileForm", () => {
     const { getByLabelText, getAllByText, queryByRole } = render(<ProfileForm person={makePerson()} canEdit={false} />);
     expect((getByLabelText("Name") as HTMLInputElement).disabled).toBe(true);
     expect((getByLabelText("Bio") as HTMLTextAreaElement).disabled).toBe(true);
-    expect(getAllByText("Ask an admin to change this.")).toHaveLength(4);
+    expect(getAllByText("Ask an admin to change this.")).toHaveLength(3);
     expect(queryByRole("button", { name: "Save" })).toBeNull();
   });
 

@@ -1,7 +1,7 @@
 // APP-SET-02: the settings route, end to end at the page: the role and band
 // matrix as drawn, the redirects, the requests the page makes, the deep link
 // and the rail (RULES S3) on a settings route.
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test, mock } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
@@ -130,6 +130,22 @@ describe("the settings route", () => {
     await waitFor(() => expect(rows(view)).toContain("Memories"));
     const memories = within(column(view)).getByRole("link", { name: /Memories/ });
     expect(memories.getAttribute("href")).toBe("/people/person-adult?tab=memories");
+  });
+
+  test("a dirty profile draft blocks a SettingsShell section change", async () => {
+    const originalConfirm = window.confirm;
+    window.confirm = mock(() => false);
+    try {
+      const view = open(makePerson("adult"), "/settings/account/profile");
+      await waitFor(() => expect(view.getByLabelText("Name")).toBeTruthy());
+      fireEvent.change(view.getByLabelText("Name"), { target: { value: "Changed" } });
+      fireEvent.click(within(column(view)).getByRole("link", { name: "Appearance" }));
+      expect(window.confirm).toHaveBeenCalledWith("Leave without saving?");
+      expect(where(view)).toBe("/settings/account/profile");
+      expect(view.getByText("Unsaved changes.")).toBeTruthy();
+    } finally {
+      window.confirm = originalConfirm;
+    }
   });
 
   test("the column title stays Settings with no back row or collapse controls; Cmd/Ctrl+B is inert", async () => {
