@@ -34,8 +34,10 @@ import { runConfiguredInternetProbe } from "@/lib/internetProbe";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
 import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
+import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
 
 const configuredPort = Number(process.env.PORT ?? 8787);
+purgeLegacyHubLogs();
 initSafetyAlarm();
 installConsoleFileMirror();
 installFatalErrorHandlers(shutdownEngines);
