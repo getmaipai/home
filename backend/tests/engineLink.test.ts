@@ -43,7 +43,7 @@ describe("engine link routes", () => {
   test("revoke clears credentials and restores local engine setting", async () => {
     const client = await owner(); setHouseholdSettingValue("engines.stack.where", "another_computer"); issuePairingCode();
     const paths = getLinkKeyPaths(); expect(existsSync(paths.askpassPath)).toBe(false);
-    let started = false; setStackLinkControl({ async stopLocalStack() {}, async startLocalStackAndClearLink() { started = true; } });
+    let started = false; setStackLinkControl({ async stopLocalStack() {}, async startLocalStackAndClearLink() { started = true; }, startLink() {}, stopLink() {}, refreshLink() {} });
     const response = await client.request("/api/engine-link/credentials", { method: "DELETE" });
     expect(response.status).toBe(200); expect(getHouseholdSettingValue("engines.stack.where")).toBe("this_computer");
     expect(started).toBe(false); expect(existsSync(paths.askpassPath)).toBe(false);

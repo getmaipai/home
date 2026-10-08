@@ -42,7 +42,8 @@ engineLinkRoutes.openapi(fetchRoute, async (c) => {
   const sourceAllowed = await isHouseholdNetworkHost(source, { allowTailnet });
   if (!sourceAllowed) return c.json({ error: "Pairing is available only on the household network" }, 403);
   if (!isSecureRequest(c)) return c.json({ error: "Pairing requires a secure Home connection" }, 400);
-  if (!tryConsume(`engine-pair:source:${source}`, { capacity: 5, refillPerSecond: 1 }) || !tryConsume("engine-pair:global", { capacity: 30, refillPerSecond: 1 })) return c.json({ error: "Too many pairing attempts" }, 429);
+  if (!tryConsume(`engine-pair:source:${source}`, { capacity: 5, refillPerSecond: 1 })) return c.json({ error: "Too many pairing attempts" }, 429);
+  if (!tryConsume("engine-pair:global", { capacity: 30, refillPerSecond: 1 })) return c.json({ error: "Too many pairing attempts" }, 429);
   const payload = getPairingPublicKey(c.req.valid("param").lookup, getHubInstanceId());
   return payload ? c.json(payload, 200) : c.json({ error: "Pairing code is invalid or expired" }, 400);
 });

@@ -323,7 +323,13 @@ export function startEngineLink(config: LinkConfig, deps?: Partial<LinkDependenc
     activeState.link.updateSettings({ host: config.host, sshPort: config.sshPort, localPort: config.localPort, allowTailnet: config.allowTailnet });
     return activeState.link;
   }
-  activeState.link = new EngineLink(config, deps);
+  try {
+    activeState.link = new EngineLink({ ...config, env: getLinkSshAskpassEnvironment() }, deps);
+  } catch (error) {
+    const missing = error && typeof error === "object" && (error as NodeJS.ErrnoException).code === "ENOENT";
+    activeState.link = new EngineLink(config, deps);
+    if (missing) activeState.link.retry();
+  }
   activeState.link.start();
   return activeState.link;
 }
