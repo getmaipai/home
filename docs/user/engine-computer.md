@@ -24,14 +24,14 @@ MaiPai Home can use the AI engines on another computer in your home. Home keeps 
    sudo maipai-engine pair 192.0.2.20 ABCD-EFGH-JKLM
    ```
 
-   Replace `192.0.2.20` with Home's address. Replace the example code with the one from Home. The code expires after ten minutes. The command prints a check code when pairing finishes.
-4. In Home, select **Check the engine computer**. Compare its check code with the one on the engine computer. If they match, select **Yes, pin this computer**.
+   Replace `192.0.2.20` with Home's address. Replace the example code with the one from Home. The code expires after ten minutes. The command prints a check code when pairing finishes. Keep that window open, because you type the code into Home in step 4.
+4. In Home, select **Check the engine computer**. Type the check code that the engine computer printed, then select **Pin this computer**. Dashes, spaces and small letters are fine. If the code is wrong, Home does not pin the computer. After five wrong tries, Home stops the pairing. Start again from step 3 to get a new one-time code.
 
 The engine computer is ready when the **Status** screen shows it as working.
 
 ## If Home says the engine computer is not answering
 
-Make sure the engine computer is on and connected to your home network. Open **Status** in Home and read the engine computer's status. If Home shows an alert, open **Repairs** and follow its steps. If the alert says the computer changed its security key, pair it again and compare the check codes before approving.
+Make sure the engine computer is on and connected to your home network. Open **Status** in Home and read the engine computer's status. If Home shows an alert, open **Repairs** and follow its steps. If the alert says the computer changed its security key, pair it again and type the new check code from the engine computer.
 
 ## Use it away from home
 

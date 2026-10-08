@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
-import { __setLinkKeyCommandForTests, derivePairingLookup, getLinkCredentialStatus, issuePairingCode, revokeLinkKey } from "@/lib/stack/linkKeys";
+import { __setLinkKeyCommandForTests, derivePairingLookup, hostKeyCheckCode, getLinkCredentialStatus, issuePairingCode, revokeLinkKey } from "@/lib/stack/linkKeys";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { getLinkKeyPaths } from "@/lib/stack/linkKeys";
 import { existsSync } from "node:fs";
@@ -11,6 +11,8 @@ import { isSecurePairingRequest, pairingSourceAddress } from "@/routes/engineLin
 
 beforeEach(() => { resetDb(); revokeLinkKey(); __setLinkKeyCommandForTests(null); __resetRateLimiterForTests(); __resetStackLinkControlForTests(); });
 async function owner(): Promise<TestClient> { const client = new TestClient("192.168.1.40"); await client.post("/api/auth/setup", { displayName: "Owner", secret: "correcthorse" }); return client; }
+
+const HOST_LINE = "192.168.1.40 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPoISQD6sKkxbk5FD8YL6LuvYzhXACmFp4cr8oleBk1h test";
 
 describe("engine link routes", () => {
   test("admin routes require a session and deny a child", async () => {
@@ -57,11 +59,53 @@ describe("engine link routes", () => {
     expect(fetched.status).toBe(200);
     const scan = await client.post("/api/engine-link/host-key/scan");
     expect(scan.status).toBe(200);
-    const { check_code } = await scan.json() as { check_code: string };
+    expect(await scan.json()).toEqual({ scanned: true });
+    const check_code = hostKeyCheckCode(HOST_LINE);
     const confirmed = await client.post("/api/engine-link/host-key/confirm", { check_code });
     expect(confirmed.status).toBe(200);
     expect(getLinkCredentialStatus()).toEqual({ paired: true });
     expect([stopped, refreshed]).toEqual([1, 1]);
+  });
+  async function pairedUpToScan(client: TestClient) {
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
+    setHouseholdSettingValue("engines.stack.remote.host", "192.168.1.40");
+    setStackLinkControl({ async stopLocalStack() {}, async startLocalStackAndClearLink() {}, startLink() {}, stopLink() {}, refreshLink() {} });
+    __setLinkKeyCommandForTests(async () => ({ code: 0, stdout: `${HOST_LINE}\n` }));
+    const { code } = await (await client.post("/api/engine-link/pair")).json() as { code: string };
+    await client.get(`/api/engine-link/pair/${derivePairingLookup(code)}`);
+  }
+  test("scan never returns the check code, even when asked", async () => {
+    const client = await owner(); await pairedUpToScan(client);
+    expect(await (await client.post("/api/engine-link/host-key/scan")).json()).toEqual({ scanned: true });
+    expect(await (await client.post("/api/engine-link/host-key/scan", { reveal_check_code: true })).json()).toEqual({ scanned: true });
+  });
+  test("confirm before a scan says to scan first instead of blaming the code", async () => {
+    const client = await owner(); await pairedUpToScan(client);
+    const early = await client.post("/api/engine-link/host-key/confirm", { check_code: hostKeyCheckCode(HOST_LINE) });
+    expect(early.status).toBe(400);
+    expect((await early.json() as { error: string }).error).toContain("Check the engine computer");
+    expect(getLinkCredentialStatus()).toEqual({ paired: false });
+  });
+  test("a wrong typed code is refused with 400 and nothing is pinned; the right one pins", async () => {
+    const client = await owner(); await pairedUpToScan(client);
+    await client.post("/api/engine-link/host-key/scan");
+    const wrong = await client.post("/api/engine-link/host-key/confirm", { check_code: "AAAA-AAAA-AAAA" });
+    expect(wrong.status).toBe(400);
+    expect(JSON.stringify(await wrong.json())).not.toContain("AAAA");
+    expect(getLinkCredentialStatus()).toEqual({ paired: false });
+    const right = await client.post("/api/engine-link/host-key/confirm", { check_code: hostKeyCheckCode(HOST_LINE).toLowerCase() });
+    expect(right.status).toBe(200);
+    expect(getLinkCredentialStatus()).toEqual({ paired: true });
+  });
+  test("five wrong typed codes lock pairing with 429 and the right code is then refused", async () => {
+    const client = await owner(); await pairedUpToScan(client);
+    await client.post("/api/engine-link/host-key/scan");
+    const statuses: number[] = [];
+    for (let i = 0; i < 5; i++) statuses.push((await client.post("/api/engine-link/host-key/confirm", { check_code: "AAAAAAAAAAAA" })).status);
+    expect(statuses).toEqual([400, 400, 400, 400, 429]);
+    const after = await client.post("/api/engine-link/host-key/confirm", { check_code: hostKeyCheckCode(HOST_LINE) });
+    expect(after.status).toBe(400);
+    expect(getLinkCredentialStatus()).toEqual({ paired: false });
   });
   test("public route rate limits by source and globally", async () => {
     const client = await owner(); setHouseholdSettingValue("engines.stack.where", "another_computer");

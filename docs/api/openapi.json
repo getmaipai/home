@@ -17316,18 +17316,21 @@
         "summary": "Read the engine computer's SSH host key",
         "responses": {
           "200": {
-            "description": "Check code to compare with the engine computer",
+            "description": "The host key was read. The check code is never returned: the owner types the code printed on the engine computer into the confirm step.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "check_code": {
-                      "type": "string"
+                    "scanned": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
                     }
                   },
                   "required": [
-                    "check_code"
+                    "scanned"
                   ]
                 }
               }
@@ -17371,7 +17374,7 @@
         "tags": [
           "Engine link"
         ],
-        "summary": "Pin the confirmed SSH host key",
+        "summary": "Pin the SSH host key after the owner types the engine computer's check code",
         "requestBody": {
           "content": {
             "application/json": {
@@ -17380,8 +17383,8 @@
                 "properties": {
                   "check_code": {
                     "type": "string",
-                    "minLength": 12,
-                    "maxLength": 12
+                    "minLength": 1,
+                    "maxLength": 32
                   }
                 },
                 "required": [
@@ -17439,6 +17442,9 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too many wrong check codes; start pairing again"
           }
         }
       }

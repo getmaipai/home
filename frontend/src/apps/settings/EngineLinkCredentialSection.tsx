@@ -2,13 +2,15 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
 import { ApiError, api } from "@/lib/api";
 
 export function EngineLinkCredentialSection() {
   const queryClient = useQueryClient();
   const status = useQuery({ queryKey: ["engine-link-credentials"], queryFn: api.engineLinkCredentialStatus });
   const [pairing, setPairing] = useState<{ code: string; expires_at: string } | null>(null);
-  const [checkCode, setCheckCode] = useState<string | null>(null);
+  const [scanned, setScanned] = useState(false);
+  const [typedCode, setTypedCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -23,18 +25,25 @@ export function EngineLinkCredentialSection() {
   async function beginPairing() {
     const result = await api.issueEngineLinkPairing();
     setPairing(result);
-    setCheckCode(null);
+    setScanned(false);
+    setTypedCode("");
   }
 
   async function scanHostKey() {
-    const result = await api.scanEngineLinkHostKey();
-    setCheckCode(result.check_code);
+    await api.scanEngineLinkHostKey();
+    setScanned(true);
   }
 
   async function confirmHostKey() {
-    if (!checkCode) return;
-    await api.confirmEngineLinkHostKey(checkCode);
-    setCheckCode(null);
+    if (!typedCode.trim()) return;
+    try { await api.confirmEngineLinkHostKey(typedCode); }
+    catch (err) {
+      setTypedCode("");
+      if (err instanceof ApiError && err.status === 429) { setScanned(false); setPairing(null); }
+      throw err;
+    }
+    setScanned(false);
+    setTypedCode("");
     setPairing(null);
     await queryClient.invalidateQueries({ queryKey: ["engine-link-credentials"] });
   }
@@ -42,7 +51,8 @@ export function EngineLinkCredentialSection() {
   async function revoke() {
     await api.revokeEngineLink();
     setPairing(null);
-    setCheckCode(null);
+    setScanned(false);
+    setTypedCode("");
     await queryClient.invalidateQueries({ queryKey: ["engine-link-credentials"] });
   }
   if (status.isLoading || status.isError || !status.data) return null;
@@ -57,12 +67,12 @@ export function EngineLinkCredentialSection() {
           <Button variant="outline" disabled={busy} onClick={() => void run(scanHostKey)}>Check the engine computer</Button>
         </div>
       )}
-      {checkCode ? (
-        <div className="flex flex-col items-start gap-2">
-          <p className="text-base">Check code: <code>{checkCode}</code></p>
-          <p className="text-sm text-[var(--muted-foreground)]">Does the other computer show this code?</p>
-          <Button disabled={busy} onClick={() => void run(confirmHostKey)}>Yes, pin this computer</Button>
-        </div>
+      {scanned ? (
+        <form className="flex max-w-sm flex-col items-start gap-2" onSubmit={(event) => { event.preventDefault(); void run(confirmHostKey); }}>
+          <p className="text-base">Type the check code shown on the engine computer.</p>
+          <Input aria-label="Check code from the engine computer" placeholder="Check code" value={typedCode} onChange={(event) => setTypedCode(event.target.value)} disabled={busy} autoComplete="off" autoCapitalize="characters" spellCheck={false} maxLength={32} />
+          <Button type="submit" disabled={busy || !typedCode.trim()}>Pin this computer</Button>
+        </form>
       ) : null}
       {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-[var(--muted-foreground)]">Before revoking, run <code>maipai-engine unpair</code> on the engine computer.</p><Button variant="destructive" disabled={busy} onClick={() => void run(revoke)}>Revoke link key</Button></div> : null}
     </Section>

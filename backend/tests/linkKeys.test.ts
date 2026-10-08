@@ -1,10 +1,10 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { existsSync, readFileSync, statSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { utils as sshUtils } from "ssh2";
-import { __resetPairingForTests, __setLinkKeyCommandForTests, confirmHostKey, derivePairingLookup, getLinkCredentialStatus, getLinkKeyPaths, getLinkSshAskpassEnvironment, getPairingPublicKey, hostKeyCheckCode, issuePairingCode, revokeLinkKey, scanHostKey, verifyPairingPayload } from "@/lib/stack/linkKeys";
+import { __resetPairingForTests, __setLinkKeyCommandForTests, confirmHostKey, derivePairingLookup, getLinkCredentialStatus, getLinkKeyPaths, getLinkSshAskpassEnvironment, getPairingPublicKey, hostKeyCheckCode, HostKeyConfirmError, issuePairingCode, revokeLinkKey, scanHostKey, verifyPairingPayload } from "@/lib/stack/linkKeys";
 
 afterEach(() => { revokeLinkKey(); __resetPairingForTests(); __setLinkKeyCommandForTests(null); });
 
@@ -80,5 +80,63 @@ describe("engine link pairing credentials", () => {
     issuePairingCode(1000);
     expect(() => confirmHostKey("000000000000")).toThrow();
     expect(scanHostKey("engine.local", 22)).rejects.toThrow();
+  });
+  const BLOB = "AAAAC3NzaC1lZDI1NTE5AAAAIPoISQD6sKkxbk5FD8YL6LuvYzhXACmFp4cr8oleBk1h";
+  async function scanned(now?: number) {
+    const issued = issuePairingCode(now);
+    getPairingPublicKey(derivePairingLookup(issued.code), "household-1", now);
+    __setLinkKeyCommandForTests(async () => ({ code: 0, stdout: `engine.local ssh-ed25519 ${BLOB} test\n` }));
+    return (await scanHostKey("engine.local", 22)).check_code;
+  }
+  test("typed check code: dashes, spaces and lower case still match", async () => {
+    const code = await scanned();
+    const typed = `${code.slice(0, 4)}-${code.slice(4, 8)} ${code.slice(8)}`.toLowerCase();
+    confirmHostKey(typed);
+    expect(getLinkCredentialStatus()).toEqual({ paired: true });
+  });
+  test("typed check code: a wrong code never pins and the right one still works after a few misses", async () => {
+    const code = await scanned();
+    for (let i = 0; i < 4; i++) expect(() => confirmHostKey("AAAAAAAAAAAA")).toThrow(HostKeyConfirmError);
+    expect(existsSync(getLinkKeyPaths().knownHostsPath)).toBe(false);
+    confirmHostKey(code);
+    expect(getLinkCredentialStatus()).toEqual({ paired: true });
+  });
+  test("typed check code: five wrong tries lock the pairing, even for the right code", async () => {
+    const code = await scanned();
+    for (let i = 0; i < 4; i++) expect(() => confirmHostKey("AAAAAAAAAAAA")).toThrow();
+    let locked: unknown;
+    try { confirmHostKey("AAAAAAAAAAAA"); } catch (error) { locked = error; }
+    expect(locked).toBeInstanceOf(HostKeyConfirmError);
+    expect((locked as HostKeyConfirmError).locked).toBe(true);
+    expect(() => confirmHostKey(code)).toThrow();
+    expect(existsSync(getLinkKeyPaths().knownHostsPath)).toBe(false);
+    expect(getLinkCredentialStatus()).toEqual({ paired: false });
+  });
+  test("typed check code: a rescan does not reset the wrong-try count", async () => {
+    await scanned();
+    for (let i = 0; i < 3; i++) expect(() => confirmHostKey("AAAAAAAAAAAA")).toThrow();
+    const again = (await scanHostKey("engine.local", 22)).check_code;
+    expect(() => confirmHostKey("AAAAAAAAAAAA")).toThrow();
+    expect(() => confirmHostKey("AAAAAAAAAAAA")).toThrow();
+    expect(() => confirmHostKey(again)).toThrow();
+  });
+  test("typed check code: wrong length, empty and non-string-ish input fail closed", async () => {
+    const code = await scanned();
+    for (const bad of ["", "   ", code.slice(0, 11), `${code}A`, "!!!!!!!!!!!!"]) expect(() => confirmHostKey(bad)).toThrow();
+    expect(existsSync(getLinkKeyPaths().knownHostsPath)).toBe(false);
+  });
+  test("typed check code: an expired pairing refuses even the right code", async () => {
+    const code = await scanned();
+    try {
+      setSystemTime(new Date(Date.now() + 11 * 60_000));
+      expect(() => confirmHostKey(code)).toThrow();
+    } finally { setSystemTime(); }
+    expect(existsSync(getLinkKeyPaths().knownHostsPath)).toBe(false);
+  });
+  test("typed check code: a failure message never contains either code", async () => {
+    const code = await scanned();
+    try { confirmHostKey("QQQQQQQQQQQQ"); } catch (error) {
+      expect(String((error as Error).message)).not.toContain(code); expect(String((error as Error).message)).not.toContain("QQQQQQQQQQQQ");
+    }
   });
 });

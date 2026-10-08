@@ -19,7 +19,7 @@ const askpassPath = join(linkDir, process.platform === "win32" ? "askpass.cmd" :
 const passphrasePath = join(linkDir, ".passphrase.enc");
 protectExistingSecretPaths([keysDir, linkDir, privateKeyPath, publicKeyPath, knownHostsPath, passphrasePath, askpassPath]);
 
-type Pairing = { code: string; expiresAt: number; used: boolean; fetchedAt: number | null; confirmed: boolean };
+type Pairing = { code: string; expiresAt: number; used: boolean; fetchedAt: number | null; confirmed: boolean; wrongChecks: number };
 let pairing: Pairing | null = null;
 let scannedCandidate: { line: string; checkCode: string; expiresAt: number } | null = null;
 
@@ -57,7 +57,7 @@ function ensureKeyPair(): void {
 }
 
 export function issuePairingCode(now = Date.now()): { code: string; expires_at: string } {
-  ensureKeyPair(); pairing = { code: newCode(), expiresAt: now + PAIR_TTL_MS, used: false, fetchedAt: null, confirmed: false }; scannedCandidate = null;
+  ensureKeyPair(); pairing = { code: newCode(), expiresAt: now + PAIR_TTL_MS, used: false, fetchedAt: null, confirmed: false, wrongChecks: 0 }; scannedCandidate = null;
   return { code: pairing.code, expires_at: new Date(pairing.expiresAt).toISOString() };
 }
 export function getPairingPublicKey(lookup: string, householdId: string, now = Date.now()): { public_key: string; household_id: string; hmac: string } | null {
@@ -114,11 +114,28 @@ export async function scanHostKey(host: string, port: number): Promise<{ check_c
   const fields = line.trim().split(/\s+/); if (fields.length < 3 || fields[1] !== "ssh-ed25519") throw new Error("invalid host key");
   scannedCandidate = { line, checkCode: hostKeyCheckCode(line), expiresAt: active.expiresAt }; return { check_code: scannedCandidate.checkCode };
 }
-export function confirmHostKey(code: string): void {
-  const active = assertActivePairing();
-  if (!scannedCandidate || Date.now() >= scannedCandidate.expiresAt || scannedCandidate.expiresAt !== active.expiresAt || !constantStringEqual(code, scannedCandidate.checkCode)) throw new Error("check code does not match");
-  if (existsSync(knownHostsPath)) throw new Error("a host key is already pinned");
-  ensurePrivateDir(); writeFileSync(knownHostsPath, `${scannedCandidate.line.trim()}\n`, { mode: 0o600 }); protectSecretPath(knownHostsPath); scannedCandidate = null;
+const MAX_WRONG_CHECK_CODES = 5;
+/** Thrown when a typed check code is refused. `reason` says why; `locked` is true once too many wrong codes ended the pairing. The message never carries a code. */
+export class HostKeyConfirmError extends Error {
+  constructor(message: string, readonly reason: "expired" | "not_scanned" | "already_pinned" | "mismatch" | "locked" = "mismatch") { super(message); this.name = "HostKeyConfirmError"; }
+  get locked(): boolean { return this.reason === "locked"; }
+}
+export function normalizeCheckCode(code: string): string { return code.replace(/[\s-]/g, "").toUpperCase(); }
+/** Pins the scanned host key only when the code the owner typed from the engine computer matches it. Fails closed and ends the pairing after five wrong codes. */
+export function confirmHostKey(typedCode: string): void {
+  let active: Pairing;
+  try { active = assertActivePairing(); } catch { throw new HostKeyConfirmError("pairing expired or public key not fetched", "expired"); }
+  const candidate = scannedCandidate;
+  if (!candidate || Date.now() >= candidate.expiresAt || candidate.expiresAt !== active.expiresAt) throw new HostKeyConfirmError("no scanned host key to confirm", candidate ? "expired" : "not_scanned");
+  const typed = normalizeCheckCode(typedCode);
+  const matches = typed.length === candidate.checkCode.length && constantStringEqual(typed, candidate.checkCode);
+  if (!matches) {
+    active.wrongChecks += 1;
+    if (active.wrongChecks >= MAX_WRONG_CHECK_CODES) { pairing = null; scannedCandidate = null; throw new HostKeyConfirmError("too many wrong check codes", "locked"); }
+    throw new HostKeyConfirmError("check code does not match");
+  }
+  if (existsSync(knownHostsPath)) throw new HostKeyConfirmError("a host key is already pinned", "already_pinned");
+  ensurePrivateDir(); writeFileSync(knownHostsPath, `${candidate.line.trim()}\n`, { mode: 0o600 }); protectSecretPath(knownHostsPath); scannedCandidate = null;
   active.confirmed = true; pairing = null;
 }
 

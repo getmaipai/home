@@ -3,7 +3,7 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { getHubInstanceId } from "@/lib/hubIdentity";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { derivePairingLookup, getLinkCredentialStatus, getPairingPublicKey, issuePairingCode, scanHostKey, confirmHostKey, revokeLinkKey } from "@/lib/stack/linkKeys";
+import { derivePairingLookup, getLinkCredentialStatus, getPairingPublicKey, issuePairingCode, scanHostKey, confirmHostKey, HostKeyConfirmError, revokeLinkKey } from "@/lib/stack/linkKeys";
 import { stopEngineLink } from "@/lib/stack/link";
 import { REMOTE_ENGINE_HOST_KEY } from "@/lib/remoteStackSettings";
 import { isHouseholdNetworkHost } from "@maipai/core/src/net";
@@ -70,7 +70,7 @@ engineLinkRoutes.openapi(fetchRoute, async (c) => {
 const scanRoute = createRoute({
   method: "post", path: "/host-key/scan", tags: ["Engine link"], summary: "Read the engine computer's SSH host key",
   middleware: [requireRole("owner", "admin")] as const,
-  responses: { 200: { content: { "application/json": { schema: z.object({ check_code: z.string() }) } }, description: "Check code to compare with the engine computer" }, ...ErrorResponses },
+  responses: { 200: { content: { "application/json": { schema: z.object({ scanned: z.literal(true) }) } }, description: "The host key was read. The check code is never returned: the owner types the code printed on the engine computer into the confirm step." }, ...ErrorResponses },
 });
 engineLinkRoutes.openapi(scanRoute, async (c) => {
   const host = getHouseholdSettingValue(REMOTE_ENGINE_HOST_KEY);
@@ -78,19 +78,25 @@ engineLinkRoutes.openapi(scanRoute, async (c) => {
   if (typeof host !== "string" || !host.trim() || !Number.isInteger(port) || port < 1 || port > 65535) return c.json({ error: "Set a valid engine computer address and port first" }, 400);
   const allowTailnet = getHouseholdSettingValue("engines.stack.remote.allow_tailnet") === true;
   if (!(await isHouseholdNetworkHost(host, { allowTailnet }))) return c.json({ error: "That address is outside your home network" }, 400);
-  try { return c.json(await scanHostKey(host, port), 200); }
+  try { await scanHostKey(host, port); return c.json({ scanned: true as const }, 200); }
   catch { return c.json({ error: "Could not read the engine computer's SSH host key" }, 400); }
 });
 
 const confirmRoute = createRoute({
-  method: "post", path: "/host-key/confirm", tags: ["Engine link"], summary: "Pin the confirmed SSH host key",
+  method: "post", path: "/host-key/confirm", tags: ["Engine link"], summary: "Pin the SSH host key after the owner types the engine computer's check code",
   middleware: [requireRole("owner", "admin")] as const,
-  request: { body: { content: { "application/json": { schema: z.object({ check_code: z.string().length(12) }) } } } },
-  responses: { 200: { content: { "application/json": { schema: z.object({ paired: z.boolean() }) } }, description: "Host key pinned" }, ...ErrorResponses },
+  request: { body: { content: { "application/json": { schema: z.object({ check_code: z.string().min(1).max(32) }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ paired: z.boolean() }) } }, description: "Host key pinned" }, ...ErrorResponses, 429: { description: "Too many wrong check codes; start pairing again" } },
 });
 engineLinkRoutes.openapi(confirmRoute, (c) => {
   try { confirmHostKey(c.req.valid("json").check_code); rebuildEngineLinkAfterPairing(); return c.json({ paired: getLinkCredentialStatus().paired }, 200); }
-  catch { return c.json({ error: "The check code did not match the scanned host key" }, 400); }
+  catch (error) {
+    if (error instanceof HostKeyConfirmError && error.locked) return c.json({ error: "Too many wrong check codes. Start pairing again." }, 429);
+    if (error instanceof HostKeyConfirmError && error.reason === "expired") return c.json({ error: "Pairing expired. Start pairing again." }, 400);
+    if (error instanceof HostKeyConfirmError && error.reason === "not_scanned") return c.json({ error: "Select Check the engine computer first." }, 400);
+    if (error instanceof HostKeyConfirmError && error.reason === "already_pinned") return c.json({ error: "An engine computer is already paired. Revoke the link key first." }, 400);
+    return c.json({ error: "The check code did not match the engine computer" }, 400);
+  }
 });
 
 const statusRoute = createRoute({
