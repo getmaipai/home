@@ -36492,7 +36492,30 @@ The family setup guide is [Use another computer for the AI](user/engine-computer
 
 The away setting is admin-only and off by default. Both computers must use the owner's Tailscale network. With the setting on, Home accepts a Tailnet address as the path to the same SSH service. The Stack still listens on box loopback only, behind the restricted SSH forward. Turning the setting off while using a tailnet address is rejected until the address is changed to a home network address. Choosing **This computer** restarts Home's local Stack and clears the remote address.
 
-The DOCTOR-01 box doctor is read-only. It reports one PASS or FAIL and one fix per check. The key identity check stays UNVERIFIED until the box pairing record stores a fingerprint: `paired-home.json` currently has `household_id` and `code_hash`, with no authorized-key identity. The smallest additive field is `authorized_key_fingerprint`, the OpenSSH SHA256 fingerprint of the installed public key. No record shape change is part of DOCTOR-01. On the reviewed `origin/main` base, the helper does not yet include `doctor` and must be updated with DOCTOR-01 before the command can run.
+The box doctor is read-only. `sudo maipai-engine doctor` reports five PASS or FAIL checks and a fix for each: the user service and linger, a loopback-only listener on port 8770, NVIDIA GPU visibility, the pinned `llama-server` build, and exactly one authorized key matching the pairing record. Run it on the engine computer. The Home doctor is `backend/scripts/engine-link-doctor.ts`, also exposed as **Check the connection** in Engines. It checks ten links in order: remote address selection, allowed home or Tailnet address, SSH reachability, pinned host key, SSH authentication, tunnel, Stack contract, engine roles, GPU visibility, and a completion. Each result has a fix. Later checks stop when an earlier link is unavailable, so fix the first failure and check again.
+
+### Install and link behavior
+
+`bash scripts/install.sh --engine-computer` is the Ubuntu engine-computer path. Run it as root, normally with `sudo`. It creates the locked `maipai-stack` service account, enables lingering so its user service runs without an interactive login, installs the Stack under `/opt/maipai-stack`, stores Stack data under `/data/stack`, and enables the SSH service. It prompts before installing `openssh-server` if missing. The Stack service binds only to `127.0.0.1:8770`. The `maipai-engine` helper is installed in `/usr/local/bin`; its `pair`, `unpair`, `update`, `status`, and `doctor` commands are the supported box controls.
+
+Pairing begins from Settings → Engines, after selecting **Another computer** and setting the box address. An owner or admin creates a 12-character, single-use code, valid for ten minutes. Pairing requires a secure Home connection. The box runs `sudo maipai-engine pair <Home address> <code>`, fetches the response from Home, verifies its HMAC, and installs one restricted SSH key line. The key permits port forwarding only to `127.0.0.1:8770`. Pairing is limited to the household network. The box prints a check code derived from its SSH host key; in Home, **Check the engine computer** reads the host key and the owner enters that code before **Pin this computer** stores the pin. The check code is compared in constant time, normalized for spaces, dashes and case, and is never returned by the scan endpoint. Five wrong codes end the attempt. Start over with a new code. A previously paired box refuses another household unless the command includes `--replace`.
+
+Home owns the SSH tunnel. Its local side listens only on `127.0.0.1:8771`, forwarding to the box's loopback-only port 8770. A reverse loopback forward on box port 8772 carries Home's voice service back to the Stack; no service needs a public Stack listener. SSH uses the Home private key, strict host-key checking, keepalives, and the box's `maipai-stack` account. The host key is pinned only after the user-entered check code matches. A remote Tailscale address is accepted only when an admin turns on **Reach the engine computer when away from home**; this does not change the loopback binding or SSH authentication.
+
+The link probes Stack health every ten seconds, with a three-second timeout. Transient DNS, transport and Stack failures reconnect with full jitter, from a one-second base up to a 60-second cap. Once the link has been ready for a minute, the backoff resets. A link that remains unavailable for two minutes becomes offline. A healthy probe restores ready state; roles are checked every 30 seconds. Home never resends a failed chat turn. Pending background work resumes through its own worker retry or job polling after reconnection. Pairing, host-key, network-policy and incompatible-contract failures need a fix before retry; the status and doctor checks name the repair step.
+
+### Box page template for the private homelab page
+
+Copy this template to the engine computer's private homelab page and fill in the bracketed values there. Keep real hostnames and addresses out of Home's public docs.
+
+- What it runs: MaiPai Stack for `[household name]`.
+- Computer: `[model]`, Ubuntu `[version]`.
+- Graphics and memory: `[GPU models and memory]`.
+- Service account: `maipai-stack`; data folder: `/data/stack`.
+- Service status: `sudo maipai-engine status`; diagnostics: `sudo maipai-engine doctor`.
+- Paired Home: `[private Home name]`.
+- Update the Stack: `sudo maipai-engine update`.
+- Remove this Home pairing: `sudo maipai-engine unpair`.
 
 ### Homelab page template for the private repo
 
@@ -36505,8 +36528,8 @@ Copy this section into that engine computer's private homelab page, then fill in
 - Stack data folder: `/data/stack`.
 - Service: `maipai-stack`; inspect it with `sudo maipai-engine status`.
 - Paired Home: `[private Home name]`.
-- After DOCTOR-01 lands: `sudo maipai-engine doctor` (read-only).
+- Diagnostics: `sudo maipai-engine doctor` (read-only).
 - Update the Stack: `sudo maipai-engine update`.
 - Remove this Home pairing: `sudo maipai-engine unpair`.
 
-The current fetched `origin/main` helper has no `doctor` command. The verified current box command set is `pair`, `unpair`, `update`, and `status`. Run the doctor command only after DOCTOR-01 lands on `main`.
+The installed helper supports `pair`, `unpair`, `update`, `status`, and `doctor`.
