@@ -106,7 +106,7 @@ const EXTRA_OFFERED = (process.env.MAIPAI_BENCH_OFFER ?? "").split(",").map((id)
 function budgetOfferedTools(): ToolSpec[] {
   const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
   if (!entry?.turn_budget) throw new Error("qwen3-8b-instruct-q4-k-m has no turn_budget in modelCatalog.ts");
-  return [...new Set([...entry.turn_budget.tools_offered, ...EXTRA_OFFERED])]
+  return [...new Set([...(entry.turn_budget.tools_offered ?? []), ...EXTRA_OFFERED])]
     .slice()
     .sort()
     .map((id) => {
