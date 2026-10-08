@@ -2237,18 +2237,71 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
     }
   });
 
-  test("no hover peek: pointing at or focusing the header's control while hidden leaves the column hidden", async () => {
+  const peekNode = () => document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]');
+  const waitForPeek = () => waitFor(() => expect(peekNode() === null).toBe(false));
+
+  test("CHAT-SIDEBAR-PEEK-01: resting the pointer on the header's show control opens the peek; leaving closes it; a click still pins", async () => {
     const restore = stubFetch();
     try {
       const view = renderChat();
       await view.findByLabelText("Message input");
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
       const show = view.getByRole("button", { name: "Show conversations" });
-      fireEvent.pointerEnter(show);
-      fireEvent.mouseEnter(show);
-      fireEvent.focus(show);
+      // Passing over it does nothing.
+      fireEvent.pointerEnter(show, { pointerType: "mouse" });
+      fireEvent.pointerLeave(show, { pointerType: "mouse" });
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(peekNode() === null).toBe(true);
       expect(column()).toHaveAttribute("data-state", "closed");
-      expect(column().querySelector('[data-slot="sidebar"]')?.hasAttribute("inert")).toBe(true);
+      // Resting on it opens the same column node as an overlay.
+      fireEvent.pointerEnter(show, { pointerType: "mouse" });
+      await waitForPeek();
+      expect(peekNode()).toBe(column());
+      // Leaving the control closes it after the grace.
+      fireEvent.pointerLeave(show, { pointerType: "mouse" });
+      await waitFor(() => expect(peekNode() === null).toBe(true));
+      expect(column()).toHaveAttribute("data-state", "closed");
+      // Moving from the control into the peek keeps it open.
+      fireEvent.pointerEnter(show, { pointerType: "mouse" });
+      await waitForPeek();
+      fireEvent.pointerLeave(show, { pointerType: "mouse" });
+      fireEvent.pointerEnter(peekNode()!, { pointerType: "mouse" });
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(peekNode() === null).toBe(false);
+      fireEvent.pointerLeave(peekNode()!, { pointerType: "mouse" });
+      await waitFor(() => expect(peekNode() === null).toBe(true));
+      // A click on the control while peeking pins the column open.
+      fireEvent.pointerEnter(show, { pointerType: "mouse" });
+      await waitForPeek();
+      fireEvent.click(show);
+      expect(column()).toHaveAttribute("data-state", "open");
+      expect(peekNode() === null).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  test("CHAT-SIDEBAR-PEEK-01: touch never peeks; keyboard focus on the control opens it; Escape closes it without it reopening", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderChat();
+      await view.findByLabelText("Message input");
+      fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
+      const show = view.getByRole("button", { name: "Show conversations" });
+      fireEvent.pointerEnter(show, { pointerType: "touch" });
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(peekNode() === null).toBe(true);
+      // Focus from a person tabbing in opens the peek.
+      // Hiding handed focus to the control quietly; tab away, then back in.
+      show.blur();
+      show.focus();
+      await waitForPeek();
+      // Escape closes it and hands focus back to the control quietly: no reopen.
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => expect(peekNode() === null).toBe(true));
+      await waitFor(() => expect(document.activeElement).toBe(view.getByRole("button", { name: "Show conversations" })));
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      expect(peekNode() === null).toBe(true);
     } finally {
       restore();
     }

@@ -3587,14 +3587,47 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       if (!(await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').count())) throw new Error("COLUMN-02: the peek closed with the pointer inside it");
       await page.mouse.move(900, 450);
       await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor({ state: "detached" });
-      // Keyboard focus never opens it; Escape closes it.
-      await page.getByRole("button", { name: "Show conversations" }).focus();
+      // CHAT-SIDEBAR-PEEK-01: resting on the header's show control opens the
+      // same peek, over the conversation, and leaving closes it.
+      const peekSel = '[data-slot="next-chat-rail"][data-state="peek"]';
+      await shoot(page, `column-toggle-collapsed-1440-${theme}`);
+      const toggleBox = await page.getByRole("button", { name: "Show conversations" }).boundingBox();
+      if (!toggleBox) throw new Error("CHAT-SIDEBAR-PEEK-01: no show control while the column is hidden");
+      await page.mouse.move(toggleBox.x + toggleBox.width / 2, toggleBox.y + toggleBox.height / 2);
+      await page.locator(peekSel).waitFor();
+      // A person's hand is never perfectly still: a small nudge lets the
+      // browser see the pointer now sits over the peek, not the control.
+      await page.mouse.move(toggleBox.x + toggleBox.width / 2 + 2, toggleBox.y + toggleBox.height / 2 + 2);
       await page.waitForTimeout(300);
-      if (await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').count()) throw new Error("COLUMN-02: keyboard focus opened the peek");
-      await page.mouse.move(zone.x + 2, 450);
-      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor();
+      await shoot(page, `column-toggle-peek-1440-${theme}`);
+      const viaToggle = await measure(page);
+      if (!before.composer || !viaToggle.composer || Math.abs(before.composer.x - viaToggle.composer.x) > 4 || before.composer.width !== viaToggle.composer.width) {
+        throw new Error("CHAT-SIDEBAR-PEEK-01: the toggle peek moved the conversation");
+      }
+      await page.mouse.move(900, 450);
+      await page.locator(peekSel).waitFor({ state: "detached" });
+      // Keyboard focus on the control opens it too; Escape closes it and focus stays put.
+      await page.getByRole("button", { name: "Show conversations" }).blur();
+      await page.getByRole("button", { name: "Show conversations" }).focus();
+      await page.locator(peekSel).waitFor();
       await page.keyboard.press("Escape");
-      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor({ state: "detached" });
+      await page.locator(peekSel).waitFor({ state: "detached" });
+      await page.waitForTimeout(400);
+      if (await page.locator(peekSel).count()) throw new Error("CHAT-SIDEBAR-PEEK-01: Escape closed the peek and focus reopened it");
+      // A click on the control while peeking pins the column open.
+      await page.mouse.move(toggleBox.x + toggleBox.width / 2, toggleBox.y + toggleBox.height / 2);
+      await page.locator(peekSel).waitFor();
+      await page.getByRole("button", { name: "Keep conversations open" }).click();
+      await page.waitForTimeout(500);
+      await shoot(page, `column-toggle-pinned-1440-${theme}`);
+      // Back to hidden for the zone checks below.
+      await page.getByRole("button", { name: "Hide conversations" }).click();
+      await page.mouse.move(900, 450);
+      await page.waitForTimeout(500);
+      await page.mouse.move(zone.x + 2, 450);
+      await page.locator(peekSel).waitFor();
+      await page.keyboard.press("Escape");
+      await page.locator(peekSel).waitFor({ state: "detached" });
       // The pin control docks the column (the pointer leaves and returns,
       // since a pointer that never moved raises no new enter).
       await page.mouse.move(900, 450);

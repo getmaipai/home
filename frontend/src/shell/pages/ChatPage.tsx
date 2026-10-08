@@ -1529,7 +1529,13 @@ export function ChatPage({ person }: { person: Roster }) {
                   aria-expanded={false}
                   aria-controls={CHAT_COLUMN_ID}
                   aria-keyshortcuts="Meta+B Control+B"
-                  onFocus={skipTooltipOnQuietFocus}
+                  onPointerEnter={column.peekToggleHandlers.onPointerEnter}
+                  onPointerLeave={column.peekToggleHandlers.onPointerLeave}
+                  onPointerDown={column.peekToggleHandlers.onPointerDown}
+                  onPointerUp={column.peekToggleHandlers.onPointerUp}
+                  onPointerMove={column.peekToggleHandlers.onPointerMove}
+                  onFocus={(event) => { skipTooltipOnQuietFocus(event); column.peekToggleHandlers.onFocus(event); }}
+                  onBlur={column.peekToggleHandlers.onBlur}
                   onClick={column.toggleFromButton}
                 ><ColumnOpenIcon className="size-4.5" /></TooltipIconButton> : null}
                 <ChatHeaderBar />

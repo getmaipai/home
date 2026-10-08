@@ -138,7 +138,11 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
   /** Pointer rested on the edge zone: open after a short delay. */
   const schedulePeekOpen = useCallback(() => {
     clearPeekTimer();
-    peekTimerRef.current = window.setTimeout(() => { peekTimerRef.current = null; setPeek(true); }, PEEK_OPEN_DELAY_MS);
+    peekTimerRef.current = window.setTimeout(() => {
+      peekTimerRef.current = null;
+      // Pinned open in the meantime (a click on the control): nothing to peek.
+      if (collapsedRef.current) setPeek(true);
+    }, PEEK_OPEN_DELAY_MS);
   }, [clearPeekTimer]);
   const closePeek = useCallback((restoreFocus = false) => {
     clearPeekTimer();
@@ -199,6 +203,39 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
     onPointerEnter: (event: { pointerType: string }) => { if (event.pointerType !== "touch") schedulePeekOpen(); },
     onPointerLeave: clearPeekTimer,
   };
+  /** CHAT-SIDEBAR-PEEK-01: the same peek, opened from the conversation
+   * header's show control while the column is hidden. Resting the pointer
+   * on it, or tabbing to it, opens the overlay; leaving it closes after the
+   * grace (moving into the peek cancels that, see `peekColumnHandlers`).
+   * Touch has no hover, and focus that arrives from a click or from this
+   * page handing focus back (Escape, pin) never opens it. A click still
+   * pins, through `toggleFromButton`. */
+  const pointerFocusRef = useRef(false);
+  const peekToggleHandlers = {
+    onPointerEnter: (event: { pointerType: string }) => { if (event.pointerType !== "touch") schedulePeekOpen(); },
+    onPointerLeave: (event: { pointerType: string }) => { if (event.pointerType !== "touch") schedulePeekClose(); },
+    onPointerDown: () => { pointerFocusRef.current = true; },
+    // Mouse focus lands between press and release; a browser that does not
+    // focus a clicked button (Safari) must not leave the flag set.
+    onPointerUp: () => { pointerFocusRef.current = false; },
+    // The peek is the answer to pointing at this control, and its own pin
+    // control carries the tooltip: a default-prevented move keeps Radix's
+    // tooltip from opening over the peek's first rows.
+    onPointerMove: (event: { pointerType: string; preventDefault: () => void }) => { if (event.pointerType !== "touch") event.preventDefault(); },
+    onFocus: (event: FocusEvent<HTMLElement>) => {
+      const fromPointer = pointerFocusRef.current;
+      pointerFocusRef.current = false;
+      if (fromPointer || event.isDefaultPrevented()) return;
+      event.preventDefault();
+      schedulePeekOpen();
+    },
+    onBlur: (event: FocusEvent<HTMLElement>) => {
+      pointerFocusRef.current = false;
+      const column = document.getElementById(CHAT_COLUMN_ID);
+      if (column && event.relatedTarget instanceof Node && column.contains(event.relatedTarget)) return;
+      schedulePeekClose();
+    },
+  };
   const peekColumnHandlers = {
     onPointerEnter: clearPeekTimer,
     onPointerLeave: (event: { pointerType: string }) => { if (event.pointerType !== "touch") schedulePeekClose(); },
@@ -228,6 +265,7 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
     collapsed,
     peek,
     peekZoneHandlers,
+    peekToggleHandlers,
     peekColumnHandlers,
     closePeek,
     pinPeek,
