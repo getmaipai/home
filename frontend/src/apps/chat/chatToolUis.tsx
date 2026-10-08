@@ -45,6 +45,7 @@ export const SpecSheetToolRender: ToolCallMessagePartComponent<Record<string, ne
 
 export const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string; version: number }> = ({ result }) => {
   const openArtifact = useContext(ArtifactOpenContext);
+  const navigate = useNavigate();
   const query = useQuery({
     queryKey: ["artifact-current", result?.id],
     queryFn: () => api.artifactCurrent(result!.id),
@@ -57,13 +58,10 @@ export const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string,
   // with `data` still undefined - without this branch the card was
   // stuck reading a non-spinning "Loading..." forever, never an error.
   const meta = data ? `${data.kind} · v${data.version}` : query.isError ? "Not available right now" : "Loading…";
-  return (
-    <ProducedArtifactCard id={result.id} title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onOpen={() => openArtifact(result.id)} />
-  );
+  return <ProducedArtifactCard id={result.id} title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onOpen={() => openArtifact(result.id)} onShowInLibrary={() => navigate("/files")} />;
 };
 
-export function ProducedArtifactCard({ id, title, meta, generating, onOpen }: { id: string; title: string; meta: string; generating: boolean; onOpen: () => void }) {
-  const navigate = useNavigate();
+export function ProducedArtifactCard({ id, title, meta, generating, onOpen, onShowInLibrary }: { id: string; title: string; meta: string; generating: boolean; onOpen: () => void; onShowInLibrary: () => void }) {
   const MoreIcon = getIcon("more-horizontal");
   return (
     <div className="flex w-full max-w-sm items-center gap-1" data-slot="produced-artifact-card">
@@ -78,7 +76,7 @@ export function ProducedArtifactCard({ id, title, meta, generating, onOpen }: { 
           <DropdownMenuContent align="start">
             <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => { window.location.assign(`/api/artifacts/${encodeURIComponent(id)}/export`); }}>Download</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/files")}>Show in Library</DropdownMenuItem>
+            <DropdownMenuItem onSelect={onShowInLibrary}>Show in Library</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -153,6 +151,7 @@ export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, neve
 export function ProjectFinishedArtifact({ id }: { id: string }) {
   const openArtifact = useContext(ArtifactOpenContext);
   const reloadMainThread = useContext(ReloadMainThreadContext);
+  const navigate = useNavigate();
   const query = useQuery({ queryKey: ["artifact-current", id], queryFn: () => api.artifactCurrent(id) });
   const data = query.data;
   const meta = data ? `${data.kind} · v${data.version}` : query.isError ? "Not available right now" : "Loading…";
@@ -179,7 +178,7 @@ export function ProjectFinishedArtifact({ id }: { id: string }) {
     openArtifact(id);
     reloadMainThread();
   }, [id, openArtifact, reloadMainThread]);
-  return <ProducedArtifactCard id={id} title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onOpen={() => openArtifact(id)} />;
+  return <ProducedArtifactCard id={id} title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onOpen={() => openArtifact(id)} onShowInLibrary={() => navigate("/files")} />;
 }
 
 // PROJECT-PROGRESS-01 (issue #180): a project's own dependency-graph
