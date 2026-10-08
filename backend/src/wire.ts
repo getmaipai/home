@@ -4,6 +4,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.js";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
+import type { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 import type { conversationTurns, conversations } from "./db/schema";
 // hardware.ts has zero "@/"-aliased imports of its own, unlike backup.ts
 // and modelCatalog.ts below, so its types are re-exported directly
@@ -354,6 +355,8 @@ export interface TurnValue {
   images?: ChatImagePart[];
   /** ANSWER-IMG-02: the pictures shown with this answer (additive). */
   answer_images?: AnswerImageSet;
+  /** GENUI-02: answer blocks accepted by the host and emitted as block events. */
+  blocks?: AnswerBlock[];
   /** RVW-1: which rung answered (lib/ruleNames.ts's Rung), additive on
    * the wire and on the turn row. */
   rung?: "typed_source" | "search" | "model_knowledge" | "failed" | "none";
@@ -482,7 +485,7 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
 // listConversationTurns()/list()) drops the raw column entirely for a
 // minor's own turn rather than sending `null`, matching the write-side
 // gate `reasoning`'s own wire event and POST /api/turn already apply.
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; answer_images?: AnswerImageSet; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; answer_images?: AnswerImageSet; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

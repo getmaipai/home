@@ -460,6 +460,7 @@ function buildTurnRow(
     userText,
     images: images.length ? JSON.stringify(images) : null,
     answerImages: opts.answerImages ? JSON.stringify(opts.answerImages) : null,
+    blocks: value.blocks?.length ? JSON.stringify(value.blocks) : null,
     // The reply side too (a package answer that echoes a credential would
     // otherwise land in reply_text and its episode embedding). REASONING-04:
     // visibleText() strips a prose reply's own think block first (a no-op
@@ -1905,7 +1906,7 @@ export function listConversationTurns(
   const projectByTurn = projectsByTurn(rows.map((r) => r.id));
 
   return { ok: true, value: rows.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, blocks: rawBlocks, ...row } = r;
     // Named once, read by both fields below (a code review's own
     // finding: two separately-inlined copies of the identical condition
     // is exactly the kind of thing a later rule change updates in one
@@ -1928,7 +1929,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...(rawBlocks ? { blocks: JSON.parse(rawBlocks) as import("@maipai/spec/gen/ts/answer-block.js").AnswerBlock[] } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2875,12 +2876,12 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
     return pendingAskCache.get(conversationId) ?? null;
   };
   return capped.map((r) => {
-    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, ...row } = r;
+    const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, blocks: rawBlocks, ...row } = r;
     const reasoning = effectiveReasoningFor(r, dropReasoningForActor);
     // getmaipai/home#130: no age gate, same call listConversationTurns()
     // above makes - the card is the reply itself. APPROVE-CARD-01's
     // confirm gets the same treatment.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...(rawBlocks ? { blocks: JSON.parse(rawBlocks) as import("@maipai/spec/gen/ts/answer-block.js").AnswerBlock[] } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

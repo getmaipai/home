@@ -142,16 +142,28 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
   // THIN-0M: a reply refused as a whole (blocking, or a streamed reply
   // held as an envelope) leaves its check on state.outputSafety instead.
   const outputFlag = gated?.refused ?? gated?.lastFlagged ?? state.outputSafety;
-  const crisisResources = outputFlag ? (deriveCrisisResources(outputFlag) ?? inputCrisisLine) : inputCrisisLine;
+  const safety = outputFlag && state.blockSafety
+    ? {
+        ...outputFlag,
+        flagged: outputFlag.flagged || state.blockSafety.flagged,
+        categories: [...new Set([...outputFlag.categories, ...state.blockSafety.categories])],
+        matched_signals: [...new Set([...outputFlag.matched_signals, ...state.blockSafety.matched_signals])],
+        notify_parent: outputFlag.notify_parent || state.blockSafety.notify_parent,
+      }
+    : outputFlag ?? state.blockSafety;
+  const crisisResources = safety ? (deriveCrisisResources(safety) ?? inputCrisisLine) : inputCrisisLine;
   return {
     reply: { text, speech },
     source,
     ...(state.failedGenerationReply ? { failed_generation: true as const } : {}),
     ...(state.promptLimit === "carry_offer" ? { carry_offer: true } : {}),
-    safety: outputFlag ?? state.safety,
+    safety: safety ?? state.safety,
     conversation_id: state.conversationId,
     turn_id: state.turnId,
     ...(state.images?.length ? { images: state.images } : {}),
+    ...(state.toolEvents.some((event) => event.t === "block")
+      ? { blocks: state.toolEvents.flatMap((event) => event.t === "block" ? [event.block] : []) }
+      : {}),
     crisis_resources: crisisResources,
     // SAFETY-NOTICE-01: the same resources as a client draws them.
     ...(crisisResources ? { crisis_support: crisisSupportFor(crisisResources) } : {}),

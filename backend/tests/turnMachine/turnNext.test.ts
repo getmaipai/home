@@ -512,6 +512,53 @@ describe("turnNext.ts: structured_part and artifact reach TurnValue (home#147)",
   });
 });
 
+describe("turnNext.ts: accepted answer blocks reach the turn and stored row (GENUI-02)", () => {
+  test("stores an allowed package block and keeps it after the tool result", async () => {
+    const plugins = await import("@/lib/plugins");
+    const originalLoad = plugins.loadManifestOnly;
+    const manifest = spyOn(plugins, "loadManifestOnly").mockImplementation((id) => {
+      const loaded = originalLoad(id);
+      return id === "websearch" && loaded.ok
+        ? { ...loaded, value: { ...loaded.value, returns_blocks: ["spec_sheet"] } }
+        : loaded;
+    });
+    const block = {
+      id: "blk-turn01",
+      kind: "spec_sheet",
+      schema_version: 1,
+      producer: "websearch",
+      alt: "A date facts sheet.",
+      provenance: "almanac-date result",
+      created_at: "2026-10-08T12:00:00.000Z",
+      hlc: "1791478099338:0:abcdef",
+      props: { title: "Date", rows: [{ label: "Date", value: "Thursday" }] },
+    };
+    const run = spyOn(plugins, "runPlugin").mockResolvedValue({
+      ok: true,
+      value: { reply: { text: "Today is Thursday." }, actions: [], blocks: [block] } as never,
+    } as never);
+    try {
+      const result = await withStub(
+        {
+          calls: (request) => (!request.messages.some((message) => message.role === "tool") && request.tools?.some((tool) => tool.function.name === "websearch") ? [{ id: "call-block", name: "websearch", args: JSON.stringify({ expression: "Thursday" }) }] : undefined),
+          reply: (request) => (request.messages.some((message) => message.role === "tool") ? "Today is Thursday." : "unused"),
+        },
+        () => runTurnNext(people.owner, "chat", "search for Thursday"),
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toBe("Today is Thursday.");
+      expect(result.toolEvents?.map((event) => event.t)).toEqual(["tool_call", "tool_result", "block"]);
+      expect(result.value.blocks).toEqual([block]);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+      expect(JSON.parse(row!.blocks as unknown as string)).toEqual([block]);
+    } finally {
+      run.mockRestore();
+      manifest.mockRestore();
+    }
+  });
+});
+
 describe("turnNext.ts: the household-subject rule", () => {
   test("a search naming a household member asks instead of running", async () => {
     // The household-subject rule (turn-machine-state-record-2026-09-22.md

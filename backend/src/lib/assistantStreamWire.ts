@@ -94,6 +94,9 @@ export function createAssistantStreamSink(onCancel: () => void = () => {}): Assi
           controller.enqueue({ type: "text-delta", path: [index], textDelta: JSON.stringify(event.args) });
           controller.enqueue({ type: "tool-call-args-text-finish", path: [index] });
         } else {
+          // GENUI-02 blocks are already emitted as their own data event;
+          // they do not replace or fail the package's tool result part.
+          if (event.t === "block") return;
           const index = tools.get(event.call_id);
           if (index === undefined) return;
           controller.enqueue(event.t === "tool_result"

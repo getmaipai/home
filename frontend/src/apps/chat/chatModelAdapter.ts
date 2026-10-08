@@ -405,7 +405,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             const e = toolEvent.data;
             if (e.t === "tool_call") {
               toolCalls.set(e.call_id, { packageId: e.package_id, state: "running" });
-            } else {
+            } else if (e.t === "tool_result" || e.t === "tool_error") {
               // tool_result and tool_error both resolve an existing call;
               // an unrecognized call_id (a result for a call this stream
               // never saw start, a stream resumed mid-call) is ignored
@@ -417,7 +417,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // one `e.t` check, not two, decides both `state` and
                 // whether `sites` applies.
                 toolCalls.set(e.call_id, e.t === "tool_result" ? { ...existing, state: e.outcome.error_code ? "error" : "ok", ...(e.outcome.sites ? { sites: e.outcome.sites } : {}) } : { ...existing, state: "error", failureKind: e.error });
-                if (e.t === "tool_error" || (e.t === "tool_result" && Boolean(e.outcome.error_code))) failedTool = true;
+                if (e.t === "tool_error" || Boolean(e.outcome.error_code)) failedTool = true;
               }
             }
             if (activityShown) {

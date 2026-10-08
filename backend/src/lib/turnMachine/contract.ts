@@ -196,6 +196,9 @@ export interface TurnState {
    * one. */
   planBasis: Omit<PlanInput, "evidence">;
   safety: SafetyResult;
+  /** GENUI-02: crisis signal found in a validated block string, carried to
+   * the same crisis-resource overlay as the prose output. */
+  blockSafety?: SafetyResult;
   crisis: boolean;
   engineUnavailable: boolean;
   /** True only when answer.ts delivered the fixed model-failure line. */

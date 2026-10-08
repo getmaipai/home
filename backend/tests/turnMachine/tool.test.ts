@@ -7,7 +7,7 @@
 // fast, direct unit tests of toolNode's own error path, an unknown
 // package id needing no DB or actor fields at all (loadManifestOnly()
 // fails on the filesystem check before runPlugin() ever reads actor).
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test, spyOn } from "bun:test";
 import { toolNode } from "@/lib/turnMachine/nodes/tool";
 import type { TurnState, ActionProposal } from "@/lib/turnMachine/contract";
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
@@ -20,6 +20,50 @@ function proposal(tool: string, args: Record<string, unknown>, callId: string): 
 }
 
 describe("toolNode: wire events, validated against the spec's own schema", () => {
+  const validBlock = {
+    id: "blk-tool01",
+    kind: "spec_sheet",
+    schema_version: 1,
+    producer: "almanac-date",
+    alt: "A date facts sheet.",
+    provenance: "almanac-date result",
+    created_at: "2026-10-08T12:00:00.000Z",
+    hlc: "1791478099338:0:abcdef",
+    props: { title: "Date", rows: [{ label: "Date", value: "Thursday" }] },
+  };
+
+  test("emits an allowed block after its tool_result", async () => {
+    const plugins = await import("@/lib/plugins");
+    const manifest = spyOn(plugins, "loadManifestOnly").mockReturnValue({ ok: true, value: { id: "almanac-date", returns_blocks: ["spec_sheet"] } } as never);
+    const run = spyOn(plugins, "runPlugin").mockResolvedValue({ ok: true, value: { reply: { text: "The package answer remains available." }, actions: [], blocks: [validBlock] } as never } as never);
+    try {
+      const state = { ...STATE, surface: "chat", actor: { displayName: "Sage", role: "adult", birthdate: null } } as unknown as TurnState;
+      const { output } = await toolNode(state, { proposals: [proposal("almanac-date", {}, "call-block")] }, SIGNAL);
+      expect(output.toolEvents.map((event) => event.t)).toEqual(["tool_call", "tool_result", "block"]);
+      expect(output.toolEvents.map((event) => ToolTurnStreamEvent.parse(event).t)).toEqual(["tool_call", "tool_result", "block"]);
+      expect(output.outcomes[0]?.result?.reply?.text).toBe("The package answer remains available.");
+    } finally {
+      run.mockRestore();
+      manifest.mockRestore();
+    }
+  });
+
+  test("an invalid block is dropped while the successful package answer remains", async () => {
+    const plugins = await import("@/lib/plugins");
+    const manifest = spyOn(plugins, "loadManifestOnly").mockReturnValue({ ok: true, value: { id: "almanac-date", returns_blocks: ["spec_sheet"] } } as never);
+    const run = spyOn(plugins, "runPlugin").mockResolvedValue({ ok: true, value: { reply: { text: "The package answer remains available." }, actions: [], blocks: [{ kind: "spec_sheet", props: {} }] } as never } as never);
+    try {
+      const state = { ...STATE, surface: "chat", actor: { displayName: "Sage", role: "adult", birthdate: null } } as unknown as TurnState;
+      const { output } = await toolNode(state, { proposals: [proposal("almanac-date", {}, "call-invalid-block")] }, SIGNAL);
+      expect(output.toolEvents.map((event) => event.t)).toEqual(["tool_call", "tool_result"]);
+      expect(output.outcomes[0]?.status).toBe("succeeded");
+      expect(output.outcomes[0]?.result?.reply?.text).toBe("The package answer remains available.");
+    } finally {
+      run.mockRestore();
+      manifest.mockRestore();
+    }
+  });
+
   test("an unknown package produces one tool_call, then one tool_error - not a tool_result with an error_code", async () => {
     const { output } = await toolNode(STATE, { proposals: [proposal("not-a-real-package", { x: 1 }, "call-1")] }, SIGNAL);
     expect(output.toolEvents.length).toBe(2);

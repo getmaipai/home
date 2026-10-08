@@ -261,7 +261,7 @@ function parseHandleResult(result: { content: unknown; isError?: boolean }): Plu
   const content = result.content as { type: string; text?: string }[];
   const text = content.find((c) => c.type === "text")?.text;
   if (!text) throw new Error("handle returned no text content");
-  const parsed = JSON.parse(text) as Partial<PluginResult>;
+  const parsed = JSON.parse(text) as Partial<PluginResult> & { blocks?: unknown[] };
   return {
     reply: parsed.reply,
     actions: parsed.actions ?? [],
@@ -270,6 +270,7 @@ function parseHandleResult(result: { content: unknown; isError?: boolean }): Plu
     // CHAT-16: a handler's typed fields for the composer ride through as
     // a recipe's do (result.schema.json's `data` and `synthesis_hint`).
     ...(parsed.data !== undefined && parsed.data !== null && typeof parsed.data === "object" ? { data: parsed.data as Record<string, unknown> } : {}),
+    ...(Array.isArray(parsed.blocks) ? { blocks: parsed.blocks } : {}),
     ...(typeof parsed.synthesis_hint === "string" ? { synthesis_hint: parsed.synthesis_hint } : {}),
   };
 }
