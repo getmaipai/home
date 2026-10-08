@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { EngineLink, fullJitterDelay, getEngineLink, LINK_BACKOFF_CAP_MS, LINK_OFFLINE_AFTER_MS, LINK_PROBE_INTERVAL_MS, LINK_PROBE_TIMEOUT_MS, LINK_READY_RESET_MS, mapSshFailure, startEngineLink, stopEngineLink, __setEngineLinkForTests, type LinkDependencies } from "@/lib/stack/link";
 import { StackError } from "@/lib/stack/errors";
+import { __setLinkKeyCommandForTests, confirmHostKey, derivePairingLookup, getPairingPublicKey, issuePairingCode, revokeLinkKey, scanHostKey } from "@/lib/stack/linkKeys";
 
 type Timer = { at: number; fn: () => void; cancelled: boolean };
 type FakeChild = { exit?: (code: number | null, signal: NodeJS.Signals | null) => void; error?: (error: Error & { code?: string }) => void; killed: number; once: (event: string, cb: (...args: any[]) => void) => void; kill: () => void };
@@ -37,6 +38,7 @@ function setup(fetcher?: () => Promise<Response>): void {
     hostKeyMatches: async () => "match",
     spawn: (_command, args, options) => {
       expect(options.stdio).toEqual(["ignore", "ignore", "ignore"]);
+      expect(options.env).toBeDefined();
       expect(args.some((arg) => arg.startsWith("maipai-stack@"))).toBe(true);
       expect(args.join(" ")).not.toContain("BEGIN OPENSSH PRIVATE KEY");
       processArgs.push(args);
@@ -50,8 +52,17 @@ function setup(fetcher?: () => Promise<Response>): void {
 const config = (allowTailnet = false) => ({ host: "engine.local", privateKeyPath: "/private/id_ed25519", knownHostsPath: "/private/known_hosts", allowTailnet });
 async function startReady(link = new EngineLink(config(), deps)): Promise<EngineLink> { link.start(); await flush(); expect(link.snapshot().state).toBe("ready"); return link; }
 
-beforeEach(() => setup());
-afterEach(() => { timers = []; });
+beforeEach(() => { stopEngineLink(); revokeLinkKey(); setup(); });
+afterEach(() => { stopEngineLink(); revokeLinkKey(); __setLinkKeyCommandForTests(null); timers = []; });
+
+async function pairCredentialsForTest(): Promise<void> {
+  const issued = issuePairingCode();
+  expect(getPairingPublicKey(derivePairingLookup(issued.code), "test-home")).not.toBeNull();
+  __setLinkKeyCommandForTests(async () => ({ code: 0, stdout: "engine.local ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPoISQD6sKkxbk5FD8YL6LuvYzhXACmFp4cr8oleBk1h test\n" }));
+  const scanned = await scanHostKey("engine.local", 22);
+  confirmHostKey(scanned.check_code);
+  __setLinkKeyCommandForTests(null);
+}
 
 describe("engine link state machine", () => {
   test("status details report only a remote contract after a successful probe", async () => {
@@ -192,6 +203,7 @@ describe("engine link state machine", () => {
   });
 
   test("start is idempotent for the active link and stop clears its timers and instance", async () => {
+    await pairCredentialsForTest();
     const link = startEngineLink(config(), deps);
     startEngineLink(config(), deps);
     await flush();
@@ -200,6 +212,26 @@ describe("engine link state machine", () => {
     stopEngineLink();
     expect(getEngineLink()).toBeNull();
     expect(timers.filter((timer) => !timer.cancelled).length).toBe(0);
+  });
+
+  test("does not spawn SSH before credentials exist", () => {
+    revokeLinkKey();
+    const link = startEngineLink(config(), deps);
+    expect(link.snapshot()).toMatchObject({ state: "offline", reason: "link_not_paired" });
+    expect(children).toHaveLength(0);
+    expect(getEngineLink()).toBe(link);
+    stopEngineLink();
+  });
+
+  test("a missing host pin is not paired and never spawns SSH", async () => {
+    deps.hostKeyMatches = async () => "not_paired";
+    const link = new EngineLink(config(), deps);
+    link.start(); await flush();
+    expect(link.snapshot()).toMatchObject({ state: "offline", reason: "link_not_paired" });
+    expect(children).toHaveLength(0);
+    link.stop();
+    // This direct state-machine path proves the host-pin status is terminal
+    // before ssh; the public start path checks the full credential set first.
   });
 
   test("replacing the injected singleton stops its existing timers", async () => {

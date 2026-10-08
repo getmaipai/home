@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -10,7 +10,6 @@ import { utils as sshUtils } from "ssh2";
 
 const CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const PAIR_TTL_MS = 10 * 60_000;
-const MAX_ATTEMPTS = 5;
 const linkDir = join(dataDir, "keys", "stack-link");
 const keysDir = join(dataDir, "keys");
 const privateKeyPath = join(linkDir, "id_ed25519");
@@ -20,7 +19,7 @@ const askpassPath = join(linkDir, process.platform === "win32" ? "askpass.cmd" :
 const passphrasePath = join(linkDir, ".passphrase.enc");
 protectExistingSecretPaths([keysDir, linkDir, privateKeyPath, publicKeyPath, knownHostsPath, passphrasePath, askpassPath]);
 
-type Pairing = { code: string; expiresAt: number; attempts: number; used: boolean };
+type Pairing = { code: string; expiresAt: number; used: boolean; fetchedAt: number | null; confirmed: boolean };
 let pairing: Pairing | null = null;
 let scannedCandidate: { line: string; checkCode: string; expiresAt: number } | null = null;
 
@@ -58,16 +57,16 @@ function ensureKeyPair(): void {
 }
 
 export function issuePairingCode(now = Date.now()): { code: string; expires_at: string } {
-  ensureKeyPair(); pairing = { code: newCode(), expiresAt: now + PAIR_TTL_MS, attempts: 0, used: false }; scannedCandidate = null;
+  ensureKeyPair(); pairing = { code: newCode(), expiresAt: now + PAIR_TTL_MS, used: false, fetchedAt: null, confirmed: false }; scannedCandidate = null;
   return { code: pairing.code, expires_at: new Date(pairing.expiresAt).toISOString() };
 }
 export function getPairingPublicKey(lookup: string, householdId: string, now = Date.now()): { public_key: string; household_id: string; hmac: string } | null {
   if (!pairing || pairing.used || now >= pairing.expiresAt) return null;
-  if (!constantStringEqual(derivePairingLookup(pairing.code), lookup)) { pairing.attempts++; return null; }
+  if (!constantStringEqual(derivePairingLookup(pairing.code), lookup.toLowerCase())) return null;
   const publicKey = readFileSync(publicKeyPath, "utf8").trim();
   const message = `${publicKey}\n${householdId}`;
   const hmac = createHmac("sha256", derivePairingMacKey(pairing.code)).update(message).digest("hex");
-  pairing.used = true; return { public_key: publicKey, household_id: householdId, hmac };
+  pairing.used = true; pairing.fetchedAt = now; return { public_key: publicKey, household_id: householdId, hmac };
 }
 export function verifyPairingPayload(code: string, payload: { public_key: string; household_id: string; hmac: string }): boolean {
   const expected = createHmac("sha256", derivePairingMacKey(code)).update(`${payload.public_key}\n${payload.household_id}`).digest();
@@ -91,38 +90,44 @@ function run(command: string, args: string[], timeoutMs: number): Promise<{ code
     child.once("close", (code) => { clearTimeout(timer); if (!settled) { settled = true; resolve({ code, stdout }); } });
   });
 }
-function checkCode(line: string): string {
-  const digest = Buffer.from(line.split(/\s+/)[2] ?? "", "base64"); let bits = 0, value = 0, base32 = "";
+let commandRunner = run;
+export function __setLinkKeyCommandForTests(runner: typeof run | null): void { commandRunner = runner ?? run; }
+export function hostKeyCheckCode(line: string): string {
+  const fields = line.trim().split(/\s+/);
+  const keyField = fields[0]?.startsWith("ssh-") ? fields[1] : fields[2];
+  const blob = Buffer.from(keyField ?? "", "base64");
+  const digest = createHash("sha256").update(blob).digest(); let bits = 0, value = 0, base32 = "";
   for (const byte of digest) { value = (value << 8) | byte; bits += 8; while (bits >= 5) { bits -= 5; base32 += CODE_ALPHABET[(value >>> bits) & 31]; } }
   if (bits) base32 += CODE_ALPHABET[(value << (5 - bits)) & 31]; return base32.slice(0, 12);
 }
 function assertActivePairing(now = Date.now()): Pairing {
-  if (!pairing || pairing.used || now >= pairing.expiresAt) { scannedCandidate = null; throw new Error("pairing expired"); }
+  if (!pairing || pairing.confirmed || pairing.fetchedAt === null || now >= pairing.expiresAt || now >= pairing.fetchedAt + PAIR_TTL_MS) { scannedCandidate = null; throw new Error("pairing expired or public key not fetched"); }
   return pairing;
 }
 export async function scanHostKey(host: string, port: number): Promise<{ check_code: string }> {
   const active = assertActivePairing();
   if (!validHost(host) || !Number.isInteger(port) || port < 1 || port > 65535) throw new Error("invalid host");
-  const result = await run("ssh-keyscan", ["-T", "5", "-p", String(port), "-t", "ed25519", "--", host], 8_000);
+  const result = await commandRunner("ssh-keyscan", ["-T", "5", "-p", String(port), "-t", "ed25519", "--", host], 8_000);
   const line = result.stdout.split(/\r?\n/).find((value) => value && !value.startsWith("#"));
   if (result.code !== 0 || !line) throw new Error("host key scan failed");
   const fields = line.trim().split(/\s+/); if (fields.length < 3 || fields[1] !== "ssh-ed25519") throw new Error("invalid host key");
-  scannedCandidate = { line, checkCode: checkCode(line), expiresAt: active.expiresAt }; return { check_code: scannedCandidate.checkCode };
+  scannedCandidate = { line, checkCode: hostKeyCheckCode(line), expiresAt: active.expiresAt }; return { check_code: scannedCandidate.checkCode };
 }
 export function confirmHostKey(code: string): void {
   const active = assertActivePairing();
   if (!scannedCandidate || Date.now() >= scannedCandidate.expiresAt || scannedCandidate.expiresAt !== active.expiresAt || !constantStringEqual(code, scannedCandidate.checkCode)) throw new Error("check code does not match");
   if (existsSync(knownHostsPath)) throw new Error("a host key is already pinned");
   ensurePrivateDir(); writeFileSync(knownHostsPath, `${scannedCandidate.line.trim()}\n`, { mode: 0o600 }); protectSecretPath(knownHostsPath); scannedCandidate = null;
+  active.confirmed = true; pairing = null;
 }
 
-export type HostKeyStatus = "match" | "mismatch" | "unreachable";
+export type HostKeyStatus = "match" | "mismatch" | "unreachable" | "not_paired";
 export async function isCurrentHostKey(host: string, port: number): Promise<HostKeyStatus> {
   if (!validHost(host) || !Number.isInteger(port) || port < 1 || port > 65535) return "unreachable";
-  if (!existsSync(knownHostsPath)) return "mismatch";
+  if (!existsSync(knownHostsPath)) return "not_paired";
   const known = readFileSync(knownHostsPath, "utf8").split(/\r?\n/).filter(Boolean).map((line) => line.trim().split(/\s+/).slice(-2).join(" "));
   try {
-    const scanned = await run("ssh-keyscan", ["-T", "5", "-p", String(port), "-t", "ed25519", "--", host], 8_000);
+    const scanned = await commandRunner("ssh-keyscan", ["-T", "5", "-p", String(port), "-t", "ed25519", "--", host], 8_000);
     if (scanned.code !== 0) return "unreachable";
     const candidate = scanned.stdout.split(/\r?\n/).filter((line) => line && !line.startsWith("#")).map((line) => line.trim().split(/\s+/).slice(-2).join(" "));
     if (!candidate.length) return "unreachable";

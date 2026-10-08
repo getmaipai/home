@@ -4,12 +4,14 @@ import { app } from "@/app";
 // an HTTP client instead of hand-threading Set-Cookie headers.
 export class TestClient {
   private cookie: string | null = null;
+  constructor(private readonly remoteAddress?: string) {}
 
   async request(
     path: string,
     init: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
   ): Promise<Response> {
     const headers: Record<string, string> = { ...init.headers };
+    const remoteAddress = this.remoteAddress;
     if (init.body !== undefined) headers["content-type"] = "application/json";
     if (this.cookie) headers["cookie"] = this.cookie;
 
@@ -17,7 +19,7 @@ export class TestClient {
       method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
       headers,
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-    });
+    }, remoteAddress ? { server: { requestIP: () => ({ address: remoteAddress, family: remoteAddress.includes(":") ? "IPv6" : "IPv4", port: 12345 }) } } : undefined);
 
     const setCookie = res.headers.get("set-cookie");
     if (setCookie) this.cookie = setCookie.split(";")[0]!;

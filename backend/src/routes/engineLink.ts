@@ -10,6 +10,8 @@ import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import { tryConsume } from "@/lib/rateLimiter";
 import { setHouseholdSettingValue } from "@/lib/settings";
+import { getConnInfo } from "hono/bun";
+import { rebuildEngineLinkAfterPairing } from "@/lib/remoteStackSettings";
 
 export const engineLinkRoutes = apiRouter();
 const ErrorResponses = errorResponses({ 400: "Invalid request or pairing code", 401: "Not signed in", 403: "Admin access required" });
@@ -18,6 +20,14 @@ const PairPayloadSchema = z.object({ public_key: z.string(), household_id: z.str
 function isSecureRequest(c: { req: { header(name: string): string | undefined; url: string } }): boolean {
   const forwardedProtocol = TRUST_PROXY ? c.req.header("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase() : undefined;
   return forwardedProtocol ? forwardedProtocol === "https" : new URL(c.req.url).protocol === "https:";
+}
+
+export function pairingSourceAddress(socketAddress: string | undefined, forwardedFor: string | undefined, trustedProxy: boolean): string | null {
+  if (trustedProxy) {
+    const rightmost = forwardedFor?.split(",").at(-1)?.trim();
+    return rightmost || null;
+  }
+  return socketAddress?.trim() || null;
 }
 
 const issueRoute = createRoute({
@@ -37,11 +47,14 @@ const fetchRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: PairPayloadSchema } }, description: "Public key and code-keyed integrity check" }, 400: { description: "Code expired, exhausted, invalid or already used" } },
 });
 engineLinkRoutes.openapi(fetchRoute, async (c) => {
-  const source = TRUST_PROXY ? (c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "") : c.req.header("x-real-ip") ?? "127.0.0.1";
+  if (!isSecureRequest(c)) return c.json({ error: "Pairing requires a secure Home connection" }, 400);
+  let socketAddress: string | undefined;
+  try { socketAddress = getConnInfo(c).remote.address; } catch { socketAddress = undefined; }
+  const source = pairingSourceAddress(socketAddress, c.req.header("x-forwarded-for"), TRUST_PROXY);
+  if (!source) return c.json({ error: "Could not verify the connection source" }, 403);
   const allowTailnet = getHouseholdSettingValue("engines.stack.remote.allow_tailnet") === true;
   const sourceAllowed = await isHouseholdNetworkHost(source, { allowTailnet });
   if (!sourceAllowed) return c.json({ error: "Pairing is available only on the household network" }, 403);
-  if (!isSecureRequest(c)) return c.json({ error: "Pairing requires a secure Home connection" }, 400);
   if (!tryConsume(`engine-pair:source:${source}`, { capacity: 5, refillPerSecond: 1 })) return c.json({ error: "Too many pairing attempts" }, 429);
   if (!tryConsume("engine-pair:global", { capacity: 30, refillPerSecond: 1 })) return c.json({ error: "Too many pairing attempts" }, 429);
   const payload = getPairingPublicKey(c.req.valid("param").lookup, getHubInstanceId());
@@ -70,7 +83,7 @@ const confirmRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: z.object({ paired: z.boolean() }) } }, description: "Host key pinned" }, ...ErrorResponses },
 });
 engineLinkRoutes.openapi(confirmRoute, (c) => {
-  try { confirmHostKey(c.req.valid("json").check_code); return c.json({ paired: getLinkCredentialStatus().paired }, 200); }
+  try { confirmHostKey(c.req.valid("json").check_code); rebuildEngineLinkAfterPairing(); return c.json({ paired: getLinkCredentialStatus().paired }, 200); }
   catch { return c.json({ error: "The check code did not match the scanned host key" }, 400); }
 });
 

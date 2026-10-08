@@ -4,7 +4,7 @@ import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { LinkState, type LinkState as EngineLinkState } from "@maipai/spec/gen/ts/link-state";
 import { STACK_CONTRACT_MAX, STACK_CONTRACT_MIN } from "./contract";
 import { StackError } from "./errors";
-import { getLinkSshAskpassEnvironment, isCurrentHostKey } from "./linkKeys";
+import { getLinkCredentialStatus, getLinkSshAskpassEnvironment, isCurrentHostKey } from "./linkKeys";
 
 export const LINK_PROBE_INTERVAL_MS = 10_000;
 export const LINK_PROBE_TIMEOUT_MS = 3_000;
@@ -38,7 +38,7 @@ export interface LinkDependencies {
   random: () => number;
   resolveHost: (host: string) => Promise<string[]>;
   hostAllowed: typeof isHouseholdNetworkHost;
-  hostKeyMatches: (host: string, port: number) => Promise<"match" | "mismatch" | "unreachable">;
+  hostKeyMatches: (host: string, port: number) => Promise<"match" | "mismatch" | "unreachable" | "not_paired">;
   log: (event: string, fields: Record<string, unknown>) => void;
   onRoles?: () => Promise<boolean>;
   onState?: (state: EngineLinkState) => void;
@@ -95,7 +95,7 @@ export class EngineLink {
   private rolesDegraded = false;
 
   constructor(config: LinkConfig, deps: Partial<LinkDependencies> = {}) {
-    this.config = { sshPort: 22, localPort: 8771, allowTailnet: false, ...config };
+    this.config = { sshPort: 22, localPort: 8771, allowTailnet: false, ...config, env: config.env ?? { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? process.cwd() } };
     this.deps = { ...defaultDeps, ...deps };
   }
   snapshot(): EngineLinkState { return LinkState.parse(this.state); }
@@ -107,6 +107,13 @@ export class EngineLink {
   isReady(): boolean { return this.state.state === "ready" || this.state.state === "degraded"; }
   pathInUse(): "home" | "tailnet" | null { return this.lastGood?.path ?? null; }
   assertReady(): void { if (!this.isReady()) throw new StackError("unreachable", "Stack link is unreachable"); }
+  setUnavailable(reason: LinkReason): void {
+    this.running = false;
+    ++this.generation;
+    this.clearTimers();
+    this.killChild();
+    this.setState({ state: "offline", reason, contract: this.state.contract });
+  }
 
   start(): void {
     if (this.running) return;
@@ -186,9 +193,10 @@ export class EngineLink {
     if (!this.current(generation)) return;
     const address = checked.find((item) => item.allowed)?.address;
     if (!address) { this.fail("link_outside_home", generation, true); return; }
-    let hostKeyStatus: "match" | "mismatch" | "unreachable";
+    let hostKeyStatus: "match" | "mismatch" | "unreachable" | "not_paired";
     try { hostKeyStatus = await this.deps.hostKeyMatches(address, this.config.sshPort); } catch { hostKeyStatus = "unreachable"; }
     if (!this.current(generation)) return;
+    if (hostKeyStatus === "not_paired") { this.fail("link_not_paired", generation, true); return; }
     if (hostKeyStatus === "mismatch") { this.fail("link_host_key_changed", generation, true); return; }
     if (hostKeyStatus === "unreachable") { this.fail("link_timeout", generation); return; }
     const path = this.isTailnetAddress(address) ? "tailnet" : "home";
@@ -319,16 +327,21 @@ interface ActiveLinkState { link: EngineLink | null; }
 const linkGlobal = globalThis as typeof globalThis & { __maipaiEngineLink?: ActiveLinkState };
 const activeState = linkGlobal.__maipaiEngineLink ??= { link: null };
 export function startEngineLink(config: LinkConfig, deps?: Partial<LinkDependencies>): EngineLink {
+  if (!getLinkCredentialStatus().paired) {
+    activeState.link?.stop();
+    activeState.link = new EngineLink(config, deps);
+    activeState.link.setUnavailable("link_not_paired");
+    return activeState.link;
+  }
   if (activeState.link) {
     activeState.link.updateSettings({ host: config.host, sshPort: config.sshPort, localPort: config.localPort, allowTailnet: config.allowTailnet });
     return activeState.link;
   }
-  try {
-    activeState.link = new EngineLink({ ...config, env: getLinkSshAskpassEnvironment() }, deps);
-  } catch (error) {
-    const missing = error && typeof error === "object" && (error as NodeJS.ErrnoException).code === "ENOENT";
+  try { activeState.link = new EngineLink({ ...config, env: getLinkSshAskpassEnvironment() }, deps); }
+  catch {
     activeState.link = new EngineLink(config, deps);
-    if (missing) activeState.link.retry();
+    activeState.link.setUnavailable("link_not_paired");
+    return activeState.link;
   }
   activeState.link.start();
   return activeState.link;

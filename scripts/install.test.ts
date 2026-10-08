@@ -182,6 +182,20 @@ describe("--dry-run", () => {
 });
 
 describe("REMOTE-STACK-BOX-01 engine computer dry runs", () => {
+  test("the box prints the same SHA-256 host check code as Home", () => {
+    const folder = mkdtempSync(join(tmpdir(), "maipai-engine-check-code-"));
+    const hostKey = join(folder, "host.pub");
+    const line = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPoISQD6sKkxbk5FD8YL6LuvYzhXACmFp4cr8oleBk1h known-vector";
+    try {
+      writeFileSync(hostKey, line);
+      const result = Bun.spawnSync(["bash", "-c", 'source "$ENGINE_HELPER"; print_check_code'], {
+        env: { ...process.env, ENGINE_HELPER, MAIPAI_ENGINE_HOST_KEY_PUB: hostKey },
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.toString().trim()).toBe("Check code: ZY7I47UWEAS2");
+    } finally { rmSync(folder, { recursive: true, force: true }); }
+  });
+
   test("installer dry run keeps each printed command on a short line", () => {
     const { stdout, exitCode } = runScript(["--engine-computer", "--dry-run"]);
     expect(exitCode).toBe(0);

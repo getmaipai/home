@@ -103,5 +103,12 @@ export function startConfiguredEngineLinkIfSelected(): void {
 /** Settings changes that affect the active route or tunnel restart it in place. */
 export function refreshConfiguredEngineLink(): void { realStackLinkControl.refreshLink(); }
 
+/** Pairing changes the SSH identity material, so discard any pre-pair
+ * supervisor and build a new one from the newly pinned credentials. */
+export function rebuildEngineLinkAfterPairing(): void {
+  stackLinkControl.stopLink();
+  stackLinkControl.refreshLink();
+}
+
 /** The link is synchronous to stop; this adapter matches shutdown hook semantics. */
 export function stopConfiguredEngineLink(): void { resetStackLinkRepairs(); stopEngineLink(); }

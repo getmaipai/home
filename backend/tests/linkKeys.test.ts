@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, readFileSync, statSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
-import { __resetPairingForTests, confirmHostKey, derivePairingLookup, getLinkCredentialStatus, getLinkKeyPaths, getLinkSshAskpassEnvironment, getPairingPublicKey, issuePairingCode, revokeLinkKey, scanHostKey, verifyPairingPayload } from "@/lib/stack/linkKeys";
+import { utils as sshUtils } from "ssh2";
+import { __resetPairingForTests, __setLinkKeyCommandForTests, confirmHostKey, derivePairingLookup, getLinkCredentialStatus, getLinkKeyPaths, getLinkSshAskpassEnvironment, getPairingPublicKey, hostKeyCheckCode, issuePairingCode, revokeLinkKey, scanHostKey, verifyPairingPayload } from "@/lib/stack/linkKeys";
 
-afterEach(() => { revokeLinkKey(); __resetPairingForTests(); });
+afterEach(() => { revokeLinkKey(); __resetPairingForTests(); __setLinkKeyCommandForTests(null); });
 
 describe("engine link pairing credentials", () => {
   test("expires after ten minutes and is single use", () => {
@@ -24,6 +26,40 @@ describe("engine link pairing credentials", () => {
     expect(verifyPairingPayload(issued.code.toLowerCase(), payload)).toBe(true);
     expect(verifyPairingPayload(issued.code, { ...payload, household_id: "other" })).toBe(false);
     expect(verifyPairingPayload(issued.code, { ...payload, hmac: "zz" })).toBe(false);
+  });
+  test("SHA-256 host fingerprint check codes differ between ed25519 hosts", () => {
+    const first = sshUtils.generateKeyPairSync("ed25519", { format: "new" }).public.trim();
+    const second = sshUtils.generateKeyPairSync("ed25519", { format: "new" }).public.trim();
+    expect(hostKeyCheckCode(first)).not.toBe(hostKeyCheckCode(second));
+  });
+  test("matches ssh-keygen SHA256 fingerprint bytes for a known host key", () => {
+    const line = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPoISQD6sKkxbk5FD8YL6LuvYzhXACmFp4cr8oleBk1h known-vector";
+    const folder = mkdtempSync(join(tmpdir(), "pair1d-known-host-"));
+    const path = join(folder, "host.pub");
+    try {
+      writeFileSync(path, line);
+      const fingerprint = spawnSync("ssh-keygen", ["-lf", path, "-E", "sha256"], { encoding: "utf8" });
+      expect(fingerprint.status).toBe(0);
+      const encoded = fingerprint.stdout.match(/SHA256:([^\s]+)/)?.[1];
+      expect(encoded).toBe("zj6OfpYgJaRfYytqKm342NNJmzrPjjoH6zmAUXs/Ps4");
+      expect(hostKeyCheckCode(line)).toBe("ZY7I47UWEAS2");
+    } finally { rmSync(folder, { recursive: true, force: true }); }
+  });
+  test("pairing completes in issue, fetch, scan, confirm order and lookup is case-insensitive", async () => {
+    const issued = issuePairingCode();
+    const publicKey = getPairingPublicKey(derivePairingLookup(issued.code).toUpperCase(), "household-1");
+    expect(publicKey?.household_id).toBe("household-1");
+    const publicBlob = "AAAAC3NzaC1lZDI1NTE5AAAAIPoISQD6sKkxbk5FD8YL6LuvYzhXACmFp4cr8oleBk1h";
+    __setLinkKeyCommandForTests(async () => ({ code: 0, stdout: `engine.local ssh-ed25519 ${publicBlob} test\n` }));
+    const scanned = await scanHostKey("engine.local", 22);
+    confirmHostKey(scanned.check_code);
+    expect(getLinkCredentialStatus()).toEqual({ paired: true });
+    expect(getPairingPublicKey(derivePairingLookup(issued.code), "household-1")).toBeNull();
+  });
+  test("scan requires a public key fetch", async () => {
+    issuePairingCode();
+    __setLinkKeyCommandForTests(async () => ({ code: 0, stdout: "engine.local ssh-ed25519 AAAA test\n" }));
+    await expect(scanHostKey("engine.local", 22)).rejects.toThrow();
   });
   test("keeps the private key out of pairing output and stores an encrypted OpenSSH key", () => {
     const issued = issuePairingCode(); const payload = getPairingPublicKey(derivePairingLookup(issued.code), "household-1")!; const paths = getLinkKeyPaths();
