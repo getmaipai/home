@@ -12824,7 +12824,8 @@
                               "voice",
                               "library",
                               "hub",
-                              "internet"
+                              "internet",
+                              "engine_computer"
                             ]
                           },
                           {
@@ -12978,7 +12979,8 @@
                               "voice",
                               "library",
                               "hub",
-                              "internet"
+                              "internet",
+                              "engine_computer"
                             ]
                           },
                           {
