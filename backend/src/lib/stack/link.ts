@@ -33,6 +33,7 @@ export interface LinkDependencies {
   hostAllowed: typeof isHouseholdNetworkHost;
   log: (event: string, fields: Record<string, unknown>) => void;
   onRoles?: () => Promise<boolean>;
+  onState?: (state: EngineLinkState) => void;
 }
 
 const safeLog = (event: string, fields: Record<string, unknown>) => console.info(`[stack-link] ${event}`, fields);
@@ -157,6 +158,7 @@ export class EngineLink {
     this.state = LinkState.parse(state);
     if (previous !== state.state || this.state.reason !== state.reason) {
       this.deps.log("stack_link.state_changed", { from: previous, to: state.state, reason: state.reason, attempt: this.attempt, rtt_ms: state.rtt_ms });
+      this.deps.onState?.(this.snapshot());
     }
   }
   private async connect(generation: number): Promise<void> {

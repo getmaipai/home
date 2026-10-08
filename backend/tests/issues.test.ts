@@ -151,7 +151,7 @@ describe("raiseIssue()", () => {
     expect(listIssues({ includeResolved: true })).toHaveLength(1);
   });
 
-  test("an error severity fires the repairs.new notification to adults, once, on the open transition", async () => {
+  test("an error severity fires the repairs.new notification to admins, once, on the open transition", async () => {
     const person = await owner();
     await raiseIssue({ source: "engine", key: "oom", severity: "error", title: "Model crashed", detail: "d" });
     expect(listPending(person)).toHaveLength(1);
@@ -281,6 +281,14 @@ describe("resolveIssue()", () => {
     // Already resolved - a routine recheck's own unconditional resolveIssue() call must never re-notify.
     resolveIssue("engine", "oom");
     expect(listPending(person)).toHaveLength(2);
+  });
+
+  test("a source can pass its plain recovery copy through the declared Repairs notification", async () => {
+    const person = await owner();
+    await raiseIssue({ source: "stack", key: "link.down", severity: "error", title: "The engine computer isn't answering.", detail: "fixed copy" });
+    resolveIssue("stack", "link.down", { notificationTitle: "Fixed: the engine computer is back." });
+    const resolved = listPending(person).find((item) => item.typeId === "repairs.resolved");
+    expect(resolved?.text).toBe("Fixed: the engine computer is back.");
   });
 
   test("resolving a warning or info issue never fires repairs.resolved (it never notified on the way up either)", async () => {

@@ -10,6 +10,8 @@ import { db } from "@/db";
 import { deviceCommands, people } from "@/db/schema";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
+import { getNotificationType } from "@/lib/notificationTypes";
+import { raiseIssue } from "@/lib/issues";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
 
@@ -38,6 +40,29 @@ test("quiet hours hold time-sensitive alerts through an overnight window and rel
     setSystemTime(new Date(2026, 9, 6, 7, 0));
     await deliverHeldNotifications();
     expect(listPending(row).map((item) => item.text)).toContain("Quiet Model finished downloading and is ready to use.");
+  } finally { mock.restore(); }
+});
+
+test("Stack Repairs alerts use the declared time-sensitive type, wait through quiet hours, and reach admins only", async () => {
+  setSystemTime(new Date(2026, 9, 6, 2, 0));
+  try {
+    const { client, row: ownerRow } = await owner();
+    const { row: adminRow } = await withRole(client, "Marlow", "admin");
+    const { row: adultRow } = await withRole(client, "Bramble", "adult");
+    setHouseholdSettingValue("household.quiet_hours.from", "21:00");
+    setHouseholdSettingValue("household.quiet_hours.to", "07:00");
+    expect(getNotificationType("repairs.new")).toMatchObject({ level: "time_sensitive", audience: "admins" });
+
+    await raiseIssue({ source: "stack", key: "link.down", severity: "error", title: "The engine computer isn't answering. Chat and pictures are paused until it's back. Check that it's on and connected to your home network.", detail: "fixed copy" });
+    expect(listPending(ownerRow)).toHaveLength(0);
+    expect(listPending(adminRow)).toHaveLength(0);
+    expect(listPending(adultRow)).toHaveLength(0);
+
+    setSystemTime(new Date(2026, 9, 6, 7, 0));
+    await deliverHeldNotifications();
+    expect(listPending(ownerRow).map((item) => item.text)).toContain("The engine computer isn't answering. Chat and pictures are paused until it's back. Check that it's on and connected to your home network.");
+    expect(listPending(adminRow)).toHaveLength(1);
+    expect(listPending(adultRow)).toHaveLength(0);
   } finally { mock.restore(); }
 });
 

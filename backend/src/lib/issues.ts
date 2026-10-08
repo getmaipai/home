@@ -61,9 +61,12 @@ export interface RaiseIssueInput {
   remindAfterMs?: number;
   /** CHAT-CALM-ERRORS-01d: also notify when an open, un-dismissed warning
    * becomes an error. Opt-in: only a source that keeps an escalated issue an
-   * error until it resolves (stackEngine.ts) sets it, so no flapping source
+   * error until it resolves (stackEngine.ts or stack/linkRepairs.ts) sets it, so no flapping source
    * can notify on every swing. */
   notifyOnEscalation?: boolean;
+  /** A producer with its own event-id cooldown can keep the Repairs row
+   * current without sending a duplicate notification. */
+  suppressNotification?: boolean;
 }
 
 const reminderTimers = hotReloadState<Map<string, ReturnType<typeof setTimeout>>>("issueReminderTimers", () => new Map());
@@ -207,7 +210,7 @@ export async function raiseIssue(input: RaiseIssueInput): Promise<Issue> {
     row = { ...existing, severity: input.severity, title: input.title, detail: input.detail, fix: fixJson, learnMore, resolvedAt: null, dismissedAt, hlc };
   }
 
-  if (isNewOpenError) {
+  if (isNewOpenError && !input.suppressNotification) {
     const component = componentForIssueSource(input.source);
     const endsAt = component ? maintenanceEndsAt(component, maintenanceNowOverride?.() ?? new Date()) : null;
     if (endsAt) {
@@ -217,7 +220,7 @@ export async function raiseIssue(input: RaiseIssueInput): Promise<Issue> {
       await trigger("repairs.new", { title: input.title });
       if (input.remindAfterMs !== undefined) startReminderTimer(input.source, input.key, input.remindAfterMs);
     }
-  } else if (input.severity === "error" && !wasGenuinelyResolved && !existing?.dismissedAt) {
+  } else if (input.severity === "error" && !wasGenuinelyResolved && !existing?.dismissedAt && !input.suppressNotification) {
     const component = componentForIssueSource(input.source);
     const endsAt = component ? maintenanceEndsAt(component, maintenanceNowOverride?.() ?? new Date()) : null;
     if (endsAt && !suppressedIssues.has(reminderTimerKey(input.source, input.key))) {
@@ -247,7 +250,7 @@ export async function raiseIssue(input: RaiseIssueInput): Promise<Issue> {
  * await it; `trigger()` runs detached, its own failure logged rather
  * than thrown into a caller that never awaited this in the first
  * place. */
-export function resolveIssue(source: string, key: string): void {
+export function resolveIssue(source: string, key: string, opts: { suppressNotification?: boolean; notificationTitle?: string } = {}): void {
   clearReminderTimer(source, key);
   const wasSuppressed = clearSuppressedIssue(source, key);
   const existing = findRow(source, key);
@@ -257,14 +260,14 @@ export function resolveIssue(source: string, key: string): void {
     .set({ resolvedAt: new Date().toISOString(), dismissedAt: null, hlc: nextHlc() })
     .where(eq(issues.id, existing.id))
     .run();
-  if (wasOpenError && !wasSuppressed) {
+  if (wasOpenError && !wasSuppressed && !opts.suppressNotification) {
     // trackBackgroundWork (a review, 2026-09-24): the identical shape
     // notifications.ts's own notifyIfFlagged() already uses for its own
     // detached trigger() call, so a test's global afterEach can drain
     // this before the next test's resetDb() wipes the rows it reads
     // and writes (getmaipai/home#123's own fix, never re-broken here).
     trackBackgroundWork(
-      trigger("repairs.resolved", { title: existing.title }).catch((err) => {
+      trigger("repairs.resolved", { title: opts.notificationTitle ?? `Resolved: ${existing.title}` }).catch((err) => {
         console.error(`[issues] repairs.resolved notification failed for ${source}/${key}: ${(err as Error).message}`);
       }),
     );

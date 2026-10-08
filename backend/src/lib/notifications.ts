@@ -8,7 +8,7 @@
 // db/schema.ts's notificationDeliveries comment).
 //
 // What's real here: declared types (lib/notificationTypes.ts), a
-// household-wide `adults` and `person` audience, three channels (`in_app` -
+// household-wide `admins`, `adults`, `household`, and `person` audiences, three channels (`in_app` -
 // the pending list, always on - `telegram`, opt-in - and `robot`, enabled
 // per person for time-sensitive types), a non-
 // configurable type that always fires regardless of preference, and a
@@ -50,6 +50,7 @@ function resolveRecipients(type: NotificationType, personId?: string): PersonRow
   }
   const everyone = listActivePeople();
   if (type.audience === "household") return everyone;
+  if (type.audience === "admins") return everyone.filter((p) => p.role === "owner" || p.role === "admin");
   // Session C step 7 (session-c-brain-and-voice.md): a code review found
   // this used to share isMinorRole(role) with evaluateSafety()'s own
   // pre-step-7 check, so the two always agreed by construction. Now that
@@ -120,7 +121,7 @@ export interface TriggerOptions {
    * has real ids to link to (`/memory?ids=...`) without a second query. */
   memoryIds?: readonly string[];
   /** NOTIFY-SHARE-01: drops one person from the resolved recipient list
-   * after audience resolution - for a `household` (or `adults`) audience
+   * after audience resolution - for a `household`, `adults`, or `admins` audience
    * type fired BY one of its own members about their own action (a
    * share to "household"), so the person who just did the thing doesn't
    * also get told they did it. Never needed for a `person`-audience

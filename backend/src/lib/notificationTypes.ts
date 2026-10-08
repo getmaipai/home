@@ -13,13 +13,11 @@
 export type NotificationLevel = "immediate" | "time_sensitive" | "passive";
 
 /** The org doc's audience list is "a person, the household, admins,
- * parents of a child." `person` and `household` are exact; `adults`
- * stands in for both "admins" and "parents of a child" until Person
- * gains a real parent/guardian link (no such relationship exists in
- * spec/schemas/person.schema.json today) - a documented gap, not a
- * silent approximation: every adult in the house is a safe over-
- * inclusion for a safety alert, never an under-inclusion. */
-export type NotificationAudience = "person" | "household" | "adults";
+ * parents of a child." `person`, `household`, and `admins` are exact.
+ * `adults` includes every adult, including admins, and stands in for
+ * "parents of a child" until Person gains a real parent/guardian link
+ * (no such relationship exists in spec/schemas/person.schema.json). */
+export type NotificationAudience = "person" | "household" | "adults" | "admins";
 
 export interface NotificationType {
   id: string;
@@ -130,7 +128,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   {
     id: "repairs.new",
     level: "time_sensitive",
-    audience: "adults",
+    audience: "admins",
     template: "{title}",
     configurable: true,
     defaultChannels: ["in_app"],
@@ -139,7 +137,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   {
     id: "repairs.still_open",
     level: "time_sensitive",
-    audience: "adults",
+    audience: "admins",
     template: "Still not fixed: {title}",
     configurable: true,
     defaultChannels: ["in_app"],
@@ -154,12 +152,10 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   {
     id: "repairs.resolved",
     level: "time_sensitive",
-    audience: "adults",
-    // Not "{title} is working again" - a title is often already phrased
-    // as the broken state ("Web search can't reach your SearXNG
-    // instance"), and appending "is working again" to an arbitrary
-    // title reads wrong for many of them. "Resolved:" works for any.
-    template: "Resolved: {title}",
+    audience: "admins",
+    // Callers pass complete plain-language copy through the same declared
+    // Repairs event, so a source can say what recovery means in its context.
+    template: "{title}",
     // false, not true like repairs.new: a matching Telegram toggle
     // needs a settings key, and that key is a shared-spec record
     // (commons's own spec/settings/keys.json) - out of scope for this

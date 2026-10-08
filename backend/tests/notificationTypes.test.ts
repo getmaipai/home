@@ -18,7 +18,7 @@ test("repairs.still_open is the declared adult reminder type", () => {
   expect(getNotificationType("repairs.still_open")).toEqual({
     id: "repairs.still_open",
     level: "time_sensitive",
-    audience: "adults",
+    audience: "admins",
     template: "Still not fixed: {title}",
     configurable: true,
     defaultChannels: ["in_app"],

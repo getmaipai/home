@@ -7,7 +7,7 @@
 // client per URL, and mapping a StackError the same way everywhere
 // (never inventing a cause the Stack itself didn't state).
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { getEngineLink } from "@/lib/stack/link";
+import { getEngineLink, LINK_OFFLINE_AFTER_MS } from "@/lib/stack/link";
 import { createStackClient, type StackClient } from "@/lib/stack/client";
 import { FAILURE_COPY, stackRefusalKind, type FailureKind } from "@/lib/failureCopy";
 import { StackError, type StackErrorKind } from "@/lib/stack/errors";
@@ -377,7 +377,7 @@ export function reportStackFailure(err: unknown, role: string): void {
  * entry is a warning; it becomes an error once the role has stayed down
  * past STACK_RECOVERY_WINDOW_MS, and at once for any other state or for
  * a Stack that did not answer at all. */
-export const STACK_RECOVERY_WINDOW_MS = 2 * 60_000;
+export const STACK_RECOVERY_WINDOW_MS = LINK_OFFLINE_AFTER_MS;
 const RECOVERABLE_STATES: ReadonlySet<string> = new Set(["installed", "loaded"]);
 type DownRecord = { since: number; state: string | undefined; detail: string; escalated: boolean; timer?: ReturnType<typeof setTimeout> };
 const downSince = new Map<string, DownRecord>();

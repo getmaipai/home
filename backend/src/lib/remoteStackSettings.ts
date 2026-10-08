@@ -4,6 +4,7 @@ import { getEngineLink, startEngineLink, stopEngineLink, type LinkConfig } from 
 import { startLocalStackService, stopLocalStackService, STACK_LINK_KNOWN_HOSTS_PATH, STACK_LINK_PRIVATE_KEY_PATH } from "@/lib/localStackService";
 import { dataDir } from "@/lib/paths";
 import { join } from "node:path";
+import { reportStackLinkState, resetStackLinkRepairs } from "@/lib/stack/linkRepairs";
 
 export const REMOTE_ENGINE_HOST_KEY = "engines.stack.remote.host";
 export const REMOTE_ALLOW_TAILNET_KEY = "engines.stack.remote.allow_tailnet";
@@ -24,10 +25,10 @@ const realStackLinkControl: StackLinkControl = {
   async stopLocalStack() { stopLocalStackService(); },
   async startLocalStackAndClearLink() { startLocalStackService(); },
   startLink() { startConfiguredEngineLink(); },
-  stopLink() { stopEngineLink(); },
+  stopLink() { resetStackLinkRepairs(); stopEngineLink(); },
   refreshLink() {
     if (getHouseholdSettingValue(ENGINE_WHERE_KEY) === "another_computer") startConfiguredEngineLink();
-    else stopEngineLink();
+    else { resetStackLinkRepairs(); stopEngineLink(); }
   },
 };
 
@@ -83,8 +84,8 @@ function configuredLink(): LinkConfig | null {
 
 function startConfiguredEngineLink(): void {
   const config = configuredLink();
-  if (config) startEngineLink(config);
-  else stopEngineLink();
+  if (config) startEngineLink(config, { onState: reportStackLinkState });
+  else { resetStackLinkRepairs(); stopEngineLink(); }
 }
 
 setStackLinkControl(realStackLinkControl);
@@ -92,6 +93,7 @@ setStackLinkControl(realStackLinkControl);
 /** Called at boot: invalid or incomplete pairing must not hold up Home. */
 export function startConfiguredEngineLinkIfSelected(): void {
   if (getHouseholdSettingValue(ENGINE_WHERE_KEY) !== "another_computer") {
+    resetStackLinkRepairs();
     stopEngineLink();
     return;
   }
@@ -102,4 +104,4 @@ export function startConfiguredEngineLinkIfSelected(): void {
 export function refreshConfiguredEngineLink(): void { realStackLinkControl.refreshLink(); }
 
 /** The link is synchronous to stop; this adapter matches shutdown hook semantics. */
-export function stopConfiguredEngineLink(): void { stopEngineLink(); }
+export function stopConfiguredEngineLink(): void { resetStackLinkRepairs(); stopEngineLink(); }
