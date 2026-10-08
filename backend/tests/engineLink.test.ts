@@ -7,7 +7,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { getLinkKeyPaths } from "@/lib/stack/linkKeys";
 import { existsSync } from "node:fs";
 import { __resetStackLinkControlForTests, setStackLinkControl } from "@/lib/remoteStackSettings";
-import { pairingSourceAddress } from "@/routes/engineLink";
+import { isSecurePairingRequest, pairingSourceAddress } from "@/routes/engineLink";
 
 beforeEach(() => { resetDb(); revokeLinkKey(); __setLinkKeyCommandForTests(null); __resetRateLimiterForTests(); __resetStackLinkControlForTests(); });
 async function owner(): Promise<TestClient> { const client = new TestClient("192.168.1.40"); await client.post("/api/auth/setup", { displayName: "Owner", secret: "correcthorse" }); return client; }
@@ -39,6 +39,11 @@ describe("engine link routes", () => {
     expect(pairingSourceAddress("10.0.0.2", "8.8.8.8, 192.168.1.40", true)).toBe("192.168.1.40");
     expect(pairingSourceAddress("10.0.0.2", "8.8.8.8", true)).toBe("8.8.8.8");
     expect(pairingSourceAddress("10.0.0.2", undefined, true)).toBeNull();
+  });
+  test("secure proxy protocol uses the rightmost appended hop", () => {
+    expect(isSecurePairingRequest("http:", "https, http", true)).toBe(false);
+    expect(isSecurePairingRequest("http:", "http, https", true)).toBe(true);
+    expect(isSecurePairingRequest("http:", "https", false)).toBe(false);
   });
   test("pairing completion rebuilds the link from the newly pinned credentials", async () => {
     const client = await owner();

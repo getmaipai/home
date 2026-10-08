@@ -17,9 +17,15 @@ export const engineLinkRoutes = apiRouter();
 const ErrorResponses = errorResponses({ 400: "Invalid request or pairing code", 401: "Not signed in", 403: "Admin access required" });
 const PairCodeSchema = z.object({ code: z.string().regex(/^[A-Z2-7]{12}$/), expires_at: z.string() });
 const PairPayloadSchema = z.object({ public_key: z.string(), household_id: z.string(), hmac: z.string() });
+export function isSecurePairingRequest(protocol: string, forwardedProto: string | undefined, trustedProxy: boolean): boolean {
+  const forwardedProtocol = trustedProxy ? forwardedProto?.split(",").at(-1)?.trim().toLowerCase() : undefined;
+  return forwardedProtocol ? forwardedProtocol === "https" : protocol === "https:";
+}
+
 function isSecureRequest(c: { req: { header(name: string): string | undefined; url: string } }): boolean {
-  const forwardedProtocol = TRUST_PROXY ? c.req.header("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase() : undefined;
-  return forwardedProtocol ? forwardedProtocol === "https" : new URL(c.req.url).protocol === "https:";
+  const protocol = new URL(c.req.url).protocol;
+  const forwardedProto = c.req.header("x-forwarded-proto");
+  return isSecurePairingRequest(protocol, forwardedProto, TRUST_PROXY);
 }
 
 export function pairingSourceAddress(socketAddress: string | undefined, forwardedFor: string | undefined, trustedProxy: boolean): string | null {

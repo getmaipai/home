@@ -39,6 +39,7 @@ export interface LinkDependencies {
   resolveHost: (host: string) => Promise<string[]>;
   hostAllowed: typeof isHouseholdNetworkHost;
   hostKeyMatches: (host: string, port: number) => Promise<"match" | "mismatch" | "unreachable" | "not_paired">;
+  askpassEnvironment: () => NodeJS.ProcessEnv;
   log: (event: string, fields: Record<string, unknown>) => void;
   onRoles?: () => Promise<boolean>;
   onState?: (state: EngineLinkState) => void;
@@ -58,6 +59,7 @@ const defaultDeps: LinkDependencies = {
   },
   hostAllowed: isHouseholdNetworkHost,
   hostKeyMatches: async (host, port) => isCurrentHostKey(host, port),
+  askpassEnvironment: getLinkSshAskpassEnvironment,
   log: safeLog,
 };
 
@@ -105,6 +107,7 @@ export class EngineLink {
       contract: this.lastGood?.contract ?? (this.state.reason === "link_needs_update" ? this.state.contract : null) };
   }
   isReady(): boolean { return this.state.state === "ready" || this.state.state === "degraded"; }
+  isRunning(): boolean { return this.running; }
   pathInUse(): "home" | "tailnet" | null { return this.lastGood?.path ?? null; }
   assertReady(): void { if (!this.isReady()) throw new StackError("unreachable", "Stack link is unreachable"); }
   setUnavailable(reason: LinkReason): void {
@@ -333,13 +336,15 @@ export function startEngineLink(config: LinkConfig, deps?: Partial<LinkDependenc
     activeState.link.setUnavailable("link_not_paired");
     return activeState.link;
   }
-  if (activeState.link) {
+  if (activeState.link?.isRunning()) {
     activeState.link.updateSettings({ host: config.host, sshPort: config.sshPort, localPort: config.localPort, allowTailnet: config.allowTailnet });
     return activeState.link;
   }
-  try { activeState.link = new EngineLink({ ...config, env: getLinkSshAskpassEnvironment() }, deps); }
+  activeState.link?.stop();
+  const linkDeps = { ...defaultDeps, ...deps };
+  try { activeState.link = new EngineLink({ ...config, env: linkDeps.askpassEnvironment() }, linkDeps); }
   catch {
-    activeState.link = new EngineLink(config, deps);
+    activeState.link = new EngineLink(config, linkDeps);
     activeState.link.setUnavailable("link_not_paired");
     return activeState.link;
   }

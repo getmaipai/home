@@ -223,6 +223,21 @@ describe("engine link state machine", () => {
     stopEngineLink();
   });
 
+  test("rebuilds a stopped link after askpass environment creation recovers", async () => {
+    await pairCredentialsForTest();
+    const unavailable = startEngineLink(config(), { ...deps, askpassEnvironment: () => { throw new Error("askpass unavailable"); } });
+    expect(unavailable.snapshot()).toMatchObject({ state: "offline", reason: "link_not_paired" });
+    expect(unavailable.isRunning()).toBe(false);
+    expect(children).toHaveLength(0);
+
+    const recovered = startEngineLink(config(), deps);
+    expect(recovered).not.toBe(unavailable);
+    await flush();
+    expect(recovered.isRunning()).toBe(true);
+    expect(recovered.snapshot().state).toBe("ready");
+    expect(children).toHaveLength(1);
+  });
+
   test("a missing host pin is not paired and never spawns SSH", async () => {
     deps.hostKeyMatches = async () => "not_paired";
     const link = new EngineLink(config(), deps);

@@ -43,6 +43,7 @@ describe("engine link pairing credentials", () => {
       const encoded = fingerprint.stdout.match(/SHA256:([^\s]+)/)?.[1];
       expect(encoded).toBe("zj6OfpYgJaRfYytqKm342NNJmzrPjjoH6zmAUXs/Ps4");
       expect(hostKeyCheckCode(line)).toBe("ZY7I47UWEAS2");
+      expect(hostKeyCheckCode(line.replace("known-vector", "ssh-box.local"))).toBe("ZY7I47UWEAS2");
     } finally { rmSync(folder, { recursive: true, force: true }); }
   });
   test("pairing completes in issue, fetch, scan, confirm order and lookup is case-insensitive", async () => {

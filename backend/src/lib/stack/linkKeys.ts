@@ -94,7 +94,8 @@ let commandRunner = run;
 export function __setLinkKeyCommandForTests(runner: typeof run | null): void { commandRunner = runner ?? run; }
 export function hostKeyCheckCode(line: string): string {
   const fields = line.trim().split(/\s+/);
-  const keyField = fields[0]?.startsWith("ssh-") ? fields[1] : fields[2];
+  const keyTypeIndex = fields.findIndex((field) => field === "ssh-ed25519");
+  const keyField = keyTypeIndex >= 0 ? fields[keyTypeIndex + 1] : undefined;
   const blob = Buffer.from(keyField ?? "", "base64");
   const digest = createHash("sha256").update(blob).digest(); let bits = 0, value = 0, base32 = "";
   for (const byte of digest) { value = (value << 8) | byte; bits += 8; while (bits >= 5) { bits -= 5; base32 += CODE_ALPHABET[(value >>> bits) & 31]; } }
