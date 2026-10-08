@@ -17198,20 +17198,20 @@
         }
       }
     },
-    "/api/engine-link/pair/{code}": {
+    "/api/engine-link/pair/{lookup}": {
       "get": {
         "tags": [
           "Engine link"
         ],
-        "summary": "Fetch pairing material using its one-time code",
+        "summary": "Fetch pairing material using the derived lookup",
         "parameters": [
           {
             "schema": {
               "type": "string",
-              "pattern": "^[A-Z2-7]{12}$"
+              "pattern": "^[\\da-f]{32}$/i"
             },
             "required": true,
-            "name": "code",
+            "name": "lookup",
             "in": "path"
           }
         ],
