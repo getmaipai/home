@@ -385,7 +385,9 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   // Both real, independent gaps found the same week against the same
   // cache - checked together rather than as two separate conditionals.
   const candidateEnabled = candidate.data.enabled;
-  if (nextRole !== target.role || candidateEnabled !== target.enabled || candidate.data.birthdate !== target.birthdate) {
+  if (nextRole !== target.role || candidateEnabled !== target.enabled || candidate.data.birthdate !== target.birthdate || candidate.data.accent !== target.accent) {
+    // accent: SETTINGS-APPEARANCE-01. The shell reads it back through
+    // /api/auth/me, which is served from this same cached row.
     invalidateSessionCacheForPerson(id);
   }
 

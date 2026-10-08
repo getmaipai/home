@@ -225,6 +225,17 @@ async function sessionFor(personId: string, secret?: string): Promise<TestClient
 // the ones that decide whether a household can be taken over, locked
 // out, or left holding data it was told had been erased.
 describe("PATCH /api/people/:id", () => {
+  test("a new accent shows in the very next /api/auth/me read, not after the session cache expires", async () => {
+    const ownerClient = await ownerSession();
+    const child = await addPerson(ownerClient, "Bramble", "child");
+    const childClient = await sessionFor(child.id);
+    await childClient.get("/api/auth/me"); // warms the cached session row
+    const res = await childClient.request(`/api/people/${child.id}`, { method: "PATCH", body: { accent: "violet" } });
+    expect(res.status).toBe(200);
+    const me = (await (await childClient.get("/api/auth/me")).json()) as { accent: string | null };
+    expect(me.accent).toBe("violet");
+  });
+
   test("anyone may edit their own name and nickname", async () => {
     const ownerClient = await ownerSession();
     const child = await addPerson(ownerClient, "Bramble", "child");

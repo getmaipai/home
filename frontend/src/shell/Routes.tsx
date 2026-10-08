@@ -5,6 +5,7 @@ import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
 import { useHeaderExtra } from "@maipai/ui/src/dashboard/layouts/full/vertical/header/HeaderExtraContext";
 import { useLook } from "@/shell/useLook";
+import { useAccent } from "@/shell/useAccent";
 import { useAppearance } from "@/shell/useAppearance";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
@@ -111,6 +112,7 @@ function PageHeaderLayout() {
 function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
   useAppearance(person.id);
   useLook(person.id);
+  useAccent(person.accent);
 
   return (
     <IncognitoProvider>

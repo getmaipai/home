@@ -82,6 +82,36 @@ html.incognito body[class*="style-"] {
   --input: var(--incognito-input-border);
 }
 
+/* SETTINGS-APPEARANCE-01: the signed-in person's profile accent
+ * (`Person.accent`, one of six named swatches; `useAccent.ts` paints it as
+ * `<body data-accent>`). The kit ships each swatch as a tinted surface with
+ * a foreground paired to it in both themes (`--profile-accent-<name>` and
+ * `-foreground`), so the accent drives the tokens the kit already uses for
+ * selected and hovered surfaces: `--accent` and `--sidebar-accent`. Each
+ * swatch is named once, here, and read by the shared rule below. `body[...]`
+ * (0,1,1) outranks the look's `.style-<name>` rules (0,1,0), so the
+ * accent wins over a look; no accent set means the look stands. */
+body[data-accent="blue"] { --person-accent: var(--profile-accent-blue); --person-accent-foreground: var(--profile-accent-blue-foreground); }
+body[data-accent="violet"] { --person-accent: var(--profile-accent-violet); --person-accent-foreground: var(--profile-accent-violet-foreground); }
+body[data-accent="teal"] { --person-accent: var(--profile-accent-teal); --person-accent-foreground: var(--profile-accent-teal-foreground); }
+body[data-accent="orange"] { --person-accent: var(--profile-accent-orange); --person-accent-foreground: var(--profile-accent-orange-foreground); }
+body[data-accent="pink"] { --person-accent: var(--profile-accent-pink); --person-accent-foreground: var(--profile-accent-pink-foreground); }
+body[data-accent="red"] { --person-accent: var(--profile-accent-red); --person-accent-foreground: var(--profile-accent-red-foreground); }
+body[data-accent] {
+  --accent: var(--person-accent);
+  --accent-foreground: var(--person-accent-foreground);
+  --sidebar-accent: var(--person-accent);
+  --sidebar-accent-foreground: var(--person-accent-foreground);
+}
+/* The settings column's selected row and search field draw the kit's neutral
+ * `--settings-fill`, which the kit sets on `:root:not(.dark) body`; match
+ * that specificity (and beat it by one class) to tint it with the person's
+ * accent in both themes. */
+:root:not(.dark) body[data-accent],
+:root.dark body[data-accent] {
+  --settings-fill: color-mix(in srgb, var(--background), var(--person-accent) 24%);
+}
+
 /* The vendored FullLayout sidebar adds its own high-specificity
  * `**:data-[slot=sidebar-inner]:bg-background` rule, so this one surface
  * resolves to the canvas token instead of the sidebar token above. Keep
