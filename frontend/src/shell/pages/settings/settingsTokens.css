@@ -1,3 +1,13 @@
+/* SETTINGS-DENSITY-01: give the shipped settings rows enough width for
+ * readable descriptions and their controls at desktop widths. The shell
+ * and row consume these kit tokens; narrow layouts still use the kit's
+ * responsive row variant.
+ */
+:root {
+  --settings-content-max: 1080px;
+  --settings-row-text-max: 560px;
+}
+
 /* APP-SET-02: the Neutral look's switch colour on the settings pages.
  * ChatGPT's settings switches are blue (sampled #3983f7); the kit reads
  * `--switch-checked` (default: the look's `--primary`) and the other looks
