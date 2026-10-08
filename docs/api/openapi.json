@@ -15086,6 +15086,66 @@
         }
       }
     },
+    "/api/engines/connection-check": {
+      "post": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "Check each remote engine connection hop",
+        "responses": {
+          "200": {
+            "description": "Ten connection checks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "hops": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "number"
+                          },
+                          "pass": {
+                            "type": "boolean"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "fix": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "pass",
+                          "fix"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "hops"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/engines": {
       "get": {
         "tags": [

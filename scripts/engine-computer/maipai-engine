@@ -5,6 +5,7 @@ STACK_USER=maipai-stack
 STACK_HOME=/home/maipai-stack
 STACK_DATA=/data/stack
 STACK_ROOT=/opt/maipai-stack
+STACK_STORE=/data/stack/engines
 PAIR_FILE="${MAIPAI_ENGINE_PAIR_FILE:-/var/lib/maipai-stack/paired-home.json}"
 AUTH_KEYS="${MAIPAI_ENGINE_AUTH_KEYS:-$STACK_HOME/.ssh/authorized_keys}"
 STACK_TAG=233bc4fd91c01efd54aa44d9147bcccd6fe956a9
@@ -18,7 +19,67 @@ need_root() { [ "$(id -u)" -eq 0 ] || die "Run with sudo."; }
 
 usage() {
   say "Usage: maipai-engine [--dry-run] pair <home> <code> [--replace]"
-  say "       maipai-engine [--dry-run] unpair|update|status"
+  say "       maipai-engine [--dry-run] unpair|update|status|doctor"
+}
+
+doctor() {
+  local uid linger active enabled listeners matching_keys
+  uid=$(id -u "$STACK_USER" 2>/dev/null || true)
+  active=no; enabled=no; linger=no
+  if [ -n "$uid" ]; then
+    if [ -z "${XDG_RUNTIME_DIR:-}" ]; then export XDG_RUNTIME_DIR="/run/user/$uid"; fi
+    systemctl --user is-active --quiet maipai-stack.service && active=yes || true
+    systemctl --user is-enabled --quiet maipai-stack.service && enabled=yes || true
+    [ "$(loginctl show-user "$STACK_USER" -p Linger --value 2>/dev/null || true)" = yes ] && linger=yes
+  fi
+  [ "$active" = yes ] && [ "$enabled" = yes ] && [ "$linger" = yes ] \
+    && say "PASS hop 1: service active, enabled, linger on" \
+    || say "FAIL hop 1: service active=$active enabled=$enabled linger=$linger"
+  [ "$active" = yes ] && [ "$enabled" = yes ] && [ "$linger" = yes ] \
+    && say "Fix hop 1: no action needed." \
+    || say "Fix hop 1: sudo loginctl enable-linger maipai-stack"
+
+  listeners=$(ss -H -ltn 'sport = :8770' 2>/dev/null | awk '{print $4}')
+  if [ -n "$listeners" ] && ! printf '%s\n' "$listeners" | grep -Ev '^127\.0\.0\.1:8770$|^\[::1\]:8770$' | grep -q .; then
+    say "PASS hop 2: listener is loopback-only on 8770"
+    say "Fix hop 2: no action needed."
+  else
+    say "FAIL hop 2: listener is absent or not loopback-only"
+    say "Fix hop 2: bind Stack to 127.0.0.1:8770"
+  fi
+
+  if nvidia-smi -L >/dev/null 2>&1 && [ -n "$(nvidia-smi -L 2>/dev/null)" ]; then
+    say "PASS hop 3: NVIDIA GPUs are visible"
+    say "Fix hop 3: no action needed."
+  else
+    say "FAIL hop 3: nvidia-smi found no GPUs"
+    say "Fix hop 3: install the NVIDIA driver"
+  fi
+
+  local engine_current engine_target
+  engine_current="${MAIPAI_ENGINE_CURRENT:-$STACK_STORE/llama-server/current}"
+  if [ -L "$engine_current" ]; then engine_target="$(readlink -f "$engine_current")"; else engine_target="${MAIPAI_PINNED_ENGINE:-}"; fi
+  if [ -n "$engine_target" ] && [ -x "$engine_target/llama-server" ] && [ -f "$engine_target/.engine-ready" ] && "$engine_target/llama-server" --version 2>/dev/null | grep -q 'b10797'; then
+    say "PASS hop 4: pinned llama-server b10797 is present"
+    say "Fix hop 4: no action needed."
+  else
+    say "FAIL hop 4: pinned llama-server b10797 is missing"
+    say "Fix hop 4: sudo maipai-engine update"
+  fi
+
+  if current=$(read_pair 2>/dev/null); then
+    matching_keys=$(awk '/^restrict,port-forwarding,permitopen="127\.0\.0\.1:8770" ssh-ed25519 [A-Za-z0-9+/]+( .*)?$/ && NF >= 3 { n++ } END { print n+0 }' "$AUTH_KEYS" 2>/dev/null)
+    if [ "$matching_keys" = 1 ] && [ "$(wc -l < "$AUTH_KEYS" | tr -d ' ')" = 1 ]; then
+      say "UNVERIFIED hop 5: paired-home.json has no authorized-key fingerprint"
+      say "Fix hop 5: add authorized_key_fingerprint to pair record"
+    else
+      say "FAIL hop 5: restricted authorized key is missing or duplicated"
+      say "Fix hop 5: sudo maipai-engine pair HOME CODE"
+    fi
+  else
+    say "FAIL hop 5: no paired household"
+    say "Fix hop 5: sudo maipai-engine pair HOME CODE"
+  fi
 }
 
 normalize_code() { printf '%s' "$1" | tr -d '-' | tr '[:lower:]' '[:upper:]'; }
@@ -171,6 +232,7 @@ main() {
     unpair) unpair ;;
     update) update ;;
     status) status ;;
+    doctor) doctor ;;
     *) usage; exit 2 ;;
   esac
 }

@@ -894,6 +894,7 @@ export const api = {
   // budget or an empty health list) is a normal, common household state
   // (no Stack set up), never an error - routes/engines.ts's own header.
   engines: () => request<EnginesOverview>("/api/engines"),
+  engineConnectionCheck: () => request<{ hops: Array<{ id: number; pass: boolean; detail?: string; fix: string }> }>("/api/engines/connection-check", { method: "POST" }),
   enginesHealth: () => request<EnginesHealth>("/api/engines/health"),
   // GET /api/voice/stt/status (DICT-01): whether the STT assets (Silero
   // VAD, Moonshine) are installed and the recognizer is loaded - the

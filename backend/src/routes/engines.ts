@@ -17,6 +17,7 @@ import { getHomeSupervisorRoles } from "@/lib/homeSupervisorRoles";
 import { classifyStackError, STACK_ERROR_RESPONSES } from "@/lib/stack/httpErrors";
 import { getStackUpdatesState, checkStackUpdates, applyStackEngineUpdate, rollbackStackEngine } from "@/lib/stackUpdates";
 import { ROLE_IDS } from "@/lib/stack/types";
+import { runEngineLinkDoctor } from "../../scripts/engine-link-doctor";
 
 export const enginesRoutes = apiRouter();
 
@@ -165,6 +166,19 @@ const SettingsApplyBodySchema = z.record(z.string(), z.unknown());
 const SettingsResponseSchema = z.object({ sections: z.array(z.object({ id: z.string(), label: z.string() })), settings: z.array(StackSettingSchema) });
 
 // ---- Routes ------------------------------------------------------------
+
+const connectionCheckRoute = createRoute({
+  method: "post",
+  path: "/connection-check",
+  tags: ["Engines"],
+  summary: "Check each remote engine connection hop",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ hops: z.array(z.object({ id: z.number(), pass: z.boolean(), detail: z.string().optional(), fix: z.string() })) }) } }, description: "Ten connection checks." },
+    ...errorResponses({ 403: "Not owner/admin" }),
+  },
+});
+enginesRoutes.openapi(connectionCheckRoute, async (c) => c.json({ hops: await runEngineLinkDoctor() }, 200));
 
 const overviewRoute = createRoute({
   method: "get",
