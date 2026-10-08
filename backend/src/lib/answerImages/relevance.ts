@@ -68,6 +68,9 @@ export type RelevanceContext = {
   /** Words from the descriptions of other things with the same name
    * (image-search accuracy study R4, built from Wikidata per subject). */
   otherSenseWords?: readonly string[];
+  /** The subject's own Wikidata description ("smart speaker"): a word it
+   * holds is the subject itself, never an object that replaces it. */
+  description?: string;
 };
 
 /** Image-search accuracy study (data-scratch/research/
@@ -111,13 +114,32 @@ const PERSONAL_HOSTS = [
 
 /** Words a caption uses for a person's own snapshot, a fan's costume or
  * build, or a meet-up crowd. Word-boundary matches on the normalised text. */
-const PERSONAL_WORDS = /\b(cosplay|cosplayer|cosplayers|cosplaying|fan art|fanart|fanmade|selfie|selfies|me with|my|mine|our|myself|wedding|birthday|meetup|convention|comic con|comiket|lego)\b|コスプレ|コミックマーケット/;
+const PERSONAL_WORDS = /\b(cosplay|cosplayer|cosplayers|cosplaying|costume|costumes|costumed|fan art|fanart|fanmade|selfie|selfies|me with|my|mine|our|myself|wedding|birthday|meetup|convention|comic con|comiket|lego)\b|コスプレ|コミックマーケット/;
 
 /** Words a caption uses when the picture is of people. For a thing (not a
  * person) such a picture is a photo of someone with the thing, often a
  * private person or a child ("Child plays video game on Nintendo Switch
  * while sitting on a couch", a Commons category member). */
-const PEOPLE_WORDS = /\b(child|children|kid|kids|boy|boys|girl|girls|baby|toddler|teen|teenager|woman|women|people|family|crowd|visitors|tourists|couple|friend|friends|daughter|wife|husband|mom|mum|dad|mother|father|grandma|grandpa|students|shopper|shoppers|queue)(s|es)?\b|\b(her|his) (device|phone|tablet|camera)\b|\b(booth|expo|gamescom)\b/;
+const PEOPLE_WORDS = /\b(child|children|kid|kids|boy|boys|girl|girls|baby|toddler|teen|teenager|woman|women|people|family|crowd|visitors|tourists|couple|friend|friends|daughter|wife|husband|mom|mum|dad|mother|father|grandma|grandpa|students|shopper|shoppers|queue|fans|person)(s|es)?\b|\b(her|his) (device|phone|tablet|camera)\b|\b(booth|expo|gamescom)\b/;
+
+/** For a person: words a caption uses when the picture is of a gathering
+ * around them (fans at a trial, a protest), whose faces are strangers'. */
+const GATHERING_WORDS = /\b(fan|fans|protest|protests|protester|protesters|protesting|supporters|demonstrators|demonstration|crowd|crowds|audience|mourners|rally)\b/;
+
+/** IMGQ-05 follow-up (judged sample 2026-10-08): things a file shows instead
+ * of the subject while still sitting in its category and naming it: a ticket
+ * stub, a chart of its colours, the chip inside it, a sign about it, a part
+ * of it, an advert that carries its name. Word matches on the text outside
+ * the subject's own name and on the visible categories. A word the subject's
+ * own name or Wikidata description holds is exempt ("Ticket to Ride", a
+ * smart speaker). */
+const OBJECT_WORDS = /\b(tickets?|stubs?|histograms?|charts?|signage|speakers?|headrests?|head restraints?|apu|wafers?|die shots?|ads|adverts?|advertisements?)\b/;
+
+/** A place named by its distance from the subject: the picture is of what
+ * is opposite it, not of it. */
+const MILITARY_WORDS = /\b(sgt|sergeant|squadron|airman|petty officer|air force)\b/;
+const OCCUPIES_SITE = /\boccup(?:y|ies|ied)\s+the\s+(?:location|site|spot|grounds?|land)\s+of\s+(?:the\s+)?(.*)$/;
+const NEAR_PREPOSITIONS = ["opposite", "near", "nearby", "next to", "beside", "behind", "outside", "across from", "facing", "overlooking", "close to", "adjacent to", "view from", "seen from", "taken from"];
 
 /** Words a caption uses for a screen capture, not a photo. */
 const SCREENSHOT_WORDS = /\b(screenshot|screenshots|screen shot|screen capture|screencap|virtual desktop|desktop pet|application window|user interface|taskbar)\b|скриншот|スクリーンショット/;
@@ -127,8 +149,11 @@ const SCREENSHOT_WORDS = /\b(screenshot|screenshots|screen shot|screen capture|s
  * people and crowds (design section 8's closed list). Matched as whole words
  * at the start of a visible category ("Cosplayers at Comiket 97"). A stem
  * the subject's own name contains is exempt ("Logos" for a logo subject). */
-const CATEGORY_STEMS = ["cosplay", "cosplayers", "costumes", "fan art", "selfies", "screenshots", "scans", "diagrams", "maps of", "logos", "icons", "charts", "signatures", "documents", "drawings", "sketches", "comics", "memes", "collages", "montages", "people at", "visitors", "audiences", "crowds", "conventions", "comiket", "wikimedians", "users", "flags of", "coats of arms"];
-const PEOPLE_STEMS = new Set(["people at", "visitors", "audiences", "crowds", "conventions", "cosplayers", "selfies"]);
+const CATEGORY_STEMS = ["cosplay", "cosplayers", "costumes", "fan art", "selfies", "screenshots", "scans", "diagrams", "maps of", "logos", "icons", "charts", "signatures", "documents", "drawings", "sketches", "comics", "memes", "collages", "montages", "people at", "tourists", "visitors", "audiences", "crowds", "conventions", "comiket", "wikimedians", "users", "flags of", "coats of arms"];
+/** Category stems for a thing's pictures of people with it (a person's own
+ * pictures are filed under such categories as a matter of course). */
+const THING_PEOPLE_STEMS = ["people with", "people in", "standing people", "sitting people"];
+const PEOPLE_STEMS = new Set(["people at", "tourists", "visitors", "audiences", "crowds", "conventions", "cosplayers", "selfies"]);
 
 /** Picture kinds that are not a still photo. */
 const NOT_STILL = /\.(svg|gif|tiff?|pdf|djvu|webm|mp4|ogv)(\?|$)/i;
@@ -204,6 +229,21 @@ function firstWord(re: RegExp, text: string): string | null {
   return m ? m[0].trim() : null;
 }
 
+/** The words of the subject's own Wikidata description, singular forms. */
+function ownWords(ctx: RelevanceContext): Set<string> {
+  return new Set(normalizeForMatch(ctx.description ?? "").split(" ").filter(Boolean).map((w) => w.replace(/s$/, "")));
+}
+
+/** The first match of `re` in `text` that the subject itself does not use. */
+function firstUnexempt(re: RegExp, text: string, own: ReadonlySet<string>): string | null {
+  const global = new RegExp(re.source, "g");
+  for (const m of text.matchAll(global)) {
+    const word = m[0].trim();
+    if (!word.split(" ").every((w) => own.has(w.replace(/s$/, "")))) return word;
+  }
+  return null;
+}
+
 /** Null when the candidate may be shown, else the reason it may not. */
 export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): RelevanceDrop | null {
   const { names, subjectIsPerson } = ctx;
@@ -215,7 +255,7 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
   const restrictions = (c.restrictions ?? []).map((r) => r.toLowerCase());
   if (restrictions.some((r) => r === "costume" || r === "fan-art" || r === "2257")) return "restriction";
   const visible = (c.categories ?? []).map((cat) => withoutNames(normalizeForMatch(cat), names));
-  const stem = CATEGORY_STEMS.find((st) => visible.some((cat) => cat.startsWith(` ${st} `)) && !names.some((n) => ` ${n} `.includes(` ${st} `)));
+  const stem = [...CATEGORY_STEMS, ...(subjectIsPerson ? [] : THING_PEOPLE_STEMS)].find((st) => visible.some((cat) => cat.startsWith(` ${st} `)) && !names.some((n) => ` ${n} `.includes(` ${st} `)));
   if (restrictions.includes("personality")) {
     if (!subjectIsPerson) return "personality_rights";
     // A teen: a person's picture that is also filed under a crowd or
@@ -231,7 +271,24 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
   // The lead image is the article's own choice: the caption lists (English
   // words, and a lead's description is often in another language) never
   // judge it.
-  if (c.lead) return null;
+  // A category naming an object that replaces the subject ("Basketball
+  // tickets", "Turkish Airlines advertisements") is English on every file.
+  const own = ownWords(ctx);
+  const objectCategory = visible.map((cat) => firstUnexempt(OBJECT_WORDS, cat, own)).find((w) => w !== null);
+  if (objectCategory) return `object:${objectCategory}`;
+  if (c.lead) {
+    // The file name is the one text of a lead that is not in another
+    // language: a lead named for a crowd or a ticket is still not the thing
+    // ("Bluey entertains the crowds at Under 5s Day").
+    const leadName = withoutNames(normalizeForMatch(c.title), names);
+    const leadObject = firstUnexempt(OBJECT_WORDS, leadName, own);
+    if (leadObject) return `object:${leadObject}`;
+    if (!subjectIsPerson) {
+      const people = firstWord(PEOPLE_WORDS, leadName);
+      if (people) return `caption:${people}`;
+    }
+    return null;
+  }
   const words = `${c.title} ${c.objectName ?? ""} ${c.description}`;
   // The subject's own name never counts against it ("My Little Pony",
   // "LEGO Batman", "Windows user interface").
@@ -244,6 +301,22 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
   if (!subjectIsPerson) {
     const people = firstWord(PEOPLE_WORDS, said);
     if (people) return `caption:${people}`;
+  } else {
+    const gathering = firstUnexempt(GATHERING_WORDS, said, own);
+    if (gathering) return `crowd:${gathering}`;
+    // A serviceman of the same name ("Senior Master Sgt. Michael Jackson").
+    const serving = firstUnexempt(MILITARY_WORDS, said, own);
+    if (serving) return `namesake:${serving}`;
+  }
+  const object = firstUnexempt(OBJECT_WORDS, said, own);
+  if (object) return `object:${object}`;
+  if (c.source === "wikimedia") {
+    const hay = normalizeForMatch(words);
+    const near = NEAR_PREPOSITIONS.find((prep) => names.some((n) => hay.includes(` ${prep} ${n} `) || hay.includes(` ${prep} the ${n} `)));
+    if (near) return `near:${near}`;
+    // A building that now stands where the subject's old ground was.
+    const onSite = OCCUPIES_SITE.exec(hay)?.[1];
+    if (onSite !== undefined && names.some((n) => onSite.trimStart().startsWith(n.trim()))) return "near:occupy";
   }
   // Agreement: two independent signals that the picture is of the subject.
   let signals = 0;

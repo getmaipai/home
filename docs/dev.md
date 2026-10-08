@@ -36330,6 +36330,21 @@ Setup: Stack chat engine `local b10797-832fd6f17`, model `Qwen3-8B-Q4_K_M.gguf`,
 
 Cause of the wrong tiles: the Commons candidate sits in the subject's own category and its caption names the subject, so both signals of the agree rule pass; the rule cannot tell an object that belongs to the subject from the subject itself.
 
+**Follow-up fix (2026-10-08): deterministic metadata rules for wrong-subject and crowd tiles.** `judgeRelevance` (`relevance.ts`) gained rules on text it already reads, with no model and no prompt: an object-of-the-subject word list (tickets, stubs, histograms, charts, signage, speakers, headrests, APU, wafers, die shots, ads) applied to visible Commons categories, to a lead's file name and to a non-lead's title and caption, exempt where the subject's own name or Wikidata description holds the word (a smart speaker, Ticket to Ride); a gathering rule for a person's row (fans, protest, crowd, audience, rally); `tourists`, `person` and, for things only, `people with` and `people in` category stems; `costume`; a thing's lead whose file name says people ("Bluey entertains the crowds"); "opposite", "near" and the other place words, plus "occupy the location of", for Commons; and a serviceman rule for a person (Sgt., squadron, Air Force) for a namesake. Tests: `backend/tests/answerImagesObjectsOfSubject.test.ts`, with the exact captions and categories of the judged tiles and the right tiles that must stay. Rejected as not discriminating: "used in the Wikipedia article" and the global-usage count of a file.
+
+Live re-run, same 43 rows, same politeness (15 s pace, SearXNG and public Wikimedia only, no chat), every changed row's contact sheet opened. The first re-run showed three tiles that the new drops had let into the visible slots (the Air Force namesake Michael Jackson, the Fujitsu offices on Manchester United's old ground, a person on a couch holding a PS5 controller); they were closed with the last three rules above and the five affected rows re-run. One PS5 re-run returned zero search results (a SearXNG blip, `searxng: 0`) and passed on the repeat.
+
+| bar | before | after |
+|---|---|---|
+| wrong-subject visible tile, at most 1 of 40 | 8 of 43 rows | 0 of 43 rows (Fiero, PS5, Taj Mahal, Starry Night, Lakers, Man Utd, both Michael Jackson rows, Exorcist all show the subject) |
+| private people in a visible row | 3 plus the protest stranger in both MJ rows | 1 (Kinkaku-ji: a tourist group in "Kinkaku-ji 2009-03-22", filed in the temple's category, caption "Kinkaku-ji"); Bluey, Starry Night and the MJ protest sign gone |
+| broken or placeholder tiles | 0 | 0 |
+| duplicate tiles visible | 0 (1 hidden croissant) | 0 (the croissant pair is still in the sheet, hidden) |
+
+Known cost, from the low-level review: these are English word lists, so a person's own photo that says "rally", "audience" or "Sgt." (an activist, a veteran), and a lead file named for a crowd of an event or place, can lose a tile; the gathering and object rules are exempt only for words the subject's name or description holds, and the "occupy the location of" rule only fires when the subject's name follows it. Every drop is counted by reason in `dropped_by_relevance` (`crowd:`, `object:`, `near:`, `namesake:`), so a loss shows in the trace.
+
+Not fixable from metadata: the Kinkaku-ji tourist photo says nothing in its text or categories; removing it needs a look at the pixels (a person detector), a vision check that needs an owner ruling and may not sit in a safety path as a learned component. The hidden Exorcist search thumbnails (a Black Widow still, a clapperboard) stay hidden and are not wrong. The Exorcist: Martyrs row now shows three stills of the 2027 series. The 2026-10-08 dataset's "poster judged on year" miss is unchanged by this fix.
+
 **Real-turn bench (evidence 2 to 5), Qwen3-8B, ON arm**
 
 | bar | measured | result |

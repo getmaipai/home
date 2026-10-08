@@ -194,7 +194,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     // the result's metadata, not a safety floor).
     const names = subjectNames([subject, entity.label], [...(entity.aliases ?? []), ...(entity.otherLabels ?? [])]);
     const searchNames = subjectNames([subject, entity.label], entity.aliases ?? []);
-    const context = { names, searchNames, ...(entity.otherSenseWords ? { otherSenseWords: entity.otherSenseWords } : {}), subjectIsPerson: entity.human, band: input.band, ...(entity.commonsCategory ? { commonsCategory: entity.commonsCategory } : {}), ...(entity.officialSite ? { officialSite: entity.officialSite } : {}) };
+    const context = { names, searchNames, ...(entity.otherSenseWords ? { otherSenseWords: entity.otherSenseWords } : {}), subjectIsPerson: entity.human, ...(entity.description ? { description: entity.description } : {}), band: input.band, ...(entity.commonsCategory ? { commonsCategory: entity.commonsCategory } : {}), ...(entity.officialSite ? { officialSite: entity.officialSite } : {}) };
     let droppedByFloor = 0;
     const droppedByRelevance: Record<RelevanceDrop, number> = {};
     const seen = new Set<string>();
