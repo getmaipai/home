@@ -4,7 +4,7 @@ import { SearxngEngines } from "@maipai/spec/gen/ts/searxng-engines.js";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { consumeSearxngRequestToken, FETCH_USER_AGENT } from "@/lib/packageHost";
+import { consumeSearxngCheckToken, FETCH_USER_AGENT } from "@/lib/packageHost";
 import { lastSearxngCanaryResult } from "@/lib/searxngHealth";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { isStackConfigured } from "@/lib/stackEngine";
@@ -126,7 +126,7 @@ function looksLikeLimiterBlock(text: string): boolean {
 }
 
 async function request(baseUrl: string, path: string, fetcher: SearchInstanceFetch): Promise<{ status: number; text: string; contentType: string } | null> {
-  if (!consumeSearxngRequestToken()) return { status: -1, text: "", contentType: "" };
+  if (!consumeSearxngCheckToken()) return { status: -1, text: "", contentType: "" };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {

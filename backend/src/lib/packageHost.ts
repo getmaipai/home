@@ -135,9 +135,20 @@ const SEARXNG_RATE_LIMIT_KEY = "searxng";
 // engines. A person asking several things in a row is still a burst of
 // three; nothing beyond that was ever a person's own pace.
 const SEARXNG_RATE_LIMIT = { capacity: 3, refillPerSecond: 1 / 6 };
-/** One choke point for real searches and the settings checker. */
+/** One choke point for real searches (the person's questions and answer pictures). */
 export function consumeSearxngRequestToken(): boolean {
   return tryConsume(SEARXNG_RATE_LIMIT_KEY, SEARXNG_RATE_LIMIT);
+}
+// The settings checker (searchInstanceCheck.ts) makes up to four requests per
+// run. Sharing the three-token search bucket let one check, which runs on
+// every save of `search.searxng_url`, drain the burst, so the next questions
+// asked within about 18 seconds were answered "rate-limited" with zero
+// sources (found 2026-10-08 by smoke:chat). Its own bucket, sized for one
+// full check, keeps the same per-instance pace without starving a person.
+const SEARXNG_CHECK_RATE_LIMIT_KEY = "searxng-check";
+const SEARXNG_CHECK_RATE_LIMIT = { capacity: 4, refillPerSecond: 1 / 6 };
+export function consumeSearxngCheckToken(): boolean {
+  return tryConsume(SEARXNG_CHECK_RATE_LIMIT_KEY, SEARXNG_CHECK_RATE_LIMIT);
 }
 const SEARXNG_TIMEOUT_MS = SEARXNG_ATTEMPT_LIMIT_MS;
 const SEARXNG_PAGE_TIMEOUT_MS = 10_000;

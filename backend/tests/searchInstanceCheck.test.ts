@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import configFull from "./fixtures/searxng/config-full.json";
 import searchOk from "./fixtures/searxng/search-ok.json";
 import { checkSearchInstance, buildSearchInstanceSnippet, __resetSearchInstanceCheckForTests, type SearchInstanceFetch } from "@/lib/searchInstanceCheck";
+import { consumeSearxngRequestToken } from "@/lib/packageHost";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetRateLimiterForTests, __setRateLimiterClockForTests, tryConsume } from "@/lib/rateLimiter";
 import { __setLastSearxngCanaryResultForTests } from "@/lib/searxngHealth";
@@ -66,15 +67,21 @@ describe("search instance checks", () => {
     expect(snippet).toContain("brave.images");
   });
 
-  test("one full check makes at most four requests through the shared SearXNG bucket", async () => {
+  test("one full check makes at most four requests, through its own bucket", async () => {
     const { fetcher, paths } = stubFetch(configFull);
     await checkSearchInstance({ force: true, fetcher, now: FIXED_NOW });
 
     expect(paths.length).toBeLessThanOrEqual(4);
     expect(paths).toContain("/healthz");
     expect(paths).toContain("/config");
-    expect(paths.filter((path) => path === "/healthz" || path === "/config" || path === "/stats/errors" || path === "/search").length).toBeLessThanOrEqual(4);
-    expect(tryConsume("searxng", { capacity: 3, refillPerSecond: 1 / 6 }, FIXED_NOW)).toBe(false);
+    expect(tryConsume("searxng-check", { capacity: 4, refillPerSecond: 1 / 6 }, FIXED_NOW)).toBe(false);
+  });
+
+  test("a settings save's full check leaves the whole search burst for the next question (smoke adult-search: 0 sources, rate_limited)", async () => {
+    const { fetcher } = stubFetch(configFull);
+    await checkSearchInstance({ force: true, fetcher, now: FIXED_NOW });
+
+    expect([consumeSearxngRequestToken(), consumeSearxngRequestToken(), consumeSearxngRequestToken()]).toEqual([true, true, true]);
   });
 
   test("an SSO page fails the readable-results check with a sign-in fix", async () => {
