@@ -4,6 +4,18 @@
   "serial": {
     "backend": [
       {
+        "file": "tests/legacyImport.test.ts",
+        "reason": "Clears the process-wide backup directory while asserting that no backup exists."
+      },
+      {
+        "file": "tests/partialRestore.test.ts",
+        "reason": "Clears the process-wide backup directory before each restore test."
+      },
+      {
+        "file": "tests/turnMachine/turnNext.test.ts",
+        "reason": "Installs temporary Stack clients in a process-global slot used by other test files."
+      },
+      {
         "file": "tests/mdns.test.ts",
         "reason": "Uses real multicast discovery and shared machine network state."
       }
