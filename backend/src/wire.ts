@@ -95,8 +95,10 @@ export interface TurnStats {
    * measured context size. */
   context_window_tokens?: number | null;
   context_used_percent?: number | null;
-  /** THIN-3C may attach measured prompt segments when available. */
-  context_segments?: Partial<Record<"prefix" | "tools" | "memory" | "history" | "reply", number>>;
+  /** THIN-3E: cumulative engine-tokenize differences for the prompt parts
+   * and the final generation's output. Omitted unless every prompt count
+   * and difference is valid. */
+  context_segments?: Partial<Record<ContextSegmentKey, number>>;
   cache_reuse_tokens: number | null;
   cache_reuse_percent: number | null;
   engine: string | null;
@@ -127,6 +129,10 @@ export interface TurnStats {
    * kept in step by hand, not by a shared import. */
   nodes?: TurnNodeExecution[];
 }
+
+/** Shared vocabulary for measured turn context segments. */
+export const CONTEXT_SEGMENT_KEYS = ["prefix", "tools", "history", "memory", "message", "reply"] as const;
+export type ContextSegmentKey = typeof CONTEXT_SEGMENT_KEYS[number];
 
 /** LAT-00: one real model call, projected to plain values for the wire -
  * see the retired turn engine's GenerationRecord for the working shape this comes

@@ -2,7 +2,7 @@ import type { ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
 import type { EngineIdentity } from "@/lib/engineIdentity";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 import type { TurnTimings } from "@/lib/turnContext";
-import type { TurnStats, TurnGeneration } from "@/wire";
+import type { TurnStats, TurnGeneration, ContextSegmentKey } from "@/wire";
 import type { StackFailureFacts } from "@/lib/stackEngine";
 import type { FailureKind } from "@/lib/failureCopy";
 
@@ -103,6 +103,7 @@ export function buildTurnStats(
   identity: EngineIdentity | null | undefined,
   thinking: boolean | undefined,
   contextWindowTokens: number | null = null,
+  contextSegments?: Partial<Record<ContextSegmentKey, number | null>>,
 ): TurnStats {
   // The summary fields below have always meant "the generation that
   // actually produced what the household heard" - the LAST one a turn
@@ -129,6 +130,9 @@ export function buildTurnStats(
   const cacheDenominator = cacheTokens !== null && promptTokens !== null ? cacheTokens + promptTokens : 0;
   const firstToken = finite(timings.first_token_ms);
   const totalTime = finite(finishedAt - startedAt);
+  const validContextSegments = contextSegments && Object.values(contextSegments).every((value) => finite(value) !== null && value! >= 0)
+    ? contextSegments as Partial<Record<ContextSegmentKey, number>>
+    : undefined;
   return {
     prompt_tokens: promptTokens,
     predicted_tokens: predictedTokens,
@@ -138,6 +142,7 @@ export function buildTurnStats(
     context_tokens: promptTokens,
     context_window_tokens: Number.isInteger(contextWindowTokens) && contextWindowTokens! > 0 ? contextWindowTokens : null,
     context_used_percent: contextUsedTokens !== null && Number.isInteger(contextWindowTokens) && contextWindowTokens! > 0 ? contextUsedTokens / contextWindowTokens! * 100 : null,
+    ...(validContextSegments ? { context_segments: validContextSegments } : {}),
     cache_reuse_tokens: cacheTokens,
     cache_reuse_percent: cacheDenominator > 0 ? cacheTokens! / cacheDenominator * 100 : null,
     engine: identity ? formatEngineIdentity(identity) : null,

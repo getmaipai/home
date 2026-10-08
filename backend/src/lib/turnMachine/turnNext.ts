@@ -34,6 +34,9 @@ import { surfaceClassOf } from "@/lib/surfaceClass";
 import { AFFIRMATIVE_RE } from "@/lib/consentVocab";
 import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
+import { countTokens } from "@/lib/tokenCount";
+import { contextToMessages } from "./messages";
+import type { ContextSegmentKey } from "@/wire";
 import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity, stackRefusal } from "@/lib/stackEngine";
@@ -108,8 +111,8 @@ export interface RunTurnNextOpts {
   ephemeral?: boolean;
 }
 
-function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[]): TurnValue {
-  const stats = buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0, state.budget.context_window_tokens);
+function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["source"], text: string, speech?: string, reasoning?: string, sources?: Source[], contextSegments?: Partial<Record<ContextSegmentKey, number>>): TurnValue {
+  const stats = buildTurnStats(state.generations, emptyTimings(), startedAt, Date.now(), getActiveChatEngineIdentity(), state.budget.thinking_budget_tokens > 0, state.budget.context_window_tokens, contextSegments);
   // A live acceptance run (U2d) caught this omitting plugin_id/
   // command_id/sources entirely - the old engine file's own equivalent
   // builder always carries the package id that ran (plugin_id for a
@@ -191,6 +194,45 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     ...(source === "command" && packageId ? { command_id: packageId } : {}),
     ...(sources && sources.length > 0 ? { sources } : {}),
   } as TurnValue;
+}
+
+/** THIN-3E: count growing prefixes of the one real prompt builder after
+ * generation. Any engine count failure or inconsistent cumulative count
+ * makes the whole breakdown unavailable. */
+async function measuredContextSegments(state: TurnState): Promise<Partial<Record<ContextSegmentKey, number>> | undefined> {
+  if (state.bare || state.generations.length === 0) return undefined;
+  try {
+  const base = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? []);
+  const memoryCut = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], true);
+  const windowEnd = 1 + state.context.filter((item) => item.source === "window").length;
+  const [prefix, withTools, withHistory, withMemory] = await Promise.all([
+    countTokens(base.slice(0, 1)),
+    countTokens(base.slice(0, 1), { tools: state.lastTools }),
+    countTokens(base.slice(0, windowEnd), { tools: state.lastTools }),
+    countTokens(memoryCut, { tools: state.lastTools }),
+  ]);
+  const finalGeneration = state.generations.at(-1)?.stats;
+  const asCount = (value: unknown): number | null => typeof value === "number" && Number.isFinite(value) ? value : null;
+  const prompt = asCount(finalGeneration?.usage?.prompt_tokens) ?? asCount(finalGeneration?.timings?.prompt_n);
+  const reply = asCount(finalGeneration?.usage?.completion_tokens) ?? asCount(finalGeneration?.timings?.predicted_n);
+  if ([prefix, withTools, withHistory, withMemory, prompt, reply].some((value) => value === null)) return undefined;
+  const tools = withTools! - prefix!;
+  const history = withHistory! - withTools!;
+  const memory = withMemory! - withHistory!;
+  const message = prompt! - withMemory!;
+  if ([tools, history, memory, message].some((value) => value < 0)) return undefined;
+  const hasMemory = state.context.some((item) => item.source === "memory" || item.source === "episode");
+  return {
+    prefix: prefix!,
+    tools,
+    ...(hasMemory ? { memory } : {}),
+    history,
+    message,
+    reply: reply!,
+  };
+  } catch {
+    return undefined;
+  }
 }
 
 function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: string, value: TurnValue): void {
@@ -626,6 +668,8 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
   // judge's idle window), as the old path's lease.engage() does.
   if (ranNodes.has("context") || ranNodes.has("model")) begun.lease.engage();
 
+  const contextSegments = await measuredContextSegments(state);
+
   let value: TurnValue;
   if (finalState === "asked") {
     const ask = state.ask;
@@ -658,7 +702,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
       state.outcomes.push(outcomeOf({ callId: `${state.turnId}:confirm`, packageId: ask.packageId, status: "pending", args: ask.args, via: "confirm", userMessage: promptText }));
     }
     if (ask && !temporary && !state.ephemeral) setPendingAsk(conversationId, { ...ask, turnId: state.turnId, capabilities: ask.capabilities, consequential: ask.consequential });
-    value = buildTurnValue(state, startedAt, "confirm", promptText);
+    value = buildTurnValue(state, startedAt, "confirm", promptText, undefined, undefined, undefined, contextSegments);
     if (ask && !temporary && !state.ephemeral) value.confirm = { package_id: ask.packageId, open: true };
   } else if (finalState === "refused") {
     // A review caught this reading `step` (SafetyOutput there, not
@@ -667,9 +711,9 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // `.text` field it can never have: the fixed refusal line is the
     // only text this path produces, written here directly instead of a
     // fallback that implied a different source that doesn't exist.
-    value = buildTurnValue(state, startedAt, "safety_refuse", "I can't help with that.");
+    value = buildTurnValue(state, startedAt, "safety_refuse", "I can't help with that.", undefined, undefined, undefined, contextSegments);
   } else if (finalState === "blocked") {
-    value = buildTurnValue(state, startedAt, "policy", "Keep passwords and keys in Credentials, not in chat.");
+    value = buildTurnValue(state, startedAt, "policy", "Keep passwords and keys in Credentials, not in chat.", undefined, undefined, undefined, contextSegments);
   } else {
     const gateOutput = (finalSnapshot.context as { step: unknown }).step as { refused?: boolean; text?: string; speech?: string; reasoningOut?: string; sources?: Source[] };
     // The last outcome's own `via` (commands.ts/tool.ts both tag it)
@@ -701,7 +745,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     const failedPattern = state.outcomes.some((outcome) => outcome.via === "pattern" && outcome.status === "failed");
     // THIN-7E: the answer to a who question is a "confirm", as the old engine reported it.
     const source: TurnValue["source"] = state.whoAnswer ? "confirm" : failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
-    value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources);
+    value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources, contextSegments);
     // ANSWER-IMG-02: the pictures are stored with an answer the gate let
     // through, where they were placed (or after the text), never with a
     // refusal. On a stream, a set placed before a later sentence is refused

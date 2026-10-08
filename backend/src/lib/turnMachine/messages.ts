@@ -171,7 +171,7 @@ function isStableContext(source: ContextItem["source"]): boolean {
  * prefix NEXT-CACHE-01 needed. The plan line follows labelled context
  * and precedes the raw words, as the approved CHAT-LATE-SYSTEM-01
  * verdict requires for every model and surface class. */
-export function contextToMessages(context: readonly ContextItem[], utterance: string, persona: Persona, plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass, pictures: readonly LlmImagePart[] = []): LlmMessage[] {
+export function contextToMessages(context: readonly ContextItem[], utterance: string, persona: Persona, plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass, pictures: readonly LlmImagePart[] = [], cutAfterMemory = false): LlmMessage[] {
   // VISION-02c: pictures ride with the person's raw words on the final
   // user message; the labelled text section never replaces the image parts.
   const windowItems = context.filter((item) => item.source === "window");
@@ -232,10 +232,12 @@ export function contextToMessages(context: readonly ContextItem[], utterance: st
   let userContent = "Context for this turn (background data first; the person's words follow):";
   if (memoryBlock) userContent += `\n\n${memoryBlock}`;
   if (memoryDataLines.length > 0) userContent += `\n\nEarlier conversation records:\n${memoryDataLines.join("\n\n")}`;
-  if (dataLines.length > 0) userContent += `\n\nOther labelled context:\n${dataLines.join("\n\n")}`;
-  if (clockLines.length > 0) userContent += `\n\nClock:\n${clockLines.join("\n")}`;
-  userContent += `\n\nHow to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass)}`;
-  userContent += `\n\nThe person's words:\n${utterance}`;
+  if (!cutAfterMemory && dataLines.length > 0) userContent += `\n\nOther labelled context:\n${dataLines.join("\n\n")}`;
+  if (!cutAfterMemory && clockLines.length > 0) userContent += `\n\nClock:\n${clockLines.join("\n")}`;
+  if (!cutAfterMemory) {
+    userContent += `\n\nHow to answer this one: ${planLineForTurnMachine(plan, signal, promptSurfaceClass)}`;
+    userContent += `\n\nThe person's words:\n${utterance}`;
+  }
   messages.push(pictures.length > 0 ? { role: "user", content: userContent, images: [...pictures] } : { role: "user", content: userContent });
   return messages;
 }

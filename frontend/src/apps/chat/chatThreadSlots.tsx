@@ -39,6 +39,7 @@ import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type StatusAppsResponse, type TurnErrorDetail, type TurnStats } from "@/lib/api";
+import { CONTEXT_SEGMENT_KEYS, type ContextSegmentKey } from "@maipai/home-backend/src/wire";
 import { StatusIndicator } from "@maipai/ui/src/ui/status";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { appStatusToSidebar } from "@/shell/statusApps";
@@ -560,9 +561,9 @@ export function buildTimingStats(stats: TurnStats): TimingStat[] {
 }
 
 export function buildContextSegmentStats(stats: TurnStats): TimingStat[] {
-  const labels = { prefix: "Prefix", tools: "Tools", memory: "Memory", history: "History", reply: "Reply" } as const;
+  const labels: Record<ContextSegmentKey, string> = { prefix: "Prefix", tools: "Tools", memory: "Memory", history: "History", message: "This message", reply: "Reply" };
   return Object.entries(stats.context_segments ?? {}).flatMap(([key, tokens]) => {
-    if (!(key in labels) || typeof tokens !== "number" || !Number.isFinite(tokens) || tokens < 0) return [];
+    if (!(CONTEXT_SEGMENT_KEYS as readonly string[]).includes(key) || typeof tokens !== "number" || !Number.isFinite(tokens) || tokens < 0) return [];
     return [{ label: labels[key as keyof typeof labels], value: `${tokens.toLocaleString()} tokens` }];
   });
 }

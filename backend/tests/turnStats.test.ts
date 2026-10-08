@@ -42,6 +42,26 @@ function scriptedEngine() {
 }
 
 describe("STATS-01 turn stats", () => {
+  test("THIN-3E records measured prompt segments beside the real context window", () => {
+    const stats = buildTurnStats(
+      [{ reason: "initial", thinking: false, maxTokens: null, requestSentMs: 0, firstDeltaMs: 10, stats: { usage: { prompt_tokens: 1_024, completion_tokens: 40, total_tokens: 1_064 }, timings: null, stopReason: "stop" } }],
+      emptyTimings(), 0, 500, null, false, 32_768,
+      { prefix: 120, tools: 180, memory: 90, history: 500, message: 134, reply: 40 },
+    );
+    expect(stats.context_window_tokens).toBe(32_768);
+    expect(stats.context_used_percent).toBeCloseTo(1_064 / 32_768 * 100);
+    expect(stats.context_segments).toEqual({ prefix: 120, tools: 180, memory: 90, history: 500, message: 134, reply: 40 });
+    expect(Object.values(stats.context_segments!).reduce((sum, value) => sum + value, 0)).toBe(stats.prompt_tokens! + stats.predicted_tokens!);
+  });
+
+  test("THIN-3E omits the breakdown when any count is unavailable or a difference is negative", () => {
+    const generation = [{ reason: "initial", thinking: false, maxTokens: null, requestSentMs: 0, firstDeltaMs: 10, stats: { usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 }, timings: null, stopReason: "stop" } }];
+    const unavailable = buildTurnStats(generation, emptyTimings(), 0, 20, null, false, null, { prefix: 1, tools: null });
+    const negative = buildTurnStats(generation, emptyTimings(), 0, 20, null, false, null, { prefix: 3, tools: -1 });
+    expect(unavailable).not.toHaveProperty("context_segments");
+    expect(negative).not.toHaveProperty("context_segments");
+  });
+
   test("a scripted final stream chunk preserves usage, timings, and stop reason", async () => {
     const engine = scriptedEngine();
     process.env.MAIPAI_LLAMA_SERVER_URL = engine.url;
