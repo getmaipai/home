@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // GPU-01: a pre-household validation bench. It never starts an engine,
 // opens the household database, or sends family data.
 import { mkdtempSync, rmSync } from "node:fs";

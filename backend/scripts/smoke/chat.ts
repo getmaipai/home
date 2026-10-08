@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // SMOKE-CHAT-01: a one-command, REAL end-to-end chat smoke test.
 //
 //   bun run smoke:chat            (from the repo root or backend/)

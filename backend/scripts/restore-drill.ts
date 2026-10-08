@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import "../../scripts/runTemp";
 // Step 8: "the restore drill: a script that restores the latest backup
 // into a temporary data directory and boots it headless with a sign-in;
 // the release skill runs it" (2.5). This is that script - a real proof,

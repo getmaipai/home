@@ -2,6 +2,7 @@
 // imports, so it's the only place that can set MAIPAI_DATA_DIR before
 // src/lib/paths.ts (and everything downstream: the keystore, the db)
 // reads it at module-eval time.
+import "../../scripts/runTemp";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

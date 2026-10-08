@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // QUERY-WRITER-01 (dev.md, getmaipai-26's ruling, 2026-09-24): the
 // item's own live acceptance - "a replay row with roster names only,
 // following the same shape (a person-subject turn, then a pronoun

@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // PROJECT-PACK-01's own live acceptance line (docs/BACKLOG.md): "the
 // book made end to end on the dev machine, the result opened and
 // judged." Drives the REAL bedtime-storybook package (backend/packages/

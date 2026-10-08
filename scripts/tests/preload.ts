@@ -3,6 +3,7 @@
 // area has no React components to render, only DOM-API-only helpers
 // like panelOverflow.ts that Playwright's page.evaluate() also runs
 // against a real browser.
+import "../runTemp";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 GlobalRegistrator.register();

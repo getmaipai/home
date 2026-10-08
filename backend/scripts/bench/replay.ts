@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // U0a (docs/plans/simple-turn-pipeline-2026-09-22.md, point 4 and unit
 // U0a): the owner's replay set. Mirrors conversation.ts's own runner
 // shape (a pure, importable fixture-scoring core; a dual offline/

@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import "../../../../scripts/runTemp";
 // EVAL-07 replay, one OS process per question instead of one process for
 // the whole run: found live, 2026-09-14 (docs/BACKLOG.md's own EVAL-07
 // item carries the finding for a later fix) - three single-process

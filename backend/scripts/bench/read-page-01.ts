@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // READ-PAGE-01 (home/docs/BACKLOG.md; home/docs/dev.md "LIVE-0923-01"):
 // measure-first for stripping the model's own `read_page` argument on a
 // websearch call, the same "never trust the model's own tool argument"

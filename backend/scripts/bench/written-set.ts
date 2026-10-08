@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // U4/RESP-01 (docs/plans/turn-machine-state-record-2026-09-22.md;
 // BACKLOG.md's U4 row: "Tests: the written-set bench, the seeded voice
 // set"): twenty typed questions on the written register - a fact, a

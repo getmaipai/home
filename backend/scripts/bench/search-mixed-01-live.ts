@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // SEARCH-MIXED-01 (dev.md, getmaipai-26's ruling, 2026-09-24): the
 // item's own live acceptance - measure on the real 8B, a fake SearXNG
 // that always fails, whether an ordinary offered round that calls two

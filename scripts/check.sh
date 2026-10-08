@@ -108,6 +108,7 @@ on_exit() {
   if [ -n "$FRONTEND_PID" ]; then stop_tree "$FRONTEND_PID"; fi
   wait 2>/dev/null || true
   rm -f "$SCOPE_CHANGED_FILE" "$SCOPE_IMPORTED_FILE"
+  [ -z "${SETTINGS_SCRATCH:-}" ] || rm -rf "$SETTINGS_SCRATCH"
   [ -z "$GATE_LEG_DONE_DIR" ] || rm -rf "$GATE_LEG_DONE_DIR"
   if [ -n "$GATE_LOCK_LABEL" ]; then
     bash "$GATE_LOCK" release "$GATE_LOCK_LABEL" >/dev/null 2>&1 || true

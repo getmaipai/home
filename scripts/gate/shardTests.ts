@@ -1,3 +1,4 @@
+import "../runTemp";
 // GATE-SPEED-01 (a): runs one workspace's bun test files as N parallel bun
 // processes ("shards"), split by measured duration, with the same pass/fail
 // meaning as a single `bun test`: exit 0 only if every file passed, otherwise

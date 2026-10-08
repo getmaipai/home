@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // STYLE-CORPUS-01 (docs/BACKLOG.md; design in docs/dev.md "EVAL-03 design
 // pass: a companion's voice is a per-companion style adapter..."): the
 // content-preserving voice corpus, one JSONL per bundled companion

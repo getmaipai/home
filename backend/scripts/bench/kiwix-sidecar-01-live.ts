@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // KIWIX-SIDECAR-01: the item's own live acceptance - "a fixture ZIM,
 // searchable on loopback." kiwixSidecar.test.ts drives
 // ensureKiwixInstalled()'s and registerKiwixSidecar()'s own

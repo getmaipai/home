@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // PROJECT-PHRASE-01's own live acceptance (docs/dev.md, 2026-09-27): the
 // work order's own item #2 - "one real, live, end-to-end run ... offer a
 // bedtime storybook, confirm with a plain 'yes', and read the ACTUAL

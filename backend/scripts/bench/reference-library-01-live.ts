@@ -1,3 +1,4 @@
+import "../../../scripts/runTemp";
 // REFERENCE-LIBRARY-01's own live acceptance: "a real flavour installed
 // end to end against a real pinned URL... a resume proven by
 // interrupting a download mid-stream and confirming it continues rather

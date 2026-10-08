@@ -2,6 +2,7 @@
 // backend/tests/preload.ts uses for its own test-only setup. Needed for
 // @testing-library/react component tests (kit/settings/SettingField.test.tsx):
 // bun's default test environment has no `document`/`window` at all.
+import "./runTemp";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { plugin } from "bun";
 import { expect } from "bun:test";
