@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { api, ApiError, isOwnerOrAdminRole, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 import { useDataTableControls } from "@/shell/pages/dataTableControls";
+import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 
 /** /engines: SHELL-06's own row - `GET /api/engines` and
  * `GET /api/engines/health`, through the kit DataTable and its slots. */
@@ -145,7 +146,22 @@ export function EnginesPage({ person }: { person: Roster }) {
             <p className="text-sm text-muted-foreground">Only an owner or admin can manage engines.</p>
           </CardContent>
         </Card>
-      ) : <AsyncState
+      ) : <>
+      <SettingsRenderer
+        scope="household"
+        scopeValue="household"
+        honouredBy="home"
+        only={["household.ai"]}
+        includeKeys={[
+          "engines.stack.where",
+          "engines.stack.remote.host",
+          "engines.stack.remote.local_port",
+          "engines.stack.remote.ssh_port",
+          "engines.stack.remote.allow_tailnet",
+        ]}
+        titleOverrides={{ "household.ai": "Where the AI engines run" }}
+      />
+      <AsyncState
         data={data}
         error={error}
         isFetching={overviewQuery.isFetching || healthQuery.isFetching}
@@ -256,7 +272,8 @@ export function EnginesPage({ person }: { person: Roster }) {
             </>
           )
         }
-      </AsyncState>}
+      </AsyncState>
+      </>}
     </>
   );
 }

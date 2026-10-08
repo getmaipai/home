@@ -289,6 +289,7 @@ const nextPersonalManagementReview = process.argv.includes("--next-personal-mana
 const nextPrivacyReview = process.argv.includes("--next-privacy-review");
 const nextPersonProfileReview = process.argv.includes("--next-person-profile-review");
 const nextEnginesReview = process.argv.includes("--next-engines-review");
+const remoteStackSettingsReview = process.argv.includes("--remote-stack-settings-review");
 const statusA2bReview = process.argv.includes("--status-a2b-review");
 const statusA2cReview = process.argv.includes("--status-a2c-review");
 const statusC3bReview = process.argv.includes("--status-c3b-review");
@@ -8236,6 +8237,55 @@ async function captureNextEnginesReview(browser: Browser, sessionValue: string):
   }
 }
 
+/** REMOTE-STACK-SETTINGS-01: seeded owner household captures the engine
+ * settings and both conditional privacy rows from the real backend. */
+async function captureRemoteStackSettingsReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "queue", "screenshots", "set1");
+  mkdirSync(outDir, { recursive: true });
+  const headers = { "Content-Type": "application/json", Cookie: `session=${ownerSession}` };
+  const save = async (key: string, value: unknown) => {
+    const response = await fetch(`${BASE_URL}/api/settings`, { method: "PUT", headers, body: JSON.stringify({ scope: "household", key, value }) });
+    if (!response.ok) throw new Error(`remote Stack screenshot setting ${key} failed: ${response.status} ${await response.text()}`);
+  };
+  const viewport = VIEWPORTS.find((item) => item.slug === "desktop")!;
+  const context = await newContext(browser, viewport, "light", ownerSession);
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+    await page.goto(`${BASE_URL}/engines`);
+    await page.getByRole("heading", { name: "Where the AI engines run" }).waitFor();
+    await page.getByText("Where the engine runs", { exact: true }).waitFor();
+    await settleAnimations(page);
+    let file = join(outDir, "engines-settings-default.png");
+    await page.screenshot({ path: file, fullPage: true });
+    console.log(`Wrote ${file}`);
+
+    await save("engines.stack.remote.host", "192.168.1.20");
+    await save("engines.stack.where", "another_computer");
+    await page.goto(`${BASE_URL}/privacy`);
+    await page.getByText("Your engine computer", { exact: true }).waitFor();
+    await settleAnimations(page);
+    file = join(outDir, "privacy-engine-computer-home.png");
+    await page.screenshot({ path: file, fullPage: true });
+    console.log(`Wrote ${file}`);
+
+    await save("engines.stack.remote.allow_tailnet", true);
+    await page.reload();
+    await page.getByText("Your engine computer, when you are away", { exact: true }).waitFor();
+    await settleAnimations(page);
+    file = join(outDir, "privacy-engine-computer-tailnet.png");
+    await page.screenshot({ path: file, fullPage: true });
+    console.log(`Wrote ${file}`);
+    dedicatedScreenshots.push(
+      { file: "engines-settings-default.png", route: "/engines", viewport: "desktop", theme: "light" },
+      { file: "privacy-engine-computer-home.png", route: "/privacy", viewport: "desktop", theme: "light" },
+      { file: "privacy-engine-computer-tailnet.png", route: "/privacy", viewport: "desktop", theme: "light" },
+    );
+  } finally {
+    await context.close();
+  }
+}
+
 async function captureStatusB2bReview(browser: Browser, ownerSession: string): Promise<void> {
   const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-b2b";
   mkdirSync(outDir, { recursive: true });
@@ -9975,6 +10025,12 @@ async function main() {
     if (showcaseScrollReview) {
       await captureShowcaseScrollReview(browser, sessionValue);
       console.log("completed named review: --showcase-scroll-review");
+      return;
+    }
+
+    if (remoteStackSettingsReview) {
+      await captureRemoteStackSettingsReview(browser, sessionValue);
+      console.log("completed named review: --remote-stack-settings-review");
       return;
     }
 

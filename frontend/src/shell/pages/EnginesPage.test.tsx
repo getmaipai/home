@@ -90,6 +90,8 @@ function mockEnginesFetch(overview: EnginesOverview, health: EnginesHealth) {
     if (url.includes("/api/engines/health")) return Promise.resolve(Response.json(health));
     if (/\/api\/engines\/[^/]+\/(install|start|stop|restart)(?:\?|$)/.test(url)) return Promise.resolve(Response.json({ ok: true }));
     if (url.includes("/api/engines")) return Promise.resolve(Response.json(overview));
+    if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
     return Promise.resolve(new Response("{}", { status: 200 }));
   });
   globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -230,6 +232,38 @@ describe("EnginesPage", () => {
       expect(document.body.querySelector('[data-slot="data-table"]')).toBeNull();
     } finally {
       restore();
+    }
+  });
+
+  test("admins see the generic remote engine settings and the away control defaults off", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+      if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([
+        { key: "engines.stack.where", scope: "household", selector: "select", range: { options: ["this_computer", "another_computer"] }, default: "this_computer", label: "Where the engine runs", copy: { does: "Another computer at home can run the AI if it has a stronger graphics card." }, level: "basic", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
+        { key: "engines.stack.remote.host", scope: "household", selector: "text", default: "", label: "Engine computer name", level: "basic", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
+        { key: "engines.stack.remote.local_port", scope: "household", selector: "number", default: 8771, label: "Engine computer local port", level: "expert", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
+        { key: "engines.stack.remote.ssh_port", scope: "household", selector: "number", default: 22, label: "Engine computer secure connection port", level: "advanced", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
+        { key: "engines.stack.remote.allow_tailnet", scope: "household", selector: "boolean", default: false, label: "Reach the engine computer when away from home", level: "advanced", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
+      ]));
+      if (url.includes("/api/settings?scope=household")) return Promise.resolve(Response.json([
+        ["engines.stack.where", "this_computer"], ["engines.stack.remote.host", ""],
+        ["engines.stack.remote.local_port", 8771], ["engines.stack.remote.ssh_port", 22],
+        ["engines.stack.remote.allow_tailnet", false],
+      ].map(([key, value]) => ({ key, value, source: "default", label: key, level: "basic", secret: false, ...(key === "engines.stack.where" ? { does: "Another computer at home can run the AI if it has a stronger graphics card." } : {}) }))));
+      if (url.includes("/api/settings?scope=person")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/settings?scope=device")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/engines/health")) return Promise.resolve(Response.json({ configured: false, health: [] }));
+      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: false, roles: [], engines: [], budget: null }));
+      return Promise.resolve(Response.json([]));
+    }) as unknown as typeof fetch;
+    try {
+      renderWithQueryClient(<EnginesPage person={makePerson()} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Where the engine runs"));
+      expect(document.body.textContent).toContain("Engine computer name");
+      expect(document.body.textContent).toContain("Reach the engine computer when away from home");
+    } finally {
+      globalThis.fetch = originalFetch;
     }
   });
 

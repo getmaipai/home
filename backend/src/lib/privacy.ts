@@ -315,7 +315,27 @@ function inboundConnections(): PrivacyConnection[] {
 }
 
 export function privacyConnections(manifests = loadedManifests()): PrivacyConnection[] {
-  return [...platformConnections(), ...inboundConnections(), ...pluginConnections(manifests)];
+  const where = getHouseholdSettingValue("engines.stack.where");
+  const allowTailnet = getHouseholdSettingValue("engines.stack.remote.allow_tailnet") === true;
+  const remoteRows: PrivacyConnection[] = where === "another_computer" ? [
+    {
+      id: "platform:engine-computer", source: "MaiPai Home", sourceKind: "platform",
+      destination: "Your engine computer",
+      when: "Whenever someone chats, asks about a picture, makes a picture or talks to MaiPai",
+      what: "The words, pictures and voice for that one request",
+      who: "Only your engine computer, over an encrypted link on your home network. Nothing goes to the internet.",
+      optIn: true, retention: "The engine computer's local processing and any history Home saves under your household settings", direction: "outbound",
+    },
+    ...(allowTailnet ? [{
+      id: "platform:engine-computer-away", source: "MaiPai Home", sourceKind: "platform" as const,
+      destination: "Your engine computer, when you are away",
+      when: "Same moments, only while this computer is away from home",
+      what: "The same words, pictures and voice",
+      who: "Only your engine computer, through your own Tailscale network. It crosses the internet inside Tailscale's encrypted link; MaiPai runs none of it.",
+      optIn: true, retention: "The engine computer's local processing and any history Home saves under your household settings", direction: "outbound" as const,
+    }] : []),
+  ] : [];
+  return [...platformConnections(), ...inboundConnections(), ...remoteRows, ...pluginConnections(manifests)];
 }
 
 /** Both halves of the page from one pass over the packages. */

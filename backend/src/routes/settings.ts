@@ -9,6 +9,7 @@ import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
 import { refreshSafetyAlarmSensors } from "@/lib/safetyAlarm";
 import { checkSearchInstance } from "@/lib/searchInstanceCheck";
+import { applyEngineWhere, validateRemoteEngineSetting, ENGINE_WHERE_KEY } from "@/lib/remoteStackSettings";
 
 export const settingsRoutes = apiRouter();
 
@@ -101,11 +102,16 @@ settingsRoutes.openapi(putRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
   if (body.value === undefined) return c.json({ error: "scope, key, and value are required" }, 400);
+  if (body.scope === "household") {
+    const refusal = await validateRemoteEngineSetting(body.key, body.value);
+    if (refusal) return c.json({ error: refusal }, 400);
+  }
   const result = setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
+  if (body.scope === "household" && body.key === ENGINE_WHERE_KEY) await applyEngineWhere(body.value);
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
