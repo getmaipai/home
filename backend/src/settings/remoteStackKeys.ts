@@ -15,7 +15,7 @@ export const REMOTE_STACK_SETTINGS_KEYS = [
   {
     key: "engines.stack.remote.local_port", scope: "household", selector: "number", range: { min: 1, max: 65535, step: 1 }, default: 8771,
     label: "Engine computer local port", help: "The port on this computer where the engine computer's connection appears. Change it only if another program already uses it. Only an admin can change this. Shown only while the engine runs on another computer.",
-    level: "expert", secret: false, lives_in: "household.ai", honoured_by: ["home"],
+    level: "advanced", secret: false, lives_in: "household.ai", honoured_by: ["home"],
   },
   {
     key: "engines.stack.remote.host", scope: "household", selector: "text", default: "",

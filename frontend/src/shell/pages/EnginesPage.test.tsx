@@ -242,7 +242,7 @@ describe("EnginesPage", () => {
       if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([
         { key: "engines.stack.where", scope: "household", selector: "select", range: { options: ["this_computer", "another_computer"] }, default: "this_computer", label: "Where the engine runs", copy: { does: "Another computer at home can run the AI if it has a stronger graphics card." }, level: "basic", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
         { key: "engines.stack.remote.host", scope: "household", selector: "text", default: "", label: "Engine computer name", level: "basic", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
-        { key: "engines.stack.remote.local_port", scope: "household", selector: "number", default: 8771, label: "Engine computer local port", level: "expert", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
+        { key: "engines.stack.remote.local_port", scope: "household", selector: "number", default: 8771, label: "Engine computer local port", level: "advanced", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
         { key: "engines.stack.remote.ssh_port", scope: "household", selector: "number", default: 22, label: "Engine computer secure connection port", level: "advanced", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
         { key: "engines.stack.remote.allow_tailnet", scope: "household", selector: "boolean", default: false, label: "Reach the engine computer when away from home", level: "advanced", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
       ]));
@@ -261,6 +261,11 @@ describe("EnginesPage", () => {
       renderWithQueryClient(<EnginesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Where the engine runs"));
       expect(document.body.textContent).toContain("Engine computer name");
+      const advanced = Array.from(document.querySelectorAll("button")).find((button) => /^Show \d+ advanced settings$/.test(button.textContent ?? ""));
+      expect(advanced).toBeTruthy();
+      fireEvent.click(advanced!);
+      expect(document.body.textContent).toContain("Engine computer local port");
+      expect(document.body.textContent).toContain("Engine computer secure connection port");
       expect(document.body.textContent).toContain("Reach the engine computer when away from home");
     } finally {
       globalThis.fetch = originalFetch;

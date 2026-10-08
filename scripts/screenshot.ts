@@ -8259,6 +8259,12 @@ async function captureRemoteStackSettingsReview(browser: Browser, ownerSession: 
     let file = join(outDir, "engines-settings-default.png");
     await page.screenshot({ path: file, fullPage: true });
     console.log(`Wrote ${file}`);
+    await page.getByRole("button", { name: /Show \d+ advanced settings/ }).click();
+    await page.getByText("Engine computer local port", { exact: true }).waitFor();
+    await settleAnimations(page);
+    file = join(outDir, "engines-settings-advanced.png");
+    await page.screenshot({ path: file, fullPage: true });
+    console.log(`Wrote ${file}`);
 
     await save("engines.stack.remote.host", "192.168.1.20");
     await save("engines.stack.where", "another_computer");
@@ -8278,6 +8284,7 @@ async function captureRemoteStackSettingsReview(browser: Browser, ownerSession: 
     console.log(`Wrote ${file}`);
     dedicatedScreenshots.push(
       { file: "engines-settings-default.png", route: "/engines", viewport: "desktop", theme: "light" },
+      { file: "engines-settings-advanced.png", route: "/engines", viewport: "desktop", theme: "light" },
       { file: "privacy-engine-computer-home.png", route: "/privacy", viewport: "desktop", theme: "light" },
       { file: "privacy-engine-computer-tailnet.png", route: "/privacy", viewport: "desktop", theme: "light" },
     );
