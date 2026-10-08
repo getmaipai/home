@@ -72,11 +72,10 @@ export function ChatMessageError() {
   };
 
   // The person's line is the whole message (no title above it), muted, with
-  // a text Retry: the kit ErrorState (ui-v0.5.103 calm colours), as wide as
-  // the message column so one sentence stays on one line on a desktop.
+  // a text Retry, using the kit ErrorState as shipped.
   return (
     <MessagePrimitive.Error>
-      <ErrorState title={error.message} detail="" retrying={retrying} onRetry={retry} retryDisabled={engineDownReason(availability)} className="max-w-none px-0 py-1" />
+      <ErrorState title={error.message} detail="" retrying={retrying} onRetry={retry} retryDisabled={engineDownReason(availability)} />
     </MessagePrimitive.Error>
   );
 }

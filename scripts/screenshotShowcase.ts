@@ -167,7 +167,7 @@ try {
     }
   }
   const list = await fetch(`${base}/api/dev/ui-fixtures`, { headers: { Cookie: `session=${session}` } });
-  const scenarios = ((await list.json()) as { fixtures: { id: string; title: string; description: string }[] }).fixtures.filter((f) => !only || only.includes(f.id));
+  const scenarios = captureFailureRoles ? [] : ((await list.json()) as { fixtures: { id: string; title: string; description: string }[] }).fixtures.filter((f) => !only || only.includes(f.id));
 
   const browser = await chromium.launch(process.env.SHOWCASE_CHROMIUM ? { executablePath: process.env.SHOWCASE_CHROMIUM } : {});
   try {

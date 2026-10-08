@@ -24,17 +24,6 @@
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     }
   },
-  "apps/chat/chatErrorSlot.tsx": {
-    "ErrorState": {
-      "tokens": [
-        "max-w-none",
-        "px-0",
-        "py-1"
-      ],
-      "ed": "ED-036",
-      "reason": "Kit ErrorState lacked an inline layout (layout=inline in ui-v0.5.116); cleanup item 6."
-    }
-  },
   "apps/chat/chatHeaderBar.tsx": {
     "Input": {
       "tokens": [
