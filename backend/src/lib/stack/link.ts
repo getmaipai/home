@@ -12,6 +12,7 @@ export const LINK_BACKOFF_BASE_MS = 1_000;
 export const LINK_BACKOFF_CAP_MS = 60_000;
 export const LINK_READY_RESET_MS = 60_000;
 export const LINK_OFFLINE_AFTER_MS = 2 * 60_000;
+export const REMOTE_VOICE_PORT = 8772;
 const ROLE_PROBE_INTERVAL = 30_000;
 function validSshHost(host: string): boolean {
   const bare = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
@@ -29,6 +30,12 @@ export interface LinkConfig {
   knownHostsPath: string;
   env?: NodeJS.ProcessEnv;
 }
+export function buildEngineLinkSshArgs(config: LinkConfig & { sshPort: number; localPort: number }, address: string): string[] {
+  const hostAlias = config.sshPort === 22 ? config.host : `[${config.host}]:${config.sshPort}`;
+  const homePort = Number(process.env.PORT ?? 8787);
+  return ["-N", "-T", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${config.knownHostsPath}`, "-o", `HostKeyAlias=${hostAlias}`, "-o", "HostKeyAlgorithms=ssh-ed25519", "-o", "IdentitiesOnly=yes", "-i", config.privateKeyPath, "-L", `127.0.0.1:${config.localPort}:127.0.0.1:8770`, "-R", `127.0.0.1:${REMOTE_VOICE_PORT}:127.0.0.1:${homePort}`, "-p", String(config.sshPort), "--", `maipai-stack@${address}`];
+}
+
 export interface LinkDependencies {
   spawn: (command: string, args: string[], options: { env?: NodeJS.ProcessEnv; stdio: ["ignore", "ignore", "ignore"] }) => Pick<ChildProcess, "once" | "kill">;
   fetch: (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -204,8 +211,7 @@ export class EngineLink {
     if (hostKeyStatus === "unreachable") { this.fail("link_timeout", generation); return; }
     const path = this.isTailnetAddress(address) ? "tailnet" : "home";
     if (!validSshHost(this.config.host)) { this.fail("link_outside_home", generation, true); return; }
-    const hostAlias = this.config.sshPort === 22 ? this.config.host : `[${this.config.host}]:${this.config.sshPort}`;
-    const args = ["-N", "-T", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${this.config.knownHostsPath}`, "-o", `HostKeyAlias=${hostAlias}`, "-o", "HostKeyAlgorithms=ssh-ed25519", "-o", "IdentitiesOnly=yes", "-i", this.config.privateKeyPath, "-L", `127.0.0.1:${this.config.localPort}:127.0.0.1:8770`, "-p", String(this.config.sshPort), "--", `maipai-stack@${address}`];
+    const args = buildEngineLinkSshArgs(this.config, address);
     let child: Child;
     try { child = this.deps.spawn("ssh", args, { env: this.config.env, stdio: ["ignore", "ignore", "ignore"] }); }
     catch (error) { this.fail(this.structuredReason(error) ?? "link_refused", generation); return; }

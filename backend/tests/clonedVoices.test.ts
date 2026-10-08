@@ -13,7 +13,7 @@ import {
   clonedVoiceExists,
   clonedVoiceUrl,
 } from "@/lib/clonedVoices";
-import { setPersonTtsVoiceUnchecked, getPersonSettingValue } from "@/lib/settings";
+import { setPersonTtsVoiceUnchecked, getPersonSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import type { PersonRow } from "@/types";
 
 // clonedVoicesDir is a real filesystem directory, not a DB table
@@ -236,8 +236,14 @@ describe("getClonedVoiceFile() / clonedVoiceExists()", () => {
 });
 
 describe("clonedVoiceUrl()", () => {
-  test("is a real http URL back at this hub's own file-serving route", () => {
+  test("uses Home's loopback address when the Stack is local", () => {
+    setHouseholdSettingValue("engines.stack.where", "this_computer");
     const url = clonedVoiceUrl("voice-abc123");
     expect(url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/api\/voice\/cloned\/voice-abc123\/file$/);
+  });
+
+  test("uses the reverse SSH forward when the Stack is remote", () => {
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
+    expect(clonedVoiceUrl("voice-abc123")).toBe("http://127.0.0.1:8772/api/voice/cloned/voice-abc123/file");
   });
 });

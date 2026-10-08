@@ -15,6 +15,7 @@ import { clonedVoices, people } from "@/db/schema";
 import { clonedVoicesDir, ensureDataDir } from "@/lib/paths";
 import { newClonedVoiceId } from "@/lib/id";
 import { selfBaseUrl } from "@/lib/selfUrl";
+import { isRemoteStackSelected } from "@/lib/stackEngine";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { clearMatchingValues } from "@/lib/settings";
 import type { PersonRow } from "@/types";
@@ -186,5 +187,6 @@ export function clonedVoiceExists(id: string): boolean {
  * `/tts` route already accepts for `voice_url` (spec/voice/ts/client.ts),
  * no new scheme or translation needed. */
 export function clonedVoiceUrl(id: string): string {
-  return `${selfBaseUrl()}/api/voice/cloned/${id}/file`;
+  const baseUrl = isRemoteStackSelected() ? "http://127.0.0.1:8772" : selfBaseUrl();
+  return `${baseUrl}/api/voice/cloned/${id}/file`;
 }
