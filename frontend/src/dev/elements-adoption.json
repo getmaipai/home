@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-08T20:17:56.502Z",
-  "kitTag": "ui-v0.5.179",
+  "generatedAt": "2026-10-08T23:53:46.306Z",
+  "kitTag": "ui-v0.5.182",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -8,6 +8,14 @@
       "group": "activity/showcase",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for K06, covered by the shipped activity Element tests; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "AnswerBlockShowcase.tsx",
+      "name": "AnswerBlockShowcase",
+      "group": "answers/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only fixture for the kit dispatcher; it is not a standalone Home product surface.",
       "implemented": false
     },
     {
@@ -130,6 +138,14 @@
       "verdictReason": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements.",
       "implemented": false,
       "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
+    },
+    {
+      "file": "answer-block.tsx",
+      "name": "answer-block",
+      "group": "answers",
+      "verdict": "wire after",
+      "verdictReason": "Wire the kit dispatcher into Home in GENUI-03b, after the Home chat data binding and history adapter are implemented.",
+      "implemented": false
     },
     {
       "file": "approval-card.tsx",

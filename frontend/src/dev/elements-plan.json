@@ -1623,6 +1623,20 @@
       "verdictReason": "Deferred until places-style result must carry lat/lon (additive on weather and a future places tool)."
     },
     {
+      "file": "answer-block.tsx",
+      "name": "answer-block",
+      "group": "answers",
+      "verdict": "wire after",
+      "verdictReason": "Wire the kit dispatcher into Home in GENUI-03b, after the Home chat data binding and history adapter are implemented."
+    },
+    {
+      "file": "AnswerBlockShowcase.tsx",
+      "name": "AnswerBlockShowcase",
+      "group": "answers/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only fixture for the kit dispatcher; it is not a standalone Home product surface."
+    },
+    {
       "file": "markdown-text.css",
       "name": "markdown-text styles",
       "group": "markdown",
