@@ -25,6 +25,7 @@
   "min_role": "child",
   "consequential": false,
   "offline": "full",
+  "returns_blocks": ["todo_list"],
   "config": [],
   "data_sources": [],
   "permissions": ["lists:read"],

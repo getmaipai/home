@@ -537,8 +537,11 @@ describe("POST /api/plugins/list-add/run and list-view/run", () => {
 
     const viewRes = await client.post("/api/plugins/list-view/run", {});
     expect(viewRes.status).toBe(200);
-    const viewBody = (await viewRes.json()) as { reply?: { text: string } };
+    const viewBody = (await viewRes.json()) as { reply?: { text: string }; blocks?: { kind: string; producer: string }[] };
     expect(viewBody.reply?.text).toBe("milk");
+    // GENUI-05: the direct run returns the package's block after the same filter a turn applies.
+    expect(viewBody.blocks).toHaveLength(1);
+    expect(viewBody.blocks![0]).toMatchObject({ kind: "todo_list", producer: "list-view" });
   });
 
   test("view reports an empty list plainly", async () => {

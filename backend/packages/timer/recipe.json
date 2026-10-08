@@ -5,6 +5,6 @@
     { "op": "timer", "as": "the_timer", "text": "{expression}" },
     { "op": "pick", "as": "label", "from": "the_timer", "path": "label" },
     { "op": "pick", "as": "when_text", "from": "the_timer", "path": "when_text" },
-    { "op": "format", "as": "reply", "text": "Timer set: {label} ({when_text}).", "speech": "Timer set: {label} ({when_text})." }
+    { "op": "format", "as": "reply", "text": "Timer set: {label} ({when_text}).", "speech": "Timer set: {label} ({when_text}).", "data": { "label": "{label}", "when_text": "{when_text}" } }
   ]
 }

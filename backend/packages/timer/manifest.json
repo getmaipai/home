@@ -33,6 +33,7 @@
   "min_role": "child",
   "consequential": false,
   "offline": "full",
+  "returns_blocks": ["schedule_card"],
   "config": [],
   "data_sources": [],
   "permissions": ["timers:write"],

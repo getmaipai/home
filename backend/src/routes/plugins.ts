@@ -15,6 +15,7 @@ import { listInstalledManifests, listPackageIds, loadManifestOnly, meetsMinRole,
 import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
+import { filterAnswerBlocks } from "@/lib/answerBlocks";
 
 export const pluginsRoutes = apiRouter();
 
@@ -164,7 +165,14 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
     }
     return c.json({ error: result.error }, result.status);
   }
-  return c.json(result.value);
+  // GENUI-05: a package's blocks leave through the same filter a turn applies
+  // (manifest allowlist, spec check, this person's age band, the output floor);
+  // what fails is dropped, never the reply.
+  const { blocks: rawBlocks, ...rest } = result.value as typeof result.value & { blocks?: unknown };
+  if (!Array.isArray(rawBlocks) || rawBlocks.length === 0) return c.json(rest);
+  const loaded = loadManifestOnly(id);
+  const blocks = filterAnswerBlocks(rawBlocks, id, loaded.ok ? loaded.value.returns_blocks ?? [] : [], speakerAgeBand(actor, new Date()), actor);
+  return c.json(blocks.length > 0 ? { ...rest, blocks } : rest);
 });
 
 // Owner/admin only: forces a re-check outside the daily job, e.g. right

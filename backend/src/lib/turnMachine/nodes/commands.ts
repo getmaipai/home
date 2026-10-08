@@ -24,6 +24,7 @@ import { answerWhoTurn } from "@/lib/askNames";
 import { classifyTurnSignal } from "@/lib/turnSignal";
 import { COMPUTED_WILDCARD_RESOLVERS, NEVER_FIRES_WILDCARDS } from "@/lib/manifestLint";
 import type { Node, NodeOutcome } from "../contract";
+import { blockEventsFor } from "../blockEvents";
 
 export interface CommandsInput {
   utterance: string;
@@ -33,7 +34,9 @@ export type CommandsOutput =
   | { matched: false }
   // `whoAnswer` (THIN-7E): the reply is ASK-01's answer to a who question; the outcome is
   // only the answer node's input and is never recorded on the turn.
-  | { matched: true; text: string; speech?: string; outcome: import("@/lib/turnContext").ToolExecutionOutcome; whoAnswer?: true };
+  | { matched: true; text: string; speech?: string; outcome: import("@/lib/turnContext").ToolExecutionOutcome; whoAnswer?: true;
+      /** GENUI-05: the package's accepted answer blocks, as `block` events (a command match runs no tool round). */
+      blockEvents?: import("@maipai/spec/stack/ts/turn-stream-event.js").TurnStreamEvent[] };
 
 export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, input) => {
   // THIN-7E (ASK-01): the answer to a question put on an earlier turn, or a judge's open
@@ -198,7 +201,10 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
       // this direct.
       const reply = usableReply({ result: result.value });
       const text = reply?.text ?? "Done.";
-      return { outcome: okOutcome, output: { matched: true, text, speech: reply?.speech, outcome } };
+      // GENUI-05: a closed intent's visual (a reminder or timer card, the
+      // shopping list) rides the same filter as a tool call's blocks.
+      const blockEvents = blockEventsFor(state, id, outcome.callId, (result.value as typeof result.value & { blocks?: unknown }).blocks, state.toolEvents ?? []);
+      return { outcome: okOutcome, output: { matched: true, text, speech: reply?.speech, outcome, ...(blockEvents.length > 0 ? { blockEvents } : {}) } };
     }
   }
 

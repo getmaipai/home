@@ -301,7 +301,11 @@ export const turnMachine = setup({
     },
     recordCommandOutcome: ({ context }) => {
       const step = context.step as CommandsOutput;
-      if (step.matched && !step.whoAnswer) context.turnState.outcomes.push(step.outcome);
+      if (step.matched && !step.whoAnswer) {
+        context.turnState.outcomes.push(step.outcome);
+        // GENUI-05: the matched package's accepted blocks, in the turn's tool events.
+        if (step.blockEvents?.length) context.turnState.toolEvents.push(...step.blockEvents);
+      }
     },
     // `policy`'s own actor reads `context.step` for the calls to
     // evaluate (the model node's own shape, "tool_calls"); a resumed

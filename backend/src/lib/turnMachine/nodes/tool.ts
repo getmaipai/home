@@ -3,8 +3,8 @@
 // model order." The node's signal reaches runPlugin() so search requests
 // stop at cancellation; the race still records a timeout if a package
 // ignores the signal.
-import { loadManifestOnly, runPlugin } from "@/lib/plugins";
-import { filterAnswerBlocks } from "@/lib/answerBlocks";
+import { runPlugin } from "@/lib/plugins";
+import { blockEventsFor } from "../blockEvents";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
@@ -12,8 +12,6 @@ import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } fro
 import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
 import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
-import { turnAgeBand } from "../speaker";
-import { carriesCrisisSignal } from "@/lib/safety";
 
 export interface ToolInput {
   proposals: readonly ActionProposal[];
@@ -233,40 +231,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       // the package result lands. They follow their tool_result in call
       // order and precede the phrasing round's first streamed prose delta.
       const packageBlocks = (result.value as typeof result.value & { blocks?: unknown }).blocks;
-      if (Array.isArray(packageBlocks) && packageBlocks.length) {
-        const loadedManifest = loadManifestOnly(tool);
-        const allowedKinds = loadedManifest.ok ? loadedManifest.value.returns_blocks ?? [] : [];
-        const seenIds = new Set(toolEvents.flatMap((event) => event.t === "block" ? [event.block.id] : []));
-        try {
-          const blocks = filterAnswerBlocks(
-            packageBlocks,
-            tool,
-            allowedKinds,
-            turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()),
-            state.actor,
-            seenIds,
-            (safety) => {
-              if (!carriesCrisisSignal(safety)) return;
-              const prior = state.blockSafety;
-              state.blockSafety = prior
-                ? {
-                    ...safety,
-                    action: "allow_with_resources",
-                    flagged: prior.flagged || safety.flagged,
-                    categories: [...new Set([...prior.categories, ...safety.categories])],
-                    matched_signals: [...new Set([...prior.matched_signals, ...safety.matched_signals])],
-                    notify_parent: prior.notify_parent || safety.notify_parent,
-                  }
-                : { ...safety, action: "allow_with_resources" };
-            },
-          );
-          for (const block of blocks) toolEvents.push({ t: "block", call_id: callId, block });
-        } catch {
-          // A visual filter is deliberately best-effort with respect to
-          // delivery: malformed package data can never fail its answer.
-          console.warn("[answer-block] block processing failed; answer retained");
-        }
-      }
+      toolEvents.push(...blockEventsFor(state, tool, callId, packageBlocks, toolEvents));
     } else {
       toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: outcome.failureKind! });
     }

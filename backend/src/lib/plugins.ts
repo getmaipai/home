@@ -22,6 +22,7 @@ import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recip
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
+import { blocksForRecipeRun, type BlockCapture } from "@/lib/packageBlocks";
 import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { registerProjectType } from "@/lib/projects/projectTypes";
@@ -553,9 +554,20 @@ export async function runPlugin(
   const loaded = loadPackage(id);
   if (!loaded.ok) return loaded;
   const { recipe } = loaded.value;
-  const host = createHost(actor, manifest, [], turn, options);
+  // GENUI-05: rows the host reads for a block producer (packageBlocks.ts).
+  const capture: BlockCapture = {};
+  const host = createHost(actor, manifest, [], turn, { ...options, capture });
   try {
-    return { ok: true, value: await runRecipe(recipe, inputs, host) };
+    const value = await runRecipe(recipe, inputs, host);
+    // The package's blocks come from this run's own data; a failure to build
+    // one never changes the reply (the blocks are an addition to it).
+    let blocks: Record<string, unknown>[] = [];
+    try {
+      blocks = blocksForRecipeRun(manifest, value, capture, turn?.id);
+    } catch {
+      console.warn(`[answer-block] ${id} could not build its blocks; reply retained`);
+    }
+    return { ok: true, value: blocks.length > 0 ? ({ ...value, blocks } as PluginResult) : value };
   } catch (err) {
     if (err instanceof HostError) {
       const status = err.code === "permission_denied" ? 403 : err.code === "not_found" ? 404 : 400;

@@ -70,6 +70,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
+import type { BlockCapture } from "@/lib/packageBlocks";
 import { cachedFetch } from "@/lib/packageCache";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import { runRapidOcr } from "@/lib/documentExtraction";
@@ -1753,7 +1754,7 @@ function mapWriteFailure(status: number, error: string): never {
  * together in scope (the conversation a turn belongs to), so building
  * one object at the call site is the natural shape, not friction added
  * for its own sake. */
-export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number } = {}): Host {
+export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number; capture?: BlockCapture } = {}): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
   function requirePermission(perm: string): void {
@@ -2230,7 +2231,9 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       view(): string {
         requirePermission("lists:read");
         const list = findOrCreateStandingList("shopping");
-        const items = (JSON.parse(list.items) as { text: string; done: boolean }[]).filter((i) => !i.done);
+        const items = (JSON.parse(list.items) as { id: string; text: string; done: boolean }[]).filter((i) => !i.done);
+        // GENUI-05: the rows this read already holds, for list-view's todo_list block.
+        if (runtime.capture) runtime.capture.listItems = items.map((i) => ({ id: i.id, text: i.text }));
         return items.length > 0 ? items.map((i) => i.text).join(", ") : "Your shopping list is empty.";
       },
     },
