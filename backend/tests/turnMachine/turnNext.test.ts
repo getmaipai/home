@@ -457,7 +457,7 @@ describe("turnNext.ts: the interim rule", () => {
 describe("turnNext.ts: structured_part and artifact reach TurnValue (home#147)", () => {
   test("a successful almanac-date outcome carries a structured_part spec sheet on the new path", async () => {
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "almanac-date"] };
+    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "almanac-date"] };
     try {
       const result = await withStub(
         {
@@ -481,7 +481,7 @@ describe("turnNext.ts: structured_part and artifact reach TurnValue (home#147)",
 
   test("a package's own reply (no phrasing round) is not tagged routing tier \"tool\", so the window keeps noting it as the package's words", async () => {
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "almanac-date"] };
+    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "almanac-date"] };
     try {
       const result = await withStub(
         {
@@ -619,7 +619,7 @@ describe("turnNext.ts: consent and confirmation", () => {
     // same way a future ranked set would, to exercise policy's own
     // consent gate for a real consequential manifest.
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "lock-doors"] };
+    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "lock-doors"] };
     const parked = await withStub(
       {
         calls: (request) => (request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "call-1", name: "lock-doors", args: "{}" }] : undefined),
@@ -654,7 +654,7 @@ describe("turnNext.ts: consent and confirmation", () => {
     registerProjectType({ id: "bedtime-storybook", title: "Bedtime storybook", description: "A bedtime storybook.", minRole: "child", consequential: true, paramsSchema: { type: "object", required: ["topic"], properties: { topic: { type: "string" } }, additionalProperties: false }, buildPlan: () => ({ steps: [{ id: "a", kind: "text", needs: [], params: { role: "chat", promptTemplate: "write a gentle story", inputs: [] } }], ceilings: { maxWallSeconds: 30, maxGeneratorJobs: 1 } }) });
     const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
     const original = entry.turn_budget;
-    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, START_PROJECT_TOOL_ID] };
+    entry.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), START_PROJECT_TOOL_ID] };
     try {
       const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === START_PROJECT_TOOL_ID) ? [{ id: "storybook", name: START_PROJECT_TOOL_ID, args: JSON.stringify({ type: "bedtime-storybook", params: { topic: "a moon rabbit" } }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "make a bedtime storybook about a moon rabbit"));
       expect(result.ok).toBe(true);
@@ -666,7 +666,7 @@ describe("turnNext.ts: consent and confirmation", () => {
   test("PARENT-ASK-01a: a child's family-name search is refused without claiming a parent was asked", async () => {
     const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
     const original = entry.turn_budget;
-    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "websearch"] };
+    entry.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "websearch"] };
     try {
       const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "websearch") ? [{ id: "search", name: "websearch", args: JSON.stringify({ expression: "Jesse Torres news" }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "search the web for Jesse Torres news"));
       expect(result.ok).toBe(true);
@@ -680,7 +680,7 @@ describe("turnNext.ts: consent and confirmation", () => {
   test("PARENT-ASK-01a: a teen lock request is refused before it can be parked", async () => {
     const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
     const original = entry.turn_budget;
-    entry.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "lock-doors"] };
+    entry.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "lock-doors"] };
     try {
       const actor = { ...people.child, role: "teen" };
       const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "lock", name: "lock-doors", args: "{}" }] : undefined, reply: () => "unused" }, () => runTurnNext(actor, "chat", "lock the doors"));
@@ -746,7 +746,7 @@ describe("turnNext.ts: consent and confirmation", () => {
 describe("turnNext.ts: APPROVE-CARD-01, the confirm card's wire shape and its structured resume", () => {
   async function parkLockDoorsAsk(opts: { temporary?: boolean } = {}) {
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "lock-doors"] };
+    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "lock-doors"] };
     try {
       return await withStub(
         {
@@ -1129,7 +1129,7 @@ describe("turnNext.ts: policy refusals without a parked ask", () => {
     // model_text reply where the state table promises "the refusal
     // line for min_role."
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
-    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...original!.tools_offered, "lock-doors"] };
+    CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "lock-doors"] };
     let result: Awaited<ReturnType<typeof runTurnNext>>;
     try {
       result = await withStub(
