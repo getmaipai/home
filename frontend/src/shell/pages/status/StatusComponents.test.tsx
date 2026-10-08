@@ -217,6 +217,17 @@ describe("StatusComponents", () => {
     } finally { restore(); }
   });
 
+  test("a starting Library says which step it is on, and a stuck one says it is taking longer than usual", async () => {
+    const message = "The offline library has been starting for 5 minutes, longer than usual. Restarting it from Repairs may help.";
+    const starting = health({ sidecars: [{ id: "kiwix-serve", status: "starting", baseUrl: null, start: { phase: "starting", elapsed_seconds: 300, stuck: true, message } }] });
+    const restore = stubHealth(starting);
+    try {
+      const view = renderWithQuery(<StatusComponents person={makePerson("child")} health={starting} />);
+      expect(await view.findByText(message)).toBeInTheDocument();
+      expect(view.getByText("Starting")).toBeInTheDocument();
+    } finally { restore(); }
+  });
+
   test("only owners and admins see four engine restart buttons", async () => {
     const restore = stubHealth(health());
     try {

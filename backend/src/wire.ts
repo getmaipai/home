@@ -676,10 +676,26 @@ export interface EngineStatsSample {
 // aliased imports of its own).
 export type SidecarStatus = "stopped" | "starting" | "running" | "unhealthy" | "crashed";
 
+/** KIWIX-STARTING-DIAG-01: which step a sidecar's start is on, and for
+ * how long. Present only while a start is in progress. Mirrors
+ * lib/sidecars.ts's SidecarStartDiagnostic (hand-copied, same reason as
+ * the types above). */
+export type SidecarStartPhase = "installing" | "preparing" | "starting";
+export interface SidecarStartDiagnostic {
+  phase: SidecarStartPhase;
+  /** Seconds in the current step. */
+  elapsed_seconds: number;
+  /** True once the step has run longer than a normal install or start. */
+  stuck: boolean;
+  /** One plain household sentence for the Status page and Repairs. */
+  message: string;
+}
+
 export interface SidecarStatusEntry {
   id: string;
   status: SidecarStatus;
   baseUrl: string | null;
+  start?: SidecarStartDiagnostic;
 }
 
 export interface EngineHealthEntry {

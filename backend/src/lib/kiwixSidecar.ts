@@ -18,7 +18,7 @@ import { detectHardware } from "@/lib/hardware";
 import { selectKiwixBinary, KIWIX_READY_MARKER, type KiwixBinaryPin } from "@/lib/kiwixCatalog";
 import { kiwixToolsDir, defaultReferenceLibraryDir } from "@/lib/paths";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { registerSidecar, startSidecar, getSidecar } from "@/lib/sidecars";
+import { registerSidecar, startSidecar, getSidecar, markSidecarStartPhase, clearSidecarStart } from "@/lib/sidecars";
 
 const execFileAsync = promisify(execFile);
 
@@ -52,8 +52,17 @@ export function referenceLibraryDir(): string {
  * notes' own "Kiwix purges old kiwix-tools builds" warning - this is
  * exactly that failure, worded the way a household member reads it,
  * not a stack trace). */
-export async function ensureKiwixInstalled(): Promise<{ serveBin: string; manageBin: string }> {
-  const hw = await detectHardware();
+export interface KiwixInstallDeps {
+  detectHardware: typeof detectHardware;
+  download: typeof downloadUrl;
+  extract: typeof extractArchive;
+}
+
+export async function ensureKiwixInstalled(
+  deps: Partial<KiwixInstallDeps> = {},
+): Promise<{ serveBin: string; manageBin: string }> {
+  const { detectHardware: detect = detectHardware, download = downloadUrl, extract = extractArchive } = deps;
+  const hw = await detect();
   const pin = selectKiwixBinary(hw);
   if (!pin) {
     throw new Error("no kiwix-tools build is pinned for this computer's platform yet");
@@ -63,10 +72,11 @@ export async function ensureKiwixInstalled(): Promise<{ serveBin: string; manage
   const manageBin = join(destDir, binName("kiwix-manage"));
   const readyMarker = join(destDir, KIWIX_READY_MARKER);
   if (!existsSync(readyMarker)) {
+    markSidecarStartPhase(KIWIX_SIDECAR_ID, "installing");
     mkdirSync(destDir, { recursive: true });
     const archivePath = join(destDir, ".download.tmp");
     try {
-      await downloadUrl(pin.archive.url, archivePath, {
+      await download(pin.archive.url, archivePath, {
         expectedSha256: pin.archive.sha256,
         expectedBytes: pin.archive.approxBytes,
       });
@@ -78,7 +88,7 @@ export async function ensureKiwixInstalled(): Promise<{ serveBin: string; manage
           : `kiwix-tools ${pin.label} failed to download: ${message}`,
       );
     }
-    await extractArchive(archivePath, destDir);
+    await extract(archivePath, destDir);
     rmSync(archivePath, { force: true });
     // kiwix-tools' own archive extracts one wrapping directory
     // (kiwix-tools_<platform>-<version>/) - the same one-level nesting
@@ -167,10 +177,17 @@ export function kiwixBaseUrl(): string | null {
  * registered sidecar gets. */
 export async function startKiwixSidecar(): Promise<void> {
   try {
+    // The diagnostic opens before the install so a first-run download
+    // shows as "installing", not as a missing library.
+    markSidecarStartPhase(KIWIX_SIDECAR_ID, "preparing");
     const bins = await ensureKiwixInstalled();
+    markSidecarStartPhase(KIWIX_SIDECAR_ID, "preparing");
     await registerKiwixSidecar(bins);
     await startSidecar(KIWIX_SIDECAR_ID);
+    // startSidecar clears its own step; this covers its early returns.
+    clearSidecarStart(KIWIX_SIDECAR_ID);
   } catch (err) {
+    clearSidecarStart(KIWIX_SIDECAR_ID);
     // ensureKiwixInstalled()'s own failure (no pin, a dead pinned URL)
     // never reaches startSidecar()'s own Repairs path, since it throws
     // before registerSidecar() is ever called - logged here so an

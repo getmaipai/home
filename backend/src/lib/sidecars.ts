@@ -399,19 +399,112 @@ export function getSidecar(
   return { status: entry.status, baseUrl: baseUrlFor(entry.config) };
 }
 
-/** For GET /api/health: every registered sidecar, start order first. */
-export function listSidecars(): Array<{
+export type SidecarStartPhase = "installing" | "preparing" | "starting";
+
+/** Longest a step normally takes before the household is told it is
+ * taking longer than usual. A first install downloads a program, so it
+ * gets the longest allowance; spawning and library setup are seconds. */
+export const SIDECAR_START_STUCK_MS: Record<SidecarStartPhase, number> = {
+  installing: 10 * 60_000,
+  preparing: 2 * 60_000,
+  starting: 2 * 60_000,
+};
+
+const PHASE_LABELS: Record<SidecarStartPhase, string> = {
+  installing: "Downloading the offline library program for the first time. This can take a few minutes.",
+  preparing: "Getting the offline library ready.",
+  starting: "Starting the offline library.",
+};
+
+export interface SidecarStartDiagnostic {
+  phase: SidecarStartPhase;
+  elapsed_seconds: number;
+  stuck: boolean;
+  message: string;
+}
+
+interface StartProgress { phase: SidecarStartPhase; phaseStartedAtMs: number }
+
+// Keyed by sidecar id, not by registry entry: a first install runs before
+// the sidecar is registered, and the Status page should still say so.
+const startProgress = hotReloadState<Map<string, StartProgress>>("sidecarStartProgress", () => new Map());
+const STALL_CHECK_MS = 30_000;
+let stallTimer: ReturnType<typeof setInterval> | null = null;
+
+function diagnosticFor(p: StartProgress, nowMs: number): SidecarStartDiagnostic {
+  const elapsedMs = Math.max(0, nowMs - p.phaseStartedAtMs);
+  const stuck = elapsedMs > SIDECAR_START_STUCK_MS[p.phase];
+  const minutes = Math.max(1, Math.round(elapsedMs / 60_000));
+  const message = stuck
+    ? `The offline library has been starting for ${minutes} ${minutes === 1 ? "minute" : "minutes"}, longer than usual. Restarting it from Repairs may help.`
+    : PHASE_LABELS[p.phase];
+  return { phase: p.phase, elapsed_seconds: Math.floor(elapsedMs / 1000), stuck, message };
+}
+
+/** Records which step a sidecar's start is on. Calling it again moves to
+ * the next step and restarts that step's clock. */
+export function markSidecarStartPhase(id: string, phase: SidecarStartPhase, nowMs: number = Date.now()): void {
+  startProgress.set(id, { phase, phaseStartedAtMs: nowMs });
+  if (!stallTimer) {
+    stallTimer = setInterval(() => void checkStalledSidecarStarts(), STALL_CHECK_MS);
+    stallTimer.unref?.();
+  }
+}
+
+/** Ends the start diagnostic (running, failed or stopped) and resolves a
+ * "taking longer than usual" Repairs row if one was raised. */
+export function clearSidecarStart(id: string): void {
+  startProgress.delete(id);
+  resolveIssue(`sidecar:${id}`, "slow_start");
+  if (startProgress.size === 0 && stallTimer) {
+    clearInterval(stallTimer);
+    stallTimer = null;
+  }
+}
+
+/** Raises one Repairs warning for each start past its threshold. Also run
+ * on a timer while any start is in progress. */
+export async function checkStalledSidecarStarts(nowMs: number = Date.now()): Promise<void> {
+  for (const [id, progress] of startProgress) {
+    const diag = diagnosticFor(progress, nowMs);
+    if (!diag.stuck) continue;
+    await raiseIssue({
+      source: `sidecar:${id}`,
+      key: "slow_start",
+      severity: "warning",
+      title: "The offline library is taking a long time to start",
+      detail: diag.message,
+      fix: registry.has(id) ? { label: `Restart ${id}`, action: `restart_sidecar:${id}` } : null,
+    });
+    // The start may have ended while the row was being raised.
+    if (!startProgress.has(id)) resolveIssue(`sidecar:${id}`, "slow_start");
+  }
+}
+
+/** For GET /api/health: every registered sidecar, start order first, plus
+ * a "starting" row for one still installing before it is registered. */
+export function listSidecars(nowMs: number = Date.now()): Array<{
   id: string;
   status: SidecarStatus;
   baseUrl: string | null;
+  start?: SidecarStartDiagnostic;
 }> {
-  return [...registry.values()]
+  const rows = [...registry.values()]
     .sort((a, b) => (a.config.startupOrder ?? 0) - (b.config.startupOrder ?? 0))
-    .map((e) => ({
-      id: e.config.id,
-      status: e.status,
-      baseUrl: baseUrlFor(e.config),
-    }));
+    .map((e) => {
+      const progress = startProgress.get(e.config.id);
+      return {
+        id: e.config.id,
+        status: e.status,
+        baseUrl: baseUrlFor(e.config),
+        ...(progress ? { start: diagnosticFor(progress, nowMs) } : {}),
+      };
+    });
+  for (const [id, progress] of startProgress) {
+    if (registry.has(id)) continue;
+    rows.push({ id, status: "starting", baseUrl: null, start: diagnosticFor(progress, nowMs) });
+  }
+  return rows;
 }
 
 export function getSidecarLogs(id: string): string[] {
@@ -1150,6 +1243,7 @@ export async function startSidecar(id: string): Promise<void> {
   entry.stopping = false;
   entry.status = "starting";
   const { config } = entry;
+  markSidecarStartPhase(id, "starting");
   try {
     const healthCheck = config.healthUrl
       ? () => checkHealthUrl(config.healthUrl!)
@@ -1172,9 +1266,11 @@ export async function startSidecar(id: string): Promise<void> {
     // and refuse to poll it).
     if (entry.stopping) {
       proc.kill();
+      clearSidecarStart(id);
       log(entry, "start aborted: stopped while spawning");
       return;
     }
+    clearSidecarStart(id);
     entry.proc = proc;
     entry.status = "running";
     entry.consecutiveFailures = 0;
@@ -1183,6 +1279,7 @@ export async function startSidecar(id: string): Promise<void> {
     resolveIssue(`sidecar:${id}`, "crashed");
     startHealthLoop(entry);
   } catch (err) {
+    clearSidecarStart(id);
     entry.proc = null;
     const message = err instanceof Error ? err.message : String(err);
     // The same race as above, the failure side of it: a stop that landed
@@ -1319,6 +1416,8 @@ export function __resetSidecarsForTests(): void {
     entry.proc?.kill();
   }
   registry.clear();
+  startProgress.clear();
+  if (stallTimer) { clearInterval(stallTimer); stallTimer = null; }
   blockedPorts.clear();
   freePortProcessScanForTests = null;
   freePortProcessFactsForTests = null;
