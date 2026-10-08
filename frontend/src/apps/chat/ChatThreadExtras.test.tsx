@@ -159,6 +159,18 @@ test("Cmd+K opens the palette and running a command closes it", async () => {
   await waitFor(() => expect(view.queryByRole("combobox", { name: "Type a command" })).toBeNull());
 });
 
+test("the Cmd+K palette opens at the kit's large size, ChatGPT-search proportions (SEARCH-MODAL-SIZE-01)", async () => {
+  const view = renderChat({ count: 1 });
+  const root = view.container.querySelector('[data-slot="aui_thread-viewport"]')!;
+  act(() => root.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true, cancelable: true })));
+  await view.findByRole("combobox", { name: "Type a command" });
+  const dialog = document.querySelector('[data-slot="dialog-content"]')?.getAttribute("class") ?? "";
+  expect(dialog).toContain("sm:max-w-3xl");
+  expect(dialog).not.toContain("sm:max-w-sm");
+  const palette = document.querySelector('[data-slot="command-palette"]')?.getAttribute("class") ?? "";
+  expect(palette).toContain("h-[min(36rem,calc(100dvh-4rem))]");
+});
+
 test("Focus composer keeps focus after the command palette closes", async () => {
   const view = renderChat({ count: 1 });
   const root = view.container.querySelector('[data-slot="aui_thread-viewport"]')!;

@@ -200,6 +200,7 @@ export function ChatThreadExtras() {
           open
           onOpenChange={(open) => { if (!open) { setPaletteOpen(false); setPaletteQuery(""); } }}
           title="Chat commands"
+          size="lg"
           commands={paletteCommands}
           query={paletteQuery}
           activeId={activeCommand || paletteCommands[0]?.id || ""}

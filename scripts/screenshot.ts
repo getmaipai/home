@@ -192,6 +192,7 @@ const chatListReview = process.argv.includes("--chat-list-review");
 const chatSearchReview = process.argv.includes("--chat-search-review");
 const chatPaletteReview = process.argv.includes("--chat-palette-review");
 const chatMobileSheetReview = process.argv.includes("--chat-mobile-sheet-review");
+const searchModalSizeReview = process.argv.includes("--search-modal-size-review");
 const chatShortcutsReview = process.argv.includes("--chat-shortcuts-review");
 const chatFindHeaderAlignmentReview = process.argv.includes("--chat-find-header-alignment-review");
 const chatFindBubbleHoverWidthReview = process.argv.includes("--chat-find-bubble-hover-width-review");
@@ -4358,6 +4359,56 @@ async function captureChatMobileSheetReview(browser: Browser, sessionValue: stri
       await page.close();
     } finally {
       await context.close();
+    }
+  }
+}
+
+/** SEARCH-MODAL-SIZE-01: the Cmd/Ctrl+K command palette dialog at the kit's
+ * large size. Measures the real dialog box against the viewport (the proof
+ * happy-dom cannot give) and throws on a mismatch, then captures it. */
+async function captureSearchModalSizeReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const cases = [
+    { slug: "desktop-1440x900", width: 1440, height: 900 },
+    { slug: "phone-390x844", width: 390, height: 844 },
+    { slug: "short-390x500", width: 390, height: 500 },
+  ];
+  for (const { slug, width, height } of cases) {
+    for (const theme of ["light", "dark"] as const) {
+      const context = await newContext(browser, { slug, width, height }, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).click();
+        await page.keyboard.press("Control+k");
+        const dialog = page.getByRole("dialog", { name: "Chat commands" });
+        await dialog.waitFor();
+        await settleAnimations(page);
+        const box = await dialog.boundingBox();
+        if (!box) throw new Error(`search modal: no box at ${slug}`);
+        const wantWidth = Math.min(768, width - 32);
+        const wantHeight = Math.min(576, height - 64);
+        if (Math.abs(box.width - wantWidth) > 1.5 || Math.abs(box.height - wantHeight) > 1.5) {
+          throw new Error(`search modal ${slug}/${theme}: ${box.width}x${box.height}, wanted ${wantWidth}x${wantHeight}`);
+        }
+        if (box.x < 0 || box.y < 0 || box.x + box.width > width + 0.5 || box.y + box.height > height + 0.5) {
+          throw new Error(`search modal ${slug}/${theme} overflows the viewport: ${JSON.stringify(box)}`);
+        }
+        const scrolls = await page.evaluate(() => {
+          const list = document.querySelector('[role="listbox"][aria-label="Commands"]');
+          return { overflowsPage: document.documentElement.scrollWidth > window.innerWidth, listScrolls: list ? list.scrollHeight > list.clientHeight : null };
+        });
+        if (scrolls.overflowsPage) throw new Error(`search modal ${slug}/${theme}: page scrolls sideways`);
+        console.log(`${slug}/${theme}: dialog ${box.width.toFixed(1)}x${box.height.toFixed(1)} of ${width}x${height} (${((box.width / width) * 100).toFixed(0)}% x ${((box.height / height) * 100).toFixed(0)}%), list scrolls inside: ${scrolls.listScrolls}`);
+        const file = `search-modal-size-${slug}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file), fullPage: false });
+        console.log(`Wrote ${join(outDir, file)}`);
+        await page.close();
+      } finally {
+        await context.close();
+      }
     }
   }
 }
@@ -10556,6 +10607,12 @@ async function main() {
     if (!a11yOnly && chatMobileSheetReview) {
       await captureChatMobileSheetReview(browser, sessionValue);
       console.log("completed named review: --chat-mobile-sheet-review");
+      return;
+    }
+
+    if (!a11yOnly && searchModalSizeReview) {
+      await captureSearchModalSizeReview(browser, sessionValue);
+      console.log("completed named review: --search-modal-size-review");
       return;
     }
 
