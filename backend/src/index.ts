@@ -154,6 +154,7 @@ ensureCoreJob("updates.check", "every:1d");
 // job itself is a no-op when engines.stack.url is empty or the
 // household hasn't turned stack.updates.enabled on.
 ensureCoreJob("stack.updates.maintenance", "every:1d");
+ensureCoreJob("stack.image_jobs", "every:1m");
 // docs/PACKAGES.md's bronze bar: smoke "at install, at every update, and
 // on a schedule" (lib/smoke.ts). No install/update flow exists yet
 // (session-d step 6 builds the store), so a boot-time pass below stands

@@ -23,6 +23,7 @@ import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import type { SubjectRef } from "@/lib/unknownNames";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture } from "./stackFixture";
+import { StackError } from "@/lib/stack/errors";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { useDefaultScriptedStack } from "./stackFixture";
 
@@ -605,6 +606,20 @@ describe("judgeTurn() - dedupe by supersede", () => {
 });
 
 describe("judgeTurn() - the poison guard", () => {
+  test("a remote link drop leaves the judge turn pending without spending attempts", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I like anchovies", "I will remember that.");
+    await withScriptedJudge(() => ({ facts: [] }), async () => {
+      judgeFixture!.client.chat = async () => { throw new StackError("unreachable", "Stack link is unreachable"); };
+      const result = await judgeTurn(turn);
+      expect(result.ok).toBe(false);
+      const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!;
+      expect(row.judgeAttempts).toBe(0);
+      expect(row.judgeStatus).toBeNull();
+      expect(judgeQueueStats().pending).toBe(1);
+    });
+  });
+
   test("three failed extraction attempts mark the turn judge_failed; fewer than three leave it retryable", async () => {
     await withNotificationsOutsideQuietHours(async () => {
       const { actor } = await owner();

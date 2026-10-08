@@ -1,5 +1,6 @@
+import { inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { modelDownloadJobs } from "@/db/schema";
+import { jobs, modelDownloadJobs } from "@/db/schema";
 import { createJob, updateJob, type HomeJob } from "@/lib/jobs";
 import type { StackJob } from "@/lib/stack/types";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
@@ -59,4 +60,25 @@ export async function startImageProducerJob(input: { actorId: string; prompt: st
   } catch {
     return job;
   }
+}
+
+/** Reconcile active image projections after a Stack link reconnect. The
+ * Stack owns execution; Home only polls the persisted original job id. */
+export async function pollActiveStackImageJobs(): Promise<number> {
+  if (!isStackConfigured()) return 0;
+  const active = db.select().from(jobs).where(inArray(jobs.state, ["queued", "running"])).all();
+  let updated = 0;
+  for (const row of active) {
+    let provenance: Record<string, unknown>;
+    try { provenance = JSON.parse(row.provenance) as Record<string, unknown>; } catch { continue; }
+    if (provenance.producer !== "image" || typeof provenance.stackJobId !== "string") continue;
+    try {
+      const current = await getStackClient().job(provenance.stackJobId);
+      if (updateJob(row.id, { state: current.state, progress: { percent: current.percent, status: current.status }, resultRef: typeof current.result === "object" && current.result !== null && typeof (current.result as Record<string, unknown>).fileId === "string" ? (current.result as Record<string, string>).fileId : null, errorKind: current.state === "failed" ? "failed" : null })) updated++;
+    } catch {
+      // A disconnected link is retried on the worker's next pass; never
+      // resubmit a producer job or turn transport failure into job failure.
+    }
+  }
+  return updated;
 }

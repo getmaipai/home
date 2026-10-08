@@ -69,6 +69,9 @@ export interface StackEventBridgeOptions {
   onEvent?: (event: StackEventEnvelope) => void;
   /** Injectable for tests: the fetch to open the SSE stream. */
   fetch?: typeof fetch;
+  /** Injectable reconnect timers for deterministic offline tests. */
+  setTimeout?: typeof setTimeout;
+  clearTimeout?: typeof clearTimeout;
 }
 
 export interface StackEventBridge {
@@ -202,6 +205,8 @@ function parseSse(chunk: string, pending: string): { events: StackEventEnvelope[
 
 export function startStackEventBridge(client: StackClient, options: StackEventBridgeOptions = {}): StackEventBridge {
   const doFetch = options.fetch ?? globalThis.fetch;
+  const schedule = options.setTimeout ?? setTimeout;
+  const unschedule = options.clearTimeout ?? clearTimeout;
   const base = (options.baseUrl ?? "http://127.0.0.1:8770").replace(/\/$/, "");
   const seen = new Set<number>();
   let lastSeq = -1;
@@ -239,7 +244,7 @@ export function startStackEventBridge(client: StackClient, options: StackEventBr
     if (stopped) return;
     try {
       const headers: Record<string, string> = {};
-      if (lastSeq >= 0) headers["last-event-id"] = String(lastSeq);
+      if (lastSeq >= 0) headers["Last-Event-Id"] = String(lastSeq);
       const res = await doFetch(`${base}/stack/v1/events`, { headers });
       if (!res.ok || !res.body) {
         throw new Error(`the Stack answered ${res.status} on the event feed`);
@@ -251,7 +256,7 @@ export function startStackEventBridge(client: StackClient, options: StackEventBr
       console.error(`${LOG_PREFIX} event feed connection failed: ${(err as Error).message}; reconnecting in ${backoff}ms`);
     }
     if (!stopped) {
-      timer = setTimeout(() => {
+      timer = schedule(() => {
         timer = null;
         void connect();
       }, backoff);
@@ -265,7 +270,7 @@ export function startStackEventBridge(client: StackClient, options: StackEventBr
     stop() {
       stopped = true;
       if (timer) {
-        clearTimeout(timer);
+        unschedule(timer);
         timer = null;
       }
     },

@@ -2695,6 +2695,7 @@ async function foldConversation(conversationId: string, opts: { inTurn?: boolean
       block = block.slice(0, lo);
     }
     const stored = await storeFold(conversation, temporary, block, Math.floor(SUMMARY_CAP_SHARE * contextTokens));
+    if (!stored && foldRetryRequested.delete(conversation.id)) return true;
     if (!stored || block[block.length - 1]!.id === target) return false;
   }
   return false;
@@ -2737,6 +2738,7 @@ const FOLD_REFUSED_BACKOFF_MS = 10 * 60 * 1000;
 /** A conversation whose fold the output floor refused twice is not
  * folded again until this time (in process memory). */
 const foldRefusedUntil = new Map<string, number>();
+const foldRetryRequested = new Set<string>();
 
 function passesFloor(text: string, band: AgeBand): boolean {
   return evaluateReply({ text }, band).effective.action === "allow";
@@ -2757,6 +2759,7 @@ async function storeFold(conversation: Conversation, temporary: boolean, block: 
   const log = (line: string) => { if (!temporary) console.log(`[conversationHistory] ${line} for ${conversation.id}`); };
   const transcript = foldTranscript(block);
   let summary = conversation.summary;
+  let retryAfterLink = false;
   if (transcript) {
     // CHAT-03 (#89): the fold never re-reads a credential from its own prior summary.
     const prior = conversation.summary ? redactCredentials(conversation.summary) : "none yet";
@@ -2767,11 +2770,13 @@ async function storeFold(conversation: Conversation, temporary: boolean, block: 
         { role: "system", content: instructions },
         { role: "user", content: `<prior_notes>\n${prior}\n</prior_notes>\n\n<transcript>\n${transcript}\n</transcript>` },
       ]);
+      retryAfterLink = !result.ok && result.failureKind === "unreachable";
       return result.ok && result.text.trim() ? result.text.trim() : null;
     };
     try {
       let folded = await fold(FOLD_INSTRUCTIONS);
       if (folded === null) {
+        if (retryAfterLink) { foldRetryRequested.add(conversation.id); return false; }
         log("summary fold skipped: the background engine is unavailable");
         return false;
       }

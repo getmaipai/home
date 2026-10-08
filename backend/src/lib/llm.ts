@@ -840,13 +840,15 @@ export async function startCompleteStream(
   return startDirectTokens(role, messages, opts, signal);
 }
 
-export type BackgroundResult = { ok: true; text: string } | { ok: false; unavailable: true };
+export type BackgroundResult = { ok: true; text: string } | { ok: false; unavailable: true; failureKind?: string };
 
 /** Runs memory extraction and summaries through the configured Stack judge. */
 export async function completeBackground(messages: LlmMessage[], options: LlmCompleteOptions = {}): Promise<BackgroundResult> {
   const { body } = chatRequestBody(messages, options);
   const result = await completeViaStackRequest("background", { ...body, model: options.model ?? "judge" });
-  if (!result.ok) return { ok: false, unavailable: true };
+  if (!result.ok) {
+    return { ok: false, unavailable: true, failureKind: result.failure.failureKind };
+  }
   const data = result.data as { choices?: Array<{ message?: { content?: string } }> };
   const content = data.choices?.[0]?.message?.content;
   return typeof content === "string" ? { ok: true, text: content } : { ok: false, unavailable: true };
@@ -868,7 +870,7 @@ export interface EmbedValue {
 
 export type EmbedOpResult =
   | { ok: true; value: EmbedValue }
-  | { ok: false; status: 400 | 503; code: "invalid_input" | "unavailable"; error: string };
+  | { ok: false; status: 400 | 503; code: "invalid_input" | "unavailable"; error: string; failureKind?: string };
 
 // CHAT-09: the preprocessing scheme version stamped into every stored
 // embedding row and carried on every query vector. Today there is exactly

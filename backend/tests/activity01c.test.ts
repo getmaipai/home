@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { db } from "@/db";
 import { jobs, scheduledJobs, modelDownloadJobs } from "@/db/schema";
 import { createJob, updateJob, listJobsForViewer, listJobsForViewerLive } from "@/lib/jobs";
-import { modelDownloadJobsAsHomeJobs, startImageProducerJob } from "@/lib/jobProducers";
+import { modelDownloadJobsAsHomeJobs, pollActiveStackImageJobs, startImageProducerJob } from "@/lib/jobProducers";
 import { people } from "@/db/schema";
 import { runDueJobs } from "@/lib/scheduler";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture } from "./stackFixture";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { StackError } from "@/lib/stack/errors";
 
 beforeEach(() => {
   resetDb();
@@ -18,6 +19,31 @@ beforeEach(() => {
 const person = (id: string, role: string) => ({ id, role, birthdate: null } as never);
 
 describe("ACTIVITY-01c producer adapters", () => {
+  test("a pending image resumes polling its original Stack job id after link recovery", async () => {
+    const queued = { id: "img-resume-1", kind: "image.generate", role: "image", state: "queued", percent: 0, completedBytes: 0, totalBytes: 1, status: "queued", position: null, input: { prompt: "private prompt" }, result: null, reason: null, createdAt: "2026-10-06T10:00:00.000Z", updatedAt: "2026-10-06T10:00:00.000Z" };
+    const done = { ...queued, state: "done", percent: 100, status: "ready", result: { fileId: "file-resume" } };
+    const fixture = startStackFixture({ "POST /stack/v1/jobs": async () => Response.json({ job: queued }, { status: 202 }) });
+    try {
+      const queried: string[] = [];
+      const originalJob = fixture.client.job.bind(fixture.client);
+      let disconnected = true;
+      fixture.client.job = async (id, opts) => {
+        queried.push(id);
+        if (disconnected) throw new StackError("unreachable", "Stack link is unreachable");
+        return id === queued.id ? done as never : originalJob(id, opts);
+      };
+      __setStackClientForTests(fixture.client);
+      const now = new Date().toISOString();
+      db.insert(people).values({ id: "adult-resume", displayName: "Adult", nickname: null, bio: null, accent: null, role: "adult", birthdate: null, avatarSeed: "a", source: "local", localOnly: false, createdAt: now, updatedAt: now, deletedAt: null, hlc: "1:0:abcdefgh", enabled: true, guestExpiresAt: null, memorializedAt: null } as never).run();
+      const initial = await startImageProducerJob({ actorId: "adult-resume", prompt: "private prompt" });
+      expect(initial.state).toBe("queued");
+      disconnected = false;
+      expect(await pollActiveStackImageJobs()).toBe(1);
+      expect(queried).toEqual([queued.id, queued.id]);
+      expect(db.select().from(jobs).get()).toMatchObject({ id: queued.id, state: "done", resultRef: "file-resume" });
+    } finally { fixture.stop(); }
+  });
+
   test("a child-started image producer reaches done from the Stack job", async () => {
     const stackJob = { id: "img-child-1", kind: "image", role: "image", state: "done", percent: 100, completedBytes: 1, totalBytes: 1, status: "ready", position: null, input: { prompt: "private child prompt" }, result: { fileId: "file-1" }, reason: null, createdAt: "2026-10-06T10:00:00.000Z", updatedAt: "2026-10-06T10:01:00.000Z" };
     const fixture = startStackFixture({

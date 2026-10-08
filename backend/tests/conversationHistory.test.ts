@@ -23,6 +23,8 @@ function useBackgroundStack(upstream: string): void {
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __setSummaryRefreshDelayForTests } from "@/lib/summaryRefresh";
+import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
+import { StackError } from "@/lib/stack/errors";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import {
   list,
@@ -1867,6 +1869,37 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     if (!row.ok) throw new Error(row.error);
     expect(row.value.summary).not.toBeNull();
     expect(row.value.summary_through_turn).not.toBeNull();
+  });
+
+  test("a remote link drop keeps a summary fold pending for the next debounced pass", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    for (let i = 0; i < 8; i++) logTurn(actor, "chat", `resume msg ${i}`, { reply: { text: `resume reply ${i}` }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: `turn-resume-${i}` });
+    const { startStubLlmServer } = await import("@maipai/spec/llm/ts/stubServer.js");
+    const stub = startStubLlmServer();
+    useBackgroundStack(stub.url);
+    const fixture = backgroundFixtures.at(-1)!;
+    const originalChat = fixture.client.chat.bind(fixture.client);
+    let disconnected = true;
+    let calls = 0;
+    fixture.client.chat = async (...args) => {
+      calls++;
+      if (disconnected) { disconnected = false; throw new StackError("unreachable", "Stack link is unreachable"); }
+      return originalChat(...args);
+    };
+    __setSummaryRefreshDelayForTests(1);
+    try {
+      scheduleSummaryRefresh(conv.value.id);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(calls).toBe(2);
+      const row = getConversation(actor, conv.value.id);
+      if (!row.ok) throw new Error(row.error);
+      expect(row.value.summary).not.toBeNull();
+    } finally {
+      __setSummaryRefreshDelayForTests(null);
+      await stub.stop();
+    }
   });
 
   // A code review (2026-09-13) found that editing the exact turn named by

@@ -27,6 +27,9 @@ import { db, sqlite } from "@/db";
 import { people, conversationTurns, episodes, pendingEpisodeEmbeddings, episodeEmbeddings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
+import { __setStackClientForTests } from "@/lib/stackEngine";
+import { StackError } from "@/lib/stack/errors";
+import type { StackClient } from "@/lib/stack/client";
 
 beforeEach(() => {
   resetDb();
@@ -400,6 +403,21 @@ describe("MEM-04 recallEpisodes()", () => {
     expect(db.select().from(pendingEpisodeEmbeddings).all()).toHaveLength(0);
     const matches = recallEpisodes(actor, "risotto", qv(768), { now: NOW, sides: "both" }); // "risotto" is in the hub's side of t-risotto
     expect(matches.map((m) => m.episode.turnId)).toContain("t-risotto");
+  });
+
+  test("pending episode embeddings survive a remote link drop and finish after recovery", async () => {
+    const { actor } = await setupOwner();
+    seedThreeWeeks(actor);
+    const pendingBefore = db.select().from(pendingEpisodeEmbeddings).all().length;
+    const client = { embeddings: async () => { throw new StackError("unreachable", "Stack link is unreachable"); } } as unknown as StackClient;
+    __setStackClientForTests(client);
+    expect(await embedPendingEpisodes()).toBe(0);
+    expect(db.select().from(pendingEpisodeEmbeddings).all()).toHaveLength(pendingBefore);
+
+    const vectors = Array.from({ length: 768 }, (_, i) => i === 0 ? 1 : 0);
+    client.embeddings = async (request) => ({ data: { data: (request.input as string[]).map((_, index) => ({ index, embedding: vectors })), model: "resume-embed" }, identity: { host: "local", build: null, model: "resume-embed", healthy: true } });
+    expect(await embedPendingEpisodes()).toBeGreaterThan(0);
+    expect(db.select().from(pendingEpisodeEmbeddings).all()).toHaveLength(0);
   });
 });
 

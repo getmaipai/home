@@ -852,7 +852,7 @@ export function rejectWorld(
  * (network, malformed JSON, an empty/non-object response) - null is what
  * counts against the poison guard; an empty array is a real, valid
  * "nothing worth remembering here" answer and does NOT. */
-async function extractFacts(speakerName: string, turn: ConversationTurnRow): Promise<ExtractedFact[] | null> {
+async function extractFacts(speakerName: string, turn: ConversationTurnRow): Promise<{ facts: ExtractedFact[] } | { facts: null; failureKind?: string }> {
   const messages: LlmMessage[] = [
     { role: "system", content: buildExtractionPrompt(speakerName, turn.createdAt) },
     { role: "user", content: `${speakerName}: ${turn.userText}\nAssistant: ${turn.replyText}` },
@@ -861,18 +861,18 @@ async function extractFacts(speakerName: string, turn: ConversationTurnRow): Pro
     temperature: 0.1,
     response_format: { type: "json_schema", json_schema: EXTRACTION_SCHEMA },
   });
-  if (!result.ok) return null;
+  if (!result.ok) return { facts: null, failureKind: result.failureKind };
   try {
     const parsed = JSON.parse(result.text) as { facts?: unknown };
-    if (!Array.isArray(parsed.facts)) return null;
+    if (!Array.isArray(parsed.facts)) return { facts: null };
     const facts: ExtractedFact[] = [];
     for (const raw of parsed.facts.slice(0, MAX_FACTS_PER_TURN)) {
       const fact = normalizeFact(raw);
       if (fact) facts.push(fact);
     }
-    return facts;
+    return { facts };
   } catch {
-    return null;
+    return { facts: null };
   }
 }
 
@@ -1162,13 +1162,20 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
     return { ok: true, factsWritten: 0 };
   }
   const speakerName = sanitizeForPrompt(speaker.displayName);
-  const extracted = await extractFacts(speakerName, turn);
-  if (extracted === null) {
+  const extraction = await extractFacts(speakerName, turn);
+  if (extraction.facts === null) {
+    // A remote link loss is transport state, not bad model output. Keep the
+    // row pending without consuming the finite malformed-output attempts;
+    // the normal judge worker pass will retry it after the link recovers.
+    if (extraction.failureKind === "unreachable") {
+      return { ok: false, factsWritten: 0 };
+    }
     if (markAttempt(turn.id, turn.judgeAttempts + 1)) {
       await trigger("memory.judge_failed", {}, { personId: speaker.id, subjectTurnId: turn.id });
     }
     return { ok: false, factsWritten: 0 };
   }
+  const extracted = extraction.facts;
   // The output-side rejection: the prompt's own examples, an unfilled
   // placeholder, a credential, and anything not grounded in the speaker's
   // words (MEM-06 (a); the confirmed assistant line is passed by a later

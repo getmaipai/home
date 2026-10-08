@@ -309,6 +309,9 @@ export interface StackFailureResult {
   status: 503;
   code: "unavailable";
   error: string;
+  /** Internal classifier used by durable background work to distinguish a
+   * disconnected remote link from a malformed model response. */
+  failureKind?: StackErrorKind;
   /** CHAT-CALM-ERRORS-01b: the raw facts beside the person's line, for the generation record. */
   facts?: StackFailureFacts;
 }
@@ -345,11 +348,11 @@ export function stackFailureResult(err: unknown, role: string): StackFailureResu
       // person (memory, speech, an internal call), so they keep the
       // plain "unavailable" wording every other failure kind already
       // gets; the real reason still goes to Repairs either way.
-      return { ok: false, status: 503, code: "unavailable", error: role === "chat" ? OFFLINE_COMPANION_LINE : `${role} model unavailable: the Stack is offline`, facts };
+      return { ok: false, status: 503, code: "unavailable", error: role === "chat" ? OFFLINE_COMPANION_LINE : `${role} model unavailable: the Stack is offline`, facts, failureKind: err.kind };
     }
     resolveStackOffline(role);
     const detail = role === "chat" && err.body ? ` (${boundedRawBody(err.body)})` : "";
-    return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${err.message}${detail}`, facts };
+    return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${err.message}${detail}`, facts, failureKind: err.kind };
   }
   return { ok: false, status: 503, code: "unavailable", error: `${role} model unavailable: ${(err as Error).message}`, facts };
 }

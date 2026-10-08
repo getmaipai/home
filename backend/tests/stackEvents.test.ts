@@ -226,6 +226,32 @@ describe("stack event bridge: notification mapping", () => {
 });
 
 describe("stack event bridge: reconnect and replay", () => {
+  test("resumes a dropped feed with Last-Event-Id", async () => {
+    const events: StackEventEnvelope[] = [];
+    const requests: Headers[] = [];
+    let reconnect: (() => void) | undefined;
+    let calls = 0;
+    const client = createStackClient({ baseUrl: BASE });
+    const bridge = startStackEventBridge(client, {
+      baseUrl: BASE,
+      fetch: (async (_input, init) => {
+        requests.push(new Headers(init?.headers));
+        calls++;
+        return streamResponse([sseFrame({ id: "job.progress", at: `2026-09-20T00:00:0${calls}Z`, seq: calls, data: { job: "j1", status: "running", percent: calls } })]);
+      }) as typeof fetch,
+      setTimeout: ((fn: (...args: never[]) => void) => { reconnect = fn; return 1 as unknown as ReturnType<typeof setTimeout>; }) as unknown as typeof setTimeout,
+      clearTimeout: (() => {}) as typeof clearTimeout,
+      onEvent: (event) => events.push(event),
+    });
+    await waitFor(() => events.length === 1);
+    expect(requests[0]?.get("Last-Event-Id")).toBeNull();
+    reconnect?.();
+    await waitFor(() => events.length === 2);
+    bridge.stop();
+    expect(requests[1]?.get("Last-Event-Id")).toBe("1");
+    expect(events.map((event) => event.seq)).toEqual([1, 2]);
+  });
+
   test("a dropped stream reconnects and replays from the last seen seq", async () => {
     const events: StackEventEnvelope[] = [];
     // First stream: seq 1 and 2, then the socket dies. Second stream
