@@ -9,7 +9,7 @@ import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
 import { refreshSafetyAlarmSensors } from "@/lib/safetyAlarm";
 import { checkSearchInstance } from "@/lib/searchInstanceCheck";
-import { applyEngineWhere, validateRemoteEngineSetting, ENGINE_WHERE_KEY } from "@/lib/remoteStackSettings";
+import { applyEngineWhere, validateRemoteEngineSetting, ENGINE_WHERE_KEY, refreshConfiguredEngineLink } from "@/lib/remoteStackSettings";
 
 export const settingsRoutes = apiRouter();
 
@@ -112,6 +112,7 @@ settingsRoutes.openapi(putRoute, async (c) => {
   }
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   if (body.scope === "household" && body.key === ENGINE_WHERE_KEY) await applyEngineWhere(body.value);
+  else if (body.scope === "household" && ["engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"].includes(body.key)) refreshConfiguredEngineLink();
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();

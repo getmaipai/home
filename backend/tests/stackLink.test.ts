@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { EngineLink, fullJitterDelay, LINK_BACKOFF_CAP_MS, LINK_OFFLINE_AFTER_MS, LINK_PROBE_INTERVAL_MS, LINK_PROBE_TIMEOUT_MS, LINK_READY_RESET_MS, mapSshFailure, type LinkDependencies } from "@/lib/stack/link";
+import { EngineLink, fullJitterDelay, getEngineLink, LINK_BACKOFF_CAP_MS, LINK_OFFLINE_AFTER_MS, LINK_PROBE_INTERVAL_MS, LINK_PROBE_TIMEOUT_MS, LINK_READY_RESET_MS, mapSshFailure, startEngineLink, stopEngineLink, __setEngineLinkForTests, type LinkDependencies } from "@/lib/stack/link";
 import { StackError } from "@/lib/stack/errors";
 
 type Timer = { at: number; fn: () => void; cancelled: boolean };
@@ -142,6 +142,27 @@ describe("engine link state machine", () => {
     try { link.assertReady(); throw new Error("expected throw"); }
     catch (error) { expect(error).toBeInstanceOf(StackError); expect((error as StackError).kind).toBe("unreachable"); }
     await startReady(link); expect(() => link.assertReady()).not.toThrow(); link.stop();
+  });
+
+  test("start is idempotent for the active link and stop clears its timers and instance", async () => {
+    const link = startEngineLink(config(), deps);
+    startEngineLink(config(), deps);
+    await flush();
+    expect(getEngineLink()).toBe(link);
+    expect(children).toHaveLength(1);
+    stopEngineLink();
+    expect(getEngineLink()).toBeNull();
+    expect(timers.filter((timer) => !timer.cancelled).length).toBe(0);
+  });
+
+  test("replacing the injected singleton stops its existing timers", async () => {
+    const first = new EngineLink(config(), deps); first.start(); await flush();
+    __setEngineLinkForTests(first);
+    const second = new EngineLink(config(), deps);
+    __setEngineLinkForTests(second);
+    expect(first.snapshot().state).toBe("offline");
+    expect(timers.filter((timer) => !timer.cancelled && timer.at > now).length).toBe(0);
+    stopEngineLink();
   });
 
   test("ignores late probes and exits after stop/replacement", async () => {

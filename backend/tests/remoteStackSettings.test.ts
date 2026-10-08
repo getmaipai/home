@@ -9,11 +9,16 @@ import {
   REMOTE_ENGINE_TAILNET_DISABLE_ERROR,
   REMOTE_ENGINE_TAILNET_ERROR,
   setStackLinkControl,
+  startConfiguredEngineLinkIfSelected,
 } from "@/lib/remoteStackSettings";
+import { getEngineLink, __setEngineLinkForTests, type EngineLink } from "@/lib/stack/link";
+import { __resetStackEngineForTests, __setStackClientForTests, getStackClient } from "@/lib/stackEngine";
 
 beforeEach(() => {
   resetDb();
   __resetStackLinkControlForTests();
+  __setEngineLinkForTests(null);
+  __resetStackEngineForTests();
 });
 
 async function owner(): Promise<TestClient> {
@@ -52,13 +57,28 @@ describe("remote Stack settings", () => {
     setStackLinkControl({
       async stopLocalStack() { calls.push("stop"); },
       async startLocalStackAndClearLink() { calls.push("start-and-clear-link"); },
+      startLink() { calls.push("start-link"); },
+      stopLink() { calls.push("stop-link"); },
+      refreshLink() { calls.push("refresh-link"); },
     });
     await client.put("/api/settings", { scope: "household", key: "engines.stack.remote.host", value: "192.168.1.20" });
     await client.put("/api/settings", { scope: "household", key: "engines.stack.where", value: "another_computer" });
-    expect(calls).toEqual(["stop"]);
+    expect(calls).toEqual(["stop", "start-link"]);
     await client.put("/api/settings", { scope: "household", key: "engines.stack.where", value: "this_computer" });
-    expect(calls).toEqual(["stop", "start-and-clear-link"]);
+    expect(calls).toEqual(["stop", "start-link", "stop-link", "start-and-clear-link"]);
     expect(getHouseholdSettingValue("engines.stack.remote.host")).toBe("");
+  });
+
+  test("this computer selection does not start the link at boot", () => {
+    startConfiguredEngineLinkIfSelected();
+    expect(getEngineLink()).toBeNull();
+  });
+
+  test("remote selection without a ready link fails before a Stack client or network call", () => {
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
+    setHouseholdSettingValue("engines.stack.remote.host", "192.168.1.20");
+    __setStackClientForTests(null);
+    expect(() => getStackClient()).toThrow(expect.objectContaining({ kind: "unreachable" }));
   });
 
   test("privacy rows appear only for a remote engine and the away row only when enabled", () => {

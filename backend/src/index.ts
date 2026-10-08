@@ -35,6 +35,7 @@ import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
 import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
+import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@/lib/remoteStackSettings";
 
 const configuredPort = Number(process.env.PORT ?? 8787);
 purgeLegacyHubLogs();
@@ -70,6 +71,11 @@ setWarmupPrompt(turnWarmupPrompt);
 // module-load seeding, still there - see lib/hlc.ts's own header on why
 // the wider seed lives here instead of scattered per-table).
 seedHlcFromDatabase();
+// Remote Stack links are optional boot work. The state machine starts its
+// SSH/DNS/probe work asynchronously, so a missing or offline engine never
+// holds Home's HTTP server startup.
+try { startConfiguredEngineLinkIfSelected(); }
+catch (err) { console.error(`[index] engine link failed to start: ${(err as Error).message}`); }
 void syncStackRequirementIssue();
 await recordBootGap();
 void recordStatusSample();
@@ -434,6 +440,7 @@ try {
 process.on("exit", () => wyomingServer?.stop());
 const exitGracefully = async (): Promise<void> => {
   wyomingServer?.stop();
+  stopConfiguredEngineLink();
   await shutdownEngines();
   process.exit(0);
 };

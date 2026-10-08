@@ -1,5 +1,9 @@
 import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
+import { getEngineLink, startEngineLink, stopEngineLink, type LinkConfig } from "@/lib/stack/link";
+import { startLocalStackService, stopLocalStackService, STACK_LINK_KNOWN_HOSTS_PATH, STACK_LINK_PRIVATE_KEY_PATH } from "@/lib/localStackService";
+import { dataDir } from "@/lib/paths";
+import { join } from "node:path";
 
 export const REMOTE_ENGINE_HOST_KEY = "engines.stack.remote.host";
 export const REMOTE_ALLOW_TAILNET_KEY = "engines.stack.remote.allow_tailnet";
@@ -11,21 +15,30 @@ export const REMOTE_ENGINE_TAILNET_DISABLE_ERROR = "Change the address to one on
 export type StackLinkControl = {
   stopLocalStack(): Promise<void>;
   startLocalStackAndClearLink(): Promise<void>;
+  startLink(): void;
+  stopLink(): void;
+  refreshLink(): void;
 };
 
-const noStackLinkControl: StackLinkControl = {
-  async stopLocalStack() {},
-  async startLocalStackAndClearLink() {},
+const realStackLinkControl: StackLinkControl = {
+  async stopLocalStack() { stopLocalStackService(); },
+  async startLocalStackAndClearLink() { startLocalStackService(); },
+  startLink() { startConfiguredEngineLink(); },
+  stopLink() { stopEngineLink(); },
+  refreshLink() {
+    if (getHouseholdSettingValue(ENGINE_WHERE_KEY) === "another_computer") startConfiguredEngineLink();
+    else stopEngineLink();
+  },
 };
 
-let stackLinkControl: StackLinkControl = noStackLinkControl;
+let stackLinkControl: StackLinkControl = realStackLinkControl;
 
 export function setStackLinkControl(control: StackLinkControl): void {
-  stackLinkControl = control;
+  stackLinkControl = { ...realStackLinkControl, ...control };
 }
 
 export function __resetStackLinkControlForTests(): void {
-  stackLinkControl = noStackLinkControl;
+  stackLinkControl = realStackLinkControl;
 }
 
 export async function validateRemoteEngineSetting(key: string, value: unknown): Promise<string | null> {
@@ -40,9 +53,53 @@ export async function validateRemoteEngineSetting(key: string, value: unknown): 
 }
 
 export async function applyEngineWhere(value: unknown): Promise<void> {
-  if (value === "another_computer") await stackLinkControl.stopLocalStack();
+  if (value === "another_computer") {
+    await stackLinkControl.stopLocalStack();
+    stackLinkControl.startLink();
+  }
   else if (value === "this_computer") {
+    stackLinkControl.stopLink();
     await stackLinkControl.startLocalStackAndClearLink();
     setHouseholdSettingValue(REMOTE_ENGINE_HOST_KEY, "");
   }
 }
+
+function configuredLink(): LinkConfig | null {
+  const host = getHouseholdSettingValue(REMOTE_ENGINE_HOST_KEY);
+  if (typeof host !== "string" || !host.trim()) return null;
+  const numberSetting = (key: string, fallback: number) => {
+    const value = getHouseholdSettingValue(key);
+    return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 65535 ? value : fallback;
+  };
+  return {
+    host: host.trim(),
+    sshPort: numberSetting("engines.stack.remote.ssh_port", 22),
+    localPort: numberSetting("engines.stack.remote.local_port", 8771),
+    allowTailnet: getHouseholdSettingValue(REMOTE_ALLOW_TAILNET_KEY) === true,
+    privateKeyPath: join(dataDir, STACK_LINK_PRIVATE_KEY_PATH),
+    knownHostsPath: join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH),
+  };
+}
+
+function startConfiguredEngineLink(): void {
+  const config = configuredLink();
+  if (config) startEngineLink(config);
+  else stopEngineLink();
+}
+
+setStackLinkControl(realStackLinkControl);
+
+/** Called at boot: invalid or incomplete pairing must not hold up Home. */
+export function startConfiguredEngineLinkIfSelected(): void {
+  if (getHouseholdSettingValue(ENGINE_WHERE_KEY) !== "another_computer") {
+    stopEngineLink();
+    return;
+  }
+  startConfiguredEngineLink();
+}
+
+/** Settings changes that affect the active route or tunnel restart it in place. */
+export function refreshConfiguredEngineLink(): void { realStackLinkControl.refreshLink(); }
+
+/** The link is synchronous to stop; this adapter matches shutdown hook semantics. */
+export function stopConfiguredEngineLink(): void { stopEngineLink(); }

@@ -291,8 +291,19 @@ export class EngineLink {
   }
 }
 
-let activeLink: EngineLink | null = null;
-export function startEngineLink(config: LinkConfig, deps?: Partial<LinkDependencies>): EngineLink { activeLink?.stop(); activeLink = new EngineLink(config, deps); activeLink.start(); return activeLink; }
-export function stopEngineLink(): void { activeLink?.stop(); activeLink = null; }
-export function getEngineLinkState(): EngineLinkState | null { return activeLink?.snapshot() ?? null; }
-export function __setEngineLinkForTests(link: EngineLink | null): void { activeLink = link; }
+interface ActiveLinkState { link: EngineLink | null; }
+const linkGlobal = globalThis as typeof globalThis & { __maipaiEngineLink?: ActiveLinkState };
+const activeState = linkGlobal.__maipaiEngineLink ??= { link: null };
+export function startEngineLink(config: LinkConfig, deps?: Partial<LinkDependencies>): EngineLink {
+  if (activeState.link) {
+    activeState.link.updateSettings({ host: config.host, sshPort: config.sshPort, localPort: config.localPort, allowTailnet: config.allowTailnet });
+    return activeState.link;
+  }
+  activeState.link = new EngineLink(config, deps);
+  activeState.link.start();
+  return activeState.link;
+}
+export function stopEngineLink(): void { activeState.link?.stop(); activeState.link = null; }
+export function getEngineLink(): EngineLink | null { return activeState.link; }
+export function getEngineLinkState(): EngineLinkState | null { return activeState.link?.snapshot() ?? null; }
+export function __setEngineLinkForTests(link: EngineLink | null): void { activeState.link?.stop(); activeState.link = link; }

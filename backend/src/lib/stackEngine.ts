@@ -7,6 +7,7 @@
 // client per URL, and mapping a StackError the same way everywhere
 // (never inventing a cause the Stack itself didn't state).
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { getEngineLink } from "@/lib/stack/link";
 import { createStackClient, type StackClient } from "@/lib/stack/client";
 import { FAILURE_COPY, stackRefusalKind, type FailureKind } from "@/lib/failureCopy";
 import { StackError, type StackErrorKind } from "@/lib/stack/errors";
@@ -30,6 +31,14 @@ const ISSUE_SOURCE = "stack";
  * bad value degrades to Home's own supervisors instead of throwing out
  * of every call site that asks for a client. */
 export function getStackUrl(): string | null {
+  if (getHouseholdSettingValue("engines.stack.where") === "another_computer") {
+    const link = getEngineLink();
+    if (!link) return null;
+    link.assertReady();
+    const portValue = getHouseholdSettingValue("engines.stack.remote.local_port");
+    const port = typeof portValue === "number" && Number.isInteger(portValue) && portValue > 0 && portValue <= 65535 ? portValue : 8771;
+    return `http://127.0.0.1:${port}`;
+  }
   const raw = getHouseholdSettingValue("engines.stack.url");
   if (typeof raw !== "string" || raw.trim().length === 0) return null;
   const trimmed = raw.trim();
@@ -40,6 +49,11 @@ export function getStackUrl(): string | null {
 }
 
 export function isStackConfigured(): boolean {
+  // Remote selection is a configured target even while its SSH link is
+  // connecting. roleHealth() must probe that target (and report it
+  // unavailable) rather than treating a valid selection like no Stack at
+  // all; getStackClient() below remains fail-closed until the link is ready.
+  if (getHouseholdSettingValue("engines.stack.where") === "another_computer") return true;
   return testClient !== null || getStackUrl() !== null;
 }
 
@@ -65,6 +79,18 @@ let defaultTestClientEnabled = false;
  * admin action, never mid-turn) invalidates the cache the same way a
  * generation bump invalidates llmSupervisor.ts's own cached backend. */
 export function getStackClient(): StackClient {
+  if (getHouseholdSettingValue("engines.stack.where") === "another_computer" && !(process.env.NODE_ENV === "test" && testClient)) {
+    const link = getEngineLink();
+    if (!link) throw new StackError("unreachable", "Stack link is unreachable");
+    link.assertReady();
+    const remoteUrl = getStackUrl();
+    if (!remoteUrl) throw new StackError("unreachable", "Stack link is unreachable");
+    if (!cachedClient || cachedUrl !== remoteUrl) {
+      cachedClient = createStackClient({ baseUrl: remoteUrl });
+      cachedUrl = remoteUrl;
+    }
+    return cachedClient;
+  }
   if (testClient) return testClient;
   // A backend test may clear the preload's scripted client to exercise
   // unconfigured behavior, but it must never turn a household URL into a
