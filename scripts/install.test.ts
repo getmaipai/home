@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -113,6 +113,56 @@ describe("fetch_stack_commons", () => {
     expect(result.stderr.toString()).not.toContain("mktemp called during dry-run");
     expect(result.stdout.toString()).toContain("would fetch getmaipai/commons@core-v0.1.0");
     expect(result.stdout.toString()).toContain("scripts/build-binary.sh");
+  });
+});
+
+describe("engine computer Bun recovery", () => {
+  test.each(["missing", "empty", "unrunnable"] as const)("installs a working Bun runtime when its directory is %s", (state) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-engine-bun-recovery-"));
+    const bunHome = join(root, ".bun");
+    if (state === "empty") mkdirSync(bunHome);
+    if (state === "unrunnable") {
+      mkdirSync(join(bunHome, "bin"), { recursive: true });
+      writeFileSync(join(bunHome, "bin", "bun"), "#!/usr/bin/env bash\nexit 1\n", { mode: 0o755 });
+    }
+    const install = [
+      'curl() { printf "%s\\n" \'mkdir -p "$BUN_INSTALL/bin"\' \'printf "#!/usr/bin/env bash\\\\necho 1.2.3\\\\n" > "$BUN_INSTALL/bin/bun"\' \'chmod +x "$BUN_INSTALL/bin/bun"\'; }',
+      `source "${INSTALL_SH}"; ensure_bun_system_wide "${bunHome}"`,
+    ].join("; ");
+    try {
+      const result = Bun.spawnSync(["bash", "-c", install]);
+      expect(result.exitCode).toBe(0);
+      expect(Bun.spawnSync([join(bunHome, "bin", "bun"), "--version"]).stdout.toString().trim()).toBe("1.2.3");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("build output cannot delete the Bun runtime inside the engine install root", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-engine-build-output-"));
+    const bunHome = join(root, ".bun");
+    const bunBin = join(bunHome, "bin", "bun");
+    const source = join(root, "source");
+    const build = join(source, "scripts", "build-binary.sh");
+    const output = join(root, "scratch-output");
+    mkdirSync(join(bunHome, "bin"), { recursive: true });
+    mkdirSync(join(source, "scripts"), { recursive: true });
+    writeFileSync(bunBin, "#!/usr/bin/env bash\necho 1.2.3\n", { mode: 0o755 });
+    writeFileSync(build, [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      "bun --version >/dev/null",
+      'rm -rf "$OUT_DIR"',
+      'mkdir -p "$OUT_DIR/migrations" "$OUT_DIR/backend-src"',
+      'printf binary > "$OUT_DIR/maipai-stack-linux-x64"',
+    ].join("\n"), { mode: 0o755 });
+    try {
+      const command = `source "${INSTALL_SH}"; build_stack_binary "${source}" "${output}" "${bunBin}" no && publish_engine_stack_binary "${output}" "${root}" maipai-stack-linux-x64`;
+      const result = Bun.spawnSync(["bash", "-c", command]);
+      expect(result.exitCode).toBe(0);
+      expect(Bun.spawnSync([bunBin, "--version"]).stdout.toString().trim()).toBe("1.2.3");
+      expect(readFileSync(join(root, "maipai-stack-linux-x64"), "utf8")).toBe("binary");
+      expect(existsSync(join(root, "migrations"))).toBe(true);
+      expect(existsSync(join(root, "backend-src"))).toBe(true);
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });
 

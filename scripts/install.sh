@@ -110,12 +110,20 @@ find_free_port() {
 }
 
 ensure_bun_system_wide() {
-  local bun_home="$1"
-  if [ -x "${bun_home}/bin/bun" ]; then return; fi
+  local bun_home="$1" bun_bin="${1}/bin/bun" bun_version
+  if [ -x "$bun_bin" ]; then
+    bun_version=$("$bun_bin" --version 2>/dev/null) && [ -n "$bun_version" ] && return 0
+    log "The Bun runtime at ${bun_bin} is not runnable; replacing it..."
+    rm -rf "$bun_home" || die "Could not remove the unusable Bun runtime at ${bun_home}"
+  fi
   log "Installing the Bun runtime to ${bun_home}..."
-  mkdir -p "$bun_home"
-  curl -fsSL https://bun.sh/install | BUN_INSTALL="$bun_home" bash
-  [ -x "${bun_home}/bin/bun" ] || die "Bun install did not produce ${bun_home}/bin/bun"
+  mkdir -p "$bun_home" || die "Could not create the Bun runtime directory ${bun_home}"
+  curl -fsSL https://bun.sh/install | BUN_INSTALL="$bun_home" bash \
+    || die "Could not install Bun into ${bun_home}"
+  [ -x "$bun_bin" ] || die "Bun install did not produce an executable at ${bun_bin}"
+  bun_version=$("$bun_bin" --version 2>/dev/null) \
+    || die "Bun was installed at ${bun_bin}, but it could not run"
+  [ -n "$bun_version" ] || die "Bun at ${bun_bin} returned an empty version"
 }
 
 fetch_release_source() {
@@ -336,6 +344,19 @@ build_stack_binary() {
   PATH="$(dirname "$bun_bin"):$PATH" OUT_DIR="$out_dir" SKIP_VERIFY=1 bash "${source_dir}/scripts/build-binary.sh" || return 1
 }
 
+# Stack's build-binary.sh clears OUT_DIR before compiling. Keep its
+# scratch output outside the engine install root, where the Bun runtime
+# lives, then copy only the compiled payload into place.
+publish_engine_stack_binary() {
+  local built_dir="$1" out_dir="$2" binary_name="$3" artifact
+  mkdir -p "$out_dir" || return 1
+  for artifact in "$binary_name" migrations backend-src; do
+    [ -e "${built_dir}/${artifact}" ] || return 1
+    rm -rf "${out_dir:?}/${artifact}" || return 1
+    cp -a "${built_dir}/${artifact}" "$out_dir/" || return 1
+  done
+}
+
 # install-service's own argv, one token per line - the single source
 # both the --dry-run log line (stack_install_service_command, below,
 # built from this) and the real sudo -u/env call below actually run
@@ -516,8 +537,12 @@ setup_engine_computer() {
   source_dir="${source_root}/stack"
   fetch_stack_source "$source_dir" no || die "Could not fetch Stack source"
   fetch_stack_commons "${source_root}/commons" no || die "Could not fetch Stack's pinned Commons dependency"
-  build_stack_binary "$source_dir" "$ENGINE_STACK_ROOT" "$bun_bin" no \
+  local build_dir="${source_root}/output"
+  build_stack_binary "$source_dir" "$build_dir" "$bun_bin" no \
     || die "Could not build Stack binary"
+  publish_engine_stack_binary "$build_dir" "$ENGINE_STACK_ROOT" \
+    "$(render_stack_binary_name "$os" "$arch")" \
+    || die "Could not install the compiled Stack files into ${ENGINE_STACK_ROOT}"
   rm -rf "$source_root"
   chown -R "$ENGINE_STACK_USER:$ENGINE_STACK_USER" "$ENGINE_STACK_ROOT"
   local binary="$ENGINE_STACK_ROOT/$(render_stack_binary_name "$os" "$arch")"
