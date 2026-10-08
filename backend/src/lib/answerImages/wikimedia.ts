@@ -127,6 +127,10 @@ const STOP = new Set(["the", "and", "for", "from", "with", "that", "this", "its"
 /** A few spellings Wikidata descriptions use for what a person calls a kind. */
 const KIND_SPELLINGS: Record<string, string[]> = { tv: ["television"], movie: ["film"], film: ["film", "movie"], show: ["series", "television", "sitcom"], car: ["car", "automobile", "marque", "vehicle"], game: ["game"], snake: ["snake", "snakes"], fruit: ["fruit"], brand: ["brand", "company", "marque", "manufacturer"], company: ["company", "brand", "manufacturer"] };
 
+/** Kinds too generic to tell two things with one name apart (the show_images
+ * manifest's own example kind is "animal"). */
+const LOOSE_KINDS = new Set(["animal", "creature", "pet", "thing", "object", "item", "place", "location", "stuff", "plant", "person", "people", "something"]);
+
 function words(text: string): string[] {
   return text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter((w) => (w.length >= 3 || w === "tv") && !STOP.has(w) && !/^\d+$/.test(w));
 }
@@ -180,7 +184,12 @@ export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJ
   const wanted = subject.trim().toLowerCase();
   const pageSense = pageItem ? senses.find((x) => x.id === pageItem) : undefined;
   const kindFit = (x: Sense) => (kind.trim() ? kindScore(kind, x.description) : 0);
-  const fitting = senses.filter((x) => x.id !== pageItem && kindFit(x) > 0).sort((x, y) => kindFit(y) - kindFit(x));
+  // IMGQ-RESOLVE-01: a loose kind ("animal", "thing", "place") matches any
+  // description that happens to carry the word ("Animals" in a song's), so it
+  // never moves the subject off its own page onto a hit named exactly the
+  // subject. Specific kinds keep the full veto.
+  const looseKind = words(kind).length > 0 && words(kind).every((w) => LOOSE_KINDS.has(w));
+  const fitting = senses.filter((x) => x.id !== pageItem && kindFit(x) > 0 && !(looseKind && pageItem && x.label.toLowerCase() === wanted)).sort((x, y) => kindFit(y) - kindFit(x));
   // One entity call for the page's item and the senses that fit the kind
   // best: another sense wins only when it fits the kind, the page's item
   // does not, and it has an English article (a museum object or a zoo

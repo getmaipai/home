@@ -33,6 +33,15 @@ const WORLD: Record<string, Subject> = {
     { id: "Q105553568", label: "Wednesday", description: "American horror comedy television series", enwiki: "Wednesday (TV series)" },
     { id: "Q19498", label: "Sheffield Wednesday F.C.", description: "association football club in Sheffield, England", enwiki: "Sheffield Wednesday F.C." },
   ] },
+  "golden retriever": { page: { title: "Golden Retriever", item: "Q38686" }, senses: [
+    { id: "Q5579731", label: "Golden Retriever", description: "song by Super Furry Animals", enwiki: "Golden Retriever (song)" },
+    { id: "Q38686", label: "golden retriever", description: "dog breed", enwiki: "Golden Retriever" },
+  ] },
+  apple: { page: { title: "Apple", item: "Q89" }, senses: [
+    { id: "Q312", label: "Apple Inc.", description: "American technology company", enwiki: "Apple Inc." },
+    { id: "Q89", label: "apple", description: "fruit of the apple tree", enwiki: "Apple" },
+    { id: "Q213710", label: "Apple", description: "album by Mother Love Bone, a thing of beauty", enwiki: "Apple (album)" },
+  ] },
   croissant: { page: { title: "Croissant", item: "Q207832" }, senses: [
     { id: "Q37152046", label: "Croissant", description: "family name" },
     { id: "Q207832", label: "croissant", description: "French pastry", enwiki: "Croissant" },
@@ -99,6 +108,27 @@ describe("R1: the subject's own Wikipedia page names the item; the kind chooses 
   test("Wednesday: the TV series for 'TV series', though the page is the day", async () => {
     const { r } = await pick("Wednesday", "TV series");
     expect("entity" in r && r.entity.id).toBe("Q105553568");
+  });
+
+  // IMGQ-RESOLVE-01: "animal" matched "Animals" in a song's description.
+  test("golden retriever with the loose kind 'animal': the dog breed's page, not the song named the same", async () => {
+    const loose = await pick("golden retriever", "animal");
+    expect("entity" in loose.r && loose.r.entity.id).toBe("Q38686");
+    const specific = await pick("golden retriever", "dog breed");
+    expect("entity" in specific.r && specific.r.entity.id).toBe("Q38686");
+  });
+
+  test("loose kinds (thing, place, object) never move a subject off its own page; a specific kind still does", async () => {
+    for (const kind of ["thing", "place", "object"]) {
+      const r = (await pick("Apple", kind)).r;
+      expect("entity" in r && r.entity.id).toBe("Q89");
+    }
+    const fruit = (await pick("Apple", "fruit")).r;
+    expect("entity" in fruit && fruit.entity.id).toBe("Q89");
+    const company = (await pick("Apple", "technology company")).r;
+    expect("entity" in company && company.entity.id).toBe("Q312");
+    const planet = (await pick("Mercury", "planet")).r;
+    expect("entity" in planet && planet.entity.id).toBe("Q308");
   });
 
   test("never more than three Wikimedia calls (page and search side by side, then the item)", async () => {
