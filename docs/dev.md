@@ -36312,6 +36312,41 @@ Bars not met after two iterations, so `show_images` stays out of `tools_offered`
 
 Recall and first text with the new `kind` argument were not measured: the Stack's chat engine was refused for memory throughout (another session's engine held it).
 
+## IMGQ-05 and ANSWER-IMG-05 evidence run for the architect (2026-10-08)
+
+Evidence for `data-scratch/architect/ANSWER-IMG-06.verdict`. `tools_offered` is not edited; every bar below that fails is a reason it stays off.
+
+Setup: Stack chat engine `local b10797-832fd6f17`, model `Qwen3-8B-Q4_K_M.gguf`, Apple M4 Pro with 24 GB unified memory, resolver fix 34d920a5 and search fix 26d21751 in. Fresh empty data directory, full system prompt and roster, OFF and ON arm blocks alternating, 5 repeats, 20 s outside pace, SearXNG used at a person's pace. Judged tables and contact sheets stay in `data-scratch/chat-ab/img05-judged-1008/` and `img05-bench-1008/` (not committed).
+
+**Judged 40-question sample (evidence 1), 43 rows** (the 40 plus the owner's three: the new Exorcist poster, "show me a picture of Michael Jackson", and the "what does he look like" follow-up). Every visible tile was opened and judged by me.
+
+| bar | measured | result |
+|---|---|---|
+| broken or placeholder tiles | 0 | met |
+| duplicate tiles (visible) | 0; 1 hidden near-duplicate (croissant) | met visible, 1 hidden |
+| wrong-subject visible tile, at most 1 of 40 | 8 of 43 questions (Fiero seat speaker, PS5 chip die, Taj Mahal plaque, Starry Night histogram, Lakers ticket stubs, Man Utd bus advert, Michael Jackson concert ticket, plus the Exorcist poster row) | missed by 7 |
+| private people in a thing's visible row | 3 (Kinkaku-ji tourists, Bluey crowd, Starry Night visitors) plus a protest-sign stranger in both Michael Jackson rows | missed |
+| poster judged on year | Exorcist rows show 1973 material (logo, puppet, 1974 newspaper ad, 1973 poster); no 2027 poster surfaced | missed |
+
+Cause of the wrong tiles: the Commons candidate sits in the subject's own category and its caption names the subject, so both signals of the agree rule pass; the rule cannot tell an object that belongs to the subject from the subject itself.
+
+**Real-turn bench (evidence 2 to 5), Qwen3-8B, ON arm**
+
+| bar | measured | result |
+|---|---|---|
+| calls on visual rows, at least 90% | 15 of 55 (27%) on the main run; owner rows 14 of 15 | missed by 63 points on the main run |
+| recall (called and pictures shown), at least 85% | at most 27% main run; owner rows 2 of 15, because most Michael Jackson calls returned no pictures and the reply was "I don't actually have that" | missed |
+| non-visual rows called | 0 of 50 | met |
+| household-name row called | 0 of 5 | met |
+| 50-turn non-visual conversation | 0 calls | met |
+| first text, not-called rows | +10 ms | met |
+| first text, called alone | +0.7 to +0.9 s on three rows; outliers Fiero +11.5 s, teen red panda +3.4 s | met except two outliers |
+| child with images off, spoken turn | tool not offered | met |
+
+Caveats. The main run's ON replies show degenerate text and subjects leaking across rows ("Stranger Things Overview" repeated, "#MichaelJacksonPictureRequest"). Many other connections were established to the Stack during the run (the live hub is a client), so the numbers may be contaminated; this is unproven and the run was not repeated. Not measured: the Qwen3-VL arm, the teen Wikimedia budget as a separate table, and childOn beyond one row.
+
+Smallest fixes, none built. Recall and calls: only the tool description is allowed (prompt wording is out under RULES), and Qwen3-8B may not follow it; the call failures on Michael Jackson need the tool-argument path checked (calls made, no pictures). Wrong subject: prefer the subject's own article images over Commons category members for a thing, a deterministic change in `judgeRelevance`; a vision "is this X" check needs an owner ruling under rule 1.
+
 ## DOCS-01: 2026-10-06 owner rulings and documentation reconciliation
 
 The owner’s later ruling controls the earlier Row-Bot activity placement: Running now has no header button and no S2 exception. Chat shows the working dot at the reply tail, step disclosure in the message and the activity card above the composer. Approval waits use the calm card above the composer. The empty new-chat screen has a centered greeting, composer and generic starter suggestions; it has no “Runs on your own hub” line.

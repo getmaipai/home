@@ -205,6 +205,26 @@
       "id": "t-manutd",
       "subject": "Manchester United F.C.",
       "kind": "football club"
+    },
+    {
+      "id": "o-exorcist",
+      "subject": "The Exorcist: Martyrs",
+      "kind": "film",
+      "owner_row": "latest poster for the new Exorcist movie; judged on year (the 2027 film, not the 1973 one)"
+    },
+    {
+      "id": "o-mj",
+      "subject": "Michael Jackson",
+      "kind": "singer",
+      "person": true,
+      "owner_row": "show me a picture of Michael Jackson (public figure)"
+    },
+    {
+      "id": "o-mj-follow",
+      "subject": "Michael Jackson",
+      "kind": "singer",
+      "person": true,
+      "owner_row": "what does he look like (a follow-up resolves to the previous subject)"
     }
   ]
 }
