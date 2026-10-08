@@ -132,9 +132,15 @@ fetch_release_source() {
   local tmp
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' RETURN
-  curl -fsSL "https://github.com/${REPO}/archive/refs/tags/${tag}.tar.gz" -o "${tmp}/src.tar.gz"
-  mkdir -p "$dest"
-  tar -xzf "${tmp}/src.tar.gz" -C "$dest" --strip-components=1
+  if ! curl -fsSL "https://github.com/${REPO}/archive/refs/tags/${tag}.tar.gz" -o "${tmp}/src.tar.gz" \
+    || ! mkdir -p "$dest" \
+    || ! tar -xzf "${tmp}/src.tar.gz" -C "$dest" --strip-components=1; then
+    trap - RETURN
+    rm -rf "$tmp"
+    return 1
+  fi
+  trap - RETURN
+  rm -rf "$tmp"
 }
 
 build_app() {
@@ -279,9 +285,15 @@ fetch_stack_source() {
   local tmp
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' RETURN
-  curl -fsSL "https://github.com/${STACK_REPO}/archive/${STACK_TAG}.tar.gz" -o "${tmp}/stack.tar.gz" || return 1
-  mkdir -p "$dest" || return 1
-  tar -xzf "${tmp}/stack.tar.gz" -C "$dest" --strip-components=1 || return 1
+  if ! curl -fsSL "https://github.com/${STACK_REPO}/archive/${STACK_TAG}.tar.gz" -o "${tmp}/stack.tar.gz" \
+    || ! mkdir -p "$dest" \
+    || ! tar -xzf "${tmp}/stack.tar.gz" -C "$dest" --strip-components=1; then
+    trap - RETURN
+    rm -rf "$tmp"
+    return 1
+  fi
+  trap - RETURN
+  rm -rf "$tmp"
 }
 
 commons_core_sha256() {
@@ -312,16 +324,41 @@ fetch_stack_commons() {
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' RETURN
   log "Fetching getmaipai/commons@${tag}..."
-  curl -fsSL "https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz" -o "${tmp}/commons.tar.gz" || return 1
-  local actual
-  actual=$(sha256_file "${tmp}/commons.tar.gz") || return 1
-  if [ "$actual" != "$expected" ]; then
-    log "Commons ${tag} archive SHA-256 mismatch: expected ${expected}, got ${actual}"
+  if ! curl -fsSL "https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz" -o "${tmp}/commons.tar.gz"; then
+    trap - RETURN
+    rm -rf "$tmp"
     return 1
   fi
-  mkdir -p "$dest" || return 1
-  tar -xzf "${tmp}/commons.tar.gz" -C "$dest" --strip-components=1 "commons-${tag}/core" || return 1
-  [ -f "${dest}/core/package.json" ] || { log "Commons ${tag} archive is missing core/package.json"; return 1; }
+  local actual
+  if ! actual=$(sha256_file "${tmp}/commons.tar.gz"); then
+    trap - RETURN
+    rm -rf "$tmp"
+    return 1
+  fi
+  if [ "$actual" != "$expected" ]; then
+    log "Commons ${tag} archive SHA-256 mismatch: expected ${expected}, got ${actual}"
+    trap - RETURN
+    rm -rf "$tmp"
+    return 1
+  fi
+  if ! mkdir -p "$dest"; then
+    trap - RETURN
+    rm -rf "$tmp"
+    return 1
+  fi
+  if ! tar -xzf "${tmp}/commons.tar.gz" -C "$dest" --strip-components=1 "commons-${tag}/core"; then
+    trap - RETURN
+    rm -rf "$tmp"
+    return 1
+  fi
+  if [ ! -f "${dest}/core/package.json" ]; then
+    log "Commons ${tag} archive is missing core/package.json"
+    trap - RETURN
+    rm -rf "$tmp"
+    return 1
+  fi
+  trap - RETURN
+  rm -rf "$tmp"
 }
 
 # Builds via the Stack's own scripts/build-binary.sh (one definition:

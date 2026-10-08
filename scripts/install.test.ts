@@ -400,6 +400,35 @@ describe("REMOTE-STACK-BOX-01 engine computer dry runs", () => {
   });
 });
 
+describe("engine computer installer cleanup", () => {
+  test("completes the engine-computer function sequence without a leaked RETURN trap", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-engine-install-trap-"));
+    const command = [
+      `source "${INSTALL_SH}"`,
+      `mktemp() { echo "${root}"; }`,
+      `curl() { :; }`,
+      `tar() { command mkdir -p "${root}/commons/core"; touch "${root}/commons/core/package.json"; }`,
+      `sha256_file() { echo d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4; }`,
+      `build_stack_binary() { return 0; }`,
+      `install_stack_service() { return 0; }`,
+      `mkdir() { command mkdir -p "$@"; }`,
+      `fetch_stack_source "${root}/stack" no`,
+      `fetch_stack_commons "${root}/commons" no`,
+      `setup_stack "${root}/install" /usr/bin/bun linux x64 no`,
+      'echo "engine-computer path complete"',
+    ].join("; ");
+    try {
+      const result = Bun.spawnSync(["bash", "-c", command]);
+      const stderr = result.stderr.toString();
+      expect(stderr).not.toContain("unbound variable");
+      expect(result.exitCode, `${stderr}\n${result.stdout.toString()}`).toBe(0);
+      expect(result.stdout.toString()).toContain("engine-computer path complete");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("piped execution (curl -fsSL ... | bash, this file's own documented usage)", () => {
   test("main() still runs - a real regression found by a code review", () => {
     // `[[ "${BASH_SOURCE[0]}" == "${0}" ]]` looked like the right guard
