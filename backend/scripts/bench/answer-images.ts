@@ -40,6 +40,11 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import dataset from "./datasets/answer-images.json";
 import { refuseIfGateRunning, waitForHubQuiet } from "./liveHubQuiet";
+import { createEngineActivity } from "./engineSettle";
+
+// ANSWER-IMG-06: every engine request through the stand-in, so a row never starts
+// beside the hub's own background title or summary request (see engineSettle.ts).
+const engineActivity = createEngineActivity();
 
 type Label = "V" | "N" | "either" | "n/a";
 type PersonKey = "owner" | "teen" | "childOff" | "childOn";
@@ -145,7 +150,21 @@ const standIn = Bun.serve({
     const url = new URL(req.url);
     if (req.method === "GET" && url.pathname === "/health") return Response.json({ status: "ok" });
     const body = req.method === "GET" || req.method === "HEAD" ? undefined : await req.arrayBuffer();
-    const upstream = await realFetch(`${STACK_URL}${url.pathname}${url.search}`, { method: req.method, headers: req.headers, body, signal: req.signal });
+    engineActivity.begin();
+    let ended = false;
+    const finish = () => { if (!ended) { ended = true; engineActivity.end(); } };
+    let upstream: Response;
+    try {
+      upstream = await realFetch(`${STACK_URL}${url.pathname}${url.search}`, { method: req.method, headers: req.headers, body, signal: req.signal });
+    } catch (err) {
+      finish();
+      throw err;
+    }
+    if (!(req.method === "POST" && url.pathname === "/v1/chat/completions" && body)) {
+      const bytes = await upstream.arrayBuffer().catch(() => new ArrayBuffer(0));
+      finish();
+      return new Response(bytes, { status: upstream.status, headers: upstream.headers });
+    }
     if (req.method === "POST" && url.pathname === "/v1/chat/completions" && body) {
       const record: EngineRequest = { offered: [], toolChoice: undefined, called: [], contentToolText: false, cachedTokens: null, promptTokens: null, startAt: performance.now(), firstByteAt: null, endAt: null, timings: null };
       try {
@@ -158,7 +177,7 @@ const standIn = Bun.serve({
       // exact prompt and tool block each band sends.
       if (process.env.MAIPAI_IMG05_DUMP === "1") writeFileSync(join(OUT, `request-${String(requests.length).padStart(4, "0")}.json`), new TextDecoder().decode(body));
       engineHeaders = { engine: upstream.headers.get("x-maipai-engine") ?? engineHeaders.engine, model: upstream.headers.get("x-maipai-model") ?? engineHeaders.model };
-      if (!upstream.body) return upstream;
+      if (!upstream.body) { finish(); return upstream; }
       const [mine, theirs] = upstream.body.tee();
       void (async () => {
         const reader = mine.getReader();
@@ -171,7 +190,7 @@ const standIn = Bun.serve({
         }
         record.endAt = performance.now();
         parseCompletion(new TextDecoder().decode(Buffer.concat(chunks)), record);
-      })().catch(() => undefined);
+      })().catch(() => undefined).finally(finish);
       return new Response(theirs, { status: upstream.status, headers: upstream.headers });
     }
     return new Response(upstream.body, { status: upstream.status, headers: upstream.headers });
@@ -226,6 +245,13 @@ setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
 const searchSet = setHouseholdSettingValue("search.searxng_url", tee.url.toString().replace(/\/$/, ""));
 if (!searchSet.ok) throw new Error(`search setting: ${searchSet.error}`);
 
+// The hub waits 20 s of quiet before a title or summary; a bench moves on in seconds, so they run
+// right after their turn and the next row waits for them (engineSettle.ts).
+const { __setConversationTitleDelayForTests } = await import("@/lib/conversationTitle");
+const { __setSummaryRefreshDelayForTests } = await import("@/lib/summaryRefresh");
+__setConversationTitleDelayForTests(250);
+__setSummaryRefreshDelayForTests(250);
+
 const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
 if (!entry?.turn_budget) throw new Error("the 8B has no turn_budget");
 const shipped = (entry.turn_budget.tools_offered ?? []).filter((id) => id !== SHOW);
@@ -249,7 +275,7 @@ if (!turnedOn.ok) throw new Error(`turning pictures on for the child: ${turnedOn
 interface Picture { id: string; bytes: number; width: number | null; height: number | null; decoded: boolean; file: string | null; dhash: string | null; site: string; caption: string }
 interface Run {
   arm: Arm; row: string; label: Label; person: PersonKey; rep: number; text: string;
-  offered: boolean; called: string[]; subjects: string[]; textShapedCall: boolean;
+  offered: boolean; called: string[]; subjects: string[]; callArgs: string[]; textShapedCall: boolean;
   firstTextMs: number | null; totalMs: number; reply: string; error: string | null;
   images: { visible: number; items: number; afterParagraph: number; badge: number; near: [number, number, number][]; pictures: Picture[]; sheet: string | null } | null;
   skipped: string | null; outbound: Record<string, number>; cachedTokens: number | null; promptTokens: number | null;
@@ -359,6 +385,8 @@ async function turn(arm: Arm, row: Row, rep: number, conversationId: string | nu
   const subjects = [
     ...mine.flatMap((r) => r.called.filter((c) => c.name === SHOW).map((c) => { try { return String(JSON.parse(c.args).subject ?? ""); } catch { return c.args; } })),
   ];
+  // The raw arguments of every show_images call, to trace a call that shows nothing.
+  const callArgs = mine.flatMap((r) => r.called.filter((c) => c.name === SHOW).map((c) => c.args));
   const showOutcome = outcomes.find((o) => o.packageId === SHOW);
   let skipped: string | null = null;
   let trace: unknown = null;
@@ -380,7 +408,7 @@ async function turn(arm: Arm, row: Row, rep: number, conversationId: string | nu
   }
   const run: Run = {
     arm, row: row.id, label: row.label, person: row.person, rep, text: row.text,
-    offered, called, subjects, textShapedCall: mine.some((r) => r.contentToolText),
+    offered, called, subjects, callArgs, textShapedCall: mine.some((r) => r.contentToolText),
     firstTextMs, totalMs, reply, error, images, skipped, outbound: out,
     cachedTokens: mine[0]?.cachedTokens ?? null, promptTokens: mine[0]?.promptTokens ?? null,
     outsideTouched: searches > searchMark || outbound.length > outMark,
@@ -393,6 +421,8 @@ async function turn(arm: Arm, row: Row, rep: number, conversationId: string | nu
 const hubLog = process.env.MAIPAI_HUB_LOG;
 let lastOutside = 0;
 async function paced(): Promise<void> {
+  // The previous row's background engine requests (title, summary) finish before this row starts.
+  if (!(await engineActivity.settle(3_000, 120_000))) console.log("[answer-images] the engine did not go quiet within 120 s; continuing");
   const since = Date.now() - lastOutside;
   if (lastOutside > 0 && since < OUTSIDE_PACE_MS) await new Promise((r) => setTimeout(r, OUTSIDE_PACE_MS - since));
   if (hubLog) await waitForHubQuiet(hubLog, (m) => console.log(m));
@@ -435,7 +465,7 @@ try {
           const { run } = await turn(arm, row, rep, convo, `${row.id}-${arm}-${rep}`);
           runs.push(run);
           if (run.outsideTouched) lastOutside = Date.now();
-          console.log(`[${arm} r${rep}] ${row.id} (${row.label}) offered=${run.offered} called=[${run.called.join(",")}]${run.subjects.length ? ` subject=${JSON.stringify(run.subjects)}` : ""} first=${run.firstTextMs === null ? "none" : Math.round(run.firstTextMs)}ms total=${Math.round(run.totalMs)}ms pictures=${run.images ? `${run.images.items} (visible ${run.images.visible}, after_paragraph ${run.images.afterParagraph})` : "none"}${run.skipped ? ` skipped=${run.skipped}` : ""}${run.error ? ` ERROR=${run.error}` : ""}`);
+          console.log(`[${arm} r${rep}] ${row.id} (${row.label}) offered=${run.offered} called=[${run.called.join(",")}]${run.callArgs.length ? ` args=${run.callArgs.join(" ")}` : ""} first=${run.firstTextMs === null ? "none" : Math.round(run.firstTextMs)}ms total=${Math.round(run.totalMs)}ms pictures=${run.images ? `${run.images.items} (visible ${run.images.visible}, after_paragraph ${run.images.afterParagraph})` : "none"}${run.skipped ? ` skipped=${run.skipped}` : ""}${run.error ? ` ERROR=${run.error}` : ""}`);
           save();
         }
       }

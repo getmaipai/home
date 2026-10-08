@@ -4,6 +4,14 @@ All notable changes to the Show Pictures package, in [Keep a Changelog](https://
 
 ## [Unreleased]
 
+### Fixed
+
+- ANSWER-IMG-06: `kind` is marked `grounded: false`. It is the model's own
+  label ("person", "building", "animal"), not the person's words, and the
+  grounding check refused every call whose kind the person had not said, so
+  "show me a picture of Michael Jackson" got "I don't actually have that" and
+  no pictures. The `subject` is still checked against what the person said.
+
 ### Changed
 
 - IMGSEARCH-01: a required `kind` argument says what kind of thing to show

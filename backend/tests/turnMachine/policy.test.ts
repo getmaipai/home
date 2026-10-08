@@ -105,6 +105,36 @@ describe("argsGrounded(): GROUND-01 step 2, exempts only the manifest's schema-t
   });
 });
 
+// ANSWER-IMG-06: show_images' `kind` is the model's own one-to-three-word
+// classification ("person", "building", "animal"), never something the person
+// said. A real-turn bench trace showed every call refused as `ungrounded_args`
+// on `kind` and answered with the "I won't guess" line: Michael Jackson with
+// kind "person", Eiffel Tower with "building", koala with "animal". Only the
+// `subject` (the thing the person named) is grounded.
+describe("argsGrounded(): show_images grounds the subject, not the model's own kind", () => {
+  const showImages = loadManifestOnly("show_images");
+  if (!showImages.ok) throw new Error("show_images manifest failed to load");
+  const showSchema = showImages.value.args as typeof schema;
+
+  test("the exact calls the live bench traced pass: subject named, kind a classification the person never said", () => {
+    expect(argsGrounded({ subject: "Michael Jackson", kind: "person" }, ["show me a picture of Michael Jackson"], showSchema)).toBe(true);
+    expect(argsGrounded({ subject: "Eiffel Tower", kind: "building" }, ["what does the Eiffel Tower look like"], showSchema)).toBe(true);
+    expect(argsGrounded({ subject: "koala", kind: "animal" }, ["what does a koala look like"], showSchema)).toBe(true);
+  });
+
+  test("the subject is still grounded: a subject the person never said is refused whatever the kind", () => {
+    expect(argsGrounded({ subject: "Eiffel Tower", kind: "building" }, ["what does a koala look like"], showSchema)).toBe(false);
+  });
+
+  test("a bare pronoun subject is still refused", () => {
+    expect(argsGrounded({ subject: "he", kind: "person" }, ["what does he look like"], showSchema)).toBe(false);
+  });
+
+  test("a follow-up grounds on the window's earlier user turn", () => {
+    expect(argsGrounded({ subject: "Michael Jackson", kind: "person" }, ["what does he look like", "who is Michael Jackson"], showSchema)).toBe(true);
+  });
+});
+
 // MANIFEST-REFUSAL-01 (fixes getmaipai/home#166, coordinator's comment
 // 2026-09-26): the live incident was every bundled manifest gaining an
 // `incognito` key the still-running process's schema didn't know, and

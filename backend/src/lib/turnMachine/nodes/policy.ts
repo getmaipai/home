@@ -102,6 +102,11 @@ const PURE_NUMBER_RE = /^\d+$/;
 interface ArgPropertySchema {
   type?: string;
   enum?: readonly unknown[];
+  /** `false`: the manifest declares this field the model's own label, never
+   * the person's words (show_images' `kind`: "person", "building"), so it is
+   * not checked for term overlap. The field that carries the person's words
+   * (the subject, the query) is still checked. ANSWER-IMG-06. */
+  grounded?: boolean;
 }
 interface ArgSchema {
   properties?: Record<string, ArgPropertySchema>;
@@ -145,6 +150,7 @@ function checkGrounding(args: Record<string, unknown>, sourceTexts: readonly str
     // wrongly checked as if they were free text), not a reason to stop
     // checking anything else.
     if (prop?.enum !== undefined || prop?.type === "boolean") continue;
+    if (prop?.grounded === false) continue;
     if (isBarePronoun(value)) return { ok: false, arg: key };
     const terms = [...tokenize(value)].filter((t) => !PURE_NUMBER_RE.test(t));
     if (terms.length === 0) continue; // nothing left but numbers/stopwords - never counts against it

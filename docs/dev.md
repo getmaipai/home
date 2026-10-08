@@ -36362,6 +36362,30 @@ Caveats. The main run's ON replies show degenerate text and subjects leaking acr
 
 Smallest fixes, none built. Recall and calls: only the tool description is allowed (prompt wording is out under RULES), and Qwen3-8B may not follow it; the call failures on Michael Jackson need the tool-argument path checked (calls made, no pictures). Wrong subject: prefer the subject's own article images over Commons category members for a thing, a deterministic change in `judgeRelevance`; a vision "is this X" check needs an owner ruling under rule 1.
 
+**Quiet-machine re-run of the real-turn bench (2026-10-08).** The table above is superseded by this one; the first run was garbled for two reasons found and fixed below. Setup: hub on port 8787 stopped, dev Stack alone, engine `local b10797-832fd6f17`, model `Qwen3-8B-Q4_K_M.gguf`, Apple M4 Pro with 24 GB unified memory, full system prompt and roster, OFF and ON blocks alternating, 5 repeats, every row including the owner, teen and child rows, 310 turns plus the 50-turn conversation, SearXNG at a person's pace. 0 broken tiles in 206, 0 empty replies, 0 spliced or meta replies in 310 (the earlier run had 5).
+
+| bar | measured | result |
+|---|---|---|
+| calls on visual rows, at least 90% | 43 of 70 (61%): adult 39 of 60, teen 4 of 5, child with images on 0 of 5 | missed by 29 points |
+| recall (called and pictures shown), at least 85% | 42 of 70 (60%): adult 38 of 60, teen 4 of 5, child 0 of 5 | missed by 25 points |
+| non-visual rows called, at most 5% | 0 of 50 | met |
+| household-name row called | 0 of 5 | met |
+| 50-turn non-visual conversation | 0 calls, 0 errors | met |
+| first text, not-called rows | owner median 515 ms against 517 ms OFF (+0) | met |
+| first text, called alone | owner median 1569 ms against 517 ms OFF (about +1.0 s) | borderline at the bar; teen red panda about +3.3 s (4.2 s against 1.0 s) |
+| child with images off, spoken turn, temporary chat | tool not offered in 10 of 10 | met |
+
+Per row, adult calls out of 5: Michael Jackson 5, "what does he look like" 5, koala 5, Blaine "look" 5, Exorcist poster 5 (pictures in 4, one `no_candidates`), Eiffel 4, switch 4, stranger 3, Feldman 2, Fiero 1, Blaine 0, Jurassic 0. The private-person row called twice and correctly showed nothing (`no_article`). A called turn showed 3 tiles in all but two.
+
+Defects found and fixed (ANSWER-IMG-06):
+
+1. The Michael Jackson, Eiffel and koala calls made no pictures. Traced from real logs: the call carried `kind: "person"` (the model's own label), and GROUND-01 refused it as `ungrounded_args` because "person" is not in what the user said, so the reply was "I don't actually have that". `kind` is now marked `grounded: false` in the tool schema, `checkGrounding` skips such a property, and the subject is still checked. Regression tests in `backend/tests/turnMachine/policy.test.ts` (exact traced calls, a subject never said still refused, a pronoun subject refused, a follow-up grounded on the window). Before this fix the Michael Jackson rows (14 of 15 calls, 2 of 15 with pictures) lost their pictures here; no separate before and after run of the whole table was made, so the effect on the overall rate is not isolated.
+2. Replies with another row's text spliced in. The hub's debounced title and summary requests normally wait for a 20 s idle window; the bench sent rows seconds apart, so they ran on the single engine slot beside the next turn. The bench now counts engine requests through its stand-in and waits for a quiet engine before each row (`backend/scripts/bench/engineSettle.ts`, test `backend/tests/engineSettle.test.ts`), and shortens the title and summary delays. This is a bench defect only; a person never sends the next message inside that window.
+
+Description trials, both reverted. Two rewrites of the `show_images` description (within its 200 character limit) did not raise calls or recall clearly, so the original stays. Blaine, Jurassic, Fiero and the child koala row rarely or never call on this model.
+
+Smallest allowed fix for the remaining miss: none that is proven. The only permitted levers are the tool description (tried twice, no clear gain) and native engine features; prompt wording and a learned component are out. Qwen3-8B's tool choice is the limit. Not measured: the Qwen3-VL arm.
+
 ## DOCS-01: 2026-10-06 owner rulings and documentation reconciliation
 
 The owner’s later ruling controls the earlier Row-Bot activity placement: Running now has no header button and no S2 exception. Chat shows the working dot at the reply tail, step disclosure in the message and the activity card above the composer. Approval waits use the calm card above the composer. The empty new-chat screen has a centered greeting, composer and generic starter suggestions; it has no “Runs on your own hub” line.
