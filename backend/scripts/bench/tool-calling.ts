@@ -22,6 +22,9 @@
 // budget-offered pass below is the one path's own tool offer.
 //
 // Usage: bun run scripts/bench/tool-calling.ts
+// The E1 route pass can target Home's Stack API directly with
+// MAIPAI_BENCH_PASS=route, MAIPAI_STACK_URL, and MAIPAI_BENCH_ARM=A0|A0n|A2|A2n|A1;
+// each named arm fixes its model, sampling and thinking settings in routeE1Arms.ts.
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
 import "./setup"; // CHAT-22: must come before anything that reaches "@/db"
 import { finishBench, startBench } from "./setup";
@@ -47,6 +50,8 @@ import { CHAT_SAMPLING } from "@/lib/llm";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { scoreRun } from "./freshScore";
 import { hashValue } from "./routeStats";
+import { createStackClient } from "@/lib/stack/client";
+import { isRouteE1Arm, routeE1ArmConfig } from "./routeE1Arms";
 
 interface ToolCallCorpusRow {
   utterance: string;
@@ -223,7 +228,11 @@ interface RouteResult {
 }
 
 async function routeDecisionPass(): Promise<{ executed: number; engine: string }> {
-  const modelId = process.env.MAIPAI_CHAT_MODEL_ID ?? process.env.MAIPAI_REPLAY_MODEL_ID;
+  const stackUrl = process.env.MAIPAI_STACK_URL;
+  const selectedArm = process.env.MAIPAI_BENCH_ARM;
+  if (stackUrl && selectedArm && !isRouteE1Arm(selectedArm)) throw new Error("MAIPAI_BENCH_ARM must be A0, A0n, A2, A2n or A1 when targeting the Stack");
+  const stackArm = stackUrl ? routeE1ArmConfig((selectedArm && isRouteE1Arm(selectedArm) ? selectedArm : "A0")) : null;
+  const modelId = stackArm?.modelId ?? process.env.MAIPAI_CHAT_MODEL_ID ?? process.env.MAIPAI_REPLAY_MODEL_ID;
   const catalog = CATALOG.find((m) => m.id === modelId) ?? CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
   if (!catalog?.turn_budget) throw new Error(`No catalog chat budget for ${modelId ?? "default model"}`);
   const group = (process.env.MAIPAI_BENCH_GROUP ?? "fresh+hardneg").split("+");
@@ -234,14 +243,14 @@ async function routeDecisionPass(): Promise<{ executed: number; engine: string }
   if (requestedSplit === "heldout" && !items.length) throw new Error("held-out split contains no dataset items");
   const requested = Number(process.env.MAIPAI_BENCH_REPEATS ?? 5);
   const repeats = Number.isInteger(requested) && requested > 0 ? requested : 5;
-  const sampling = process.env.MAIPAI_BENCH_SAMPLING ?? "chat";
+  const sampling = stackArm?.sampling ?? process.env.MAIPAI_BENCH_SAMPLING ?? "chat";
   if (!["chat", "nodrx", "greedy"].includes(sampling)) throw new Error("MAIPAI_BENCH_SAMPLING must be chat, nodrx or greedy");
-  const samplingParams = sampling === "chat" ? CHAT_SAMPLING : sampling === "nodrx" ? { temperature: 0.7, min_p: 0.05 } : { temperature: 0 };
-  const thinking = process.env.MAIPAI_BENCH_THINKING === "on";
+  const samplingParams = stackArm?.samplingParams ?? (sampling === "chat" ? CHAT_SAMPLING : sampling === "nodrx" ? { temperature: 0.7, min_p: 0.05 } : { temperature: 0 });
+  const thinking = stackArm?.thinking ?? process.env.MAIPAI_BENCH_THINKING === "on";
   const schema = process.env.MAIPAI_BENCH_WEBSEARCH_SCHEMA ?? "current";
   if (!["current", "query"].includes(schema)) throw new Error("MAIPAI_BENCH_WEBSEARCH_SCHEMA must be current or query");
   const offeredTools = resolveTurnBudget(catalog.id, "adult").tools_offered;
-  const arm = process.env.MAIPAI_BENCH_ARM ?? (thinking ? "A1" : modelId?.includes("qwen3-vl") ? (sampling === "nodrx" ? "A2n" : "A2") : sampling === "nodrx" ? "A0n" : "A0");
+  const arm = stackArm?.arm ?? process.env.MAIPAI_BENCH_ARM ?? (thinking ? "A1" : modelId?.includes("qwen3-vl") ? (sampling === "nodrx" ? "A2n" : "A2") : sampling === "nodrx" ? "A0n" : "A0");
   const { toolSpecFor } = await import("@/lib/turnMachine/nodes/model");
   const tools = offeredTools.slice().sort().map((id) => {
     const tool = toolSpecFor(id);
@@ -261,13 +270,20 @@ async function routeDecisionPass(): Promise<{ executed: number; engine: string }
   const counts: number[] = [];
   const clock = `Thursday, October 8, 2026`;
   const engineStatus = getEngineStatus();
+  const stackClient = stackUrl ? createStackClient({ baseUrl: stackUrl, timeoutMs: 120_000 }) : null;
+  const stackRoles = stackClient ? await stackClient.roles() : null;
+  const chatRole = stackRoles?.roles.find((role) => role.id === "chat");
+  if (stackClient && !chatRole) throw new Error("The configured Stack does not report a chat role");
+  if (stackClient && chatRole?.models?.length && !chatRole.models.some((model) => model.id === modelId)) {
+    throw new Error(`Stack chat role does not list model ${modelId}; available models: ${chatRole.models.map((model) => model.id).join(", ")}`);
+  }
   const engineBuild = String((engineStatus as unknown as { build?: string }).build ?? "not reported by engine");
   const configurationHash = hashValue({ modelId: modelId ?? catalog.id, engineBuild, sampling, samplingParams, thinking, thinkingBudgetTokens: thinking ? catalog.turn_budget.thinking_budget_tokens_toggled : 0, websearchSchema: schema, tools, persona: DEFAULT_PERSONA, clock, promptBuilder: "contextToMessages", toolChoice: "auto" });
   const splitHash = hashValue(items.slice().sort((a,b)=>a.id.localeCompare(b.id)));
   const env = {
     date: new Date().toISOString(), arm, modelId, catalogModel: catalog.id, sampling, thinking: thinking ? "on (512 budget)" : "off", split: requestedSplit, configurationHash, splitHash,
     schema, websearchSchema: schema, repeats, group: group.join("+"), itemCount: items.length, offeredTools: tools.map((t) => t.id), samplingParams, thinkingBudgetTokens: thinking ? catalog.turn_budget.thinking_budget_tokens_toggled : 0,
-    engine: engineStatus, engineBuild, engineUrl: sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL),
+    engine: stackRoles ? { stackRole: chatRole, endpoint: sanitizeEngineUrl(stackUrl) } : engineStatus, engineBuild, engineUrl: sanitizeEngineUrl(stackUrl ?? process.env.MAIPAI_LLAMA_SERVER_URL),
     note: "One production-shaped first round per item/repeat; no search, retry, phrasing or query-writer call.",
   };
   for (const item of items) for (let rep = 1; rep <= repeats; rep++) {
@@ -276,12 +292,28 @@ async function routeDecisionPass(): Promise<{ executed: number; engine: string }
     const plan = planFor({ signal, surface: "chat", surfaceClass: "written", brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: DEFAULT_PERSONA.engagement, vocabulary: DEFAULT_PERSONA.complexity }, band: "adult", deferred: false, disclosureWithheld: false });
     const context: ContextItem[] = [{ id: `clock-${conversationId}`, text: clock, source: "clock", subjects: [], disclosure: "child_ok" }];
     const messages = contextToMessages(context, item.prompt, DEFAULT_PERSONA, plan, signal, "written");
-    const tokenCount = await countTokens(messages, { tools }).catch(() => null);
+    const tokenCount = stackClient
+      ? await stackClient.tokenize({ model: modelId ?? catalog.id, messages: messages as unknown as Array<{ role: string }>, timeout_ms: 3_000, tools: tools.map((tool) => ({ type: "function", function: { name: tool.id, description: tool.description, parameters: tool.args } })) }).then((reply) => reply.data.count).catch(() => null)
+      : await countTokens(messages, { tools }).catch(() => null);
     if (tokenCount !== null) counts.push(tokenCount);
     const started = performance.now();
     const samplingOpts = sampling === "chat" ? {} : samplingParams;
-    const result = await complete("chat", messages, { ...samplingOpts, ...(thinking ? { thinking: true } : { thinking: false }), tools, tool_choice: "auto", max_tokens: catalog.turn_budget.reply_ceiling_tokens + (thinking ? catalog.turn_budget.thinking_budget_tokens_toggled : 0) });
-    const calls = result.ok ? (result.value.tool_calls ?? []) : [];
+    const requestOptions = { ...samplingOpts, timeout_ms: 120_000, chat_template_kwargs: { enable_thinking: thinking }, tools: tools.map((tool) => ({ type: "function", function: { name: tool.id, description: tool.description, parameters: tool.args } })), tool_choice: "auto", max_tokens: catalog.turn_budget.reply_ceiling_tokens + (thinking ? (stackArm?.thinkingBudgetTokens ?? catalog.turn_budget.thinking_budget_tokens_toggled) : 0) };
+    const result = stackClient
+      ? await stackClient.chat({ model: modelId ?? catalog.id, messages, ...requestOptions })
+      : await complete("chat", messages, { ...samplingOpts, ...(thinking ? { thinking: true } : { thinking: false }), tools, tool_choice: "auto", max_tokens: catalog.turn_budget.reply_ceiling_tokens + (thinking ? catalog.turn_budget.thinking_budget_tokens_toggled : 0) }).then((completion) => completion.ok ? { direct: completion.value } : { failure: completion.error });
+    const stackData = "data" in result ? result.data : undefined;
+    const direct = "direct" in result ? result.direct : undefined;
+    const failure = "failure" in result ? result.failure : undefined;
+    const message = (stackData as { choices?: Array<{ message?: { tool_calls?: Array<{ function?: { name?: string; arguments?: string | Record<string, unknown> } }> } }> } | undefined)?.choices?.[0]?.message;
+    const stackCalls = (message?.tool_calls ?? []).map((call) => {
+      const args = call.function?.arguments;
+      let parsed: Record<string, unknown> = {};
+      if (typeof args === "string") { try { parsed = JSON.parse(args) as Record<string, unknown>; } catch { parsed = {}; } }
+      else if (args && typeof args === "object") parsed = args;
+      return { tool: call.function?.name ?? "", args: parsed };
+    });
+    const calls = direct ? (direct.tool_calls ?? []) : stackData ? stackCalls : [];
     const names = calls.map((c) => c.tool);
     const args = calls.map((c) => (c.args ?? {}) as Record<string, unknown>);
     const evidence = names.some((name) => item.acceptable_tools.includes(name));
@@ -292,7 +324,8 @@ async function routeDecisionPass(): Promise<{ executed: number; engine: string }
     const expected = item.expected_terms ?? [];
     const fused = expected.some((term) => term.includes(" ") && query !== null && query.toLowerCase().replace(/[^a-z0-9]+/g, " ").includes(term.toLowerCase().replace(/\s+/g, "")));
     const elapsed = performance.now() - started;
-    const scored = scoreRun({ id: item.id, kind: item.kind, gold: item.gold, prompt: item.prompt, acceptable_tools: item.acceptable_tools, expected_terms: expected, calls: names, query, error: result.ok ? null : result.error, decisionOnly: true });
+    const error = failure ?? (stackData ? null : "Stack response omitted data");
+    const scored = scoreRun({ id: item.id, kind: item.kind, gold: item.gold, prompt: item.prompt, acceptable_tools: item.acceptable_tools, expected_terms: expected, calls: names, query, error, decisionOnly: true });
     const row: RouteResult = {
       arm, model_id: modelId ?? catalog.id, sampling, thinking: thinking ? "on (512 budget)" : "off", websearch_schema: schema,
       engine_build: engineBuild,
@@ -303,14 +336,14 @@ async function routeDecisionPass(): Promise<{ executed: number; engine: string }
       false_search: scored.stage_codes.includes("D_FALSE"),
       elapsed_ms: elapsed, decision_latency_ms: elapsed, ttft_ms: null, first_answer_text_ms: null, first_answer_text: null, total_ms: elapsed, token_count: tokenCount,
       token_count_fallback: tokenCount === null ? "countTokens returned null (engine endpoint unsupported/unavailable); no proxy estimate" : null,
-      error: result.ok ? null : result.error,
+      error,
     };
     results.push(row);
     console.log(`${item.id} rep ${rep}: acceptable evidence=${evidence}; calls=[${names.join(", ") || "none"}] ${row.elapsed_ms.toFixed(0)}ms`);
     writeFileSync(join(outDir, "results.json"), JSON.stringify({ arm, environment: { ...env, tokenCount: counts.length ? { minimum: Math.min(...counts), median: counts.slice().sort((a,b)=>a-b)[Math.floor(counts.length/2)] } : { fallback: "tokenCount returned null for every request" } }, results }, null, 2));
   }
   console.log(`\nWrote ${results.length} route rows to ${join(outDir, "results.json")}`);
-  return { executed: results.length, engine: `${getEngineStatus().kind} at ${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)}` };
+  return { executed: results.length, engine: `${stackClient ? "Stack" : getEngineStatus().kind} at ${sanitizeEngineUrl(stackUrl ?? process.env.MAIPAI_LLAMA_SERVER_URL)}` };
 }
 
 /** PHRASE-02's coordinator follow-up (CHAT-RICH-01), kept for the next

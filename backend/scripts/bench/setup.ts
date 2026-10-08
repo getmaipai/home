@@ -12,16 +12,17 @@
 //    tests/reset-db.ts insists on), and either does not exist yet or is
 //    an empty directory. A directory with anything in it, a household's
 //    or a previous run's, is never reused: every run gets a fresh one.
-// 2. MAIPAI_LLAMA_SERVER_URL and MAIPAI_EMBED_URL both name an engine
-//    that answers its health probe right now. The supervisors' URL tier
-//    spawns nothing and downloads nothing; without a URL they would
-//    spawn (and, for a missing model, download), which a bench must
-//    never do. A URL that nothing answers is refused too: every
-//    downstream call swallows an unreachable engine (complete() returns
-//    ok:false, the embed helpers return undefined), so a bench pointed
-//    at a dead port would score every case FAIL and still end with
-//    "executed N cases", exit 0 (a code review on CHAT-22); startBench()
-//    below, the first line of every bench's main(), probes both.
+// 2. In direct mode MAIPAI_LLAMA_SERVER_URL and MAIPAI_EMBED_URL both
+//    name an engine that answers its health probe right now. The
+//    supervisors' URL tier spawns nothing and downloads nothing;
+//    without a URL they would spawn (and, for a missing model, download),
+//    which a bench must never do. A URL that nothing answers is refused
+//    too: every downstream call swallows an unreachable engine
+//    (complete() returns ok:false, embed helpers return undefined), so a
+//    dead port could score every case FAIL and still exit 0 (CHAT-22).
+//    The E1 decision pass can instead name MAIPAI_STACK_URL; it requires
+//    the Stack health and role APIs to answer and routes only through
+//    that Stack. startBench() probes the selected path before cases run.
 // 3. MAIPAI_BACKGROUND_URL, when unset, is pointed at a closed port so
 //    the memory judge can never spawn its engine from a bench either;
 //    a bench that needs the judge (judge-eval) probes it and refuses
@@ -38,6 +39,7 @@ import { tmpdir } from "node:os";
 import { resolve, sep } from "node:path";
 import { LlamaServerClient } from "@maipai/spec/llm/ts/client.js";
 import { sanitizeEngineUrl } from "@/lib/engineIdentity";
+import { createStackClient } from "@/lib/stack/client";
 import { startRecordingProxy } from "./recordingProxy";
 
 const CLOSED_PORT_URL = "http://127.0.0.1:1";
@@ -60,8 +62,9 @@ if (existsSync(resolved)) {
   const entries = readdirSync(resolved);
   if (entries.length > 0) refuse(`MAIPAI_DATA_DIR (${resolved}) is not empty (${entries.length} entries, e.g. ${entries[0]}); a bench never reuses a directory, create a fresh one.`);
 }
-if (!process.env.MAIPAI_LLAMA_SERVER_URL) refuse("MAIPAI_LLAMA_SERVER_URL is not set; a bench connects only to an engine already running, it never spawns or downloads one.");
-if (!process.env.MAIPAI_EMBED_URL) refuse("MAIPAI_EMBED_URL is not set; a bench connects only to an embed engine already running, it never spawns or downloads one.");
+const stackRouteBench = process.env.MAIPAI_BENCH_PASS === "route" && !!process.env.MAIPAI_STACK_URL;
+if (!stackRouteBench && !process.env.MAIPAI_LLAMA_SERVER_URL) refuse("MAIPAI_LLAMA_SERVER_URL is not set; a bench connects only to an engine already running, it never spawns or downloads one.");
+if (!stackRouteBench && !process.env.MAIPAI_EMBED_URL) refuse("MAIPAI_EMBED_URL is not set; a bench connects only to an embed engine already running, it never spawns or downloads one.");
 // B-GUARD-02 (a review, 2026-09-24): the real-SearXNG clearance check
 // used to live here too, keyed to one specific env var name
 // (MAIPAI_SEARXNG_URL) - which meant a script reading a differently-
@@ -75,14 +78,21 @@ if (!process.env.MAIPAI_EMBED_URL) refuse("MAIPAI_EMBED_URL is not set; a bench 
 // caller's own choice.
 
 /** Rule 2's second half, awaited as the first line of every bench's
- * main(): both URLs answer the same /health probe the supervisors use
- * (ready means "ok"; a loading, hung or absent server reads false
- * within three seconds). Not a top-level await here: an async module's
+ * main(): direct URLs answer the /health probe the supervisors use, or
+ * an E1 Stack target answers its health and roles APIs. Not a top-level
+ * await here: an async module's
  * sibling imports do not wait for it, so "@/db" would open the
  * database while the probe was still in flight. The directory is the
  * bench's own fresh one by then, so refusing from main() mutates
  * nothing that matters. */
 export async function startBench(): Promise<void> {
+  if (process.env.MAIPAI_BENCH_PASS === "route" && process.env.MAIPAI_STACK_URL) {
+    const stack = createStackClient({ baseUrl: process.env.MAIPAI_STACK_URL });
+    await stack.healthz();
+    const roles = await stack.roles();
+    if (!roles.roles.some((role) => role.id === "chat")) refuse(`no chat role is available from the Stack (${sanitizeEngineUrl(process.env.MAIPAI_STACK_URL)}); the bench needs an already-running Stack chat role.`);
+    return;
+  }
   if (process.env.MAIPAI_BENCH_UPSTREAM === "stack") {
     // Some entry points already own a recording proxy for chat. Their
     // marker lets the shared setup reuse it for the other role URLs
