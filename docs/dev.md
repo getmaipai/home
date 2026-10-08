@@ -36411,3 +36411,28 @@ the Stack on `127.0.0.1:8770` and SSH on port 22; `/data/stack` was
 owned by `maipai-admin`. No installation or update was run on the box.
 The live install with the dedicated `maipai-stack` account is a separate
 step with the owner.
+
+## REMOTE-STACK-DOCS-01: engine computer setup docs (2026-10-08)
+
+The family setup guide is [Use another computer for the AI](user/engine-computer.md). The shipped setup flow starts in **Engines**: choose **Another computer**, enter a home or allowed Tailscale address, then finish in **Settings → Devices → Engine computer link**. **Pair engine computer** creates the one-time code. The box command is `sudo maipai-engine pair <Home address> <code>`; the box fetches the pairing response and prints a check code. In Home, **Check the engine computer** scans the host key; the owner compares that check code with the box and selects **Yes, pin this computer**. A match pins the host key and rebuilds the link.
+
+The away setting is admin-only and off by default. Both computers must use the owner's Tailscale network. With the setting on, Home accepts a Tailnet address as the path to the same SSH service. The Stack still listens on box loopback only, behind the restricted SSH forward. Turning the setting off while using a tailnet address is rejected until the address is changed to a home network address. Choosing **This computer** restarts Home's local Stack and clears the remote address.
+
+The DOCTOR-01 box doctor is read-only. It reports one PASS or FAIL and one fix per check. The key identity check stays UNVERIFIED until the box pairing record stores a fingerprint: `paired-home.json` currently has `household_id` and `code_hash`, with no authorized-key identity. The smallest additive field is `authorized_key_fingerprint`, the OpenSSH SHA256 fingerprint of the installed public key. No record shape change is part of DOCTOR-01. On the reviewed `origin/main` base, the helper does not yet include `doctor` and must be updated with DOCTOR-01 before the command can run.
+
+### Homelab page template for the private repo
+
+Copy this section into that engine computer's private homelab page, then fill in each bracketed value locally. Do not copy private addresses into public Home docs.
+
+- What it runs: MaiPai Stack for the Home household `[household name]`.
+- Computer: `[model]`, Ubuntu `[version]`.
+- Graphics cards and memory: `[card models and memory]`.
+- Service account: `maipai-stack`.
+- Stack data folder: `/data/stack`.
+- Service: `maipai-stack`; inspect it with `sudo maipai-engine status`.
+- Paired Home: `[private Home name]`.
+- After DOCTOR-01 lands: `sudo maipai-engine doctor` (read-only).
+- Update the Stack: `sudo maipai-engine update`.
+- Remove this Home pairing: `sudo maipai-engine unpair`.
+
+The current fetched `origin/main` helper has no `doctor` command. The verified current box command set is `pair`, `unpair`, `update`, and `status`. Run the doctor command only after DOCTOR-01 lands on `main`.
