@@ -4003,12 +4003,46 @@ async function seedTurnFor(session: string, text: string): Promise<{ conversatio
   return (await turn.json()) as { conversation_id: string; turn_id: string };
 }
 
-type Wave2Shot = { name?: string; band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; live?: boolean; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
+type Wave2Shot = { name?: string; band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; live?: boolean; create?(session: string, prompt: string): Promise<{ conversation_id: string; turn_id: string }>; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
 
 const ALL_COMBOS = [["desktop", "light"], ["desktop", "dark"], ["phone", "light"], ["phone", "dark"]] as const;
 const TWO_COMBOS = [["desktop", "light"], ["phone", "dark"]] as const;
 
 function wave2Shots(part: string): Wave2Shot[] {
+  if (part === "approval") {
+    const create = async (session: string, prompt: string) => {
+      const conversation = await seedTitledConversation("elements wave 2 approval", { Cookie: `session=${session}` }, "Locking up for the night");
+      const me = (await (await fetch(`${BASE_URL}/api/auth/me`, { headers: { Cookie: `session=${session}` } })).json()) as { person?: { id: string }; id?: string };
+      const personId = me.person?.id ?? me.id;
+      if (!personId) throw new Error("elements wave 2 approval: signed-in person id missing");
+      const turnId = `shot-confirm-${crypto.randomUUID().replaceAll("-", "")}`;
+      const confirm = JSON.stringify({ package_id: "lock-doors", open: true });
+      const pendingAsk = JSON.stringify({ kind: "confirm", prompt: "Lock the doors?", packageId: "lock-doors", args: {}, turnId });
+      const script = `import { sqlite } from "./src/db/index.ts";
+const now = new Date().toISOString();
+sqlite.query("INSERT INTO conversation_turns (id, person_id, surface, user_text, reply_text, source, safety_action, conversation_id, created_at, hlc, status, confirm) VALUES (?, ?, 'chat', ?, ?, 'confirm', 'allow', ?, ?, ?, 'done', ?)").run(${JSON.stringify(turnId)}, ${JSON.stringify(personId)}, ${JSON.stringify(prompt)}, "I can lock the doors now. Want me to go ahead?", ${JSON.stringify(conversation.id)}, now, Date.now() + ":0:" + ${JSON.stringify(turnId)}, ${JSON.stringify(confirm)});
+sqlite.query("UPDATE conversations SET pending_ask = ? WHERE id = ?").run(${JSON.stringify(pendingAsk)}, ${JSON.stringify(conversation.id)});
+sqlite.close();`;
+      const result = Bun.spawnSync({ cmd: ["bun", "-e", script], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+      if (result.exitCode !== 0) throw new Error(`elements wave 2 approval: seeding the parked ask failed with exit code ${result.exitCode}`);
+      return { conversation_id: conversation.id, turn_id: turnId };
+    };
+    const drive = async (page: Page) => {
+      const card = page.locator('[data-slot="approval-card"]');
+      await card.waitFor({ timeout: 20000 });
+      await page.getByRole("button", { name: /^Allow once/ }).waitFor();
+      await page.getByRole("button", { name: "Deny", exact: true }).waitFor();
+      await page.getByText("Go ahead?", { exact: true }).waitFor();
+      await page.getByText(/^Nothing happens until you choose\. Waiting since /).waitFor();
+      if ((await page.locator("body").innerText()).includes("Asked a parent")) throw new Error("elements wave 2 approval: card claims a parent was asked");
+      if (await page.getByRole("button", { name: /Always allow/ }).count()) throw new Error("elements wave 2 approval: Always allow is present");
+    };
+    return [
+      { band: "adult", person: null, prompt: "Lock the doors", combos: ALL_COMBOS, create, drive },
+      { band: "teen", person: "Marlow", prompt: "Lock the doors", combos: ALL_COMBOS, create, drive },
+      { band: "child", person: "Nova", prompt: "Lock the doors", combos: ALL_COMBOS, create, drive },
+    ];
+  }
   if (part === "followups") {
     const drive = async (page: Page) => {
       for (const prompt of ["Which pigments show up first?", "Why do colors vary by tree?"]) {
@@ -4114,7 +4148,7 @@ async function captureElementsWave2Review(browser: Browser, sessionValue: string
   for (const shot of wave2Shots(part)) {
     const session = await sessionFor(sessionValue, shot.person);
     for (const [slug, theme] of shot.combos) {
-      const seeded = shot.live ? undefined : await seedTurnFor(session, shot.prompt);
+      const seeded = shot.create ? await shot.create(session, shot.prompt) : shot.live ? undefined : await seedTurnFor(session, shot.prompt);
       if (seeded) await shot.seed?.(session, seeded);
       const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
       const context = await newContext(browser, viewport, theme, session);

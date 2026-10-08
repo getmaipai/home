@@ -10,13 +10,9 @@ import { ThreadListSidebar } from "@maipai/ui/src/elements/thread-list-sidebar.a
 import { ThreadSearch } from "@maipai/ui/src/elements/thread-search";
 import type { ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
 import { MarkdownDocument } from "@/shell/pages/MarkdownDocument";
-// APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
-// default `ToolFallback` renders (its own `import { ToolFallback } from
-// "@maipai/ui/src/assistant-ui/tool-fallback.aui"`) - used here directly
-// so a "confirm" card renders through `ToolFallback.Approval` exactly as
-// it ships, never a hand-built card (the kit's own `approval-card.tsx`
-// is built for a terminal command and can't be relabeled, per the org's
-// "no hand-built UI" rule).
+// APPROVE-CARD-02: the confirm ask uses the kit ApprovalCard renderer
+// registered in elementBindings.ts; this page supplies its lifted answer
+// callback through ConfirmAskAnswerProvider below.
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -235,7 +231,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   ttsAvailableRef.current = ttsAvailable;
   const pendingSpeechRef = useRef(false);
   // APPROVE-CARD-01: armed by ConfirmAskAnswerProvider's own `respond`
-  // callback (ConfirmToolRender's respondToApproval, via
+  // callback (ConfirmToolRender's Allow once/Deny handlers, via
   // ConfirmAskAnswerContext), the same single-shot shape as
   // `pendingSpeechRef` above - `consumeAskAnswer` below reads and clears it.
   const askAnswerRef = useRef<{ turnId: string; approved: boolean } | undefined>(undefined);

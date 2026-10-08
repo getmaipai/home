@@ -95,14 +95,6 @@
       ],
       "ed": "ED-025",
       "reason": "Kit artifact-card lacked an actions slot (added in ui-v0.5.116); ADOPT-02."
-    },
-    "Kbd": {
-      "tokens": [
-        "bg-primary-foreground/20",
-        "ms-1"
-      ],
-      "ed": "ED-035",
-      "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     }
   },
   "apps/chat/composerAddMenu.tsx": {

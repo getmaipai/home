@@ -4,15 +4,8 @@
 import { useCallback, useContext, useEffect, useState, type MutableRefObject, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useAui, useAuiState, type ToolApprovalOption, type ToolCallMessagePartComponent } from "@assistant-ui/react";
-// APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
-// default `ToolFallback` renders (its own `import { ToolFallback } from
-// "@maipai/ui/src/assistant-ui/tool-fallback.aui"`) - used here directly
-// so a "confirm" card renders through `ToolFallback.Approval` exactly as
-// it ships, never a hand-built card (the kit's own `approval-card.tsx`
-// is built for a terminal command and can't be relabeled, per the org's
-// "no hand-built UI" rule).
-import { ToolFallback } from "@maipai/ui/src/assistant-ui/tool-fallback.aui";
+import { useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
+import { ApprovalCard } from "@maipai/ui/src/elements/approval-card";
 import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
 import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
@@ -94,23 +87,6 @@ export function ProducedArtifactCard({ id, title, meta, generating, onOpen }: { 
 }
 
 
-export const CONFIRM_APPROVAL_OPTIONS: readonly ToolApprovalOption[] = [
-  { id: "yes", kind: "allow-once", label: "Approve" },
-  { id: "no", kind: "reject-once", label: "Deny" },
-];
-
-/** APPROVE-CALM-01: the card's text. The first line is the question (the
- * kit paints it bold), the rest are plain detail lines (muted). The reply
- * above already says what the action is; the card asks, reassures and
- * says how long it has waited. */
-export function confirmPrompt(createdAt: Date | undefined): string {
-  const lines = ["Go ahead?", "Nothing happens until you choose."];
-  if (createdAt && !Number.isNaN(createdAt.getTime())) {
-    lines.push(`Waiting since ${createdAt.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`);
-  }
-  return lines.join("\n");
-}
-
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return target.isContentEditable || target.tagName === "TEXTAREA" || target.tagName === "INPUT" || target.tagName === "SELECT";
@@ -118,23 +94,10 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-// APPROVE-CARD-01: a package's own confirm_needed/consent_needed ask
-// (turnNext.ts's finishTurn() "asked" branch), rendered through the
-// shipped `ToolFallback.Approval` exactly as it ships - never the kit's
-// own `approval-card.tsx` (built for a terminal command, can't be
-// relabeled). The tool-call part's own `result` carries
-// `{package_id, open, turn_id}` (chatModelAdapter.ts/chatHistoryAdapter.ts),
-// never the part's own `approval` field: setting a REAL `part.approval`
-// would mark the message `requires-action` in assistant-ui's
-// LocalRuntime and re-run the model adapter on this SAME assistant
-// message once answered - wrong here, since Home parks the ask
-// server-side and the answer is a genuinely new turn. The `approval`
-// object below is synthesized purely for THIS component's own render
-// logic (never written back onto the real message part, which never
-// carries one), and `respondToApproval` here is OUR OWN handler, never
-// the real one `ToolCallMessagePartProps` would supply (that one is
-// only ever valid while a real `part.approval` is set - ours never is).
-export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, never>, { package_id: string; open: boolean; turn_id: string }> = ({ result }) => {
+// APPROVE-CARD-02: map the server-parked ask to the kit's shipped
+// ApprovalCard. The tool-call part carries `{package_id, open, turn_id}`;
+// answering still sends a genuinely new turn through Home's lifted handler.
+export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, never>, { package_id: string; open: boolean; turn_id: string }> = function ConfirmToolRender({ result }) {
   const respond = useContext(ConfirmAskAnswerContext);
   const createdAt = useAuiState((state) => state.message.createdAt);
   // A reply after this one means the ask was answered or passed over: the
@@ -159,36 +122,21 @@ export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, neve
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, turnId, respond]);
-  if (!result) return null;
+  if (!result || !open || !turnId) return null;
+  const ShieldCheckIcon = getIcon("shield-check");
+  const createdAtDate = createdAt instanceof Date ? createdAt : createdAt ? new Date(createdAt) : undefined;
+  const waitingSince = createdAtDate && !Number.isNaN(createdAtDate.getTime())
+    ? ` Waiting since ${createdAtDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+    : "";
   return (
-    <ToolFallback.Approval
-      // confirmPrompt() writes a short question, a line break, then detail.
-      data-titled-prompt=""
-      // The hint shows only where a keyboard is the likely input.
-      primaryHint={pointer === "fine" ? <Kbd aria-hidden className="ms-1 bg-primary-foreground/20 text-primary-foreground">{IS_MAC ? "⌘ ↵" : "Ctrl ↵"}</Kbd> : null}
-      approval={{
-        id: result.turn_id,
-        prompt: confirmPrompt(createdAt instanceof Date ? createdAt : createdAt ? new Date(createdAt) : undefined),
-        options: CONFIRM_APPROVAL_OPTIONS,
-        // The component's own source (tool-fallback.aui.tsx): a
-        // `resolution` set at all - "cancelled" or "expired" - suppresses
-        // interactive rendering entirely (its top guard returns null),
-        // never partially disables it. `open: false` (an answered,
-        // superseded, or reload-stale ask - conversationHistory.ts's own
-        // read-time derivation) is exactly a "no longer waiting for an
-        // answer" case, so "expired" is the honest value here.
-        resolution: open ? undefined : "expired",
-      }}
-      respondToApproval={async (response) => {
-        // Our own two options are both known kinds with no `confirm`
-        // step, so `ToolFallbackApproval`'s own `respondWithOption()`
-        // always calls this with `{optionId: "yes" | "no"}` - never the
-        // `approved` field a real runtime resolution would carry (that
-        // derivation is the runtime's job for a real `part.approval`,
-        // which this never is).
-        const approved = "optionId" in response ? response.optionId === "yes" : false;
-        respond(result.turn_id, approved);
-      }}
+    <ApprovalCard
+      state="request"
+      icon={<ShieldCheckIcon aria-hidden />}
+      title="Go ahead?"
+      subtitle={`Nothing happens until you choose.${waitingSince}`}
+      allowHint={pointer === "fine" ? <Kbd aria-hidden>{IS_MAC ? "⌘ ↵" : "Ctrl ↵"}</Kbd> : undefined}
+      onAllowOnce={() => respond(turnId, true)}
+      onDeny={() => respond(turnId, false)}
     />
   );
 };

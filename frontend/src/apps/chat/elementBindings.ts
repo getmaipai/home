@@ -73,7 +73,7 @@ export const TOOL_BINDINGS: readonly ToolBinding[] = [
   { toolName: firstSpecSheetToolId!, element: "spec-sheet", render: SpecSheetToolRender },
   ...remainingSpecSheetToolIds.map((toolName) => ({ toolName, element: "spec-sheet", render: SpecSheetToolRender })),
   { toolName: "write_document", element: "artifact-card", render: ArtifactCardToolRender },
-  { toolName: "confirm", element: "tool-fallback (Approval)", render: ConfirmToolRender },
+  { toolName: "confirm", element: "approval-card", render: ConfirmToolRender },
   { toolName: "project", element: "job-progress", render: ProjectToolRender },
   { toolName: "tool_timeline", element: "tool-timeline", render: ToolTimelineToolRender, display: "inline" },
 ];

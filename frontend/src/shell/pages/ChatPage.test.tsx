@@ -1496,10 +1496,9 @@ describe("ChatPage (SHELL-02's slice 4: artifacts)", () => {
     }
   });
 });
-// APPROVE-CARD-01 (issue #177): a package's own confirm_needed/
-// consent_needed ask renders through the shipped `ToolFallback.Approval`
-// (vendored at `@maipai/ui/src/assistant-ui/tool-fallback.aui`), never a
-// hand-built card - `ConfirmTool`'s own registration, ChatPage.tsx.
+// APPROVE-CARD-02: a package's own confirm_needed/consent_needed ask
+// renders through the shipped ApprovalCard Element, registered in
+// elementBindings.ts.
 describe("ChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
   // stubTurnFetch's own shape (slice 3, above), extended to return a
   // DIFFERENT stream per successive /api/turn/stream call - the click-
@@ -1532,7 +1531,11 @@ describe("ChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     fireEvent.click(send);
   }
 
-  test("an open confirm card renders ToolFallback.Approval's Approve/Deny options under a short question", async () => {
+  test.each([
+    ["adult", "owner"],
+    ["teen", "teen"],
+    ["child", "child"],
+  ] as const)("an open confirm card for a %s renders the same kit card without claiming a parent was asked", async (_band, role) => {
     const restore = stubConfirmTurnFetch([
       ndjsonStream([
         { type: "delta", text: "Go ahead and lock the doors?" },
@@ -1542,22 +1545,22 @@ describe("ChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/chat"]}>
-          <ChatPage person={makePerson()} />
+          <ChatPage person={makePerson({ role })} />
         </MemoryRouter>,
       );
       await sendMessage(view, "lock the doors");
       expect(await view.findByText("Go ahead and lock the doors?")).toBeVisible();
-      expect(await view.findByRole("button", { name: /^Approve/ })).toBeVisible();
+      expect(await view.findByRole("button", { name: /^Allow once/ })).toBeVisible();
       expect(await view.findByRole("button", { name: "Deny" })).toBeVisible();
-      // APPROVE-CALM-01: the card's own question, then plain detail lines.
-      const prompt = view.container.querySelector(".aui-tool-fallback-approval-prompt");
-      expect(prompt?.textContent).toMatch(/^Go ahead\?\nNothing happens until you choose\.\nWaiting since /);
+      expect(await view.findByText("Go ahead?", { exact: true })).toBeVisible();
+      expect(await view.findByText(/^Nothing happens until you choose\. Waiting since /)).toBeVisible();
+      expect(view.container.textContent).not.toContain("Asked a parent");
     } finally {
       restore();
     }
   });
 
-  test("tapping Approve sends a new turn with the matching ask_answer and the tapped label as its text, then clears the one-shot field", async () => {
+  test("tapping Allow once sends a new turn with the matching ask_answer and the tapped label as its text, then clears the one-shot field", async () => {
     const restore = stubConfirmTurnFetch([
       ndjsonStream([
         { type: "delta", text: "Go ahead and lock the doors?" },
@@ -1579,7 +1582,7 @@ describe("ChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
         </MemoryRouter>,
       );
       await sendMessage(view, "lock the doors");
-      const yesButton = await view.findByRole("button", { name: /^Approve/ });
+      const yesButton = await view.findByRole("button", { name: /^Allow once/ });
       fireEvent.click(yesButton);
       expect(await view.findByText("Sure, locking the doors.")).toBeVisible();
       const bodies = turnRequestBodies();
@@ -1641,14 +1644,14 @@ describe("ChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
         </MemoryRouter>,
       );
       await sendMessage(view, "lock the doors");
-      await view.findByRole("button", { name: /^Approve/ });
+      await view.findByRole("button", { name: /^Allow once/ });
       fireEvent.keyDown(view.getByLabelText("Message input"), { key: "Enter", ctrlKey: true });
       expect(turnRequestBodies()).toHaveLength(1);
       fireEvent.keyDown(document.body, { key: "Enter", ctrlKey: true });
       expect(await view.findByText("Sure, locking the doors.")).toBeVisible();
       expect(turnRequestBodies()[1]).toMatchObject({ ask_answer: { turn_id: "turn-confirm4", approved: true } });
       // Answered: the card is gone and the shortcut no longer answers it again.
-      await waitFor(() => expect(view.queryByRole("button", { name: /^Approve/ })).toBeNull());
+      await waitFor(() => expect(view.queryByRole("button", { name: /^Allow once/ })).toBeNull());
       fireEvent.keyDown(document.body, { key: "Enter", ctrlKey: true });
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(turnRequestBodies()).toHaveLength(2);
@@ -1665,7 +1668,7 @@ describe("ChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
   // path (GET /api/conversations/:id/turns), the same shape
   // "the open conversation's title is the tab title" (above) already
   // uses to open an existing conversation.
-  test("a closed (open: false) confirm card on reload renders no Approve/Deny buttons - already answered, non-interactive", async () => {
+  test("a closed (open: false) confirm card on reload renders no Allow once/Deny buttons - already answered, non-interactive", async () => {
     const conversation = { id: "conv-confirm-closed", title: "Locks", surface: "chat", created_at: "2026-09-27T00:00:00Z", pinned: false };
     const row = {
       id: "turn-confirm-closed",
@@ -1701,7 +1704,7 @@ describe("ChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
         </MemoryRouter>,
       );
       expect(await view.findByText("Go ahead and lock the doors?")).toBeVisible();
-      expect(view.queryByRole("button", { name: /^Approve/ })).toBeNull();
+      expect(view.queryByRole("button", { name: /^Allow once/ })).toBeNull();
       expect(view.queryByRole("button", { name: "Deny" })).toBeNull();
     } finally {
       globalThis.fetch = original;

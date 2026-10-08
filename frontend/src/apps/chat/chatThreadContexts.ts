@@ -2,13 +2,8 @@
 // Every slot and tool UI reads these with a safe default, so the same
 // composition renders in the chat page and in the /dev/ui showcase.
 import { createContext } from "react";
-// APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
-// default `ToolFallback` renders (its own `import { ToolFallback } from
-// "@maipai/ui/src/assistant-ui/tool-fallback.aui"`) - used here directly
-// so a "confirm" card renders through `ToolFallback.Approval` exactly as
-// it ships, never a hand-built card (the kit's own `approval-card.tsx`
-// is built for a terminal command and can't be relabeled, per the org's
-// "no hand-built UI" rule).
+// APPROVE-CARD-02: the named confirm renderer receives the lifted answer
+// callback so it can answer the parked ask as a new turn.
 import type { ConnectionPhase } from "@maipai/ui/src/elements/connection-state";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/

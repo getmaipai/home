@@ -12,13 +12,8 @@ import { GuardrailNotice } from "@maipai/ui/src/elements/guardrail-notice";
 import type { CrisisSupport } from "@maipai/home-backend/src/wire";
 import { ActionBarMorePrimitive, ComposerPrimitive, useAui, useAuiState, type ThreadAssistantMessagePart, type ThreadMessage } from "@assistant-ui/react";
 import { type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
-// APPROVE-CARD-01: the same vendored Element `thread.aui.tsx`'s own
-// default `ToolFallback` renders (its own `import { ToolFallback } from
-// "@maipai/ui/src/assistant-ui/tool-fallback.aui"`) - used here directly
-// so a "confirm" card renders through `ToolFallback.Approval` exactly as
-// it ships, never a hand-built card (the kit's own `approval-card.tsx`
-// is built for a terminal command and can't be relabeled, per the org's
-// "no hand-built UI" rule).
+// APPROVE-CARD-02: confirmation is rendered by the named approval-card
+// binding; the lifted context below lets it send an answer as a new turn.
 import { ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "@maipai/ui/src/elements/reasoning.aui";
 import { Sources as SourcesCard } from "@maipai/ui/src/elements/sources";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
