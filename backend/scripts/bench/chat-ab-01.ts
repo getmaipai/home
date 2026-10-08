@@ -41,6 +41,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { loadavg, uptime } from "node:os";
 import { join } from "node:path";
 import dataset from "./datasets/chat-ab-01.json";
+import { startFixtureSearch, type FixtureSearch } from "./fixtureSearch";
+import { evidenceFired, scoreRun, splitCallStages, summarizeFresh, type FreshRun } from "./freshScore";
 import { refuseIfGateRunning, refuseRealSearxngWithoutClearance, waitForHubQuiet } from "./liveHubQuiet";
 import { startRecordingProxy, type RecordedRequest, type RecordingProxy } from "./recordingProxy";
 
@@ -50,8 +52,10 @@ const OUT_DIR = process.env.MAIPAI_AB_OUT ?? join(process.cwd(), "..", "data-scr
 const RESULTS = join(OUT_DIR, "results.json");
 const SIDE_BY_SIDE = join(OUT_DIR, "side-by-side.md");
 const SINGLE_RUNS = (() => {
-  const at = process.argv.indexOf("--runs");
-  return at < 0 ? 2 : Math.max(1, Number(process.argv[at + 1]));
+  const runsAt = process.argv.indexOf("--runs");
+  const repsAt = process.argv.indexOf("--reps");
+  const at = repsAt >= 0 ? repsAt : runsAt;
+  return at < 0 ? 3 : Math.max(1, Number(process.argv[at + 1]));
 })();
 const SEARCH_FREE_ITEMS = new Set(["k1-heat-pump", "w1-story", "f4-recipe"]);
 const ONLY = (() => {
@@ -61,8 +65,8 @@ const ONLY = (() => {
 const GROUP = (() => {
   const at = process.argv.indexOf("--group");
   const g = at < 0 ? "adult" : (process.argv[at + 1] ?? "adult");
-  if (!["adult", "child", "spoken"].includes(g)) throw new Error(`--group must be adult, child or spoken (got ${g})`);
-  return g as "adult" | "child" | "spoken";
+  if (!["adult", "child", "spoken", "fresh"].includes(g)) throw new Error(`--group must be adult, child, spoken or fresh (got ${g})`);
+  return g as "adult" | "child" | "spoken" | "fresh";
 })();
 // THIN-Q2 / BENCH-AB-02: --arms A2,AP,AT,APT,APM,B picks the adult arms (default
 // A,A2,B) and runs them in BLOCKS (arm, then item, then run), so the engine
@@ -83,7 +87,7 @@ const SEARCH_PACE_MS = 30_000;
 const MAX_TOKENS = 1536;
 
 type Arm = "A" | "A2" | "AP" | "AT" | "APT" | "APM" | "B" | "C" | "S";
-type Category = "knowledge" | "reasoning" | "formatting" | "writing" | "world" | "multiturn";
+type Category = "knowledge" | "reasoning" | "formatting" | "writing" | "world" | "multiturn" | "fresh";
 
 interface SearchQuery {
   q: string;
@@ -92,6 +96,7 @@ interface SearchQuery {
   engines: string[];
   unresponsive: string[];
   stoppedByBench: boolean;
+  fixtureId?: string | null;
 }
 interface RunRecord {
   arm: Arm;
@@ -132,7 +137,16 @@ interface RunRecord {
     pluginId: string | null;
     outcomes: string[];
     ttftNote: string;
+    firstRoundCalls?: string[];
+    retryCalls?: string[];
+    queryWriterCalls?: string[];
   };
+  fresh?: { kind: "time-sensitive" | "timeless" | "hard-negative"; acceptableTools: string[]; evidenceFired: boolean; fixtureId?: string | null };
+  modelId?: string; sampling?: string; thinking?: string; websearchSchema?: string; engineBuild?: string;
+  family?: string; split?: string; gold?: string; ageRow?: string; stageCodes?: string[];
+  decisionLatencyMs?: number | null; firstAnswerTextMs?: number | null;
+  tokenCountFallback?: string | null;
+  firstRoundCalls?: { name: string; arguments: string }[]; retryCalls?: { name: string; arguments: string }[]; queryWriterCalls?: string[];
 }
 
 // ==== helpers ====
@@ -189,7 +203,7 @@ function render(runs: RunRecord[], env: unknown): string {
   lines.push("## Summary by category and arm", "");
   lines.push("Medians over every run of the category (single-turn items: 2 runs each; multi-turn: all 9 turns of both scripts). Checkable-correct counts the reasoning items only. Multi-turn recall counts stated facts recalled at turns 8 and 9 (3 facts x 2 scripts = 6 per turn).", "");
   lines.push("| Category | Arm | Runs | Median words | Median TTFT ms | Median total ms | Checkable correct | Recall turn 8 | Recall turn 9 |", "|---|---|---:|---:|---:|---:|---|---|---|");
-  for (const category of ["knowledge", "reasoning", "formatting", "writing", "world", "multiturn"] as Category[]) {
+  for (const category of ["knowledge", "reasoning", "formatting", "writing", "world", "multiturn", "fresh"] as Category[]) {
     for (const arm of ["A", "A2", "AP", "AT", "APT", "APM", "B", "C", "S"] as Arm[]) {
       const rs = runs.filter((r) => r.category === category && r.arm === arm);
       if (rs.length === 0) continue;
@@ -203,6 +217,12 @@ function render(runs: RunRecord[], env: unknown): string {
         `| ${category} | ${arm} | ${rs.length} | ${fmt(median(ok.map((r) => r.words)))} | ${fmt(median(ok.flatMap((r) => (r.ttftMs === null ? [] : [r.ttftMs]))))} | ${fmt(median(ok.flatMap((r) => (r.totalMs === null ? [] : [r.totalMs]))))} | ${checkable.length ? `${checkable.filter((r) => r.correct).length}/${checkable.length}` : "-"} | ${category === "multiturn" ? recall(8) : "-"} | ${category === "multiturn" ? recall(9) : "-"} |`,
       );
     }
+  }
+  const freshRuns: FreshRun[] = runs.filter((r) => r.fresh).map((r) => ({ kind: r.fresh!.kind, searched: r.fresh!.evidenceFired, askedToSearch: false, failed: r.error !== null || r.reply.trim() === "" }));
+  if (freshRuns.length) {
+    const summary = summarizeFresh(freshRuns);
+    lines.push("", "## Fresh evidence summary (SEARCH-FRESH-01)", "", "Evidence is an acceptable first-round tool call; retry and query-writer calls are separate in results.json.", "", "| Kind | Scored runs | Evidence calls |", "|---|---:|---:|");
+    for (const kind of ["time-sensitive", "timeless", "hard-negative"] as const) lines.push(`| ${kind} | ${summary[kind].runs} | ${summary[kind].searched} |`);
   }
   const bad = runs.filter((r) => r.error !== null || r.reply.trim() === "");
   lines.push("", "## Errored or empty runs", "");
@@ -226,12 +246,16 @@ if (!chatUrl) {
   process.exit(2);
 }
 const realSearxng = process.env.MAIPAI_BENCH_REAL_SEARXNG_URL;
+const searchMode = process.env.MAIPAI_BENCH_SEARCH;
+const fixtureItems = (dataset.fresh?.items ?? []) as { id: string; prompt: string; kind?: string; acceptable_tools?: string[]; fixture?: { as_of: string; title: string; content: string; url?: string } }[];
+let fixtureSearch: FixtureSearch | null = null;
+if (searchMode === "fixture" || searchMode === "down") fixtureSearch = startFixtureSearch(fixtureItems, searchMode);
 const selectedSearchFreeItems = GROUP === "adult" && ONLY !== null && ONLY.size > 0 && [...ONLY].every((id) => SEARCH_FREE_ITEMS.has(id));
-if (!realSearxng && !selectedSearchFreeItems) {
+if (!realSearxng && !fixtureSearch && !selectedSearchFreeItems) {
   console.error("chat-ab-01 refused: MAIPAI_BENCH_REAL_SEARXNG_URL is not set (arm B uses the real SearXNG, cleared per run).");
   process.exit(2);
 }
-if (realSearxng) refuseRealSearxngWithoutClearance("chat-ab-01", realSearxng);
+if (realSearxng && !fixtureSearch) refuseRealSearxngWithoutClearance("chat-ab-01", realSearxng);
 
 // Arms A and A2 talk to the engine directly; arm B reaches it through the
 // recording proxy (so the requests of each turn can be read), which only
@@ -328,8 +352,9 @@ const teeServer = Bun.serve({
     tee.lastSearchAt = Date.now();
     let upstream: Response;
     try {
-      if (!realSearxng) throw new Error("search-free bench selection attempted a search");
-      upstream = await fetch(new URL(url.pathname + url.search, realSearxng), { method: req.method, headers: { accept: req.headers.get("accept") ?? "application/json" } });
+      const upstreamBase = fixtureSearch?.url ?? realSearxng;
+      if (!upstreamBase) throw new Error("search-free bench selection attempted a search");
+      upstream = await fetch(new URL(url.pathname + url.search, upstreamBase), { method: req.method, headers: { accept: req.headers.get("accept") ?? "application/json" } });
     } catch (err) {
       tee.queries.push({ q, status: 0, rows: 0, engines: [], unresponsive: [(err as Error).message], stoppedByBench: false });
       return new Response("upstream unreachable", { status: 502 });
@@ -610,6 +635,43 @@ async function main(): Promise<void> {
   const base = { seed: "engine-random" };
 
   const wanted = (id: string) => !ONLY || ONLY.has(id);
+
+  if (GROUP === "fresh") {
+    const items = fixtureItems.filter((row) => row.kind === "time-sensitive" || row.kind === "timeless") as (typeof fixtureItems[number] & { family?: string; split?: string; gold?: "must" | "must_not" | "may"; age_row?: string; expected_terms?: string[] })[];
+    const benchEnv = { ...env, searchMode, sampling: "chat (production pipeline)", thinking: "off", websearchSchema: "current", reps: SINGLE_RUNS, itemCount: items.length, fixtureSearch: true, fixtureRowsCarryFullText: true, pageFetch: "not fetched; full text is in each SearXNG result row", tokenCount: { source: "engine usage.prompt_tokens", fallback: "null when engine omits usage; no estimate is substituted" }, modelId: String((env as { stackChatRoleModel?: string }).stackChatRoleModel ?? "n/a"), engineBuild: engineHeaders["x-maipai-engine"] };
+    for (const item of items.filter((row) => wanted(row.id))) for (let rep = 1; rep <= SINGLE_RUNS; rep++) {
+      console.log(`[chat-ab-01] fresh ${item.id} rep ${rep}/${SINGLE_RUNS}`);
+      await pacedBeforeSearchTurn(); proxy.reset();
+      const mark = tee.queries.length;
+      const result = await runPipeline(`fresh-${item.id}-${rep}`, [item.prompt]);
+      const turn = result.turns[0];
+      if (!turn) throw new Error(`fresh pipeline returned no turn for ${item.id} rep ${rep}`);
+      const requests = proxy.requests.map((request) => ({ ...request }));
+      const stages = splitCallStages(requests.map((request) => ({ toolCalls: request.toolCalls.map((call) => call.name), responseFormat: request.responseFormat, responseText: request.responseText })));
+      const firstRequest = requests.find((request) => !request.responseFormat);
+      const retryRequests = requests.filter((request) => request !== firstRequest && !request.responseFormat);
+      const argsByName = (names: string[], scope: RecordedRequest[]) => names.flatMap((name) => scope.flatMap((request) => request.toolCalls.filter((call) => call.name === name).map((call) => ({ name, arguments: call.arguments }))));
+      const queries = tee.queries.slice(mark);
+      const firstNames = stages.firstRoundCalls;
+      const searchCall = requests.flatMap((request) => request.toolCalls).find((call) => call.name === "websearch");
+      let query: string | null = null;
+      if (searchCall?.arguments) { try { const args = JSON.parse(searchCall.arguments) as Record<string, unknown>; query = String(args.expression ?? args.query ?? "") || null; } catch { query = searchCall.arguments; } }
+      const score = scoreRun({ id: item.id, kind: item.kind, gold: item.gold, prompt: item.prompt, acceptable_tools: item.acceptable_tools, expected_terms: item.expected_terms, firstRoundCalls: firstNames, query, reply: turn.reply, error: turn.error, status: queries.at(-1)?.status, stoppedByBench: queries.some((row) => row.stoppedByBench), hasSource: requests.some((request) => request.sourceUrls.length > 0) });
+      const fresh = { kind: item.kind as "time-sensitive" | "timeless" | "hard-negative", acceptableTools: item.acceptable_tools ?? [], evidenceFired: score.evidence, fixtureId: queries.find((row) => row.fixtureId)?.fixtureId ?? null };
+      runs.push({ ...base, arm: "B", item: item.id, category: "fresh", rep, turn: null, prompt: item.prompt, reply: turn.reply, words: words(turn.reply), ttftMs: turn.ttftMs, totalMs: turn.totalMs, promptTokens: turn.promptTokens, completionTokens: turn.completionTokens, finishReason: turn.finishReason, correct: null, factsRecalled: null, error: turn.error,
+        modelId: String((env as { stackChatRoleModel?: string }).stackChatRoleModel ?? "n/a"), sampling: "chat", thinking: "off", websearchSchema: "current", engineBuild: engineHeaders["x-maipai-engine"], family: item.family ?? item.id, split: item.split ?? "dev", gold: item.gold ?? (item.kind === "time-sensitive" ? "must" : "must_not"), ageRow: item.age_row ?? "adult", stageCodes: score.stage_codes, decisionLatencyMs: firstRequest?.latencyMs ?? null, firstAnswerTextMs: turn.ttftMs, tokenCountFallback: turn.promptTokens === null ? "engine did not report usage.prompt_tokens; null preserved" : null,
+        firstRoundCalls: argsByName(stages.firstRoundCalls, firstRequest ? [firstRequest] : []), retryCalls: argsByName(stages.retryCalls, retryRequests), queryWriterCalls: requests.filter((request) => request.responseFormat).map((request) => request.responseText), fresh,
+        b: { engineRequests: requests.length, generations: requests.length, searchFired: queries.length > 0, searchForced: requests.some((request) => request.toolChoice === "required"), searchQueries: queries, source: turn.b?.source ?? null, pluginId: turn.b?.pluginId ?? null, outcomes: turn.b?.outcomes ?? [], ttftNote: turn.b?.ttftNote ?? "turn trace", firstRoundCalls: stages.firstRoundCalls, retryCalls: stages.retryCalls, queryWriterCalls: stages.queryWriterCalls },
+      });
+      const recordedEnv = { ...benchEnv, fixtureQueries: fixtureSearch?.queries ?? [], fixturePagesFetched: fixtureSearch?.pagesFetched ?? [], search: { queries: tee.queries, stopped: tee.stopped, stopReason: tee.stopReason } };
+      save(runs, recordedEnv);
+    }
+    const finalEnv = { ...benchEnv, fixtureQueries: fixtureSearch?.queries ?? [], fixturePagesFetched: fixtureSearch?.pagesFetched ?? [], search: { queries: tee.queries, stopped: tee.stopped, stopReason: tee.stopReason } };
+    save(runs, finalEnv); writeFileSync(SIDE_BY_SIDE, render(runs, finalEnv));
+    console.log(`wrote ${runs.length} fresh rows to ${RESULTS}`);
+    runner.cleanupBenchPeople(people); finishBench({ executed: runs.length, engine: String(benchEnv.engineBuild) });
+    return;
+  }
 
   // Single-turn items: item -> run -> arms, so drift hits the arms alike.
   if (GROUP === "child") {

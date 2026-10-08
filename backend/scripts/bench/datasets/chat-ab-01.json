@@ -62,7 +62,7 @@
       "category": "reasoning",
       "prompt": "A tank fills in 6 hours with pipe A alone and in 9 hours with pipe B alone. A drain empties a full tank in 18 hours. With A, B and the drain all open, how long does it take to fill an empty tank?",
       "expectedAll": [
-        "4.5|4 1/2|4\u00bd|four and a half|4 hours and 30|4 hours 30|4 hours, 30"
+        "4.5|4 1/2|4½|four and a half|4 hours and 30|4 hours 30|4 hours, 30"
       ]
     },
     {
@@ -248,6 +248,1752 @@
       {
         "id": "sp6-eurovision",
         "prompt": "Look up which country won the most recent Eurovision Song Contest."
+      }
+    ]
+  },
+  "fresh": {
+    "note": "SEARCH-FRESH-01: 60 fresh decision items plus 30 hard negatives, read by both the chat A/B row group and the route decision pass. Search fixtures are deterministic and loopback-only.",
+    "items": [
+      {
+        "id": "fresh-ts-01",
+        "kind": "time-sensitive",
+        "prompt": "when is the new Exorcist movie coming out",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-01",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "when is the new Exorcist movie coming out",
+          "content": "Recorded bench evidence for the question: when is the new Exorcist movie coming out. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "when is the new Exorcist movie coming out"
+        ]
+      },
+      {
+        "id": "fresh-ts-02",
+        "kind": "time-sensitive",
+        "prompt": "what's the latest version of Python",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-02",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the latest version of Python",
+          "content": "Recorded bench evidence for the question: what's the latest version of Python. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the latest version of Python"
+        ]
+      },
+      {
+        "id": "fresh-ts-03",
+        "kind": "time-sensitive",
+        "prompt": "who is the current prime minister of the United Kingdom",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-03",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who is the current prime minister of the United Kingdom",
+          "content": "Recorded bench evidence for the question: who is the current prime minister of the United Kingdom. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "who is the current prime minister of the United Kingdom"
+        ]
+      },
+      {
+        "id": "fresh-ts-04",
+        "kind": "time-sensitive",
+        "prompt": "what movies are coming out in theaters this month",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-04",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what movies are coming out in theaters this month",
+          "content": "Recorded bench evidence for the question: what movies are coming out in theaters this month. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "what movies are coming out in theaters this month"
+        ]
+      },
+      {
+        "id": "fresh-ts-05",
+        "kind": "time-sensitive",
+        "prompt": "what was the score of the last Lakers game",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-05",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what was the score of the last Lakers game",
+          "content": "Recorded bench evidence for the question: what was the score of the last Lakers game. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "what was the score of the last Lakers game"
+        ]
+      },
+      {
+        "id": "fresh-ts-06",
+        "kind": "time-sensitive",
+        "prompt": "what's the price of bitcoin right now",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-06",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the price of bitcoin right now",
+          "content": "Recorded bench evidence for the question: what's the price of bitcoin right now. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the price of bitcoin right now"
+        ]
+      },
+      {
+        "id": "fresh-ts-07",
+        "kind": "time-sensitive",
+        "prompt": "who won the most recent Formula 1 race",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-07",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who won the most recent Formula 1 race",
+          "content": "Recorded bench evidence for the question: who won the most recent Formula 1 race. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "who won the most recent Formula 1 race"
+        ]
+      },
+      {
+        "id": "fresh-ts-08",
+        "kind": "time-sensitive",
+        "prompt": "what is the newest iPhone",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-08",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the newest iPhone",
+          "content": "Recorded bench evidence for the question: what is the newest iPhone. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the newest iPhone"
+        ]
+      },
+      {
+        "id": "fresh-ts-09",
+        "kind": "time-sensitive",
+        "prompt": "is there a new season of Stranger Things coming",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-09",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "is there a new season of Stranger Things coming",
+          "content": "Recorded bench evidence for the question: is there a new season of Stranger Things coming. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "is there a new season of Stranger Things coming"
+        ]
+      },
+      {
+        "id": "fresh-ts-10",
+        "kind": "time-sensitive",
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "prompt": "what's the weather going to be like in Chicago this weekend",
+        "acceptable_tools": [
+          "weather"
+        ],
+        "family": "fresh-ts-10",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the weather going to be like in Chicago this weekend",
+          "content": "Recorded bench evidence for the question: what's the weather going to be like in Chicago this weekend. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "expected_terms": [
+          "s the weather going to be like in Chicago this weekend"
+        ]
+      },
+      {
+        "id": "fresh-ts-11",
+        "kind": "time-sensitive",
+        "prompt": "who is the current president of France",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-11",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who is the current president of France",
+          "content": "Recorded bench evidence for the question: who is the current president of France. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "who is the current president of France"
+        ]
+      },
+      {
+        "id": "fresh-ts-12",
+        "kind": "time-sensitive",
+        "prompt": "what's the latest news about SpaceX",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-12",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the latest news about SpaceX",
+          "content": "Recorded bench evidence for the question: what's the latest news about SpaceX. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the latest news about SpaceX"
+        ]
+      },
+      {
+        "id": "fresh-ts-13",
+        "kind": "time-sensitive",
+        "prompt": "when is the next Super Bowl",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-13",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "when is the next Super Bowl",
+          "content": "Recorded bench evidence for the question: when is the next Super Bowl. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "when is the next Super Bowl"
+        ]
+      },
+      {
+        "id": "fresh-ts-14",
+        "kind": "time-sensitive",
+        "prompt": "what is the current price of gold",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-14",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the current price of gold",
+          "content": "Recorded bench evidence for the question: what is the current price of gold. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the current price of gold"
+        ]
+      },
+      {
+        "id": "fresh-ts-15",
+        "kind": "time-sensitive",
+        "prompt": "what's the newest Marvel movie",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-15",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the newest Marvel movie",
+          "content": "Recorded bench evidence for the question: what's the newest Marvel movie. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the newest Marvel movie"
+        ]
+      },
+      {
+        "id": "fresh-ts-16",
+        "kind": "time-sensitive",
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "prompt": "what's the latest stable release of Node.js",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-16",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the latest stable release of Node.js",
+          "content": "Recorded bench evidence for the question: what's the latest stable release of Node.js. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "expected_terms": [
+          "s the latest stable release of Node"
+        ]
+      },
+      {
+        "id": "fresh-ts-17",
+        "kind": "time-sensitive",
+        "prompt": "who won the most recent Nobel Prize in Physics",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-17",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who won the most recent Nobel Prize in Physics",
+          "content": "Recorded bench evidence for the question: who won the most recent Nobel Prize in Physics. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "who won the most recent Nobel Prize in Physics"
+        ]
+      },
+      {
+        "id": "fresh-ts-18",
+        "kind": "time-sensitive",
+        "prompt": "when is the new Zelda game coming out",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-18",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "when is the new Zelda game coming out",
+          "content": "Recorded bench evidence for the question: when is the new Zelda game coming out. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "when is the new Zelda game coming out"
+        ]
+      },
+      {
+        "id": "fresh-ts-19",
+        "kind": "time-sensitive",
+        "prompt": "what's the current exchange rate from dollars to euros",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-19",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the current exchange rate from dollars to euros",
+          "content": "Recorded bench evidence for the question: what's the current exchange rate from dollars to euros. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the current exchange rate from dollars to euros"
+        ]
+      },
+      {
+        "id": "fresh-ts-20",
+        "kind": "time-sensitive",
+        "prompt": "what are the top songs on the charts this week",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-20",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what are the top songs on the charts this week",
+          "content": "Recorded bench evidence for the question: what are the top songs on the charts this week. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "what are the top songs on the charts this week"
+        ]
+      },
+      {
+        "id": "fresh-ts-21",
+        "kind": "time-sensitive",
+        "prompt": "what is the newest version of macOS",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-21",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the newest version of macOS",
+          "content": "Recorded bench evidence for the question: what is the newest version of macOS. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the newest version of macOS"
+        ]
+      },
+      {
+        "id": "fresh-ts-22",
+        "kind": "time-sensitive",
+        "prompt": "is the new Dune movie out yet",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-22",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "is the new Dune movie out yet",
+          "content": "Recorded bench evidence for the question: is the new Dune movie out yet. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "is the new Dune movie out yet"
+        ]
+      },
+      {
+        "id": "fresh-ts-23",
+        "kind": "time-sensitive",
+        "prompt": "who is the current CEO of Intel",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-23",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who is the current CEO of Intel",
+          "content": "Recorded bench evidence for the question: who is the current CEO of Intel. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "who is the current CEO of Intel"
+        ]
+      },
+      {
+        "id": "fresh-ts-24",
+        "kind": "time-sensitive",
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "prompt": "what time does the sun set today in Denver",
+        "acceptable_tools": [
+          "weather"
+        ],
+        "family": "fresh-ts-24",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what time does the sun set today in Denver",
+          "content": "Recorded bench evidence for the question: what time does the sun set today in Denver. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "expected_terms": [
+          "what time does the sun set today in Denver"
+        ]
+      },
+      {
+        "id": "fresh-ts-25",
+        "kind": "time-sensitive",
+        "prompt": "what's the next episode of The Simpsons about",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-25",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the next episode of The Simpsons about",
+          "content": "Recorded bench evidence for the question: what's the next episode of The Simpsons about. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the next episode of The Simpsons about"
+        ]
+      },
+      {
+        "id": "fresh-ts-26",
+        "kind": "time-sensitive",
+        "prompt": "what's the current unemployment rate in the US",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-26",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the current unemployment rate in the US",
+          "content": "Recorded bench evidence for the question: what's the current unemployment rate in the US. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the current unemployment rate in the US"
+        ]
+      },
+      {
+        "id": "fresh-ts-27",
+        "kind": "time-sensitive",
+        "prompt": "what did the Federal Reserve decide at its last meeting",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-27",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what did the Federal Reserve decide at its last meeting",
+          "content": "Recorded bench evidence for the question: what did the Federal Reserve decide at its last meeting. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "what did the Federal Reserve decide at its last meeting"
+        ]
+      },
+      {
+        "id": "fresh-ts-28",
+        "kind": "time-sensitive",
+        "prompt": "when is the next solar eclipse I can see in North America",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-28",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "when is the next solar eclipse I can see in North America",
+          "content": "Recorded bench evidence for the question: when is the next solar eclipse I can see in North America. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "when is the next solar eclipse I can see in North America"
+        ]
+      },
+      {
+        "id": "fresh-ts-29",
+        "kind": "time-sensitive",
+        "prompt": "what's the newest Nintendo console",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-29",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the newest Nintendo console",
+          "content": "Recorded bench evidence for the question: what's the newest Nintendo console. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the newest Nintendo console"
+        ]
+      },
+      {
+        "id": "fresh-ts-30",
+        "kind": "time-sensitive",
+        "prompt": "which team leads the Premier League table right now",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-ts-30",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "which team leads the Premier League table right now",
+          "content": "Recorded bench evidence for the question: which team leads the Premier League table right now. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must",
+        "age_row": "adult",
+        "expected_terms": [
+          "which team leads the Premier League table right now"
+        ]
+      },
+      {
+        "id": "fresh-tl-01",
+        "kind": "timeless",
+        "prompt": "what is 17 times 23",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-01",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is 17 times 23",
+          "content": "Recorded bench evidence for the question: what is 17 times 23. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is 17 times 23"
+        ]
+      },
+      {
+        "id": "fresh-tl-02",
+        "kind": "timeless",
+        "prompt": "what is the capital of Australia",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-02",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the capital of Australia",
+          "content": "Recorded bench evidence for the question: what is the capital of Australia. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the capital of Australia"
+        ]
+      },
+      {
+        "id": "fresh-tl-03",
+        "kind": "timeless",
+        "prompt": "what does the word ephemeral mean",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-03",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what does the word ephemeral mean",
+          "content": "Recorded bench evidence for the question: what does the word ephemeral mean. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what does the word ephemeral mean"
+        ]
+      },
+      {
+        "id": "fresh-tl-04",
+        "kind": "timeless",
+        "prompt": "why is the sky blue",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-04",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "why is the sky blue",
+          "content": "Recorded bench evidence for the question: why is the sky blue. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "why is the sky blue"
+        ]
+      },
+      {
+        "id": "fresh-tl-05",
+        "kind": "timeless",
+        "prompt": "how many sides does a hexagon have",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-05",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how many sides does a hexagon have",
+          "content": "Recorded bench evidence for the question: how many sides does a hexagon have. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how many sides does a hexagon have"
+        ]
+      },
+      {
+        "id": "fresh-tl-06",
+        "kind": "timeless",
+        "prompt": "what is the boiling point of water in Celsius",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-06",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the boiling point of water in Celsius",
+          "content": "Recorded bench evidence for the question: what is the boiling point of water in Celsius. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the boiling point of water in Celsius"
+        ]
+      },
+      {
+        "id": "fresh-tl-07",
+        "kind": "timeless",
+        "prompt": "who wrote Pride and Prejudice",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-07",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who wrote Pride and Prejudice",
+          "content": "Recorded bench evidence for the question: who wrote Pride and Prejudice. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "who wrote Pride and Prejudice"
+        ]
+      },
+      {
+        "id": "fresh-tl-08",
+        "kind": "timeless",
+        "prompt": "explain what a noun is",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-08",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "explain what a noun is",
+          "content": "Recorded bench evidence for the question: explain what a noun is. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "explain what a noun is"
+        ]
+      },
+      {
+        "id": "fresh-tl-09",
+        "kind": "timeless",
+        "prompt": "what is the square root of 144",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-09",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the square root of 144",
+          "content": "Recorded bench evidence for the question: what is the square root of 144. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the square root of 144"
+        ]
+      },
+      {
+        "id": "fresh-tl-10",
+        "kind": "timeless",
+        "prompt": "what is the capital of Canada",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-10",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the capital of Canada",
+          "content": "Recorded bench evidence for the question: what is the capital of Canada. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the capital of Canada"
+        ]
+      },
+      {
+        "id": "fresh-tl-11",
+        "kind": "timeless",
+        "prompt": "how does photosynthesis work",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-11",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how does photosynthesis work",
+          "content": "Recorded bench evidence for the question: how does photosynthesis work. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how does photosynthesis work"
+        ]
+      },
+      {
+        "id": "fresh-tl-12",
+        "kind": "timeless",
+        "prompt": "what is the chemical symbol for gold",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-12",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the chemical symbol for gold",
+          "content": "Recorded bench evidence for the question: what is the chemical symbol for gold. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the chemical symbol for gold"
+        ]
+      },
+      {
+        "id": "fresh-tl-13",
+        "kind": "timeless",
+        "prompt": "how many days are in a leap year",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-13",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how many days are in a leap year",
+          "content": "Recorded bench evidence for the question: how many days are in a leap year. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how many days are in a leap year"
+        ]
+      },
+      {
+        "id": "fresh-tl-14",
+        "kind": "timeless",
+        "prompt": "what is the Pythagorean theorem",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-14",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the Pythagorean theorem",
+          "content": "Recorded bench evidence for the question: what is the Pythagorean theorem. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the Pythagorean theorem"
+        ]
+      },
+      {
+        "id": "fresh-tl-15",
+        "kind": "timeless",
+        "prompt": "translate good morning into Spanish",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-15",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "translate good morning into Spanish",
+          "content": "Recorded bench evidence for the question: translate good morning into Spanish. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "translate good morning into Spanish"
+        ]
+      },
+      {
+        "id": "fresh-tl-16",
+        "kind": "timeless",
+        "prompt": "what is the largest planet in our solar system",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-16",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the largest planet in our solar system",
+          "content": "Recorded bench evidence for the question: what is the largest planet in our solar system. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the largest planet in our solar system"
+        ]
+      },
+      {
+        "id": "fresh-tl-17",
+        "kind": "timeless",
+        "prompt": "define the word photosynthesis",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-17",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "define the word photosynthesis",
+          "content": "Recorded bench evidence for the question: define the word photosynthesis. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "define the word photosynthesis"
+        ]
+      },
+      {
+        "id": "fresh-tl-18",
+        "kind": "timeless",
+        "prompt": "what is 15 percent of 200",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-18",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is 15 percent of 200",
+          "content": "Recorded bench evidence for the question: what is 15 percent of 200. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is 15 percent of 200"
+        ]
+      },
+      {
+        "id": "fresh-tl-19",
+        "kind": "timeless",
+        "prompt": "who painted the Mona Lisa",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-19",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who painted the Mona Lisa",
+          "content": "Recorded bench evidence for the question: who painted the Mona Lisa. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "who painted the Mona Lisa"
+        ]
+      },
+      {
+        "id": "fresh-tl-20",
+        "kind": "timeless",
+        "prompt": "how many continents are there",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-20",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how many continents are there",
+          "content": "Recorded bench evidence for the question: how many continents are there. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how many continents are there"
+        ]
+      },
+      {
+        "id": "fresh-tl-21",
+        "kind": "timeless",
+        "prompt": "what is the difference between a simile and a metaphor",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-21",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the difference between a simile and a metaphor",
+          "content": "Recorded bench evidence for the question: what is the difference between a simile and a metaphor. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the difference between a simile and a metaphor"
+        ]
+      },
+      {
+        "id": "fresh-tl-22",
+        "kind": "timeless",
+        "prompt": "what is the capital of Japan",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-22",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the capital of Japan",
+          "content": "Recorded bench evidence for the question: what is the capital of Japan. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the capital of Japan"
+        ]
+      },
+      {
+        "id": "fresh-tl-23",
+        "kind": "timeless",
+        "prompt": "how many minutes are in a day",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-23",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how many minutes are in a day",
+          "content": "Recorded bench evidence for the question: how many minutes are in a day. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how many minutes are in a day"
+        ]
+      },
+      {
+        "id": "fresh-tl-24",
+        "kind": "timeless",
+        "prompt": "what causes the seasons to change",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-24",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what causes the seasons to change",
+          "content": "Recorded bench evidence for the question: what causes the seasons to change. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what causes the seasons to change"
+        ]
+      },
+      {
+        "id": "fresh-tl-25",
+        "kind": "timeless",
+        "prompt": "give me a rhyme for the word orange",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-25",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "give me a rhyme for the word orange",
+          "content": "Recorded bench evidence for the question: give me a rhyme for the word orange. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "give me a rhyme for the word orange"
+        ]
+      },
+      {
+        "id": "fresh-tl-26",
+        "kind": "timeless",
+        "prompt": "what is the freezing point of water in Fahrenheit",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-26",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the freezing point of water in Fahrenheit",
+          "content": "Recorded bench evidence for the question: what is the freezing point of water in Fahrenheit. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the freezing point of water in Fahrenheit"
+        ]
+      },
+      {
+        "id": "fresh-tl-27",
+        "kind": "timeless",
+        "prompt": "what is a prime number",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-27",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is a prime number",
+          "content": "Recorded bench evidence for the question: what is a prime number. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is a prime number"
+        ]
+      },
+      {
+        "id": "fresh-tl-28",
+        "kind": "timeless",
+        "prompt": "who was the first president of the United States",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-28",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who was the first president of the United States",
+          "content": "Recorded bench evidence for the question: who was the first president of the United States. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "who was the first president of the United States"
+        ]
+      },
+      {
+        "id": "fresh-tl-29",
+        "kind": "timeless",
+        "prompt": "what is the speed of light",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-29",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the speed of light",
+          "content": "Recorded bench evidence for the question: what is the speed of light. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the speed of light"
+        ]
+      },
+      {
+        "id": "fresh-tl-30",
+        "kind": "timeless",
+        "prompt": "how do you spell necessary",
+        "acceptable_tools": [
+          "websearch"
+        ],
+        "family": "fresh-tl-30",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how do you spell necessary",
+          "content": "Recorded bench evidence for the question: how do you spell necessary. This fixture exists only to verify search plumbing and has no live search facts."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how do you spell necessary"
+        ]
+      },
+      {
+        "id": "fresh-hn-01",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-01",
+        "prompt": "why do people still read Shakespeare today",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "why do people still read Shakespeare today",
+          "content": "Recorded bench evidence for the hard-negative item: why do people still read Shakespeare today. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "why do people still read Shakespeare today"
+        ]
+      },
+      {
+        "id": "fresh-hn-02",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-01",
+        "prompt": "who was president of the United States in 1980",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who was president of the United States in 1980",
+          "content": "Recorded bench evidence for the hard-negative item: who was president of the United States in 1980. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "who was president of the United States in 1980"
+        ]
+      },
+      {
+        "id": "fresh-hn-03",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-01",
+        "prompt": "what is the current in a 9-volt circuit",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the current in a 9-volt circuit",
+          "content": "Recorded bench evidence for the hard-negative item: what is the current in a 9-volt circuit. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the current in a 9",
+          "volt circuit"
+        ]
+      },
+      {
+        "id": "fresh-hn-04",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-02",
+        "prompt": "explain the news cycle",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "explain the news cycle",
+          "content": "Recorded bench evidence for the hard-negative item: explain the news cycle. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "explain the news cycle"
+        ]
+      },
+      {
+        "id": "fresh-hn-05",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-02",
+        "prompt": "what's the latest I can plant tulips",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the latest I can plant tulips",
+          "content": "Recorded bench evidence for the hard-negative item: what's the latest I can plant tulips. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the latest I can plant tulips"
+        ]
+      },
+      {
+        "id": "fresh-hn-06",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-02",
+        "prompt": "is it still true that light is the fastest thing",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "is it still true that light is the fastest thing",
+          "content": "Recorded bench evidence for the hard-negative item: is it still true that light is the fastest thing. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "is it still true that light is the fastest thing"
+        ]
+      },
+      {
+        "id": "fresh-hn-07",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-03",
+        "prompt": "how long has the Eiffel Tower stood",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how long has the Eiffel Tower stood",
+          "content": "Recorded bench evidence for the hard-negative item: how long has the Eiffel Tower stood. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how long has the Eiffel Tower stood"
+        ]
+      },
+      {
+        "id": "fresh-hn-08",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-03",
+        "prompt": "what is the current in a series circuit",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the current in a series circuit",
+          "content": "Recorded bench evidence for the hard-negative item: what is the current in a series circuit. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the current in a series circuit"
+        ]
+      },
+      {
+        "id": "fresh-hn-09",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-03",
+        "prompt": "why is current measured in amperes",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "why is current measured in amperes",
+          "content": "Recorded bench evidence for the hard-negative item: why is current measured in amperes. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "why is current measured in amperes"
+        ]
+      },
+      {
+        "id": "fresh-hn-10",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-04",
+        "prompt": "how does the news cycle work",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how does the news cycle work",
+          "content": "Recorded bench evidence for the hard-negative item: how does the news cycle work. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how does the news cycle work"
+        ]
+      },
+      {
+        "id": "fresh-hn-11",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-04",
+        "prompt": "what does current mean in electricity",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what does current mean in electricity",
+          "content": "Recorded bench evidence for the hard-negative item: what does current mean in electricity. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what does current mean in electricity"
+        ]
+      },
+      {
+        "id": "fresh-hn-12",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-04",
+        "prompt": "what is the latest chapter of a book I am reading",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the latest chapter of a book I am reading",
+          "content": "Recorded bench evidence for the hard-negative item: what is the latest chapter of a book I am reading. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the latest chapter of a book I am reading"
+        ]
+      },
+      {
+        "id": "fresh-hn-13",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-05",
+        "prompt": "how do I search the web for jobs safely",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how do I search the web for jobs safely",
+          "content": "Recorded bench evidence for the hard-negative item: how do I search the web for jobs safely. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how do I search the web for jobs safely"
+        ]
+      },
+      {
+        "id": "fresh-hn-14",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-05",
+        "prompt": "what is the current definition of a noun",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the current definition of a noun",
+          "content": "Recorded bench evidence for the hard-negative item: what is the current definition of a noun. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the current definition of a noun"
+        ]
+      },
+      {
+        "id": "fresh-hn-15",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-05",
+        "prompt": "what's the best way to keep up with the news",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what's the best way to keep up with the news",
+          "content": "Recorded bench evidence for the hard-negative item: what's the best way to keep up with the news. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "s the best way to keep up with the news"
+        ]
+      },
+      {
+        "id": "fresh-hn-16",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-06",
+        "prompt": "is the current in a river faster after rain",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "is the current in a river faster after rain",
+          "content": "Recorded bench evidence for the hard-negative item: is the current in a river faster after rain. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "is the current in a river faster after rain"
+        ]
+      },
+      {
+        "id": "fresh-hn-17",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-06",
+        "prompt": "who was the first person to walk on the Moon",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who was the first person to walk on the Moon",
+          "content": "Recorded bench evidence for the hard-negative item: who was the first person to walk on the Moon. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "who was the first person to walk on the Moon"
+        ]
+      },
+      {
+        "id": "fresh-hn-18",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-06",
+        "prompt": "what was the latest book Jane Austen wrote",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what was the latest book Jane Austen wrote",
+          "content": "Recorded bench evidence for the hard-negative item: what was the latest book Jane Austen wrote. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what was the latest book Jane Austen wrote"
+        ]
+      },
+      {
+        "id": "fresh-hn-19",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-07",
+        "prompt": "why are people still interested in dinosaurs",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "why are people still interested in dinosaurs",
+          "content": "Recorded bench evidence for the hard-negative item: why are people still interested in dinosaurs. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "why are people still interested in dinosaurs"
+        ]
+      },
+      {
+        "id": "fresh-hn-20",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-07",
+        "prompt": "what does the word today mean in a sentence",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what does the word today mean in a sentence",
+          "content": "Recorded bench evidence for the hard-negative item: what does the word today mean in a sentence. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what does the word today mean in a sentence"
+        ]
+      },
+      {
+        "id": "fresh-hn-21",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-07",
+        "prompt": "how do I search online for a job",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how do I search online for a job",
+          "content": "Recorded bench evidence for the hard-negative item: how do I search online for a job. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how do I search online for a job"
+        ]
+      },
+      {
+        "id": "fresh-hn-22",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-08",
+        "prompt": "how many years has the Eiffel Tower been standing",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how many years has the Eiffel Tower been standing",
+          "content": "Recorded bench evidence for the hard-negative item: how many years has the Eiffel Tower been standing. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how many years has the Eiffel Tower been standing"
+        ]
+      },
+      {
+        "id": "fresh-hn-23",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-08",
+        "prompt": "what is the speed of light today in a vacuum",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the speed of light today in a vacuum",
+          "content": "Recorded bench evidence for the hard-negative item: what is the speed of light today in a vacuum. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the speed of light today in a vacuum"
+        ]
+      },
+      {
+        "id": "fresh-hn-24",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-08",
+        "prompt": "what is the current through a 9 volt resistor",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the current through a 9 volt resistor",
+          "content": "Recorded bench evidence for the hard-negative item: what is the current through a 9 volt resistor. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the current through a 9 volt resistor"
+        ]
+      },
+      {
+        "id": "fresh-hn-25",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-09",
+        "prompt": "why do people read the news",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "why do people read the news",
+          "content": "Recorded bench evidence for the hard-negative item: why do people read the news. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "why do people read the news"
+        ]
+      },
+      {
+        "id": "fresh-hn-26",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-09",
+        "prompt": "what is the latest theorem in geometry",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the latest theorem in geometry",
+          "content": "Recorded bench evidence for the hard-negative item: what is the latest theorem in geometry. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the latest theorem in geometry"
+        ]
+      },
+      {
+        "id": "fresh-hn-27",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-09",
+        "prompt": "who is a famous historical prime minister",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "who is a famous historical prime minister",
+          "content": "Recorded bench evidence for the hard-negative item: who is a famous historical prime minister. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "who is a famous historical prime minister"
+        ]
+      },
+      {
+        "id": "fresh-hn-28",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-10",
+        "prompt": "what is the current in the water cycle",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "what is the current in the water cycle",
+          "content": "Recorded bench evidence for the hard-negative item: what is the current in the water cycle. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "what is the current in the water cycle"
+        ]
+      },
+      {
+        "id": "fresh-hn-29",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-10",
+        "prompt": "is Shakespeare still taught in schools and why",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "is Shakespeare still taught in schools and why",
+          "content": "Recorded bench evidence for the hard-negative item: is Shakespeare still taught in schools and why. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "is Shakespeare still taught in schools and why"
+        ]
+      },
+      {
+        "id": "fresh-hn-30",
+        "kind": "hard-negative",
+        "acceptable_tools": [],
+        "family": "hn-family-10",
+        "prompt": "how long has the Great Wall existed",
+        "fixture": {
+          "as_of": "2026-10-08",
+          "title": "how long has the Great Wall existed",
+          "content": "Recorded bench evidence for the hard-negative item: how long has the Great Wall existed. No fresh information is required."
+        },
+        "split": "dev",
+        "gold": "must_not",
+        "age_row": "adult",
+        "expected_terms": [
+          "how long has the Great Wall existed"
+        ]
       }
     ]
   }

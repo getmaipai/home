@@ -75,4 +75,15 @@ describe("recording proxy Stack adapter", () => {
     });
     expect((upstream.received.at(-1)?.body as { model: string }).model).toBe(model);
   });
+
+  test("records first-round tool names and arguments plus query-writer response format", async () => {
+    const upstream = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ choices: [{ message: { role: "assistant", tool_calls: [{ id: "call-1", type: "function", function: { name: "websearch", arguments: '{"expression":"latest release"}' } }] }, finish_reason: "tool_calls" }] }) });
+    servers.push(upstream);
+    const proxy = startRecordingProxy(`http://127.0.0.1:${upstream.port}`);
+    servers.push({ stop: () => proxy.stop() });
+    await fetch(`${proxy.url}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "chat", messages: [{ role: "user", content: "latest release" }], tools: [], response_format: { type: "json_schema" } }) });
+    await proxy.settled();
+    expect(proxy.requests[0]?.responseFormat).toEqual({ type: "json_schema" });
+    expect(proxy.requests[0]?.toolCalls).toEqual([{ index: 0, name: "websearch", arguments: '{"expression":"latest release"}' }]);
+  });
 });

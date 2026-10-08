@@ -1,0 +1,604 @@
+{
+  "environment": {
+    "search": {
+      "rowsPerQuery": [
+        {
+          "q": "price of bitcoin right now",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": true
+        },
+        {
+          "q": "most recent Formula 1 race winner",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "newest iPhone",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "new season of Stranger Things coming",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "current president of France",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "latest news about SpaceX",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "current price of gold",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "newest Marvel movie",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "who won the most recent Nobel Prize inPhysics",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "when is the new Zelda game coming out",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "current exchange rate from dollars to euros",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "top songs on the charts this week",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "is the new Dune movie out yet",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "current CEO of Intel",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "current unemployment rate in the US",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "what did the Federal Reserve decide at its latest meeting",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "next solar eclipse in North America",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "newest Nintendo console",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        },
+        {
+          "q": "Premier League table leaders 2026",
+          "status": 503,
+          "rows": 0,
+          "stoppedByBench": false
+        }
+      ],
+      "stopped": true
+    }
+  },
+  "runs": [
+    {
+      "id": "archive-503-01",
+      "item": "archive-503-01",
+      "prompt": "price of bitcoin right now",
+      "reply": "The lookup failed for query archive-503-01.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "price of bitcoin right now",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-02",
+      "item": "archive-503-02",
+      "prompt": "most recent Formula 1 race winner",
+      "reply": "The lookup failed for query archive-503-02.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "most recent Formula 1 race winner",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-03",
+      "item": "archive-503-03",
+      "prompt": "newest iPhone",
+      "reply": "The lookup failed for query archive-503-03.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "newest iPhone",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-04",
+      "item": "archive-503-04",
+      "prompt": "new season of Stranger Things coming",
+      "reply": "The lookup failed for query archive-503-04.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "new season of Stranger Things coming",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-05",
+      "item": "archive-503-05",
+      "prompt": "current president of France",
+      "reply": "The lookup failed for query archive-503-05.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "current president of France",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-06",
+      "item": "archive-503-06",
+      "prompt": "latest news about SpaceX",
+      "reply": "The lookup failed for query archive-503-06.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "latest news about SpaceX",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-07",
+      "item": "archive-503-07",
+      "prompt": "current price of gold",
+      "reply": "The lookup failed for query archive-503-07.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "current price of gold",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-08",
+      "item": "archive-503-08",
+      "prompt": "newest Marvel movie",
+      "reply": "The lookup failed for query archive-503-08.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "newest Marvel movie",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-09",
+      "item": "archive-503-09",
+      "prompt": "who won the most recent Nobel Prize inPhysics",
+      "reply": "The lookup failed for query archive-503-09.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "who won the most recent Nobel Prize inPhysics",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-10",
+      "item": "archive-503-10",
+      "prompt": "when is the new Zelda game coming out",
+      "reply": "The lookup failed for query archive-503-10.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "when is the new Zelda game coming out",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-11",
+      "item": "archive-503-11",
+      "prompt": "current exchange rate from dollars to euros",
+      "reply": "The lookup failed for query archive-503-11.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "current exchange rate from dollars to euros",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-12",
+      "item": "archive-503-12",
+      "prompt": "top songs on the charts this week",
+      "reply": "The lookup failed for query archive-503-12.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "top songs on the charts this week",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-13",
+      "item": "archive-503-13",
+      "prompt": "is the new Dune movie out yet",
+      "reply": "The lookup failed for query archive-503-13.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "is the new Dune movie out yet",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-14",
+      "item": "archive-503-14",
+      "prompt": "current CEO of Intel",
+      "reply": "The lookup failed for query archive-503-14.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "current CEO of Intel",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-15",
+      "item": "archive-503-15",
+      "prompt": "current unemployment rate in the US",
+      "reply": "The lookup failed for query archive-503-15.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "current unemployment rate in the US",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-16",
+      "item": "archive-503-16",
+      "prompt": "what did the Federal Reserve decide at its latest meeting",
+      "reply": "The lookup failed for query archive-503-16.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "what did the Federal Reserve decide at its latest meeting",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-17",
+      "item": "archive-503-17",
+      "prompt": "next solar eclipse in North America",
+      "reply": "The lookup failed for query archive-503-17.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "next solar eclipse in North America",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-18",
+      "item": "archive-503-18",
+      "prompt": "newest Nintendo console",
+      "reply": "The lookup failed for query archive-503-18.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "newest Nintendo console",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "archive-503-19",
+      "item": "archive-503-19",
+      "prompt": "Premier League table leaders 2026",
+      "reply": "The lookup failed for query archive-503-19.",
+      "b": {
+        "searchFired": true,
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "Premier League table leaders 2026",
+            "status": 503,
+            "rows": 0,
+            "stoppedByBench": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "ts-10",
+      "item": "fresh-ts-10",
+      "prompt": "weather in Chicago this weekend",
+      "reply": "Chicago forecast fixture answer.",
+      "b": {
+        "pluginId": "weather",
+        "outcomes": [
+          "weather"
+        ]
+      }
+    },
+    {
+      "id": "ts-24",
+      "item": "fresh-ts-24",
+      "prompt": "sunset today in Denver",
+      "reply": "Denver sunset forecast fixture answer.",
+      "b": {
+        "pluginId": "weather",
+        "outcomes": [
+          "weather"
+        ]
+      }
+    },
+    {
+      "id": "ts-04",
+      "item": "fresh-ts-04",
+      "prompt": "movies coming out this month",
+      "reply": "The lookup completed.",
+      "b": {
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "movies coming out in theaters this month",
+            "status": 200
+          }
+        ]
+      }
+    },
+    {
+      "id": "eclipse",
+      "item": "fresh-ts-28",
+      "prompt": "when is the next solar eclipse I can see in North America",
+      "reply": "The next eclipse is in 2024 [1].",
+      "b": {
+        "pluginId": "websearch",
+        "outcomes": [
+          "websearch"
+        ],
+        "searchQueries": [
+          {
+            "q": "solar eclipse",
+            "status": 200
+          }
+        ]
+      }
+    },
+    {
+      "id": "ts-16",
+      "item": "fresh-ts-16",
+      "prompt": "latest stable release of Node",
+      "reply": "The score of the last Lakers game would require checking the latest sports news or a sports database. As of my knowledge cutoff in October 2023, I do not have real-time data.",
+      "b": {
+        "pluginId": null,
+        "outcomes": []
+      }
+    },
+    {
+      "id": "ts-05",
+      "item": "fresh-ts-05",
+      "prompt": "another latest score question",
+      "reply": "The score of the last Lakers game would require checking the latest sports news or a sports database. As of my knowledge cutoff in October 2023, I do not have real-time data.",
+      "b": {
+        "pluginId": null,
+        "outcomes": []
+      }
+    }
+  ]
+}

@@ -43,6 +43,10 @@ export interface RecordedRequest {
   /** `usage.prompt_tokens` - `undefined` on the same terms as
    * `cachedTokens`. */
   promptTokens?: number;
+  /** Tool names and their raw JSON arguments from the response. */
+  toolCalls: { index: number; name: string; arguments: string }[];
+  responseFormat?: unknown;
+  latencyMs?: number;
 }
 
 export interface RecordingProxy {
@@ -90,6 +94,7 @@ export function extractModelText(raw: string): string {
 
 export interface ModelMeta {
   hasToolCalls: boolean;
+  toolCalls: { index: number; name: string; arguments: string }[];
   cachedTokens?: number;
   promptTokens?: number;
 }
@@ -105,10 +110,17 @@ export function extractModelMeta(raw: string): ModelMeta {
   const trimmed = raw.trim();
   type Usage = { prompt_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } };
   let hasToolCalls = false;
+  const toolCalls = new Map<number, { index: number; name: string; arguments: string }>();
   let usage: Usage | undefined;
-  const consider = (parsed: { choices?: { delta?: { tool_calls?: unknown[] }; message?: { tool_calls?: unknown[] } }[]; usage?: Usage }) => {
+  const consider = (parsed: { choices?: { delta?: { tool_calls?: { index?: number; function?: { name?: string; arguments?: string } }[] }; message?: { tool_calls?: { function?: { name?: string; arguments?: string } }[] } }[]; usage?: Usage }) => {
     const choice = parsed.choices?.[0];
-    if ((choice?.delta?.tool_calls?.length ?? 0) > 0 || (choice?.message?.tool_calls?.length ?? 0) > 0) hasToolCalls = true;
+    for (const [i, tool] of (choice?.delta?.tool_calls ?? []).entries()) {
+      hasToolCalls = true; const index = tool.index ?? i; const row = toolCalls.get(index) ?? { index, name: "", arguments: "" };
+      row.name += tool.function?.name ?? ""; row.arguments += tool.function?.arguments ?? ""; toolCalls.set(index, row);
+    }
+    for (const [i, tool] of (choice?.message?.tool_calls ?? []).entries()) {
+      hasToolCalls = true; toolCalls.set(i, { index: i, name: tool.function?.name ?? "", arguments: tool.function?.arguments ?? "" });
+    }
     if (parsed.usage) usage = parsed.usage;
   };
   if (trimmed.startsWith("{")) {
@@ -129,7 +141,7 @@ export function extractModelMeta(raw: string): ModelMeta {
       }
     }
   }
-  return { hasToolCalls, cachedTokens: usage?.prompt_tokens_details?.cached_tokens, promptTokens: usage?.prompt_tokens };
+  return { hasToolCalls, toolCalls: [...toolCalls.values()], cachedTokens: usage?.prompt_tokens_details?.cached_tokens, promptTokens: usage?.prompt_tokens };
 }
 
 /** A Bun.serve() that forwards every request to the real chat engine
@@ -178,7 +190,8 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
       // completions in flight (a background summary beside the turn's
       // own) each keep their own reply text (a review).
       let recorded: RecordedRequest | undefined;
-      let parsedBody: { messages?: { role: string; content: string }[]; tools?: { function?: { name: string } }[]; tool_choice?: string; stream?: boolean; model?: string } | undefined;
+      const requestStarted = performance.now();
+      let parsedBody: { messages?: { role: string; content: string }[]; tools?: { function?: { name: string } }[]; tool_choice?: string; stream?: boolean; model?: string; response_format?: unknown } | undefined;
       if (body && url.pathname.endsWith("/chat/completions")) {
         try {
           const parsed = JSON.parse(body) as NonNullable<typeof parsedBody>;
@@ -200,6 +213,8 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
             aborted: false,
             toolChoice: parsed.tool_choice,
             hasToolCalls: false,
+            toolCalls: [],
+            responseFormat: parsed.response_format,
           };
           requests.push(recorded);
         } catch {
@@ -271,6 +286,11 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
             record.responseText = text;
             const meta = extractModelMeta(joined);
             if (meta.hasToolCalls) record.hasToolCalls = true;
+            for (const call of meta.toolCalls) {
+              const prior = record.toolCalls.find((x) => x.index === call.index);
+              if (prior) { prior.name += call.name; prior.arguments += call.arguments; }
+              else record.toolCalls.push({ ...call });
+            }
             if (meta.cachedTokens !== undefined) record.cachedTokens = meta.cachedTokens;
             if (meta.promptTokens !== undefined) record.promptTokens = meta.promptTokens;
           } else {
@@ -283,9 +303,15 @@ export function startRecordingProxy(upstream: string): RecordingProxy {
           record.responseText = streamed ? text + extractModelText(tail) : extractModelText(nonStream);
           const meta = extractModelMeta(finalRaw);
           if (meta.hasToolCalls) record.hasToolCalls = true;
+          for (const call of meta.toolCalls) {
+            const prior = record.toolCalls.find((x) => x.index === call.index);
+            if (prior) { prior.name += call.name; prior.arguments += call.arguments; }
+            else record.toolCalls.push({ ...call });
+          }
           if (meta.cachedTokens !== undefined) record.cachedTokens = meta.cachedTokens;
           if (meta.promptTokens !== undefined) record.promptTokens = meta.promptTokens;
           record.completed = true;
+          record.latencyMs = performance.now() - requestStarted;
           finish();
         },
       });

@@ -35,6 +35,17 @@ import { START_PROJECT_TOOL_ID, startProjectToolSpec } from "@/lib/projects/tool
 import { SPEC_DIR } from "@/lib/specDir";
 import { CATALOG } from "@/lib/modelCatalog";
 import answerImageRows from "./datasets/answer-images.json";
+import routeDataset from "./datasets/chat-ab-01.json";
+import { contextToMessages } from "@/lib/turnMachine/messages";
+import type { ContextItem } from "@/lib/turnMachine/contract";
+import { DEFAULT_PERSONA } from "@/lib/persona";
+import { fallbackSignal } from "@/lib/turnSignal";
+import { planFor, type PlanInput } from "@/lib/register";
+import { countTokens } from "@/lib/tokenCount";
+import { CHAT_SAMPLING } from "@/lib/llm";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { scoreRun } from "./freshScore";
+import { hashValue } from "./routeStats";
 
 interface ToolCallCorpusRow {
   utterance: string;
@@ -152,6 +163,7 @@ const REPEATS = Number.isFinite(requestedRepeats) && requestedRepeats > 0 ? requ
 
 async function main(): Promise<{ executed: number; engine: string }> {
   await startBench();
+  if (process.env.MAIPAI_BENCH_PASS === "route") return await routeDecisionPass();
   // Warm the engine before reporting which one is active - the same
   // reason memory-eval.ts's/routing.ts's own benches do this first.
   await complete("chat", [{ role: "user", content: "hello" }]);
@@ -199,6 +211,106 @@ async function main(): Promise<{ executed: number; engine: string }> {
   const budgetExecuted = await budgetOfferedPass();
   const imageExecuted = await answerImagesPass();
   return { executed: corpus.length * REPEATS + budgetExecuted + imageExecuted, engine };
+}
+
+interface RouteItem { id: string; prompt: string; kind: string; family?: string; split?: string; gold?: "must" | "must_not" | "may"; age_row?: string; acceptable_tools: string[]; expected_terms?: string[]; }
+interface RouteResult {
+  arm: string; model_id: string; sampling: string; thinking: string; websearch_schema: string; engine_build: string;
+  id: string; item_id: string; family: string; split: string; gold: string; age_row: string; kind: string; rep: number; conversation_id: string; prompt: string;
+  acceptable_tools: string[]; calls: string[]; arguments: Record<string, unknown>[]; first_round_calls: string[]; retry_calls: string[]; query_writer_calls: string[]; stage_codes: string[]; evidence: boolean;
+  valid_query: boolean | null; mangled_query: boolean | null; false_search: boolean; elapsed_ms: number; token_count: number | null;
+  token_count_fallback: string | null; decision_latency_ms: number; ttft_ms: number | null; first_answer_text_ms: number | null; first_answer_text: string | null; total_ms: number; error: string | null;
+}
+
+async function routeDecisionPass(): Promise<{ executed: number; engine: string }> {
+  const modelId = process.env.MAIPAI_CHAT_MODEL_ID ?? process.env.MAIPAI_REPLAY_MODEL_ID;
+  const catalog = CATALOG.find((m) => m.id === modelId) ?? CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
+  if (!catalog?.turn_budget) throw new Error(`No catalog chat budget for ${modelId ?? "default model"}`);
+  const group = (process.env.MAIPAI_BENCH_GROUP ?? "fresh+hardneg").split("+");
+  const all = (routeDataset.fresh.items as RouteItem[]);
+  const requestedSplit = process.env.MAIPAI_BENCH_SPLIT ?? "dev";
+  if (!["dev", "calibration", "heldout"].includes(requestedSplit)) throw new Error("MAIPAI_BENCH_SPLIT must be dev, calibration or heldout");
+  const items = all.filter((item) => (group.includes("fresh+hardneg") || group.includes(item.kind === "hard-negative" ? "hardneg" : "fresh")) && (item.split ?? "dev") === requestedSplit);
+  if (requestedSplit === "heldout" && !items.length) throw new Error("held-out split contains no dataset items");
+  const requested = Number(process.env.MAIPAI_BENCH_REPEATS ?? 5);
+  const repeats = Number.isInteger(requested) && requested > 0 ? requested : 5;
+  const sampling = process.env.MAIPAI_BENCH_SAMPLING ?? "chat";
+  if (!["chat", "nodrx", "greedy"].includes(sampling)) throw new Error("MAIPAI_BENCH_SAMPLING must be chat, nodrx or greedy");
+  const samplingParams = sampling === "chat" ? CHAT_SAMPLING : sampling === "nodrx" ? { temperature: 0.7, min_p: 0.05 } : { temperature: 0 };
+  const thinking = process.env.MAIPAI_BENCH_THINKING === "on";
+  const schema = process.env.MAIPAI_BENCH_WEBSEARCH_SCHEMA ?? "current";
+  if (!["current", "query"].includes(schema)) throw new Error("MAIPAI_BENCH_WEBSEARCH_SCHEMA must be current or query");
+  const offeredTools = catalog.turn_budget.tools_offered ?? [];
+  const arm = process.env.MAIPAI_BENCH_ARM ?? (thinking ? "A1" : modelId?.includes("qwen3-vl") ? (sampling === "nodrx" ? "A2n" : "A2") : sampling === "nodrx" ? "A0n" : "A0");
+  const { toolSpecFor } = await import("@/lib/turnMachine/nodes/model");
+  const tools = offeredTools.slice().sort().map((id) => {
+    const tool = toolSpecFor(id);
+    if (!tool) throw new Error(`budget tool ${id} has no production tool spec`);
+    if (id !== "websearch" || schema === "current") return tool;
+    const args = structuredClone(tool.args) as Record<string, unknown>;
+    const properties = args.properties as Record<string, Record<string, unknown>>;
+    const expression = properties.expression;
+    delete properties.read_page;
+    if (expression) { properties.query = expression; delete properties.expression; }
+    args.required = (args.required as string[]).map((key) => key === "expression" ? "query" : key);
+    return { ...tool, args };
+  });
+  const outDir = process.env.MAIPAI_BENCH_OUT ?? join(process.cwd(), "data-scratch", "route-e1", arm);
+  mkdirSync(outDir, { recursive: true });
+  const results: RouteResult[] = [];
+  const counts: number[] = [];
+  const clock = `Thursday, October 8, 2026`;
+  const engineStatus = getEngineStatus();
+  const engineBuild = String((engineStatus as unknown as { build?: string }).build ?? "not reported by engine");
+  const configurationHash = hashValue({ modelId: modelId ?? catalog.id, engineBuild, sampling, samplingParams, thinking, thinkingBudgetTokens: thinking ? catalog.turn_budget.thinking_budget_tokens_toggled : 0, websearchSchema: schema, tools, persona: DEFAULT_PERSONA, clock, promptBuilder: "contextToMessages", toolChoice: "auto" });
+  const splitHash = hashValue(items.slice().sort((a,b)=>a.id.localeCompare(b.id)));
+  const env = {
+    date: new Date().toISOString(), arm, modelId, catalogModel: catalog.id, sampling, thinking: thinking ? "on (512 budget)" : "off", split: requestedSplit, configurationHash, splitHash,
+    schema, websearchSchema: schema, repeats, group: group.join("+"), itemCount: items.length, offeredTools: tools.map((t) => t.id), samplingParams, thinkingBudgetTokens: thinking ? catalog.turn_budget.thinking_budget_tokens_toggled : 0,
+    engine: engineStatus, engineBuild, engineUrl: sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL),
+    note: "One production-shaped first round per item/repeat; no search, retry, phrasing or query-writer call.",
+  };
+  for (const item of items) for (let rep = 1; rep <= repeats; rep++) {
+    const conversationId = crypto.randomUUID();
+    const signal = fallbackSignal(item.prompt, "adult", "identified_profile", "question");
+    const plan = planFor({ signal, surface: "chat", surfaceClass: "written", brevity: false, evidence: { choices: 0, sources: 0, deliverable: false }, companion: { directness: "diplomatic", engagement: DEFAULT_PERSONA.engagement, vocabulary: DEFAULT_PERSONA.complexity }, band: "adult", deferred: false, disclosureWithheld: false });
+    const context: ContextItem[] = [{ id: `clock-${conversationId}`, text: clock, source: "clock", subjects: [], disclosure: "child_ok" }];
+    const messages = contextToMessages(context, item.prompt, DEFAULT_PERSONA, plan, signal, "written");
+    const tokenCount = await countTokens(messages, { tools }).catch(() => null);
+    if (tokenCount !== null) counts.push(tokenCount);
+    const started = performance.now();
+    const samplingOpts = sampling === "chat" ? {} : samplingParams;
+    const result = await complete("chat", messages, { ...samplingOpts, ...(thinking ? { thinking: true } : { thinking: false }), tools, tool_choice: "auto", max_tokens: catalog.turn_budget.reply_ceiling_tokens + (thinking ? catalog.turn_budget.thinking_budget_tokens_toggled : 0) });
+    const calls = result.ok ? (result.value.tool_calls ?? []) : [];
+    const names = calls.map((c) => c.tool);
+    const args = calls.map((c) => (c.args ?? {}) as Record<string, unknown>);
+    const evidence = names.some((name) => item.acceptable_tools.includes(name));
+    const search = calls.find((c) => c.tool === "websearch");
+    const searchArgs = search?.args as Record<string, unknown> | undefined;
+    const queryArg = searchArgs?.expression ?? searchArgs?.query;
+    const query = typeof queryArg === "string" ? queryArg : null;
+    const expected = item.expected_terms ?? [];
+    const fused = expected.some((term) => term.includes(" ") && query !== null && query.toLowerCase().replace(/[^a-z0-9]+/g, " ").includes(term.toLowerCase().replace(/\s+/g, "")));
+    const elapsed = performance.now() - started;
+    const scored = scoreRun({ id: item.id, kind: item.kind, gold: item.gold, prompt: item.prompt, acceptable_tools: item.acceptable_tools, expected_terms: expected, calls: names, query, error: result.ok ? null : result.error, decisionOnly: true });
+    const row: RouteResult = {
+      arm, model_id: modelId ?? catalog.id, sampling, thinking: thinking ? "on (512 budget)" : "off", websearch_schema: schema,
+      engine_build: engineBuild,
+      id: item.id, item_id: item.id, family: item.family ?? item.id, split: item.split ?? "dev", gold: item.gold ?? (item.kind === "time-sensitive" ? "must" : "must_not"), age_row: item.age_row ?? "adult", kind: item.kind, rep, conversation_id: conversationId, prompt: item.prompt,
+      acceptable_tools: item.acceptable_tools, calls: names, arguments: args, first_round_calls: names, retry_calls: [], query_writer_calls: [], stage_codes: scored.stage_codes, evidence,
+      valid_query: query === null ? null : query.trim().length > 0 && (scored.stage_codes.includes("Q_OK") || scored.stage_codes.includes("Q_RESCUED")),
+      mangled_query: query === null || expected.length === 0 ? null : fused,
+      false_search: scored.stage_codes.includes("D_FALSE"),
+      elapsed_ms: elapsed, decision_latency_ms: elapsed, ttft_ms: null, first_answer_text_ms: null, first_answer_text: null, total_ms: elapsed, token_count: tokenCount,
+      token_count_fallback: tokenCount === null ? "countTokens returned null (engine endpoint unsupported/unavailable); no proxy estimate" : null,
+      error: result.ok ? null : result.error,
+    };
+    results.push(row);
+    console.log(`${item.id} rep ${rep}: acceptable evidence=${evidence}; calls=[${names.join(", ") || "none"}] ${row.elapsed_ms.toFixed(0)}ms`);
+    writeFileSync(join(outDir, "results.json"), JSON.stringify({ arm, environment: { ...env, tokenCount: counts.length ? { minimum: Math.min(...counts), median: counts.slice().sort((a,b)=>a-b)[Math.floor(counts.length/2)] } : { fallback: "tokenCount returned null for every request" } }, results }, null, 2));
+  }
+  console.log(`\nWrote ${results.length} route rows to ${join(outDir, "results.json")}`);
+  return { executed: results.length, engine: `${getEngineStatus().kind} at ${sanitizeEngineUrl(process.env.MAIPAI_LLAMA_SERVER_URL)}` };
 }
 
 /** PHRASE-02's coordinator follow-up (CHAT-RICH-01), kept for the next
