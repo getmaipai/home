@@ -70,6 +70,52 @@ describe("render_stack_binary_name", () => {
   });
 });
 
+describe("fetch_stack_commons", () => {
+  test("lays the pinned, checksummed core workspace beside Stack using an offline mocked download", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-commons-layout-"));
+    const archiveRoot = join(root, "archive", "commons-core-v0.1.0", "core");
+    const workspace = join(root, "workspace");
+    const stackDir = join(workspace, "stack");
+    const commonsDir = join(workspace, "commons");
+    const archive = join(root, "commons.tar.gz");
+    mkdirSync(archiveRoot, { recursive: true });
+    mkdirSync(join(stackDir, "backend"), { recursive: true });
+    writeFileSync(join(archiveRoot, "package.json"), JSON.stringify({ name: "@maipai/core", version: "0.1.0" }));
+    const packed = Bun.spawnSync(["tar", "-czf", archive, "-C", join(root, "archive"), "commons-core-v0.1.0"]);
+    expect(packed.exitCode).toBe(0);
+    const digestResult = Bun.spawnSync(["shasum", "-a", "256", archive]);
+    expect(digestResult.exitCode).toBe(0);
+    const digest = digestResult.stdout.toString().split(/\s+/)[0];
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; curl() { cp "$FIXTURE_ARCHIVE" "$4"; }; commons_core_sha256() { printf '%s\\n' "$EXPECTED_SHA"; }; fetch_stack_commons "$COMMONS_DEST" no`], {
+      env: { ...process.env, FIXTURE_ARCHIVE: archive, EXPECTED_SHA: digest, COMMONS_DEST: commonsDir },
+    });
+    try {
+      expect(result.exitCode).toBe(0);
+      expect(readFileSync(join(commonsDir, "core", "package.json"), "utf8")).toContain('"version":"0.1.0"');
+      expect(join(stackDir, "backend", "../../commons/core")).toBe(join(commonsDir, "core"));
+      expect(readFileSync(join(commonsDir, "core", "package.json"), "utf8")).toContain('"name":"@maipai/core"');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("dry-run prints the pinned Commons tag and verified archive digest without fetching", () => {
+    const result = bashCall('fetch_stack_commons /tmp/maipai-stack/commons yes');
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("getmaipai/commons@core-v0.1.0");
+    expect(result.stdout).toContain("d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
+    expect(result.stdout).toContain("/tmp/maipai-stack/commons/core");
+  });
+
+  test("setup_stack dry-run does not create its scratch tree", () => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; mktemp() { echo "mktemp called during dry-run" >&2; return 1; }; setup_stack /opt/maipai-home /opt/maipai-home/.bun/bin/bun linux x64 yes`]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stderr.toString()).not.toContain("mktemp called during dry-run");
+    expect(result.stdout.toString()).toContain("would fetch getmaipai/commons@core-v0.1.0");
+    expect(result.stdout.toString()).toContain("scripts/build-binary.sh");
+  });
+});
+
 describe("stack_install_service_command", () => {
   test("names every env var install-service actually needs, in one line a test or a log can assert on", () => {
     const out = bashCall('stack_install_service_command /opt/maipai-home/stack/maipai-stack-darwin-arm64 /opt/maipai-home/stack/data 8770 /opt/maipai-home/.bun/bin/bun').stdout;
@@ -143,6 +189,8 @@ describe("--dry-run", () => {
     expect(stdout).toContain("[dry-run] MaiPai Stack install plan for");
     expect(stdout).toContain("STACK_TAG=");
     expect(stdout).toMatch(/would fetch getmaipai\/stack@[0-9a-f]+ into/);
+    expect(stdout).toContain("would fetch getmaipai/commons@core-v0.1.0");
+    expect(stdout).toContain("d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
     expect(stdout).toContain("scripts/build-binary.sh");
     expect(stdout).toContain("OUT_DIR=");
     expect(stdout).toContain("SKIP_VERIFY=1");

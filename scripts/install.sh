@@ -34,6 +34,11 @@ STACK_REPO="getmaipai/stack"
 # but silently writes the binary to the wrong place under this
 # installer's own real usage.
 STACK_TAG="233bc4fd91c01efd54aa44d9147bcccd6fe956a9"
+# The Stack at STACK_TAG pins core-v0.1.0 as file:../../commons/core.
+# Keep the Commons pin and the digest of GitHub's archive together here;
+# the archive digest is verified before anything is extracted.
+COMMONS_CORE_TAG="core-v0.1.0"
+COMMONS_CORE_SHA256="d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4"
 INSTALL_ROOT_LINUX="/opt/maipai-home"
 INSTALL_ROOT_DARWIN="/usr/local/maipai-home"
 SERVICE_USER="maipai"
@@ -271,6 +276,46 @@ fetch_stack_source() {
   tar -xzf "${tmp}/stack.tar.gz" -C "$dest" --strip-components=1 || return 1
 }
 
+commons_core_sha256() {
+  printf '%s\n' "$COMMONS_CORE_SHA256"
+}
+
+sha256_file() {
+  local file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{print $1}'
+  else
+    shasum -a 256 "$file" | awk '{print $1}'
+  fi
+}
+
+# Stack's backend/package.json resolves file:../../commons/core from
+# <workspace>/stack/backend, so the pinned workspace must live at
+# <workspace>/commons/core beside the fetched Stack source.
+fetch_stack_commons() {
+  local dest="$1" dry_run="$2"
+  local tag="$COMMONS_CORE_TAG" expected
+  expected=$(commons_core_sha256)
+  if [ "$dry_run" = "yes" ]; then
+    log "[dry-run] would fetch getmaipai/commons@${tag} (sha256 ${expected}) into ${dest}/core"
+    return 0
+  fi
+  local tmp
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' RETURN
+  log "Fetching getmaipai/commons@${tag}..."
+  curl -fsSL "https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz" -o "${tmp}/commons.tar.gz" || return 1
+  local actual
+  actual=$(sha256_file "${tmp}/commons.tar.gz") || return 1
+  if [ "$actual" != "$expected" ]; then
+    log "Commons ${tag} archive SHA-256 mismatch: expected ${expected}, got ${actual}"
+    return 1
+  fi
+  mkdir -p "$dest" || return 1
+  tar -xzf "${tmp}/commons.tar.gz" -C "$dest" --strip-components=1 "commons-${tag}/core" || return 1
+  [ -f "${dest}/core/package.json" ] || { log "Commons ${tag} archive is missing core/package.json"; return 1; }
+}
+
 # Builds via the Stack's own scripts/build-binary.sh (one definition:
 # this installer never re-implements what that script already does -
 # compile, the migrations/ sibling, and backend-src/, the vendored
@@ -395,11 +440,17 @@ install_stack_service() {
 setup_stack() {
   local install_root="$1" bun_bin="$2" os="$3" arch="$4" dry_run="$5"
   local stack_dir="${install_root}/stack"
-  local source_dir
-  source_dir=$(mktemp -d)
-  fetch_stack_source "$source_dir" "$dry_run" || { log "Could not fetch the Stack's source. The MaiPai Stack is required; installation cannot continue."; rm -rf "$source_dir"; return 1; }
-  build_stack_binary "$source_dir" "$stack_dir" "$bun_bin" "$dry_run" || { log "Could not build the Stack binary. The MaiPai Stack is required; installation cannot continue."; rm -rf "$source_dir"; return 1; }
-  rm -rf "$source_dir"
+  local source_root source_dir
+  if [ "$dry_run" = "yes" ]; then
+    source_root="/tmp/maipai-stack-install-dry-run"
+  else
+    source_root=$(mktemp -d)
+  fi
+  source_dir="${source_root}/stack"
+  fetch_stack_source "$source_dir" "$dry_run" || { log "Could not fetch the Stack's source. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
+  fetch_stack_commons "${source_root}/commons" "$dry_run" || { log "Could not fetch the Stack's pinned Commons dependency. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
+  build_stack_binary "$source_dir" "$stack_dir" "$bun_bin" "$dry_run" || { log "Could not build the Stack binary. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
+  [ "$dry_run" = "yes" ] || rm -rf "$source_root"
   install_stack_service "$install_root" "$bun_bin" "$os" "$arch" "$dry_run"
 }
 
@@ -460,11 +511,14 @@ setup_engine_computer() {
   local bun_home="${ENGINE_STACK_ROOT}/.bun"
   ensure_bun_system_wide "$bun_home"
   bun_bin="${bun_home}/bin/bun"
-  source_dir=$(mktemp -d)
+  local source_root
+  source_root=$(mktemp -d)
+  source_dir="${source_root}/stack"
   fetch_stack_source "$source_dir" no || die "Could not fetch Stack source"
+  fetch_stack_commons "${source_root}/commons" no || die "Could not fetch Stack's pinned Commons dependency"
   build_stack_binary "$source_dir" "$ENGINE_STACK_ROOT" "$bun_bin" no \
     || die "Could not build Stack binary"
-  rm -rf "$source_dir"
+  rm -rf "$source_root"
   chown -R "$ENGINE_STACK_USER:$ENGINE_STACK_USER" "$ENGINE_STACK_ROOT"
   local binary="$ENGINE_STACK_ROOT/$(render_stack_binary_name "$os" "$arch")"
   sudo -u "$ENGINE_STACK_USER" env \
