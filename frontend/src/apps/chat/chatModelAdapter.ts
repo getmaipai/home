@@ -139,6 +139,7 @@ export interface ChatModelAdapterDeps {
   // typed message inherits after the call ends.
   consumeSpoken?(): boolean | undefined;
   getConversationId?(): Promise<string>;
+  resumeConversationIfClosed?(conversationId: string): Promise<void>;
   // The live reply's own sentence-by-sentence speech (2026-09-04): a
   // separate player from the per-message "Listen" replay (chatListen.ts),
   // since a fresh reply speaks as it arrives while an earlier message's
@@ -330,6 +331,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       deps.onReplyState?.("waiting");
       try {
         let conversationId = await deps.getConversationId?.();
+        if (conversationId) await deps.resumeConversationIfClosed?.(conversationId);
         const temporary = deps.consumeTemporary?.();
         const imageParts: { id: string; name: string; width: number; height: number; media_type: string }[] = [];
         const photoTurnId = imageAttached ? `turn-${crypto.randomUUID().replaceAll("-", "").toLowerCase()}` : undefined;

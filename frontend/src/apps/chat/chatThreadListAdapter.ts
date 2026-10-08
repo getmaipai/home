@@ -84,6 +84,23 @@ export function takeCreatedChatFolder(remoteId: string): string | null {
  * `updateCustom` sends only what changed (the kit hands it the whole
  * object for a pin and for a move alike). */
 const knownCustom = new Map<string, { pinned?: boolean; folder_id?: string | null }>();
+const closedConversationIds = new Set<string>();
+
+/** Whether a previously fetched conversation needs the hub's explicit resume before its next turn. */
+export function conversationNeedsResume(id: string): boolean {
+  return closedConversationIds.has(id);
+}
+
+/** Resume a closed conversation once, keeping server details (including ids) out of chat UI copy. */
+export async function resumeClosedConversation(id: string): Promise<void> {
+  if (!closedConversationIds.has(id)) return;
+  try {
+    await api.resumeConversation(id);
+    closedConversationIds.delete(id);
+  } catch {
+    throw new Error("Could not reopen this chat. Try again.");
+  }
+}
 
 /** One bounded poll per conversation, shared by every caller: the runtime's own trigger after a reply and the
  * catch-up for a chat opened or returned to with no title both ask, and the hub only needs asking once. */
@@ -212,6 +229,8 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
         if (incognito && !incognitoThreadIds.has(remoteId)) throw new Error("This chat is not part of Incognito.");
         const row = await api.conversation(remoteId);
         if (row.surface !== "chat") throw new Error("This conversation is not a chat.");
+        if (row.status === "closed") closedConversationIds.add(remoteId);
+        else closedConversationIds.delete(remoteId);
         return { status: "regular", remoteId: row.id, title: row.title ?? undefined };
       } catch (error) {
         onOpenFailed?.(remoteId);

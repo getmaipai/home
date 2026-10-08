@@ -35,7 +35,7 @@ import { CHAT_CAPABILITIES_QUERY_KEY, chatCapabilitiesFrom, modelThinks, NO_CHAT
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { createChatModelAdapter } from "@/apps/chat/chatModelAdapter";
 import { consumeSupersedes, setPendingSupersedes } from "@/apps/chat/chatEditSupersedes";
-import { createChatThreadListAdapter, needsTitleCatchUp, setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
+import { createChatThreadListAdapter, needsTitleCatchUp, resumeClosedConversation, setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
 import { clearSubmittedFeedback, createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
@@ -488,6 +488,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
             await settingsWriteRef.current;
             return remoteId;
           },
+          resumeConversationIfClosed: resumeClosedConversation,
           // RESP-04's own design: "the choice... is remembered per
           // person with the conversation" - Jesse found this broken
           // live, 2026-09-22 (choosing Thinking reverted to Instant

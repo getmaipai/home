@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { toast } from "sonner";
-import { createChatThreadListAdapter, discardIncognitoThreads, needsTitleCatchUp, setPendingChatFolder, takeCreatedChatFolder } from "@/apps/chat/chatThreadListAdapter";
+import { conversationNeedsResume, createChatThreadListAdapter, discardIncognitoThreads, needsTitleCatchUp, resumeClosedConversation, setPendingChatFolder, takeCreatedChatFolder } from "@/apps/chat/chatThreadListAdapter";
 import { api } from "@/lib/api";
 import { offerCarry, withdrawCarry } from "@/apps/chat/chatCarry";
 import type { ThreadMessage } from "@assistant-ui/react";
@@ -16,6 +16,33 @@ const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; });
 
 describe("saved conversations", () => {
+  test("CLOSED-CHAT-01: selecting a closed conversation reads it without resuming", async () => {
+    const requests: string[] = [];
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push(`${init?.method ?? "GET"} ${String(input)}`);
+      if (String(input) === "/api/conversations/conv-19fp5aqgmr/resume") return Response.json({ id: "conv-19fp5aqgmr", status: "open" });
+      return Response.json({ id: "conv-19fp5aqgmr", title: "Older chat", surface: "chat", status: "closed" });
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova");
+    expect(await adapter.fetch("conv-19fp5aqgmr")).toMatchObject({ remoteId: "conv-19fp5aqgmr", title: "Older chat" });
+    expect(conversationNeedsResume("conv-19fp5aqgmr")).toBe(true);
+    await resumeClosedConversation("conv-19fp5aqgmr");
+    expect(requests).toEqual(["GET /api/conversations/conv-19fp5aqgmr", "POST /api/conversations/conv-19fp5aqgmr/resume"]);
+    expect(conversationNeedsResume("conv-19fp5aqgmr")).toBe(false);
+  });
+
+  test("CLOSED-CHAT-01: a failed resume exposes plain copy without the conversation id", async () => {
+    globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+      if (String(input) === "/api/conversations/conv-19fp5aqgmr/resume") {
+        return Response.json({ error: "conversation not found: conv-19fp5aqgmr" }, { status: 400 });
+      }
+      return Response.json({ id: "conv-19fp5aqgmr", title: "Older chat", surface: "chat", status: "closed" });
+    }) as unknown as typeof fetch;
+    const adapter = createChatThreadListAdapter("Nova");
+    await adapter.fetch("conv-19fp5aqgmr");
+    await expect(resumeClosedConversation("conv-19fp5aqgmr")).rejects.toThrow("Could not reopen this chat. Try again.");
+  });
+
   test("new chats have distinct persistent ids, titles survive remount, and deletion survives reload", async () => {
     const saved = new Map<string, { id: string; title: string | null; surface: string; created_at: string; pinned: boolean }>();
     let sequence = 0;
