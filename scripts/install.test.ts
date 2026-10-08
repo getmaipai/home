@@ -324,6 +324,29 @@ describe("REMOTE-STACK-BOX-01 engine computer dry runs", () => {
     }
   });
 
+  test("box doctor verifies the sole authorized key against the paired key", () => {
+    const folder = mkdtempSync(join(tmpdir(), "maipai-engine-doctor-"));
+    const pairFile = join(folder, "paired-home.json");
+    const authKeys = join(folder, "authorized_keys");
+    const key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITest fixture";
+    const expected = `restrict,port-forwarding,permitopen=\"127.0.0.1:8770\" ${key}`;
+    const runDoctor = (authorized: string) => {
+      writeFileSync(pairFile, JSON.stringify({ household_id: "household-test", authorized_key: key }));
+      writeFileSync(authKeys, authorized);
+      return Bun.spawnSync(["bash", "-c", 'source "$ENGINE_HELPER"; id() { echo 1000; }; systemctl() { return 0; }; loginctl() { echo yes; }; ss() { echo "LISTEN 0 128 127.0.0.1:8770 0.0.0.0:*"; }; nvidia-smi() { echo "GPU 0"; }; doctor'], {
+        env: { ...process.env, ENGINE_HELPER, MAIPAI_ENGINE_PAIR_FILE: pairFile, MAIPAI_ENGINE_AUTH_KEYS: authKeys, MAIPAI_PINNED_ENGINE: folder },
+      });
+    };
+    try {
+      writeFileSync(join(folder, "llama-server"), "#!/bin/sh\necho 'version b10797'\n", { mode: 0o755 });
+      writeFileSync(join(folder, ".engine-ready"), "ready");
+      const matched = runDoctor(`${expected}\n`);
+      expect(matched.stdout.toString()).toContain("PASS hop 5: one restricted key matches the paired household");
+      const duplicated = runDoctor(`${expected}\n${expected}\n`);
+      expect(duplicated.stdout.toString()).toContain("FAIL hop 5: restricted authorized key is missing or duplicated");
+    } finally { rmSync(folder, { recursive: true, force: true }); }
+  });
+
   test("pair response fetches the mocked endpoint and verifies the code HMAC", async () => {
     const code = "K7Q-M2X-RP4-ZT7";
     const normalizedCode = code.replaceAll("-", "").toUpperCase();

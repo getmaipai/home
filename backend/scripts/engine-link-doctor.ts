@@ -121,7 +121,12 @@ export async function runEngineLinkDoctor(deps: DoctorDependencies = defaults): 
   let hop2Detail: string;
   let hop2Failure: string;
   let hop2Pass = Boolean(selected);
-  if (selected) { hop2Detail = `path ${tailnetIp(selected) ? "tailnet" : "home"}`; hop2Failure = "Use the engine computer's home address."; }
+  if (selected && isTailnet && config.allowTailnet && !(await deps.tailscale())) {
+    hop2Pass = false;
+    hop2Detail = "Tailscale is not connected on this computer.";
+    hop2Failure = "Connect Tailscale on this computer.";
+  }
+  else if (selected) { hop2Detail = `path ${tailnetIp(selected) ? "tailnet" : "home"}`; hop2Failure = "Use the engine computer's home address."; }
   else if (isTailnet && !config.allowTailnet) { hop2Detail = "Turn on Reach the engine computer when away from home, or use the home address."; hop2Failure = "Enable away access or use the home address."; }
   else if (isTailnet && config.allowTailnet && !(await deps.tailscale())) { hop2Detail = "Tailscale is not connected on this computer."; hop2Failure = "Connect Tailscale on this computer."; }
   else { hop2Detail = "name did not resolve to an allowed address"; hop2Failure = "Use the engine computer's home address."; }

@@ -4,7 +4,7 @@ import { runEngineLinkDoctor, type EngineLinkDoctorDependencies } from "../scrip
 function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = "connected"): EngineLinkDoctorDependencies {
   return {
     settings: () => ({ selected: failHop !== 1, host: "engine.home", sshPort: 22, localPort: 8771, allowTailnet: tailnet !== "off" }),
-    resolve: async () => [tailnet === "off" ? "100.70.0.2" : tailnet === "disconnected" ? "100.70.0.2" : "192.168.1.20"],
+    resolve: async () => failHop === 2 ? [] : [tailnet === "off" ? "100.70.0.2" : tailnet === "disconnected" ? "100.70.0.2" : "192.168.1.20"],
     portOpen: async () => failHop !== 3,
     allowed: async (address) => !address.startsWith("100.") || tailnet === "connected",
     tailscale: async () => tailnet === "connected",
@@ -21,7 +21,7 @@ function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = 
 
 describe("engine-link doctor", () => {
   test("reports each scripted failure with that hop's fix", async () => {
-    for (const failed of [1, 3, 4, 5, 6, 7, 8, 9, 10]) {
+    for (const failed of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
       const hops = await runEngineLinkDoctor(deps(failed));
       expect(hops).toHaveLength(10);
       expect(hops[failed - 1]!.pass).toBe(false);
@@ -41,6 +41,17 @@ describe("engine-link doctor", () => {
 
   test("hop 2 reports disconnected Tailscale when the flag is on", async () => {
     const hops = await runEngineLinkDoctor(deps(undefined, "disconnected"));
+    expect(hops[1]).toMatchObject({ pass: false, detail: "Tailscale is not connected on this computer.", fix: "Connect Tailscale on this computer." });
+  });
+
+  test("hop 2 fails when a tailnet address is allowed but Tailscale is disconnected", async () => {
+    const connected = deps();
+    const hops = await runEngineLinkDoctor({
+      ...connected,
+      resolve: async () => ["100.70.0.2"],
+      allowed: async () => true,
+      tailscale: async () => false,
+    });
     expect(hops[1]).toMatchObject({ pass: false, detail: "Tailscale is not connected on this computer.", fix: "Connect Tailscale on this computer." });
   });
 });

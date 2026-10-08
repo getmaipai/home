@@ -68,10 +68,13 @@ doctor() {
   fi
 
   if current=$(read_pair 2>/dev/null); then
-    matching_keys=$(awk '/^restrict,port-forwarding,permitopen="127\.0\.0\.1:8770" ssh-ed25519 [A-Za-z0-9+/]+( .*)?$/ && NF >= 3 { n++ } END { print n+0 }' "$AUTH_KEYS" 2>/dev/null)
-    if [ "$matching_keys" = 1 ] && [ "$(wc -l < "$AUTH_KEYS" | tr -d ' ')" = 1 ]; then
-      say "UNVERIFIED hop 5: paired-home.json has no authorized-key fingerprint"
-      say "Fix hop 5: add authorized_key_fingerprint to pair record"
+    local paired_key expected_line
+    paired_key=$(read_pair_key 2>/dev/null || true)
+    expected_line="restrict,port-forwarding,permitopen=\"127.0.0.1:8770\" $paired_key"
+    matching_keys=$(awk -v expected="$expected_line" '$0 == expected { n++ } END { print n+0 }' "$AUTH_KEYS" 2>/dev/null)
+    if [ -n "$paired_key" ] && [ "$matching_keys" = 1 ] && [ "$(wc -l < "$AUTH_KEYS" | tr -d ' ')" = 1 ]; then
+      say "PASS hop 5: one restricted key matches the paired household"
+      say "Fix hop 5: no action needed."
     else
       say "FAIL hop 5: restricted authorized key is missing or duplicated"
       say "Fix hop 5: sudo maipai-engine pair HOME CODE"
@@ -87,6 +90,11 @@ normalize_code() { printf '%s' "$1" | tr -d '-' | tr '[:lower:]' '[:upper:]'; }
 read_pair() {
   [ -f "$PAIR_FILE" ] || return 1
   python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["household_id"])' "$PAIR_FILE"
+}
+
+read_pair_key() {
+  [ -f "$PAIR_FILE" ] || return 1
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("authorized_key", ""))' "$PAIR_FILE"
 }
 
 read_pair_code_hash() {
@@ -148,12 +156,12 @@ pair() {
   printf '%s\n' "$line" > "$AUTH_KEYS"
   chown "$STACK_USER:$STACK_USER" "$AUTH_KEYS"
   install -d -o root -g root -m 0755 "$(dirname "$PAIR_FILE")"
-  python3 - "$PAIR_FILE" "$household" "$code_hash" <<'PY'
+  python3 - "$PAIR_FILE" "$household" "$code_hash" "$key" <<'PY'
 import json, os, sys, tempfile
-path, household, code_hash = sys.argv[1:]
+path, household, code_hash, authorized_key = sys.argv[1:]
 fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path))
 with os.fdopen(fd, 'w') as out:
-    json.dump({'household_id': household, 'code_hash': code_hash}, out)
+    json.dump({'household_id': household, 'code_hash': code_hash, 'authorized_key': authorized_key}, out)
     out.write('\n')
 os.chmod(tmp, 0o600)
 os.replace(tmp, path)
