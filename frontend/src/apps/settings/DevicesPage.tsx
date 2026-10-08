@@ -1,6 +1,7 @@
 import { DevicesSection } from "@/apps/settings/DevicesSection";
 import { AddRobotSection } from "@/apps/settings/AddRobotSection";
 import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
+import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 
 interface DevicesPageProps {
@@ -28,6 +29,7 @@ export function DevicesPage({ person }: DevicesPageProps) {
         <>
           <AddRobotSection />
           <RobotPasswordSection />
+          <EngineLinkCredentialSection />
         </>
       ) : null}
       <DevicesSection />

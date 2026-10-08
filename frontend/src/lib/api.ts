@@ -694,6 +694,11 @@ export const api = {
     }),
   robotPasswordStatus: (deviceId: string) =>
     request<{ rotated: boolean }>(`/api/devices/${encodeURIComponent(deviceId)}/robot-password-status`),
+  engineLinkCredentialStatus: () => request<{ paired: boolean }>("/api/engine-link/credentials"),
+  issueEngineLinkPairing: () => request<{ code: string; expires_at: string }>("/api/engine-link/pair", { method: "POST" }),
+  scanEngineLinkHostKey: () => request<{ check_code: string }>("/api/engine-link/host-key/scan", { method: "POST" }),
+  confirmEngineLinkHostKey: (check_code: string) => request<{ paired: boolean }>("/api/engine-link/host-key/confirm", { method: "POST", body: JSON.stringify({ check_code }) }),
+  revokeEngineLink: () => request<{ paired: false }>("/api/engine-link/credentials", { method: "DELETE" }),
   sessions: () => request<SessionInfo[]>("/api/auth/sessions"),
   revokeSession: (id: string) =>
     request<{ success: true }>(`/api/auth/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),

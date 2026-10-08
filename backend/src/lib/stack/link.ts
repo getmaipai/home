@@ -3,6 +3,7 @@ import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { LinkState, type LinkState as EngineLinkState } from "@maipai/spec/gen/ts/link-state";
 import { STACK_CONTRACT_MAX, STACK_CONTRACT_MIN } from "./contract";
 import { StackError } from "./errors";
+import { getLinkSshAskpassEnvironment, isCurrentHostKey } from "./linkKeys";
 
 export const LINK_PROBE_INTERVAL_MS = 10_000;
 export const LINK_PROBE_TIMEOUT_MS = 3_000;
@@ -31,6 +32,7 @@ export interface LinkDependencies {
   random: () => number;
   resolveHost: (host: string) => Promise<string[]>;
   hostAllowed: typeof isHouseholdNetworkHost;
+  hostKeyMatches: (host: string, port: number) => Promise<boolean>;
   log: (event: string, fields: Record<string, unknown>) => void;
   onRoles?: () => Promise<boolean>;
   onState?: (state: EngineLinkState) => void;
@@ -49,6 +51,7 @@ const defaultDeps: LinkDependencies = {
     return (await lookup(host, { all: true })).map(({ address }) => address);
   },
   hostAllowed: isHouseholdNetworkHost,
+  hostKeyMatches: async (host, port) => isCurrentHostKey(host, port),
   log: safeLog,
 };
 
@@ -177,8 +180,13 @@ export class EngineLink {
     if (!this.current(generation)) return;
     const address = checked.find((item) => item.allowed)?.address;
     if (!address) { this.fail("link_outside_home", generation, true); return; }
+    let pinnedHostKey = false;
+    try { pinnedHostKey = await this.deps.hostKeyMatches(address, this.config.sshPort); } catch { pinnedHostKey = false; }
+    if (!this.current(generation)) return;
+    if (!pinnedHostKey) { this.fail("link_host_key_changed", generation, true); return; }
     const path = this.isTailnetAddress(address) ? "tailnet" : "home";
-    const args = ["-N", "-T", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${this.config.knownHostsPath}`, "-o", "IdentitiesOnly=yes", "-i", this.config.privateKeyPath, "-L", `127.0.0.1:${this.config.localPort}:127.0.0.1:8770`, "-p", String(this.config.sshPort), `maipai-stack@${address}`];
+    const hostAlias = this.config.sshPort === 22 ? this.config.host : `[${this.config.host}]:${this.config.sshPort}`;
+    const args = ["-N", "-T", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${this.config.knownHostsPath}`, "-o", `HostKeyAlias=${hostAlias}`, "-o", "HostKeyAlgorithms=ssh-ed25519", "-o", "IdentitiesOnly=yes", "-i", this.config.privateKeyPath, "-L", `127.0.0.1:${this.config.localPort}:127.0.0.1:8770`, "-p", String(this.config.sshPort), `maipai-stack@${address}`];
     let child: Child;
     try { child = this.deps.spawn("ssh", args, { env: this.config.env, stdio: ["ignore", "ignore", "ignore"] }); }
     catch (error) { this.fail(this.structuredReason(error) ?? "link_refused", generation); return; }

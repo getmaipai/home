@@ -7,13 +7,14 @@ type FakeChild = { exit?: (code: number | null, signal: NodeJS.Signals | null) =
 let now: number;
 let timers: Timer[];
 let children: FakeChild[];
+let processArgs: string[][];
 let logs: Array<{ event: string; fields: Record<string, unknown> }>;
 let responses: Array<() => Promise<Response>>;
 let randomValue: number;
 let allowedAddresses: Set<string>;
 let deps: Partial<LinkDependencies>;
 
-const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
+const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
 async function tick(ms: number): Promise<void> {
   const end = now + ms;
   while (true) {
@@ -24,7 +25,7 @@ async function tick(ms: number): Promise<void> {
   now = end; await flush();
 }
 function setup(fetcher?: () => Promise<Response>): void {
-  now = 0; timers = []; children = []; logs = []; responses = fetcher ? [fetcher] : []; randomValue = 0.5;
+  now = 0; timers = []; children = []; processArgs = []; logs = []; responses = fetcher ? [fetcher] : []; randomValue = 0.5;
   allowedAddresses = new Set(["192.168.1.22"]);
   deps = {
     now: () => now,
@@ -33,9 +34,12 @@ function setup(fetcher?: () => Promise<Response>): void {
     clearTimeout: (timer) => { (timer as unknown as Timer).cancelled = true; },
     resolveHost: async () => ["192.168.1.22"],
     hostAllowed: async (host) => allowedAddresses.has(host),
+    hostKeyMatches: async () => true,
     spawn: (_command, args, options) => {
       expect(options.stdio).toEqual(["ignore", "ignore", "ignore"]);
       expect(args.some((arg) => arg.startsWith("maipai-stack@"))).toBe(true);
+      expect(args.join(" ")).not.toContain("BEGIN OPENSSH PRIVATE KEY");
+      processArgs.push(args);
       const child: FakeChild = { killed: 0, once: (event, cb) => { if (event === "exit") child.exit = cb as FakeChild["exit"]; else if (event === "error") child.error = cb as FakeChild["error"]; }, kill: () => { child.killed++; } };
       children.push(child); return child as any;
     },
@@ -152,6 +156,23 @@ describe("engine link state machine", () => {
     children[0]!.error?.(Object.assign(new Error("private stderr text"), { code: "SSH_HOST_KEY_CHANGED" }));
     expect(link.snapshot()).toMatchObject({ state: "offline", reason: "link_host_key_changed" });
     expect(JSON.stringify(logs)).not.toContain("private stderr text");
+    link.stop();
+  });
+
+  test("host key mismatch fails closed before ssh starts", async () => {
+    deps.hostKeyMatches = async () => false;
+    const link = new EngineLink(config(), deps); link.start(); await flush();
+    expect(link.snapshot()).toMatchObject({ state: "offline", reason: "link_host_key_changed" });
+    expect(children).toHaveLength(0);
+    expect(JSON.stringify(logs)).not.toContain("BEGIN OPENSSH PRIVATE KEY");
+    link.stop();
+  });
+
+  test("keeps the askpass secret out of the SSH process arguments and logs", async () => {
+    const marker = "test-only-link-passphrase-marker";
+    const link = await startReady(new EngineLink({ ...config(), env: { MAIPAI_LINK_ASKPASS: marker } }, deps));
+    expect(processArgs.flat().join(" ")).not.toContain(marker);
+    expect(JSON.stringify(logs)).not.toContain(marker);
     link.stop();
   });
 

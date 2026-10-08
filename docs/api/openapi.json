@@ -17135,6 +17135,371 @@
         }
       }
     },
+    "/api/engine-link/pair": {
+      "post": {
+        "tags": [
+          "Engine link"
+        ],
+        "summary": "Start engine computer pairing",
+        "responses": {
+          "200": {
+            "description": "A short lived one-time code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "pattern": "^[A-Z2-7]{12}$"
+                    },
+                    "expires_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "expires_at"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or pairing code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin access required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engine-link/pair/{code}": {
+      "get": {
+        "tags": [
+          "Engine link"
+        ],
+        "summary": "Fetch pairing material using its one-time code",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z2-7]{12}$"
+            },
+            "required": true,
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Public key and code-keyed integrity check",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "public_key": {
+                      "type": "string"
+                    },
+                    "household_id": {
+                      "type": "string"
+                    },
+                    "hmac": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "public_key",
+                    "household_id",
+                    "hmac"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Code expired, exhausted, invalid or already used"
+          }
+        }
+      }
+    },
+    "/api/engine-link/host-key/scan": {
+      "post": {
+        "tags": [
+          "Engine link"
+        ],
+        "summary": "Read the engine computer's SSH host key",
+        "responses": {
+          "200": {
+            "description": "Check code to compare with the engine computer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "check_code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "check_code"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or pairing code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin access required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engine-link/host-key/confirm": {
+      "post": {
+        "tags": [
+          "Engine link"
+        ],
+        "summary": "Pin the confirmed SSH host key",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "check_code": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 12
+                  }
+                },
+                "required": [
+                  "check_code"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Host key pinned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "paired"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or pairing code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin access required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/engine-link/credentials": {
+      "get": {
+        "tags": [
+          "Engine link"
+        ],
+        "summary": "Show engine link credential status",
+        "responses": {
+          "200": {
+            "description": "Credential presence only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "paired"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or pairing code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin access required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Engine link"
+        ],
+        "summary": "Revoke the engine link key and host pin",
+        "responses": {
+          "200": {
+            "description": "Link credentials deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "paired": {
+                      "type": "boolean",
+                      "enum": [
+                        false
+                      ]
+                    }
+                  },
+                  "required": [
+                    "paired"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request or pairing code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admin access required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/fit-plan": {
       "post": {
         "tags": [
