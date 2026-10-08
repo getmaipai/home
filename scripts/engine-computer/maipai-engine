@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STACK_USER=maipai-stack
+STACK_HOME=/home/maipai-stack
+STACK_DATA=/data/stack
+STACK_ROOT=/opt/maipai-stack
+PAIR_FILE="${MAIPAI_ENGINE_PAIR_FILE:-/var/lib/maipai-stack/paired-home.json}"
+AUTH_KEYS="${MAIPAI_ENGINE_AUTH_KEYS:-$STACK_HOME/.ssh/authorized_keys}"
+STACK_TAG=233bc4fd91c01efd54aa44d9147bcccd6fe956a9
+STACK_REPO=getmaipai/stack
+DRY_RUN=no
+
+say() { printf '%s\n' "$*"; }
+die() { say "error: $*" >&2; exit 1; }
+dry() { [ "$DRY_RUN" = yes ]; }
+need_root() { [ "$(id -u)" -eq 0 ] || die "Run with sudo."; }
+
+usage() {
+  say "Usage: maipai-engine [--dry-run] pair <home> <code> [--replace]"
+  say "       maipai-engine [--dry-run] unpair|update|status"
+}
+
+normalize_code() { printf '%s' "$1" | tr -d '-' | tr '[:lower:]' '[:upper:]'; }
+
+read_pair() {
+  [ -f "$PAIR_FILE" ] || return 1
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["household_id"])' "$PAIR_FILE"
+}
+
+read_pair_code_hash() {
+  [ -f "$PAIR_FILE" ] || return 1
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("code_hash", ""))' "$PAIR_FILE"
+}
+
+print_check_code() {
+  local actual
+  actual=$(ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub -E sha256 | awk '{print $2}' | cut -d: -f2 | base64 -d | base32 | tr -d '=')
+  say "Check code: ${actual:0:12}"
+}
+
+pair() {
+  local home="$1" code="$2" replace="$3" current code_hash
+  code=$(normalize_code "$code")
+  [[ "$code" =~ ^[A-Z2-7]{12}$ ]] || die "Pair code must be 12 base32 characters."
+  code_hash=$(printf '%s' "$code" | sha256sum | awk '{print $1}')
+  if [[ "$home" != http://* && "$home" != https://* ]]; then
+    if [[ "$home" == *:* ]]; then home="http://${home}";
+    else home="http://${home}:3000"; fi
+  fi
+  if current=$(read_pair 2>/dev/null); then
+    if [ "$(read_pair_code_hash 2>/dev/null || true)" = "$code_hash" ]; then
+      say "Already paired to household ${current}."
+      print_check_code
+      return 0
+    fi
+    if [ "$replace" != yes ]; then
+      say "Already paired. Use --replace to switch households."
+      return 1
+    fi
+  fi
+  if dry; then
+    say "[dry-run] Would fetch and verify the pairing response."
+    say "[dry-run] Would write one restricted authorized_keys line."
+    say "[dry-run] Would record the household id."
+    say "[dry-run] Check code: AAAAAAAAAAAA"
+    return 0
+  fi
+  need_root
+  local key household response_tool response
+  response_tool="$(dirname "$0")/pair-response.py"
+  [ -f "$response_tool" ] || response_tool=/usr/local/lib/maipai-engine/pair-response.py
+  response=$(python3 "$response_tool" "$home" "$code") \
+    || die "Could not fetch or verify pairing details."
+  local fields=() field
+  while IFS= read -r field; do fields+=("$field"); done <<< "$response"
+  key="${fields[0]}"
+  household="${fields[1]}"
+  if [ -n "${current:-}" ] && [ "$current" != "$household" ] && [ "$replace" = yes ]; then
+    unpair_real
+  fi
+  install -d -o "$STACK_USER" -g "$STACK_USER" -m 0700 "$STACK_HOME/.ssh"
+  local line="restrict,port-forwarding,permitopen=\"127.0.0.1:8770\" $key"
+  touch "$AUTH_KEYS"
+  chmod 0600 "$AUTH_KEYS"
+  printf '%s\n' "$line" > "$AUTH_KEYS"
+  chown "$STACK_USER:$STACK_USER" "$AUTH_KEYS"
+  install -d -o root -g root -m 0755 "$(dirname "$PAIR_FILE")"
+  python3 - "$PAIR_FILE" "$household" "$code_hash" <<'PY'
+import json, os, sys, tempfile
+path, household, code_hash = sys.argv[1:]
+fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path))
+with os.fdopen(fd, 'w') as out:
+    json.dump({'household_id': household, 'code_hash': code_hash}, out)
+    out.write('\n')
+os.chmod(tmp, 0o600)
+os.replace(tmp, path)
+PY
+  chown root:root "$PAIR_FILE"
+  say "Paired household ${household}."
+  print_check_code
+}
+
+unpair_real() {
+  rm -f "$PAIR_FILE"
+  install -d -o "$STACK_USER" -g "$STACK_USER" -m 0700 "$(dirname "$AUTH_KEYS")"
+  : > "$AUTH_KEYS"
+  chown "$STACK_USER:$STACK_USER" "$AUTH_KEYS" 2>/dev/null || true
+  chmod 0600 "$AUTH_KEYS" 2>/dev/null || true
+}
+
+unpair() {
+  if dry; then
+    say "[dry-run] Would remove the paired household record."
+    say "[dry-run] Would clear the restricted authorized_keys entry."
+    return 0
+  fi
+  need_root
+  unpair_real
+  say "Engine computer unpaired."
+}
+
+update() {
+  if dry; then
+    say "[dry-run] Would fetch Stack at pinned STACK_TAG."
+    say "[dry-run] Would rebuild and restart maipai-stack."
+    return 0
+  fi
+  need_root
+  local tmp binary bun_bin
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' RETURN
+  curl -fsSL "https://github.com/${STACK_REPO}/archive/${STACK_TAG}.tar.gz" -o "$tmp/stack.tgz"
+  tar -xzf "$tmp/stack.tgz" -C "$tmp" --strip-components=1
+  bun_bin="$STACK_ROOT/.bun/bin/bun"
+  [ -x "$bun_bin" ] || die "Pinned Bun runtime is missing."
+  PATH="$(dirname "$bun_bin"):$PATH" OUT_DIR="$STACK_ROOT" SKIP_VERIFY=1 \
+    bash "$tmp/scripts/build-binary.sh"
+  chown -R "$STACK_USER:$STACK_USER" "$STACK_ROOT"
+  loginctl enable-linger "$STACK_USER"
+  local uid
+  uid=$(id -u "$STACK_USER")
+  sudo -u "$STACK_USER" env "XDG_RUNTIME_DIR=/run/user/${uid}" \
+    systemctl --user restart maipai-stack
+}
+
+status() {
+  if dry; then
+    say "[dry-run] Would show Stack and pairing status."
+    return 0
+  fi
+  need_root
+  systemctl --user -M "$STACK_USER@" status maipai-stack.service --no-pager || true
+  if current=$(read_pair); then say "Paired household: $current"; else say "Not paired."; fi
+}
+
+main() {
+  local args=() arg
+  for arg in "$@"; do
+    if [ "$arg" = --dry-run ]; then DRY_RUN=yes; else args+=("$arg"); fi
+  done
+  [ "${#args[@]}" -gt 0 ] || { usage; exit 2; }
+  case "${args[0]}" in
+    pair)
+      [ "${#args[@]}" -ge 3 ] || { usage; exit 2; }
+      local replace=no
+      [ "${args[3]:-}" = --replace ] && replace=yes
+      pair "${args[1]}" "${args[2]}" "$replace"
+      ;;
+    unpair) unpair ;;
+    update) update ;;
+    status) status ;;
+    *) usage; exit 2 ;;
+  esac
+}
+
+main "$@"

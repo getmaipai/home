@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { createHmac } from "node:crypto";
 
 // HOME-STACK-01: install.sh's Stack functions are pure bash, sourced
 // (not executed - see the script's own "am I sourced" guard at the
@@ -10,6 +11,47 @@ import { tmpdir } from "node:os";
 // than a TypeScript reimplementation that could drift from what the
 // script actually does.
 const INSTALL_SH = join(import.meta.dir, "install.sh");
+const ENGINE_HELPER = join(import.meta.dir, "engine-computer", "maipai-engine");
+const PAIR_RESPONSE = join(import.meta.dir, "engine-computer", "pair-response.py");
+
+async function readChild(process: ReturnType<typeof Bun.spawn>) {
+  const [exitCode, stdout, stderr] = await Promise.all([
+    process.exited,
+    new Response(process.stdout as ReadableStream<Uint8Array>).text(),
+    new Response(process.stderr as ReadableStream<Uint8Array>).text(),
+  ]);
+  return { exitCode, stdout, stderr };
+}
+
+async function startPairServer(body: Record<string, string>, expectedPath?: string) {
+  const source = `
+    const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch(request) {
+      const path = new URL(request.url).pathname;
+      if (process.env.EXPECTED_PATH && path !== process.env.EXPECTED_PATH) return new Response("wrong path", { status: 404 });
+      return Response.json(JSON.parse(process.env.RESPONSE_BODY));
+    }});
+    console.log(server.port);
+    process.on("SIGTERM", () => { server.stop(true); process.exit(0); });
+  `;
+  const child = Bun.spawn(["bun", "-e", source], {
+    env: { ...process.env, RESPONSE_BODY: JSON.stringify(body), EXPECTED_PATH: expectedPath ?? "" },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const reader = child.stdout.getReader();
+  let line = "";
+  while (!line.includes("\n")) {
+    const chunk = await reader.read();
+    if (chunk.done) throw new Error(`Mock server exited before ready: ${await new Response(child.stderr as ReadableStream<Uint8Array>).text()}`);
+    line += new TextDecoder().decode(chunk.value);
+  }
+  return { child, port: Number(line.trim()) };
+}
+
+async function stopPairServer(child: ReturnType<typeof Bun.spawn>) {
+  child.kill("SIGTERM");
+  await child.exited;
+}
 
 function bashCall(cmd: string): { stdout: string; stderr: string; exitCode: number } {
   const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${cmd}`]);
@@ -136,6 +178,90 @@ describe("--dry-run", () => {
     const { stdout, exitCode } = runScript(["--dry-run"]);
     expect(exitCode).toBe(0);
     expect(stdout).not.toContain("must run as root");
+  });
+});
+
+describe("REMOTE-STACK-BOX-01 engine computer dry runs", () => {
+  test("installer dry run keeps each printed command on a short line", () => {
+    const { stdout, exitCode } = runScript(["--engine-computer", "--dry-run"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("STACK_TAG=");
+    expect(stdout).toContain("sudo useradd -r -U -s /usr/sbin/nologin maipai-stack");
+    expect(stdout).toContain("sudo loginctl enable-linger maipai-stack");
+    expect(stdout).toContain("sudo apt-get install openssh-server");
+    expect(stdout).toContain("sudo systemctl enable --now ssh");
+    expect(stdout).toContain("Ready to pair.");
+    for (const line of stdout.split("\n")) {
+      if (line.includes("sudo ")) expect(line.length).toBeLessThan(70);
+    }
+  });
+
+  test.each([
+    ["pair", ["pair", "192.0.2.10", "K7Q-M2X-RP4-ZT7"]],
+    ["unpair", ["unpair"]],
+    ["update", ["update"]],
+    ["status", ["status"]],
+  ] as const)("%s dry run is repeatable", (_name, args) => {
+    const first = Bun.spawnSync([ENGINE_HELPER, "--dry-run", ...args]);
+    const second = Bun.spawnSync([ENGINE_HELPER, "--dry-run", ...args]);
+    expect(first.exitCode).toBe(0);
+    expect(second.exitCode).toBe(0);
+    expect(second.stdout.toString()).toBe(first.stdout.toString());
+    for (const line of first.stdout.toString().split("\n")) {
+      if (line.includes("sudo ")) expect(line.length).toBeLessThan(70);
+    }
+  });
+
+  test("pair response fetches the mocked endpoint and verifies the code HMAC", async () => {
+    const code = "K7Q-M2X-RP4-ZT7";
+    const normalizedCode = code.replaceAll("-", "").toUpperCase();
+    const lookup = createHmac("sha256", normalizedCode)
+      .update("maipai-pair-lookup")
+      .digest("hex")
+      .slice(0, 32);
+    const macKey = createHmac("sha256", normalizedCode)
+      .update("maipai-pair-mac")
+      .digest();
+    const publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITest fixture";
+    const householdId = "household-test-01";
+    const signature = createHmac("sha256", macKey)
+      .update(`${publicKey}\n${householdId}`)
+      .digest("hex");
+    const server = await startPairServer({ public_key: publicKey, household_id: householdId, hmac_sha256: signature }, `/api/engine-link/pair/${lookup}`);
+    try {
+      const home = `http://127.0.0.1:${server.port}`;
+      const process = Bun.spawn(["python3", PAIR_RESPONSE, home, code], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const { exitCode, stdout, stderr } = await readChild(process);
+      expect(stderr).toBe("");
+      expect(exitCode).toBe(0);
+      expect(stdout.trim().split("\n")).toEqual([publicKey, householdId]);
+    } finally {
+      await stopPairServer(server.child);
+    }
+  });
+
+  test("pair response rejects a mocked endpoint with a bad HMAC", async () => {
+    const server = await startPairServer({
+          public_key: "ssh-ed25519 AAAA fixture",
+          household_id: "household-test-01",
+          hmac_sha256: "bad",
+    });
+    try {
+      const home = `http://127.0.0.1:${server.port}`;
+      const process = Bun.spawn(["python3", PAIR_RESPONSE, home, "K7Q-M2X-RP4-ZT7"], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const { exitCode, stderr, stdout } = await readChild(process);
+      expect(exitCode).toBe(1);
+      expect(stdout).toBe("");
+      expect(stderr).toContain("did not verify");
+    } finally {
+      await stopPairServer(server.child);
+    }
   });
 });
 

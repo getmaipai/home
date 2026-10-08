@@ -36396,3 +36396,18 @@ The stream ended 9 ms after the tunnel was killed. The scratch
 there was no persisted row for the dropped turn's user message or reply.
 This baseline used Home's real NDJSON route;
 the browser UI was not separately captured.
+
+## REMOTE-STACK-BOX-01: engine computer read-only pre-install checks (2026-10-08)
+
+Before the installer change, these read-only checks were run on the
+engine computer through SSH:
+
+```sh
+ssh laptop-linux 'systemctl --user status maipai-stack --no-pager; ss -ltn; ls -ld /data/stack'
+```
+
+`maipai-stack.service` was active under `maipai-admin`; `ss -ltn` showed
+the Stack on `127.0.0.1:8770` and SSH on port 22; `/data/stack` was
+owned by `maipai-admin`. No installation or update was run on the box.
+The live install with the dedicated `maipai-stack` account is a separate
+step with the owner.
