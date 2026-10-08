@@ -26,19 +26,29 @@ a spoken turn is shaped. Where a rule below would do either, this rule
 wins.
 
 1. **The model decides, not a word rule.** No regex, word list or
-   classifier decides whether a message needs a search or a tool. Tools
-   are offered with `tool_choice: "auto"`. What stays deterministic:
-   the safety floor on input and output, the credential catch, consent
-   words, the household-name gate on search arguments, the crisis,
-   temporary-mode and grounding refusals, and exact commands, forget
-   among them. The turn signal is kept for the plan line, memory-judge
-   eligibility, the wire `signal` event and spoken-cue suppression; it
-   no longer decides a search. Memory reaches the model as injected
-   context, never as a tool. The offered tool set is a measured budget:
-   the base set is the ten on the record; a conditional set (pictures,
-   a link reader, media tools on a file turn) is offered only on the
-   turn that earns it, each with its own bench row, never more than 16
-   on a turn.
+   classifier reads open-ended wording to decide whether a message needs
+   a search or a tool. Tools are offered with `tool_choice: "auto"`,
+   and the model decides when the person has not asked. When the person
+   asks for a search explicitly (the search control on the composer, or
+   an exact search command matched whole, never a word inside a sentence),
+   code honors it: the engine's query writer writes the query, and the
+   call passes the same policy checks as any model-proposed call (role,
+   consent, temporary mode, crisis, the household-name gate, a minor's
+   safesearch). An explicit request never reaches a tool the person's
+   role or the household's settings do not allow. A learned or embedding
+   signal about search need may run in shadow, logged as a number with no
+   text; it changes no turn until a held-out bench row shows a paired gain
+   and this rule is amended again. What stays deterministic: the safety
+   floor on input and output, the credential catch, consent words, the
+   household-name gate on search arguments, the crisis, temporary-mode
+   and grounding refusals, and exact commands, forget among them. The
+   turn signal is kept for the plan line, memory-judge eligibility, the
+   wire `signal` event and spoken-cue suppression; it no longer decides
+   a search. Memory reaches the model as injected context, never as a
+   tool. The offered tool set is a measured budget: the base set is the
+   ten on the record; a conditional set (pictures, a link reader, media
+   tools on a file turn) is offered only on the turn that earns it, each
+   with its own bench row, never more than 16 on a turn.
 2. **The engine's native feature is the implementation.** Chat
    templates, the reasoning split, tool-call parsing, JSON-schema
    output and token counts come from the engine. Home never re-wraps,
@@ -52,7 +62,12 @@ wins.
    model's catalog record, with the source of the values named. A
    global override needs a reply-quality measurement on written chat
    and a repetition measurement on spoken companion turns, not a
-   tool-calling bench alone.
+   tool-calling bench alone. A generation that offers tools is a tool
+   decision as well as a reply. Its sampling is accepted only with a
+   tool-decision measurement (evidence recall and false searches on the
+   CHAT-AB-01 fresh set, at least 3 repeats) beside the reply-quality
+   and repetition measurements above. The global `CHAT_SAMPLING` moves
+   into per-model catalog fields.
 4. **The window is the model's real context.** History is sized from
    the engine's reported context length with real token counts, per
    slot. The chat engine is never launched with a smaller context than
@@ -130,6 +145,9 @@ wins.
    this record first. Named gaps today: sentence-gated speech scheduling
    with the spoken cue, the `[n]` citation mapper, the output gate, the
    prose tool-call fallback.
+   One small block-validation checker may validate answer blocks from
+   tools before the kit draws them; all drawing stays in shipped kit
+   Elements, never hand-written (owner-approved 2026-10-08; GENUI-02).
    **Chat UI is assistant-ui Elements, never hand-written (owner's rule
    2026-10-04).** Every piece of the chat screen (message parts, actions,
    composer, model chip, reasoning and tool disclosures, sources, lists,
@@ -262,7 +280,10 @@ wins.
     beyond what the safety gate costs. It also carries a child turn, a
     spoken turn with a first-word bar of 3 seconds, the two 9-turn
     memory scripts, safety rows, and a companion-voice row. It reruns
-    after each stage, against one engine.
+    after each stage, against one engine. A claim about search decisions
+    cites the fresh set's held-out split with a recorded search stand-in,
+    at least 3 repeats and paired 95% intervals. A single run of 30 items
+    is a regression check, not evidence for a rate.
 14. **Companion voice is a per-request mechanism, never prompt prose.**
     Voice adapters are chosen per request and keyed by base model; the
     rules above are compatible with a companion chosen per turn.
