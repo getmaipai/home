@@ -16,6 +16,7 @@ import { api, ApiError, isOwnerOrAdminRole, type EnginesOverview, type EnginesHe
 import { useTabItem } from "@/shell/tabIdentity";
 import { useDataTableControls } from "@/shell/pages/dataTableControls";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
+import { useMutation } from "@tanstack/react-query";
 
 /** /engines: SHELL-06's own row - `GET /api/engines` and
  * `GET /api/engines/health`, through the kit DataTable and its slots. */
@@ -101,6 +102,7 @@ export function EnginesPage({ person }: { person: Roster }) {
   const healthQuery = useQuery<EnginesHealth>({ queryKey: ["engines-health"], queryFn: () => api.enginesHealth(), enabled: canManage });
   const queryClient = useQueryClient();
   const [busyNames, setBusyNames] = useState<ReadonlySet<string>>(new Set());
+  const doctor = useMutation({ mutationFn: api.engineConnectionCheck });
   const roles = useMemo(() => overviewQuery.data?.roles.map(toRoleRow) ?? [], [overviewQuery.data]);
   const engines = useMemo(() => overviewQuery.data?.engines.map(toEngineRow) ?? [], [overviewQuery.data]);
   const health = useMemo(() => healthQuery.data?.health.map(toHealthRow) ?? [], [healthQuery.data]);
@@ -161,6 +163,22 @@ export function EnginesPage({ person }: { person: Roster }) {
         ]}
         titleOverrides={{ "household.ai": "Where the AI engines run" }}
       />
+      <Button type="button" disabled={doctor.isPending} onClick={() => doctor.mutate()}>
+        {doctor.isPending ? "Checking connection…" : "Check the connection"}
+      </Button>
+      {doctor.data && (
+        <Card>
+          <CardContent>
+            {doctor.data.hops.map((hop) => (
+              <p key={hop.id}>
+                {hop.pass ? "PASS" : "FAIL"} hop {hop.id}{hop.detail ? `: ${hop.detail}` : ""}
+                {!hop.pass && ` — Fix: ${hop.fix}`}
+              </p>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+      {doctor.isError && <p role="alert">{doctor.error instanceof ApiError ? doctor.error.message : "Could not check the connection."}</p>}
       <AsyncState
         data={data}
         error={error}
