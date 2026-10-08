@@ -369,7 +369,7 @@ export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 if [ "$SCOPE" != "docs" ]; then
   CORE_TAG="core-v0.1.4"
   UI_TAG="ui-v0.5.175"
-  SPEC_TAG="spec-v0.1.106"
+  SPEC_TAG="spec-v0.1.108"
   SHARED_REPO="${MAIPAI_COMMONS_DIR:-../commons}"
   if [ ! -d "$SHARED_REPO" ]; then
     echo "getmaipai/commons is missing at $SHARED_REPO (set MAIPAI_COMMONS_DIR); backend and frontend import @maipai/core, @maipai/ui and @maipai/spec from its workspaces."
@@ -417,8 +417,29 @@ run_preflight() {
     settings_scratch="$(mktemp -d)"
     mkdir -p "$settings_scratch/spec/settings"
     git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json > "$settings_scratch/spec/settings/keys.json"
-    if ! (cd backend && MAIPAI_COMMONS_DIR="$settings_scratch" bun run gen:settings >/dev/null) || \
-      ! diff -q "$settings_scratch/spec/settings/keys.json" <(git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json) >/dev/null; then
+    if ! (cd backend && MAIPAI_COMMONS_DIR="$settings_scratch" bun run gen:settings >/dev/null); then
+      echo "backend settings registry could not be generated"
+      rm -rf "$settings_scratch"
+      return 1
+    fi
+    if ! node - "$SPEC_DIR" "$settings_scratch/spec/settings/keys.json" <<'NODE'
+const fs = require("node:fs");
+const { execFileSync } = require("node:child_process");
+const [specDir, outputPath] = process.argv.slice(2);
+const spec = JSON.parse(execFileSync("git", ["-C", specDir, "show", "HEAD:spec/settings/keys.json"], { encoding: "utf8" }));
+const generated = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+const byKey = new Map(spec.map((entry) => [entry.key, entry]));
+const missing = generated.filter((entry) => !entry.key.startsWith("engines.stack.") && JSON.stringify(byKey.get(entry.key)) !== JSON.stringify(entry));
+const required = ["engines.stack.where", "engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"];
+const localPort = byKey.get("engines.stack.remote.local_port");
+if (localPort?.level !== "advanced") missing.push({ key: "engines.stack.remote.local_port (expected advanced)" });
+const missingRequired = required.filter((key) => !byKey.has(key));
+if (missing.length || missingRequired.length) {
+  console.error(`Home settings drift: ${missing.map((entry) => entry.key).join(", ")}; missing spec-owned keys: ${missingRequired.join(", ")}`);
+  process.exit(1);
+}
+NODE
+    then
       echo "backend settings registry is stale against $SPEC_TAG"
       rm -rf "$settings_scratch"
       return 1
@@ -555,8 +576,25 @@ run_backend_suite() {
   mkdir -p "$SETTINGS_SCRATCH/spec/settings"
   git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json > "$SETTINGS_SCRATCH/spec/settings/keys.json"
   (cd backend && MAIPAI_COMMONS_DIR="$SETTINGS_SCRATCH" bun run gen:settings >/dev/null)
-  if ! diff -q "$SETTINGS_SCRATCH/spec/settings/keys.json" <(git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json) >/dev/null; then
-    echo "backend/src/settings/coreKeys.ts no longer matches spec/settings/keys.json as pinned at $SPEC_TAG. Run 'bun run gen:settings' in backend/ (with MAIPAI_COMMONS_DIR pointed at a scratch copy, not $SPEC_DIR - that worktree is shared and read-only), then fix and re-tag spec/settings/keys.json in getmaipai/commons's own main checkout and bump the pin here."
+  if ! node - "$SPEC_DIR" "$SETTINGS_SCRATCH/spec/settings/keys.json" <<'NODE'
+const fs = require("node:fs");
+const { execFileSync } = require("node:child_process");
+const [specDir, outputPath] = process.argv.slice(2);
+const spec = JSON.parse(execFileSync("git", ["-C", specDir, "show", "HEAD:spec/settings/keys.json"], { encoding: "utf8" }));
+const generated = JSON.parse(fs.readFileSync(outputPath, "utf8"));
+const byKey = new Map(spec.map((entry) => [entry.key, entry]));
+const missing = generated.filter((entry) => !entry.key.startsWith("engines.stack.") && JSON.stringify(byKey.get(entry.key)) !== JSON.stringify(entry));
+const required = ["engines.stack.where", "engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"];
+const localPort = byKey.get("engines.stack.remote.local_port");
+if (localPort?.level !== "advanced") missing.push({ key: "engines.stack.remote.local_port (expected advanced)" });
+const missingRequired = required.filter((key) => !byKey.has(key));
+if (missing.length || missingRequired.length) {
+  console.error(`Home settings drift: ${missing.map((entry) => entry.key).join(", ")}; missing spec-owned keys: ${missingRequired.join(", ")}`);
+  process.exit(1);
+}
+NODE
+  then
+    echo "Home settings declarations no longer match their entries in spec/settings/keys.json as pinned at $SPEC_TAG."
     diff -u <(git -C "$SPEC_DIR" show HEAD:spec/settings/keys.json) "$SETTINGS_SCRATCH/spec/settings/keys.json" || true
     rm -rf "$SETTINGS_SCRATCH"
     exit 1
