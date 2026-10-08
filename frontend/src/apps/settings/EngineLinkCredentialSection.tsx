@@ -64,7 +64,7 @@ export function EngineLinkCredentialSection() {
           <Button disabled={busy} onClick={() => void run(confirmHostKey)}>Yes, pin this computer</Button>
         </div>
       ) : null}
-      {status.data.paired ? <Button variant="destructive" disabled={busy} onClick={() => void run(revoke)}>Revoke link key</Button> : null}
+      {status.data.paired ? <div className="flex flex-col items-start gap-2"><p className="text-sm text-[var(--muted-foreground)]">Before revoking, run <code>maipai-engine unpair</code> on the engine computer.</p><Button variant="destructive" disabled={busy} onClick={() => void run(revoke)}>Revoke link key</Button></div> : null}
     </Section>
   );
 }

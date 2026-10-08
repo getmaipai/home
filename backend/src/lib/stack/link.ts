@@ -1,4 +1,5 @@
 import { spawn as nodeSpawn, type ChildProcess } from "node:child_process";
+import { isIP } from "node:net";
 import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { LinkState, type LinkState as EngineLinkState } from "@maipai/spec/gen/ts/link-state";
 import { STACK_CONTRACT_MAX, STACK_CONTRACT_MIN } from "./contract";
@@ -12,6 +13,11 @@ export const LINK_BACKOFF_CAP_MS = 60_000;
 export const LINK_READY_RESET_MS = 60_000;
 export const LINK_OFFLINE_AFTER_MS = 2 * 60_000;
 const ROLE_PROBE_INTERVAL = 30_000;
+function validSshHost(host: string): boolean {
+  const bare = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+  if (/^[\d.]+$/.test(bare) || bare.includes(":")) return isIP(bare) !== 0;
+  return host.length <= 253 && host.split(".").every((label) => label.length > 0 && label.length <= 63 && /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(label));
+}
 
 export type LinkReason = NonNullable<EngineLinkState["reason"]>;
 export interface LinkConfig {
@@ -32,7 +38,7 @@ export interface LinkDependencies {
   random: () => number;
   resolveHost: (host: string) => Promise<string[]>;
   hostAllowed: typeof isHouseholdNetworkHost;
-  hostKeyMatches: (host: string, port: number) => Promise<boolean>;
+  hostKeyMatches: (host: string, port: number) => Promise<"match" | "mismatch" | "unreachable">;
   log: (event: string, fields: Record<string, unknown>) => void;
   onRoles?: () => Promise<boolean>;
   onState?: (state: EngineLinkState) => void;
@@ -180,13 +186,15 @@ export class EngineLink {
     if (!this.current(generation)) return;
     const address = checked.find((item) => item.allowed)?.address;
     if (!address) { this.fail("link_outside_home", generation, true); return; }
-    let pinnedHostKey = false;
-    try { pinnedHostKey = await this.deps.hostKeyMatches(address, this.config.sshPort); } catch { pinnedHostKey = false; }
+    let hostKeyStatus: "match" | "mismatch" | "unreachable";
+    try { hostKeyStatus = await this.deps.hostKeyMatches(address, this.config.sshPort); } catch { hostKeyStatus = "unreachable"; }
     if (!this.current(generation)) return;
-    if (!pinnedHostKey) { this.fail("link_host_key_changed", generation, true); return; }
+    if (hostKeyStatus === "mismatch") { this.fail("link_host_key_changed", generation, true); return; }
+    if (hostKeyStatus === "unreachable") { this.fail("link_timeout", generation); return; }
     const path = this.isTailnetAddress(address) ? "tailnet" : "home";
+    if (!validSshHost(this.config.host)) { this.fail("link_outside_home", generation, true); return; }
     const hostAlias = this.config.sshPort === 22 ? this.config.host : `[${this.config.host}]:${this.config.sshPort}`;
-    const args = ["-N", "-T", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${this.config.knownHostsPath}`, "-o", `HostKeyAlias=${hostAlias}`, "-o", "HostKeyAlgorithms=ssh-ed25519", "-o", "IdentitiesOnly=yes", "-i", this.config.privateKeyPath, "-L", `127.0.0.1:${this.config.localPort}:127.0.0.1:8770`, "-p", String(this.config.sshPort), `maipai-stack@${address}`];
+    const args = ["-N", "-T", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${this.config.knownHostsPath}`, "-o", `HostKeyAlias=${hostAlias}`, "-o", "HostKeyAlgorithms=ssh-ed25519", "-o", "IdentitiesOnly=yes", "-i", this.config.privateKeyPath, "-L", `127.0.0.1:${this.config.localPort}:127.0.0.1:8770`, "-p", String(this.config.sshPort), "--", `maipai-stack@${address}`];
     let child: Child;
     try { child = this.deps.spawn("ssh", args, { env: this.config.env, stdio: ["ignore", "ignore", "ignore"] }); }
     catch (error) { this.fail(this.structuredReason(error) ?? "link_refused", generation); return; }

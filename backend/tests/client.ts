@@ -13,7 +13,7 @@ export class TestClient {
     if (init.body !== undefined) headers["content-type"] = "application/json";
     if (this.cookie) headers["cookie"] = this.cookie;
 
-    const res = await app.request(path, {
+    const res = await app.request(new URL(path, "https://localhost"), {
       method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
       headers,
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,

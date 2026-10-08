@@ -3,11 +3,13 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { getHubInstanceId } from "@/lib/hubIdentity";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { getLinkCredentialStatus, getPairingPublicKey, issuePairingCode, scanHostKey, confirmHostKey, revokeLinkKey } from "@/lib/stack/linkKeys";
+import { derivePairingLookup, getLinkCredentialStatus, getPairingPublicKey, issuePairingCode, scanHostKey, confirmHostKey, revokeLinkKey } from "@/lib/stack/linkKeys";
 import { stopEngineLink } from "@/lib/stack/link";
 import { REMOTE_ENGINE_HOST_KEY } from "@/lib/remoteStackSettings";
 import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { TRUST_PROXY } from "@/lib/trustProxy";
+import { tryConsume } from "@/lib/rateLimiter";
+import { setHouseholdSettingValue } from "@/lib/settings";
 
 export const engineLinkRoutes = apiRouter();
 const ErrorResponses = errorResponses({ 400: "Invalid request or pairing code", 401: "Not signed in", 403: "Admin access required" });
@@ -30,13 +32,18 @@ engineLinkRoutes.openapi(issueRoute, (c) => {
 });
 
 const fetchRoute = createRoute({
-  method: "get", path: "/pair/{code}", tags: ["Engine link"], summary: "Fetch pairing material using its one-time code",
-  request: { params: z.object({ code: z.string().regex(/^[A-Z2-7]{12}$/) }) },
+  method: "get", path: "/pair/{lookup}", tags: ["Engine link"], summary: "Fetch pairing material using the derived lookup",
+  request: { params: z.object({ lookup: z.string().regex(/^[\da-f]{32}$/i) }) },
   responses: { 200: { content: { "application/json": { schema: PairPayloadSchema } }, description: "Public key and code-keyed integrity check" }, 400: { description: "Code expired, exhausted, invalid or already used" } },
 });
-engineLinkRoutes.openapi(fetchRoute, (c) => {
+engineLinkRoutes.openapi(fetchRoute, async (c) => {
+  const source = TRUST_PROXY ? (c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "") : c.req.header("x-real-ip") ?? "127.0.0.1";
+  const allowTailnet = getHouseholdSettingValue("engines.stack.remote.allow_tailnet") === true;
+  const sourceAllowed = await isHouseholdNetworkHost(source, { allowTailnet });
+  if (!sourceAllowed) return c.json({ error: "Pairing is available only on the household network" }, 403);
   if (!isSecureRequest(c)) return c.json({ error: "Pairing requires a secure Home connection" }, 400);
-  const payload = getPairingPublicKey(c.req.valid("param").code, getHubInstanceId());
+  if (!tryConsume(`engine-pair:source:${source}`, { capacity: 5, refillPerSecond: 1 }) || !tryConsume("engine-pair:global", { capacity: 30, refillPerSecond: 1 })) return c.json({ error: "Too many pairing attempts" }, 429);
+  const payload = getPairingPublicKey(c.req.valid("param").lookup, getHubInstanceId());
   return payload ? c.json(payload, 200) : c.json({ error: "Pairing code is invalid or expired" }, 400);
 });
 
@@ -51,7 +58,7 @@ engineLinkRoutes.openapi(scanRoute, async (c) => {
   if (typeof host !== "string" || !host.trim() || !Number.isInteger(port) || port < 1 || port > 65535) return c.json({ error: "Set a valid engine computer address and port first" }, 400);
   const allowTailnet = getHouseholdSettingValue("engines.stack.remote.allow_tailnet") === true;
   if (!(await isHouseholdNetworkHost(host, { allowTailnet }))) return c.json({ error: "That address is outside your home network" }, 400);
-  try { return c.json(scanHostKey(host, port), 200); }
+  try { return c.json(await scanHostKey(host, port), 200); }
   catch { return c.json({ error: "Could not read the engine computer's SSH host key" }, 400); }
 });
 
@@ -78,4 +85,4 @@ const revokeRoute = createRoute({
   middleware: [requireRole("owner", "admin")] as const,
   responses: { 200: { content: { "application/json": { schema: z.object({ paired: z.literal(false) }) } }, description: "Link credentials deleted" }, ...ErrorResponses },
 });
-engineLinkRoutes.openapi(revokeRoute, (c) => { stopEngineLink(); revokeLinkKey(); return c.json({ paired: false as const }, 200); });
+engineLinkRoutes.openapi(revokeRoute, (c) => { stopEngineLink(); revokeLinkKey(); setHouseholdSettingValue("engines.stack.where", "this_computer"); return c.json({ paired: false as const }, 200); });

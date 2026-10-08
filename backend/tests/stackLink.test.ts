@@ -34,7 +34,7 @@ function setup(fetcher?: () => Promise<Response>): void {
     clearTimeout: (timer) => { (timer as unknown as Timer).cancelled = true; },
     resolveHost: async () => ["192.168.1.22"],
     hostAllowed: async (host) => allowedAddresses.has(host),
-    hostKeyMatches: async () => true,
+    hostKeyMatches: async () => "match",
     spawn: (_command, args, options) => {
       expect(options.stdio).toEqual(["ignore", "ignore", "ignore"]);
       expect(args.some((arg) => arg.startsWith("maipai-stack@"))).toBe(true);
@@ -160,11 +160,19 @@ describe("engine link state machine", () => {
   });
 
   test("host key mismatch fails closed before ssh starts", async () => {
-    deps.hostKeyMatches = async () => false;
+    deps.hostKeyMatches = async () => "mismatch";
     const link = new EngineLink(config(), deps); link.start(); await flush();
     expect(link.snapshot()).toMatchObject({ state: "offline", reason: "link_host_key_changed" });
     expect(children).toHaveLength(0);
     expect(JSON.stringify(logs)).not.toContain("BEGIN OPENSSH PRIVATE KEY");
+    link.stop();
+  });
+
+  test("an unreachable host key check retries with backoff instead of declaring a changed key", async () => {
+    deps.hostKeyMatches = async () => "unreachable";
+    const link = new EngineLink(config(), deps); link.start(); await flush();
+    expect(link.snapshot()).toMatchObject({ state: "connecting", reason: "link_timeout" });
+    expect(children).toHaveLength(0); expect(timers.some((timer) => timer.at === 500)).toBe(true);
     link.stop();
   });
 
