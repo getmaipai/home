@@ -593,11 +593,12 @@ export type FitPlanResponse = { plan: StackFitPlan | null; wording: { verdict: "
 export type StatusHistoryState = "operational" | "degraded" | "outage" | "maintenance" | "none";
 export type StatusHistoryMinutes = { operational: number; degraded: number; outage: number; maintenance: number };
 export type StatusHistoryDay = { date: string; worst: StatusHistoryState; minutes: StatusHistoryMinutes };
-export type StatusHistoryIncident = { component: "chat" | "embed" | "background" | "voice" | "library" | "hub"; started_at: string; ended_at: string | null; minutes: number; ongoing: boolean };
+export type StatusHistoryIncident = { component: "chat" | "embed" | "background" | "voice" | "library" | "hub" | "engine_computer"; started_at: string; ended_at: string | null; minutes: number; ongoing: boolean };
 export type StatusHistoryComponent = { component: StatusHistoryIncident["component"]; uptime_percent: number | null; days: StatusHistoryDay[]; current: { state: StatusHistoryState; since: string | null } };
 export type StatusHistory = { generated_at: string; days: number; components: StatusHistoryComponent[]; incidents: StatusHistoryIncident[] };
 
 export type StatusAppsResponse = StatusAppsWire;
+export type EngineComputerStatus = { configured: boolean; state: "working" | "connecting" | "slow_to_answer" | "reconnecting" | "not_reachable"; reason: string | null; details?: { path: "home" | "tailnet" | null; lastProbeAt: string | null; contract: string | null } };
 export type StatusApp = StatusAppsResponse[number];
 export type StatusAppNeed = NonNullable<StatusApp["needs"]>[number];
 export type StatusAppState = StatusApp["state"];
@@ -1168,6 +1169,7 @@ export const api = {
   // has ever needed.
   health: () => request<HealthStatus>("/api/health", { timeoutMs: 8_000 }),
   statusBoard: () => request<StatusBoard>("/api/status/board"),
+  engineComputerStatus: () => request<EngineComputerStatus>("/api/status/engine-computer"),
   statusApps: () => request<StatusAppsResponse>("/api/status/apps"),
   statusHistory: async (days = 90) => {
     const history = await request<StatusHistory>(`/api/status/history?days=${days}`);

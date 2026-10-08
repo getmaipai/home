@@ -14,6 +14,8 @@ import { buildStatusHistory } from "@/lib/statusHistory";
 import { resetDb } from "./reset-db";
 import { __resetServiceHealthForTests } from "@/lib/serviceHealth";
 import { __setRoleHealthForTests } from "@/lib/roleHealth";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { __setEngineLinkForTests } from "@/lib/stack/link";
 
 type EngineKind = HealthSnapshot["engines"]["chat"]["kind"];
 
@@ -32,10 +34,23 @@ beforeEach(() => {
   db.delete(maintenanceWindows).run();
   __setStatusHistoryHealthForTests(undefined);
   __setRoleHealthForTests({});
+  __setEngineLinkForTests(null);
 });
-afterEach(() => { __setStatusHistoryHealthForTests(undefined); __setRoleHealthForTests({}); });
+afterEach(() => { __setStatusHistoryHealthForTests(undefined); __setRoleHealthForTests({}); __setEngineLinkForTests(null); });
 
 describe("componentStatesFrom", () => {
+  test.each([
+    ["ready", "operational"], ["connecting", "degraded"], ["degraded", "degraded"],
+    ["reconnecting", "degraded"], ["offline", "outage"],
+  ] as const)("remote engine computer $0 maps to $1", (state, expected) => {
+    const health = baseHealth();
+    expect(componentStatesFrom(health, new Set(), state).engine_computer).toBe(expected);
+  });
+  test("a selected but unpaired remote engine computer records as offline", () => {
+    const result = setHouseholdSettingValue("engines.stack.where", "another_computer");
+    expect(result.ok).toBe(true);
+    expect(componentStatesFrom(baseHealth(), new Set()).engine_computer).toBe("outage");
+  });
   test.each(kinds.flatMap((kind) => aliveValues.map((alive) => ({ kind, alive }))))("engine $kind with alive=$alive follows chatAvailability", ({ kind, alive }) => {
     const health = baseHealth();
     health.engines.chat = { kind, alive, pid: null };

@@ -297,6 +297,7 @@ const statusB2bReview = process.argv.includes("--status-b2b-review");
 const statusD1Review = process.argv.includes("--status-d1-review");
 const statusEngineControlsReview = process.argv.includes("--status-engine-controls-review");
 const statusAppsReview = process.argv.includes("--status-apps-review");
+const engineComputerReview = process.argv.includes("--engine-computer-review");
 const statusExpandReview = process.argv.includes("--status-expand-review");
 const statusPolishReview = process.argv.includes("--status-polish-review");
 const browserAlertsReview = process.argv.includes("--browser-alerts-review");
@@ -8563,6 +8564,51 @@ async function captureStatusAppsReview(browser: Browser, ownerSession: string): 
   console.log("Fixture capture shows Chat down with Brain down for the admin, and the plain reason without engine names for a household member.");
 }
 
+async function captureEngineComputerReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/queue/screenshots/sts1";
+  mkdirSync(outDir, { recursive: true });
+  const scenarios = [
+    { file: "offline", state: "not_reachable", reason: "The engine computer did not answer in time." },
+    { file: "ready", state: "working", reason: null },
+    { file: "degraded", state: "slow_to_answer", reason: "The engine computer is answering slowly." },
+    { file: "reconnecting", state: "reconnecting", reason: "The connection to the engine computer was interrupted." },
+  ] as const;
+  for (const scenario of scenarios) {
+    const context = await newContext(browser, VIEWPORTS.find((item) => item.slug === "desktop")!, "light", ownerSession);
+    try {
+      const page = await context.newPage();
+      await page.route("**/api/status/engine-computer", (route) => route.fulfill({ status: 200, json: {
+        configured: true, state: scenario.state, reason: scenario.reason,
+        details: { path: "home", lastProbeAt: new Date().toISOString(), contract: "3" },
+      } }));
+      if (scenario.state === "working") {
+        await page.route("**/api/status/apps", async (route) => {
+          const response = await route.fetch();
+          const rows = await response.json() as Array<{ state: string; reason: string | null; uptimePercent: number; history: Array<{ state: string; uptime: number; minutes: { operational: number; degraded: number; outage: number; maintenance: number } }>; needs?: Array<{ state: string }> }>;
+          await route.fulfill({ response, json: rows.map((row) => ({ ...row, state: "operational", reason: null, uptimePercent: 100,
+            history: row.history.map((day) => ({ ...day, state: "operational", uptime: 100, minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } })),
+            ...(row.needs ? { needs: row.needs.map((need) => ({ ...need, state: "operational" })) } : {}),
+          })) });
+        });
+        await page.route("**/api/health", async (route) => {
+          const response = await route.fetch();
+          const health = await response.json() as { ok: boolean; engines: Record<string, { kind: string; alive: boolean | null }> };
+          health.ok = true;
+          for (const engine of Object.values(health.engines)) { engine.kind = "spawned"; engine.alive = true; }
+          await route.fulfill({ response, json: health });
+        });
+      }
+      await page.goto(`${BASE_URL}/status`);
+      const expected = scenario.state === "working" ? "Working" : scenario.state === "not_reachable" ? "Not reachable" : scenario.state === "slow_to_answer" ? "Slow to answer" : "Reconnecting";
+      await page.getByText(`Engine computer: ${expected}`, { exact: true }).waitFor({ timeout: 15000 });
+      await page.getByText("Through your home network", { exact: true }).waitFor();
+      const path = join(outDir, `engine-computer-${scenario.file}.png`);
+      await page.screenshot({ path, fullPage: true });
+      console.log(`Wrote ${path}`);
+    } finally { await context.close(); }
+  }
+}
+
 async function captureStatusExpandReview(browser: Browser, ownerSession: string): Promise<void> {
   const outDir = "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/screens/status-expand";
   mkdirSync(outDir, { recursive: true });
@@ -9883,6 +9929,11 @@ async function main() {
     if (statusAppsReview) {
       await captureStatusAppsReview(browser, sessionValue);
       console.log("completed named review: --status-apps-review");
+      return;
+    }
+    if (engineComputerReview) {
+      await captureEngineComputerReview(browser, sessionValue);
+      console.log("completed named review: --engine-computer-review");
       return;
     }
     if (statusExpandReview) {

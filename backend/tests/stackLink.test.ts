@@ -50,6 +50,14 @@ beforeEach(() => setup());
 afterEach(() => { timers = []; });
 
 describe("engine link state machine", () => {
+  test("status details report only a remote contract after a successful probe", async () => {
+    const link = new EngineLink(config(), deps);
+    expect(link.statusDetails()).toEqual({ path: null, lastProbeAt: null, contract: null });
+    await startReady(link);
+    expect(link.statusDetails()).toEqual({ path: "home", lastProbeAt: new Date(now).toISOString(), contract: "1" });
+    link.stop();
+  });
+
   test("follows connecting -> ready -> reconnecting after two failed probes -> ready", async () => {
     const link = await startReady();
     responses.push(() => Promise.resolve(new Response("", { status: 503 })), () => Promise.resolve(new Response("", { status: 503 })));

@@ -89,6 +89,11 @@ export class EngineLink {
     this.deps = { ...defaultDeps, ...deps };
   }
   snapshot(): EngineLinkState { return LinkState.parse(this.state); }
+  /** Last successful probe metadata without exposing the configured host. */
+  statusDetails(): { path: "home" | "tailnet" | null; lastProbeAt: string | null; contract: string | null } {
+    return { path: this.lastGood?.path ?? null, lastProbeAt: this.lastGood?.last_ok_at ?? null,
+      contract: this.lastGood?.contract ?? (this.state.reason === "link_needs_update" ? this.state.contract : null) };
+  }
   isReady(): boolean { return this.state.state === "ready" || this.state.state === "degraded"; }
   pathInUse(): "home" | "tailnet" | null { return this.lastGood?.path ?? null; }
   assertReady(): void { if (!this.isReady()) throw new StackError("unreachable", "Stack link is unreachable"); }

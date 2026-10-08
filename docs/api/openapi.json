@@ -13097,6 +13097,87 @@
         }
       }
     },
+    "/api/status/engine-computer": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Read the engine computer connection status",
+        "responses": {
+          "200": {
+            "description": "Plain-language link status; connection details are admin-only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "working",
+                        "connecting",
+                        "slow_to_answer",
+                        "reconnecting",
+                        "not_reachable"
+                      ]
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "details": {
+                      "type": "object",
+                      "properties": {
+                        "path": {
+                          "type": "string",
+                          "nullable": true,
+                          "enum": [
+                            "home",
+                            "tailnet",
+                            null
+                          ]
+                        },
+                        "lastProbeAt": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "contract": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "path",
+                        "lastProbeAt",
+                        "contract"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "state",
+                    "reason"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/status/apps": {
       "get": {
         "tags": [

@@ -8,6 +8,7 @@ const PART_LABELS: Record<StatusHistoryIncident["component"], string> = {
   voice: "Voice",
   library: "Library",
   hub: "Home",
+  engine_computer: "Engine computer",
 };
 
 function timeOf(value: string) {

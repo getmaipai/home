@@ -12,6 +12,9 @@ import { knownServiceComponents } from "@/lib/serviceHealth";
 import { reconcileServiceBlockIssues, serviceState } from "@/lib/serviceHealth";
 import { roleHealth } from "@/lib/roleHealth";
 import { configuredServiceComponents } from "@/lib/appNeeds";
+import { isRemoteStackSelected } from "@/lib/stackEngine";
+import { getEngineLink } from "@/lib/stack/link";
+import type { LinkState as EngineLinkState } from "@maipai/spec/gen/ts/link-state";
 
 export type StatusState = StatusEventRecord["state"];
 type ComponentStateMap = Partial<Record<StatusComponent, StatusState>>;
@@ -28,7 +31,7 @@ export function buildStatusHistory(days: number, now: Date = new Date()) {
   const rows = db.select({ component: statusEvents.component, state: statusEvents.state, at: statusEvents.at })
     .from(statusEvents).orderBy(statusEvents.at).all();
   const serviceComponents = configuredServiceComponents();
-  const components = [...baseComponents, ...serviceComponents] as StatusComponent[];
+  const components = [...baseComponents, ...(isRemoteStackSelected() ? ["engine_computer" as const] : []), ...serviceComponents] as StatusComponent[];
   const generated_at = now.toISOString();
   const output = components.map((component) => {
     const all = rows.filter((row) => row.component === component);
@@ -97,7 +100,7 @@ export function buildStatusHistory(days: number, now: Date = new Date()) {
 
 // Keep this mapping aligned with frontend/src/apps/chat/chatAvailability.ts.
 // That function is the UI's single definition of engine availability.
-export function componentStatesFrom(health: HealthSnapshot, maintenanceParts: Set<string>): ComponentStateMap {
+export function componentStatesFrom(health: HealthSnapshot, maintenanceParts: Set<string>, engineComputer: EngineLinkState["state"] | null = isRemoteStackSelected() ? getEngineLink()?.snapshot().state ?? "offline" : null): ComponentStateMap {
   const result: ComponentStateMap = {};
   for (const role of ["chat", "embed", "background", "voice"] as const) {
     const { kind, alive } = health.engines[role]!;
@@ -117,6 +120,8 @@ export function componentStatesFrom(health: HealthSnapshot, maintenanceParts: Se
     if (libraryState) result.library = libraryState;
   }
   result.hub = maintenanceParts.has("hub") ? "maintenance" : "operational";
+  if (engineComputer) result.engine_computer = engineComputer === "ready" ? "operational"
+    : engineComputer === "degraded" ? "degraded" : engineComputer === "offline" ? "outage" : "degraded";
   return result;
 }
 
@@ -167,7 +172,7 @@ export async function recordStatusSample(now: Date = new Date(), internet?: Inte
     const states = await liveComponentStatesFrom(health, maintenance);
     const configuredServices = new Set(configuredServiceComponents());
     const serviceComponents = knownServiceComponents().filter((component) => configuredServices.has(component));
-    for (const component of [...baseComponents, ...new Set(serviceComponents)] as StatusComponent[]) {
+    for (const component of [...baseComponents, ...(isRemoteStackSelected() ? ["engine_computer" as const] : []), ...new Set(serviceComponents)] as StatusComponent[]) {
       const service = component.startsWith("service:") ? serviceState(component, now.getTime()) : null;
       const state: StatusState | undefined = service ? service === "unknown" ? undefined : service === "outage" ? "outage" : service : states[component];
       if (!state || state === lastState(component)) continue;

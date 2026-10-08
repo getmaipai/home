@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup } from "@testing-library/react";
 import { StatusPage } from "@/shell/pages/StatusPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { Roster, StatusAppsResponse, StatusHistory } from "@/lib/api";
+import type { EngineComputerStatus, Roster, StatusAppsResponse, StatusHistory } from "@/lib/api";
 
 afterEach(cleanup);
 
@@ -15,7 +15,7 @@ const apps: StatusAppsResponse = [
   ...["Home", "Videos", "Music", "Podcasts"].map((name) => ({ id: name.toLowerCase(), name, state: "operational" as const, reason: null, needs: [{ kind: "engine" as const, id: "chat", name: "Brain", purpose: "Chat model", state: "operational" as const, required: true }], history: Array.from({ length: 90 }, (_, index) => ({ date: `2026-07-${String((index % 30) + 1).padStart(2, "0")}`, state: "operational" as const, uptime: 100, minutes: { operational: 1440, degraded: 0, outage: 0, maintenance: 0 } })), uptimePercent: 100 })),
 ];
 
-function mockStatus(includeNeeds: boolean, history: StatusHistory = { generated_at: new Date().toISOString(), days: 90, components: [], incidents: [] }) {
+function mockStatus(includeNeeds: boolean, history: StatusHistory = { generated_at: new Date().toISOString(), days: 90, components: [], incidents: [] }, engineComputer?: EngineComputerStatus) {
   const original = globalThis.fetch;
   const paths: string[] = [];
   globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -28,12 +28,44 @@ function mockStatus(includeNeeds: boolean, history: StatusHistory = { generated_
     }));
     if (url.includes("/api/status/history")) return Promise.resolve(Response.json(history));
     if (url.includes("/api/status/board")) return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+    if (url.includes("/api/status/engine-computer")) return Promise.resolve(Response.json(engineComputer ?? { configured: false, state: "not_reachable", reason: null }));
     return Promise.resolve(Response.json({}));
   }) as unknown as typeof fetch;
   return { paths, restore: () => { globalThis.fetch = original; } };
 }
 
 describe("StatusPage app-first view", () => {
+  test.each([
+    ["working", "Working"], ["connecting", "Connecting"], ["slow_to_answer", "Slow to answer"],
+    ["reconnecting", "Reconnecting"], ["not_reachable", "Not reachable"],
+  ] as const)("shows the plain-language engine computer state %s to a member", async (state, visible) => {
+    const { restore } = mockStatus(false, undefined, { configured: true, state, reason: "The engine computer did not answer in time." });
+    try {
+      const view = renderWithQueryClient(<StatusPage person={makePerson("adult")} />);
+      expect(await view.findByText(`Engine computer: ${visible}`)).toBeTruthy();
+      expect(view.getByText("The engine computer did not answer in time.")).toBeTruthy();
+      expect(view.queryByText(/Through your|Last probe|Stack contract/)).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("admins see approved connection details and members do not", async () => {
+    const payload: EngineComputerStatus = { configured: true, state: "working", reason: null, details: { path: "tailnet", lastProbeAt: "2026-10-07T12:00:00.000Z", contract: "3" } };
+    const adminMock = mockStatus(true, undefined, payload);
+    try {
+      const admin = renderWithQueryClient(<StatusPage person={makePerson("admin")} />);
+      expect(await admin.findByText("Through your Tailscale network")).toBeTruthy();
+      expect(admin.getByText("Stack contract:").parentElement?.textContent).toContain("3");
+    } finally { adminMock.restore(); }
+    const memberMock = mockStatus(false, undefined, { ...payload, details: undefined });
+    try {
+      const member = renderWithQueryClient(<StatusPage person={makePerson("adult")} />);
+      expect(await member.findByText("Engine computer: Working")).toBeTruthy();
+      const statusCard = member.container.querySelector("[data-engine-computer-status]");
+      expect(statusCard?.textContent).not.toContain("Through your");
+      expect(statusCard?.textContent).not.toContain("Last probe:");
+      expect(statusCard?.textContent).not.toContain("Stack contract:");
+    } finally { memberMock.restore(); }
+  });
   test("members get app rows, reason, and bars without dependency names, controls, or raw-part requests", async () => {
     const { paths, restore } = mockStatus(false);
     try {

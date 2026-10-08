@@ -23,6 +23,21 @@ function upcomingWindow(): { starts_at: string; ends_at: string } {
 }
 
 describe("status routes", () => {
+  test("engine computer state is available to members while path and probe details stay admin-only", async () => {
+    const owner = await ownerClient();
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
+    const ownerStatus = await (await owner.get("/api/status/engine-computer")).json() as Record<string, unknown>;
+    expect(ownerStatus).toMatchObject({ configured: true, state: "not_reachable", reason: "The engine computer is not paired yet." });
+    expect(ownerStatus.details).toEqual({ path: null, lastProbeAt: null, contract: null });
+    const created = await owner.post("/api/people", { displayName: "Marlow", role: "child", secret: "0000" });
+    const person = await created.json() as { id: string };
+    const child = new TestClient();
+    await child.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
+    const memberStatus = await (await child.get("/api/status/engine-computer")).json() as Record<string, unknown>;
+    expect(memberStatus).toMatchObject({ configured: true, state: "not_reachable", reason: "The engine computer is not paired yet." });
+    expect(memberStatus).not.toHaveProperty("details");
+    expect(JSON.stringify(memberStatus)).not.toMatch(/ssh|192\.0\.2\.|127\.0\.0\.1/i);
+  });
   test("app status is signed-in for everyone and need details are owner/admin only", async () => {
     expect((await new TestClient().get("/api/status/apps")).status).toBe(401);
     const owner = await ownerClient();
