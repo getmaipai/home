@@ -36353,3 +36353,46 @@ The adult image-search study applies R1 to R6 and uses `{subject, kind}` for the
 ## UI rule lints at commit time (PRECOMMIT-RULES-01, 2026-10-06)
 
 The Elements lints (`kitElementLints.test.ts`, `handBuiltChat.test.ts`, the baselines and the ELEMENTS-DECISIONS ledger checks) run in the frontend gate, which is slow and only runs before a push. `bun run lint:ui-rules` in `frontend/` now runs just those two test files (about 0.7 s, no logic copied), and `scripts/ui-rules-precommit.sh` wraps it for commits: it exits at once unless a staged file is under `frontend/src` or is the ledger, runs `frontend/src/dev/uiRulesGuard.ts` (staged against HEAD: a shrink-only baseline that grew, a lost reason, a dropped ledger row), then the lint. `scripts/install-hooks.sh` installs it as the git `pre-commit` hook in the shared hooks dir so every worktree has it, and the maipai plugin's `run-ui-rules-before-commit.sh` runs the same script before a session's `git commit`. It is deterministic and local, and it scans the working tree, so stage what you scanned. `MAIPAI_SKIP_UI_RULES=1` skips the hook for one commit; `check.sh` runs `bun run lint:ui-rules` with that variable removed, so a skipped commit cannot pass the gate.
+
+## REMOTE-STACK-P0: the hand-run tunnel baseline (2026-10-07)
+
+A scratch Home backend used a fresh `MAIPAI_DATA_DIR` under the OS temp
+root, on an assigned port other than 8787. It set
+`engines.stack.url` to `http://127.0.0.1:8771`; the Stack listened on
+`127.0.0.1:8770` on the Linux engine computer. The hand-run tunnel was
+`ssh -N -L 8771:127.0.0.1:8770 192.0.2.10` in the Mac's tmux window
+`p0-tunnel`. Bun 1.4.2 came from the official user installer. `/data`
+was not writable by the account, so `STACK_DATA_DIR` was
+`~/maipai-stack-data`; `/data/stack` was not created. `systemd --user`
+installed and ran the Stack service in the active user session. Linger
+stayed off. The old 27B service remained disabled and stopped.
+
+This run exposed two blockers in Stack commit `9219e689`. Its CUDA 12.8
+runtime pin's expected SHA-256 differed from the release file by one
+character, so the stock installer rejected that archive. After correcting
+the checksum in the temporary box checkout, the launcher still reported
+that no `llama-server` build was available: `installedEnginePin()` excluded
+every NVIDIA pin. Two temporary, uncommitted box-checkout edits corrected
+the archive checksum and allowed the Linux CUDA pin through that helper.
+The P0 behavior below was measured with those local edits; a clean run of
+stock Stack `9219e689` is still needed after the fixes land in Stack.
+
+The Stack then fetched and verified its pinned
+`qwen3-8b-instruct-q4-k-m` model (Qwen3 8B Q4_K_M) and ran llama.cpp
+`b11476` on both 8 GiB GPUs. While loaded, `nvidia-smi` reported about
+5.8 GiB used on the RTX 2070 Super and 6.0 GiB on the RTX 3070. Home's
+real turn, “In one short sentence, what planet do we live on?”, returned
+“We live on the planet Earth.” Home's turn stats carried the Stack
+identity headers: `x-maipai-engine: local b11476-988190680` and
+`x-maipai-model: Qwen3-8B-Q4_K_M.gguf`.
+
+For the drop, the scratch Home sent a long water-cycle prompt and the
+`p0-tunnel` window was killed after 202 released characters. The Home
+stream delivered the partial answer, then: “I had to stop there because
+the AI stopped working. Ask me to continue if you want the rest.” It
+ended with `engine_unavailable` / “MaiPai's AI isn't running right now.”
+The stream ended 9 ms after the tunnel was killed. The scratch
+`conversation_turns` history contained the preceding successful turn only;
+there was no persisted row for the dropped turn's user message or reply.
+This baseline used Home's real NDJSON route;
+the browser UI was not separately captured.
