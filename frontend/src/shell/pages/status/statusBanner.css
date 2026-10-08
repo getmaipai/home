@@ -1,31 +1,31 @@
 [data-status-banner="online"] > div:first-child {
-  border-color: color-mix(in srgb, var(--hue-green) 28%, transparent);
-  background-color: color-mix(in srgb, var(--hue-green) 10%, transparent);
-  color: color-mix(in srgb, var(--hue-green) 72%, black);
+  border-color: color-mix(in srgb, var(--status-ok) 28%, transparent);
+  background-color: color-mix(in srgb, var(--status-ok) 10%, transparent);
+  color: color-mix(in srgb, var(--status-ok) 72%, black);
 }
 
 .dark [data-status-banner="online"] > div:first-child {
-  color: color-mix(in srgb, var(--hue-green) 72%, white);
+  color: color-mix(in srgb, var(--status-ok) 72%, white);
 }
 
 [data-status-banner="degraded"] > div:first-child {
-  border-color: color-mix(in srgb, var(--hue-yellow) 35%, transparent);
-  background-color: color-mix(in srgb, var(--hue-yellow) 12%, transparent);
-  color: var(--hue-yellow);
+  border-color: color-mix(in srgb, var(--status-warning) 35%, transparent);
+  background-color: color-mix(in srgb, var(--status-warning) 12%, transparent);
+  color: var(--status-warning);
 }
 
 [data-status-banner="maintenance"] > div:first-child {
-  border-color: color-mix(in srgb, var(--hue-blue) 30%, transparent);
-  background-color: color-mix(in srgb, var(--hue-blue) 12%, transparent);
-  color: var(--hue-blue);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+  background-color: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
 }
 
 [data-status-banner="offline"] > div:first-child,
 [data-status-banner="offline"] [data-slot="badge"] {
-  color: color-mix(in srgb, var(--destructive) 58%, black);
+  color: color-mix(in srgb, var(--status-error) 58%, black);
 }
 
 .dark [data-status-banner="offline"] > div:first-child,
 .dark [data-status-banner="offline"] [data-slot="badge"] {
-  color: color-mix(in srgb, var(--destructive) 76%, white);
+  color: color-mix(in srgb, var(--status-error) 76%, white);
 }

@@ -91,7 +91,7 @@ describe("(a) one cause, one visual", () => {
       await waitFor(() => expect(notice(view.container)?.textContent).toContain(PAUSED.adult));
       // CHAT-NOTICE-LED-01: a status dot (the kit's degraded dot, no ping) then the sentence.
       const dot = notice(view.container)?.querySelector('[data-slot="chat-notice-dot"]');
-      expect(dot?.innerHTML).toContain("tint-attention-fg");
+      expect(dot?.innerHTML).toContain("--status-warning");
       expect(dot?.innerHTML).not.toContain("animate-ping");
       expect(dot?.className).toContain("inline-flex");
       const repairs = view.getByRole("link", { name: "Open Repairs" });
@@ -123,7 +123,7 @@ describe("(a) one cause, one visual", () => {
       const view = openChat("owner");
       await waitFor(() => expect(notice(view.container)?.getAttribute("data-level")).toBe("red"));
       const dot = notice(view.container)?.querySelector('[data-slot="chat-notice-dot"]');
-      expect(dot?.innerHTML).toContain("bg-destructive");
+      expect(dot?.innerHTML).toContain("--status-error");
       expect(dot?.innerHTML).not.toContain("animate-ping");
     } finally {
       stubbed.restore();

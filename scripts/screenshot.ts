@@ -60,6 +60,7 @@ import { createHash } from "node:crypto";
 import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
+import { inflateSync } from "node:zlib";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
 import { startScreenshotStack } from "./screenshotStack";
 import { waitForAnimationSettle } from "./animationSettle";
@@ -353,6 +354,7 @@ const engineDownReview = process.argv.includes("--engine-down-review");
 const appSettingsReview = process.argv.includes("--app-settings-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
 const noticeStyleReview = process.argv.includes("--notice-style-review");
+const statusColorsReview = process.argv.includes("--status-colors-review");
 const traceReview = process.argv.includes("--trace-review");
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
@@ -3136,6 +3138,131 @@ async function captureProjectPageReview(browser: Browser, ownerSession: string):
     }
   }
 }
+
+/** Decode one pixel from a small 8-bit non-interlaced PNG (Playwright's own
+ * output): enough to read a 1x1 clip without a PNG library. */
+function pngFirstPixel(png: Buffer): [number, number, number] {
+  let width = 0;
+  const idat: Buffer[] = [];
+  for (let at = 8; at < png.length;) {
+    const len = png.readUInt32BE(at);
+    const type = png.toString("ascii", at + 4, at + 8);
+    const data = png.subarray(at + 8, at + 8 + len);
+    if (type === "IHDR") { width = data.readUInt32BE(0); if (data[8] !== 8 || (data[9] !== 2 && data[9] !== 6) || data[12] !== 0) throw new Error("pngFirstPixel: expects 8-bit RGB or RGBA, not interlaced"); }
+    if (type === "IDAT") idat.push(data);
+    at += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  // Any PNG filter leaves the first pixel of the first row as stored.
+  if (width < 1) throw new Error("pngFirstPixel: no IHDR");
+  return [raw[1]!, raw[2]!, raw[3]!];
+}
+
+async function pixelOf(page: Page, locator: Locator): Promise<[number, number, number]> {
+  await locator.scrollIntoViewIfNeeded();
+  const box = (await locator.boundingBox())!;
+  const png = await page.screenshot({ clip: { x: Math.floor(box.x + box.width / 2), y: Math.floor(box.y + box.height / 2), width: 1, height: 1 } });
+  return pngFirstPixel(png);
+}
+
+/** STATUS-COLORS-01: the same state must be the same color on every status
+ * surface (rail Chat LED, profile LED, chat status line, status page legend and
+ * strip), plus the profile menu notification badge hovered must stay readable.
+ * Real pixels (1x1 clips), light and dark, written to
+ * data-scratch/status-colors/. Throws on a mismatch over 2 per channel. */
+async function captureStatusColorsReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "status-colors");
+  mkdirSync(outDir, { recursive: true });
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const report: Record<string, unknown>[] = [];
+  const near = (a: number[], b: number[]) => a.every((v, i) => Math.abs(v - b[i]!) <= 2);
+  const lumOf = (c: number[]) => { const f = (v: number) => { const x = v / 255; return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]!) + 0.7152 * f(c[1]!) + 0.0722 * f(c[2]!); };
+  const ratio = (a: number[], b: number[]) => { const [hi, lo] = [lumOf(a), lumOf(b)].sort((x, y) => y - x); return (hi! + 0.05) / (lo! + 0.05); };
+  const parse = (css: string) => (css.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+  for (const theme of THEMES) {
+    for (const level of ["amber", "red"] as const) {
+      const context = await newContext(browser, desktop, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.route("**/api/health", async (route) => {
+          const response = await route.fetch();
+          const body = await response.json();
+          body.engines = { ...(body.engines ?? {}), chat: { kind: "stopped", pid: null, alive: false, availability: "unavailable", reason: "stopped", notice: { adult: "Chat is paused. Your message stays here; press Send once it is back.", teen: "Chat is paused right now.", child: "I'm taking a break.", repairs_link: "Open Repairs" } } };
+          await route.fulfill({ response, json: body });
+        });
+        await page.route("**/api/status/apps", (route) => route.fulfill({ json: [
+          { id: "chat", name: "Chat", state: level === "red" ? "down" : "degraded", reason: level === "red" ? "Chat is down." : "Chat is paused.", paused: level === "amber", history: [], uptimePercent: 99.1 },
+        ] }));
+        await page.route("**/api/notifications", (route) => route.fulfill({ json: Array.from({ length: 22 }, (_, i) => ({ id: `n${i}`, level: "normal", title: "Notice", body: "x", created_at: new Date().toISOString(), read: false })) }));
+        const token = level === "red" ? "--status-error" : "--status-warning";
+        await page.goto(`${BASE_URL}/chat`);
+        await page.getByRole("textbox", { name: "Message input" }).waitFor();
+        await page.waitForFunction((want) => document.querySelector("[data-chat-notice]")?.getAttribute("data-level") === want, level);
+        await page.locator("[data-slot='rail-status-mark']").first().waitFor();
+        await page.locator("[data-slot='rail-profile-dot']").first().waitFor();
+        await settleAnimations(page);
+        const expected = await page.evaluate((t) => {
+          const probe = document.createElement("div");
+          probe.style.backgroundColor = `var(${t})`;
+          document.body.appendChild(probe);
+          const c = getComputedStyle(probe).backgroundColor;
+          probe.remove();
+          return c;
+        }, token);
+        const want = parse(expected);
+        const pixels: Record<string, number[]> = {
+          "rail Chat LED": await pixelOf(page, page.locator("[data-slot='rail-status-mark']").first()),
+          "profile LED": await pixelOf(page, page.locator("[data-slot='rail-profile-dot']").first()),
+          "chat status line": await pixelOf(page, page.locator("[data-slot='chat-notice-dot'] > span:last-child").first()),
+        };
+        await page.screenshot({ path: join(outDir, `chat-${level}-${theme}.png`) });
+        await page.goto(`${BASE_URL}/status`);
+        await page.getByRole("heading", { level: 1 }).first().waitFor();
+        await settleAnimations(page);
+        const dot = page.locator("[data-status='" + (level === "red" ? "offline" : "degraded") + "'] [aria-hidden='true'] > span:last-child");
+        if (await dot.count()) pixels["status page dot"] = await pixelOf(page, dot.first());
+        const legend = page.locator(`[data-status-legend='${level === "red" ? "down" : "slow"}']`);
+        if (await legend.count()) pixels["status page legend"] = await pixelOf(page, legend.first());
+        await page.screenshot({ path: join(outDir, `status-${level}-${theme}.png`) });
+        const result: Record<string, unknown> = { theme, level, expected: want, pixels };
+        for (const [surface, px] of Object.entries(pixels)) {
+          if (!near(px, want)) throw new Error(`STATUS-COLORS-01: ${surface} is rgb(${px}) but ${token} is rgb(${want}) at ${theme}/${level}`);
+        }
+        if (Object.keys(pixels).length < 4) throw new Error(`STATUS-COLORS-01: only measured ${Object.keys(pixels).join(", ")} at ${theme}/${level}`);
+        // The profile menu's count badge, hovered (owner bug): readable text.
+        if (level === "amber") {
+          await page.goto(`${BASE_URL}/chat`);
+          await page.getByRole("button", { name: /Open profile menu/ }).click();
+          const row = page.getByRole("menuitem", { name: /Notifications/ });
+          await row.waitFor();
+          const badge = row.locator("[data-slot='rail-profile-menu-badge']");
+          // Computed colors may be oklch(); a 1x1 canvas turns them into rgb.
+          const read = () => badge.evaluate((el) => {
+            const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
+            const rgb = (c: string) => { ctx.clearRect(0, 0, 1, 1); ctx.fillStyle = "#000"; ctx.fillStyle = c; ctx.fillRect(0, 0, 1, 1); const d = ctx.getImageData(0, 0, 1, 1).data; return `rgb(${d[0]}, ${d[1]}, ${d[2]})`; };
+            return { color: rgb(getComputedStyle(el).color), background: rgb(getComputedStyle(el).backgroundColor), text: el.textContent };
+          });
+          const rest = await read();
+          await row.hover();
+          await page.waitForTimeout(250);
+          const hover = await read();
+          await page.screenshot({ path: join(outDir, `profile-menu-badge-hover-${theme}.png`) });
+          const restRatio = ratio(parse(rest.color), parse(rest.background));
+          const hoverRatio = ratio(parse(hover.color), parse(hover.background));
+          result.badge = { rest, hover, restRatio: Number(restRatio.toFixed(2)), hoverRatio: Number(hoverRatio.toFixed(2)) };
+          if (hoverRatio < 4.5 || restRatio < 4.5) throw new Error(`STATUS-COLORS-01: menu badge contrast ${JSON.stringify(result.badge)} at ${theme}`);
+        }
+        report.push(result);
+        console.log("status-colors", JSON.stringify(result));
+      } finally {
+        await context.close();
+      }
+    }
+  }
+  writeFileSync(join(outDir, "report.json"), JSON.stringify(report, null, 2));
+}
+
 
 /** COLUMN-01 (owner, 2026-10-06): the chat history column, open, hidden,
  * mid-slide, searching, hovered and selected rows, pinned, empty, loading
@@ -10340,6 +10467,12 @@ async function main() {
     if (noticeStyleReview) {
       await captureChatNoticeReview(browser, sessionValue);
       console.log("completed named review: --notice-style-review");
+      return;
+    }
+
+    if (statusColorsReview) {
+      await captureStatusColorsReview(browser, sessionValue);
+      console.log("completed named review: --status-colors-review");
       return;
     }
 

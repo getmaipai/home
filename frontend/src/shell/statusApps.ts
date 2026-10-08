@@ -19,10 +19,10 @@ export function appStatusSentence(name: string, state: StatusAppState, reason: s
   return { ariaLabel: `${name}: ${label}`, title: reason ?? (state === "operational" ? `${name} is working.` : `${name} needs attention.`) };
 }
 
-export function appStatusMenuBadge(app: StatusApp): { badge: "amber" | "red"; title: string; ariaLabel: string } | undefined {
+export function appStatusMenuBadge(app: StatusApp): { badge: "amber" | "red"; level: "degraded" | "offline"; title: string; ariaLabel: string } | undefined {
   const badge = appStatusToSidebar(app.state);
   if (!badge) return undefined;
-  return { badge, ...appStatusSentence(app.name, app.state, app.reason) };
+  return { badge, level: badge === "red" ? "offline" : "degraded", ...appStatusSentence(app.name, app.state, app.reason) };
 }
 
 export function sidebarItemStatus(apps: readonly StatusApp[], item: { name: string; url?: string }) {

@@ -1,13 +1,13 @@
 [data-status-legend="fine"] {
-  background-color: var(--hue-green);
+  background-color: var(--status-ok);
 }
 
 [data-status-legend="slow"] {
-  background-color: var(--hue-yellow);
+  background-color: var(--status-warning);
 }
 
 [data-status-legend="down"] {
-  background-color: var(--destructive);
+  background-color: var(--status-error);
 }
 
 [data-status-legend="maintenance"] {
