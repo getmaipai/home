@@ -2,14 +2,29 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __resetStackEngineForTests, __setStackClientForTests, getStackClient, isStackRoleEnabled, getHomeOwnedRoles, recordStackChatIdentity, getActiveChatEngineIdentity, type StackRole } from "@/lib/stackEngine";
+import { __setEngineLinkForTests, EngineLink } from "@/lib/stack/link";
+import { StackError } from "@/lib/stack/errors";
 import { getDefaultScriptedStack } from "./stackFixture";
 
 const roles: StackRole[] = ["chat", "embeddings", "stt", "tts"];
 
 beforeEach(() => { resetDb(); __setStackClientForTests(null); });
-afterEach(() => __resetStackEngineForTests());
+afterEach(() => { __resetStackEngineForTests(); __setEngineLinkForTests(null); });
 
 describe("Stack role routing", () => {
+  test("a remote link that is down fails synchronously before any network call", () => {
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
+    let calls = 0;
+    __setEngineLinkForTests(new EngineLink({ host: "engine.lan", privateKeyPath: "/key", knownHostsPath: "/known" }, { fetch: async () => { calls++; return new Response(); } }));
+    const started = performance.now();
+    let thrown: unknown;
+    try { getStackClient(); } catch (error) { thrown = error; }
+    expect(performance.now() - started).toBeLessThan(100);
+    expect(thrown).toBeInstanceOf(StackError);
+    expect(thrown).toMatchObject({ kind: "unreachable" });
+    expect(calls).toBe(0);
+  });
+
   test("a configured Stack serves every role regardless of stored switches", () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
     for (const role of roles) expect(isStackRoleEnabled(role)).toBe(true);

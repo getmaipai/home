@@ -48,6 +48,16 @@ export function getStackUrl(): string | null {
   return hostLabel(trimmed) === "local" ? trimmed : null;
 }
 
+/** Whether the selected engine is remote, independent of link readiness. */
+export function isRemoteStackSelected(): boolean {
+  return getHouseholdSettingValue("engines.stack.where") === "another_computer";
+}
+
+/** The last verified path remains available after a link drop for failure copy. */
+export function engineComputerAwayFromHome(): boolean {
+  return isRemoteStackSelected() && getEngineLink()?.pathInUse() === "tailnet";
+}
+
 export function isStackConfigured(): boolean {
   // Remote selection is a configured target even while its SSH link is
   // connecting. roleHealth() must probe that target (and report it

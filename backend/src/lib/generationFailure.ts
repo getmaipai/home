@@ -4,7 +4,7 @@
 // is the only place the wording lives. Where no model can voice the reply,
 // plain copy says what happened and what to try: no codes, no vendor text.
 // The raw detail stays on the stored generation record (turnStats.ts).
-import { OFFLINE_COMPANION_LINE, stackRefusal } from "@/lib/stackEngine";
+import { engineComputerAwayFromHome, isRemoteStackSelected, OFFLINE_COMPANION_LINE, stackRefusal } from "@/lib/stackEngine";
 import type { FailureKind } from "@/lib/failureCopy";
 
 export * from "@/lib/failureCopy";
@@ -28,7 +28,14 @@ function anyOf(text: string, ...needles: string[]): boolean {
 export function classifyGenerationFailure(message: string | undefined): ClassifiedFailure {
   const text = (message ?? "").toLowerCase();
   if (anyOf(text, "deadline exceeded", "stalled")) return { kind: "slow", transient: true };
-  if (anyOf(text, "could not reach", "connection refused", "econnrefused", "foreignportholder", "not running", "unreachable")) return { kind: "unreachable", transient: false };
+  if (anyOf(text, "connection reset", "econnreset", "socket hang up", "closed unexpectedly")) {
+    return isRemoteStackSelected()
+      ? { kind: "engine_computer", transient: false }
+      : { kind: "unreachable", transient: true };
+  }
+  if (anyOf(text, "could not reach", "connection refused", "econnrefused", "foreignportholder", "not running", "unreachable")) {
+    return { kind: isRemoteStackSelected() ? "engine_computer" : "unreachable", transient: false };
+  }
   // A Stack 503 reaches here as the companion line (stackEngine.ts); its
   // stated reason was remembered when it arrived.
   const refusal = text.startsWith(OFFLINE_COMPANION_LINE.toLowerCase()) ? stackRefusal("chat") : null;
@@ -54,3 +61,4 @@ export const RETRY_BACKOFF_MS: { adult: readonly number[]; minor: readonly numbe
   minor: [500],
 };
 
+export { engineComputerAwayFromHome };

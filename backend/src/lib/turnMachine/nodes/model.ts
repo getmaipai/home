@@ -14,7 +14,7 @@ import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, new
 import { visibleReplyMaxTokens } from "@/lib/turnShared";
 import { streamWatchdog, replyIsUncapped } from "../deadline";
 import type { StackFailureFacts } from "@/lib/stackEngine";
-import { classifyGenerationFailure, partialReplyNote, RETRY_BACKOFF_MS, stackRefusalKind, type FailureKind } from "@/lib/generationFailure";
+import { classifyGenerationFailure, engineComputerAwayFromHome, partialReplyNote, RETRY_BACKOFF_MS, stackRefusalKind, type FailureKind } from "@/lib/generationFailure";
 import { isWrittenAdultTurn, promptSurfaceClassFor, type SurfaceClass } from "@/lib/surfaceClass";
 import { toolCallAssistantMessage, toolResultMessages, phrasingInstruction, picturesOnlyInstruction, searchEvidenceMaxChars } from "@/lib/composer";
 import { SHOW_IMAGES_TOOL_ID } from "@/lib/answerImages/turn";
@@ -62,7 +62,7 @@ function settleFailedGate(gate: StreamGate | undefined, state?: TurnState, messa
   if (gate && gate.result().text.length > 0) {
     // THIN-DL-02: the person keeps what was written, and a plain closing
     // note says it stopped (never a retry once text was released).
-    if (state && !cancelled) gate.push(`\n\n${partialReplyNote(classifyGenerationFailure(message).kind, state.plan?.age_band !== "adult")}`);
+    if (state && !cancelled) gate.push(`\n\n${partialReplyNote(classifyGenerationFailure(message).kind, state.plan?.age_band !== "adult", engineComputerAwayFromHome())}`);
     gate.finish();
   } else gate?.reset();
 }

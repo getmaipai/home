@@ -107,10 +107,20 @@ function scrubGeneration(g: TurnGeneration): TurnGeneration {
   return { ...kept, error: null };
 }
 
+/** Node traces also carry the engine's raw message; keep their structure but
+ * remove it from every viewer who cannot read admin error details. */
+function scrubNode(node: NonNullable<TurnStats["nodes"]>[number]): NonNullable<TurnStats["nodes"]>[number] {
+  if ("ok" in node.outcome && !node.outcome.ok && node.outcome.message !== undefined) {
+    const { message: _message, ...outcome } = node.outcome;
+    return { ...node, outcome };
+  }
+  return node;
+}
+
 /** `stats` without the raw generation cause, for anyone who may not read it. */
-export function statsForViewer<S extends Pick<TurnStats, "generations"> | undefined>(stats: S, actor: PersonRow): S {
+export function statsForViewer<S extends Pick<TurnStats, "generations" | "nodes"> | undefined>(stats: S, actor: PersonRow): S {
   if (!stats || canReadErrorDetail(actor)) return stats;
-  return { ...stats, generations: stats.generations.map(scrubGeneration) };
+  return { ...stats, generations: stats.generations.map(scrubGeneration), ...(stats.nodes ? { nodes: stats.nodes.map(scrubNode) } : {}) };
 }
 
 /** A turn value for the wire: raw generation errors only for an admin. */

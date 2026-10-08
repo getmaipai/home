@@ -1,9 +1,10 @@
 // THIN-DL-02: the one table of failure wording, with no imports so any module
 // may read it. Kinds and the classifier live in generationFailure.ts.
-export type FailureKind = "busy" | "memory" | "stopped" | "slow" | "unreachable" | "context_too_large" | "other";
+export type FailureKind = "busy" | "memory" | "stopped" | "slow" | "unreachable" | "engine_computer" | "context_too_large" | "other";
 
 interface FailureCopy {
   adult: string;
+  adultAway?: string;
   minor: string;
 }
 
@@ -32,6 +33,11 @@ export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
   },
   unreachable: {
     adult: "I can't reach the AI on this computer. Check it's running, then try again.",
+    minor: "I can't get to my thinking part right now. Please tell a grown-up.",
+  },
+  engine_computer: {
+    adult: "I can't reach the engine computer right now. Your message is safe; send it again once chat is back.",
+    adultAway: "I can't reach the engine computer from here. Your message is safe; send it again when you are home or once the connection is back.",
     minor: "I can't get to my thinking part right now. Please tell a grown-up.",
   },
   context_too_large: {
@@ -108,6 +114,7 @@ export const FAILURE_ADVICE: Record<FailureKind, FailureAdvice> = {
   stopped: { cause: "The chat engine was stopped, so the reply never started.", next_step: "Start the chat engine in Repairs.", repairs: true },
   slow: { cause: "The chat engine stopped answering before the reply finished.", next_step: "Retry. If it keeps happening, check Repairs.", repairs: true },
   unreachable: { cause: "Home could not reach the chat engine.", next_step: "Check that the MaiPai Stack is running in Repairs.", repairs: true },
+  engine_computer: { cause: "Home could not reach the engine computer.", next_step: "Retry when the connection is back. If it stays down, check Repairs.", repairs: true },
   context_too_large: { cause: "The request was too large for the chat engine's context window.", next_step: "Retry with less text, or start a new chat.", repairs: false },
   other: { cause: "The reply failed, and the engine did not say why.", next_step: "Retry. If it keeps happening, check Repairs.", repairs: true },
 };
@@ -122,13 +129,17 @@ export const TOOL_FAILURE_ADVICE: Record<"unavailable" | "timed_out" | "found_no
   bad_arguments: { verb: "got a request it could not use", next_step: "Retry; the model may word the request differently.", repairs: false },
 };
 
-export function failureLine(kind: FailureKind, minor: boolean): string {
+export function failureLine(kind: FailureKind, minor: boolean, awayFromHome = false): string {
+  if (kind === "engine_computer" && awayFromHome && !minor) {
+    return FAILURE_COPY.engine_computer.adultAway ?? FAILURE_COPY.engine_computer.adult;
+  }
   return minor ? FAILURE_COPY[kind].minor : FAILURE_COPY[kind].adult;
 }
 
 /** The closing note after a reply that was cut off with some text already
  * on screen. The person keeps what was written; this says it stopped. */
-export function partialReplyNote(kind: FailureKind, minor: boolean): string {
+export function partialReplyNote(kind: FailureKind, minor: boolean, awayFromHome = false): string {
+  if (kind === "engine_computer") return failureLine(kind, minor, awayFromHome);
   if (minor) return "I had to stop there. Ask me again if you want the rest.";
   return kind === "slow" ? "I had to stop there because the AI stopped answering. Ask me to continue if you want the rest." : "I had to stop there because the AI stopped working. Ask me to continue if you want the rest.";
 }

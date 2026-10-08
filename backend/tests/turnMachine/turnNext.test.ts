@@ -29,6 +29,7 @@ import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
 import { StreamSafetyRefusal, StreamUnavailable, type StreamOutcome, type SpeakerEvidence } from "@/lib/turnShared";
 import * as llm from "@/lib/llm";
 import { streamTurnEvents, THINKING_CUE_DELAY_MS } from "@/routes/turn";
+import { streamEventForViewer } from "@/lib/turnErrorDetail";
 import type { TurnStreamEvent } from "@/wire";
 import { getPendingAsk, resolveOrCreateConversation, setPendingAsk } from "@/lib/conversationHistory";
 import { listPending } from "@/lib/notifications";
@@ -38,7 +39,7 @@ import { eq } from "drizzle-orm";
 import { NO_RECORD_BUDGET } from "@/lib/turnMachine/budget";
 import { ensureSubjectEntity } from "@/lib/subjects";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
-import { partialReplyNote } from "@/lib/generationFailure";
+import { FAILURE_COPY, partialReplyNote } from "@/lib/generationFailure";
 import { remember, embedMemoryRecordSafely, PROFILE_SOURCE } from "@/lib/memory";
 import { DEFAULT_PERSONA, resolvePersona } from "@/lib/persona";
 import { identityLine } from "@/lib/turnShared";
@@ -3393,11 +3394,11 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
      * LLM client boundary alone; every node above it (model.ts's own
      * gate wiring, the machine, turnNext.ts, streamTurnEvents()) runs
      * unmodified and for real. */
-    function mockFailingStream(mode: "throw" | "cancel"): ReturnType<typeof spyOn> {
+    function mockFailingStream(mode: "throw" | "cancel", failure = "chat model unavailable: stub engine crashed mid-stream"): ReturnType<typeof spyOn> {
       return spyOn(llm, "startCompleteStreamPieces").mockImplementation(async (_role, _messages, _opts, signal) => {
         async function* tokens(): AsyncGenerator<llm.LlmStreamPiece, undefined, void> {
           for (const word of FIRST_SENTENCE.split(" ")) yield { channel: "text", text: `${word} ` };
-          if (mode === "throw") throw new Error("chat model unavailable: stub engine crashed mid-stream");
+          if (mode === "throw") throw new Error(failure);
           await new Promise<void>((_resolve, reject) => {
             const fail = () => reject(new Error("chat model unavailable: The operation was aborted."));
             if (signal?.aborted) fail();
@@ -3443,6 +3444,60 @@ describe("turnNext.ts: runTurnNextStream() (STREAM-NEXT-01)", () => {
         expect(stats.generations?.some((g) => g.error)).toBe(true);
       } finally {
         spy.mockRestore();
+      }
+    });
+
+    test("a remote link drop keeps the person's message and streamed words, records the remote failure, and never resends", async () => {
+      const spy = mockFailingStream("throw", "chat model unavailable: connection reset by peer");
+      setHouseholdSettingValue("engines.stack.where", "another_computer");
+      try {
+        const result = await runTurnNextStream(people.owner, "chat", "Please keep this exact message");
+        if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+        const events: TurnStreamEvent[] = [];
+        for await (const event of streamTurnEvents(result, people.owner.id)) events.push(event);
+        const delivered = events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("");
+        const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.turnId)).get();
+        expect(delivered).toContain(FIRST_SENTENCE);
+        expect(delivered).toContain("I can't reach the engine computer right now. Your message is safe; send it again once chat is back.");
+        expect(row?.userText).toBe("Please keep this exact message");
+        expect(row?.replyText).toBe(delivered);
+        const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { failure_kind?: string }[] };
+        expect(stats.generations?.some((g) => g.failure_kind === "engine_computer")).toBe(true);
+        expect(spy).toHaveBeenCalledTimes(1);
+      } finally {
+        spy.mockRestore();
+        setHouseholdSettingValue("engines.stack.where", "this_computer");
+      }
+    });
+
+    test("remote link failures keep child and teen turns behind their own output floor and reveal no admin detail", async () => {
+      const spy = mockFailingStream("throw", "chat model unavailable: connection reset by peer");
+      setHouseholdSettingValue("engines.stack.where", "another_computer");
+      const child = people.child;
+      try {
+        db.update(people_).set({ role: "teen" }).where(eq(people_.id, child.id)).run();
+        const teen = db.select().from(people_).where(eq(people_.id, child.id)).get()!;
+        for (const actor of [child, teen]) {
+          const result = await runTurnNextStream(actor, "chat", "Please keep me company");
+          if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+          const events: TurnStreamEvent[] = [];
+          for await (const event of streamTurnEvents(result, actor.id)) events.push(event);
+          const delivered = events.filter((e) => e.type === "delta").map((e) => (e as { text: string }).text).join("");
+          const viewerEvents = events.map((event) => streamEventForViewer(event, actor));
+          const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.turnId)).get();
+          expect(delivered).toContain(FAILURE_COPY.unreachable.minor);
+          expect(delivered).not.toContain("engine computer");
+          expect(JSON.stringify(viewerEvents)).not.toMatch(/connection reset by peer|tailnet|address|engine computer|stack_error/i);
+          expect(row?.userText).toBe("Please keep me company");
+          expect(row?.replyText).toBe(delivered);
+          const stats = JSON.parse(row!.stats as unknown as string) as { generations?: { failure_kind?: string }[] };
+          expect(stats.generations?.some((g) => g.failure_kind === "engine_computer")).toBe(true);
+        }
+        expect(spy).toHaveBeenCalledTimes(2);
+      } finally {
+        db.update(people_).set({ role: "child" }).where(eq(people_.id, child.id)).run();
+        spy.mockRestore();
+        setHouseholdSettingValue("engines.stack.where", "this_computer");
       }
     });
 

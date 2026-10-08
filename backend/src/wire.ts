@@ -183,7 +183,7 @@ export interface TurnGeneration {
   engine_id?: string;
   model_id?: string;
   /** The failure's kind (backend failureCopy.ts's FailureKind) as classified when it happened; admin only. */
-  failure_kind?: "busy" | "memory" | "stopped" | "slow" | "unreachable" | "context_too_large" | "other";
+  failure_kind?: "busy" | "memory" | "stopped" | "slow" | "unreachable" | "engine_computer" | "context_too_large" | "other";
   failed_ms?: number;
   failed_at?: string;
 }

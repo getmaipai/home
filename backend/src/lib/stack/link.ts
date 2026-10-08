@@ -90,6 +90,7 @@ export class EngineLink {
   }
   snapshot(): EngineLinkState { return LinkState.parse(this.state); }
   isReady(): boolean { return this.state.state === "ready" || this.state.state === "degraded"; }
+  pathInUse(): "home" | "tailnet" | null { return this.lastGood?.path ?? null; }
   assertReady(): void { if (!this.isReady()) throw new StackError("unreachable", "Stack link is unreachable"); }
 
   start(): void {

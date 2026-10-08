@@ -75,6 +75,14 @@ describe("the what-leaves-the-house table", () => {
     expect(row?.who).toBe("Open-Meteo");
     expect(row?.optIn).toBe(true);
   });
+
+  test("the remote engine row says chat pauses when it cannot be reached", () => {
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
+    const row = privacyConnections().find((r) => r.id === "platform:engine-computer");
+    expect(row).toBeDefined();
+    expect(row!.what.toLowerCase()).toContain("paused when it cannot be reached");
+    expect(row!.what.toLowerCase()).not.toContain("failure kind");
+  });
 });
 
 // The hub's own downloads are the half nothing else declares, so these

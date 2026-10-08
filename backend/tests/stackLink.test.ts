@@ -103,9 +103,19 @@ describe("engine link state machine", () => {
     deps.resolveHost = async () => ["100.70.1.2"];
     const link = await startReady(new EngineLink(config(true), deps));
     expect(link.snapshot().path).toBe("tailnet");
+    expect(link.pathInUse()).toBe("tailnet");
     link.updateSettings({ allowTailnet: false });
     expect(link.snapshot()).toMatchObject({ state: "offline", reason: "link_outside_home" });
     expect(children[0]!.killed).toBe(1);
+    link.stop();
+  });
+
+  test("retains the last verified path after a tunnel drop for failure wording", async () => {
+    allowedAddresses = new Set(["100.70.1.2"]);
+    deps.resolveHost = async () => ["100.70.1.2"];
+    const link = await startReady(new EngineLink(config(true), deps));
+    children[0]!.exit?.(1, null); await flush();
+    expect(link.pathInUse()).toBe("tailnet");
     link.stop();
   });
 
