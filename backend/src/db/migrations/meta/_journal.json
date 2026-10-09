@@ -575,6 +575,13 @@
       "when": 1791246775353,
       "tag": "0081_modern_wendell_vaughn",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "6",
+      "when": 1791246775354,
+      "tag": "0082_quiet_hours_holds",
+      "breakpoints": true
     }
   ]
 }

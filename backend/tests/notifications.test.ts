@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, mock } from "bun:test";
+import { describe, expect, test, beforeEach, mock, setSystemTime, useFakeTimers, useRealTimers } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -15,6 +15,24 @@ beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetRateLimiterForTests();
+});
+
+test("quiet hours hold time-sensitive notifications until end but never hold immediate notifications", async () => {
+  useFakeTimers();
+  setSystemTime(new Date("2026-10-05T02:00:00"));
+  try {
+    const { client, row } = await owner();
+    await client.request("/api/settings", { method: "PUT", body: { scope: "household", key: "household.quiet_hours.start", value: "22:00" } });
+    await client.request("/api/settings", { method: "PUT", body: { scope: "household", key: "household.quiet_hours.end", value: "07:00" } });
+    await trigger("model.download_ready", { modelName: "Held Model" });
+    expect(listPending(row)).toHaveLength(0);
+    await trigger("safety.flagged_turn", { childName: "Nova", categories: "self_harm" });
+    expect(listPending(row)).toHaveLength(1);
+    setSystemTime(new Date("2026-10-05T07:00:00"));
+    const { deliverHeldNotifications } = await import("@/lib/notifications");
+    await deliverHeldNotifications();
+    expect(listPending(row).map((item) => item.text)).toContain("Held Model finished downloading and is ready to use.");
+  } finally { useRealTimers(); }
 });
 
 async function owner(): Promise<{ client: TestClient; row: PersonRow }> {

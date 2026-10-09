@@ -13,12 +13,9 @@
 // configurable type that always fires regardless of preference, and a
 // thirty-day-center-shaped read/dismiss history (routes/notifications.ts).
 //
-// What's deferred, named rather than half-built: quiet hours (no
-// schedule concept exists yet for any settings key, not just this one -
-// scheduler.ts's own header names the identical gap), the `passive`
-// digest batching (every level delivers immediately today; a `passive`
-// type is stored and readable the same as the others, just not yet
-// batched into a scheduled digest), browser push / Go / TV overlay /
+// What's deferred, named rather than half-built: the `passive` digest
+// batching (the daily updater job is the only producer already naturally
+// limited to once a day), browser push / Go / TV overlay /
 // robot speech (no such clients exist yet to receive them), and a real
 // `parents_of_child` audience (Person has no parent/guardian link -
 // lib/notificationTypes.ts's own comment on why `adults` stands in).
@@ -27,11 +24,11 @@
 // core's are declared, and get its own settings-key toggle through its
 // manifest's `config[]` (already-spec'd, docs/SETTINGS.md), not by
 // editing this file.
-import { eq, and, isNull, inArray, desc } from "drizzle-orm";
+import { eq, and, isNull, inArray, desc, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { notificationDeliveries, people } from "@/db/schema";
+import { notificationDeliveries, notificationHolds, people } from "@/db/schema";
 import { newNotificationId } from "@/lib/id";
-import { getSettingValueForPerson } from "@/lib/settings";
+import { getSettingValueForPerson, getHouseholdSettingValue } from "@/lib/settings";
 import { sendTelegramMessage } from "@/lib/telegramChannel";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { listActivePeople } from "@/lib/access";
@@ -174,29 +171,17 @@ export async function trigger(typeId: string, vars: Record<string, string> = {},
   const text = renderTemplate(type.template, vars);
 
   for (const recipient of recipients) {
-    const channels = resolveChannelsFor(type, recipient);
-    if (channels.includes("telegram")) {
-      // resolveChannelsFor() only ever includes "telegram" once it has
-      // already confirmed a real chat id exists, so this is never
-      // undefined in practice - re-reading it here (rather than having
-      // that function return it alongside the channel list) keeps the
-      // settings lookup in exactly one place.
-      const chatId = getSettingValueForPerson(recipient.id, "notifications.telegram.chat_id") as string;
-      await sendTelegramMessage(chatId, text);
+    const now = new Date();
+    const quiet = quietHours(recipient, now);
+    const heldUntil = type.level === "time_sensitive" && quiet.active ? quiet.endAt : null;
+    if (heldUntil) {
+      db.insert(notificationHolds).values({
+        id: newNotificationId(), typeId: type.id, recipientId: recipient.id, text,
+        options: JSON.stringify(opts), deliverAfter: heldUntil.toISOString(),
+      }).run();
+      continue;
     }
-    db.insert(notificationDeliveries)
-      .values({
-        id: newNotificationId(),
-        typeId: type.id,
-        recipientId: recipient.id,
-        text,
-        channels: JSON.stringify(channels),
-        createdAt: new Date().toISOString(),
-        subjectPersonId: opts.subjectPersonId ?? null,
-        subjectTurnId: opts.subjectTurnId ?? null,
-        memoryIds: opts.memoryIds ? JSON.stringify(opts.memoryIds) : null,
-      })
-      .run();
+    await deliver(type, recipient, text, opts, now);
   }
 }
 
@@ -271,6 +256,64 @@ export function listPending(actor: PersonRow): NotificationDeliveryView[] {
     .orderBy(desc(notificationDeliveries.createdAt))
     .all()
     .map(toView);
+}
+
+const QUIET_START = "quiet_hours.start";
+const QUIET_END = "quiet_hours.end";
+
+function minutes(value: unknown, fallback: string): number {
+  const text = typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value) ? value : fallback;
+  const [hour, minute] = text.split(":").map(Number);
+  return hour! * 60 + minute!;
+}
+
+function quietHours(recipient: PersonRow, now: Date): { active: boolean; endAt: Date } {
+  const start = minutes(getSettingValueForPerson(recipient.id, `person.${QUIET_START}`), "22:00");
+  const end = minutes(getSettingValueForPerson(recipient.id, `person.${QUIET_END}`), "07:00");
+  const householdStart = minutes(getHouseholdSettingValue(`household.${QUIET_START}`), "22:00");
+  const householdEnd = minutes(getHouseholdSettingValue(`household.${QUIET_END}`), "07:00");
+  const band = speakerAgeBand(recipient, now);
+  const own = band === "teen" || band === "adult";
+  const from = own ? start : householdStart;
+  const to = own ? end : householdEnd;
+  const current = now.getHours() * 60 + now.getMinutes();
+  const active = from === to ? false : from < to ? current >= from && current < to : current >= from || current < to;
+  const endAt = new Date(now);
+  endAt.setHours(Math.floor(to / 60), to % 60, 0, 0);
+  if (current >= to) endAt.setDate(endAt.getDate() + 1);
+  return { active, endAt };
+}
+
+async function deliver(type: NotificationType, recipient: PersonRow, text: string, opts: TriggerOptions, now: Date): Promise<void> {
+  const channels = resolveChannelsFor(type, recipient);
+  if (channels.includes("telegram")) {
+    const chatId = getSettingValueForPerson(recipient.id, "notifications.telegram.chat_id") as string;
+    await sendTelegramMessage(chatId, text);
+  }
+  db.insert(notificationDeliveries).values({
+    id: newNotificationId(), typeId: type.id, recipientId: recipient.id, text,
+    channels: JSON.stringify(channels), createdAt: now.toISOString(),
+    subjectPersonId: opts.subjectPersonId ?? null, subjectTurnId: opts.subjectTurnId ?? null,
+    memoryIds: opts.memoryIds ? JSON.stringify(opts.memoryIds) : null,
+  }).run();
+}
+
+/** Deliver durable, held time-sensitive events whose recipient's quiet hours have ended. */
+export async function deliverHeldNotifications(now = new Date()): Promise<number> {
+  const held = db.select().from(notificationHolds).where(lte(notificationHolds.deliverAfter, now.toISOString())).all();
+  for (const row of held) {
+    const type = getNotificationType(row.typeId);
+    const recipient = db.select().from(people).where(and(eq(people.id, row.recipientId), isNull(people.deletedAt))).get() as PersonRow | undefined;
+    if (type && recipient && !quietHours(recipient, now).active) {
+      await deliver(type, recipient, row.text, JSON.parse(row.options) as TriggerOptions, now);
+      db.delete(notificationHolds).where(eq(notificationHolds.id, row.id)).run();
+    } else if (!recipient || !type) {
+      db.delete(notificationHolds).where(eq(notificationHolds.id, row.id)).run();
+    } else {
+      db.update(notificationHolds).set({ deliverAfter: quietHours(recipient, now).endAt.toISOString() }).where(eq(notificationHolds.id, row.id)).run();
+    }
+  }
+  return held.length;
 }
 
 /** The thirty-day center (org doc: "A thirty-day center per person with

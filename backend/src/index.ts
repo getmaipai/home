@@ -4,6 +4,7 @@
 import { instanceLock } from "@/lib/bootGuard";
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
+import { deliverHeldNotifications } from "@/lib/notifications";
 import { runPlugin, registerAllPackageNotificationTypes, registerAllPackageProjectTypes, runDueWarmJobs } from "@/lib/plugins";
 import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
@@ -222,6 +223,7 @@ for (const role of engineWarmupsForStackRoles()) {
 // a package's first real call), so this just arms the sweep.
 startIdleSweep();
 setInterval(() => {
+  void deliverHeldNotifications().catch((err: Error) => console.error(`[notifications] held delivery failed: ${err.message}`));
   runDueJobs(runPlugin, new Date(), {
     "packages.smoke": async () => {
       await runAllSmokeTests();

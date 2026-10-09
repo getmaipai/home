@@ -181,6 +181,8 @@ export function NextSettingField({ setting, onChange, onReset, disabled, selfPer
         aria-label={def.label}
       />
     );
+  } else if (def.selector === "time") {
+    control = <Input type="time" className="min-h-12 w-40" value={String(resolved.value)} disabled={disabled} onChange={(e) => void onChange(e.target.value)} aria-label={def.label} />;
   } else if (def.selector === "text") {
     control = (
       <Input

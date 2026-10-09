@@ -41,7 +41,7 @@ function renderSection(id: typeof definitions[number]["id"]) {
       </Card>
     </Collapsible>
   </>;
-  if (id === "integrations") return <NextSettingsRenderer scope="household" scopeValue="household" only={["household.integrations", "household.notifications", "household.reference"]} />;
+  if (id === "integrations") return <><NextSettingsRenderer scope="household" scopeValue="household" only={["household.integrations", "household.notifications", "household.reference"]} includeKeys={["household.quiet_hours.start", "household.quiet_hours.end"]} /><p className="text-sm text-muted-foreground">Household quiet hours apply to children. Adults and teens can set their own hours in Profile → Notifications.</p><NextSettingsRenderer scope="household" scopeValue="household" only={["household.integrations", "household.notifications", "household.reference"]} includeKeys={["notifications.telegram.bot_token"]} /></>;
   if (id === "storage") return <>
     <NextSettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
     <div className="grid gap-4 sm:grid-cols-2">
