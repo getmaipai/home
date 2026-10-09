@@ -13,7 +13,10 @@ describe("SEARCH-FRESH-01 fixture search", () => {
     const negatives = items.filter((item) => item.kind === "hard-negative");
     expect(negatives).toHaveLength(30);
     expect(new Set(negatives.map((item) => item.family)).size).toBe(10);
-    for (const item of items) expect(item).toMatchObject({ family: expect.any(String), split: "dev", gold: expect.stringMatching(/must|must_not|may/), age_row: "adult", acceptable_tools: expect.any(Array), expected_terms: expect.any(Array), fixture: { as_of: "2026-10-08" } });
+    // Bun's toMatchObject writes asymmetric matcher values onto the received
+    // object. Match a copy so this shared JSON import stays fixture data for
+    // other test files in the same process.
+    for (const item of items) expect(structuredClone(item)).toMatchObject({ family: expect.any(String), split: "dev", gold: expect.stringMatching(/must|must_not|may/), age_row: "adult", acceptable_tools: expect.any(Array), expected_terms: expect.any(Array), fixture: { as_of: "2026-10-08" } });
   });
   test("serves recorded SearXNG rows and full page text from loopback", async () => {
     const fixture = startFixtureSearch([{ id: "ts-1", prompt: "weather Chicago this weekend", fixture: { as_of: "2026-10-08", title: "Chicago forecast", content: "Rain Saturday.", url: "http://fixture.invalid/ts-1" } }]);
