@@ -54,6 +54,7 @@ import { removeFileBlobs } from "@/lib/attachments";
 import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
 import { trigger } from "@/lib/notifications";
 import { roleRequiresCredential, requiresCredential } from "@/lib/personAuthMethods";
+import { eraseChatFolderReferences } from "@/lib/chatFolders";
 import type { PersonRow } from "@/types";
 import type { personToDbValues } from "@/lib/personShape";
 
@@ -388,6 +389,7 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
   const conversationThreads = sqlite.query("DELETE FROM conversations WHERE person_id = ?").run(personId).changes;
   // PROJECTS-01a: their projects (chat folders) go with their chats. After
   // the conversations above, which reference them.
+  eraseChatFolderReferences(personId);
   const chatFolderRows = sqlite.query("DELETE FROM chat_folders WHERE person_id = ?").run(personId).changes;
   // Person-scope settings hold the spec's full scope string
   // ("person:<id>"), so they are matched by that, not by a person_id

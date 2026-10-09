@@ -11,6 +11,10 @@
 // a mocked recall() - the tier floor is the real thing under test.
 import { describe, expect, test, beforeEach } from "bun:test";
 import { resetDb } from "../reset-db";
+import { sqlite } from "@/db";
+import { createChatFolder } from "@/lib/chatFolders";
+import { createConversation } from "@/lib/conversationHistory";
+import type { PersonRow } from "@/types";
 import { createBenchPeople, type BenchPeople } from "../../scripts/bench/conversationRunner";
 import { remember, embedMemoryRecordSafely, recall, PROFILE_SOURCE } from "@/lib/memory";
 import { contextNode, applyContext, decideReasoning, MEMORY_CONTEXT_MIN_SCORE } from "@/lib/turnMachine/nodes/context";
@@ -37,9 +41,57 @@ const SIGNAL = new AbortController().signal;
  * state.conversationId (resolveOrCreateConversation's own inputs) -
  * the same minimal-real-state pattern outputGate.test.ts already uses
  * for a node whose tested branch reads only part of TurnState. */
-function stateFor(actor: BenchPeople["owner"]): TurnState {
-  return withTurnDefaults({ actor, surface: "chat", conversationId: "" } as TurnState);
+function stateFor(actor: PersonRow, conversationId = ""): TurnState {
+  return withTurnDefaults({ actor, surface: "chat", conversationId } as TurnState);
 }
+
+describe("contextNode: PROJECTS-P2 stable project instructions", () => {
+  test("a durable written chat receives the live owner project instructions as stable context", async () => {
+    const made = createChatFolder(people.owner, { name: "Garden", instructions: "Use the greenhouse notes when answering." });
+    expect(made.ok).toBe(true);
+    if (!made.ok) return;
+    const conversation = createConversation(people.owner, { folderId: made.value.id });
+    expect(conversation.ok).toBe(true);
+    if (!conversation.ok) return;
+
+    const first = await contextNode(stateFor(people.owner, conversation.value.id), { utterance: "What should I plant?" }, SIGNAL);
+    const second = await contextNode(stateFor(people.owner, conversation.value.id), { utterance: "How often should I water?" }, SIGNAL);
+    const firstProject = first.output.items.find((item) => item.source === "project");
+    const secondProject = second.output.items.find((item) => item.source === "project");
+    expect(firstProject?.text).toContain("Notes this person set for the project Garden.");
+    expect(firstProject?.text).toContain("Use the greenhouse notes when answering.");
+    expect(secondProject?.text).toBe(firstProject?.text);
+  });
+
+  test("temporary, bare, spoken, and unsafe minor turns receive no project instructions", async () => {
+    const made = createChatFolder(people.owner, { name: "Family", person: people.child.id, instructions: "Keep answers friendly." });
+    expect(made.ok).toBe(true);
+    if (!made.ok) return;
+    const unsafe = sqlite.query("UPDATE chat_folders SET instructions = ? WHERE id = ?");
+    unsafe.run("I want to kill myself", made.value.id);
+    const childChat = createConversation(people.child, { folderId: made.value.id });
+    expect(childChat.ok).toBe(true);
+    if (!childChat.ok) return;
+
+    const childState = stateFor(people.child, childChat.value.id);
+    const child = await contextNode(childState, { utterance: "hello" }, SIGNAL);
+    expect(child.output.items.some((item) => item.source === "project")).toBe(false);
+
+    const bareState = stateFor(people.owner, childChat.value.id);
+    bareState.actor = people.child;
+    bareState.bare = true;
+    const bare = await contextNode(bareState, { utterance: "hello" }, SIGNAL);
+    expect(bare.output.items.some((item) => item.source === "project")).toBe(false);
+
+    const spokenState = stateFor(people.child, childChat.value.id);
+    spokenState.spoken = true;
+    const spoken = await contextNode(spokenState, { utterance: "hello" }, SIGNAL);
+    expect(spoken.output.items.some((item) => item.source === "project")).toBe(false);
+
+    const temporary = await contextNode(stateFor(people.child), { utterance: "hello", temporary: true }, SIGNAL);
+    expect(temporary.output.items.some((item) => item.source === "project")).toBe(false);
+  });
+});
 
 describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor gated", () => {
   test("the live clock line tells the model its training knowledge may be old", async () => {

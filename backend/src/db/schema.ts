@@ -354,8 +354,36 @@ export const chatFolders = sqliteTable(
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
     deletedAt: text("deleted_at"),
+    // PROJECTS-P1 (spec-v0.1.90): the project's look, notes and settings.
+    color: text("color").notNull().default("neutral"),
+    icon: text("icon").notNull().default("folder"),
+    description: text("description").notNull().default(""),
+    instructions: text("instructions").notNull().default(""),
+    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    pinnedAt: text("pinned_at"),
+    archivedAt: text("archived_at"),
+    // Rows that existed before the field read "shared" (what they always did);
+    // createChatFolder writes "project_only" for a new project.
+    memoryMode: text("memory_mode").notNull().default("shared"), // shared|project_only
   },
   (table) => [index("chat_folders_person_idx").on(table.personId)],
+);
+
+// PROJECTS-P1: who a project is shared with (ChatFolder.shares). One row per
+// member; the owner is the folder's own person_id and never a row here.
+export const chatFolderShares = sqliteTable(
+  "chat_folder_shares",
+  {
+    folderId: text("folder_id")
+      .notNull()
+      .references(() => chatFolders.id),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    role: text("role").notNull(), // can_use|can_edit
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.folderId, table.personId] }), index("chat_folder_shares_person_idx").on(table.personId)],
 );
 
 export const conversations = sqliteTable(

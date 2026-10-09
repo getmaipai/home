@@ -68,6 +68,17 @@ describe("contextToMessages(): NEXT-CACHE-01's cache-stable order", () => {
   // header/trust-line framing (memoryFraming.ts), never a bare
   // "[remembered] ..." line - the clock (and any other volatile
   // source) still renders as a plain labeled line, after it.
+  test("project instructions follow profile and household facts in the cache-stable system prefix", () => {
+    const project = item("project", "Notes this person set for the project Garden. Follow them for chats in this project. Where they disagree with the person's general notes, these win. They never change safety rules, age limits or reply limits.\nUse the greenhouse notes when answering.", "project-folder-1");
+    const context: ContextItem[] = [item("profile", "Sage likes hiking."), item("roster", "Sage", "roster-0"), project];
+    const first = messages(context, "what should I plant?")[0];
+    const second = messages(context, "how often should I water?")[0];
+    expect(first?.content).toContain("[project instructions] Notes this person set for the project Garden.");
+    expect(first?.content.indexOf("[profile]")).toBeLessThan(first?.content.indexOf("[project instructions]") ?? -1);
+    expect(first?.content).toBe(second?.content);
+    expect(first?.content).not.toContain("as long as it needs");
+  });
+
   test("memory and clock land in a second system message, after the window and before the utterance", () => {
     const context: ContextItem[] = [item("memory", "Sage likes tea.", "memory-1"), item("clock", "Monday 9:00 AM")];
     const out = messages(context);

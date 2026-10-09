@@ -51,6 +51,7 @@ const SOURCE_LABEL: Record<Exclude<ContextItem["source"], "window" | "utterance"
   quoted: "quoted",
   // UPLOAD-IMG-02: the fact that pictures were attached (chatImageNote.ts).
   attachment: "attached",
+  project: "project instructions",
 };
 
 function renderContextLine(item: ContextItem): string {
@@ -122,6 +123,7 @@ function windowRoleFromId(id: string): "system" | "user" | "assistant" | "tool" 
 function isStableContext(source: ContextItem["source"]): boolean {
   if (source === "profile") return true;
   if (source === "roster") return true;
+  if (source === "project") return true;
   return false;
 }
 
