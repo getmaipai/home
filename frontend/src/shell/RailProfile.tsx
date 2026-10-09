@@ -2,12 +2,20 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import RailProfileMenu from "@maipai/ui/src/dashboard/layouts/full/vertical/rail/RailProfileMenu";
-import { api, type Roster } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { ROLE_LABELS } from "@/apps/people/roles";
 import { NotificationBell, useNotificationsQuery } from "@/shell/NotificationBell";
 import { useStatusSummary } from "@/shell/StatusIndicator";
 
 const HELP_URL = "https://github.com/getmaipai/home/blob/main/docs/user/README.md";
+
+/** The Home settings row (ADMIN-HOME-SETTINGS-01): the household's owner
+ * and admins only, and never for a minor's band. The hub keeps its own gates
+ * on every household write; this only decides whether the row is drawn. */
+export function homeSettingsRow(person: Pick<Roster, "role" | "age_band">) {
+  const minor = person.age_band === "child" || person.age_band === "teen";
+  return isOwnerOrAdminRole(person.role) && !minor ? { href: "/settings/home", label: "Home settings" } : undefined;
+}
 
 /** RAIL-01 (owner's layout, 2026-10-06): Home's data for the kit's rail
  * profile menu. Notifications, system status, Incognito, Settings, Help
@@ -46,6 +54,7 @@ export function RailProfile({
       status={status}
       incognito={{ on: incognito, onChange: onIncognitoChange }}
       settingsHref="/settings"
+      homeSettings={homeSettingsRow(person)}
       helpHref={HELP_URL}
       onLogout={() => {
         // The next person on this browser must never see this person's

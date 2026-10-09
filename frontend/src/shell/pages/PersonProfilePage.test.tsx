@@ -162,6 +162,33 @@ describe("PersonProfilePage", () => {
     } finally { restore(); }
   });
 
+  // ADMIN-HOME-SETTINGS-01 (owner rule 2026-10-08): no one but the person sees
+  // their weather and maps places, a child's included, so People > a child's
+  // settings draws no key with the `location` selector for an owner or admin.
+  test.each(["owner", "admin"] as const)("a %s opening a child's Limits tab is shown no location-selector key", async (role) => {
+    const placeKey = { key: "weather.places", scope: "person", selector: "location", default: [], label: "Weather places", level: "basic", secret: false, lives_in: "weather.places", honoured_by: ["home"] } as unknown as SettingsKey;
+    const original = globalThis.fetch;
+    const { registry, values } = limitSettings();
+    const withPlaces = [...registry, placeKey];
+    const valuesWithPlaces = [...values, { key: placeKey.key, value: [], source: "default", label: placeKey.label, level: "basic", secret: false } as ResolvedSetting];
+    const restore = stubProfileAndLimitsFetch();
+    const inner = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(withPlaces));
+      if (url.includes("/api/settings?scope=")) return Promise.resolve(Response.json(valuesWithPlaces));
+      return inner(input, init);
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderProfile("/people/person-bramble?tab=limits", viewer({ role }));
+      expect(await view.findByText("Daily time limits for Bramble.")).toBeTruthy();
+      await waitFor(() => expect(document.querySelectorAll('[id="settings-person.allowance"] input[type="number"]').length).toBe(9));
+      expect(document.querySelector('[data-setting-key="weather.places"]')).toBeNull();
+      expect(document.querySelector('[id="settings-weather.places"]')).toBeNull();
+      expect(view.queryByText("Weather places")).toBeNull();
+    } finally { restore(); globalThis.fetch = original; }
+  });
+
   test("an owner does not see Limits on their own profile", async () => {
     const restore = stubFetch({});
     try {

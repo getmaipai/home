@@ -2,7 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { Roster } from "@/lib/api";
-import { RailProfile } from "@/shell/RailProfile";
+import { RailProfile, homeSettingsRow } from "@/shell/RailProfile";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 
 afterEach(cleanup);
@@ -85,5 +85,38 @@ describe("RailProfile log out", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+// ADMIN-HOME-SETTINGS-01: the Home settings row is the household's owner and
+// admins only, drawn right after Settings; no one else's menu has it.
+describe("RailProfile Home settings row", () => {
+  test.each([["owner", true], ["admin", true], ["adult", false], ["teen", false], ["child", false], ["guest", false]] as const)("a %s: row shown %s", async (role, shown) => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/notifications") || url.includes("/api/status/apps")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+    }) as unknown as typeof fetch;
+    try {
+      const age_band = role === "child" ? "child" : role === "teen" ? "teen" : "adult";
+      const view = renderWithQueryClient(
+        <MemoryRouter>
+          <RailProfile person={{ ...person(role), age_band } as Roster} incognito={false} onIncognitoChange={() => {}} onSignedOut={() => {}} />
+        </MemoryRouter>,
+      );
+      fireEvent.click(view.getByRole("button", { name: /Open profile menu for Juniper/ }));
+      await view.findByRole("menuitem", { name: /Settings/ });
+      const row = view.queryByRole("menuitem", { name: /Home settings/ });
+      expect(row !== null).toBe(shown);
+      if (row) expect(row.getAttribute("href")).toBe("/settings/home");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("an admin who is also a minor's band is shown no row", () => {
+    expect(homeSettingsRow({ role: "admin", age_band: "teen" })).toBeUndefined();
+    expect(homeSettingsRow({ role: "owner", age_band: "adult" })).toEqual({ href: "/settings/home", label: "Home settings" });
   });
 });

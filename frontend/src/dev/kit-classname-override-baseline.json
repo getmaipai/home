@@ -301,36 +301,6 @@
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
     }
   },
-  "apps/settings/SettingsPage.tsx": {
-    "Button": {
-      "tokens": [
-        "bg-background",
-        "bg-primary/10",
-        "gap-2.5",
-        "h-auto",
-        "justify-start",
-        "min-h-10",
-        "px-2",
-        "px-3",
-        "py-1.5",
-        "py-2",
-        "rounded-md",
-        "rounded-xl",
-        "shadow-sm"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Input": {
-      "tokens": [
-        "bg-card",
-        "h-12",
-        "rounded-xl"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
   "apps/settings/UsersSection.tsx": {
     "Input": {
       "tokens": [

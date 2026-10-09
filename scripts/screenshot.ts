@@ -353,6 +353,7 @@ const chatSkillsReview = process.argv.includes("--chat-skills-review");
 const engineDownReview = process.argv.includes("--engine-down-review");
 // APP-SET-02: the settings areas (Account, Chat settings, Home settings) as an admin, an adult, a teen and a child see them.
 const appSettingsReview = process.argv.includes("--app-settings-review");
+const adminHomeReview = process.argv.includes("--admin-home-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
 const noticeStyleReview = process.argv.includes("--notice-style-review");
 const statusColorsReview = process.argv.includes("--status-colors-review");
@@ -2863,6 +2864,79 @@ async function captureAppSettingsReview(browser: Browser, ownerSession: string):
             const file = join(outDir, `settings-${who}-${area}-${viewport.width}-${theme}.png`);
             await page.screenshot({ path: file, fullPage: false });
             console.log(`Wrote ${file}`);
+          }
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
+}
+
+/** ADMIN-HOME-SETTINGS-01: the profile menu with its Home settings row (owner)
+ * and without it (an adult), and Home settings itself, at 1440 and 390 in
+ * both themes. Prints what each page drew so a spinner, skeleton or error
+ * state is a thrown error rather than a judgement call, and writes the
+ * images under data-scratch/ for a person to open. */
+async function captureAdminHomeReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "oc3-shots");
+  mkdirSync(outDir, { recursive: true });
+  const ownerHeaders = { "Content-Type": "application/json", Cookie: `session=${ownerSession}` };
+  const created = await fetch(`${BASE_URL}/api/people`, {
+    method: "POST", headers: ownerHeaders,
+    body: JSON.stringify({ displayName: "Review adult", role: "adult", secret: "review-home-adult" }),
+  });
+  if (!created.ok) throw new Error(`admin home review adult setup failed: ${created.status} ${await created.text()}`);
+  const adult = await created.json() as { id: string };
+  const signedIn = await fetch(`${BASE_URL}/api/auth/verify-secret`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: adult.id, secret: "review-home-adult" }) });
+  const adultSession = signedIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!adultSession) throw new Error("admin home review adult sign-in carried no session cookie");
+  const personas: Array<[string, string]> = [["owner", ownerSession], ["adult", adultSession]];
+  for (const [who, session] of personas) {
+    for (const slug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          await page.goto(`${BASE_URL}/chat`);
+          await page.getByRole("textbox", { name: "Message input" }).waitFor();
+          const trigger = page.locator('[data-slot="rail-profile-trigger"]');
+          if (!(await trigger.first().isVisible())) {
+            // A phone keeps the rail in a drawer: open it first.
+            await page.locator('[data-slot="sidebar-trigger"], [data-sidebar="trigger"]').first().click();
+          }
+          await trigger.first().click();
+          await page.getByRole("menuitem", { name: /Settings/ }).first().waitFor();
+          await settleAnimations(page);
+          const homeRow = await page.getByRole("menuitem", { name: /Home settings/ }).count();
+          console.log(`admin-home ${who} menu ${slug} ${theme}: homeSettingsRow=${homeRow}`);
+          if ((who === "owner") !== (homeRow === 1)) throw new Error(`admin home review: ${who} menu row count ${homeRow}`);
+          await page.screenshot({ path: join(outDir, `menu-${who}-${viewport.width}-${theme}.png`) });
+          if (who !== "owner") continue;
+          // The row goes where it says.
+          await page.getByRole("menuitem", { name: /Home settings/ }).click();
+          await page.waitForURL(/\/settings\/home/);
+          const paths = ["/settings/home/general", "/settings/home/ai", "/settings/home/developer"];
+          for (const path of paths) {
+            await page.goto(`${BASE_URL}${path}`);
+            await page.locator('[data-slot="settings-shell"]').waitFor();
+            await page.waitForTimeout(800);
+            const state = await page.evaluate(() => ({
+              path: location.pathname,
+              heading: document.querySelector("h1")?.textContent?.trim(),
+              rows: [...document.querySelectorAll('[data-slot="settings-column"] a')].map((a) => a.textContent?.trim()),
+              spinner: document.querySelectorAll('[role="status"][aria-label*="oading"]').length,
+              skeleton: document.querySelectorAll('[data-slot="skeleton"]').length,
+              alert: [...document.querySelectorAll('[role="alert"]')].map((a) => a.textContent?.trim()),
+              overflow: document.documentElement.scrollWidth > window.innerWidth,
+            }));
+            console.log(`admin-home ${who} ${path} ${slug} ${theme}: ${JSON.stringify(state)}`);
+            if (state.overflow) throw new Error(`admin home review ${path} ${slug} ${theme} scrolls sideways`);
+            if (state.spinner || state.skeleton || state.alert.length) throw new Error(`admin home review ${path} ${slug} ${theme} shows a loading or error state`);
+            await settleAnimations(page);
+            await page.screenshot({ path: join(outDir, `home-settings-${path.split("/").pop()}-${viewport.width}-${theme}.png`) });
           }
         } finally {
           await context.close();
@@ -10561,6 +10635,12 @@ async function main() {
     if (appSettingsReview) {
       await captureAppSettingsReview(browser, sessionValue);
       console.log("completed named review: --app-settings-review");
+      return;
+    }
+
+    if (adminHomeReview) {
+      await captureAdminHomeReview(browser, sessionValue);
+      console.log("completed named review: --admin-home-review");
       return;
     }
 
