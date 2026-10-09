@@ -189,6 +189,8 @@ function failureAdminDetails(): Event[] {
 }
 
 export const UI_FIXTURES: UiFixture[] = [
+  { id: "artifact-card", title: "Artifact card", description: "A finished document with the shipped artifact card and its Open, Download and Library actions.", events: turn("artifact-card", "I finished the document.", { value: { artifact: { id: "showcase-artifact-card", version: 1 } } }) },
+  { id: "job-progress", title: "Job progress", description: "A running background project with the shipped progress card and its cancel control.", events: turn("job-progress", "I started the project. It is still running.", { value: { project: { id: "showcase-job-progress" } } }) },
   { id: "table", title: "Table", description: "A markdown table with four columns and a closing line.", events: turn("table", TABLE) },
   { id: "code", title: "Code blocks", description: "Fenced Python and TypeScript blocks, each with its copy button.", events: turn("code", CODE) },
   { id: "math", title: "Math", description: "Inline and block LaTeX: a circle, the quadratic formula and a sum.", events: turn("math", MATH) },

@@ -88,15 +88,7 @@
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     }
   },
-  "apps/chat/chatToolUis.tsx": {
-    "ArtifactCard": {
-      "tokens": [
-        "min-w-0"
-      ],
-      "ed": "ED-025",
-      "reason": "Kit artifact-card lacked an actions slot (added in ui-v0.5.116); ADOPT-02."
-    }
-  },
+  "apps/chat/chatToolUis.tsx": {},
   "apps/chat/composerAddMenu.tsx": {
     "ComposerMenuItem": {
       "tokens": [

@@ -22,10 +22,7 @@
     "ChatWelcome",
     "MessageDetailsReveal"
   ],
-  "apps/chat/chatToolUis.tsx": [
-    "ProducedArtifactCard",
-    "ProjectToolRender"
-  ],
+  "apps/chat/chatToolUis.tsx": [],
   "apps/chat/composerAddMenu.tsx": [
     "ComposerAddMenuItem",
     "GroupLabel",

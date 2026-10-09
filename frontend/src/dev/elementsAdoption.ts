@@ -40,4 +40,5 @@ export const SCENARIO_FOR_ELEMENT: Record<string, string> = {
   "math-block": "math", "shiki-highlighter": "code", "data-table": "table",
   "tool-call": "failed-tool", "tool-error": "failed-tool", "error-state": "failure-engine-down",
   "guardrail-notice": "failure-safety", "image": "links", "thinking-indicator": "essay",
+  "artifact-card": "artifact-card", "job-progress": "job-progress",
 };

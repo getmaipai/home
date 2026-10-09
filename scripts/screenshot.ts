@@ -4009,6 +4009,21 @@ const ALL_COMBOS = [["desktop", "light"], ["desktop", "dark"], ["phone", "light"
 const TWO_COMBOS = [["desktop", "light"], ["phone", "dark"]] as const;
 
 function wave2Shots(part: string): Wave2Shot[] {
+  if (part === "artifact-card") {
+    return [{
+      band: "adult", person: null, prompt: "Write a weekend storybook.", combos: ALL_COMBOS, live: true,
+      drive: async (page) => { await page.locator('[data-slot="artifact-card"]').waitFor({ timeout: 20000 }); },
+    }];
+  }
+  if (part === "job-progress") {
+    return [{
+      band: "adult", person: null, prompt: "Start a weekend storybook.", combos: ALL_COMBOS, live: true,
+      drive: async (page) => {
+        await page.locator('[data-slot="job-progress"]').waitFor({ timeout: 20000 });
+        await page.getByText("Step 1 of 2", { exact: true }).waitFor();
+      },
+    }];
+  }
   if (part === "approval") {
     const create = async (session: string, prompt: string) => {
       const conversation = await seedTitledConversation("elements wave 2 approval", { Cookie: `session=${session}` }, "Locking up for the night");
@@ -4155,6 +4170,43 @@ async function captureElementsWave2Review(browser: Browser, sessionValue: string
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        if (part === "artifact-card" || part === "job-progress") {
+          const partId = part;
+          if (partId === "job-progress") {
+            await page.route("**/api/projects/showcase-job-progress", (route) => route.fulfill({
+              status: 200,
+              contentType: "application/json",
+              body: JSON.stringify({
+                id: "showcase-job-progress", type: "adhoc", title: "Weekend storybook", state: "running",
+                plan: { steps: [], ceilings: { maxWallSeconds: 120, maxGeneratorJobs: 1 } },
+                steps: [
+                  { stepId: "chapter-one", state: "running", startedAt: "2026-10-08T00:00:00.000Z", endedAt: null, error: null, artifactIds: [] },
+                  { stepId: "chapter-two", state: "pending", startedAt: null, endedAt: null, error: null, artifactIds: [] },
+                ],
+                artifacts: [], provenance: { person: "showcase", conversationId: "showcase", turnId: "showcase-job-progress", planSource: "model" },
+                error: null, hlc: "1788000000000:0:showcase", createdAt: "2026-10-08T00:00:00.000Z", updatedAt: "2026-10-08T00:00:00.000Z", posted_artifact: null,
+              }),
+            }));
+          }
+          if (partId === "artifact-card") {
+            await page.route("**/api/artifacts/showcase-artifact-card/current", (route) => route.fulfill({
+              status: 200,
+              contentType: "application/json",
+              body: JSON.stringify({
+                id: "showcase-artifact-card", conversation_id: "showcase", turn_id: "showcase-artifact-card",
+                kind: "markdown", title: "Weekend storybook", body: "A weekend storybook for the family.", version: 1,
+                parent_version: null, created_by: "showcase", provenance: "showcase", created_at: "2026-10-08T00:00:00.000Z", hlc: "1788000000000:0:showcase",
+              }),
+            }));
+          }
+          await page.route("**/api/turn/stream", async (route) => {
+            const value = partId === "artifact-card"
+              ? { turn_id: "showcase-artifact-card", reply: { text: "I finished the document." }, source: "plugin", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-10-08T00:00:00.000Z" }, artifact: { id: "showcase-artifact-card", version: 1 } }
+              : { turn_id: "showcase-job-progress", reply: { text: "I started the project. It is still running." }, source: "plugin", safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: "2026-10-08T00:00:00.000Z" }, project: { id: "showcase-job-progress" } };
+            const body = Buffer.from(await new Response(assistantStreamBody([{ type: "delta", text: value.reply.text }, { type: "done", value }])).arrayBuffer());
+            await route.fulfill({ status: 200, headers: { "content-type": "text/plain; charset=utf-8", "x-vercel-ai-data-stream": "v1" }, body });
+          });
+        }
         if (seeded) {
           await page.goto(`${BASE_URL}/chat?conversation=${seeded.conversation_id}`);
           await page.getByRole("button", { name: "Not helpful" }).last().waitFor({ timeout: 20000 });

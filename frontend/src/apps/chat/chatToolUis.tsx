@@ -45,9 +45,15 @@ export const SpecSheetToolRender: ToolCallMessagePartComponent<Record<string, ne
 
 export const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string; version: number }> = ({ result }) => {
   const openArtifact = useContext(ArtifactOpenContext);
-  const query = useQuery({
+  const query = useQuery<Awaited<ReturnType<typeof api.artifactCurrent>>>({
     queryKey: ["artifact-current", result?.id],
-    queryFn: () => api.artifactCurrent(result!.id),
+    queryFn: () => import.meta.env.DEV && result?.id === "showcase-artifact-card"
+      ? Promise.resolve({
+          id: "showcase-artifact-card", conversation_id: "showcase", turn_id: "showcase-artifact-card",
+          title: "Weekend storybook", kind: "markdown", body: "A weekend storybook for the family.", version: 1,
+          parent_version: null, created_by: "showcase", provenance: "showcase", created_at: "2026-10-08T00:00:00.000Z", hlc: "1788000000000:0:showcase",
+        })
+      : api.artifactCurrent(result!.id),
     enabled: result !== undefined,
   });
   if (!result) return null;
@@ -57,18 +63,16 @@ export const ArtifactCardToolRender: ToolCallMessagePartComponent<Record<string,
   // with `data` still undefined - without this branch the card was
   // stuck reading a non-spinning "Loading..." forever, never an error.
   const meta = data ? `${data.kind} · v${data.version}` : query.isError ? "Not available right now" : "Loading…";
-  return (
-    <ProducedArtifactCard id={result.id} title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onOpen={() => openArtifact(result.id)} />
-  );
-};
-
-export function ProducedArtifactCard({ id, title, meta, generating, onOpen }: { id: string; title: string; meta: string; generating: boolean; onOpen: () => void }) {
   const navigate = useNavigate();
   const MoreIcon = getIcon("more-horizontal");
+  const onOpen = () => openArtifact(result.id);
   return (
-    <div className="flex w-full max-w-sm items-center gap-1" data-slot="produced-artifact-card">
-      <ArtifactCard className="min-w-0 flex-1" title={title} meta={meta} generating={generating} onClick={onOpen} />
-      <div className="shrink-0">
+    <ArtifactCard
+      title={data?.title ?? "Document"}
+      meta={meta}
+      generating={query.isLoading}
+      onClick={onOpen}
+      actions={
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="ghost" size="icon" aria-label="More">
@@ -77,14 +81,14 @@ export function ProducedArtifactCard({ id, title, meta, generating, onOpen }: { 
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => { window.location.assign(`/api/artifacts/${encodeURIComponent(id)}/export`); }}>Download</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => { window.location.assign(`/api/artifacts/${encodeURIComponent(result.id)}/export`); }}>Download</DropdownMenuItem>
             <DropdownMenuItem onSelect={() => navigate("/files")}>Show in Library</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
-    </div>
+      }
+    />
   );
-}
+};
 
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -141,47 +145,6 @@ export const ConfirmToolRender: ToolCallMessagePartComponent<Record<string, neve
   );
 };
 
-// PROJECT-PROGRESS-01: once a project finishes with a real posted
-// artifact, this replaces the JobProgress card below with the exact same
-// artifact-card render ArtifactCardToolRender above uses for a
-// `write_document` turn - a small dedicated component rather than
-// reusing that one directly (its own type is a `ToolCallMessagePartComponent`,
-// shaped for `useAssistantToolUI`'s full prop set, not a bare `{id}`
-// caller). Same query key (`["artifact-current", id]`) as that render,
-// so the two share a cache entry if a reload's own real `artifact` field
-// ever fetches the identical id.
-export function ProjectFinishedArtifact({ id }: { id: string }) {
-  const openArtifact = useContext(ArtifactOpenContext);
-  const reloadMainThread = useContext(ReloadMainThreadContext);
-  const query = useQuery({ queryKey: ["artifact-current", id], queryFn: () => api.artifactCurrent(id) });
-  const data = query.data;
-  const meta = data ? `${data.kind} · v${data.version}` : query.isError ? "Not available right now" : "Loading…";
-  // Jesse, live-found 2026-09-27: "auto open the canvas when the book
-  // is ready... this should be the default." This component only ever
-  // mounts live: a reload turns a finished project's row into a plain
-  // `write_document`-shaped artifact (chatHistoryAdapter.ts's own #182
-  // rule hides `row.project` once `row.artifact` is set), so there is
-  // no "reopening old history" case here to guard against the way
-  // chatModelAdapter.ts's own onArtifactReady comment has to - every
-  // mount of this component genuinely means the artifact just became
-  // available in front of whoever has this thread open right now.
-  //
-  // `reloadMainThread()` rides the SAME effect (Jesse, live-found the
-  // same day): without it, the surrounding reply text stayed on its own
-  // stream-time "Creating…" wording until ProjectResultReload's own,
-  // separate notification poll (up to 15s later) happened to catch up -
-  // two different events, on two different timers, for what reads as
-  // one "it's done" moment. This reload picks up post.ts's own corrected
-  // replyText ("<title> is ready.") the moment the SAME poll tick that
-  // opens the canvas sees the project is done, not on a second, slower
-  // poll's own schedule.
-  useEffect(() => {
-    openArtifact(id);
-    reloadMainThread();
-  }, [id, openArtifact, reloadMainThread]);
-  return <ProducedArtifactCard id={id} title={data?.title ?? "Document"} meta={meta} generating={query.isLoading} onOpen={() => openArtifact(id)} />;
-}
-
 // PROJECT-PROGRESS-01 (issue #180): a project's own dependency-graph
 // plan has no percentage or per-step label to report (steps.ts's own
 // header) - v1's whole "how far along" signal is which step is still
@@ -226,9 +189,21 @@ export const PROJECT_SETTLED_ARTIFACT_POLL_LIMIT = 5;
 // idle page never keeps a timer running"), the same rule applied here to
 // a project's own terminal states.
 export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+  const openArtifact = useContext(ArtifactOpenContext);
+  const reloadMainThread = useContext(ReloadMainThreadContext);
+  const navigate = useNavigate();
+  const MoreIcon = getIcon("more-horizontal");
   const query = useQuery({
     queryKey: ["project", result?.id],
-    queryFn: () => api.project(result!.id),
+    queryFn: () => import.meta.env.DEV && result?.id === "showcase-job-progress"
+      ? Promise.resolve({
+          id: "showcase-job-progress", type: "adhoc", title: "Weekend storybook", state: "running",
+          plan: { steps: [], ceilings: { maxWallSeconds: 120, maxGeneratorJobs: 1 } },
+          steps: [{ stepId: "chapter-one", state: "running", startedAt: new Date().toISOString(), endedAt: null, error: null, artifactIds: [] }, { stepId: "chapter-two", state: "pending", startedAt: null, endedAt: null, error: null, artifactIds: [] }],
+          artifacts: [], provenance: { person: "showcase", conversationId: "showcase", turnId: "showcase-job-progress", planSource: "model" },
+          error: null, hlc: "1788000000000:0:showcase", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), posted_artifact: null,
+        } as ProjectView)
+      : api.project(result!.id),
     enabled: result !== undefined,
     refetchInterval: (q) => {
       // A persistently failing poll (the project row gone, a transient
@@ -245,13 +220,25 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
       return data.posted_artifact || q.state.dataUpdateCount >= PROJECT_SETTLED_ARTIFACT_POLL_LIMIT ? false : PROJECT_POLL_MS;
     },
   });
+  const artifactId = query.data?.posted_artifact?.id;
+  const artifactQuery = useQuery({
+    queryKey: ["artifact-current", artifactId],
+    queryFn: () => api.artifactCurrent(artifactId!),
+    enabled: artifactId !== undefined,
+  });
+  useEffect(() => {
+    if (!artifactId) return;
+    openArtifact(artifactId);
+    reloadMainThread();
+  }, [artifactId, openArtifact, reloadMainThread]);
   if (!result) return null;
   const project = query.data;
   if (!project) {
-    // A persistently failing fetch gets a real (if quiet) line, not
-    // silence forever - the same isError branch ArtifactCardToolRender/
-    // ProjectFinishedArtifact below already have for their own fetch.
-    if (query.isError) return <p className="text-sm text-destructive">Couldn't check on this project right now.</p>;
+    // Keep a failed project lookup visible through the shipped progress
+    // Element, so a lost poll does not leave the person with silence.
+    if (query.isError) {
+      return <JobProgress title="Project" stages={[]} stageIndex={0} stageProgress={0} outcome={{ status: "failed", summary: "Couldn't check on this project right now." }} />;
+    }
     // Nothing to show yet on the very first, still-in-flight poll - the
     // reply's own text already told the person the project started
     // (tool.ts's own `runStartProjectTool()` phrasing), so a brief gap
@@ -265,16 +252,48 @@ export const ProjectToolRender: ToolCallMessagePartComponent<Record<string, neve
   // own header posts a real document either way (a failure summary for
   // `failed`), only `cancelled` posts nothing.
   if ((project.state === "done" || project.state === "failed") && project.posted_artifact) {
-    return <ProjectFinishedArtifact id={project.posted_artifact.id} />;
-  }
-  if (project.state === "failed") {
-    return <p className="text-sm text-destructive">{project.title} didn't finish{project.error ? `: ${project.error}` : "."}</p>;
-  }
-  if (project.state === "cancelled") {
-    return <p className="text-muted-foreground text-sm">{project.title} was cancelled.</p>;
+    const id = project.posted_artifact.id;
+    const data = artifactQuery.data;
+    const meta = data ? `${data.kind} · v${data.version}` : artifactQuery.isError ? "Not available right now" : "Loading…";
+    const onOpen = () => openArtifact(id);
+    return (
+      <ArtifactCard
+        title={data?.title ?? "Document"}
+        meta={meta}
+        generating={artifactQuery.isLoading}
+        onClick={onOpen}
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" aria-label="More">
+                <MoreIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => { window.location.assign(`/api/artifacts/${encodeURIComponent(id)}/export`); }}>Download</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => navigate("/files")}>Show in Library</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      />
+    );
   }
   const stages = projectStages(project.steps);
   const stageIndex = projectStageIndex(project.steps);
+  if (project.state === "failed" || project.state === "cancelled") {
+    return (
+      <JobProgress
+        title={project.title}
+        stages={stages}
+        stageIndex={stageIndex}
+        stageProgress={0}
+        outcome={project.state === "failed"
+          ? { status: "failed", summary: project.error ?? "This project didn't finish." }
+          : { status: "cancelled", summary: "This project was cancelled." }}
+      />
+    );
+  }
   return (
     <JobProgress
       title={project.title}

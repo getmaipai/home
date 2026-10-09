@@ -1312,20 +1312,20 @@ describe("ChatPage (SHELL-02's slice 4: artifacts)", () => {
     }
   });
 
-  test("produced-file menu exposes its available actions and supports keyboard navigation", async () => {
+  test.each(["child", "teen", "adult"] as const)("produced-file menu exposes its available actions for a %s and supports keyboard navigation", async (band) => {
     const originalWidth = window.innerWidth;
     Object.defineProperty(window, "innerWidth", { configurable: true, value: 1280 });
     let restore: () => void = () => {};
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/chat"]}>
-          <ChatPage person={makePerson()} />
+          <ChatPage person={band === "adult" ? makePerson() : makePerson({ role: band, age_band: band })} />
         </MemoryRouter>,
       );
       await waitFor(() => expect(view.queryByLabelText("Message input")).not.toBeNull());
       await act(async () => { window.dispatchEvent(new Event("resize")); });
       restore = await openArtifact(view);
-      const card = view.container.querySelector('[data-slot="produced-artifact-card"]');
+      const card = view.container.querySelector('[data-slot="artifact-card"]');
       expect(card).toBeTruthy();
       const trigger = within(card as HTMLElement).getByRole("button", { name: "More" });
       fireEvent.keyDown(trigger, { key: "ArrowDown" });
@@ -2036,7 +2036,7 @@ describe("ChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
     fireEvent.click(send);
   }
 
-  test("a start_project turn shows live step progress that updates via polling, then shows the posted artifact once the project finishes - no reload needed from the person", async () => {
+  test.each(["child", "teen", "adult"] as const)("a start_project turn for a %s shows live step progress and then the posted artifact", async (band) => {
     const { restore } = stubProjectTurnFetch(
       ndjsonStream([
         { type: "delta", text: "Starting a bedtime storybook now - 3 steps, about 1 minute." },
@@ -2055,7 +2055,7 @@ describe("ChatPage (PROJECT-PROGRESS-01: live project progress)", () => {
     try {
       const view = renderPage(
         <MemoryRouter initialEntries={["/chat"]}>
-          <ChatPage person={makePerson()} />
+          <ChatPage person={band === "adult" ? makePerson() : makePerson({ role: band, age_band: band })} />
         </MemoryRouter>,
       );
       await sendMessage(view, "write me a bedtime storybook");
