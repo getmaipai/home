@@ -3,7 +3,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { decryptBiometricPrintEmbedding } from "@/lib/biometricPrints";
 import { db } from "@/db";
-import { people, biometricPrints } from "@/db/schema";
+import { people, biometricPrints, issues } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { storeRobotCredential } from "@/lib/robotCredentials";
@@ -64,6 +64,32 @@ describe("POST /api/biometric-prints", () => {
     const created = (await res.json()) as { consented_by_person_id: string };
     const ownerId = created.consented_by_person_id;
     expect(ownerId).not.toBe(child.id);
+  });
+
+  test("an admin cannot enroll a teen without the teen's own session", async () => {
+    const owner = await ownerSession();
+    const adminRes = await owner.post("/api/people", { displayName: "Admin", role: "admin", secret: "adminpin1" });
+    expect(adminRes.status).toBe(201);
+    const admin = await sessionFor(((await adminRes.json()) as { id: string }).id, "adminpin1");
+    const teen = await addPerson(owner, "Rowan", "teen", "teenpin1");
+    const res = await admin.post("/api/biometric-prints", { person_id: teen.id, model_id: "sface-2021dec", embedding: SFACE_EMBEDDING });
+    expect(res.status).toBe(403);
+  });
+
+  test("a teen's own session can enroll their face and is recorded as consenter", async () => {
+    const owner = await ownerSession();
+    const teen = await addPerson(owner, "Rowan", "teen", "teenpin1");
+    const teenClient = await sessionFor(teen.id, "teenpin1");
+    const res = await teenClient.post("/api/biometric-prints", { person_id: teen.id, model_id: "sface-2021dec", embedding: SFACE_EMBEDDING });
+    expect(res.status).toBe(201);
+    expect((await res.json() as { consented_by_person_id: string }).consented_by_person_id).toBe(teen.id);
+  });
+
+  test("no one can enroll a guest", async () => {
+    const owner = await ownerSession();
+    const guest = await addPerson(owner, "Visitor", "guest");
+    const res = await owner.post("/api/biometric-prints", { person_id: guest.id, model_id: "sface-2021dec", embedding: SFACE_EMBEDDING });
+    expect(res.status).toBe(403);
   });
 
   test("a child can never consent to their own enrollment, even signed in as themself", async () => {
@@ -380,13 +406,37 @@ describe("POST /api/biometric-prints/enrollments", () => {
     expect(decryptBiometricPrintEmbedding(oldIds[0]!)).toBeNull();
   });
 
+  test("the batch route applies teen and guest consent rules too", async () => {
+    const owner = await ownerSession();
+    const teen = await addPerson(owner, "Rowan", "teen", "teenpin1");
+    const guest = await addPerson(owner, "Visitor", "guest");
+    expect((await owner.post("/api/biometric-prints/enrollments", body(teen.id, [sample(1)]))).status).toBe(403);
+    expect((await owner.post("/api/biometric-prints/enrollments", body(guest.id, [sample(1)]))).status).toBe(403);
+    const teenClient = await sessionFor(teen.id, "teenpin1");
+    expect((await teenClient.post("/api/biometric-prints/enrollments", body(teen.id, [sample(2)]))).status).toBe(201);
+  });
+
   test("the robot sync list returns only the new set afterwards", async () => {
     const owner = await ownerSession();
     const me = sage();
     await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(1), sample(2)]));
     const second = (await (await owner.post("/api/biometric-prints/enrollments", body(me.id, [sample(3)]))).json()) as { prints: Array<{ id: string }> };
     const { listPrintsForSync } = await import("@/lib/biometricPrints");
-    expect(listPrintsForSync().map((p) => p.id)).toEqual(second.prints.map((p) => p.id));
+    expect((await listPrintsForSync()).map((p) => p.id)).toEqual(second.prints.map((p) => p.id));
+  });
+
+  test("legacy guest prints are deleted and unconfirmed teen prints are withheld and repaired", async () => {
+    const owner = await ownerSession();
+    const teen = await addPerson(owner, "Rowan", "teen", "teenpin1");
+    const guest = await addPerson(owner, "Visitor", "guest");
+    const teenPrint = rawPrint(teen.id, "face");
+    const guestPrint = rawPrint(guest.id, "face");
+    const { listPrintsForSync } = await import("@/lib/biometricPrints");
+    const synced = await listPrintsForSync();
+    expect(synced.map((p) => p.id)).not.toContain(teenPrint);
+    expect(synced.map((p) => p.id)).not.toContain(guestPrint);
+    expect(db.select().from(biometricPrints).where(eq(biometricPrints.id, guestPrint)).get()?.deletedAt).not.toBeNull();
+    expect(db.select().from(issues).all().some((issue) => issue.source === "biometricPrints" && issue.key === `legacy-consent/${teen.id}`)).toBe(true);
   });
 
   test("another person's prints and this person's voice prints are untouched", async () => {

@@ -184,6 +184,5 @@ const syncRoute = createRoute({
   },
 });
 biometricPrintsRoutes.openapi(syncRoute, (c) => {
-  const prints = listPrintsForSync();
-  return c.json({ as_of: new Date().toISOString(), prints }, 200);
+  return listPrintsForSync().then((prints) => c.json({ as_of: new Date().toISOString(), prints }, 200));
 });

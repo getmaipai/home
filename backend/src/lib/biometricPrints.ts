@@ -31,6 +31,7 @@ import { newBiometricPrintId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
 import { canManage } from "@/lib/personLifecycle";
+import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { SFACE_DIM, SFACE_MODEL_ID, SFACE_SHA256 } from "@/lib/faceModelPins";
 import type { PersonRow } from "@/types";
 import { validateBiometricPrint } from "@maipai/spec/records/ts/validate.js";
@@ -79,10 +80,43 @@ function toSummary(row: PrintRow): BiometricPrintSummary {
 // grows its own carve-outs (its own comment notes birthdate/localOnly
 // already needed one).
 function canConsentFor(actor: PersonRow, target: { id: string; role: string }): boolean {
-  // The one absolute in the design on top of canManage()'s ordinary
-  // self-case: a child never consents for themself, full stop.
+  // Visitors are presence only and are never enrolled. A teen's consent
+  // is personal: only their authenticated self-session can create it.
+  if (target.role === "guest") return false;
+  if (target.role === "teen") return actor.id === target.id;
+  // A child never consents for themself, full stop; a parent enrolls.
   if (target.role === "child" && actor.id === target.id) return false;
   return canManage(actor, target);
+}
+
+const LEGACY_CONSENT_SOURCE = "biometricPrints";
+
+/** Reconcile prints written before FACE-CONSENT-02. Guest prints are
+ * revoked immediately. Teen prints remain stored as household evidence
+ * but are never handed to a matcher until the teen re-enrolls themself. */
+async function reconcileLegacyConsent(): Promise<Set<string>> {
+  const enrolled = db.select().from(biometricPrints).where(and(eq(biometricPrints.modality, "face"), isNull(biometricPrints.deletedAt))).all() as PrintRow[];
+  const peopleById = new Map(db.select({ id: people.id, role: people.role }).from(people).all().map((person) => [person.id, person.role]));
+  const withheld = new Set<string>();
+  const now = new Date().toISOString();
+  const unconfirmedTeenIds = new Set<string>();
+  const guestIds = new Set<string>();
+  const affectedTeenIds = new Set<string>();
+  for (const row of enrolled) {
+    const role = peopleById.get(row.personId);
+    if (role === "guest") { tombstonePrint(db, row.id, now); guestIds.add(row.personId); }
+    else if (role === "teen") {
+      affectedTeenIds.add(row.personId);
+      if (row.consentedByPersonId !== row.personId) { withheld.add(row.id); unconfirmedTeenIds.add(row.personId); }
+    }
+  }
+  for (const id of guestIds) await raiseIssue({ source: LEGACY_CONSENT_SOURCE, key: `legacy-consent/${id}`, severity: "warning", title: "A visitor's face print was removed", detail: "Guest face prints are not allowed. The existing print was revoked and removed." });
+  for (const [id, role] of peopleById) {
+    if (role === "teen" && unconfirmedTeenIds.has(id)) {
+      await raiseIssue({ source: LEGACY_CONSENT_SOURCE, key: `legacy-consent/${id}`, severity: "warning", title: "A teen's face print needs their confirmation", detail: "This older face print is withheld from robot sync until this person enrolls it again from their own account." });
+    } else if (role === "teen" && affectedTeenIds.has(id)) resolveIssue(LEGACY_CONSENT_SOURCE, `legacy-consent/${id}`);
+  }
+  return withheld;
 }
 
 export interface BiometricPrintCreate {
@@ -312,14 +346,17 @@ export function deleteBiometricPrint(actor: PersonRow, printId: string): OpResul
  * same isNull(deletedAt) filter every other live-print read in this file
  * already uses; because of that, every row this query returns is
  * guaranteed to still have an embedding to decrypt. */
-export function listPrintsForSync(): BiometricPrintT[] {
+export async function listPrintsForSync(): Promise<BiometricPrintT[]> {
+  const withheld = await reconcileLegacyConsent();
+  const roles = db.select({ id: people.id, role: people.role }).from(people).all();
+  const roleByPerson = new Map(roles.map((person) => [person.id, person.role]));
   const rows = db
     .select()
     .from(biometricPrints)
     .where(and(eq(biometricPrints.modality, "face"), isNull(biometricPrints.deletedAt)))
     .all() as PrintRow[];
 
-  return rows.map((row) => ({
+  return rows.filter((row) => !withheld.has(row.id) && roleByPerson.get(row.personId) !== "guest" && (roleByPerson.get(row.personId) !== "teen" || row.consentedByPersonId === row.personId)).map((row) => ({
     ...toSummary(row),
     // Safe: a live (deletedAt IS NULL) row always still has its embedding -
     // only the tombstone path (above) ever nulls embeddingEncrypted, and

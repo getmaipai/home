@@ -35,4 +35,14 @@ describe("canEnrollFace", () => {
     const child = { id: "person-child", role: "child" as const };
     expect(canEnrollFace(teen, child)).toBe(false);
   });
+
+  test("only a teen can enroll their own face, and guests can never enroll", () => {
+    const owner = { id: "person-owner", role: "owner" as const };
+    const teen = { id: "person-teen", role: "teen" as const };
+    const guest = { id: "person-guest", role: "guest" as const };
+    expect(canEnrollFace(owner, teen)).toBe(false);
+    expect(canEnrollFace(teen, teen)).toBe(true);
+    expect(canEnrollFace(owner, guest)).toBe(false);
+    expect(canEnrollFace(guest, guest)).toBe(false);
+  });
 });

@@ -23,6 +23,8 @@ export interface EnrollTarget {
  * this item's own scope.
  */
 export function canEnrollFace(viewer: { id: string; role: Role }, target: EnrollTarget): boolean {
+  if (target.role === "guest") return false;
+  if (target.role === "teen") return viewer.id === target.id && viewer.role === "teen";
   if (target.role === "child" && viewer.id === target.id) return false;
   return canManagePerson(viewer.role, viewer.id, target);
 }
