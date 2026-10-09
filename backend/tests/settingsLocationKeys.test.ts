@@ -44,7 +44,9 @@ async function household() {
 }
 
 describe("People > a child's settings and the location selector", () => {
-  test.each(["owner", "admin", "adult", "teen", "child", "guest"] as const)("%s reading a child's person scope is never given a location-selector key", async (role) => {
+  // The child is left out of this list on purpose: when the child reads their own person scope they ARE the
+  // person, and a person sees their own places (the next test pins that).
+  test.each(["owner", "admin", "adult", "teen", "guest"] as const)("%s reading a child's person scope is never given a location-selector key", async (role) => {
     const { ownerRow, row, ids } = await household();
     const actor = role === "owner" ? ownerRow : row(ids[role]!);
     const result = listValues(actor, `person:${ids.child}`);
@@ -55,6 +57,18 @@ describe("People > a child's settings and the location selector", () => {
     }
     const names = locationKeys();
     expect(result.value.filter((v) => names.has(v.key)).map((v) => v.key)).toEqual([]);
+  });
+
+  test("the child reading their own scope does get their own location keys (a person's places are theirs)", async () => {
+    const { row, ids } = await household();
+    const result = listValues(row(ids.child!), `person:${ids.child}`);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // The person-scoped ones (household.home is household scope and is not in a person's list).
+      const names = new Set(getRegistry().filter((k) => (k.selector as string) === "location" && k.scope === "person").map((k) => k.key));
+      expect(names.size).toBeGreaterThan(0);
+      expect(result.value.filter((v) => names.has(v.key)).length).toBe(names.size);
+    }
   });
 
   test("an owner and an admin do read the child's scope, so the check above has something to check", async () => {
