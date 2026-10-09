@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { runEngineLinkDoctor, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { knownHostsName } from "@/lib/stack/linkKeys";
+import { hostKeyPinned, runEngineLinkDoctor, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
 
 function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = "connected"): EngineLinkDoctorDependencies {
   return {
@@ -53,5 +56,50 @@ describe("engine-link doctor", () => {
       tailscale: async () => false,
     });
     expect(hops[1]).toMatchObject({ pass: false, detail: "Tailscale is not connected on this computer.", fix: "Connect Tailscale on this computer." });
+  });
+});
+
+describe("doctor hop 4 known_hosts lookup (DOCTOR-HOSTKEY-01)", () => {
+  const keygen = Bun.spawnSync(["ssh-keygen", "-F", "x", "-f", "/dev/null"]);
+  const haveKeygen = keygen.exitCode !== null && !String(keygen.stderr).includes("not found") && keygen.exitCode !== 127;
+  // A well-formed ed25519 public key blob built here (not a literal), so no secret-shaped string sits in the file.
+  const key = Buffer.concat([Buffer.from([0, 0, 0, 11]), Buffer.from("ssh-ed25519"), Buffer.from([0, 0, 0, 32]), Buffer.alloc(32, 7)]).toString("base64");
+  const file = () => {
+    const scratch = join(import.meta.dir, "..", "..", "data-scratch", "tmp"); mkdirSync(scratch, { recursive: true });
+    const dir = mkdtempSync(join(scratch, "hostkey-"));
+    const path = join(dir, "known_hosts");
+    writeFileSync(path, `192.0.2.52 ssh-ed25519 ${key}\n[192.0.2.53]:2222 ssh-ed25519 ${key}\n`);
+    return { dir, path };
+  };
+  const t = haveKeygen ? test : test.skip;
+  if (!haveKeygen) console.warn("ssh-keygen not found on PATH: skipping the real known_hosts lookup test");
+
+  t("finds a port-22 key filed as the bare host and a [host]:2222 key, and misses an unpinned host", async () => {
+    const { dir, path } = file();
+    try {
+      expect(await hostKeyPinned("192.0.2.52", 22, path)).toBe(true);
+      expect(await hostKeyPinned("192.0.2.53", 2222, path)).toBe(true);
+      expect(await hostKeyPinned("192.0.2.99", 22, path)).toBe(false);
+      expect(await hostKeyPinned("192.0.2.99", 2222, path)).toBe(false);
+      expect(await hostKeyPinned("192.0.2.52", 2222, path)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("knownHostsName files a host the way ssh does", () => {
+    expect(knownHostsName("192.0.2.52", 22)).toBe("192.0.2.52");
+    expect(knownHostsName("192.0.2.52", 2222)).toBe("[192.0.2.52]:2222");
+    expect(knownHostsName("[::1]", 22)).toBe("::1");
+    expect(knownHostsName("[::1]", 2222)).toBe("[::1]:2222");
+  });
+
+  test("a failed hop 4 names what was looked up and the port, and hands the real host name to the checks", async () => {
+    const seen: unknown[][] = [];
+    const base = deps();
+    const hops = await runEngineLinkDoctor({ ...base, hostKey: async (...args) => { seen.push(args); return false; } });
+    expect(seen).toEqual([["engine.home", 22]]);
+    expect(hops[3]).toMatchObject({ pass: false, detail: "looked up engine.home on SSH port 22 and found no pinned key" });
+    const auth: unknown[][] = [];
+    await runEngineLinkDoctor({ ...base, authenticate: async (...args) => { auth.push(args); return true; } });
+    expect(auth).toEqual([["engine.home", 22, "192.168.1.20"]]);
   });
 });

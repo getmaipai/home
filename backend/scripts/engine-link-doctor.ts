@@ -7,6 +7,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { dataDir } from "@/lib/paths";
 import { STACK_LINK_PRIVATE_KEY_PATH, STACK_LINK_KNOWN_HOSTS_PATH } from "@/lib/localStackService";
 import { getTailscaleStatus } from "@/lib/tailscale";
+import { knownHostsName } from "@/lib/stack/linkKeys";
 import { createStackClient } from "@/lib/stack/client";
 import { STACK_CONTRACT_MIN, STACK_CONTRACT_MAX } from "@/lib/stack/contract";
 
@@ -19,7 +20,7 @@ type DoctorDependencies = {
   tailscale: () => Promise<boolean>;
   keyFiles: () => { privateKey: boolean; knownHosts: boolean };
   hostKey: (host: string, port: number) => Promise<boolean>;
-  authenticate: (host: string, port: number) => Promise<boolean>;
+  authenticate: (host: string, port: number, address?: string) => Promise<boolean>;
   forward: (port: number) => Promise<boolean>;
   health: (port: number) => Promise<{ ok: boolean; version: string }>;
   roles: (port: number) => Promise<Array<{ id: string; state: { state: string } }>>;
@@ -34,6 +35,15 @@ const tailnetIp = (address: string) => {
   return (octets.length === 4 && octets[0] === 100 && octets[1]! >= 64 && octets[1]! <= 127)
     || address.toLowerCase().startsWith("fd7a:115c:a1e0:");
 };
+
+/** True when the known_hosts file holds a key for this host, asked the way ssh filed it (bare host on port 22, `[host]:port` otherwise). */
+export function hostKeyPinned(host: string, port: number, knownHostsFile: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const child = spawn("ssh-keygen", ["-F", knownHostsName(host, port), "-f", knownHostsFile], { stdio: ["ignore", "ignore", "ignore"] });
+    child.once("error", () => resolve(false));
+    child.once("exit", (code) => resolve(code === 0));
+  });
+}
 
 const defaults: DoctorDependencies = {
   settings: () => ({
@@ -60,16 +70,9 @@ const defaults: DoctorDependencies = {
     privateKey: existsSync(join(dataDir, STACK_LINK_PRIVATE_KEY_PATH)),
     knownHosts: existsSync(join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH)),
   }),
-  hostKey: async (host, port) => {
-    const result = await new Promise<boolean>((resolve) => {
-      const child = spawn("ssh-keygen", ["-F", `[${host}]:${port}`, "-f", join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH)], { stdio: ["ignore", "ignore", "ignore"] });
-      child.once("error", () => resolve(false));
-      child.once("exit", (code) => resolve(code === 0));
-    });
-    return result;
-  },
-  authenticate: async (host, port) => {
-    const child = spawn("ssh", ["-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH)}`, "-o", "IdentitiesOnly=yes", "-i", join(dataDir, STACK_LINK_PRIVATE_KEY_PATH), "-p", String(port), `maipai-stack@${host}`, "true"], { stdio: ["ignore", "ignore", "ignore"] });
+  hostKey: (host, port) => hostKeyPinned(host, port, join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH)),
+  authenticate: async (host, port, address = host) => {
+    const child = spawn("ssh", ["-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH)}`, "-o", `HostKeyAlias=${knownHostsName(host, port)}`, "-o", "IdentitiesOnly=yes", "-i", join(dataDir, STACK_LINK_PRIVATE_KEY_PATH), "-p", String(port), `maipai-stack@${address}`, "true"], { stdio: ["ignore", "ignore", "ignore"] });
     await new Promise<void>((resolve, reject) => {
       child.once("error", reject);
       child.once("exit", (code) => code === 0 ? resolve() : reject(new Error("ssh check failed")));
@@ -137,10 +140,13 @@ export async function runEngineLinkDoctor(deps: DoctorDependencies = defaults): 
   hops.push(fix(3, portOpen, `Open SSH port ${config.sshPort} on the engine computer.`));
   const files = deps.keyFiles();
   let hostMatches = false;
-  if (portOpen && files.knownHosts) hostMatches = await deps.hostKey(selected, config.sshPort).catch(() => false);
-  hops.push(fix(4, hostMatches, "Pair again and confirm the engine computer's key."));
+  // Keys are filed under the name the owner typed (what the pairing scanned and the tunnel's HostKeyAlias uses), not the resolved address.
+  const keyName = knownHostsName(config.host, config.sshPort);
+  if (portOpen && files.knownHosts) hostMatches = await deps.hostKey(config.host, config.sshPort).catch(() => false);
+  const hop4Detail = hostMatches ? undefined : !portOpen ? `skipped: SSH port ${config.sshPort} is not open` : !files.knownHosts ? "no pinned engine computer key on this computer" : `looked up ${keyName} on SSH port ${config.sshPort} and found no pinned key`;
+  hops.push(fix(4, hostMatches, "Pair again and confirm the engine computer's key.", "No action needed.", hop4Detail));
   let authenticated = false;
-  if (portOpen && hostMatches && files.privateKey) authenticated = await deps.authenticate(selected, config.sshPort).catch(() => false);
+  if (portOpen && hostMatches && files.privateKey) authenticated = await deps.authenticate(config.host, config.sshPort, selected).catch(() => false);
   hops.push(fix(5, authenticated, "Pair this Home with the engine computer again."));
   if (!authenticated) return hops.concat(Array.from({ length: 5 }, (_, i) => fix(i + 6, false, "Fix hop 5, then rerun doctor.")));
 

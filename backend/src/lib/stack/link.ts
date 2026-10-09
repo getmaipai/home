@@ -4,7 +4,7 @@ import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { LinkState, type LinkState as EngineLinkState } from "@maipai/spec/gen/ts/link-state";
 import { STACK_CONTRACT_MAX, STACK_CONTRACT_MIN } from "./contract";
 import { StackError } from "./errors";
-import { getLinkCredentialStatus, getLinkSshAskpassEnvironment, isCurrentHostKey } from "./linkKeys";
+import { getLinkCredentialStatus, getLinkSshAskpassEnvironment, isCurrentHostKey, knownHostsName } from "./linkKeys";
 
 export const LINK_PROBE_INTERVAL_MS = 10_000;
 export const LINK_PROBE_TIMEOUT_MS = 3_000;
@@ -31,7 +31,7 @@ export interface LinkConfig {
   env?: NodeJS.ProcessEnv;
 }
 export function buildEngineLinkSshArgs(config: LinkConfig & { sshPort: number; localPort: number }, address: string): string[] {
-  const hostAlias = config.sshPort === 22 ? config.host : `[${config.host}]:${config.sshPort}`;
+  const hostAlias = knownHostsName(config.host, config.sshPort);
   const homePort = Number(process.env.PORT ?? 8787);
   return ["-N", "-T", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${config.knownHostsPath}`, "-o", `HostKeyAlias=${hostAlias}`, "-o", "HostKeyAlgorithms=ssh-ed25519", "-o", "IdentitiesOnly=yes", "-i", config.privateKeyPath, "-L", `127.0.0.1:${config.localPort}:127.0.0.1:8770`, "-R", `127.0.0.1:${REMOTE_VOICE_PORT}:127.0.0.1:${homePort}`, "-p", String(config.sshPort), "--", `maipai-stack@${address}`];
 }

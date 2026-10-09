@@ -79,6 +79,11 @@ export function verifyPairingPayload(code: string, payload: { public_key: string
   return secureEqual(expected, Buffer.from(payload.hmac, "hex"));
 }
 
+/** The name OpenSSH files a host key under in known_hosts (what `ssh-keyscan -p` writes and `ssh-keygen -F` must be asked for): the bare host on port 22, `[host]:port` on any other port. The one definition for the doctor's lookup, `HostKeyAlias` and the doctor's ssh check. */
+export function knownHostsName(host: string, port: number): string {
+  const bare = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
+  return port === 22 ? bare : `[${bare}]:${port}`;
+}
 function validHost(host: string): boolean {
   if (host.length > 253 || host.trim() !== host || !host) return false;
   const bare = host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
