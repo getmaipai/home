@@ -58,6 +58,16 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false }:
     }
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.endsWith("/api/voice/cloned")) return Promise.resolve(Response.json({ voices: [] }));
+    // ENGINES-AI-01: Engines and AI now draws the engines console and the model list as its trail view, so the
+    // fixture answers what those read (an unconfigured Stack and a small Mac) instead of the bare "{}" below.
+    const route = url.split("?")[0]!;
+    if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));
+    if (route.endsWith("/api/engines/health")) return Promise.resolve(Response.json({ configured: false, health: [] }));
+    if (route.endsWith("/api/engines")) return Promise.resolve(Response.json({ configured: false, roles: [], engines: [], budget: null }));
+    if (url.includes("/api/host/hardware")) return Promise.resolve(Response.json({ platform: "darwin", totalRamGb: 24, cpuCount: 14, isAppleSilicon: true, unifiedMemoryGb: 24, cudaDevices: [] }));
+    if (url.includes("/api/host/models/selection")) return Promise.resolve(Response.json({ modelId: null }));
+    if (url.includes("/api/host/models")) return Promise.resolve(Response.json([]));
+    if (url.includes("/api/host/engine/status")) return Promise.resolve(Response.json({ kind: "none", modelId: null, pid: null, startedAt: null }));
     if (url.includes("/api/settings?scope=")) {
       const scope = decodeURIComponent(url.split("scope=")[1] ?? "");
       scopes.push(scope);

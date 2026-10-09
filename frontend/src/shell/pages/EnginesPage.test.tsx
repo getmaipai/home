@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
-import { EnginesPage } from "@/shell/pages/EnginesPage";
+import { EnginesConsole } from "@/shell/pages/EnginesPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { EnginesOverview, EnginesHealth, StackRoleInfo, StackEngineInfo, StackHealthItem, Roster } from "@/lib/api";
 
@@ -98,11 +98,11 @@ function mockEnginesFetch(overview: EnginesOverview, health: EnginesHealth) {
   return { fetchMock, restore: () => { globalThis.fetch = originalFetch; } };
 }
 
-describe("EnginesPage", () => {
+describe("EnginesConsole (the engines section of Home settings, ENGINES-AI-01)", () => {
   test("no Stack configured: the honest empty state, never an error", async () => {
     const { restore } = mockEnginesFetch({ configured: false, roles: [], engines: [], budget: null }, { configured: false, health: [] });
     try {
-      renderWithQueryClient(<EnginesPage person={makePerson()} />);
+      renderWithQueryClient(<EnginesConsole person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("No Stack configured"));
       expect(document.body.textContent).not.toContain("Could not load engines.");
     } finally {
@@ -121,7 +121,7 @@ describe("EnginesPage", () => {
       { configured: true, health: [makeHealthItem({ title: "The chat engine crashed", severity: "critical" })] },
     );
     try {
-      renderWithQueryClient(<EnginesPage person={makePerson()} />);
+      renderWithQueryClient(<EnginesConsole person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Chat"));
       expect(document.body.textContent).toContain("Ready");
       expect(document.body.textContent).toContain("qwen3-8b-instruct");
@@ -151,7 +151,7 @@ describe("EnginesPage", () => {
       { configured: true, health: [] },
     );
     try {
-      const view = renderWithQueryClient(<EnginesPage person={makePerson()} />);
+      const view = renderWithQueryClient(<EnginesConsole person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Embedding"));
       const roleTable = view.container.querySelector<HTMLElement>("[aria-label='Engine roles']")!;
       const headerRow = roleTable.querySelector<HTMLElement>("[data-slot='data-table-header-row']")!;
@@ -177,7 +177,7 @@ describe("EnginesPage", () => {
       { configured: true, health: [] },
     );
     try {
-      renderWithQueryClient(<EnginesPage person={makePerson()} />);
+      renderWithQueryClient(<EnginesConsole person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Chat"));
       expect(document.body.textContent).toContain("No data available.");
     } finally {
@@ -202,7 +202,7 @@ describe("EnginesPage", () => {
       { configured: true, health: [] },
     );
     try {
-      renderWithQueryClient(<EnginesPage person={makePerson()} />);
+      renderWithQueryClient(<EnginesConsole person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("llama.cpp server"));
       expect(document.body.textContent).toContain("Needs restart");
       expect(document.body.textContent).not.toContain("Update available");
@@ -215,7 +215,7 @@ describe("EnginesPage", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;
     try {
-      renderWithQueryClient(<EnginesPage person={makePerson()} />);
+      renderWithQueryClient(<EnginesConsole person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Something broke"));
       expect(document.body.textContent).toContain("Try again");
     } finally {
@@ -226,7 +226,7 @@ describe("EnginesPage", () => {
   test("a non-admin sees the denied message and never fetches engines", async () => {
     const { fetchMock, restore } = mockEnginesFetch({ configured: true, roles: [], engines: [], budget: null }, { configured: true, health: [] });
     try {
-      renderWithQueryClient(<EnginesPage person={makePerson({ role: "adult" })} />);
+      renderWithQueryClient(<EnginesConsole person={makePerson({ role: "adult" })} />);
       await waitFor(() => expect(document.body.textContent).toContain("Only an owner or admin can manage engines."));
       expect(fetchMock).not.toHaveBeenCalled();
       expect(document.body.querySelector('[data-slot="data-table"]')).toBeNull();
@@ -235,42 +235,8 @@ describe("EnginesPage", () => {
     }
   });
 
-  test("admins see the generic remote engine settings and the away control defaults off", async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock((input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
-      if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([
-        { key: "engines.stack.where", scope: "household", selector: "select", range: { options: ["this_computer", "another_computer"] }, default: "this_computer", label: "Where the engine runs", copy: { does: "Another computer at home can run the AI if it has a stronger graphics card." }, level: "basic", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
-        { key: "engines.stack.remote.host", scope: "household", selector: "text", default: "", label: "Engine computer name", level: "basic", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
-        { key: "engines.stack.remote.local_port", scope: "household", selector: "number", default: 8771, label: "Engine computer local port", level: "advanced", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
-        { key: "engines.stack.remote.ssh_port", scope: "household", selector: "number", default: 22, label: "Engine computer secure connection port", level: "advanced", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
-        { key: "engines.stack.remote.allow_tailnet", scope: "household", selector: "boolean", default: false, label: "Reach the engine computer when away from home", level: "advanced", secret: false, lives_in: "household.ai", honoured_by: ["home"] },
-      ]));
-      if (url.includes("/api/settings?scope=household")) return Promise.resolve(Response.json([
-        ["engines.stack.where", "this_computer"], ["engines.stack.remote.host", ""],
-        ["engines.stack.remote.local_port", 8771], ["engines.stack.remote.ssh_port", 22],
-        ["engines.stack.remote.allow_tailnet", false],
-      ].map(([key, value]) => ({ key, value, source: "default", label: key, level: "basic", secret: false, ...(key === "engines.stack.where" ? { does: "Another computer at home can run the AI if it has a stronger graphics card." } : {}) }))));
-      if (url.includes("/api/settings?scope=person")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/settings?scope=device")) return Promise.resolve(Response.json([]));
-      if (url.includes("/api/engines/health")) return Promise.resolve(Response.json({ configured: false, health: [] }));
-      if (url.includes("/api/engines")) return Promise.resolve(Response.json({ configured: false, roles: [], engines: [], budget: null }));
-      return Promise.resolve(Response.json([]));
-    }) as unknown as typeof fetch;
-    try {
-      renderWithQueryClient(<EnginesPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("Where the engine runs"));
-      expect(document.body.textContent).toContain("Engine computer name");
-      const advanced = Array.from(document.querySelectorAll("button")).find((button) => /^Show \d+ advanced settings$/.test(button.textContent ?? ""));
-      expect(advanced).toBeTruthy();
-      fireEvent.click(advanced!);
-      expect(document.body.textContent).toContain("Engine computer local port");
-      expect(document.body.textContent).toContain("Engine computer secure connection port");
-      expect(document.body.textContent).toContain("Reach the engine computer when away from home");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
+  // The generic remote-engine settings (where, name, ports, away) are the section's own card now; the section test
+  // (EnginesAiSection.test.tsx) checks them in place, with the console beneath them.
 
   test("engine action options follow installed and running state, call the real name and refresh both queries", async () => {
     const engines = [
@@ -283,7 +249,7 @@ describe("EnginesPage", () => {
       { configured: true, health: [] },
     );
     try {
-      renderWithQueryClient(<EnginesPage person={makePerson()} />);
+      renderWithQueryClient(<EnginesConsole person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Install display label"));
 
       async function openActions(label: string) {

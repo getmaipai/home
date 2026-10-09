@@ -2,7 +2,7 @@
 // One test per row of the redirect table.
 import { describe, expect, test } from "bun:test";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
-import { customizeTarget, legacySettingsTarget } from "@/shell/pages/settings/settingsRedirects";
+import { customizeTarget, legacySettingsTarget, retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
 
 const admin = { canManageHousehold: true };
 const member = { canManageHousehold: false };
@@ -61,6 +61,27 @@ describe("legacySettingsTarget", () => {
   test("an unknown section falls back to the tab's start", () => {
     expect(legacySettingsTarget("?tab=household&section=not-a-section", "", admin, registry)).toBe("/settings/home/general");
     expect(legacySettingsTarget("?tab=me&section=not-a-section", "", member, registry)).toBe("/settings/account");
+  });
+});
+
+// ENGINES-AI-01: the Manage pages that moved into Home settings keep working as links.
+describe("retiredManagePageTarget", () => {
+  test.each([
+    ["/engines", "/settings/home/ai"],
+    ["/models", "/settings/home/ai"],
+    ["/voices", "/settings/home/voices"],
+    ["/engines/", "/settings/home/ai"],
+  ])("%s lands on %s for someone who manages the household", (from, to) => {
+    expect(retiredManagePageTarget(from, admin)).toBe(to);
+  });
+  test("a viewer who may not manage the household lands on Account (their voice, for /voices)", () => {
+    expect(retiredManagePageTarget("/engines", member)).toBe("/settings/account");
+    expect(retiredManagePageTarget("/models", member)).toBe("/settings/account");
+    expect(retiredManagePageTarget("/voices", member)).toBe("/settings/account/voice");
+  });
+  test("a page that has not moved is not redirected", () => {
+    expect(retiredManagePageTarget("/users", admin)).toBeUndefined();
+    expect(retiredManagePageTarget("/backups", admin)).toBeUndefined();
   });
 });
 

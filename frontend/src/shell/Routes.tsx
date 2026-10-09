@@ -15,7 +15,6 @@ import { FamilyPage } from "@/shell/pages/FamilyPage";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
 import { CustomizeRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
 import { StoragePage } from "@/shell/pages/StoragePage";
-import { EnginesPage } from "@/shell/pages/EnginesPage";
 import { PerformancePage } from "@/shell/pages/PerformancePage";
 import { TurnTracePage } from "@/shell/pages/TurnTracePage";
 import { UpdatesPage } from "@/shell/pages/UpdatesPage";
@@ -28,7 +27,6 @@ import { meetsMinRole } from "@/apps/people/roles";
 import { DevicesPage } from "@/shell/pages/DevicesPage";
 import { PrivacyPage } from "@/shell/pages/PrivacyPage";
 import { UsersPage } from "@/shell/pages/UsersPage";
-import { ModelsPage } from "@/shell/pages/ModelsPage";
 import { FilesPage } from "@/shell/pages/FilesPage";
 import { PersonProfilePage } from "@/shell/pages/PersonProfilePage";
 import { SignInPage } from "@/shell/pages/SignInPage";
@@ -45,6 +43,7 @@ import { sidebarItemStatus } from "@/shell/statusApps";
 import { TabIdentityProvider } from "@/shell/tabIdentity";
 import { useSessionLocked } from "@/shell/sessionLockContext";
 import { activeAppHref, rememberLastAppRoute } from "@/shell/pages/settings/settingsBackLink";
+import { retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
  * 2026-09-21.md, step 1): mounts the template's
@@ -81,7 +80,6 @@ function PageHeaderLayout() {
   const titleByPath: Record<string, string> = {
     "/people": "Family",
     "/storage": "Storage",
-    "/engines": "Engines",
     "/performance": "Performance",
     "/updates": "Updates",
     "/repairs": "Repairs",
@@ -91,7 +89,6 @@ function PageHeaderLayout() {
     "/devices": "Devices",
     "/privacy": "Privacy",
     "/users": "Users",
-    "/models": "Models",
     "/files": "Library",
     "/dev/ui": "Chat showcase",
   };
@@ -191,14 +188,16 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
               replace to the page that holds them now; `/customize` is gone. */}
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
           <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={onPersonChange} />} />
-          <Route path="voices" element={<Navigate to={meetsMinRole(person.role, "admin") ? "/settings/home/voices" : "/settings/account/voice"} replace />} />
+          {/* ENGINES-AI-01: the Manage pages that moved into Home settings are links that land on their section. */}
+          {["voices", "engines", "models"].map((path) => (
+            <Route key={path} path={path} element={<Navigate to={retiredManagePageTarget(`/${path}`, { canManageHousehold: meetsMinRole(person.role, "admin") }) ?? "/settings/account"} replace />} />
+          ))}
           <Route path="customize" element={<CustomizeRedirect person={person} />} />
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />
             <Route path="people" element={<FamilyPage person={person} />} />
             <Route path="people/:id" element={<PersonProfilePage person={person} onPersonChange={onPersonChange} />} />
             <Route path="storage" element={<StoragePage person={person} />} />
-            <Route path="engines" element={<EnginesPage person={person} />} />
             <Route path="performance" element={<PerformancePage />} />
             <Route path="trace/:turnId" element={<TurnTracePage />} />
             <Route path="updates" element={<UpdatesPage person={person} />} />
@@ -209,7 +208,6 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="devices" element={<DevicesPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="users" element={<UsersPage person={person} />} />
-            <Route path="models" element={<ModelsPage person={person} />} />
             <Route path="files" element={<FilesPage person={person} />} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
           </Route>

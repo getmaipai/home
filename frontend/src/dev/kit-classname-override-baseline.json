@@ -519,31 +519,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "shell/pages/ModelsPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "p-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "shell/pages/PersonProfilePage.tsx": {
     "CardHeader": {
       "tokens": [

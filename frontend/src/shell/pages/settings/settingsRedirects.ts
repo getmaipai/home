@@ -46,6 +46,18 @@ export function legacySettingsTarget(search: string, hash: string, viewer: { can
   return place ? settingsPath(place[0], place[1], keyFromHash) : ACCOUNT;
 }
 
+/** ENGINES-AI-01: the Manage pages that moved into Home settings. Each old route lands on the section that holds its
+ * content now; a viewer who may not manage the household lands on Account, as every Home settings link does for them.
+ * `/engines` and `/models` are both the Engines and AI section (its trail view draws the engines console and the model
+ * list); `/voices` is the Voices section for an admin and the person's own Voice section for anyone else. `/users` stays
+ * a page until the spec's People section draws the user list (see the report's commons order), so it is not here. */
+export function retiredManagePageTarget(pathname: string, viewer: { canManageHousehold: boolean }): string | undefined {
+  const path = pathname.replace(/\/$/, "");
+  if (path === "/voices") return viewer.canManageHousehold ? settingsPath("home", "voices") : settingsPath("account", "voice");
+  if (path === "/engines" || path === "/models") return viewer.canManageHousehold ? settingsPath("home", "ai") : ACCOUNT;
+  return undefined;
+}
+
 /** `/customize` is gone; Skills moved under Chat settings. A child has no
  * Skills, so they land on Chat settings. */
 export function customizeTarget(band: "child" | "teen" | "adult"): string {

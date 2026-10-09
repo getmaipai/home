@@ -20,7 +20,6 @@
 import { useLocation } from "react-router-dom";
 import type { Icon } from "@maipai/ui/src/icons";
 import SidebarContent from "@maipai/ui/src/dashboard/layouts/full/vertical/sidebar/sidebaritems";
-import { EnginesIcon } from "@/shell/pages/EnginesPage";
 import { PerformanceIcon } from "@/shell/pages/PerformancePage";
 import { UpdatesIcon } from "@/shell/pages/UpdatesPage";
 import { RepairsIcon } from "@/shell/pages/RepairsPage";
@@ -31,7 +30,6 @@ import { CommandsIcon } from "@/shell/pages/CommandsPage";
 import { DevicesIcon } from "@/shell/pages/DevicesPage";
 import { PrivacyIcon } from "@/shell/pages/PrivacyPage";
 import { UsersIcon } from "@/shell/pages/UsersPage";
-import { ModelsIcon } from "@/shell/pages/ModelsPage";
 import { FilesIcon } from "@/shell/pages/FilesPage";
 import { StatusIcon } from "@/shell/pages/StatusPage";
 
@@ -53,7 +51,6 @@ for (const group of SidebarContent) {
 const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/storage": { icon: StorageIcon, label: "Storage" },
   "/status": { icon: StatusIcon, label: "Status" },
-  "/engines": { icon: EnginesIcon, label: "Engines" },
   "/performance": { icon: PerformanceIcon, label: "Performance" },
   "/updates": { icon: UpdatesIcon, label: "Updates" },
   "/repairs": { icon: RepairsIcon, label: "Repairs" },
@@ -63,7 +60,6 @@ const MANAGE_PAGE_ENTRIES: Record<string, PageHeaderEntry> = {
   "/devices": { icon: DevicesIcon, label: "Devices" },
   "/privacy": { icon: PrivacyIcon, label: "Privacy" },
   "/users": { icon: UsersIcon, label: "Users" },
-  "/models": { icon: ModelsIcon, label: "AI models" },
   "/files": { icon: FilesIcon, label: "Library" },
 };
 

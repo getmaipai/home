@@ -7,7 +7,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { getLinkKeyPaths } from "@/lib/stack/linkKeys";
 import { existsSync } from "node:fs";
 import { __resetStackLinkControlForTests, setStackLinkControl } from "@/lib/remoteStackSettings";
-import { isSecurePairingRequest, pairingSourceAddress, PAIRING_NEEDS_HTTPS_MESSAGE } from "@/routes/engineLink";
+import { isSecurePairingRequest, pairingSourceAddress, ENGINE_ADDRESS_MISSING_MESSAGE, PAIRING_NEEDS_HTTPS_MESSAGE } from "@/routes/engineLink";
 
 beforeEach(() => { resetDb(); revokeLinkKey(); __setLinkKeyCommandForTests(null); __resetRateLimiterForTests(); __resetStackLinkControlForTests(); });
 async function owner(): Promise<TestClient> { const client = new TestClient("192.168.1.40"); await client.post("/api/auth/setup", { displayName: "Owner", secret: "correcthorse" }); return client; }
@@ -37,6 +37,33 @@ describe("engine link routes", () => {
     expect(((await plain.json()) as { error: string }).error).toBe(PAIRING_NEEDS_HTTPS_MESSAGE);
     expect((await new TestClient("8.8.8.8").get(`/api/engine-link/pair/${derivePairingLookup(code)}`, { "x-real-ip": "192.168.1.40" })).status).toBe(403);
   });
+  // ENGINES-AI-01: the pairing wizard picks the computer in its first step, so a code can be issued before the
+  // engine runs on another computer; and the refusals it shows inline say what to fix.
+  test("a pairing code is issued while the engine still runs on this computer", async () => {
+    const client = await owner();
+    expect(getHouseholdSettingValue("engines.stack.where")).toBe("this_computer");
+    const issued = await client.post("/api/engine-link/pair");
+    expect(issued.status).toBe(200);
+    expect(((await issued.json()) as { code: string }).code).toMatch(/^[A-Z2-7]{12}$/);
+  });
+  test("checking the engine computer with no address says what to enter and where", async () => {
+    const client = await owner();
+    const refused = await client.post("/api/engine-link/host-key/scan");
+    expect(refused.status).toBe(400);
+    const message = ((await refused.json()) as { error: string }).error;
+    expect(message).toBe(ENGINE_ADDRESS_MISSING_MESSAGE);
+    expect(message).toContain("Enter its name or home network address");
+    expect(message).toContain("Engines and AI");
+  });
+  test("an address outside the home network says to use the computer's name or home address", async () => {
+    const client = await owner();
+    await client.put("/api/settings", { scope: "household", key: "engines.stack.remote.host", value: "192.168.1.20" });
+    setHouseholdSettingValue("engines.stack.remote.host", "8.8.8.8");
+    const refused = await client.post("/api/engine-link/host-key/scan");
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { error: string }).error).toContain("for example 192.168.1.20");
+  });
+
   // PAIR-COPY-01: both refusals say what to do, in the same words, and the words name https://.
   test("starting a pairing over plain HTTP is refused with a message that names the https:// fix", async () => {
     const client = await owner(); setHouseholdSettingValue("engines.stack.where", "another_computer");

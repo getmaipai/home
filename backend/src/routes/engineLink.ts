@@ -5,7 +5,7 @@ import { getHubInstanceId } from "@/lib/hubIdentity";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { derivePairingLookup, getLinkCredentialStatus, getPairingPublicKey, issuePairingCode, scanHostKey, confirmHostKey, HostKeyConfirmError, revokeLinkKey } from "@/lib/stack/linkKeys";
 import { stopEngineLink } from "@/lib/stack/link";
-import { REMOTE_ENGINE_HOST_KEY } from "@/lib/remoteStackSettings";
+import { REMOTE_ENGINE_HOST_KEY, REMOTE_ENGINE_ADDRESS_ERROR } from "@/lib/remoteStackSettings";
 import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import { tryConsume } from "@/lib/rateLimiter";
@@ -21,6 +21,12 @@ const PairPayloadSchema = z.object({ public_key: z.string(), household_id: z.str
 // that name the fix. One constant, so the two can never drift apart. The tests assert the https:// text.
 export const PAIRING_NEEDS_HTTPS_MESSAGE =
   "Pairing only works when Home is opened at a secure address that starts with https://. This request came in through an address that starts with http://. Open Home through its https:// address, then try again. On the engine computer, give the pairing command the https:// address too.";
+
+// ENGINES-AI-01: the two refusals the pairing wizard shows inline. Each says what is wrong and what to do.
+export const ENGINE_ADDRESS_MISSING_MESSAGE =
+  "Home does not have the engine computer's address and port yet. Enter its name or home network address and its secure connection port (usually 22) in Settings, Home settings, Engines and AI, then try again.";
+export const ENGINE_SCAN_FAILED_MESSAGE =
+  "Home could not read the engine computer's security key. Check that the engine computer is on, that it is on your home network, and that its secure connection port is right (usually 22), then try again.";
 
 export function isSecurePairingRequest(protocol: string, forwardedProto: string | undefined, trustedProxy: boolean): boolean {
   const forwardedProtocol = trustedProxy ? forwardedProto?.split(",").at(-1)?.trim().toLowerCase() : undefined;
@@ -48,7 +54,8 @@ const issueRoute = createRoute({
 });
 engineLinkRoutes.openapi(issueRoute, (c) => {
   if (!isSecureRequest(c)) return c.json({ error: PAIRING_NEEDS_HTTPS_MESSAGE }, 400);
-  if (getHouseholdSettingValue("engines.stack.where") !== "another_computer") return c.json({ error: "Choose another computer for the AI engines first" }, 400);
+  // ENGINES-AI-01: no "another computer first" gate. The pairing wizard picks the computer in its first step, and a
+  // code can be issued at any time by an owner or admin over a secure address (the check above).
   return c.json(issuePairingCode(), 200);
 });
 
@@ -80,11 +87,11 @@ const scanRoute = createRoute({
 engineLinkRoutes.openapi(scanRoute, async (c) => {
   const host = getHouseholdSettingValue(REMOTE_ENGINE_HOST_KEY);
   const port = Number(getHouseholdSettingValue("engines.stack.remote.ssh_port") ?? 22);
-  if (typeof host !== "string" || !host.trim() || !Number.isInteger(port) || port < 1 || port > 65535) return c.json({ error: "Set a valid engine computer address and port first" }, 400);
+  if (typeof host !== "string" || !host.trim() || !Number.isInteger(port) || port < 1 || port > 65535) return c.json({ error: ENGINE_ADDRESS_MISSING_MESSAGE }, 400);
   const allowTailnet = getHouseholdSettingValue("engines.stack.remote.allow_tailnet") === true;
-  if (!(await isHouseholdNetworkHost(host, { allowTailnet }))) return c.json({ error: "That address is outside your home network" }, 400);
+  if (!(await isHouseholdNetworkHost(host, { allowTailnet }))) return c.json({ error: REMOTE_ENGINE_ADDRESS_ERROR }, 400);
   try { await scanHostKey(host, port); return c.json({ scanned: true as const }, 200); }
-  catch { return c.json({ error: "Could not read the engine computer's SSH host key" }, 400); }
+  catch { return c.json({ error: ENGINE_SCAN_FAILED_MESSAGE }, 400); }
 });
 
 const confirmRoute = createRoute({

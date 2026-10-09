@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Button } from "@maipai/ui/src/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,9 +13,7 @@ import {
 } from "@maipai/ui/src/dashboard/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError, isOwnerOrAdminRole, type EnginesOverview, type EnginesHealth, type StackRoleInfo, type StackEngineInfo, type StackHealthItem, type Roster } from "@/lib/api";
-import { useTabItem } from "@/shell/tabIdentity";
 import { useDataTableControls } from "@/shell/pages/dataTableControls";
-import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
 import { useMutation } from "@tanstack/react-query";
 
 /** /engines: SHELL-06's own row - `GET /api/engines` and
@@ -95,17 +93,22 @@ function toHealthRow(item: StackHealthItem): HealthRow {
   return { item: item.title, status: item.severity.charAt(0).toUpperCase() + item.severity.slice(1), since: new Date(item.since).toLocaleString() };
 }
 
-export function EnginesPage({ person }: { person: Roster }) {
-  useTabItem("Engines");
+/** ENGINES-AI-01: the engines console (roles, installed engines, health, the connection check), drawn inside Home
+ * settings > Engines and AI as that section's trail view (`home.engine_admin`). It is no longer a page of its own:
+ * /engines redirects to that section, so the person never leaves the settings shell. The "Where the engine runs"
+ * keys are the section's own card above it. */
+export function EnginesConsole({ person }: { person: Roster }) {
   const canManage = isOwnerOrAdminRole(person.role);
   const overviewQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: canManage });
   const healthQuery = useQuery<EnginesHealth>({ queryKey: ["engines-health"], queryFn: () => api.enginesHealth(), enabled: canManage });
   const queryClient = useQueryClient();
   const [busyNames, setBusyNames] = useState<ReadonlySet<string>>(new Set());
   const doctor = useMutation({ mutationFn: api.engineConnectionCheck });
-  const roles = useMemo(() => overviewQuery.data?.roles.map(toRoleRow) ?? [], [overviewQuery.data]);
-  const engines = useMemo(() => overviewQuery.data?.engines.map(toEngineRow) ?? [], [overviewQuery.data]);
-  const health = useMemo(() => healthQuery.data?.health.map(toHealthRow) ?? [], [healthQuery.data]);
+  // Tolerant of an answer with no lists: this console now draws inside the settings page, which must open whatever
+  // the engines routes answer (an unconfigured Stack, or an answer that has none of these fields).
+  const roles = useMemo(() => overviewQuery.data?.roles?.map(toRoleRow) ?? [], [overviewQuery.data]);
+  const engines = useMemo(() => overviewQuery.data?.engines?.map(toEngineRow) ?? [], [overviewQuery.data]);
+  const health = useMemo(() => healthQuery.data?.health?.map(toHealthRow) ?? [], [healthQuery.data]);
   const rolesTable = useDataTableControls(roles, ROLE_COLUMNS);
   const enginesTable = useDataTableControls(engines, ENGINE_COLUMNS);
   const healthTable = useDataTableControls(health, HEALTH_COLUMNS);
@@ -135,13 +138,6 @@ export function EnginesPage({ person }: { person: Roster }) {
 
   return (
     <>
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2">
-          <EnginesIcon size={16} className="text-muted-foreground" />
-          Engines
-        </CardTitle>
-      </CardHeader>
-
       {!canManage ? (
         <Card>
           <CardContent className="p-6">
@@ -149,20 +145,6 @@ export function EnginesPage({ person }: { person: Roster }) {
           </CardContent>
         </Card>
       ) : <>
-      <SettingsRenderer
-        scope="household"
-        scopeValue="household"
-        honouredBy="home"
-        only={["household.ai"]}
-        includeKeys={[
-          "engines.stack.where",
-          "engines.stack.remote.host",
-          "engines.stack.remote.local_port",
-          "engines.stack.remote.ssh_port",
-          "engines.stack.remote.allow_tailnet",
-        ]}
-        titleOverrides={{ "household.ai": "Where the AI engines run" }}
-      />
       <Button type="button" disabled={doctor.isPending} onClick={() => doctor.mutate()}>
         {doctor.isPending ? "Checking connection…" : "Check the connection"}
       </Button>

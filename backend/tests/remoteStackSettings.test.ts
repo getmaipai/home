@@ -69,6 +69,34 @@ describe("remote Stack settings", () => {
     expect(getHouseholdSettingValue("engines.stack.remote.host")).toBe("");
   });
 
+  // ENGINES-AI-01: why "Where the engine runs" could not be switched. The real service control (no mock) tried to stop
+  // the local Stack, a Home without the service installed threw from that step, and the PUT answered 500 after the
+  // value was saved, so the control snapped back. These are the exact inputs: no control mock, no Stack binary.
+  test("switching where saves and answers 200 even when the local Stack service cannot be stopped or started", async () => {
+    const client = await owner();
+    const ok = await client.put("/api/settings", { scope: "household", key: "engines.stack.where", value: "another_computer" });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as { value: string }).value).toBe("another_computer");
+    expect(getHouseholdSettingValue("engines.stack.where")).toBe("another_computer");
+    const back = await client.put("/api/settings", { scope: "household", key: "engines.stack.where", value: "this_computer" });
+    expect(back.status).toBe(200);
+    expect(getHouseholdSettingValue("engines.stack.where")).toBe("this_computer");
+    expect(getHouseholdSettingValue("engines.stack.remote.host")).toBe("");
+  });
+
+  test("a service command that exits with an error does not turn the save into a failure either", async () => {
+    const { __setStackServiceRunnerForTests } = await import("@/lib/localStackService");
+    __setStackServiceRunnerForTests(() => { throw new Error("service manager refused"); });
+    try {
+      const client = await owner();
+      expect((await client.put("/api/settings", { scope: "household", key: "engines.stack.where", value: "another_computer" })).status).toBe(200);
+      expect((await client.put("/api/settings", { scope: "household", key: "engines.stack.where", value: "this_computer" })).status).toBe(200);
+      expect(getHouseholdSettingValue("engines.stack.where")).toBe("this_computer");
+    } finally {
+      __setStackServiceRunnerForTests(null);
+    }
+  });
+
   test("this computer selection does not start the link at boot", () => {
     startConfiguredEngineLinkIfSelected();
     expect(getEngineLink()).toBeNull();

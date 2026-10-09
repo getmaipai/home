@@ -8,6 +8,9 @@ import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearance
 import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
 import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
+import { ModelsSection } from "@/apps/settings/ModelsSection";
+import { UsersSection } from "@/apps/settings/UsersSection";
+import { EnginesConsole } from "@/shell/pages/EnginesPage";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
 import { AddRobotSection } from "@/apps/settings/AddRobotSection";
 import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
@@ -43,7 +46,14 @@ function HomeVoiceCatalogSettings({ person }: SettingsViewProps) { useTabItem("V
 // Each is a trail view of its Home settings section (spec/settings/areas.json),
 // so the area's min_role gate (admin) is the only one this layer needs; the
 // hub still gates every call these make.
-function HomeEngineAdminSettings() { return <><EngineLinkCredentialSection /><HuggingFaceTokenSection /></>; }
+// ENGINES-AI-01: the one Engines and AI page. After the section's own settings card (where the engine runs, the engine
+// computer's name and ports) come the pairing wizard, the engines console (roles, installed engines, health, the
+// connection check, formerly /engines), the AI model list (formerly /models) and the Hugging Face token.
+function HomeEngineAdminSettings({ person }: SettingsViewProps) {
+  return <><EngineLinkCredentialSection /><EnginesConsole person={person} /><ModelsSection /><HuggingFaceTokenSection /></>;
+}
+// The user list, ready for the People section once the spec names this trail view (the report's commons order).
+function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
 function HomeDevicesAdminSettings() { return <><AddRobotSection /><RobotPasswordSection /></>; }
 function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }
 
@@ -53,6 +63,7 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.commands": HomeCommandsSettings,
   "home.voice_catalog": HomeVoiceCatalogSettings,
   "home.engine_admin": HomeEngineAdminSettings,
+  "home.users_admin": HomeUsersAdminSettings,
   "home.devices_admin": HomeDevicesAdminSettings,
   "home.routing_stats": HomeRoutingStatsSettings,
   "account.device_appearance": DeviceAppearanceSettings,

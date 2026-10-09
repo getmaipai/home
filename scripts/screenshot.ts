@@ -396,7 +396,7 @@ const ROUTES: RouteSpec[] = [
   { slug: "settings", path: "/settings/home/general" },
   { slug: "status", path: "/status" },
   { slug: "turn-trace", path: "/trace/screenshot-trace-turn" },
-  { slug: "settings-models", path: "/models" },
+  { slug: "settings-models", path: "/settings/home/ai" },
   { slug: "settings-backups", path: "/backups" },
   { slug: "settings-voices", path: "/settings/account/voice" },
   { slug: "settings-commands", path: "/settings/home/commands" },
@@ -2206,7 +2206,7 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
         body: JSON.stringify({ plan: state === "unavailable" || state === "checked-notfound" || state === "checked-nostack" ? null : makePlan(wording.verdict), wording }),
       });
     });
-    await page.goto(`${BASE_URL}/models`);
+    await page.goto(`${BASE_URL}/settings/home/ai`);
     if (state === "compare") {
       const links = [
         "https://huggingface.co/example-org/example-model-GGUF/resolve/main/example-model-Q4_K_M.gguf",
@@ -8558,7 +8558,8 @@ async function captureNextEnginesReview(browser: Browser, sessionValue: string):
             budget: null,
           } });
         });
-        await page.goto(`${BASE_URL}/engines`);
+        // ENGINES-AI-01: the engines console is the Engines and AI settings section now (/engines redirects there).
+        await page.goto(`${BASE_URL}/settings/home/ai`);
         const engineRows = page.locator(slug === "phone" ? "[data-slot='data-table-cards']" : "[data-slot='data-table-body']");
         await engineRows.getByText("llama.cpp server", { exact: true }).first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Engines");
@@ -8589,8 +8590,7 @@ async function captureRemoteStackSettingsReview(browser: Browser, ownerSession: 
   try {
     const page = await context.newPage();
     page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-    await page.goto(`${BASE_URL}/engines`);
-    await page.getByRole("heading", { name: "Where the AI engines run" }).waitFor();
+    await page.goto(`${BASE_URL}/settings/home/ai`);
     await page.getByText("Where the engine runs", { exact: true }).waitFor();
     await settleAnimations(page);
     let file = join(outDir, "engines-settings-default.png");

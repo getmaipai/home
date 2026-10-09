@@ -36,13 +36,11 @@ describe("PageHeaderTitle", () => {
     ["/people/person-sage", "Family", "lucide-users"],
     ["/storage", "Storage", "lucide-database"],
     ["/status", "Status", "lucide-activity"],
-    ["/engines", "Engines", "lucide-cpu"],
     ["/performance", "Performance", "lucide-gauge"],
     ["/updates", "Updates", "lucide-refresh-cw"],
     ["/repairs", "Repairs", "lucide-wrench"],
     ["/backups", "Backups", "lucide-archive"],
     ["/users", "Users", "lucide-users"],
-    ["/models", "AI models", "lucide-cpu"],
     ["/files", "Library", "lucide-folder"],
   ];
 
