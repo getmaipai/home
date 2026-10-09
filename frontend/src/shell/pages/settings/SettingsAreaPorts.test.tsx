@@ -117,6 +117,26 @@ describe("ported from the old settings page", () => {
     expect(links).toEqual(expect.arrayContaining(["/storage", "/privacy"]));
   });
 
+  test("Home settings ports engine credentials and the voice token into Engines and AI", async () => {
+    const view = open(makePerson("owner"), "/settings/home/ai");
+    await waitFor(() => expect(view.getByText("Chat", { selector: "h2" })).toBeTruthy());
+    expect(await view.findByText("Engine computer link", { selector: "h2" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Pair engine computer" })).toBeTruthy();
+    expect(await view.findByText("Hugging Face token (for voice cloning)", { selector: "h2" })).toBeTruthy();
+  });
+
+  test("Home Devices keeps Add a robot available before pairing", async () => {
+    const view = open(makePerson("admin"), "/settings/home/robot");
+    expect(await view.findByText("Add a robot", { selector: "h2" })).toBeTruthy();
+    expect(fixture!.requests.some((r) => r.includes("/api/devices/discover-robots"))).toBe(true);
+  });
+
+  test("Home Developer tools shows plugin routing stats", async () => {
+    const view = open(makePerson("owner"), "/settings/home/developer");
+    expect(await view.findByText("Plugin routing", { selector: "h2" })).toBeTruthy();
+    expect(await view.findByText("No chat turns yet.")).toBeTruthy();
+  });
+
   test("Home settings links to every page it used to: users, family, models, engines, backups, storage, updates, repairs, performance, status, privacy", async () => {
     const owner = makePerson("owner");
     const view = open(owner, "/settings/home/people");

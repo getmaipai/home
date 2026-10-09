@@ -9,6 +9,7 @@ import {
   getPersonSettingValue,
   getHouseholdSettingValue,
   setHouseholdSettingValue,
+  shouldIncludeSettingInRead,
 } from "@/lib/settings";
 import { nextHlc, compareHlc, seedHlc, __resetHlcForTests } from "@/lib/hlc";
 import { eq, and } from "drizzle-orm";
@@ -99,6 +100,23 @@ describe("GET /api/settings (list)", () => {
     const locale = body.find((s) => s.key === "household.locale");
     expect(locale?.value).toBe("en-US");
     expect(locale?.source).toBe("default");
+  });
+
+  test("an owner/admin child-limits read omits every location selector key and value", async () => {
+    const { owner, childId, childPerson } = await ownerAndChild();
+    const ownerPerson = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    const locationKey = {
+      key: "weather.favorite_places", scope: "person", selector: "location", default: ["secret-home"],
+      label: "Places", help: "Private places", level: "basic", lives_in: "person.limits", honoured_by: ["home"],
+    } as unknown as import("@maipai/spec/gen/ts/settings-key.js").SettingsKey;
+    const ordinaryKey = { ...locationKey, key: "tts.voice_id", selector: "select" } as unknown as import("@maipai/spec/gen/ts/settings-key.js").SettingsKey;
+    expect(shouldIncludeSettingInRead(locationKey, ownerPerson.id, childPerson.id, "person")).toBe(false);
+    expect(shouldIncludeSettingInRead(ordinaryKey, ownerPerson.id, childPerson.id, "person")).toBe(true);
+    expect(shouldIncludeSettingInRead(locationKey, childPerson.id, childPerson.id, "person")).toBe(true);
+    const res = await owner.get(`/api/settings?scope=person:${childId}`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Array<{ key: string; value: unknown }>;
+    expect(body.some(({ key, value }) => key === locationKey.key || JSON.stringify(value).includes("secret-home"))).toBe(false);
   });
 
   test("an invalid scope string is a clean 400", async () => {

@@ -25,7 +25,9 @@ export function baseViewer(person: Pick<Roster, "id" | "role" | "age_band">): Se
  * search and every card, so none of them can show a minor more. */
 export function visibleRegistry(registry: readonly SettingsKey[], band: Band): SettingsKey[] {
   const allowed = minorVisibleSettingKeys(band);
-  return registry.filter((key) => key.level !== "expert" && (!allowed || allowed.has(key.key)));
+  // The spec has introduced the location selector, but its field control
+  // is a later kit change. Keep it out of rendered keys until that ships.
+  return registry.filter((key) => key.level !== "expert" && key.selector !== "location" && (!allowed || allowed.has(key.key)));
 }
 
 /** The runtime scope string the settings API expects for a card's scope. */

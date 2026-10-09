@@ -353,6 +353,7 @@ const chatSkillsReview = process.argv.includes("--chat-skills-review");
 const engineDownReview = process.argv.includes("--engine-down-review");
 // APP-SET-02: the settings areas (Account, Chat settings, Home settings) as an admin, an adult, a teen and a child see them.
 const appSettingsReview = process.argv.includes("--app-settings-review");
+const adminHomeSettingsReview = process.argv.includes("--admin-home-settings-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
 const noticeStyleReview = process.argv.includes("--notice-style-review");
 const statusColorsReview = process.argv.includes("--status-colors-review");
@@ -644,13 +645,6 @@ async function seedHousehold(): Promise<string> {
   // page now agree instead of naming two different cities. This literal
   // "Seattle, WA" is `seedWeatherCache()`'s own `WEATHER_HOUSEHOLD_PLACE`
   // above - change this and change that.
-  const place = await fetch(`${BASE_URL}/api/settings`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "household.home_place", value: "Seattle, WA" }),
-  });
-  if (!place.ok) throw new Error(`seed household.home_place failed: ${place.status}`);
-
   await seedPeopleAndThings(sessionValue);
 
   return sessionValue;
@@ -2868,6 +2862,56 @@ async function captureAppSettingsReview(browser: Browser, ownerSession: string):
           await context.close();
         }
       }
+    }
+  }
+}
+
+/** ADMIN-HOME-SETTINGS-01: the dedicated entry and each Home section on
+ * the seeded admin, 1440 and 390 wide in both themes. */
+async function captureAdminHomeSettingsReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "admin-home-settings-shots");
+  mkdirSync(outDir, { recursive: true });
+  const routes = [
+    ["general", "/settings/home/general"], ["people", "/settings/home/people"],
+    ["engines-ai", "/settings/home/ai"], ["devices", "/settings/home/robot"],
+    ["search", "/settings/home/search"], ["integrations", "/settings/home/integrations"],
+    ["commands", "/settings/home/commands"], ["voices", "/settings/home/voices"],
+    ["storage", "/settings/home/storage"], ["maintenance", "/settings/home/maintenance"],
+    ["privacy", "/settings/home/privacy"], ["developer", "/settings/home/developer"],
+  ] as const;
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, ownerSession);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/`);
+        const profileButton = page.getByRole("button", { name: /Open profile menu/ });
+        await profileButton.waitFor();
+        await profileButton.click();
+        await page.getByRole("menuitem", { name: "Home settings" }).waitFor();
+        await settleAnimations(page);
+        const menuFile = join(outDir, `menu-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path: menuFile, fullPage: false });
+        console.log(`Wrote ${menuFile}`);
+        for (const [name, path] of routes) {
+          await page.goto(`${BASE_URL}${path}`);
+          await page.locator('[data-slot="settings-shell"]').waitFor();
+          await page.waitForTimeout(500);
+          await settleAnimations(page);
+          const measured = await page.evaluate(() => ({
+            path: location.pathname,
+            title: document.querySelector("h1")?.textContent?.trim(),
+            overflow: document.documentElement.scrollWidth > window.innerWidth,
+          }));
+          console.log(`admin-home-settings ${name} ${slug} ${theme}: ${JSON.stringify(measured)}`);
+          if (measured.overflow) throw new Error(`Home settings ${name} ${slug} ${theme} scrolls sideways`);
+          const file = join(outDir, `${name}-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path: file, fullPage: false });
+          console.log(`Wrote ${file}`);
+        }
+      } finally { await context.close(); }
     }
   }
 }
@@ -10561,6 +10605,12 @@ async function main() {
     if (appSettingsReview) {
       await captureAppSettingsReview(browser, sessionValue);
       console.log("completed named review: --app-settings-review");
+      return;
+    }
+
+    if (adminHomeSettingsReview) {
+      await captureAdminHomeSettingsReview(browser, sessionValue);
+      console.log("completed named review: --admin-home-settings-review");
       return;
     }
 

@@ -80,7 +80,9 @@ function limitSettings() {
       lives_in: "person.storage", honoured_by: ["home"], range: { min: 0, max: 100000 },
     } as SettingsKey)),
   ];
-  const values: ResolvedSetting[] = registry.map((setting) => ({ key: setting.key, value: 30, source: "default", label: setting.label, level: setting.level, secret: false }));
+  const location: SettingsKey = { key: "weather.favorite_places", scope: "person", selector: "location", default: ["PRIVATE_HOME_LOCATION"], label: "Places", level: "basic", secret: false, lives_in: "person.limits", honoured_by: ["home"] } as SettingsKey;
+  registry.push(location);
+  const values: ResolvedSetting[] = registry.map((setting) => ({ key: setting.key, value: setting.key === location.key ? ["PRIVATE_HOME_LOCATION"] : 30, source: "default", label: setting.label, level: setting.level, secret: false }));
   return { registry, values };
 }
 
@@ -159,6 +161,8 @@ describe("PersonProfilePage", () => {
       expect(document.querySelector('[id="settings-person.storage"]')).toBeTruthy();
       expect(view.getByText("Storage")).toBeTruthy();
       expect(view.queryByText("My storage")).toBeNull();
+      expect(view.queryByText("Places")).toBeNull();
+      expect(view.queryByText("PRIVATE_HOME_LOCATION")).toBeNull();
     } finally { restore(); }
   });
 

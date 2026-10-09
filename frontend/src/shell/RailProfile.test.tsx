@@ -2,6 +2,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { Roster } from "@/lib/api";
+import type { Role } from "@/lib/api";
 import { RailProfile } from "@/shell/RailProfile";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
 
@@ -12,8 +13,8 @@ const degradedChat = [{
   needs: [{ kind: "engine", id: "chat", name: "Brain", state: "degraded", purpose: "Chat model", required: true }], history: [], uptimePercent: 100,
 }];
 
-function person(role: Roster["role"]): Roster {
-  return { id: `person-${role}`, display_name: "Juniper", nickname: null, role, avatar_seed: "x", source: "hub", local_only: false, created_at: "", updated_at: "", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1:0:t", hasSecret: false, age_band: role === "child" ? "child" : "adult" } as unknown as Roster;
+function person(role: Role, age_band: "child" | "teen" | "adult" = role === "child" ? "child" : role === "teen" ? "teen" : "adult"): Roster {
+  return { id: `person-${role}`, display_name: "Juniper", nickname: null, role, avatar_seed: "x", source: "hub", local_only: false, created_at: "", updated_at: "", deleted_at: null, enabled: true, guest_expires_at: null, memorialized_at: null, hlc: "1:0:t", hasSecret: false, age_band } as unknown as Roster;
 }
 
 function renderProfile(role: Roster["role"]) {
@@ -48,6 +49,27 @@ describe("RailProfile status by age", () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+describe("RailProfile Home settings entry", () => {
+  test.each([["owner", "adult", true], ["admin", "adult", true], ["adult", "adult", false], ["teen", "teen", false], ["child", "child", false], ["guest", "adult", false], ["owner", "child", false], ["admin", "teen", false]] as const)("role=%s band=%s visible=%s", async (role, band, shown) => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/notifications")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/status/apps")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><RailProfile person={person(role, band)} incognito={false} onIncognitoChange={() => {}} onSignedOut={() => {}} /></MemoryRouter>);
+      fireEvent.click(view.getByRole("button", { name: /Open profile menu for Juniper/ }));
+      if (shown) expect(await view.findByRole("menuitem", { name: "Home settings" })).toBeTruthy();
+      else {
+        await view.findByRole("menuitem", { name: /Settings/ });
+        expect(view.queryByRole("menuitem", { name: "Home settings" })).toBeNull();
+      }
+    } finally { globalThis.fetch = originalFetch; }
   });
 });
 

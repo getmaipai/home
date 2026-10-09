@@ -89,7 +89,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
   return (
     <div className="flex min-w-0 flex-col gap-14">
       {section.lead_view ? <SettingsView view={section.lead_view} {...viewProps} /> : null}
-      {visibleCards(section, viewer, registry, "home").map((card) => {
+      {visibleCards(section, viewer, registry.filter((key) => key.selector !== "location") as never, "home").map((card) => {
         // Until APP-SET-05 re-points the face card onto the kit renderer, the
         // face card inside `account.profile` already draws this group's one
         // key (the enrollment sounds switch); a second card would repeat it.

@@ -8,6 +8,11 @@ import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearance
 import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
 import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
+import { AddRobotSection } from "@/apps/settings/AddRobotSection";
+import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
+import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
+import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
+import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
 import { useTabItem } from "@/shell/tabIdentity";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
 
@@ -33,11 +38,17 @@ function ChatSkillsSettings({ person }: SettingsViewProps) { return <ChatSkillsS
 function ChatShortcutsSettings() { return <ChatShortcutsView />; }
 function HomeCommandsSettings({ person }: SettingsViewProps) { return <CommandsSection person={person} management />; }
 function HomeVoiceCatalogSettings({ person }: SettingsViewProps) { useTabItem("Voices"); return <VoiceCatalogSection personId={person.id} householdManagement />; }
+function HomeEngineAdminSettings() { return <><EngineLinkCredentialSection /><HuggingFaceTokenSection /></>; }
+function HomeDevicesAdminSettings() { return <><AddRobotSection /><RobotPasswordSection /><EngineLinkCredentialSection /></>; }
+function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }
 
 export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = {
   "account.profile": AccountProfile,
   "account.voice": AccountVoiceControls,
   "home.commands": HomeCommandsSettings,
+  "home.engine_admin": HomeEngineAdminSettings,
+  "home.devices_admin": HomeDevicesAdminSettings,
+  "home.routing_stats": HomeRoutingStatsSettings,
   "home.voice_catalog": HomeVoiceCatalogSettings,
   "account.device_appearance": DeviceAppearanceSettings,
   "chat.skills": ChatSkillsSettings,

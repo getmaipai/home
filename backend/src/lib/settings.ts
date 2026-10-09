@@ -57,6 +57,14 @@ export interface ParsedScope {
   id: string | null;
 }
 
+/** Person-specific locations are private even when an owner/admin may
+ * manage a child's limits. Omit these keys and their resolved values from
+ * every cross-person settings read; the generic canAccessPerson policy
+ * remains the separate authority for the rest of that read. */
+export function shouldIncludeSettingInRead(keyDef: SettingsKey, actorId: string, subjectId: string, scopeKind: ScopeKind): boolean {
+  return keyDef.scope === scopeKind && !(scopeKind === "person" && actorId !== subjectId && keyDef.selector === "location");
+}
+
 // Matches spec/schemas/setting-value.schema.json's scope pattern exactly:
 // "household", "person:<id>", or "device:<id>". Exported (not test-only:
 // this is real logic worth testing on its own, the same as lib/secret.ts's
@@ -282,9 +290,9 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
   const storedByKey = new Map(stored.map((row) => [row.key, row]));
   const subject = responseSubject(actor, parsed);
   const descriptionContext = responseContext(actor, subject, parsed.kind);
-
   const results: ResolvedSetting[] = getRegistry()
-    .filter((k) => k.scope === parsed.kind && (!adultWakewordRead || k.key === WAKEWORD_SETTING_KEY))
+    .filter((k) => shouldIncludeSettingInRead(k, actor.id, subject.id, parsed.kind)
+      && (!adultWakewordRead || k.key === WAKEWORD_SETTING_KEY))
     .map((k) => {
       const row = storedByKey.get(k.key);
       const rawValue = row ? decodeStoredRow(k, row.value) : k.default;

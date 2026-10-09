@@ -153,7 +153,8 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
         loadingLabel="Loading settings"
       >
         {({ registry, values }: { registry: SettingsKey[]; values: ResolvedSetting[] }) => {
-          const allGroups: SettingsGroup[] = groupSettings(registry, values, scope, "home");
+          const supportedRegistry = registry.filter((key) => key.selector !== "location") as never;
+          const allGroups: SettingsGroup[] = groupSettings(supportedRegistry, values, scope, "home");
           let groups = (only ? allGroups.filter((g) => only.includes(g.id)) : allGroups).map((group) => {
             const keys = includeKeysByGroup?.[group.id] ?? includeKeys;
             return keys ? { ...group, basic: group.basic.filter((item) => keys.includes(item.def.key)), advanced: group.advanced.filter((item) => keys.includes(item.def.key)) } : group;

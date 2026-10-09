@@ -65,6 +65,10 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
   const { capabilities, ready } = useSettingsCapabilities(person);
   const viewer: SettingsViewer = { ...baseViewer(person), capabilities };
   const registry = registryQuery.data ? visibleRegistry(registryQuery.data, viewer.band) : undefined;
+  // The spec now recognizes the location selector while the shipped UI
+  // pin intentionally remains on its previous schema until its location
+  // control follow-up. No current Home section renders those fields.
+  const kitRegistry = registry?.filter((key) => key.selector !== "location") as never;
 
   const scopes = scopesOf(area, viewer);
   const valueQueries = useQueries({
@@ -75,9 +79,9 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
     })),
   });
 
-  const groups = registry ? visibleGroups(area, viewer, registry, "home") : [];
+  const groups = kitRegistry ? visibleGroups(area, viewer, kitRegistry, "home") : [];
   const active = groups.flatMap((group) => group.sections).find((section) => section.id === sectionId);
-  const first = registry ? firstVisibleSection(area, viewer, registry, "home") : undefined;
+  const first = kitRegistry ? firstVisibleSection(area, viewer, kitRegistry, "home") : undefined;
 
   useEffect(() => {
     if (!query) return;
@@ -86,7 +90,7 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
     return () => window.removeEventListener("keydown", onKey);
   }, [query, setParams]);
 
-  if (!registry || !ready) return <Progress mode="spinner" label="Loading settings" />;
+  if (!registry || !kitRegistry || !ready) return <Progress mode="spinner" label="Loading settings" />;
 
   // No section named: a desktop opens the first one; a phone shows the column.
   if (!sectionId && desktop && first) return <Navigate to={settingsPath(area.id, first.id)} replace />;
@@ -105,7 +109,7 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
 
   let content: ReactNode = null;
   if (query.trim()) {
-    const results = searchSettings(area, registry, values, viewer, query, { honouredBy: "home" });
+    const results = searchSettings(area, kitRegistry, values, viewer, query, { honouredBy: "home" });
     const byCrumb = new Map<string, typeof results>();
     for (const result of results) byCrumb.set(result.breadcrumb, [...(byCrumb.get(result.breadcrumb) ?? []), result]);
     content = results.length === 0
@@ -146,9 +150,9 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
       layout="docked"
       labels={{ columnTitle: "Settings" }}
       contentAs="section"
-      area={area}
+      area={area as never}
       viewer={viewer}
-      registry={registry}
+      registry={kitRegistry}
       honouredBy="home"
       activeSection={active?.id}
       sectionHref={(id) => settingsPath(area.id, id)}

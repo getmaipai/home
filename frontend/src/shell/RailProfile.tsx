@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import RailProfileMenu from "@maipai/ui/src/dashboard/layouts/full/vertical/rail/RailProfileMenu";
-import { api, type Roster } from "@/lib/api";
+import { api, isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { ROLE_LABELS } from "@/apps/people/roles";
 import { NotificationBell, useNotificationsQuery } from "@/shell/NotificationBell";
 import { useStatusSummary } from "@/shell/StatusIndicator";
@@ -33,6 +33,9 @@ export function RailProfile({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const queryClient = useQueryClient();
   const child = person.age_band === "child";
+  const homeSettings = isOwnerOrAdminRole(person.role) && person.age_band !== "child" && person.age_band !== "teen"
+    ? { href: "/settings/home", label: "Home settings" }
+    : undefined;
   const problem = summary.level === "degraded" || summary.level === "offline";
   const status = child && problem
     ? undefined
@@ -46,6 +49,7 @@ export function RailProfile({
       status={status}
       incognito={{ on: incognito, onChange: onIncognitoChange }}
       settingsHref="/settings"
+      homeSettings={homeSettings}
       helpHref={HELP_URL}
       onLogout={() => {
         // The next person on this browser must never see this person's

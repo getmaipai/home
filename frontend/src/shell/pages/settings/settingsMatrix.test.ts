@@ -34,13 +34,14 @@ const EMPTY_HOME = { robots: false, wakeword: false, child: false };
 
 function sectionIds(areaId: string, viewer: SettingsViewer): string[] {
   const area = settingsArea(areaId)!;
-  return visibleGroups(area, viewer, visibleRegistry(REGISTRY, viewer.band), "home").flatMap((g) => g.sections.map((s) => s.id));
+  const registry = visibleRegistry(REGISTRY, viewer.band) as never;
+  return visibleGroups(area, viewer, registry, "home").flatMap((g) => g.sections.map((s) => s.id));
 }
 
 /** Every registry key an area draws for this viewer. */
 function keysOf(areaId: string, viewer: SettingsViewer): Set<string> {
   const area = settingsArea(areaId)!;
-  const registry = visibleRegistry(REGISTRY, viewer.band);
+  const registry = visibleRegistry(REGISTRY, viewer.band).filter((key) => key.selector !== "location") as never;
   const keys = new Set<string>();
   for (const group of visibleGroups(area, viewer, registry, "home")) {
     for (const section of group.sections) {
@@ -83,12 +84,12 @@ describe("which sections each role sees", () => {
   });
 
   test("Home settings: only an owner or admin has any section; nobody else is shown one", () => {
-    const home = ["general", "people", "search", "integrations", "voices", "commands", "ai", "storage", "maintenance", "privacy"];
+    const home = ["general", "people", "ai", "robot", "search", "integrations", "commands", "voices", "storage", "maintenance", "privacy", "developer"];
     for (const role of ROLES) {
       const sections = sectionIds("home", viewerFor(role, EMPTY_HOME));
       expect(sections).toEqual(role === "owner" || role === "admin" ? home : []);
     }
-    expect(sectionIds("home", viewerFor("admin", FULL_HOME))).toEqual(["general", "people", "search", "integrations", "voices", "commands", "ai", "robot", "storage", "maintenance", "privacy"]);
+    expect(sectionIds("home", viewerFor("admin", FULL_HOME))).toEqual(home);
   });
 
   test("a teen sees no Robot card and no household or expert card; a child neither", () => {

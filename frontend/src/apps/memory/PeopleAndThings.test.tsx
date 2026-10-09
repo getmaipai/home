@@ -15,6 +15,7 @@ function entity(overrides: Partial<Entity> = {}): Entity {
     aliases: [],
     description: null,
     place_kind: null,
+    geo: null,
     parent_id: null,
     account_person_id: null,
     source: "hub",
