@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { isIP } from "node:net";
 import { dataDir } from "@/lib/paths";
@@ -17,7 +17,11 @@ const publicKeyPath = `${privateKeyPath}.pub`;
 const knownHostsPath = join(linkDir, "known_hosts");
 const askpassPath = join(linkDir, process.platform === "win32" ? "askpass.cmd" : "askpass.sh");
 const passphrasePath = join(linkDir, ".passphrase.enc");
-protectExistingSecretPaths([keysDir, linkDir, privateKeyPath, publicKeyPath, knownHostsPath, passphrasePath, askpassPath]);
+protectExistingSecretPaths([keysDir, linkDir, privateKeyPath, publicKeyPath, knownHostsPath, passphrasePath]);
+// STACK-LINK-ASKPASS-01: the askpass helper is NOT run through the owner-only (600) protection above. It holds no secret (the
+// passphrase arrives in the MAIPAI_LINK_ASKPASS environment variable), and ssh must be able to execute it, so it stays owner-executable.
+// An already-paired install whose helper an earlier build chmodded to 600 heals here at load and again in getLinkSshAskpassEnvironment().
+repairAskpassHelper();
 
 type Pairing = { code: string; expiresAt: number; used: boolean; fetchedAt: number | null; confirmed: boolean; wrongChecks: number };
 let pairing: Pairing | null = null;
@@ -39,9 +43,15 @@ function newCode(): string {
   return result;
 }
 function randomPassphrase(): string { return randomBytes(32).toString("base64url"); }
+/** Owner-only and executable (0o700). On Windows the .cmd keeps the same ACL protection as every other credential file. A missing file is left alone. */
+function repairAskpassHelper(): void {
+  if (!existsSync(askpassPath)) return;
+  if (process.platform === "win32") { protectSecretPath(askpassPath); return; }
+  if ((statSync(askpassPath).mode & 0o777) !== 0o700) chmodSync(askpassPath, 0o700);
+}
 function ensureAskpassHelper(): void {
   const body = process.platform === "win32" ? "@echo off\r\necho %MAIPAI_LINK_ASKPASS%\r\n" : "#!/bin/sh\nprintf '%s\\n' \"$MAIPAI_LINK_ASKPASS\"\n";
-  writeFileSync(askpassPath, body, { mode: 0o700 }); protectSecretPath(askpassPath);
+  writeFileSync(askpassPath, body, { mode: 0o700 }); repairAskpassHelper();
 }
 function ensureKeyPair(): void {
   ensurePrivateDir();
@@ -163,7 +173,7 @@ export async function isCurrentHostKey(host: string, port: number): Promise<Host
   } catch { return "unreachable"; }
 }
 export function getLinkSshAskpassEnvironment(): NodeJS.ProcessEnv {
-  ensurePrivateDir(); if (!existsSync(askpassPath)) ensureAskpassHelper();
+  ensurePrivateDir(); if (!existsSync(askpassPath)) ensureAskpassHelper(); else repairAskpassHelper();
   const encrypted = readFileSync(passphrasePath, "utf8");
   return { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? process.cwd(), SSH_ASKPASS: askpassPath, SSH_ASKPASS_REQUIRE: "force", DISPLAY: process.env.DISPLAY ?? "maipai", MAIPAI_LINK_ASKPASS: decryptSecret(encrypted) };
 }

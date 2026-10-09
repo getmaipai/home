@@ -30,10 +30,13 @@ export interface LinkConfig {
   knownHostsPath: string;
   env?: NodeJS.ProcessEnv;
 }
+// STACK-LINK-ASKPASS-01: no `BatchMode=yes` here. BatchMode turns the askpass prompt off, so the pairing's passphrase-protected key
+// was never unlocked. SSH_ASKPASS_REQUIRE=force (see getLinkSshAskpassEnvironment) supplies the passphrase; one prompt, and no
+// password or keyboard-interactive fallback, so a bad key fails fast instead of asking for a password nobody can type.
 export function buildEngineLinkSshArgs(config: LinkConfig & { sshPort: number; localPort: number }, address: string): string[] {
   const hostAlias = knownHostsName(config.host, config.sshPort);
   const homePort = Number(process.env.PORT ?? 8787);
-  return ["-N", "-T", "-o", "BatchMode=yes", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${config.knownHostsPath}`, "-o", `HostKeyAlias=${hostAlias}`, "-o", "HostKeyAlgorithms=ssh-ed25519", "-o", "IdentitiesOnly=yes", "-i", config.privateKeyPath, "-L", `127.0.0.1:${config.localPort}:127.0.0.1:8770`, "-R", `127.0.0.1:${REMOTE_VOICE_PORT}:127.0.0.1:${homePort}`, "-p", String(config.sshPort), "--", `maipai-stack@${address}`];
+  return ["-N", "-T", "-o", "NumberOfPasswordPrompts=1", "-o", "PasswordAuthentication=no", "-o", "KbdInteractiveAuthentication=no", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${config.knownHostsPath}`, "-o", `HostKeyAlias=${hostAlias}`, "-o", "HostKeyAlgorithms=ssh-ed25519", "-o", "IdentitiesOnly=yes", "-i", config.privateKeyPath, "-L", `127.0.0.1:${config.localPort}:127.0.0.1:8770`, "-R", `127.0.0.1:${REMOTE_VOICE_PORT}:127.0.0.1:${homePort}`, "-p", String(config.sshPort), "--", `maipai-stack@${address}`];
 }
 
 export interface LinkDependencies {

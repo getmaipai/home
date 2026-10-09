@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { getTailscaleStatus } from "@/lib/tailscale";
-import { getLinkKeyPaths, knownHostsName } from "@/lib/stack/linkKeys";
+import { getLinkKeyPaths, getLinkSshAskpassEnvironment, knownHostsName } from "@/lib/stack/linkKeys";
 import { createStackClient } from "@/lib/stack/client";
 import { STACK_CONTRACT_MIN, STACK_CONTRACT_MAX } from "@/lib/stack/contract";
 
@@ -48,6 +48,34 @@ export function engineLinkKeyFiles(): { privateKey: boolean; knownHosts: boolean
   return { privateKey: existsSync(privateKeyPath), knownHosts: existsSync(knownHostsPath) };
 }
 
+/**
+ * STACK-LINK-ASKPASS-01: the ssh arguments for hop 5. No `BatchMode=yes`: it disables the askpass prompt, so the pairing's
+ * passphrase-protected key was never unlocked. One prompt, no password or keyboard-interactive fallback (a bad key fails fast),
+ * and `-v` so the verdict can be read from what ssh says about authentication.
+ */
+export function authenticateSshArgs(host: string, port: number, address: string, privateKeyPath: string, knownHostsPath: string): string[] {
+  return ["-v", "-T", "-o", "NumberOfPasswordPrompts=1", "-o", "PasswordAuthentication=no", "-o", "KbdInteractiveAuthentication=no", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${knownHostsPath}`, "-o", `HostKeyAlias=${knownHostsName(host, port)}`, "-o", "IdentitiesOnly=yes", "-i", privateKeyPath, "-p", String(port), `maipai-stack@${address}`, "true"];
+}
+
+/**
+ * Whether `ssh -v` output shows the server accepted the key. The decision is on authentication, not on the command's exit code:
+ * the box account `maipai-stack` has a no-login shell and a `restrict,permitopen` key, so `true` exits 1 even when sign-in worked.
+ */
+export function sshAuthenticated(stderr: string): boolean {
+  return /Authenticated to\b/.test(stderr) || /Authentication succeeded \(publickey\)/.test(stderr);
+}
+
+function runSshAuth(args: string[], env: NodeJS.ProcessEnv): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    let stderr = "";
+    const child = spawn("ssh", args, { env, stdio: ["ignore", "ignore", "pipe"] });
+    const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error("ssh check timed out")); }, 15_000);
+    child.stderr.setEncoding("utf8"); child.stderr.on("data", (chunk: string) => { stderr += chunk; });
+    child.once("error", (error) => { clearTimeout(timer); reject(error); });
+    child.once("close", () => { clearTimeout(timer); resolve(stderr); });
+  });
+}
+
 const defaults: DoctorDependencies = {
   settings: () => ({
     selected: getHouseholdSettingValue("engines.stack.where") === "another_computer",
@@ -73,12 +101,9 @@ const defaults: DoctorDependencies = {
   hostKey: (host, port) => hostKeyPinned(host, port, getLinkKeyPaths().knownHostsPath),
   authenticate: async (host, port, address = host) => {
     const { privateKeyPath, knownHostsPath } = getLinkKeyPaths();
-    const child = spawn("ssh", ["-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${knownHostsPath}`, "-o", `HostKeyAlias=${knownHostsName(host, port)}`, "-o", "IdentitiesOnly=yes", "-i", privateKeyPath, "-p", String(port), `maipai-stack@${address}`, "true"], { stdio: ["ignore", "ignore", "ignore"] });
-    await new Promise<void>((resolve, reject) => {
-      child.once("error", reject);
-      child.once("exit", (code) => code === 0 ? resolve() : reject(new Error("ssh check failed")));
-    });
-    return true;
+    // The same environment the tunnel uses: the askpass helper supplies the key's passphrase.
+    const stderr = await runSshAuth(authenticateSshArgs(host, port, address, privateKeyPath, knownHostsPath), getLinkSshAskpassEnvironment());
+    return sshAuthenticated(stderr);
   },
   forward: async (port) => {
     try { const response = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: AbortSignal.timeout(2500) }); return response.ok; }
@@ -148,7 +173,7 @@ export async function runEngineLinkDoctor(deps: DoctorDependencies = defaults): 
   hops.push(fix(4, hostMatches, "Pair again and confirm the engine computer's key.", "No action needed.", hop4Detail));
   let authenticated = false;
   if (portOpen && hostMatches && files.privateKey) authenticated = await deps.authenticate(config.host, config.sshPort, selected).catch(() => false);
-  hops.push(fix(5, authenticated, "Pair this Home with the engine computer again."));
+  hops.push(fix(5, authenticated, "The engine computer did not accept this Home's pairing key. Pair this Home with the engine computer again.", "No action needed.", authenticated ? undefined : !portOpen || !hostMatches || !files.privateKey ? "skipped: an earlier hop failed or this Home has no key" : "ssh did not report a successful sign-in with the pairing key"));
   if (!authenticated) return hops.concat(Array.from({ length: 5 }, (_, i) => fix(i + 6, false, "Fix hop 5, then rerun doctor.")));
 
   const tunnel = await deps.forward(config.localPort);

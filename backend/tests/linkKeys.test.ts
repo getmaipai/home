@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
-import { existsSync, readFileSync, statSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, statSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -75,6 +75,39 @@ describe("engine link pairing credentials", () => {
     expect(Object.keys(env).sort()).toEqual(["DISPLAY", "HOME", "MAIPAI_LINK_ASKPASS", "PATH", "SSH_ASKPASS", "SSH_ASKPASS_REQUIRE"].sort());
     expect(env).not.toHaveProperty("NODE_OPTIONS"); expect(existsSync(getLinkKeyPaths().askpassPath)).toBe(true);
     revokeLinkKey(); expect(existsSync(getLinkKeyPaths().askpassPath)).toBe(false);
+  });
+  test("STACK-LINK-ASKPASS-01: the askpass helper is executable when created, and an existing 600 helper heals without re-pairing", () => {
+    if (process.platform === "win32") return;
+    issuePairingCode(); getLinkSshAskpassEnvironment();
+    const { askpassPath } = getLinkKeyPaths();
+    expect(statSync(askpassPath).mode & 0o100).toBe(0o100);
+    // What an earlier build left on an already-paired install: the helper chmodded to 600 (ssh then logs "exec(...): Permission denied").
+    chmodSync(askpassPath, 0o600); expect(statSync(askpassPath).mode & 0o100).toBe(0);
+    getLinkSshAskpassEnvironment();
+    expect(statSync(askpassPath).mode & 0o777).toBe(0o700);
+    // The key material stays owner-only.
+    expect(statSync(getLinkKeyPaths().privateKeyPath).mode & 0o777).toBe(0o600);
+  });
+  test("STACK-LINK-ASKPASS-01: a 600 helper on disk is repaired when the module loads", () => {
+    if (process.platform === "win32") return;
+    issuePairingCode(); getLinkSshAskpassEnvironment();
+    const { askpassPath } = getLinkKeyPaths();
+    chmodSync(askpassPath, 0o600);
+    const probe = spawnSync(process.execPath, ["-e", `await import(${JSON.stringify(import.meta.resolve("@/lib/stack/linkKeys"))}); console.log((require("node:fs").statSync(${JSON.stringify(askpassPath)}).mode & 0o777).toString(8))`], { encoding: "utf8", env: { ...process.env } });
+    expect(probe.stdout.trim()).toBe("700");
+  });
+  // STACK-LINK-ASKPASS-01: protectSecretPath chmodded the helper to 600, so ssh logged "ssh_askpass: exec(...): Permission denied" and never sent the key.
+  test.skipIf(process.platform === "win32")("a fresh pairing creates the askpass helper executable", () => {
+    issuePairingCode(); getLinkSshAskpassEnvironment();
+    expect(statSync(getLinkKeyPaths().askpassPath).mode & 0o777).toBe(0o700);
+  });
+  test.skipIf(process.platform === "win32")("an already-paired install whose helper was left at 600 heals without re-pairing", () => {
+    issuePairingCode(); getLinkSshAskpassEnvironment();
+    const { askpassPath } = getLinkKeyPaths();
+    chmodSync(askpassPath, 0o600); expect(statSync(askpassPath).mode & 0o100).toBe(0);
+    const env = getLinkSshAskpassEnvironment();
+    expect(statSync(askpassPath).mode & 0o100).toBe(0o100); expect(statSync(askpassPath).mode & 0o777).toBe(0o700);
+    expect(env.SSH_ASKPASS).toBe(askpassPath); expect(readFileSync(askpassPath, "utf8")).not.toContain(env.MAIPAI_LINK_ASKPASS!);
   });
   test("a wrong check code cannot confirm and expired pairing cannot scan or confirm", () => {
     issuePairingCode(1000);

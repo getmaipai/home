@@ -5,7 +5,7 @@ import { dataDir } from "@/lib/paths";
 import { __resetPairingForTests, __setLinkKeyCommandForTests, confirmHostKey, derivePairingLookup, getLinkKeyPaths, getPairingPublicKey, issuePairingCode, knownHostsName, revokeLinkKey, scanHostKey } from "@/lib/stack/linkKeys";
 import { configuredLink } from "@/lib/remoteStackSettings";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { engineLinkKeyFiles, hostKeyPinned, runEngineLinkDoctor, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
+import { authenticateSshArgs, engineLinkKeyFiles, hostKeyPinned, runEngineLinkDoctor, sshAuthenticated, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
 
 function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = "connected"): EngineLinkDoctorDependencies {
   return {
@@ -24,6 +24,65 @@ function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = 
     completion: async () => { if (failHop === 10) throw new Error("scripted"); return 123; },
   };
 }
+
+describe("engine-link doctor hop 5 (STACK-LINK-ASKPASS-01)", () => {
+  test("the doctor's ssh arguments do not use BatchMode and do not allow a password", () => {
+    const args = authenticateSshArgs("engine.home", 22, "192.168.1.20", "/data/key", "/data/known_hosts");
+    expect(args.join(" ")).not.toContain("BatchMode");
+    expect(args).toContain("-v");
+    expect(args).toContain("NumberOfPasswordPrompts=1");
+    expect(args).toContain("PasswordAuthentication=no");
+    expect(args).toContain("KbdInteractiveAuthentication=no");
+    expect(args).toContain("HostKeyAlias=engine.home");
+  });
+  test("the classifier passes on a -v transcript that authenticated, even though the no-login shell then exited 1", () => {
+    const transcript = [
+      "debug1: Server accepts key: /data/keys/stack-link/id_ed25519 ED25519 SHA256:abc explicit",
+      "Authenticated to engine.home ([192.168.1.20]:22) using \"publickey\".",
+      "debug1: channel 0: new session [client-session]",
+      "This account is currently not available.",
+    ].join("\n");
+    expect(sshAuthenticated(transcript)).toBe(true);
+    expect(sshAuthenticated("debug1: Authentication succeeded (publickey).")).toBe(true);
+  });
+  test("the classifier fails on Permission denied (publickey,password) and on an empty transcript", () => {
+    expect(sshAuthenticated("debug1: Authentications that can continue: publickey,password\nmaipai-stack@192.168.1.20: Permission denied (publickey,password).")).toBe(false);
+    expect(sshAuthenticated("ssh_askpass: exec(/data/keys/stack-link/askpass.sh): Permission denied\nPermission denied (publickey,password).")).toBe(false);
+    expect(sshAuthenticated("")).toBe(false);
+  });
+});
+
+describe("engine-link doctor hop 5 (STACK-LINK-ASKPASS-01)", () => {
+  test("its ssh arguments have no BatchMode and ask for one key prompt, no password", () => {
+    const args = authenticateSshArgs("engine.home", 22, "192.168.1.20", "/data/key", "/data/known_hosts");
+    expect(args.join(" ")).not.toContain("BatchMode");
+    expect(args).toContain("-v");
+    for (const option of ["NumberOfPasswordPrompts=1", "PasswordAuthentication=no", "KbdInteractiveAuthentication=no"]) expect(args).toContain(option);
+    expect(args.at(-2)).toBe("maipai-stack@192.168.1.20");
+  });
+  test("passes on a -v transcript that says Authenticated to, even though the no-login shell then exits 1", () => {
+    const transcript = [
+      "debug1: Authentications that can continue: publickey,password",
+      "debug1: Offering public key: /data/id_ed25519 ED25519 SHA256:abc explicit",
+      "debug1: Server accepts key: /data/id_ed25519 ED25519 SHA256:abc explicit",
+      "Authenticated to 192.168.1.20 ([192.168.1.20]:22) using \"publickey\".",
+      "This account is currently not available.",
+    ].join("\n");
+    expect(sshAuthenticated(transcript)).toBe(true);
+    expect(sshAuthenticated("debug1: Authentication succeeded (publickey).")).toBe(true);
+  });
+  test("fails on Permission denied (publickey,password) and on an empty transcript", () => {
+    expect(sshAuthenticated("debug1: No more authentication methods to try.\nmaipai-stack@192.168.1.20: Permission denied (publickey,password).")).toBe(false);
+    expect(sshAuthenticated("ssh_askpass: exec(/data/askpass.sh): Permission denied\nPermission denied (publickey,password).")).toBe(false);
+    expect(sshAuthenticated("")).toBe(false);
+  });
+  test("a failed sign-in says what went wrong and what to do", async () => {
+    const hop = (await runEngineLinkDoctor(deps(5)))[4]!;
+    expect(hop.pass).toBe(false);
+    expect(hop.fix).toContain("did not accept");
+    expect(hop.fix).toContain("Pair this Home");
+  });
+});
 
 describe("engine-link doctor", () => {
   test("reports each scripted failure with that hop's fix", async () => {
