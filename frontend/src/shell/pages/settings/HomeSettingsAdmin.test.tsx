@@ -2,7 +2,7 @@
 // who is not an owner or admin lands on Account; the five household sections
 // that had no entry draw inside it as trail views; and the area holds
 // household scope only.
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { renderWithQueryClient } from "../../../../tests/renderWithQueryClient";
@@ -47,30 +47,12 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
 
 const where = (view: ReturnType<typeof open>) => view.getByTestId("where").textContent;
 
-// The spec's Home settings area names these trail views on the sections the
-// moved screens belong to (`spec/settings/areas.json`, spec-v0.1.112). The
-// pin this checkout carries predates them, so the test sets the same ids on
-// the same sections for the length of a test; once the pin carries them this
-// sets what is already there.
-const TRAIL_VIEWS: Record<string, string> = { ai: "home.engine_admin", robot: "home.devices_admin", developer: "home.routing_stats" };
-const saved = new Map<string, string | undefined>();
 const homeArea = () => SETTINGS_AREAS.find((area) => area.id === "home")!;
-
-beforeEach(() => {
-  for (const section of homeArea().sections) {
-    const view = TRAIL_VIEWS[section.id];
-    if (!view) continue;
-    saved.set(section.id, section.trail_view);
-    section.trail_view = view;
-  }
-});
 
 afterEach(() => {
   cleanup();
   fixture?.restore();
   fixture = null;
-  for (const section of homeArea().sections) if (saved.has(section.id)) section.trail_view = saved.get(section.id);
-  saved.clear();
 });
 
 describe("who may open Home settings", () => {
@@ -87,6 +69,12 @@ describe("who may open Home settings", () => {
 });
 
 describe("the sections that had no entry draw inside Home settings", () => {
+  test("the spec's Home area carries a trail view for each of them", () => {
+    const trail = Object.fromEntries(homeArea().sections.filter((section) => section.trail_view).map((section) => [section.id, section.trail_view]));
+    expect(trail).toEqual({ ai: "home.engine_admin", robot: "home.devices_admin", developer: "home.routing_stats" });
+  });
+
+
   const cases: Array<[string, string, string, { robots?: boolean }]> = [
     ["engine computer pairing", "/settings/home/ai", "Engine computer link", {}],
     ["Hugging Face token", "/settings/home/ai", "Hugging Face token (for voice cloning)", {}],

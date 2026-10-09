@@ -650,7 +650,11 @@ async function seedHousehold(): Promise<string> {
     headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
     body: JSON.stringify({ scope: "household", key: "household.home_place", value: "Seattle, WA" }),
   });
-  if (!place.ok) throw new Error(`seed household.home_place failed: ${place.status}`);
+  // spec-v0.1.112 replaced `household.home_place` with `household.home` (a
+  // `location` selector, PLACE-HUB-01's migration to make), so this seed no
+  // longer lands. The screenshots that need a home place are that item's to
+  // re-seed; every other review runs without one.
+  if (!place.ok) console.warn(`seed household.home_place skipped: ${place.status} (replaced by household.home; PLACE-HUB-01)`);
 
   await seedPeopleAndThings(sessionValue);
 
@@ -2918,10 +2922,19 @@ async function captureAdminHomeReview(browser: Browser, ownerSession: string): P
           // The row goes where it says.
           await page.getByRole("menuitem", { name: /Home settings/ }).click();
           await page.waitForURL(/\/settings\/home/);
-          const paths = ["/settings/home/general", "/settings/home/ai", "/settings/home/developer"];
-          for (const path of paths) {
+          const expected: Record<string, string[]> = {
+            "/settings/home/general": [],
+            "/settings/home/ai": ["Engine computer link", "Hugging Face token (for voice cloning)"],
+            // Robot passwords draws only once a robot is paired; the seeded household has none.
+            "/settings/home/robot": ["Add a robot"],
+            "/settings/home/developer": ["Plugin routing"],
+          };
+          for (const [path, headings] of Object.entries(expected)) {
             await page.goto(`${BASE_URL}${path}`);
             await page.locator('[data-slot="settings-shell"]').waitFor();
+            // Add a robot browses the network for a few seconds before it
+            // settles; judge the settled page, never the browse window.
+            await page.locator('[data-slot="skeleton"]').first().waitFor({ state: "detached", timeout: 20000 }).catch(() => {});
             await page.waitForTimeout(800);
             const state = await page.evaluate(() => ({
               path: location.pathname,
@@ -2933,8 +2946,12 @@ async function captureAdminHomeReview(browser: Browser, ownerSession: string): P
               overflow: document.documentElement.scrollWidth > window.innerWidth,
             }));
             console.log(`admin-home ${who} ${path} ${slug} ${theme}: ${JSON.stringify(state)}`);
+            for (const heading of headings) await page.getByRole("heading", { name: heading }).waitFor({ timeout: 10000 });
+            if (state.path !== path) throw new Error(`admin home review ${path} ${slug} ${theme} landed on ${state.path}`);
             if (state.overflow) throw new Error(`admin home review ${path} ${slug} ${theme} scrolls sideways`);
             if (state.spinner || state.skeleton || state.alert.length) throw new Error(`admin home review ${path} ${slug} ${theme} shows a loading or error state`);
+            // The moved sections sit below the cards; bring the last one into view so the image shows it.
+            if (headings.length) await page.getByRole("heading", { name: headings[headings.length - 1]! }).scrollIntoViewIfNeeded();
             await settleAnimations(page);
             await page.screenshot({ path: join(outDir, `home-settings-${path.split("/").pop()}-${viewport.width}-${theme}.png`) });
           }
