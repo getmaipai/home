@@ -278,6 +278,22 @@ describe("run: the gate's pass/fail meaning", () => {
     } finally { console.log = originalLog; rmSync(dir, { recursive: true, force: true }); }
   });
 
+  test("a nested ledger name falls back to the listed file and reruns its test", async () => {
+    const dir = fixture({ "a.test.ts": "" });
+    const marker = join(dir, "first-run");
+    writeFileSync(join(dir, "tests/a.test.ts"), `import {test,expect,describe} from "bun:test"; import {existsSync,writeFileSync} from "node:fs"; describe("outer",()=>describe("inner",()=>test("nested retry",()=>{if(!existsSync(${JSON.stringify(marker)})){writeFileSync(${JSON.stringify(marker)},"seen");expect(1).toBe(2)}expect(1).toBe(1)})));`);
+    try {
+      expect(await quietRun({ dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "outer > inner > nested retry"), changedFiles: [] })).toBe(0);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("a listed rerun that selects zero tests stays red", async () => {
+    const dir = fixture({ "a.test.ts": `import {test,expect} from "bun:test"; test("actual test",()=>expect(1).toBe(1));` });
+    try {
+      expect(await quietRun({ dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "no such test"), changedFiles: [] })).not.toBe(0);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   test("an expired listed failure is treated as unlisted and red", async () => {
     const dir = fixture({ "a.test.ts": `import {test,expect} from "bun:test"; test("expired red",()=>expect(1).toBe(2));` });
     const l = ledger(dir, "expired red");
