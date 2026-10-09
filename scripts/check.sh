@@ -281,9 +281,9 @@ export MAIPAI_STANDARDS_DIR="$STANDARDS_DIR"
 # package.json reference these pins by path, so bun install fails
 # without them resolved first, regardless of which scope's tests run.
 if [ "$SCOPE" != "docs" ]; then
-  CORE_TAG="core-v0.1.0"
+  CORE_TAG="core-v0.1.4"
   UI_TAG="ui-v0.5.96"
-  SPEC_TAG="spec-v0.1.72"
+  SPEC_TAG="spec-v0.1.106"
   SHARED_REPO="${MAIPAI_COMMONS_DIR:-../commons}"
   if [ ! -d "$SHARED_REPO" ]; then
     echo "getmaipai/commons is missing at $SHARED_REPO (set MAIPAI_COMMONS_DIR); backend and frontend import @maipai/core, @maipai/ui and @maipai/spec from its workspaces."

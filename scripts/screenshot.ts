@@ -6389,6 +6389,7 @@ async function main() {
   }, scriptedChatReply: (request) => {
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     if (text.includes("D22 streaming")) return Array.from({ length: SCREENSHOT_STREAM_WORDS }, (_, i) => `Streamed reply word${i + 1}.`).join(" ");
+    if (text.includes("RUNNING NOW screenshot")) return new Promise((resolve) => setTimeout(() => resolve("A calm day, told in a few short lines."), 20000));
     if (chatPageScreenshotFixture) return SCREENSHOT_CHAT_REPLY;
     if (text.includes(RICH_REPLY_PROMPT)) return RICH_REPLY_MARKDOWN;
     if (text.includes("Friday is pizza night")) return "Friday is pizza night.";

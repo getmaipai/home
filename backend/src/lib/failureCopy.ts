@@ -18,7 +18,7 @@ export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
     minor: "I can't wake up all the way right now. Try again soon.",
   },
   slow: {
-    adult: "That took too long, so the AI stopped answering. Send it again, or try a shorter question.",
+    adult: "That took too long, so the AI stopped answering. Send it again.",
     minor: "That took me too long. Try asking again.",
   },
   unreachable: {
@@ -26,8 +26,8 @@ export const FAILURE_COPY: Record<FailureKind, FailureCopy> = {
     minor: "I can't get to my thinking part right now. Please tell a grown-up.",
   },
   context_too_large: {
-    adult: "That was too much text for me to read in one go. Try a shorter question.",
-    minor: "That was too much for me to read at once. Try a shorter question.",
+    adult: "I couldn't hold all of that in my head at once. Send it again and I'll try again.",
+    minor: "That was too much for me at once. Please ask me again.",
   },
   other: {
     adult: "Something went wrong while I was writing that. Send it again, and if it keeps happening, check Repairs.",

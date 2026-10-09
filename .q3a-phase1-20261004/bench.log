@@ -1,0 +1,91 @@
+{
+  "date": "2026-10-05T03:04:12.810Z",
+  "group": "adult",
+  "embedRole": "treated as offline by the stand-in (the Stack refused it for memory pressure: it waits 15 s, then answers 503)",
+  "engineBuild": "unknown",
+  "modelFile": "unknown",
+  "stackChatRoleModel": "n/a",
+  "contextSizeMeasuredByStack": null,
+  "chatSamplingForA2": {
+    "temperature": 0.7,
+    "min_p": 0.05,
+    "xtc_probability": 0.5,
+    "xtc_threshold": 0.1,
+    "dry_multiplier": 0.8,
+    "dry_base": 1.75,
+    "dry_allowed_length": 2
+  },
+  "hardware": "Apple M4 Pro, 24 GB unified memory",
+  "thinking": "off in all arms (arms A and A2 send enable_thinking=false; the pipeline sends thinking off)",
+  "arms": {
+    "A": "no system prompt, no sampling fields, max_tokens 1536, stream",
+    "A2": "A plus CHAT_SAMPLING",
+    "C": "the child bench person on the default turn path, chat surface, streamed",
+    "S": "the owner on the default turn path, chat surface with the spoken flag, streamed; first word is the first answer delta",
+    "B": "runConversation() through a loopback stand-in for the Stack that forwards to the same engine, adult owner, chat surface, memory judge off (no background engine), real SearXNG through a pass-through tee, Wikipedia fallback at its default (on)"
+  },
+  "seeds": "none sent by any arm; the engine and the pipeline sample with their own random seeds, so the two runs of an item differ",
+  "searchTee": "all arm B searches paced at least 30 s apart; stops at the first rate-limit or block signal"
+}
+[chat-ab-01] capture turn (one real B request, to freeze Home's persona, clock and tools block)
+[chat-ab-01] captured 2 system messages (106+43 chars) and 10 tools (3220 chars)
+[chat-ab-01] starting arm A2; uptime 63591 s; load 4.14 5.04 5.84
+[chat-ab-01] block A2 k1-heat-pump run 1
+[chat-ab-01] host load 4.14 5.04 5.84; uptime 63593 s
+[chat-ab-01] block A2 k1-heat-pump run 2
+[chat-ab-01] host load 3.58 4.86 5.76; uptime 63615 s
+[chat-ab-01] block A2 k1-heat-pump run 3
+[chat-ab-01] host load 4.57 5.01 5.78; uptime 63636 s
+[chat-ab-01] block A2 f4-recipe run 1
+[chat-ab-01] host load 8.22 5.82 6.06; uptime 63658 s; LOADED
+[chat-ab-01] block A2 f4-recipe run 2
+[chat-ab-01] host load 7.54 5.78 6.04; uptime 63672 s
+[chat-ab-01] block A2 f4-recipe run 3
+[chat-ab-01] host load 9.03 6.20 6.18; uptime 63688 s; LOADED
+[chat-ab-01] block A2 w1-story run 1
+[chat-ab-01] host load 8.26 6.17 6.17; uptime 63703 s; LOADED
+[chat-ab-01] block A2 w1-story run 2
+[chat-ab-01] host load 9.16 6.44 6.27; uptime 63717 s; LOADED
+[chat-ab-01] block A2 w1-story run 3
+[chat-ab-01] host load 7.64 6.24 6.20; uptime 63733 s
+[chat-ab-01] starting arm APT; uptime 63745 s; load 8.30 6.43 6.26
+[chat-ab-01] block APT k1-heat-pump run 1
+[chat-ab-01] host load 8.04 6.41 6.26; uptime 63747 s; LOADED
+[chat-ab-01] block APT k1-heat-pump run 2
+[chat-ab-01] host load 7.28 6.29 6.22; uptime 63757 s
+[chat-ab-01] block APT k1-heat-pump run 3
+[chat-ab-01] host load 7.55 6.38 6.25; uptime 63769 s
+[chat-ab-01] block APT f4-recipe run 1
+[chat-ab-01] host load 7.09 6.32 6.23; uptime 63779 s
+[chat-ab-01] block APT f4-recipe run 2
+[chat-ab-01] host load 8.36 6.64 6.34; uptime 63791 s; LOADED
+[chat-ab-01] block APT f4-recipe run 3
+[chat-ab-01] host load 9.22 6.93 6.45; uptime 63802 s; LOADED
+[chat-ab-01] block APT w1-story run 1
+[chat-ab-01] host load 8.17 6.78 6.40; uptime 63812 s; LOADED
+[chat-ab-01] block APT w1-story run 2
+[chat-ab-01] host load 8.25 6.85 6.43; uptime 63823 s; LOADED
+[chat-ab-01] block APT w1-story run 3
+[chat-ab-01] host load 8.90 7.04 6.50; uptime 63835 s; LOADED
+[chat-ab-01] starting arm APM; uptime 63845 s; load 8.20 6.95 6.48
+[chat-ab-01] block APM k1-heat-pump run 1
+[chat-ab-01] host load 7.95 6.92 6.47; uptime 63847 s
+[chat-ab-01] block APM k1-heat-pump run 2
+[chat-ab-01] host load 7.55 6.85 6.45; uptime 63852 s
+[chat-ab-01] block APM k1-heat-pump run 3
+[chat-ab-01] host load 7.55 6.85 6.45; uptime 63855 s
+[chat-ab-01] block APM f4-recipe run 1
+[chat-ab-01] host load 7.75 6.90 6.47; uptime 63858 s
+[chat-ab-01] block APM f4-recipe run 2
+[chat-ab-01] host load 7.81 6.96 6.49; uptime 63870 s
+[chat-ab-01] block APM f4-recipe run 3
+[chat-ab-01] host load 7.07 6.82 6.45; uptime 63880 s
+[chat-ab-01] block APM w1-story run 1
+[chat-ab-01] host load 6.96 6.81 6.45; uptime 63889 s
+[chat-ab-01] block APM w1-story run 2
+[chat-ab-01] host load 5.86 6.58 6.37; uptime 63902 s
+[chat-ab-01] block APM w1-story run 3
+[chat-ab-01] host load 5.49 6.47 6.34; uptime 63914 s
+wrote /Users/jessetorres/Developer/github.com/getmaipai/home-codex-b/backend/.q3a-phase1-20261004/results.json and /Users/jessetorres/Developer/github.com/getmaipai/home-codex-b/backend/.q3a-phase1-20261004/side-by-side.md
+
+bench finished: engine chat unknown unknown; executed 27 cases; data directory /var/folders/qr/d9yr4nz52fbf1gvkq4hjc07w0000gn/T/chatab-q3a-codex.bDFZgs (disposable)

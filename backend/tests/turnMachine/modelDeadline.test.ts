@@ -364,6 +364,8 @@ describe("THIN-DL-02: the failure line follows the kind", () => {
   });
 
   test("no line, for any kind or age, is the generic apology, carries a code, or runs past two sentences for a minor", () => {
+    const allCopy = Object.values(FAILURE_COPY).flatMap(({ adult, minor }) => [adult, minor]);
+    expect(allCopy.every((text) => !text.toLowerCase().includes("shorter"))).toBe(true);
     for (const kind of Object.keys(FAILURE_COPY) as (keyof typeof FAILURE_COPY)[]) {
       for (const text of [FAILURE_COPY[kind].adult, FAILURE_COPY[kind].minor]) {
         expect(text).not.toContain("couldn't do that");

@@ -84,8 +84,8 @@ describe("the failure kind", () => {
   });
 
   test("the table has plain copy for it, an adult's and a minor's, with no codes and never the generic line", () => {
-    expect(FAILURE_COPY.context_too_large.adult).toBe("That was too much text for me to read in one go. Try a shorter question.");
-    expect(FAILURE_COPY.context_too_large.minor).toBe("That was too much for me to read at once. Try a shorter question.");
+    expect(FAILURE_COPY.context_too_large.adult).toBe("I couldn't hold all of that in my head at once. Send it again and I'll try again.");
+    expect(FAILURE_COPY.context_too_large.minor).toBe("That was too much for me at once. Please ask me again.");
     for (const minor of [false, true]) {
       const line = failureLine("context_too_large", minor);
       expect(line).not.toContain("Something went wrong");
