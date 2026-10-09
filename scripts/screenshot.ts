@@ -41,6 +41,7 @@
 import { chromium, firefox, webkit, type Browser, type BrowserContext, type Locator, type Page } from "playwright";
 import { assistantStreamBody } from "../frontend/tests/assistantStreamBody";
 import { findClippedStrips, findOverflowingPanels } from "./panelOverflow";
+import { waitForAnimationSettle } from "./animationSettle";
 // A repo-root script, not a workspace member, so it can't resolve the
 // @maipai/spec package (only backend/ and frontend/ have it installed);
 // spec-v0.1.0 moved this file to the sibling getmaipai/shared checkout
@@ -726,6 +727,7 @@ async function newContext(browser: Browser, viewport: ViewportSpec, theme: "ligh
     userAgent: viewport.userAgent,
     isMobile: viewport.slug === "phone",
     hasTouch: viewport.slug === "phone",
+    reducedMotion: a11yOnly ? "reduce" : undefined,
   });
   await context.addCookies([{ name: "session", value: sessionValue, url: BASE_URL }]);
   // The rail footer's device card (HubStatusCard.tsx) reads GET
@@ -775,9 +777,10 @@ interface RunResult {
 // same way), so this is unconditional for every route, not gated on
 // `chatReview` the way it used to be.
 async function settleAnimations(page: import("playwright").Page) {
-  await page.evaluate(async () => {
-    await Promise.all(document.getAnimations().filter((animation) => animation.effect?.getTiming().iterations !== Infinity).map((animation) => animation.finished.catch(() => {})));
-  });
+  await waitForAnimationSettle(
+    () => page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === "running" || animation.pending).length),
+    (ms) => page.waitForTimeout(ms),
+  );
 }
 
 /** Files-page demo data stays in the screenshot browser request layer: it
