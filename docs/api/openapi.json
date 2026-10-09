@@ -16395,6 +16395,105 @@
         }
       }
     },
+    "/api/admin/turns/:id/trace": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Read a turn's safe timing trace",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stored timings and statuses only; minor turns never include engine error codes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "spans": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "depth": {
+                            "type": "integer"
+                          },
+                          "startMs": {
+                            "type": "number"
+                          },
+                          "durationMs": {
+                            "type": "number"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "running",
+                              "completed",
+                              "failed"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "depth",
+                          "startMs",
+                          "durationMs",
+                          "status"
+                        ]
+                      }
+                    },
+                    "totalMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "spans",
+                    "totalMs"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Turn not found or temporary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/dev/ui-fixtures": {
       "get": {
         "tags": [

@@ -13,6 +13,7 @@ import { NextSettingsPage } from "@/next/pages/NextSettingsPage";
 import { NextStoragePage } from "@/next/pages/NextStoragePage";
 import { NextEnginesPage } from "@/next/pages/NextEnginesPage";
 import { NextPerformancePage } from "@/next/pages/NextPerformancePage";
+import { TurnTracePage } from "@/next/pages/TurnTracePage";
 import { NextUpdatesPage } from "@/next/pages/NextUpdatesPage";
 import { NextRepairsPage } from "@/next/pages/NextRepairsPage";
 import { NextStatusPage } from "@/next/pages/NextStatusPage";
@@ -179,6 +180,7 @@ function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { pers
             <Route path="storage" element={<NextStoragePage person={person} />} />
             <Route path="engines" element={<NextEnginesPage person={person} />} />
             <Route path="performance" element={<NextPerformancePage />} />
+            <Route path="trace/:turnId" element={<TurnTracePage />} />
             <Route path="updates" element={<NextUpdatesPage person={person} />} />
             <Route path="repairs" element={<NextRepairsPage person={person} />} />
             <Route path="status" element={<NextStatusPage person={person} />} />

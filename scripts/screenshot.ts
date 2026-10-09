@@ -291,6 +291,7 @@ const nextUpdatesReview = process.argv.includes("--next-updates-review");
 const nextRepairsReview = process.argv.includes("--next-repairs-review");
 const nextBackupsReview = process.argv.includes("--next-backups-review");
 const nextPerformanceReview = process.argv.includes("--next-performance-review");
+const turnTraceReview = process.argv.includes("--turn-trace-review");
 const nextStorageReview = process.argv.includes("--next-storage-review");
 const nextSignInReview = process.argv.includes("--next-sign-in-review");
 const nextChatReview = process.argv.includes("--next-chat-review");
@@ -378,6 +379,7 @@ const ROUTES: RouteSpec[] = [
   { slug: "settings-devices", path: "/devices" },
   { slug: "files", path: "/files" },
   { slug: "settings-repairs", path: "/repairs" },
+  { slug: "turn-trace", path: "/next/trace/screenshot-turn-trace" },
   { slug: "settings-updates", path: "/updates" },
 ];
 
@@ -570,6 +572,7 @@ async function seedHousehold(): Promise<string> {
   if (!seededPeople.ok) throw new Error(`seed people lookup failed: ${seededPeople.status}`);
   const sage = ((await seededPeople.json()) as Array<{ id: string; display_name: string }>).find((person) => person.display_name === "Sage");
   if (!sage) throw new Error("seed people lookup did not return Sage");
+  seedTurnTraceReviewData(sage.id);
   if (chatArtifactCapture) attachWriteDocumentRoutingStats(sage.id);
   for (const person of [
     { displayName: "Marlow", role: "teen" },
@@ -615,6 +618,29 @@ async function seedHousehold(): Promise<string> {
   await seedPeopleAndThings(sessionValue);
 
   return sessionValue;
+}
+
+function seedTurnTraceReviewData(personId: string): void {
+  const db = new Database(join(DATA_DIR, "hub.db"));
+  if (db.query("SELECT id FROM conversation_turns WHERE id = 'screenshot-turn-trace'").get()) { db.close(); return; }
+  const conversationId = "screenshot-turn-trace-conversation";
+  const turnId = "screenshot-turn-trace";
+  const now = new Date().toISOString();
+  const hlc = `${now}:0:screenshot`;
+  db.query("INSERT INTO conversations (id, person_id, surface, mode, hlc, created_at, updated_at) VALUES (?, ?, 'chat', 'chat', ?, ?, ?)").run(conversationId, personId, hlc, now, now);
+  const stats = {
+    prompt_tokens: 64, predicted_tokens: 22, tokens_per_second: 45, time_to_first_token_ms: 190, total_time_ms: 680,
+    context_tokens: 100, cache_reuse_tokens: null, cache_reuse_percent: null, engine: "capture-engine", stop_reason: "stop", thinking: false,
+    generations: [{ reason: "model", thinking: false, max_tokens: 80, prompt_n: 64, cache_n: null, prompt_ms: 110, predicted_n: 22, predicted_ms: 430, request_sent_ms: 120, first_delta_ms: 190 }],
+    nodes: [
+      { node: "safety", impl: "safetyFloor", version: "1", startMs: 100, endMs: 125, outcome: { ok: true } },
+      { node: "context", impl: "buildContext", version: "2", startMs: 125, endMs: 210, outcome: { ok: true } },
+      { node: "model", impl: "runGeneration", version: "1", startMs: 210, endMs: 760, outcome: { ok: true } },
+      { node: "output_gate", impl: "releaseAnswer", version: "1", startMs: 760, endMs: 780, outcome: { ok: true } },
+    ],
+  };
+  db.query("INSERT INTO conversation_turns (id, person_id, surface, conversation_id, user_text, reply_text, source, safety_action, minor_speaker, created_at, hlc, stats) VALUES (?, ?, 'chat', ?, 'capture input', 'capture reply', 'model', 'allow', 0, ?, ?, ?)").run(turnId, personId, conversationId, now, `${hlc}:${turnId}`, JSON.stringify(stats));
+  db.close();
 }
 
 // Lane 11 item 2: real content for the Memory app's "People and things"
@@ -7996,6 +8022,29 @@ async function captureNextPerformanceReview(browser: Browser, sessionValue: stri
   }
 }
 
+async function captureTurnTraceReview(browser: Browser, sessionValue: string): Promise<void> {
+  const turnId = "screenshot-turn-trace";
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.goto(`${BASE_URL}/next/trace/${turnId}`);
+        await page.getByText("Trace", { exact: true }).waitFor({ timeout: 15000 });
+        await page.getByText("output_gate", { exact: false }).waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const path = join(outDir, `turn-trace-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
+        await page.close();
+      } finally { await context.close(); }
+    }
+  }
+}
+
 /** STORE-PAGE-01's own acceptance: both viewports, both themes, of
  * `/storage`, signed in as Sage (owner) - seedHousehold() already
  * creates three real people (Sage, Marlow, Nova), so the data table
@@ -9095,6 +9144,12 @@ async function main() {
 
     if (nextPerformanceReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextStorageReview) {
       await captureNextPerformanceReview(browser, sessionValue);
+    }
+
+    if (turnTraceReview) {
+      await captureTurnTraceReview(browser, sessionValue);
+      console.log("completed named review: --turn-trace-review");
+      return;
     }
 
     if (nextStorageReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview) {

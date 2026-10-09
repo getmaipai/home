@@ -579,6 +579,7 @@ export type StatusHistoryIncident = { component: "chat" | "embed" | "background"
 export type StatusHistoryComponent = { component: StatusHistoryIncident["component"]; uptime_percent: number | null; days: StatusHistoryDay[]; current: { state: StatusHistoryState; since: string | null } };
 export type StatusHistory = { generated_at: string; days: number; components: StatusHistoryComponent[]; incidents: StatusHistoryIncident[] };
 
+export interface TurnTrace { spans: Array<{ id: string; name: string; depth: number; startMs: number; durationMs: number; status: "running" | "completed" | "failed" }>; totalMs: number }
 export type StatusAppsResponse = StatusAppsWire;
 export type StatusApp = StatusAppsResponse[number];
 export type StatusAppNeed = NonNullable<StatusApp["needs"]>[number];
@@ -864,6 +865,7 @@ export const api = {
   // health and hardware. `days` defaults to 30 on the backend when
   // omitted.
   performance: (days?: number) => request<Performance>(`/api/performance${days ? `?days=${days}` : ""}`),
+  turnTrace: (id: string) => request<TurnTrace>(`/api/admin/turns/${encodeURIComponent(id)}/trace`),
   // GET /api/turn-error-detail/:id (THIN-1E): owner/admin only, the stored raw detail of a failed turn.
   turnErrorDetail: (turnId: string) => request<TurnErrorDetail>(`/api/turn-error-detail/${encodeURIComponent(turnId)}`),
   // GET /api/storage/usage (STORE-PAGE-01): every signed-in person may
