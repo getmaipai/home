@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -548,6 +548,82 @@ describe("engine computer installer cleanup", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+// ENGINE-TRAP-01: `sudo maipai-engine update` did everything, then died with "work: unbound variable". update() set
+// `trap 'rm -rf "$work"' RETURN` on a function local; a RETURN trap outlives the function, so it fired again when
+// main returned, where `work` no longer exists, and `set -u` killed the script after a good update.
+describe("maipai-engine update: its cleanup cannot fire twice or on a name that is gone (ENGINE-TRAP-01)", () => {
+  // Runs update() from a function, the way main() calls it, with every machine-changing step stubbed and every file
+  // inside `scratch`. `engine` is the script under test (the tests use the repo's; the proof run used the old one).
+  function runUpdate(engine: string, scratch: string, buildFails: boolean) {
+    const build = buildFails ? "exit 1" : 'mkdir -p "$OUT_DIR/migrations" "$OUT_DIR/backend-src" && : > "$OUT_DIR/maipai-stack-linux-x64"';
+    const script = [
+      `source "${engine}"`,
+      `need_root() { :; }`,
+      `mktemp() { command mktemp -d "${scratch}/work.XXXXXX"; }`,
+      `uname() { case "$1" in -s) echo Linux;; -m) echo x86_64;; *) command uname "$@";; esac; }`,
+      `curl() { :; }`,
+      // The Stack download is "unpacked" into $4 as a build script that writes what the real build writes.
+      `tar() { command mkdir -p "$4/scripts"; printf '%s\\n' '${build}' > "$4/scripts/build-binary.sh"; }`,
+      `fetch_stack_commons() { return 0; }`,
+      `chown() { :; }`,
+      `loginctl() { :; }`,
+      `id() { echo 1000; }`,
+      `sudo() { :; }`,
+      `STACK_ROOT="${scratch}/root"`,
+      `command mkdir -p "$STACK_ROOT/.bun/bin"`,
+      `printf '#!/bin/sh\\n' > "$STACK_ROOT/.bun/bin/bun"`,
+      `command chmod +x "$STACK_ROOT/.bun/bin/bun"`,
+      // main() calls update() from inside its own function frame, and keeps going after it.
+      `main_like() { update; echo "back in main_like"; }`,
+      `main_like`,
+      `echo "main returned"`,
+    ].join("\n");
+    return Bun.spawnSync(["bash", "-c", script]);
+  }
+  const leftovers = (scratch: string): string[] => readdirSync(scratch).filter((name) => name.startsWith("work."));
+
+  test("a good update returns to the caller, the script exits 0, and the work folder is gone", () => {
+    const scratch = mkdtempSync(join(tmpdir(), "maipai-engine-trap-"));
+    try {
+      const result = runUpdate(ENGINE_HELPER, scratch, false);
+      const said = `${result.stdout.toString()}\n${result.stderr.toString()}`;
+      expect(result.stderr.toString()).not.toContain("unbound variable");
+      expect(result.exitCode, said).toBe(0);
+      expect(said).toContain("back in main_like");
+      expect(said).toContain("main returned");
+      expect(existsSync(join(scratch, "root", "maipai-stack-linux-x64"))).toBe(true);
+      expect(leftovers(scratch)).toEqual([]);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("a failed build stops with the fix, and the work folder is still removed", () => {
+    const scratch = mkdtempSync(join(tmpdir(), "maipai-engine-trap-"));
+    try {
+      const result = runUpdate(ENGINE_HELPER, scratch, true);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).not.toContain("unbound variable");
+      expect(result.stderr.toString()).toContain("The Stack build failed");
+      expect(result.stderr.toString()).toContain("run sudo maipai-engine update again");
+      expect(leftovers(scratch)).toEqual([]);
+    } finally {
+      rmSync(scratch, { recursive: true, force: true });
+    }
+  });
+
+  test("the old line fails this test: a RETURN trap on a function local fires again where the local is gone", () => {
+    // The shape of the old code, on its own: it exits nonzero with the exact message Jesse saw.
+    const old = Bun.spawnSync(["bash", "-c", `set -euo pipefail; update() { local work=w; trap 'rm -rf "$work"' RETURN; true; }; main() { update; echo after; }; main; echo end`]);
+    expect(old.exitCode).not.toBe(0);
+    expect(old.stderr.toString()).toContain("work: unbound variable");
+    // And the shape of the fix: same frame, exits 0.
+    const fixed = Bun.spawnSync(["bash", "-c", `set -euo pipefail; W=""; cleanup() { trap - RETURN EXIT; if [ -n "\${W:-}" ]; then rm -rf "$W"; fi; W=""; return 0; }; update() { local work=w; W="$work"; trap cleanup RETURN EXIT; true; }; main() { update; echo after; }; main; echo end`]);
+    expect(fixed.exitCode, fixed.stderr.toString()).toBe(0);
+    expect(fixed.stdout.toString()).toContain("end");
   });
 });
 

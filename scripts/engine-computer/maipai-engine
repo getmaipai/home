@@ -11,6 +11,9 @@ AUTH_KEYS="${MAIPAI_ENGINE_AUTH_KEYS:-$STACK_HOME/.ssh/authorized_keys}"
 STACK_TAG=60b887c5704bd94bc742254cce48e4d34b1fd035
 STACK_REPO=getmaipai/stack
 DRY_RUN=no
+# The scratch folder update() builds in. A global on purpose: a trap that names a function's local variable
+# outlives the function and fires again, later, where that local no longer exists (ENGINE-TRAP-01).
+UPDATE_WORK=""
 
 say() { printf '%s\n' "$*"; }
 die() { say "error: $*" >&2; exit 1; }
@@ -320,6 +323,16 @@ publish_stack_binary() {
   done
 }
 
+# Removes update()'s scratch folder and then removes its own traps, so it cannot fire twice, and it names only
+# the global above (set -u safe, a no-op when there is nothing to remove). Runs when update() returns and when
+# the script exits early through die().
+cleanup_update_work() {
+  trap - RETURN EXIT
+  if [ -n "${UPDATE_WORK:-}" ]; then rm -rf "$UPDATE_WORK"; fi
+  UPDATE_WORK=""
+  return 0
+}
+
 update() {
   if dry; then
     say "[dry-run] Would fetch Stack at pinned STACK_TAG into a scratch folder."
@@ -329,8 +342,9 @@ update() {
   fi
   need_root
   local work bun_bin os arch binary_name
-  work=$(mktemp -d)
-  trap 'rm -rf "$work"' RETURN
+  work=$(mktemp -d) || die "Could not make a scratch folder for the update. Check that the disk is not full and that /tmp is writable, then run sudo maipai-engine update again."
+  UPDATE_WORK="$work"
+  trap cleanup_update_work RETURN EXIT
   mkdir -p "$work/stack"
   curl -fsSL "https://github.com/${STACK_REPO}/archive/${STACK_TAG}.tar.gz" -o "$work/stack.tgz" \
     || die "Could not download the Stack from https://github.com/${STACK_REPO}/archive/${STACK_TAG}.tar.gz. Check that this computer can reach github.com, then run sudo maipai-engine update again."
