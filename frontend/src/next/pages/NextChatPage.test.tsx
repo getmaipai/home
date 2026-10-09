@@ -1516,10 +1516,9 @@ describe("NextChatPage (SHELL-02's slice 4: artifacts)", () => {
     }
   });
 });
-// APPROVE-CARD-01 (issue #177): a package's own confirm_needed/
-// consent_needed ask renders through the shipped `ToolFallback.Approval`
-// (vendored at `@maipai/ui/src/assistant-ui/tool-fallback.aui`), never a
-// hand-built card - `ConfirmTool`'s own registration, NextChatPage.tsx.
+// APPROVE-CARD-01 (issue #177), APPROVE-CARD-02: a package's own
+// confirm_needed/consent_needed ask renders as the kit's ApprovalCard as it
+// ships, never a hand-built card (ConfirmToolRender, chatToolUis.tsx).
 describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
   // stubTurnFetch's own shape (slice 3, above), extended to return a
   // DIFFERENT stream per successive /api/turn/stream call - the click-
@@ -1552,7 +1551,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
     fireEvent.click(send);
   }
 
-  test("an open confirm card renders ToolFallback.Approval's Approve/Deny options under a short question", async () => {
+  test("an open confirm card is the kit ApprovalCard: a short question, the reassurance, Allow once and Deny, never Always allow", async () => {
     const restore = stubConfirmTurnFetch([
       ndjsonStream([
         { type: "delta", text: "Go ahead and lock the doors?" },
@@ -1567,15 +1566,46 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
       );
       await sendMessage(view, "lock the doors");
       expect(await view.findByText("Go ahead and lock the doors?")).toBeVisible();
-      expect(await view.findByRole("button", { name: /^Approve/ })).toBeVisible();
+      expect(await view.findByRole("button", { name: /^Allow once/ })).toBeVisible();
       expect(await view.findByRole("button", { name: "Deny" })).toBeVisible();
-      // APPROVE-CALM-01: the card's own question, then plain detail lines.
-      const prompt = view.container.querySelector(".aui-tool-fallback-approval-prompt");
-      expect(prompt?.textContent).toMatch(/^Go ahead\?\nNothing happens until you choose\.\nWaiting since /);
+      expect(view.queryByRole("button", { name: "Always allow" })).toBeNull();
+      // APPROVE-CALM-01: the card's own question, then the plain detail line.
+      const card = view.container.querySelector('[data-slot="approval-card"]')!;
+      expect(card.textContent).toContain("Go ahead?");
+      expect(card.textContent).toMatch(/Nothing happens until you choose\. Waiting since /);
+      // No command box: a package ask is not a terminal command.
+      expect(card.querySelector(".font-mono")).toBeNull();
     } finally {
       restore();
     }
   });
+
+  // APPROVE-CARD-02: every band answers the same card for now; a child's ask
+  // is not routed to a parent yet (PARENT-APPROVAL-01), so the card never
+  // claims one was asked.
+  for (const [band, role] of [["teen", "teen"], ["child", "child"]] as const) {
+    test(`${band}: the same waiting card with Allow once and Deny, and never "Asked a parent"`, async () => {
+      const restore = stubConfirmTurnFetch([
+        ndjsonStream([
+          { type: "delta", text: "Go ahead and lock the doors?" },
+          { type: "done", value: { turn_id: `turn-confirm-${band}`, reply: { text: "Go ahead and lock the doors?" }, source: "confirm", safety: SAFETY, confirm: { package_id: "lock-doors", open: true } } },
+        ]),
+      ]);
+      try {
+        const view = renderPage(
+          <MemoryRouter initialEntries={["/chat"]}>
+            <NextChatPage person={makePerson({ role, age_band: band })} />
+          </MemoryRouter>,
+        );
+        await sendMessage(view, "lock the doors");
+        expect(await view.findByRole("button", { name: /^Allow once/ })).toBeVisible();
+        expect(view.getByRole("button", { name: "Deny" })).toBeVisible();
+        expect(view.container.textContent).not.toContain("Asked a parent");
+      } finally {
+        restore();
+      }
+    });
+  }
 
   test("tapping Approve sends a new turn with the matching ask_answer and the tapped label as its text, then clears the one-shot field", async () => {
     const restore = stubConfirmTurnFetch([
@@ -1599,7 +1629,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
         </MemoryRouter>,
       );
       await sendMessage(view, "lock the doors");
-      const yesButton = await view.findByRole("button", { name: /^Approve/ });
+      const yesButton = await view.findByRole("button", { name: /^Allow once/ });
       fireEvent.click(yesButton);
       expect(await view.findByText("Sure, locking the doors.")).toBeVisible();
       const bodies = turnRequestBodies();
@@ -1661,14 +1691,14 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
         </MemoryRouter>,
       );
       await sendMessage(view, "lock the doors");
-      await view.findByRole("button", { name: /^Approve/ });
+      await view.findByRole("button", { name: /^Allow once/ });
       fireEvent.keyDown(view.getByLabelText("Message input"), { key: "Enter", ctrlKey: true });
       expect(turnRequestBodies()).toHaveLength(1);
       fireEvent.keyDown(document.body, { key: "Enter", ctrlKey: true });
       expect(await view.findByText("Sure, locking the doors.")).toBeVisible();
       expect(turnRequestBodies()[1]).toMatchObject({ ask_answer: { turn_id: "turn-confirm4", approved: true } });
       // Answered: the card is gone and the shortcut no longer answers it again.
-      await waitFor(() => expect(view.queryByRole("button", { name: /^Approve/ })).toBeNull());
+      await waitFor(() => expect(view.queryByRole("button", { name: /^Allow once/ })).toBeNull());
       fireEvent.keyDown(document.body, { key: "Enter", ctrlKey: true });
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(turnRequestBodies()).toHaveLength(2);
@@ -1721,7 +1751,7 @@ describe("NextChatPage (APPROVE-CARD-01: the confirm tool-call card)", () => {
         </MemoryRouter>,
       );
       expect(await view.findByText("Go ahead and lock the doors?")).toBeVisible();
-      expect(view.queryByRole("button", { name: /^Approve/ })).toBeNull();
+      expect(view.queryByRole("button", { name: /^Allow once/ })).toBeNull();
       expect(view.queryByRole("button", { name: "Deny" })).toBeNull();
     } finally {
       globalThis.fetch = original;

@@ -58,7 +58,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
 import { startScreenshotStack } from "./screenshotStack";
-import { assistantStreamBody } from "../frontend/tests/assistantStreamBody";
+import { ASSISTANT_STREAM_HEADERS, assistantStreamBody } from "../frontend/tests/assistantStreamBody";
 import { RICH_REPLY_MARKDOWN, RICH_REPLY_PROMPT } from "../frontend/src/next/pages/richReplyFixture";
 import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
@@ -3350,7 +3350,7 @@ async function seedTurnFor(session: string, text: string): Promise<{ conversatio
   return (await turn.json()) as { conversation_id: string; turn_id: string };
 }
 
-type Wave2Shot = { band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; live?: boolean; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
+type Wave2Shot = { band: "adult" | "teen" | "child"; person: string | null; prompt: string; combos: ReadonlyArray<readonly ["desktop" | "phone", "light" | "dark"]>; live?: boolean; prepare?(page: Page): Promise<void>; seed?(session: string, seeded: { conversation_id: string; turn_id: string }): Promise<void>; drive(page: Page, band: "adult" | "teen" | "child"): Promise<void> };
 
 const ALL_COMBOS = [["desktop", "light"], ["desktop", "dark"], ["phone", "light"], ["phone", "dark"]] as const;
 const TWO_COMBOS = [["desktop", "light"], ["phone", "dark"]] as const;
@@ -3414,6 +3414,34 @@ function wave2Shots(part: string): Wave2Shot[] {
     }
     return shots;
   }
+  if (part === "approval") {
+    // APPROVE-CARD-02: a package's parked confirm ask, as the hub sends it
+    // (a confirm done value), answered by the kit ApprovalCard.
+    const prepare = async (page: Page) => {
+      await page.route("**/api/turn/stream", async (route) => {
+        const sent = (route.request().postDataJSON() ?? {}) as { conversation_id?: string };
+        const value = {
+          reply: { text: "Go ahead and lock the front door?" },
+          source: "confirm",
+          safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },
+          conversation_id: sent.conversation_id ?? "conv-approvalshot",
+          turn_id: "turn-approvalshot",
+          confirm: { package_id: "lock-doors", open: true },
+        };
+        const body = await new Response(assistantStreamBody([{ type: "delta", text: value.reply.text }, { type: "done", value }])).arrayBuffer();
+        return route.fulfill({ status: 200, headers: { ...ASSISTANT_STREAM_HEADERS }, body: Buffer.from(body) });
+      });
+    };
+    const drive = async (page: Page) => {
+      await page.locator('[data-slot="approval-card"]').waitFor({ timeout: 20000 });
+      await page.getByText("Go ahead and lock the front door?").waitFor({ timeout: 20000 });
+    };
+    return [
+      { band: "adult", person: null, prompt: "Lock the front door", combos: ALL_COMBOS, live: true, prepare, drive },
+      { band: "teen", person: "Marlow", prompt: "Lock the front door", combos: TWO_COMBOS, live: true, prepare, drive },
+      { band: "child", person: "Nova", prompt: "Lock the front door", combos: TWO_COMBOS, live: true, prepare, drive },
+    ];
+  }
   throw new Error(`elements wave 2: unknown part ${part}`);
 }
 
@@ -3430,6 +3458,7 @@ async function captureElementsWave2Review(browser: Browser, sessionValue: string
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await shot.prepare?.(page);
         if (seeded) {
           await page.goto(`${BASE_URL}/chat?conversation=${seeded.conversation_id}`);
           await page.getByRole("button", { name: "Not helpful" }).last().waitFor({ timeout: 20000 });
