@@ -9,11 +9,10 @@ import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js"
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { stagedDocumentPayload, clearStagedImageAttachment } from "@/apps/chat/localImageAttachmentAdapter";
-import { answerBlockParts } from "@/apps/chat/chatAnswerBlocks";
+import { textWithAnswerParts } from "@/apps/chat/chatAnswerBlocks";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import { sourceMessageParts } from "@/apps/chat/chatSources";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
-import { textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
 import type { AnswerImageSet, CrisisSupport } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
@@ -320,8 +319,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // opposite of sources' "compact card under the reply."
         const timeline = toolTimelinePart(resumeTurnId);
         if (timeline) parts.push(timeline);
-        parts.push(...answerBlockParts(streamedBlocks));
-        if (visible || answerImages) parts.push(...textWithAnswerImages(visible, answerImages, `${resumeTurnId ?? "live"}-images`).filter((part) => part.type !== "text" || part.text));
+        // GENUI-13c: blocks and the picture set sit at their own paragraph of the text so far, as the hub placed them.
+        if (visible || answerImages || streamedBlocks.length) parts.push(...textWithAnswerParts(visible, { blocks: streamedBlocks, images: answerImages, imagesId: `${resumeTurnId ?? "live"}-images` }).filter((part) => part.type !== "text" || part.text));
         return parts;
       }
 
@@ -665,10 +664,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // this never adds a part in the running app until the
                 // backend half lands.
                 ...(timelinePart ? [timelinePart] : []),
-                // GENUI-03b: the answer blocks, where they sat while streaming
-                // (the stored turn's own list when none streamed, as on a resume).
-                ...answerBlockParts(streamedBlocks.length ? streamedBlocks : event.value.blocks),
-                ...textWithAnswerImages(finalText, event.value.answer_images ?? answerImages, `${event.value.turn_id}-images`),
+                // GENUI-03b and GENUI-13c: the answer blocks and the picture set, each at its paragraph of the reply,
+                // where they sat while streaming (the stored turn's own blocks when none streamed, as on a resume).
+                ...textWithAnswerParts(finalText, { blocks: streamedBlocks.length ? streamedBlocks : event.value.blocks, images: event.value.answer_images ?? answerImages, imagesId: `${event.value.turn_id}-images` }),
                 // APPROVE-CALM-01 (owner's Row-Bot reference, 2026-10-06): the
                 // approval card sits UNDER the reply that asks, the way the
                 // reference reads ("...so it waits for your approval", then

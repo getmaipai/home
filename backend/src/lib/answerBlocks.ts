@@ -66,7 +66,9 @@ export function filterAnswerBlocks(
       console.warn("[answer-block] dropped invalid block");
       continue;
     }
-    const block = parsed.data as AnswerBlockValue;
+    // GENUI-13a: `after_paragraph` is the hub's to stamp, where the block sits in the reply. A package never sets it:
+    // whatever value it sent is dropped here, before the block is accepted.
+    const { after_paragraph: _sentByPackage, ...block } = parsed.data as AnswerBlockValue;
     if (block.producer !== packageId || !allowedKinds.includes(block.kind) || ids.has(block.id)) {
       console.warn("[answer-block] dropped block outside package manifest");
       continue;

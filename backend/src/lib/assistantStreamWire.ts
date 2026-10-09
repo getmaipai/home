@@ -94,9 +94,15 @@ export function createAssistantStreamSink(onCancel: () => void = () => {}): Assi
           controller.enqueue({ type: "text-delta", path: [index], textDelta: JSON.stringify(event.args) });
           controller.enqueue({ type: "tool-call-args-text-finish", path: [index] });
         } else {
-          // GENUI-02 blocks are already emitted as their own data event;
-          // they do not replace or fail the package's tool result part.
-          if (event.t === "block") return;
+          // GENUI-02 blocks are already emitted as their own data event; they do not replace or fail the package's
+          // tool result part. GENUI-13c: the open text part ended above (closeOpen), the block is one `answer_block`
+          // data part in place, as the picture set is one `answer-images` part, and the next delta opens a new text part.
+          if (event.t === "block") {
+            const index = parts++;
+            controller.enqueue({ type: "part-start", path: [], part: { type: "data", name: "answer_block", data: event.block as never } });
+            controller.enqueue({ type: "part-finish", path: [index] });
+            return;
+          }
           const index = tools.get(event.call_id);
           if (index === undefined) return;
           controller.enqueue(event.t === "tool_result"

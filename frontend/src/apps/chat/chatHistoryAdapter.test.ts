@@ -262,8 +262,9 @@ describe("rowsToBranchableMessages", () => {
 
   // GENUI-03b: the stored answer blocks come back as the same `answer_block`
   // data parts the live stream built, in tool-call order, before the text.
-  test("a row carrying answer blocks reloads them in tool-call order, before the text", () => {
-    const [sheet, table, chart] = SHOWCASE_BLOCKS;
+  test("a row carrying answer blocks reloads them in tool-call order, before the text (the hub stamped after_paragraph 0)", () => {
+    const [sheet0, table0, chart0] = SHOWCASE_BLOCKS;
+    const [sheet, table, chart] = [sheet0!, table0!, chart0!].map((block) => ({ ...block, after_paragraph: 0 }));
     const row = { ...makeRow("row-1", "Here you go."), blocks: [table!, sheet!, chart!] };
     const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
     expect(items[1]!.message.content).toEqual([
@@ -274,9 +275,31 @@ describe("rowsToBranchableMessages", () => {
     ]);
   });
 
+  // GENUI-13c: history round trip. The stored text is split with the spec's paragraph helper at each block's own
+  // `after_paragraph`, so a reload puts a block where the live stream did.
+  test("a row's blocks reload at their own paragraph of the stored text (GENUI-13c)", () => {
+    const sheet = { ...SHOWCASE_BLOCKS[0]!, after_paragraph: 1 };
+    const table = { ...SHOWCASE_BLOCKS[1]!, after_paragraph: 2 };
+    const row = { ...makeRow("row-1", "First paragraph.\n\nSecond paragraph.\n\nThird paragraph."), blocks: [sheet, table] };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "text", text: "First paragraph." },
+      { type: "data", name: "answer_block", data: sheet },
+      { type: "text", text: "Second paragraph." },
+      { type: "data", name: "answer_block", data: table },
+      { type: "text", text: "Third paragraph." },
+    ]);
+    // A record with no stamp (from before the field) goes after the whole reply.
+    const legacy = { ...makeRow("row-2", "Only text."), blocks: [SHOWCASE_BLOCKS[0]!] };
+    expect(flatten(rowsToBranchableMessages([legacy], "Nova", "conv-example123"))[1]!.message.content).toEqual([
+      { type: "text", text: "Only text." },
+      { type: "data", name: "answer_block", data: SHOWCASE_BLOCKS[0] },
+    ]);
+  });
+
   test("a stored block of an unknown kind is dropped on reload and the reply still loads", () => {
-    const [sheet] = SHOWCASE_BLOCKS;
-    const row = { ...makeRow("row-1", "Still here."), blocks: [{ ...sheet!, id: "blk-zzzzzz", kind: "hologram" }, sheet!] } as unknown as ConversationTurnWithMemoryIds;
+    const sheet = { ...SHOWCASE_BLOCKS[0]!, after_paragraph: 0 };
+    const row = { ...makeRow("row-1", "Still here."), blocks: [{ ...sheet, id: "blk-zzzzzz", kind: "hologram" }, sheet] } as unknown as ConversationTurnWithMemoryIds;
     const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
     expect(items[1]!.message.content).toEqual([{ type: "data", name: "answer_block", data: sheet }, { type: "text", text: "Still here." }]);
     const only = { ...makeRow("row-2", "Plain."), blocks: [{ id: "x", kind: "hologram" }] } as unknown as ConversationTurnWithMemoryIds;

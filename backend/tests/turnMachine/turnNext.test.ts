@@ -549,9 +549,70 @@ describe("turnNext.ts: accepted answer blocks reach the turn and stored row (GEN
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
       expect(result.value.reply.text).toBe("Today is Thursday.");
       expect(result.toolEvents?.map((event) => event.t)).toEqual(["tool_call", "tool_result", "block"]);
-      expect(result.value.blocks).toEqual([block]);
+      // GENUI-13c: the hub stamps where the block sits; the answer had no text streamed before the tool result, so it
+      // goes after the one-paragraph reply.
+      const stamped = { ...block, after_paragraph: 1 };
+      expect(result.value.blocks).toEqual([stamped]);
+      expect(result.toolEvents?.find((event) => event.t === "block")).toMatchObject({ block: stamped });
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
-      expect(JSON.parse(row!.blocks as unknown as string)).toEqual([block]);
+      expect(JSON.parse(row!.blocks as unknown as string)).toEqual([stamped]);
+    } finally {
+      run.mockRestore();
+      manifest.mockRestore();
+    }
+  });
+});
+
+describe("turnNext.ts: answer blocks go out in place on the stream (GENUI-13c)", () => {
+  test("the block event follows the tool lines, carries after_paragraph, comes before the first released text it precedes, and the stored blocks agree", async () => {
+    const plugins = await import("@/lib/plugins");
+    const originalLoad = plugins.loadManifestOnly;
+    const manifest = spyOn(plugins, "loadManifestOnly").mockImplementation((id) => {
+      const loaded = originalLoad(id);
+      return id === "websearch" && loaded.ok ? { ...loaded, value: { ...loaded.value, returns_blocks: ["spec_sheet"] } } : loaded;
+    });
+    const block = {
+      id: "blk-strm01",
+      kind: "spec_sheet",
+      schema_version: 1,
+      producer: "websearch",
+      alt: "A date facts sheet.",
+      provenance: "almanac-date result",
+      created_at: "2026-10-08T12:00:00.000Z",
+      hlc: "1791478099338:0:abcdef",
+      // A package that sends its own placement is ignored: the hub stamps it.
+      after_paragraph: 7,
+      props: { title: "Date", rows: [{ label: "Date", value: "Thursday" }] },
+    };
+    const run = spyOn(plugins, "runPlugin").mockResolvedValue({ ok: true, value: { reply: { text: "Today is Thursday." }, actions: [], blocks: [block] } as never } as never);
+    try {
+      await withStub(
+        {
+          calls: (request) => (!request.messages.some((message) => message.role === "tool") && request.tools?.some((tool) => tool.function.name === "websearch") ? [{ id: "call-blk", name: "websearch", args: JSON.stringify({ expression: "Thursday" }) }] : undefined),
+          reply: (request) => (request.messages.some((message) => message.role === "tool") ? "Today is Thursday. It is a fine day.\n\nHave a good one." : "unused"),
+        },
+        async () => {
+          const result = await runTurnNextStream(people.owner, "chat", "search for Thursday");
+          if (!result.ok || result.kind !== "stream") throw new Error("expected a stream result");
+          const events: Array<{ type?: string; t?: string; text?: string; block?: { after_paragraph?: number }; value?: { blocks?: Array<{ after_paragraph?: number }>; turn_id: string } }> = [];
+          for await (const event of streamTurnEvents(result, people.owner.id)) events.push(event as never);
+          const kinds = events.map((event) => event.t ?? event.type);
+          // Exactly one block event, after the tool lines, and before the first delta (it was ready before any text).
+          expect(kinds.filter((kind) => kind === "block")).toHaveLength(1);
+          const blockAt = kinds.indexOf("block");
+          expect(blockAt).toBeGreaterThan(kinds.indexOf("tool_result"));
+          expect(blockAt).toBeLessThan(kinds.indexOf("delta"));
+          const sent = events[blockAt]!;
+          expect(sent.block?.after_paragraph).toBe(0);
+          // The reply text is whole and unaltered, and the stored blocks carry the same stamp.
+          const text = events.flatMap((event) => (event.type === "delta" ? [event.text ?? ""] : [])).join("");
+          expect(text.trim()).toBe("Today is Thursday. It is a fine day.\n\nHave a good one.");
+          const done = events.find((event) => event.type === "done")!;
+          expect(done.value?.blocks?.map((b) => b.after_paragraph)).toEqual([0]);
+          const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, done.value!.turn_id)).get();
+          expect((JSON.parse(row!.blocks as unknown as string) as Array<{ after_paragraph: number }>).map((b) => b.after_paragraph)).toEqual([0]);
+        },
+      );
     } finally {
       run.mockRestore();
       manifest.mockRestore();

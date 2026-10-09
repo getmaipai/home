@@ -174,6 +174,9 @@ export interface TurnState {
   /** ANSWER-IMG-02: the picture pipeline the `show_images` tool started
    * beside the answer (answerImages/turn.ts), and where its set landed. */
   answerImages?: import("@/lib/answerImages/turn").AnswerImageTurnState;
+  /** GENUI-13c: the answer blocks the placer put in the reply (their events carry `after_paragraph`), in placement
+   * order, each with the released-text length it goes after (Infinity: after the whole reply). */
+  placedBlocks?: import("@/lib/answerImages/turn").PlacedBlock[];
   /** ANSWER-IMG-02: whether this turn may show pictures at all (rule 0's
    * gates, decided once in beginTurn); `show_images` is offered only then. */
   answerImagesAllowed?: boolean;

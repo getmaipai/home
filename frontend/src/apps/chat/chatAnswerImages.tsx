@@ -9,6 +9,7 @@ import { useCallback, useState, type SyntheticEvent } from "react";
 import type { DataMessagePartComponent, ThreadAssistantMessagePart } from "@assistant-ui/react";
 import { ImageGallery, type GalleryImage } from "@maipai/ui/src/elements/image-gallery";
 import type { AnswerImageSet } from "@maipai/home-backend/src/wire";
+import { splitAfterParagraph } from "@maipai/spec/interpreters/ts/paragraphs.js";
 
 /** The data part's name on both wires (backend assistantStreamWire.ts). */
 export const ANSWER_IMAGES_PART = "answer-images";
@@ -16,31 +17,44 @@ export const ANSWER_IMAGES_PART = "answer-images";
 export const ANSWER_IMAGES_VISIBLE = 3;
 const HUB_IMAGE = /^\/api\/answer-image\/ai_[a-f0-9]{32}\?v=(tile|full)$/;
 
-const PARAGRAPH_BREAK = /\n[ \t]*\n\s*/g;
+// GENUI-13c: the paragraph count and split are the spec's one helper (the hub counts with the same code), not a copy
+// kept here. Re-exported because the picture tests and callers have always imported it from this file.
+export { splitAfterParagraph };
 
-/** Splits `text` after its `n`th paragraph (0: before any text), the same
- * count the hub placed the set at; a count past the end puts it last. */
-export function splitAfterParagraph(text: string, n: number): [string, string] {
-  if (n <= 0) return ["", text];
-  let seen = 0;
-  for (const match of text.matchAll(PARAGRAPH_BREAK)) {
-    const end = (match.index ?? 0) + match[0].length;
-    seen = text.slice(0, match.index).split(/\n[ \t]*\n\s*/).filter((p) => p.trim().length > 0).length;
-    if (seen >= n) return [text.slice(0, end), text.slice(end)];
-  }
-  return [text, ""];
+/** A part and where it goes: after this many paragraphs of the reply text (0: before any text; past the end or
+ * Infinity: after the whole reply). */
+export type PlacedPart = { after: number; part: ThreadAssistantMessagePart };
+
+/** The reply's text with the given parts placed in it, in the order given among equal positions: text, a part, text,
+ * and so on, one text part per stretch of text between two parts. The same cut for a picture set and an answer block
+ * (rule 9: the message part order is the layout; nothing here positions anything). No parts: the text as one part. */
+export function placeParts(text: string, placed: readonly PlacedPart[]): ThreadAssistantMessagePart[] {
+  if (placed.length === 0) return [{ type: "text", text }];
+  const cuts = placed
+    .map((item, order) => ({ ...item, order, at: splitAfterParagraph(text, item.after)[0].length }))
+    .sort((a, b) => a.at - b.at || a.order - b.order);
+  const parts: ThreadAssistantMessagePart[] = [];
+  let from = 0;
+  cuts.forEach((cut, i) => {
+    const piece = text.slice(from, cut.at);
+    if (piece.trim()) parts.push({ type: "text", text: i === 0 ? piece.trimEnd() : piece.trim() });
+    parts.push(cut.part);
+    from = cut.at;
+  });
+  const rest = text.slice(from);
+  if (rest.trim()) parts.push({ type: "text", text: rest.trimStart() });
+  return parts;
 }
+
+/** The picture set as its data part, with the id the renderer is keyed on. */
+export const answerImagesPart = (set: AnswerImageSet, id: string): ThreadAssistantMessagePart =>
+  ({ type: "data", name: ANSWER_IMAGES_PART, data: { ...set, id } }) as ThreadAssistantMessagePart;
 
 /** The reply's text with the picture set placed in it: one text part, or
  * text before, the `answer-images` data part, and text after. */
 export function textWithAnswerImages(text: string, set: AnswerImageSet | undefined, id: string): ThreadAssistantMessagePart[] {
   if (!set || set.items.length === 0) return [{ type: "text", text }];
-  const [before, after] = splitAfterParagraph(text, set.after_paragraph);
-  const parts: ThreadAssistantMessagePart[] = [];
-  if (before.trim()) parts.push({ type: "text", text: before.trimEnd() });
-  parts.push({ type: "data", name: ANSWER_IMAGES_PART, data: { ...set, id } } as ThreadAssistantMessagePart);
-  if (after.trim()) parts.push({ type: "text", text: after.trimStart() });
-  return parts;
+  return placeParts(text, [{ after: set.after_paragraph, part: answerImagesPart(set, id) }]);
 }
 
 /** What the gallery is given: hub-served pictures only, minus any that

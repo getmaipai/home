@@ -8,6 +8,8 @@
 // speculation, so nothing on screen moves. A failed or empty fetch places
 // nothing and the answer is whole (rule 6).
 import type { AnswerImageSet } from "@/wire";
+import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
+import { atParagraphBoundary, paragraphCount, paragraphCut } from "@maipai/spec/interpreters/ts/paragraphs.js";
 import type { AgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import type { SurfaceClass } from "@/lib/surfaceClass";
@@ -89,46 +91,64 @@ export function startAnswerImages(state: TurnState, subject: string, kind = ""):
   return entry;
 }
 
-const PARAGRAPH_BREAK = /\n[ \t]*\n\s*/;
+/** A block placed in the reply: its stream event with `after_paragraph` stamped, and the released-text length it
+ * goes after (Infinity: after the whole reply). Kept on the turn state in placement order (GENUI-13c). */
+export type PlacedBlock = { event: Extract<ToolStreamEvent, { t: "block" }>; offset: number };
 
-/** A blank line inside an open ``` block is not a paragraph boundary: the
- * pictures never split a code block. */
-function insideCodeFence(text: string): boolean {
-  return ((text.match(/```/g) ?? []).length % 2) === 1;
+/** The `block` events of this turn that are ready (the tool round accepted them) and not yet placed. */
+function pendingBlocks(state: TurnState): Array<Extract<ToolStreamEvent, { t: "block" }>> {
+  const placed = new Set((state.placedBlocks ?? []).map((p) => p.event.block.id));
+  return (state.toolEvents ?? []).flatMap((event) => (event.t === "block" && !placed.has(event.block.id) ? [event] : []));
 }
 
-function paragraphsIn(text: string): number {
-  return text.split(PARAGRAPH_BREAK).filter((p) => p.trim().length > 0).length;
+/** Stamps `after_paragraph` on the block, in the turn's own event list (so the `block` event and the stored turn's
+ * `blocks` carry it), and records where it goes. The hub is the only writer of this field (a package's value is
+ * dropped at the host), and it never matches the block's words to the prose: only readiness and a paragraph boundary. */
+function stampBlock(state: TurnState, event: Extract<ToolStreamEvent, { t: "block" }>, afterParagraph: number, offset: number): void {
+  const stamped = { ...event, block: { ...event.block, after_paragraph: afterParagraph } };
+  const index = state.toolEvents.indexOf(event);
+  if (index >= 0) state.toolEvents[index] = stamped;
+  (state.placedBlocks ??= []).push({ event: stamped, offset });
 }
 
-/** Feeds released text through and places a ready set at the first
- * paragraph boundary: `release` gets the text unchanged (a piece may be
- * split at its paragraph break, never altered), so the stored reply is
- * still the concatenation of everything released (rule 9). */
+/** The one placer for anything ready to show in the reply, a picture set or an answer block (GENUI-13c; it grew out
+ * of the pictures-only placer of ANSWER-IMG-02). Feeds released text through and places what is ready at the first
+ * paragraph boundary after it became ready: before any text when it was ready in time, never above text already
+ * released, never inside a code fence. `release` gets the text unchanged (a piece may be split at its paragraph
+ * break, never altered), so the stored reply is still the concatenation of everything released (rule 9). Paragraphs
+ * are counted and split by the spec's one helper, the same one every client uses. A visual that is not ready when
+ * the answer ends is placed after the reply by `settleAnswerImages` and `settleAnswerBlocks`. */
 export class AnswerImagePlacer {
   private released = "";
   constructor(private readonly state: TurnState, private readonly release: (text: string) => void) {}
 
   push(text: string): void {
-    const entry = this.state.answerImages;
-    if (!entry?.result || entry.placed) {
+    if (!this.anythingReady()) {
       this.forward(text);
       return;
     }
-    if (this.released.trim().length === 0 || (/\n[ \t]*\n\s*$/.test(this.released) && !insideCodeFence(this.released))) {
-      this.place(entry);
+    if (atParagraphBoundary(this.released)) {
+      this.placeReady();
       this.forward(text);
       return;
     }
-    const brk = PARAGRAPH_BREAK.exec(text);
-    if (!brk || insideCodeFence(this.released + text.slice(0, brk.index + brk[0].length))) {
+    const cut = paragraphCut(this.released, text);
+    if (cut < 0) {
       this.forward(text);
       return;
     }
-    const cut = brk.index + brk[0].length;
     this.forward(text.slice(0, cut));
-    this.place(entry);
+    this.placeReady();
     if (cut < text.length) this.forward(text.slice(cut));
+  }
+
+  private imagesReady(): AnswerImageTurnState | undefined {
+    const entry = this.state.answerImages;
+    return entry?.result && !entry.placed ? entry : undefined;
+  }
+
+  private anythingReady(): boolean {
+    return this.imagesReady() !== undefined || pendingBlocks(this.state).length > 0;
   }
 
   private forward(text: string): void {
@@ -136,9 +156,21 @@ export class AnswerImagePlacer {
     this.release(text);
   }
 
-  private place(entry: AnswerImageTurnState): void {
-    entry.placed = { set: { ...entry.result!, after_paragraph: paragraphsIn(this.released) }, offset: this.released.length };
+  /** Blocks first, then pictures: the same order they had when blocks all went ahead of the text. */
+  private placeReady(): void {
+    const afterParagraph = paragraphCount(this.released);
+    const offset = this.released.length;
+    for (const event of pendingBlocks(this.state)) stampBlock(this.state, event, afterParagraph, offset);
+    const entry = this.imagesReady();
+    if (entry) entry.placed = { set: { ...entry.result!, after_paragraph: afterParagraph }, offset };
   }
+}
+
+/** Places every block still waiting when the answer ends (it finished first, or nothing was ever released) after the
+ * whole reply. Call before the turn's value is built, so the stored `blocks` carry their `after_paragraph`. */
+export function settleAnswerBlocks(state: TurnState, replyText: string): void {
+  const afterParagraph = paragraphCount(replyText);
+  for (const event of pendingBlocks(state)) stampBlock(state, event, afterParagraph, Number.POSITIVE_INFINITY);
 }
 
 /** Waits for the pipeline (bounded by its own budget) and returns the set
@@ -153,6 +185,6 @@ export async function settleAnswerImages(state: TurnState, replyText: string): P
   if (call && entry.trace) call.detail = JSON.stringify(entry.trace);
   if (entry.placed) return entry.placed.set;
   if (!entry.result || replyText.trim().length === 0) return undefined;
-  entry.placed = { set: { ...entry.result, after_paragraph: paragraphsIn(replyText) }, offset: Number.POSITIVE_INFINITY };
+  entry.placed = { set: { ...entry.result, after_paragraph: paragraphCount(replyText) }, offset: Number.POSITIVE_INFINITY };
   return entry.placed.set;
 }

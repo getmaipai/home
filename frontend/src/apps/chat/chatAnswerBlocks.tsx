@@ -2,11 +2,16 @@
 // (spec AnswerBlock; the hub filtered it, GENUI-02) is one assistant-ui `data`
 // part named `answer_block`, drawn by the kit's dispatcher as shipped (rule
 // 9): the dispatcher picks the Element for the block's `kind`. Home only
-// shapes the data, in tool-call order, the same on the live stream and on a
-// reload, so nothing moves when the stored turn replaces the live one.
+// shapes the data, the same on the live stream and on a reload, so nothing
+// moves when the stored turn replaces the live one. GENUI-13c: a block sits
+// where the hub placed it, at its `after_paragraph` (absent: after the whole
+// reply), by the same placement as the picture set; the message part order is
+// the layout.
 import type { DataMessagePartComponent, ThreadAssistantMessagePart } from "@assistant-ui/react";
 import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
 import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
+import type { AnswerImageSet } from "@maipai/home-backend/src/wire";
+import { answerImagesPart, placeParts, type PlacedPart } from "@/apps/chat/chatAnswerImages";
 
 /** The data part's `name`. */
 export const ANSWER_BLOCK_PART = "answer_block";
@@ -30,6 +35,23 @@ export function drawableBlocks(blocks: readonly unknown[] | undefined): AnswerBl
 /** One `answer_block` data part per drawable block, in tool-call order. */
 export function answerBlockParts(blocks: readonly unknown[] | undefined): ThreadAssistantMessagePart[] {
   return drawableBlocks(blocks).map((block) => ({ type: "data", name: ANSWER_BLOCK_PART, data: block }) as ThreadAssistantMessagePart);
+}
+
+/** The reply's text with its answer blocks and picture set placed in it, each at its own `after_paragraph`. Among
+ * parts at the same position the blocks come first, in the order given, then the picture set: the order the hub
+ * placed them. No block and no picture set: the text as one part. A block with no `after_paragraph` (a record from
+ * before GENUI-13c) goes after the whole reply. */
+export function textWithAnswerParts(
+  text: string,
+  visuals: { blocks?: readonly unknown[] | undefined; images?: AnswerImageSet | undefined; imagesId: string },
+): ThreadAssistantMessagePart[] {
+  const placed: PlacedPart[] = drawableBlocks(visuals.blocks).map((block) => ({
+    after: block.after_paragraph ?? Number.POSITIVE_INFINITY,
+    part: { type: "data", name: ANSWER_BLOCK_PART, data: block } as ThreadAssistantMessagePart,
+  }));
+  const set = visuals.images;
+  if (set && set.items.length > 0) placed.push({ after: set.after_paragraph, part: answerImagesPart(set, visuals.imagesId) });
+  return placeParts(text, placed);
 }
 
 /** The `answer_block` data part's renderer: the kit dispatcher, given the block. */

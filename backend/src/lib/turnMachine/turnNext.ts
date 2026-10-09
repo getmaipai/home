@@ -53,7 +53,7 @@ import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
-import { AnswerImagePlacer, answerImagesAllowed, settleAnswerImages } from "@/lib/answerImages/turn";
+import { AnswerImagePlacer, answerImagesAllowed, settleAnswerBlocks, settleAnswerImages } from "@/lib/answerImages/turn";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import type { GateDecision } from "@/lib/gate/types";
 
@@ -745,6 +745,9 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     const failedPattern = state.outcomes.some((outcome) => outcome.via === "pattern" && outcome.status === "failed");
     // THIN-7E: the answer to a who question is a "confirm", as the old engine reported it.
     const source: TurnValue["source"] = state.whoAnswer ? "confirm" : failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
+    // GENUI-13c: a block still waiting when the answer ends goes after the reply; stamped before the value is built so
+    // the stored `blocks` carry where each one sits.
+    settleAnswerBlocks(state, gateOutput?.text ?? "");
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources, contextSegments);
     // ANSWER-IMG-02: the pictures are stored with an answer the gate let
     // through, where they were placed (or after the text), never with a
@@ -1022,6 +1025,8 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     // ANSWER-IMG-02: where the picture set landed, read by the wire as it
     // relays the released text (routes/turn.ts's streamTurnEvents()).
     answerImages: () => state.answerImages?.placed,
+    // GENUI-13c: the blocks the same placer put in the reply, read by the wire beside the pictures.
+    placedBlocks: () => state.placedBlocks ?? [],
     // ENGINEERING gap, named rather than silently worked around: the new
     // path has no equivalent of the old engine file's own bannedPhrasesFor()
     // yet, so the thinking-cue filler (streamTurnEvents()'s own

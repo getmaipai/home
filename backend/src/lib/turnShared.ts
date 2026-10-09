@@ -591,6 +591,9 @@ export type TurnStreamResult =
        * reply). Undefined for a turn with no pictures and every other
        * producer. */
       answerImages?: () => { set: import("@/wire").AnswerImageSet; offset: number } | undefined;
+      /** GENUI-13c: the answer blocks placed so far, each with its `after_paragraph` stamped and the released-text
+       * length it goes after (Infinity: after the whole reply). Undefined for every other producer. */
+      placedBlocks?: () => import("@/lib/answerImages/turn").PlacedBlock[];
       /** Builds the final TurnValue once the caller has drained `tokens`
        * to completion and knows the full reply text - also logs the turn
        * (conversationHistory.ts), the same "log once the real reply is

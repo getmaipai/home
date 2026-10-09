@@ -1814,7 +1814,8 @@ describe("behaviours the old NDJSON adapter carried, proven on the assistant-str
 // GENUI-03b: a package's answer blocks (the hub's `block` events) become
 // `answer_block` data parts, in tool-call order, before the reply text.
 describe("createChatModelAdapter answer blocks (GENUI-03b)", () => {
-  const [sheet, table, chart] = SHOWCASE_BLOCKS;
+  // The hub stamps where each block goes (GENUI-13c); these are ready before any text, so they sit at paragraph 0.
+  const [sheet, table, chart] = SHOWCASE_BLOCKS.slice(0, 3).map((block) => ({ ...block, after_paragraph: 0 })) as [(typeof SHOWCASE_BLOCKS)[number], (typeof SHOWCASE_BLOCKS)[number], (typeof SHOWCASE_BLOCKS)[number]];
   const blockPart = (block: unknown) => ({ type: "data" as const, name: "answer_block", data: block });
 
   test("block events render as answer_block parts in tool-call order, above the text, live", async () => {
@@ -1838,6 +1839,33 @@ describe("createChatModelAdapter answer blocks (GENUI-03b)", () => {
       expect(mid?.content?.filter((p) => p.type === "data")).toEqual([blockPart(sheet), blockPart(table)]);
       const last = yields[yields.length - 1];
       expect(last?.content?.map((p) => (p.type === "data" ? `data:${(p.data as { id: string }).id}` : p.type))).toEqual(["tool-call", `data:${sheet!.id}`, `data:${table!.id}`, "text"]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  // GENUI-13c: a block event that arrives between two released pieces is one data part in place, and the settled message
+  // is the same parts a reload builds from the stored turn.
+  test("a block stamped after_paragraph 1 lands between the two paragraphs, live and settled", async () => {
+    const stamped = { ...sheet, after_paragraph: 1 };
+    const env = stubEnvironment(
+      ndjsonStream([
+        { type: "delta", text: "First paragraph.\n\n" },
+        { t: "block", call_id: "call-1", block: stamped },
+        { type: "delta", text: "Second paragraph." },
+        { type: "done", value: { turn_id: "turn-blocks3", reply: { text: "First paragraph.\n\nSecond paragraph." }, source: "model", safety: SAFETY, blocks: [stamped] } },
+      ]),
+    );
+    try {
+      const { yields, error } = await collect([fakeUserMessage("show me")]);
+      expect(error).toBeUndefined();
+      const shape = (content: readonly { type: string; text?: string; data?: unknown }[] | undefined) =>
+        (content ?? []).map((p) => (p.type === "data" ? `data:${(p.data as { id: string }).id}` : `${p.type}:${p.text}`));
+      const last = yields[yields.length - 1];
+      expect(shape(last?.content as never)).toEqual(["text:First paragraph.", `data:${sheet.id}`, "text:Second paragraph."]);
+      // Mid-stream, once the block has arrived, it is already between the text before it and the text after it.
+      const withBlock = yields.find((y) => JSON.stringify(y.content ?? []).includes(sheet.id));
+      expect(shape(withBlock?.content as never).slice(0, 2)).toEqual(["text:First paragraph.", `data:${sheet.id}`]);
     } finally {
       env.restore();
     }

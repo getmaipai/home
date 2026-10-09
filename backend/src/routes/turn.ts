@@ -595,14 +595,23 @@ export async function* streamTurnEvents(
     // safety01.test.ts/turnNext.test.ts to narrow a case their own
     // fixtures can never actually produce (neither hand-built
     // `TurnStreamResult` there ever sets `toolEvents`).
-    for (const event of result.toolEvents ?? []) yield event as unknown as TurnStreamEvent;
+    // GENUI-13c: a `block` event is not sent here with the tool lines; it goes out where the one placer put it (below),
+    // with its `after_paragraph` stamped, so it lands between two released pieces and never above text already sent.
+    for (const event of result.toolEvents ?? []) {
+      if ("t" in event && event.t === "block" && result.placedBlocks) continue;
+      yield event as unknown as TurnStreamEvent;
+    }
 
-    // ANSWER-IMG-02 (rule 9): the picture set goes out exactly where the
-    // placer put it, between two released pieces at a paragraph boundary,
-    // so it never lands above text already sent; one placed after the
-    // whole answer goes after the last piece.
+    // ANSWER-IMG-02 and GENUI-13c (rule 9): a ready visual (an answer block or the picture set) goes out exactly where
+    // the placer put it, between two released pieces at a paragraph boundary, so it never lands above text already
+    // sent; one placed after the whole answer goes after the last piece. Blocks first, then pictures, as placed.
     let imagesSent = false;
+    let blocksSent = 0;
     function* imagesAt(length: number): Generator<TurnStreamEvent, void, void> {
+      const blocks = result.placedBlocks?.() ?? [];
+      while (blocksSent < blocks.length && length >= blocks[blocksSent]!.offset) {
+        yield blocks[blocksSent++]!.event as unknown as TurnStreamEvent;
+      }
       const placed = result.answerImages?.();
       if (!placed || imagesSent || length < placed.offset) return;
       imagesSent = true;

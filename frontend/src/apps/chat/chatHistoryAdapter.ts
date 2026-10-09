@@ -3,8 +3,7 @@ import { api, type ConversationTurnWithMemoryIds } from "@/lib/api";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import { sourceMessageParts } from "@/apps/chat/chatSources";
-import { textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
-import { answerBlockParts } from "@/apps/chat/chatAnswerBlocks";
+import { textWithAnswerParts } from "@/apps/chat/chatAnswerBlocks";
 
 export type FeedbackVerdict = "positive" | "negative";
 
@@ -194,9 +193,6 @@ export function rowsToBranchableMessages(
               // with the sources footer, since the reply it's attached to
               // genuinely came first in time.
               ...(row.artifact && row.pluginId !== PROJECT_START_PLUGIN_ID ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
-              // GENUI-03b: the stored answer blocks, in tool-call order, where
-              // the live stream put them (before the text, like the cards above).
-              ...answerBlockParts(row.blocks),
               // APPROVE-CARD-01: `row.confirm` is the reload-path twin of
               // the live "done" event's own `TurnValue.confirm`
               // (chatModelAdapter.ts) - conversationHistory.ts's own
@@ -205,8 +201,9 @@ export function rowsToBranchableMessages(
               // at write time), so no additional freshness handling is
               // needed here: `open` is already correct by the time it
               // reaches this adapter.
-              // ANSWER-IMG-04: the stored picture set, where it was shown live.
-              ...textWithAnswerImages(row.replyText, row.answer_images, `${row.id}-images`),
+              // ANSWER-IMG-04 and GENUI-13c: the stored picture set and answer blocks, each at its own paragraph of
+              // the text (the stored text is split with the spec's paragraph helper), where they were shown live.
+              ...textWithAnswerParts(row.replyText, { blocks: row.blocks, images: row.answer_images, imagesId: `${row.id}-images` }),
               // APPROVE-CALM-01: under the reply that asks, as live.
               ...(row.confirm ? [toolCallPart(`${row.id}-confirm`, "confirm", { package_id: row.confirm.package_id, open: row.confirm.open, turn_id: row.id })] : []),
               // PROJECT-PROGRESS-01: conversationHistory.ts's own
