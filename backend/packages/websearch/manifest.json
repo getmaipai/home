@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
-  "description": "You can search the web for news, prices, or current events; read the top pages for anything that may have changed.",
+  "description": "You can search the web for current events, news, prices, and anything new, latest, upcoming or that may have changed; read the top pages. Just search; never ask first.",
   "offer": {"mode":"base","priority":9},
   "author": "MaiPai",
   "license": "AGPL-3.0",
