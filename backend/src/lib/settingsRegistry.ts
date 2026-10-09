@@ -19,6 +19,20 @@ import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 
 const REGISTRY_PATH = join(SPEC_DIR, "settings", "keys.json");
 
+// Package-owned location settings do not enter the core spec registry.
+// They are supplied here until the weather and maps packages declare them.
+export const PLACE_SETTINGS_KEYS = [
+  ...(["weather", "maps"] as const).flatMap((surface) => [
+    SettingsKey.parse({ key: `${surface}.places`, scope: "person", selector: "location", range: { multiple: true, allow_current: false }, default: [], label: `${surface === "weather" ? "Weather" : "Maps"} places`, help: "Places saved for this surface.", level: "basic", lives_in: surface, honoured_by: ["home"] }),
+    SettingsKey.parse({ key: `${surface}.default_place`, scope: "person", selector: "location", range: { multiple: false, allow_current: true }, default: "current", label: `${surface === "weather" ? "Weather" : "Maps"} default place`, help: "The place used by default on this surface.", level: "basic", lives_in: surface, honoured_by: ["home"] }),
+  ]),
+];
+
+// Transition alias: the current Home settings field still writes a name.
+// It is kept outside the committed Commons registry and resolves through
+// household.home in settings.ts until the shipped location selector lands.
+const LEGACY_HOME_PLACE_KEY = SettingsKey.parse({ key: "household.home_place", scope: "household", selector: "text", default: "", label: "Household location", help: "The place MaiPai uses as the household fallback.", level: "basic", lives_in: "household.system", honoured_by: ["home", "bot"] });
+
 function loadRegistry(): SettingsKey[] {
   const raw = JSON.parse(readFileSync(REGISTRY_PATH, "utf-8")) as unknown[];
   const parsed = raw.map((entry) => SettingsKey.parse(entry));
@@ -27,7 +41,7 @@ function loadRegistry(): SettingsKey[] {
   // until the shared snapshot is advanced.
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
-  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS].filter((entry) => !keys.has(entry.key))];
+  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, LEGACY_HOME_PLACE_KEY].filter((entry) => !keys.has(entry.key))];
   return combined.map(withPersonGuardFacts);
 }
 

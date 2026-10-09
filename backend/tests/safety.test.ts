@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import type { PersonRow } from "@/types";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
+import { createEntity } from "@/lib/entities";
 
 beforeEach(() => {
   resetDb();
@@ -30,7 +31,7 @@ beforeEach(() => {
  * loudly instead of defaulting: the day one is added, this function has
  * to be taught a real extreme value for it before the test can pass,
  * rather than quietly stop meaning what it claims to. */
-function extremeValueFor(key: SettingsKey): unknown {
+function extremeValueFor(key: SettingsKey, places: { household: string; person: string }): unknown {
   switch (key.selector) {
     case "boolean":
       return true;
@@ -55,6 +56,11 @@ function extremeValueFor(key: SettingsKey): unknown {
         return db.select({ id: people.id }).from(people).all().map((row) => row.id);
       }
       return db.select({ id: people.id }).from(people).limit(1).get()?.id;
+    }
+    case "location": {
+      const range = key.range as { multiple?: boolean; allow_current?: boolean } | undefined;
+      if (range?.multiple) return [places.person];
+      return key.scope === "household" ? places.household : range?.allow_current ? "current" : places.person;
     }
     default:
       throw new Error(
@@ -227,6 +233,11 @@ describe("the crisis overlay is not configurable", () => {
     expect(covered.size).toBe(getRegistry().length);
 
     const actor = await owner();
+    const householdPlace = createEntity(actor, { kind: "place", place_kind: "map", name: "Stress household home", scope: "household", geo: { lat: 47.6, lon: -122.3, precision: "area", area: "Seattle", from: "typed" } });
+    const personPlace = createEntity(actor, { kind: "place", place_kind: "map", name: "Stress personal place", scope: "person", geo: { lat: 47.6, lon: -122.3, precision: "area", area: "Seattle", from: "typed" } });
+    expect(householdPlace.ok && householdPlace.value).toBeTruthy();
+    expect(personPlace.ok && personPlace.value).toBeTruthy();
+    const places = { household: householdPlace.value!.id, person: personPlace.value!.id };
     for (const keyDef of registry) {
       // Preserve the prepared household while removing only prior turn
       // and settings state. This makes each value isolated without
@@ -234,7 +245,7 @@ describe("the crisis overlay is not configurable", () => {
       await resetTurnFixture();
       __resetThrottleForTests();
 
-      const extreme = extremeValueFor(keyDef);
+      const extreme = extremeValueFor(keyDef, places);
       const written =
         keyDef.scope === "household"
           ? setHouseholdSettingValue(keyDef.key, extreme)

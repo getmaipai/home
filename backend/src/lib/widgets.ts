@@ -18,7 +18,8 @@
 // widget's one item; no bespoke "produce structured widget data"
 // function per package, the same "one definition, one implementation"
 // reasoning the org's own standards state outright.
-import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin, withHouseholdPlaceDefault } from "@/lib/plugins";
+import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { resolvePlace } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import type { PersonRow } from "@/types";
 
@@ -74,10 +75,9 @@ export function listWidgets(actor: { role: string }): WidgetDescriptor[] {
 }
 
 /** Runs the declared widget's own package recipe with its own declared
- * `inputs`, overridden by `household.home_place` when the widget declares
- * a `place` and the household has set one (`withHouseholdPlaceDefault()`,
- * lib/plugins.ts - the same override `warmPackage()` applies), and wraps
- * the resulting reply into one widget item. Beyond `place`, `inputs` are
+ * `inputs`, using the household home from `resolvePlace()` when the
+ * weather widget declares a `place` (the same household-only choice the
+ * warm runner applies), and wraps the resulting reply into one item. Beyond `place`, `inputs` are
  * still literal manifest placeholders until a real settings-resolution
  * pass exists for arbitrary widget inputs; a known, shared gap, not
  * something this step invented. Never a live network call OF ITS OWN: the
@@ -91,7 +91,13 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
   if (!widget) return { ok: false, status: 404, error: "no such widget" };
   if (!meetsMinRole(actor.role, manifest.min_role)) return { ok: false, status: 403, error: `${packageId} needs role ${manifest.min_role} or higher` };
 
-  const result = await runPlugin(packageId, actor, withHouseholdPlaceDefault(packageId, (widget.inputs ?? {}) as Record<string, unknown>));
+  const inputs = { ...((widget.inputs ?? {}) as Record<string, unknown>) };
+  if (packageId === "weather" && "place" in inputs) {
+    const place = await resolvePlace({ person: null, surface: "weather" });
+    if (place.from === "none" || !place.label) return { ok: false, status: 404, error: "household home is not set" };
+    inputs.place = place.label;
+  }
+  const result = await runPlugin(packageId, actor, inputs);
   if (!result.ok) {
     // Fix B (docs/dev.md's "Chat reliability: the 2026-09-07 incident",
     // B2): a Tier 1 handler's genuine upstream failure is now a typed 502

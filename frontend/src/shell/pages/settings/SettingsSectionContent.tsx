@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from "react";
-import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { getIcon } from "@maipai/ui/src/icons";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
@@ -8,7 +7,7 @@ import { resolveHref, visibleCards, type Card, type Section, type SettingsViewer
 import { minorVisibleSettingKeys } from "@maipai/home-backend/src/wire";
 import { SettingsLinks } from "@/shell/pages/settings/SettingsLinks";
 import { SettingsView, type SettingsViewProps } from "@/shell/pages/settings/settingsViews";
-import { scopeValueFor } from "@/shell/pages/settings/settingsViewer";
+import { scopeValueFor, type KitSettingsKey } from "@/shell/pages/settings/settingsViewer";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 
 const ChevronDown = getIcon("chevron-down");
@@ -75,7 +74,7 @@ export interface SectionContentProps extends SettingsViewProps {
   section: Section;
   viewer: SettingsViewer;
   /** The registry as this viewer's pages may draw it (see visibleRegistry). */
-  registry: readonly SettingsKey[];
+  registry: readonly KitSettingsKey[];
   focusKey?: string;
 }
 

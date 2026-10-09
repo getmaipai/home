@@ -11,8 +11,11 @@ import { newEntityId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { validateEntity } from "@maipai/spec/records/ts/validate.js";
 import { relationshipTypes } from "@maipai/spec/records/ts/validate.js";
+import { getPersonRole } from "@/lib/access";
 import { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Entity as EntityT } from "@maipai/spec/gen/ts/entity.js";
+import { childSafeAreaLabel } from "@/lib/placePrivacy";
+import { getHouseholdSettingValue } from "@/lib/settings";
 
 export type EntityRow = typeof entities.$inferSelect;
 
@@ -23,14 +26,20 @@ export interface OpResult<T> {
   error?: string;
 }
 
-export function toEntity(row: EntityRow): EntityT {
-  return Entity.parse({
+function coarsenForChild(entity: EntityT, isChild: boolean): EntityT {
+  if (!isChild || entity.kind !== "place" || !entity.geo) return entity;
+  return { ...entity, geo: { ...entity.geo, lat: Number(entity.geo.lat.toFixed(1)), lon: Number(entity.geo.lon.toFixed(1)), precision: "area", area: childSafeAreaLabel(entity.geo.area ?? entity.name) } };
+}
+
+export function toEntity(row: EntityRow, actor?: { role?: string }): EntityT {
+  const parsed = Entity.parse({
     id: row.id,
     kind: row.kind,
     name: row.name,
     aliases: JSON.parse(row.aliases) as string[],
     description: row.description,
     place_kind: row.placeKind,
+    geo: row.geo ? JSON.parse(row.geo) : null,
     parent_id: row.parentId,
     account_person_id: row.accountPersonId,
     source: row.source,
@@ -45,6 +54,7 @@ export function toEntity(row: EntityRow): EntityT {
     deleted_at: row.deletedAt,
     hlc: row.hlc,
   });
+  return coarsenForChild(parsed, actor?.role === "child");
 }
 
 function toRow(entity: EntityT) {
@@ -55,6 +65,7 @@ function toRow(entity: EntityT) {
     aliases: JSON.stringify(entity.aliases),
     description: entity.description,
     placeKind: entity.place_kind,
+    geo: entity.geo ? JSON.stringify(entity.geo) : null,
     parentId: entity.parent_id,
     accountPersonId: entity.account_person_id,
     source: entity.source,
@@ -77,6 +88,7 @@ export interface EntityCreate {
   aliases?: string[];
   description?: string | null;
   place_kind?: "map" | "area" | null;
+  geo?: EntityT["geo"];
   parent_id?: string | null;
   account_person_id?: string | null;
   source?: "hub" | "local" | "imported" | "inferred";
@@ -88,9 +100,8 @@ export interface EntityCreate {
   pronouns?: string | null;
 }
 
-/** A person-scoped entity is visible only to the person it belongs to
- * (and to owner/admin, the same reach they already have over everything
- * else in the household). Household-scoped is visible to everyone
+/** A person-scoped place is visible only to the person it belongs to.
+ * Other person-scoped entities retain their owner/admin reach. Household-scoped is visible to everyone
  * signed in - it is the shared roster of who/what the family knows
  * about, the same reach GET /api/people already has. */
 export function listEntities(actor: { id: string; role: string }, kind?: string): EntityT[] {
@@ -101,22 +112,29 @@ export function listEntities(actor: { id: string; role: string }, kind?: string)
     .where(isNull(entities.deletedAt))
     .all()
     .filter((r) => (kind ? r.kind === kind : true))
-    .filter((r) => r.scope === "household" || canSeeAll || r.person === actor.id);
-  return rows.map(toEntity);
+    .filter((r) => r.scope === "household" || (r.kind === "place" ? r.person === actor.id : canSeeAll || r.person === actor.id));
+  return rows.map((row) => toEntity(row, actor));
 }
 
 export function getEntity(actor: { id: string; role: string }, id: string): OpResult<EntityT> {
   const row = db.select().from(entities).where(and(eq(entities.id, id), isNull(entities.deletedAt))).get();
   if (!row) return { ok: false, status: 404, error: "no such entity" };
   const canSeeAll = actor.role === "owner" || actor.role === "admin";
-  if (row.scope === "person" && row.person !== actor.id && !canSeeAll) {
+  if (row.scope === "person" && row.person !== actor.id && (row.kind === "place" || !canSeeAll)) {
     return { ok: false, status: 404, error: "no such entity" };
   }
-  return { ok: true, status: 200, value: toEntity(row) };
+  return { ok: true, status: 200, value: toEntity(row, actor) };
 }
 
-export function createEntity(actor: { id: string }, input: EntityCreate): OpResult<EntityT> {
+export function createEntity(actor: { id: string; role?: string }, input: EntityCreate): OpResult<EntityT> {
   const now = new Date().toISOString();
+  const actorRole = actor.role ?? getPersonRole(actor.id) ?? "adult";
+  const scope = input.scope ?? (input.kind === "place" ? "person" : "household");
+  if (input.kind === "place" && scope === "household" && actorRole !== "owner" && actorRole !== "admin") return { ok: false, status: 403, error: "only owner or admin may create a household place" };
+  if (input.kind === "place" && scope === "person" && (input.person ?? actor.id) !== actor.id) return { ok: false, status: 403, error: "a place can only be created for yourself" };
+  const geo = input.kind === "place" && input.geo && actorRole === "child"
+    ? { ...input.geo, lat: Number(input.geo.lat.toFixed(1)), lon: Number(input.geo.lon.toFixed(1)), precision: "area" as const, area: childSafeAreaLabel(input.geo.area ?? input.name) }
+    : input.geo ?? null;
   const candidate = Entity.safeParse({
     id: newEntityId(),
     kind: input.kind,
@@ -124,6 +142,7 @@ export function createEntity(actor: { id: string }, input: EntityCreate): OpResu
     aliases: input.aliases ?? [],
     description: input.description ?? null,
     place_kind: input.place_kind ?? null,
+    geo,
     parent_id: input.parent_id ?? null,
     account_person_id: input.account_person_id ?? null,
     // Step 3a: the judge creates an entity the speaker named with its
@@ -133,8 +152,8 @@ export function createEntity(actor: { id: string }, input: EntityCreate): OpResu
     source: input.source ?? "hub",
     confirmed_by_person_id: null,
     confirmed_at: null,
-    scope: input.scope ?? "household",
-    person: input.scope === "person" ? (input.person ?? actor.id) : null,
+    scope,
+    person: scope === "person" ? (input.person ?? actor.id) : null,
     sensitive: input.sensitive ?? false,
     pronouns: input.pronouns ?? null,
     created_at: now,
@@ -175,7 +194,7 @@ export function createEntity(actor: { id: string }, input: EntityCreate): OpResu
     }
     throw err;
   }
-  return { ok: true, status: 201, value: candidate.data };
+  return { ok: true, status: 201, value: coarsenForChild(candidate.data, actorRole === "child") };
 }
 
 export interface EntityEdit {
@@ -183,6 +202,7 @@ export interface EntityEdit {
   aliases?: string[];
   description?: string | null;
   parent_id?: string | null;
+  geo?: EntityT["geo"];
   sensitive?: boolean;
   /** ASK-01: the entity's pronouns, from the person's own words. */
   pronouns?: string | null;
@@ -214,6 +234,7 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
   const existing = getEntity(actor, id);
   if (!existing.ok || !existing.value) return existing;
   const target = existing.value;
+  if (target.kind === "place" && target.scope === "household" && actor.role !== "owner" && actor.role !== "admin") return { ok: false, status: 403, error: "only owner or admin may change the household home" };
 
   let confirmed: { source: "local"; confirmed_by_person_id: string; confirmed_at: string } | null = null;
   if (edit.confirm) {
@@ -221,11 +242,16 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
     if (!transition.ok) return { ok: false, status: transition.status, error: transition.error };
     confirmed = { source: "local", ...transition.value! };
   }
+  const requestedGeo = edit.geo !== undefined ? edit.geo : target.geo;
+  const storedGeo = target.kind === "place" && requestedGeo && actor.role === "child"
+    ? { ...requestedGeo, lat: Number(requestedGeo.lat.toFixed(1)), lon: Number(requestedGeo.lon.toFixed(1)), precision: "area" as const, area: childSafeAreaLabel(requestedGeo.area ?? edit.name ?? target.name) }
+    : requestedGeo;
   const candidate = Entity.safeParse({
     ...target,
     name: edit.name ?? target.name,
     aliases: edit.aliases ?? target.aliases,
     description: edit.description !== undefined ? edit.description : target.description,
+    geo: storedGeo,
     parent_id: edit.parent_id !== undefined ? edit.parent_id : target.parent_id,
     sensitive: edit.sensitive ?? target.sensitive,
     pronouns: edit.pronouns !== undefined ? edit.pronouns : target.pronouns,
@@ -245,7 +271,7 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
   }
 
   db.update(entities).set(toRow(candidate.data)).where(eq(entities.id, id)).run();
-  return { ok: true, status: 200, value: candidate.data };
+  return { ok: true, status: 200, value: coarsenForChild(candidate.data, actor.role === "child") };
 }
 
 // #110: a deleted entity's edges must not survive it; the frontend's
@@ -253,6 +279,10 @@ export function updateEntity(actor: { id: string; role: string }, id: string, ed
 export function deleteEntity(actor: { id: string; role: string }, id: string): OpResult<{ id: string }> {
   const existing = getEntity(actor, id);
   if (!existing.ok) return { ok: false, status: existing.status, error: existing.error };
+  if (existing.value?.kind === "place" && existing.value.scope === "household" && actor.role !== "owner" && actor.role !== "admin") return { ok: false, status: 403, error: "only owner or admin may remove a household place" };
+  if (existing.value?.kind === "place" && existing.value.scope === "household") {
+    if (getHouseholdSettingValue("household.home") === id) return { ok: false, status: 409, error: "cannot remove the current household home" };
+  }
   const now = new Date().toISOString();
   db.transaction(() => {
     db.update(entities).set({ deletedAt: now, updatedAt: now, hlc: nextHlc() }).where(eq(entities.id, id)).run();
