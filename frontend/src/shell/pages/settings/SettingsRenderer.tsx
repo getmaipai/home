@@ -8,6 +8,7 @@ import { groupSettings, sectionTitle, type SettingsGroup } from "@maipai/ui/src/
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { SettingField } from "@/shell/pages/settings/SettingField";
 import { api, ApiError, type ResolvedSetting } from "@/lib/api";
+import type { KitSettingsKey } from "@/shell/pages/settings/settingsViewer";
 
 interface SettingsRendererProps {
   scope: "household" | "person" | "device";
@@ -153,7 +154,8 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
         loadingLabel="Loading settings"
       >
         {({ registry, values }: { registry: SettingsKey[]; values: ResolvedSetting[] }) => {
-          const allGroups: SettingsGroup[] = groupSettings(registry, values, scope, "home");
+          const renderableRegistry = registry.filter((key) => key.selector !== "location") as KitSettingsKey[];
+          const allGroups: SettingsGroup[] = groupSettings(renderableRegistry, values, scope, "home");
           let groups = (only ? allGroups.filter((g) => only.includes(g.id)) : allGroups).map((group) => {
             const keys = includeKeysByGroup?.[group.id] ?? includeKeys;
             return keys ? { ...group, basic: group.basic.filter((item) => keys.includes(item.def.key)), advanced: group.advanced.filter((item) => keys.includes(item.def.key)) } : group;

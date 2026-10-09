@@ -5,7 +5,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import {
   listPackageIds,
   loadPackage,
@@ -14,7 +14,6 @@ import {
   registerAllPackageNotificationTypes,
   registerAllPackageProjectTypes,
   warmPackage,
-  withHouseholdPlaceDefault,
   __resetPackageCachesForTests,
 } from "@/lib/plugins";
 import { getProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
@@ -661,38 +660,29 @@ describe("registerAllPackageNotificationTypes", () => {
   });
 });
 
-// Found live 2026-09-11: Home's own weather cards showed the manifest's
-// hardcoded "Seattle" widget default next to a place-free chat turn that
-// left the model to guess a `place` on its own (it guessed the literal
-// word "here" - and Open-Meteo genuinely has a village named that).
-// docs/BACKLOG.md's "A household-location setting" fixes both by giving
-// warmPackage() and getWidgetData() a real place to fall back to.
-describe("withHouseholdPlaceDefault", () => {
-  test("leaves a declared place alone when the household hasn't set a location", () => {
-    expect(withHouseholdPlaceDefault("weather", { place: "Seattle" })).toEqual({ place: "Seattle" });
-  });
-
-  test("overrides a manifest's own declared place with the household's real one once set", () => {
+describe("transitional household.home_place setting alias", () => {
+  test("keeps the existing text setting backed by the canonical household.home Entity reference", () => {
     setHouseholdSettingValue("household.home_place", "Portland, OR");
-    expect(withHouseholdPlaceDefault("weather", { place: "Seattle" })).toEqual({ place: "Portland, OR" });
-  });
-
-  test("never adds a place to inputs that don't declare one", () => {
-    setHouseholdSettingValue("household.home_place", "Portland, OR");
-    expect(withHouseholdPlaceDefault("weather", {})).toEqual({});
-  });
-
-  // Code review, 2026-09-11: a future package could declare its own
-  // `place` input meaning something unrelated to the household's own
-  // location (a travel planner's destination, say) - scoped to `weather`
-  // by package id so this can never silently rewrite it.
-  test("never touches another package's own place input, even with the same field name", () => {
-    setHouseholdSettingValue("household.home_place", "Portland, OR");
-    expect(withHouseholdPlaceDefault("travel-planner", { place: "Tokyo" })).toEqual({ place: "Tokyo" });
+    const homeId = getHouseholdSettingValue("household.home");
+    expect(typeof homeId).toBe("string");
+    expect(getHouseholdSettingValue("household.home_place")).toBe("Portland, OR");
   });
 });
 
 describe("warmPackage (session-d-packages-and-store.md step 3)", () => {
+  test("weather warming skips when the household home is unset", async () => {
+    await owner();
+    const weather = loadPackage("weather");
+    expect(weather.ok).toBe(true);
+    if (!weather.ok) return;
+    const originalError = console.error;
+    const lines: string[] = [];
+    console.error = (line: string) => lines.push(line);
+    try { await warmPackage("weather", weather.value.manifest); }
+    finally { console.error = originalError; }
+    expect(lines).toEqual([]);
+  });
+
   test("a runPlugin failure (here: a key missing weather's own required 'place') is logged, never thrown or silent", async () => {
     await owner(); // warmActor() needs at least one active person to run at all
     const weather = loadPackage("weather");

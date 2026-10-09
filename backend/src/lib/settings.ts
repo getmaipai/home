@@ -5,7 +5,7 @@
 // 6.5/6.6 are shell/kit work (chapter 6, not started).
 import { eq, and, isNull, like } from "drizzle-orm";
 import { db } from "@/db";
-import { settingsValues, people } from "@/db/schema";
+import { settingsValues, people, entities } from "@/db/schema";
 import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
 import { calledAdminForOwnSettings } from "@/lib/relationships";
 import { nextHlc, compareHlc, seedHlc } from "@/lib/hlc";
@@ -18,6 +18,11 @@ import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { describeSetting } from "@maipai/spec/interpreters/ts/describeSetting.js";
 import type { PersonRow } from "@/types";
+import { newEntityId } from "@/lib/id";
+import { createEntity, updateEntity } from "@/lib/entities";
+
+const LEGACY_HOME_PLACE_KEY = "household.home_place";
+const HOUSEHOLD_HOME_KEY = "household.home";
 
 // `CLAUDE.md` > Credentials and secrets: "Any reversible secret the app
 // stores... is encrypted with the keystore... never plaintext in a
@@ -187,6 +192,18 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       // only, a documented gap until those land.
       if (typeof value !== "string") return { ok: false, status: 400, error: "expected a string" };
       break;
+    case "location": {
+      const multiple = range?.multiple === true;
+      const allowCurrent = range?.allow_current === true;
+      if (value === null && keyDef.key === HOUSEHOLD_HOME_KEY) break;
+      const values = multiple ? value : [value];
+      if (multiple ? !Array.isArray(value) : typeof value !== "string") return { ok: false, status: 400, error: multiple ? "expected an array of place ids" : "expected a place id" };
+      for (const entry of values as unknown[]) {
+        if (entry === "current" && allowCurrent) continue;
+        if (typeof entry !== "string" || !/^ent-[a-z0-9]{6,}$/.test(entry)) return { ok: false, status: 400, error: "expected a place id" };
+      }
+      break;
+    }
   }
   return { ok: true, value: true };
 }
@@ -285,9 +302,15 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
 
   const results: ResolvedSetting[] = getRegistry()
     .filter((k) => k.scope === parsed.kind && (!adultWakewordRead || k.key === WAKEWORD_SETTING_KEY))
+    // Location settings and their values are private to their person even
+    // where the general People settings page canAccessPerson() permits a
+    // guardian to inspect other settings for a child.
+    .filter((k) => !(parsed.kind === "person" && parsed.id !== actor.id && k.selector === "location"))
     .map((k) => {
       const row = storedByKey.get(k.key);
-      const rawValue = row ? decodeStoredRow(k, row.value) : k.default;
+      const rawValue = k.key === LEGACY_HOME_PLACE_KEY
+        ? getHouseholdSettingValue(LEGACY_HOME_PLACE_KEY)
+        : row ? decodeStoredRow(k, row.value) : k.default;
       const source = row ? (row.source as ResolvedSetting["source"]) : "default";
       return resolveForResponse(k, rawValue, source, descriptionContext);
     });
@@ -309,6 +332,11 @@ function writeValue(
   if (!opts.skipValidation) {
     const validated = validateSelectorValue(keyDef, value);
     if (!validated.ok) return validated;
+  }
+
+  if (keyDef.key === HOUSEHOLD_HOME_KEY && value !== null) {
+    const row = typeof value === "string" ? db.select().from(entities).where(and(eq(entities.id, value), isNull(entities.deletedAt))).get() : undefined;
+    if (!row || row.kind !== "place" || row.placeKind !== "map" || row.scope !== "household") return { ok: false, status: 400, error: "household.home must reference a household map place" };
   }
 
   const existing = db
@@ -475,6 +503,10 @@ export function setValue(
     return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
   }
 
+  if (keyDef.selector === "location" && parsed.kind === "person" && parsed.id !== actor.id) {
+    return { ok: false, status: 403, error: "location settings are private to each person" };
+  }
+
   const auth =
     key === SAFE_SEARCH_KEY && parsed.kind === "person"
       ? assertCanSetSafeSearch(actor, parsed.id!, value)
@@ -491,6 +523,25 @@ export function setValue(
           : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
+  if (key === LEGACY_HOME_PLACE_KEY) {
+    const trimmed = typeof value === "string" ? value.trim() : "";
+    if (trimmed !== (value as string)) value = trimmed;
+    const changed = setHouseholdHomeByName(actor, trimmed);
+    if (!changed.ok) return changed;
+    return writeValue(scope, keyDef, trimmed, responseContext(actor, actor, parsed.kind));
+  }
+  if (keyDef.selector === "location" && key !== HOUSEHOLD_HOME_KEY) {
+    const range = keyDef.range as { multiple?: boolean; allow_current?: boolean } | undefined;
+    const entries = range?.multiple ? value as unknown[] : [value];
+    for (const entry of entries) {
+      if (entry === "current" && range?.allow_current) continue;
+      const place = typeof entry === "string" ? db.select().from(entities).where(and(eq(entities.id, entry), isNull(entities.deletedAt))).get() : undefined;
+      if (!place || place.kind !== "place" || place.placeKind !== "map" || place.scope !== "person" || place.person !== actor.id) {
+        return { ok: false, status: 400, error: "location settings may only reference your own saved places" };
+      }
+    }
+  }
+
   return writeValue(scope, keyDef, value, responseContext(actor, responseSubject(actor, parsed), parsed.kind));
 }
 
@@ -503,10 +554,42 @@ export function setValue(
  * not a hostile request, but the check is nearly free either way. Never
  * exposed through a route. */
 export function setHouseholdSettingValue(key: string, value: unknown): SettingsOpResult<ResolvedSetting> {
+  if (key === LEGACY_HOME_PLACE_KEY) {
+    const trimmed = typeof value === "string" ? value.trim() : "";
+    const changed = setHouseholdHomeByName(null, trimmed);
+    if (!changed.ok) return changed;
+    const keyDef = getRegistryKey(LEGACY_HOME_PLACE_KEY)!;
+    return writeValue("household", keyDef, trimmed);
+  }
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
   if (keyDef.scope !== "household") return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not household` };
   return writeValue("household", keyDef, value);
+}
+
+/** Keep the legacy text editor operational while the location selector is
+ * absent: its text is reflected by a household place Entity and the
+ * canonical household.home reference. */
+function setHouseholdHomeByName(actor: PersonRow | null, name: string): SettingsOpResult<true> {
+  const writer = actor ?? ({ id: "system", role: "owner" } as PersonRow);
+  const homeId = getHouseholdSettingValue(HOUSEHOLD_HOME_KEY);
+  if (!name) {
+    const changed = actor
+      ? setValue(actor, "household", HOUSEHOLD_HOME_KEY, null)
+      : writeValue("household", getRegistryKey(HOUSEHOLD_HOME_KEY)!, null);
+    return changed.ok ? { ok: true, value: true } : changed;
+  }
+  if (typeof homeId === "string") {
+    const updated = updateEntity(writer, homeId, { name });
+    if (!updated.ok) return { ok: false, status: updated.status === 403 ? 403 : 400, error: updated.error ?? "could not update household home" };
+    return { ok: true, value: true };
+  }
+  const created = createEntity(writer, { kind: "place", name, place_kind: "map", scope: "household", geo: null });
+  if (!created.ok || !created.value) return { ok: false, status: created.status === 403 ? 403 : 400, error: created.error ?? "could not create household home" };
+  const changed = actor
+    ? setValue(actor, "household", HOUSEHOLD_HOME_KEY, created.value.id)
+    : writeValue("household", getRegistryKey(HOUSEHOLD_HOME_KEY)!, created.value.id);
+  return changed.ok ? { ok: true, value: true } : changed;
 }
 
 /** A household setting's resolved value with no actor gate: for core
@@ -516,6 +599,11 @@ export function setHouseholdSettingValue(key: string, value: unknown): SettingsO
  * runMaintenance() directly. Never exposed through a route: a person-
  * facing read always goes through listValues()'s real authorization. */
 export function getHouseholdSettingValue(key: string): unknown {
+  if (key === LEGACY_HOME_PLACE_KEY) {
+    const homeId = getHouseholdSettingValue(HOUSEHOLD_HOME_KEY);
+    if (typeof homeId !== "string") return "";
+    return db.select({ name: entities.name }).from(entities).where(and(eq(entities.id, homeId), isNull(entities.deletedAt))).get()?.name ?? "";
+  }
   const keyDef = getRegistryKey(key);
   if (!keyDef) return undefined;
   return resolveStoredValue("household", keyDef);
@@ -556,6 +644,7 @@ export function getPersonSettingValue(actor: PersonRow, key: string): unknown {
 export function getSettingValueForPerson(personId: string, key: string): unknown {
   const keyDef = getRegistryKey(key);
   if (!keyDef || keyDef.scope !== "person") return undefined;
+  if (keyDef.selector === "location") return undefined;
   return resolveStoredValue(`person:${personId}`, keyDef);
 }
 
@@ -659,11 +748,22 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
+  if (keyDef.selector === "location" && parsed.kind === "person" && parsed.id !== actor.id) {
+    return { ok: false, status: 403, error: "location settings are private to each person" };
+  }
 
   const auth = key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
     ? assertCanAccessWakewordDeviceSetting(actor)
     : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
+
+  if (key === LEGACY_HOME_PLACE_KEY) {
+    const changed = setHouseholdHomeByName(actor, "");
+    if (!changed.ok) return changed;
+    db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
+    settingsCache.delete(settingsCacheKey(scope, key));
+    return { ok: true, value: resolveForResponse(keyDef, "", "default", responseContext(actor, actor, parsed.kind)) };
+  }
 
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));

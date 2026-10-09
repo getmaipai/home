@@ -11,6 +11,7 @@ export const entitiesRoutes = apiRouter();
 
 const KIND = z.enum(["person", "pet", "place", "organization", "thing"]);
 const SCOPE = z.enum(["household", "person"]);
+const GEO = z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180), precision: z.enum(["exact", "area"]), area: z.string().max(200).nullable(), from: z.enum(["search", "browser", "typed"]) });
 
 const listRoute = createRoute({
   method: "get",
@@ -39,13 +40,17 @@ const getRoute = createRoute({
   request: { params: idParamSchema("id", "ent-a1b2c3") },
   responses: {
     200: { content: { "application/json": { schema: Entity } }, description: "Found." },
-    ...errorResponses({ 401: "Not signed in", 404: "No such entity" }),
+    ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such entity", 409: "Conflict" }),
   },
 });
 entitiesRoutes.openapi(getRoute, (c) => {
   const actor = c.get("person");
   const result = getEntity(actor, c.req.valid("param").id);
-  if (!result.ok || !result.value) return c.json({ error: result.error ?? "no such entity" }, 404);
+  if (!result.ok || !result.value) {
+    if (result.status === 409) return c.json({ error: result.error ?? "cannot remove entity" }, 409);
+    if (result.status === 403) return c.json({ error: result.error ?? "not allowed" }, 403);
+    return c.json({ error: result.error ?? "no such entity" }, 404);
+  }
   return c.json(result.value, 200);
 });
 
@@ -65,6 +70,7 @@ const createRoute_ = createRoute({
             aliases: z.array(z.string().min(1).max(200)).optional(),
             description: z.string().nullable().optional(),
             place_kind: z.enum(["map", "area"]).nullable().optional(),
+            geo: GEO.nullable().optional(),
             parent_id: z.string().nullable().optional(),
             account_person_id: z.string().nullable().optional(),
             scope: SCOPE.optional(),
@@ -79,14 +85,16 @@ const createRoute_ = createRoute({
   responses: {
     201: { content: { "application/json": { schema: Entity } }, description: "Created." },
     200: { content: { "application/json": { schema: Entity } }, description: "Existing entity returned (find-or-create, #111)." },
-    ...errorResponses({ 400: "Invalid entity", 401: "Not signed in" }),
+    ...errorResponses({ 400: "Invalid entity", 401: "Not signed in", 403: "Cannot create a household place" }),
   },
 });
 entitiesRoutes.openapi(createRoute_, (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
   const result = createEntity(actor, body);
-  if (!result.ok || !result.value) return c.json({ error: result.error ?? "invalid entity" }, 400);
+  if (!result.ok || !result.value) return result.status === 403
+    ? c.json({ error: result.error ?? "not allowed" }, 403)
+    : c.json({ error: result.error ?? "invalid entity" }, 400);
   return result.status === 200 ? c.json(result.value, 200) : c.json(result.value, 201);
 });
 
@@ -112,6 +120,7 @@ const patchRoute = createRoute({
               aliases: z.array(z.string().min(1).max(200)).optional(),
               description: z.string().nullable().optional(),
               parent_id: z.string().nullable().optional(),
+              geo: GEO.nullable().optional(),
               sensitive: z.boolean().optional(),
               pronouns: z.string().max(100).nullable().optional(),
               confirm: z.literal(true).optional(),
@@ -146,12 +155,16 @@ const deleteRoute = createRoute({
   request: { params: idParamSchema("id", "ent-a1b2c3") },
   responses: {
     200: { content: { "application/json": { schema: z.object({ id: z.string() }) } }, description: "Removed." },
-    ...errorResponses({ 401: "Not signed in", 404: "No such entity" }),
+    ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such entity", 409: "Cannot remove the current household home" }),
   },
 });
 entitiesRoutes.openapi(deleteRoute, (c) => {
   const actor = c.get("person");
   const result = deleteEntity(actor, c.req.valid("param").id);
-  if (!result.ok || !result.value) return c.json({ error: result.error ?? "no such entity" }, 404);
+  if (!result.ok || !result.value) {
+    if (result.status === 409) return c.json({ error: result.error ?? "cannot remove entity" }, 409);
+    if (result.status === 403) return c.json({ error: result.error ?? "not allowed" }, 403);
+    return c.json({ error: result.error ?? "no such entity" }, 404);
+  }
   return c.json(result.value, 200);
 });

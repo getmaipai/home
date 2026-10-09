@@ -89,11 +89,9 @@ describe("GET /api/widgets/:package/:id/data", () => {
     expect(body.items[0]!.title).toContain("Today is");
   });
 
-  test("weather's widget resolves its declared inputs.place with no household location set (falls back to the manifest's own default)", async () => {
+  test("weather's widget skips when the household home is unset", async () => {
     const client = await owner();
     const res = await client.get("/api/widgets/weather/current/data");
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as { items: Array<{ title: string }> };
-    expect(body.items[0]!.title.length).toBeGreaterThan(0);
+    expect(res.status).toBe(404);
   });
 });
