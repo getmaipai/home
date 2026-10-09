@@ -1150,6 +1150,8 @@ export interface PendingAsk {
    * before this item or on any other kind, which keeps resuming by
    * typed/spoken text alone. */
   turnId?: string;
+  capabilities?: string[];
+  consequential?: boolean;
 }
 
 export function getPendingAsk(conversationId: string): PendingAsk | null {

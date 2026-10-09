@@ -263,7 +263,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         // has validated this call's params yet at classification time -
         // tool.ts's own real, ceiling-backed `durationLabel()` names the
         // honest number instead, once the project actually starts.
-        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `${sentenceInitial(projectType.title)} can take a few minutes to put together. Want me to create it?` } } });
+        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `${sentenceInitial(projectType.title)} can take a few minutes to put together. Want me to create it?`, capabilities: ["artifact:write"], consequential: projectType.consequential } } });
         continue;
       }
       entries.push({ proposal, decision: { allow: true } });
@@ -330,7 +330,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
     if (!isPreConfirmed) {
       if (call.tool === "websearch" && roster.length > 0 && speakerNamedAny(JSON.stringify(args), roster)) {
         noteRefusal("consent_needed");
-        entries.push({ proposal, decision: { allow: false, reason: "consent_needed", ask: { prompt: `Want me to look that up?` } } });
+        entries.push({ proposal, decision: { allow: false, reason: "consent_needed", ask: { prompt: `Want me to look that up?`, capabilities: ["search.household_subject"], consequential: false } } });
         continue;
       }
       const grounding = checkGrounding(args, sourceTexts, manifest.args as ArgSchema | undefined);
@@ -341,7 +341,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       }
       if (manifest.consequential) {
         noteRefusal("confirm_needed");
-        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `Go ahead and ${manifest.display.toLowerCase()}?` } } });
+        entries.push({ proposal, decision: { allow: false, reason: "confirm_needed", ask: { prompt: `Go ahead and ${manifest.display.toLowerCase()}?`, capabilities: manifest.permissions ?? [], consequential: manifest.consequential } } });
         continue;
       }
     }

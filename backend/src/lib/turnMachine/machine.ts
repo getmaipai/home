@@ -108,12 +108,12 @@ function deadlineFor(context: MachineContext, baseMs: number): number {
   return retryRound(context) ? retryDeadlineMs(baseMs, context.turnState.spoken || context.turnState.planBasis.surfaceClass === "spoken") : baseMs;
 }
 
-function proposalsFrom(policy: PolicyOutput): { toRun: ActionProposal[]; parkedAsk: { prompt: string; proposal: ActionProposal } | null } {
+function proposalsFrom(policy: PolicyOutput): { toRun: ActionProposal[]; parkedAsk: { prompt: string; proposal: ActionProposal; capabilities?: string[]; consequential?: boolean } | null } {
   const toRun: ActionProposal[] = [];
-  let parkedAsk: { prompt: string; proposal: ActionProposal } | null = null;
+  let parkedAsk: { prompt: string; proposal: ActionProposal; capabilities?: string[]; consequential?: boolean } | null = null;
   for (const { proposal, decision } of policy.entries) {
     if (decision.allow) toRun.push(proposal);
-    else if ((decision.reason === "consent_needed" || decision.reason === "confirm_needed") && decision.ask) parkedAsk = { prompt: decision.ask.prompt, proposal };
+    else if ((decision.reason === "consent_needed" || decision.reason === "confirm_needed") && decision.ask) parkedAsk = { prompt: decision.ask.prompt, proposal, capabilities: decision.ask.capabilities, consequential: decision.ask.consequential };
   }
   return { toRun, parkedAsk };
 }

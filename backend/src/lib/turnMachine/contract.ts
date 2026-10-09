@@ -59,6 +59,8 @@ export interface ActionProposal {
 
 export interface PendingAskInfo {
   prompt: string;
+  capabilities?: string[];
+  consequential?: boolean;
 }
 
 /** GROUND-01 (state record, "1. Split the reason"): the live diagnosis

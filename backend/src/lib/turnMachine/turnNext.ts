@@ -339,10 +339,16 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   if (opts.ask_answer && (!pendingAsk || pendingAsk.turnId !== opts.ask_answer.turn_id)) {
     return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This confirmation is no longer waiting for an answer." } };
   }
+  const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
+  const pendingProjectType = pendingAsk?.packageId === "start_project" ? projectTypeForArgs({ type: pendingAsk.args.type }) : undefined;
+  const pendingAskDecision = pendingAsk?.kind === "confirm" ? decide({ who: { personId: actor.id, role: actor.role as Role, band }, what: { capabilities: pendingAsk.capabilities ?? (pendingAsk.packageId === "start_project" ? ["artifact:write"] : []), consequential: pendingAsk.consequential ?? true, minRole: pendingProjectType?.minRole } }) : null;
+  if (pendingAskDecision?.kind === "ask_parent" || (pendingAskDecision?.kind === "deny" && pendingAskDecision.reason === "never_for_band")) {
+    setPendingAsk(conversation.id, null);
+    if (opts.ask_answer || AFFIRMATIVE_RE.test(text)) return { ok: false, result: { ok: false, status: 403, code: "parent_required", error: "This needs a parent to decide. I haven't asked one." } };
+  }
   // THIN-7C: the model, the safety check and the signal read the message with
   // its documents; logResult() is given the typed text, as the old path did.
   text = await attachDocuments(actor, surface, conversation.id, turnId, text, opts.documentAttachments ?? [], temporary || opts.ephemeral === true);
-  const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
   // OPENER-01: the same shape opener commandOpenersFrom() reads for the
   // old path (the old engine file's own commandOpeners(effectiveLoaded)) - a
   // clause opening with a bundled package's own command verb ("look",
@@ -570,7 +576,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     if (ask) {
       state.outcomes.push(outcomeOf({ callId: `${state.turnId}:confirm`, packageId: ask.packageId, status: "pending", args: ask.args, via: "confirm", userMessage: promptText }));
     }
-    if (ask && !temporary && !state.ephemeral) setPendingAsk(conversationId, { ...ask, turnId: state.turnId });
+    if (ask && !temporary && !state.ephemeral) setPendingAsk(conversationId, { ...ask, turnId: state.turnId, capabilities: ask.capabilities, consequential: ask.consequential });
     value = buildTurnValue(state, startedAt, "confirm", promptText);
     if (ask && !temporary && !state.ephemeral) value.confirm = { package_id: ask.packageId, open: true };
   } else if (finalState === "refused") {
