@@ -71,40 +71,49 @@ describe("render_stack_binary_name", () => {
 });
 
 describe("fetch_stack_commons", () => {
-  test("lays the pinned, checksummed core workspace beside Stack using an offline mocked download", () => {
+  test("lays both pinned, checksummed workspaces under commons-tags using offline mocked downloads", () => {
     const root = mkdtempSync(join(tmpdir(), "maipai-stack-commons-layout-"));
-    const archiveRoot = join(root, "archive", "commons-core-v0.1.0", "core");
+    const archiveRoot = join(root, "archive");
     const workspace = join(root, "workspace");
     const stackDir = join(workspace, "stack");
-    const commonsDir = join(workspace, "commons");
-    const archive = join(root, "commons.tar.gz");
-    mkdirSync(archiveRoot, { recursive: true });
+    const coreArchiveRoot = join(archiveRoot, "commons-core-v0.1.0", "core");
+    const specArchiveRoot = join(archiveRoot, "commons-spec-v0.1.95", "spec");
+    const coreArchive = join(root, "core.tar.gz");
+    const specArchive = join(root, "spec.tar.gz");
+    mkdirSync(coreArchiveRoot, { recursive: true });
+    mkdirSync(specArchiveRoot, { recursive: true });
     mkdirSync(join(stackDir, "backend"), { recursive: true });
-    writeFileSync(join(archiveRoot, "package.json"), JSON.stringify({ name: "@maipai/core", version: "0.1.0" }));
-    const packed = Bun.spawnSync(["tar", "-czf", archive, "-C", join(root, "archive"), "commons-core-v0.1.0"]);
-    expect(packed.exitCode).toBe(0);
-    const digestResult = Bun.spawnSync(["shasum", "-a", "256", archive]);
-    expect(digestResult.exitCode).toBe(0);
-    const digest = digestResult.stdout.toString().split(/\s+/)[0];
-    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; curl() { cp "$FIXTURE_ARCHIVE" "$4"; }; commons_core_sha256() { printf '%s\\n' "$EXPECTED_SHA"; }; fetch_stack_commons "$COMMONS_DEST" no`], {
-      env: { ...process.env, FIXTURE_ARCHIVE: archive, EXPECTED_SHA: digest, COMMONS_DEST: commonsDir },
+    writeFileSync(join(coreArchiveRoot, "package.json"), JSON.stringify({ name: "@maipai/core", version: "0.1.0" }));
+    writeFileSync(join(specArchiveRoot, "package.json"), JSON.stringify({ name: "@maipai/spec", version: "0.1.95" }));
+    expect(Bun.spawnSync(["tar", "-czf", coreArchive, "-C", archiveRoot, "commons-core-v0.1.0"]).exitCode).toBe(0);
+    expect(Bun.spawnSync(["tar", "-czf", specArchive, "-C", archiveRoot, "commons-spec-v0.1.95"]).exitCode).toBe(0);
+    const coreDigest = Bun.spawnSync(["shasum", "-a", "256", coreArchive]).stdout.toString().split(/\s+/)[0];
+    const specDigest = Bun.spawnSync(["shasum", "-a", "256", specArchive]).stdout.toString().split(/\s+/)[0];
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; curl() { case "$2" in *core-v0.1.0*) cp "$FIXTURE_CORE" "$4" ;; *spec-v0.1.95*) cp "$FIXTURE_SPEC" "$4" ;; *) return 1 ;; esac; }; commons_core_sha256() { printf '%s\\n' "$EXPECTED_CORE_SHA"; }; commons_spec_sha256() { printf '%s\\n' "$EXPECTED_SPEC_SHA"; }; fetch_stack_commons "$COMMONS_DEST" no`], {
+      env: { ...process.env, FIXTURE_CORE: coreArchive, FIXTURE_SPEC: specArchive, EXPECTED_CORE_SHA: coreDigest, EXPECTED_SPEC_SHA: specDigest, COMMONS_DEST: workspace },
     });
     try {
       expect(result.exitCode).toBe(0);
-      expect(readFileSync(join(commonsDir, "core", "package.json"), "utf8")).toContain('"version":"0.1.0"');
-      expect(join(stackDir, "backend", "../../commons/core")).toBe(join(commonsDir, "core"));
-      expect(readFileSync(join(commonsDir, "core", "package.json"), "utf8")).toContain('"name":"@maipai/core"');
+      const core = join(workspace, "commons-tags", "core-core-v0.1.0", "core");
+      const spec = join(workspace, "commons-tags", "spec-spec-v0.1.95", "spec");
+      expect(readFileSync(join(core, "package.json"), "utf8")).toContain('"name":"@maipai/core"');
+      expect(readFileSync(join(spec, "package.json"), "utf8")).toContain('"name":"@maipai/spec"');
+      expect(join(stackDir, "backend", "../../commons-tags/core-core-v0.1.0/core")).toBe(core);
+      expect(join(stackDir, "backend", "../../commons-tags/spec-spec-v0.1.95/spec")).toBe(spec);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  test("dry-run prints the pinned Commons tag and verified archive digest without fetching", () => {
-    const result = bashCall('fetch_stack_commons /tmp/maipai-stack/commons yes');
+  test("dry-run prints both pinned Commons tags and verified archive digests without fetching", () => {
+    const result = bashCall('fetch_stack_commons /work/maipai-stack yes');
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("getmaipai/commons@core-v0.1.0");
     expect(result.stdout).toContain("d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
-    expect(result.stdout).toContain("/tmp/maipai-stack/commons/core");
+    expect(result.stdout).toContain("/work/maipai-stack/commons-tags/core-core-v0.1.0/core");
+    expect(result.stdout).toContain("getmaipai/commons@spec-v0.1.95");
+    expect(result.stdout).toContain("42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903");
+    expect(result.stdout).toContain("/work/maipai-stack/commons-tags/spec-spec-v0.1.95/spec");
   });
 
   test("setup_stack dry-run does not create its scratch tree", () => {
@@ -112,7 +121,21 @@ describe("fetch_stack_commons", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stderr.toString()).not.toContain("mktemp called during dry-run");
     expect(result.stdout.toString()).toContain("would fetch getmaipai/commons@core-v0.1.0");
+    expect(result.stdout.toString()).toContain("would fetch getmaipai/commons@spec-v0.1.95");
     expect(result.stdout.toString()).toContain("scripts/build-binary.sh");
+  });
+});
+
+describe("installer and standalone helper Commons pins", () => {
+  test("keep both tag and archive SHA-256 values synchronized", () => {
+    const installer = readFileSync(INSTALL_SH, "utf8");
+    const helper = readFileSync(ENGINE_HELPER, "utf8");
+    for (const key of ["COMMONS_CORE_TAG", "COMMONS_CORE_SHA256", "COMMONS_SPEC_TAG", "COMMONS_SPEC_SHA256"]) {
+      const installValue = installer.match(new RegExp(`^${key}="([^"]+)"$`, "m"))?.[1];
+      const helperValue = helper.match(new RegExp(`^${key}=([^\\n]+)$`, "m"))?.[1];
+      expect(installValue, `${key} in install.sh`).toBeDefined();
+      expect(helperValue, `${key} in maipai-engine`).toBe(installValue);
+    }
   });
 });
 
@@ -319,6 +342,9 @@ describe("REMOTE-STACK-BOX-01 engine computer dry runs", () => {
     expect(first.exitCode).toBe(0);
     expect(second.exitCode).toBe(0);
     expect(second.stdout.toString()).toBe(first.stdout.toString());
+    if (_name === "update") {
+      expect(first.stdout.toString()).toContain("Commons core and spec");
+    }
     for (const line of first.stdout.toString().split("\n")) {
       if (line.includes("sudo ")) expect(line.length).toBeLessThan(70);
     }
@@ -407,13 +433,13 @@ describe("engine computer installer cleanup", () => {
       `source "${INSTALL_SH}"`,
       `mktemp() { echo "${root}"; }`,
       `curl() { :; }`,
-      `tar() { command mkdir -p "${root}/commons/core"; touch "${root}/commons/core/package.json"; }`,
-      `sha256_file() { echo d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4; }`,
+      `tar() { case "$*" in *commons-core-v0.1.0/core*) command mkdir -p "${root}/commons-tags/core-core-v0.1.0/core"; touch "${root}/commons-tags/core-core-v0.1.0/core/package.json" ;; *commons-spec-v0.1.95/spec*) command mkdir -p "${root}/commons-tags/spec-spec-v0.1.95/spec"; touch "${root}/commons-tags/spec-spec-v0.1.95/spec/package.json" ;; esac; }`,
+      `sha256_file() { case "$1" in *core-v0.1.0*) echo d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4 ;; *spec-v0.1.95*) echo 42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903 ;; esac; }`,
       `build_stack_binary() { return 0; }`,
       `install_stack_service() { return 0; }`,
       `mkdir() { command mkdir -p "$@"; }`,
       `fetch_stack_source "${root}/stack" no`,
-      `fetch_stack_commons "${root}/commons" no`,
+      `fetch_stack_commons "${root}" no`,
       `setup_stack "${root}/install" /usr/bin/bun linux x64 no`,
       'echo "engine-computer path complete"',
     ].join("; ");

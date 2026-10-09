@@ -30,11 +30,13 @@ STACK_REPO="getmaipai/stack"
 # Home's release carries" paragraph). Today's value adds vision URL
 # binding to the Stack supervisor.
 STACK_TAG="60b887c5704bd94bc742254cce48e4d34b1fd035"
-# The Stack at STACK_TAG pins core-v0.1.0 as file:../../commons/core.
-# Keep the Commons pin and the digest of GitHub's archive together here;
-# the archive digest is verified before anything is extracted.
+# The Stack at STACK_TAG pins both workspaces under ../../commons-tags.
+# Keep each Commons tag and its GitHub archive digest together here;
+# each archive digest is verified before anything is extracted.
 COMMONS_CORE_TAG="core-v0.1.0"
 COMMONS_CORE_SHA256="d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4"
+COMMONS_SPEC_TAG="spec-v0.1.95"
+COMMONS_SPEC_SHA256="42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903"
 INSTALL_ROOT_LINUX="/opt/maipai-home"
 INSTALL_ROOT_DARWIN="/usr/local/maipai-home"
 SERVICE_USER="maipai"
@@ -296,6 +298,10 @@ commons_core_sha256() {
   printf '%s\n' "$COMMONS_CORE_SHA256"
 }
 
+commons_spec_sha256() {
+  printf '%s\n' "$COMMONS_SPEC_SHA256"
+}
+
 sha256_file() {
   local file="$1"
   if command -v sha256sum >/dev/null 2>&1; then
@@ -305,28 +311,40 @@ sha256_file() {
   fi
 }
 
-# Stack's backend/package.json resolves file:../../commons/core from
-# <workspace>/stack/backend, so the pinned workspace must live at
-# <workspace>/commons/core beside the fetched Stack source.
+# Stack's backend/package.json resolves both file:../../commons-tags/... paths
+# from <workspace>/stack/backend. Extract each package folder into the matching
+# immutable-looking workspace path beside the fetched Stack source.
 fetch_stack_commons() {
-  local dest="$1" dry_run="$2"
-  local tag="$COMMONS_CORE_TAG" expected
-  expected=$(commons_core_sha256)
+  local workspace="$1" dry_run="$2"
   if [ "$dry_run" = "yes" ]; then
-    log "[dry-run] would fetch getmaipai/commons@${tag} (sha256 ${expected}) into ${dest}/core"
+    log "[dry-run] would fetch getmaipai/commons@${COMMONS_CORE_TAG} (sha256 $(commons_core_sha256)) into ${workspace}/commons-tags/core-core-v0.1.0/core"
+    log "[dry-run] would fetch getmaipai/commons@${COMMONS_SPEC_TAG} (sha256 $(commons_spec_sha256)) into ${workspace}/commons-tags/spec-spec-v0.1.95/spec"
     return 0
   fi
+  local tag package dest expected
+  for tag in "$COMMONS_CORE_TAG" "$COMMONS_SPEC_TAG"; do
+    case "$tag" in
+      "$COMMONS_CORE_TAG") package="core"; expected=$(commons_core_sha256) ;;
+      "$COMMONS_SPEC_TAG") package="spec"; expected=$(commons_spec_sha256) ;;
+    esac
+    dest="${workspace}/commons-tags/${package}-${tag}/${package}"
+    fetch_one_stack_commons "$tag" "$package" "$dest" "$expected" || return 1
+  done
+}
+
+fetch_one_stack_commons() {
+  local tag="$1" package="$2" dest="$3" expected="$4"
   local tmp
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' RETURN
   log "Fetching getmaipai/commons@${tag}..."
-  if ! curl -fsSL "https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz" -o "${tmp}/commons.tar.gz"; then
+  if ! curl -fsSL "https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz" -o "${tmp}/commons-${tag}.tar.gz"; then
     trap - RETURN
     rm -rf "$tmp"
     return 1
   fi
   local actual
-  if ! actual=$(sha256_file "${tmp}/commons.tar.gz"); then
+  if ! actual=$(sha256_file "${tmp}/commons-${tag}.tar.gz"); then
     trap - RETURN
     rm -rf "$tmp"
     return 1
@@ -342,13 +360,14 @@ fetch_stack_commons() {
     rm -rf "$tmp"
     return 1
   fi
-  if ! tar -xzf "${tmp}/commons.tar.gz" -C "$dest" --strip-components=1 "commons-${tag}/core"; then
+  if ! mkdir -p "$(dirname "$dest")" \
+    || ! tar -xzf "${tmp}/commons-${tag}.tar.gz" -C "$(dirname "$dest")" --strip-components=1 "commons-${tag}/${package}"; then
     trap - RETURN
     rm -rf "$tmp"
     return 1
   fi
-  if [ ! -f "${dest}/core/package.json" ]; then
-    log "Commons ${tag} archive is missing core/package.json"
+  if [ ! -f "${dest}/package.json" ]; then
+    log "Commons ${tag} archive is missing ${package}/package.json"
     trap - RETURN
     rm -rf "$tmp"
     return 1
@@ -502,7 +521,7 @@ setup_stack() {
   fi
   source_dir="${source_root}/stack"
   fetch_stack_source "$source_dir" "$dry_run" || { log "Could not fetch the Stack's source. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
-  fetch_stack_commons "${source_root}/commons" "$dry_run" || { log "Could not fetch the Stack's pinned Commons dependency. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
+  fetch_stack_commons "$source_root" "$dry_run" || { log "Could not fetch the Stack's pinned Commons dependencies. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
   build_stack_binary "$source_dir" "$stack_dir" "$bun_bin" "$dry_run" || { log "Could not build the Stack binary. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
   [ "$dry_run" = "yes" ] || rm -rf "$source_root"
   install_stack_service "$install_root" "$bun_bin" "$os" "$arch" "$dry_run"
@@ -569,7 +588,7 @@ setup_engine_computer() {
   source_root=$(mktemp -d)
   source_dir="${source_root}/stack"
   fetch_stack_source "$source_dir" no || die "Could not fetch Stack source"
-  fetch_stack_commons "${source_root}/commons" no || die "Could not fetch Stack's pinned Commons dependency"
+  fetch_stack_commons "$source_root" no || die "Could not fetch Stack's pinned Commons dependencies"
   local build_dir="${source_root}/output"
   build_stack_binary "$source_dir" "$build_dir" "$bun_bin" no \
     || die "Could not build Stack binary"
