@@ -111,6 +111,7 @@ export type ChatFolderPatch = {
   instructions?: string;
   memory_mode?: string;
   pinned?: boolean;
+  archived?: boolean;
 };
 
 // The signed-in person's own roster entry, as /api/auth/me actually
@@ -735,6 +736,7 @@ export const api = {
     const query = params.toString();
     return request<ChatFolderView[]>(`/api/chat-folders${query ? `?${query}` : ""}`);
   },
+  chatFolder: (id: string) => request<ChatFolderView>(`/api/chat-folders/${encodeURIComponent(id)}`),
   createChatProject: (input: { name: string; icon?: string; color?: string; description?: string; instructions?: string }) =>
     request<ChatFolderView>("/api/chat-folders", { method: "POST", body: JSON.stringify(input) }),
   createChatFolder: (name: string, person?: string) =>
