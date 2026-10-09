@@ -25,9 +25,16 @@ export interface HomeAssistantEventsHealth {
   lastConnectedAt: string | null;
   lastError: string | null;
 }
+export interface HomeAssistantSensorCandidate {
+  entityId: string;
+  name: string;
+  deviceClass: string | null;
+  area: string | null;
+  suggestedKind: "smoke" | "carbon_monoxide" | "gas" | "water_leak" | "alarm_panel";
+}
 
 type SocketLike = Pick<WebSocket, "readyState" | "send" | "close" | "addEventListener">;
-type Subscriber = { entities: Set<string>; callback: (change: HomeAssistantChange) => void };
+type Subscriber = { entities: Set<string>; callback: (change: HomeAssistantChange) => void; onReady?: (states: HomeAssistantState[]) => void };
 type Settings = { baseUrl: string; accessToken: string };
 type Adapters = {
   socket: (url: string) => SocketLike;
@@ -83,6 +90,47 @@ function settings(): Settings | null {
   return { baseUrl: baseUrl.replace(/\/+$/, ""), accessToken };
 }
 
+export async function listHomeAssistantSensorCandidates(): Promise<HomeAssistantSensorCandidate[]> {
+  const config = settings();
+  if (!config) throw new Error("Set up a LAN Home Assistant URL and access token first");
+  const response = await fetch(`${config.baseUrl}/api/states`, {
+    headers: { authorization: `Bearer ${config.accessToken}` },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!response.ok) throw new Error(`Home Assistant returned HTTP ${response.status}`);
+  const value: unknown = await response.json();
+  if (!Array.isArray(value)) throw new Error("Home Assistant did not return an entity list");
+  const registries = await homeAssistantRegistries(config);
+  const areasById = new Map<string, string>();
+  if (registries) for (const raw of registries.areas) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as Record<string, unknown>;
+    if (typeof row.area_id === "string" && typeof row.name === "string") areasById.set(row.area_id, row.name);
+  }
+  const entityAreaById = new Map<string, string>();
+  if (registries) for (const raw of registries.entities) {
+    if (!raw || typeof raw !== "object") continue;
+    const row = raw as Record<string, unknown>;
+    if (typeof row.entity_id === "string" && typeof row.area_id === "string") {
+      const area = areasById.get(row.area_id);
+      if (area) entityAreaById.set(row.entity_id, area);
+    }
+  }
+  const candidates: HomeAssistantSensorCandidate[] = [];
+  for (const item of value) {
+    if (!validState(item) || !item.entity_id.startsWith("binary_sensor.")) continue;
+    const deviceClass = typeof item.attributes.device_class === "string" ? item.attributes.device_class : null;
+    const suggestedKind = deviceClass === "smoke" ? "smoke"
+      : deviceClass === "carbon_monoxide" ? "carbon_monoxide"
+      : deviceClass === "gas" ? "gas"
+      : deviceClass === "moisture" ? "water_leak"
+      : "alarm_panel";
+    candidates.push({ entityId: item.entity_id, name: typeof item.attributes.friendly_name === "string" ? item.attributes.friendly_name : item.entity_id,
+      deviceClass, area: entityAreaById.get(item.entity_id) ?? (typeof item.attributes.area === "string" ? item.attributes.area : null), suggestedKind });
+  }
+  return candidates.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function ipv4Lan(host: string): boolean {
   const parts = host.split(".").map(Number);
   if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return false;
@@ -112,8 +160,48 @@ function websocketUrl(baseUrl: string): string {
   return url.toString();
 }
 
+async function homeAssistantRegistries(config: Settings): Promise<{ areas: unknown[]; entities: unknown[] } | null> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let authSent = false;
+    const results = new Map<number, unknown[]>();
+    let ws: SocketLike;
+    const finish = (value: { areas: unknown[]; entities: unknown[] } | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { ws.close(); } catch { /* already closed */ }
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), 6_000);
+    try { ws = adapters.socket(websocketUrl(config.baseUrl)); }
+    catch { finish(null); return; }
+    ws.addEventListener("message", (event) => {
+      if (settled || typeof event.data !== "string") return;
+      let frame: Record<string, unknown>;
+      try { frame = JSON.parse(event.data) as Record<string, unknown>; } catch { return; }
+      if (frame.type === "auth_required" && !authSent) {
+        authSent = true;
+        ws.send(JSON.stringify({ type: "auth", access_token: config.accessToken }));
+      } else if (frame.type === "auth_ok") {
+        ws.send(JSON.stringify({ id: 2, type: "config/area_registry/list" }));
+        ws.send(JSON.stringify({ id: 3, type: "config/entity_registry/list" }));
+      } else if ((frame.id === 2 || frame.id === 3) && frame.success === true && Array.isArray(frame.result)) {
+        results.set(frame.id, frame.result);
+        if (results.has(2) && results.has(3)) finish({ areas: results.get(2)!, entities: results.get(3)! });
+      } else if (frame.type === "auth_invalid" || frame.success === false) finish(null);
+    });
+    ws.addEventListener("error", () => finish(null));
+    ws.addEventListener("close", () => finish(null));
+  });
+}
+
 function desiredEntities(): Set<string> {
   return new Set([...subscribers.values()].flatMap((subscriber) => [...subscriber.entities]));
+}
+
+function sameEntities(left: Set<string>, right: Set<string>): boolean {
+  return left.size === right.size && [...left].every((entity) => right.has(entity));
 }
 
 function publishHealth(next: HomeAssistantEventsHealth): void {
@@ -139,10 +227,19 @@ function connected(sequence: number, ws: SocketLike): void {
     try {
       const current = await adapters.readState(config, entityId);
       if (current) lastStates.set(entityId, current);
+      return current;
     } catch (error) {
       health = { ...health, lastError: error instanceof Error ? error.message : String(error) };
+      return null;
     }
-  }));
+  })).then(() => {
+    if (sequence !== socketSequence || socket !== ws) return;
+    for (const subscriber of subscribers.values()) {
+      if (!subscriber.onReady) continue;
+      const states = [...subscriber.entities].map((id) => lastStates.get(id)).filter((state): state is HomeAssistantState => Boolean(state));
+      subscriber.onReady(states);
+    }
+  });
 }
 
 function scheduleReconnect(sequence: number, error: unknown): void {
@@ -225,9 +322,10 @@ function connect(): void {
 }
 
 /** Register a module/package consumer. Only these entity ids can reach its callback. */
-export function subscribeHomeAssistantEntities(owner: string, entityIds: readonly string[], callback: (change: HomeAssistantChange) => void): () => void {
+export function subscribeHomeAssistantEntities(owner: string, entityIds: readonly string[], callback: (change: HomeAssistantChange) => void, onReady?: (states: HomeAssistantState[]) => void): () => void {
   const entities = new Set(entityIds.filter((id) => /^[a-z0-9_]+\.[a-z0-9_]+$/.test(id)));
   if (!owner) return () => {};
+  const previousEntities = desiredEntities();
   subscribers.delete(owner);
   if (entities.size === 0) {
     publishHealth({ ...health, subscribedEntities: desiredEntities().size });
@@ -238,13 +336,16 @@ export function subscribeHomeAssistantEntities(owner: string, entityIds: readonl
       socket?.close();
       socket = null;
       publishHealth({ ...health, state: "disabled", subscribedEntities: 0 });
-    }
+      resolveIssue("home-assistant-events", "connection");
+    } else if (!sameEntities(previousEntities, desiredEntities())) refreshHomeAssistantEvents();
     return () => {};
   }
-  subscribers.set(owner, { entities, callback });
+  subscribers.set(owner, { entities, callback, onReady });
   publishHealth({ ...health, subscribedEntities: desiredEntities().size });
-  if (!socket && !reconnectTimer) connect();
+  if (!sameEntities(previousEntities, desiredEntities()) && socket) refreshHomeAssistantEvents();
+  else if (!socket && !reconnectTimer) connect();
   return () => {
+    const beforeRemove = desiredEntities();
     subscribers.delete(owner);
     publishHealth({ ...health, subscribedEntities: desiredEntities().size });
     if (subscribers.size === 0) {
@@ -254,7 +355,8 @@ export function subscribeHomeAssistantEntities(owner: string, entityIds: readonl
       socket?.close();
       socket = null;
       publishHealth({ ...health, state: "disabled", subscribedEntities: 0 });
-    }
+      resolveIssue("home-assistant-events", "connection");
+    } else if (!sameEntities(beforeRemove, desiredEntities())) refreshHomeAssistantEvents();
   };
 }
 

@@ -32,6 +32,7 @@ import { KeystoreProtectionFailedError } from "@/lib/keystore";
 import { recordBootGap, recordStatusSample, pruneStatusEvents } from "@/lib/statusHistory";
 import { runConfiguredInternetProbe } from "@/lib/internetProbe";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
+import { initSafetyAlarm } from "@/lib/safetyAlarm";
 
 const configuredPort = Number(process.env.PORT ?? 8787);
 installConsoleFileMirror();
@@ -178,6 +179,7 @@ cleanupStaleSnapshots();
 // waiting for a first caller to also have to remember it.
 registerGracefulExit();
 registerDenoHostGracefulExit();
+initSafetyAlarm();
 // A code review (2026-09-06) found these three fire-and-forget (the
 // original comments here promised "before anything real spawns" and "no
 // real engine spawn happens before the first request arrives" without

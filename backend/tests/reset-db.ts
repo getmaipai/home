@@ -64,7 +64,9 @@ import {
   nasMounts,
   appUpdateState,
   projects,
+  safetyAlarms,
 } from "@/db/schema";
+import { __resetSafetyAlarmForTests } from "@/lib/safetyAlarm";
 
 // All test files in one `bun test` run share the same imported `@/db`
 // module (Bun's module cache is process-wide, not per-file), so every
@@ -104,6 +106,7 @@ function assertDisposableTestDataDir(): void {
 export function resetDb(): void {
   assertDisposableTestDataDir();
   __resetDeviceCommandsForTests();
+  __resetSafetyAlarmForTests();
   __resetServiceHealthForTests();
   db.delete(approvals).run();
   db.delete(memoryConsolidationCursor).run();
@@ -141,6 +144,7 @@ export function resetDb(): void {
   db.delete(lists).run();
   db.delete(packageStatus).run();
   db.delete(notificationDeliveries).run();
+  db.delete(safetyAlarms).run();
   db.delete(commands).run();
   __resetCommandsCacheForTests();
   db.delete(scheduledJobs).run();

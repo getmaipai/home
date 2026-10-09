@@ -22,6 +22,7 @@ interface NextSettingsRendererProps {
   only?: readonly string[];
   includeKeys?: readonly string[];
   includeKeysByGroup?: Readonly<Record<string, readonly string[]>>;
+  excludeKeys?: readonly string[];
   expandAdvanced?: boolean;
   titleOverrides?: Readonly<Record<string, string>>;
   plainRows?: boolean;
@@ -45,7 +46,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
-export function NextSettingsRenderer({ scope, scopeValue, only, includeKeys, includeKeysByGroup, expandAdvanced = false, titleOverrides = {}, plainRows = false, mergeGroups = false }: NextSettingsRendererProps) {
+export function NextSettingsRenderer({ scope, scopeValue, only, includeKeys, includeKeysByGroup, excludeKeys, expandAdvanced = false, titleOverrides = {}, plainRows = false, mergeGroups = false }: NextSettingsRendererProps) {
   // NOTIFY-SHARE-02: NextSettingField's own PersonMultiSelect control
   // needs the viewer's own id to drop from its option list -
   // `scopeValue` is already exactly "person:<id>" for a person-scope
@@ -156,7 +157,10 @@ export function NextSettingsRenderer({ scope, scopeValue, only, includeKeys, inc
           const allGroups: SettingsGroup[] = groupSettings(registry, values, scope, "home");
           let groups = (only ? allGroups.filter((g) => only.includes(g.id)) : allGroups).map((group) => {
             const keys = includeKeysByGroup?.[group.id] ?? includeKeys;
-            return keys ? { ...group, basic: group.basic.filter((item) => keys.includes(item.def.key)), advanced: group.advanced.filter((item) => keys.includes(item.def.key)) } : group;
+            return { ...group,
+              basic: group.basic.filter((item) => (!keys || keys.includes(item.def.key)) && !excludeKeys?.includes(item.def.key)),
+              advanced: group.advanced.filter((item) => (!keys || keys.includes(item.def.key)) && !excludeKeys?.includes(item.def.key)),
+            };
           }).filter((group) => group.basic.length + group.advanced.length > 0);
           if (mergeGroups && groups.length > 1) {
             const first = groups[0];

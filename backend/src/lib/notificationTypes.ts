@@ -57,6 +57,15 @@ export type NotificationChannel = "in_app" | "telegram";
 // off the household's own history of what happened, not just muting a
 // ping. Every type - configurable or not - always gets it.
 export const NOTIFICATION_TYPES: readonly NotificationType[] = [
+  {
+    id: "safety.alarm",
+    level: "immediate",
+    audience: "adults",
+    template: "Safety alarm: {kind} in {area}.",
+    configurable: false,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
   // The org doc's own worked example ("a safety-flagged turn for a
   // parent" under `immediate`) and a real, previously-unrealized gap:
   // safety.ts's evaluateSafety() has computed `notify_parent` since it

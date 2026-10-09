@@ -15,6 +15,7 @@ import { SPEC_DIR } from "./specDir.js";
 import { areWakewordAssetsInstalled } from "@/lib/wakewordAssets";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 import { NOTIFICATION_SETTINGS_KEYS } from "@/settings/notificationKeys";
+import { SAFETY_ALARM_SETTINGS_KEYS } from "@/settings/safetyAlarmKeys";
 
 const REGISTRY_PATH = join(SPEC_DIR, "settings", "keys.json");
 
@@ -26,7 +27,7 @@ function loadRegistry(): SettingsKey[] {
   // until the shared snapshot is advanced.
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
-  return [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS].filter((entry) => !keys.has(entry.key))];
+  return [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...SAFETY_ALARM_SETTINGS_KEYS].filter((entry) => !keys.has(entry.key))];
 }
 
 let cached: SettingsKey[] | null = null;

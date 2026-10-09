@@ -22,6 +22,7 @@ function run(initialUrl = "/settings?tab=household") {
     const url = String(input);
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.includes("/api/settings?scope=")) return Promise.resolve(Response.json(values));
+    if (url.includes("/api/safety/alarm-sensors")) return Promise.resolve(Response.json({ candidates: [], mappings: [] }));
     return Promise.resolve(Response.json([]));
   }) as unknown as typeof fetch;
   function Location() { const [params] = useSearchParams(); return <output data-testid="section-param">{params.get("section") ?? ""}</output>; }

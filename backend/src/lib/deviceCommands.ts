@@ -16,6 +16,11 @@ export const DEVICE_HEARTBEAT_MS = 15_000;
 
 type DeviceCommandKind = DeviceCommandShape["kind"];
 type DeviceCommandPayload = Record<string, unknown>;
+type DeviceAlarmAction = "acknowledge" | "quiet_here" | "false_alarm";
+type DeviceAlarmActionResult = { ok: true; state: string } | { ok: false; error: string };
+let alarmActionHandler: ((deviceId: string, alarmId: string, action: DeviceAlarmAction, evidence: unknown) => DeviceAlarmActionResult) | undefined;
+
+export function registerDeviceAlarmActionHandler(handler: typeof alarmActionHandler): void { alarmActionHandler = handler; }
 
 interface CommandRow {
   id: string;
@@ -208,6 +213,19 @@ function isDeviceAck(value: unknown): value is { type: "ack"; id: string; state?
   return state.muted === undefined || typeof state.muted === "boolean";
 }
 
+function parseAlarmAction(value: unknown): { alarm_id: string; action: DeviceAlarmAction; evidence: unknown } | null {
+  if (!value || typeof value !== "object") return null;
+  const message = value as Record<string, unknown>;
+  if (message.type !== "alarm_action" || typeof message.alarm_id !== "string" || !["acknowledge", "quiet_here", "false_alarm"].includes(String(message.action))) return null;
+  const raw = message.speaker_evidence;
+  if (!raw || typeof raw !== "object") return { alarm_id: message.alarm_id, action: message.action as DeviceAlarmAction, evidence: null };
+  const evidence = raw as Record<string, unknown>;
+  const valid = (evidence.person === null || typeof evidence.person === "string") &&
+    ["signed_in", "voice", "face", "voice_and_face", "claimed", "unknown"].includes(String(evidence.basis)) &&
+    ["confirmed", "tentative", "unknown"].includes(String(evidence.level));
+  return { alarm_id: message.alarm_id, action: message.action as DeviceAlarmAction, evidence: valid ? evidence : null };
+}
+
 function disposeConnection(connection: ActiveConnection, code?: number, reason?: string): void {
   if (connection.timer) clearInterval(connection.timer);
   connection.timer = undefined;
@@ -273,6 +291,12 @@ export function deviceCommandWebSocket(deviceId: string, lastEventId?: string): 
           return;
         }
         connection.lastEventId = message.id;
+        return;
+      }
+      const alarmAction = parseAlarmAction(message);
+      if (alarmAction) {
+        const result = alarmActionHandler?.(deviceId, alarmAction.alarm_id, alarmAction.action, alarmAction.evidence) ?? { ok: false as const, error: "Alarm actions are unavailable" };
+        sendControl(connection, { type: result.ok ? "alarm_action_accepted" : "alarm_action_rejected", alarm_id: alarmAction.alarm_id, ...(result.ok ? { state: result.state } : { message: result.error }) });
         return;
       }
       sendControl(connection, { type: "error", message: "unknown device channel message" });

@@ -3,6 +3,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/das
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { NextSettingsRenderer } from "@/next/pages/settings/NextSettingsRenderer";
 import { SettingsSectionFrame, type SettingsSection } from "@/next/pages/settings/SettingsSectionFrame";
+import { SafetyAlarmMappings } from "@/next/pages/settings/SafetyAlarmMappings";
 
 const definitions = [
   { id: "general", label: "General", description: "Set your household name, location, language, and history options." },
@@ -41,7 +42,7 @@ function renderSection(id: typeof definitions[number]["id"]) {
       </Card>
     </Collapsible>
   </>;
-  if (id === "integrations") return <><NextSettingsRenderer scope="household" scopeValue="household" only={["household.integrations", "household.notifications", "household.reference", "robot.settings"]} includeKeysByGroup={{ "robot.settings": ["household.quiet_hours.from", "household.quiet_hours.to"] }} /><p className="text-sm text-muted-foreground">Household quiet hours apply to children. Adults and teens can set their own hours in Profile → Notifications.</p></>;
+  if (id === "integrations") return <><NextSettingsRenderer scope="household" scopeValue="household" only={["household.integrations", "household.notifications", "household.reference", "robot.settings"]} includeKeysByGroup={{ "robot.settings": ["household.quiet_hours.from", "household.quiet_hours.to"] }} excludeKeys={["safety.alarm.sensors"]} /><SafetyAlarmMappings /><p className="text-sm text-muted-foreground">Household quiet hours apply to children. Adults and teens can set their own hours in Profile → Notifications.</p></>;
   if (id === "storage") return <>
     <NextSettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
     <div className="grid gap-4 sm:grid-cols-2">

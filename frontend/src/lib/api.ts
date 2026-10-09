@@ -738,6 +738,10 @@ export const api = {
   wakewordStatus: () => request<{ detectors: { id: string; label: string; file: string }[]; installed: boolean }>("/api/voice/wakewords"),
   settingsValues: (scope: string) =>
     request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}`),
+  safetyAlarmSensors: () => request<{ candidates: { entityId: string; name: string; deviceClass: string | null; area: string | null; suggestedKind: "smoke" | "carbon_monoxide" | "gas" | "water_leak" | "alarm_panel" }[]; mappings: { entityId: string; area: string | null; kind: "smoke" | "carbon_monoxide" | "gas" | "water_leak" | "alarm_panel" }[] }>("/api/safety/alarm-sensors"),
+  saveSafetyAlarmSensors: (mappings: { entityId: string; area: string | null; kind: "smoke" | "carbon_monoxide" | "gas" | "water_leak" | "alarm_panel" }[]) => request<{ mappings: typeof mappings }>("/api/safety/alarm-sensors", { method: "PUT", body: JSON.stringify({ mappings }) }),
+  activeSafetyAlarms: () => request<{ id: string; sensorId: string; area: string | null; kind: string; state: string; startedAt: string }[]>("/api/safety/alarms"),
+  actOnSafetyAlarm: (id: string, action: "acknowledge" | "quiet_here" | "false_alarm") => request<{ state: string }>(`/api/safety/alarms/${encodeURIComponent(id)}/actions`, { method: "POST", body: JSON.stringify({ action }) }),
   setSetting: (scope: string, key: string, value: unknown) =>
     request<ResolvedSetting>("/api/settings", {
       method: "PUT",

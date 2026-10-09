@@ -907,6 +907,22 @@ export const notificationHolds = sqliteTable("notification_holds", {
   deliverAfter: text("deliver_after").notNull(),
 });
 
+// SAFETY-ALARM-01: a small local audit/state row for each mapped sensor
+// activation. No transcript, model output or remote service payload is
+// stored here; the active state is needed to clear and repeat robot alarms.
+export const safetyAlarms = sqliteTable("safety_alarms", {
+  id: text("id").primaryKey(),
+  sensorId: text("sensor_id").notNull(),
+  area: text("area"),
+  kind: text("kind").notNull(),
+  state: text("state").notNull(), // active | cleared | false_alarm | acknowledged
+  startedAt: text("started_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  endedAt: text("ended_at"),
+  endedByPersonId: text("ended_by_person_id").references(() => people.id, { onDelete: "set null" }),
+  quietedDevices: text("quieted_devices").notNull().default("[]"), // JSON string[]
+});
+
 // Session F (platform and trust), step 1. Mirrors
 // spec/schemas/issue.schema.json: the Health/Repairs surface's backing
 // store. Upserted on `(source, key)` by lib/issues.ts's raiseIssue() -
