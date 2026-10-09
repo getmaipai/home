@@ -4,6 +4,7 @@ import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, Pending
 import { createChatModelAdapter, stripThinking, type ChatModelAdapterDeps } from "@/apps/chat/chatModelAdapter";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
+import { SHOWCASE_BLOCKS } from "@maipai/home-backend/src/lib/uiFixtureBlocks";
 import { createLocalImageAttachmentAdapter, clearStagedImageAttachments } from "@/apps/chat/localImageAttachmentAdapter";
 import { FakeAudioContext, fakeWavBody } from "../../../tests/fakeAudioContext";
 import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
@@ -1804,6 +1805,62 @@ describe("behaviours the old NDJSON adapter carried, proven on the assistant-str
       expect(first.value?.content?.[0]).toMatchObject({ type: "text", text: "Half a sen" });
       release();
       for await (const _ of run) void _;
+    } finally {
+      env.restore();
+    }
+  });
+});
+
+// GENUI-03b: a package's answer blocks (the hub's `block` events) become
+// `answer_block` data parts, in tool-call order, before the reply text.
+describe("createChatModelAdapter answer blocks (GENUI-03b)", () => {
+  const [sheet, table, chart] = SHOWCASE_BLOCKS;
+  const blockPart = (block: unknown) => ({ type: "data" as const, name: "answer_block", data: block });
+
+  test("block events render as answer_block parts in tool-call order, above the text, live", async () => {
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_call", package_id: "products", args: {}, call_id: "call-1" },
+        { t: "tool_result", call_id: "call-1", package_id: "products", outcome: { text: "ok" } },
+        { t: "block", call_id: "call-1", block: sheet },
+        { t: "tool_call", package_id: "recipes", args: {}, call_id: "call-2" },
+        { t: "tool_result", call_id: "call-2", package_id: "recipes", outcome: { text: "ok" } },
+        { t: "block", call_id: "call-2", block: table },
+        { type: "delta", text: "Here you go." },
+        { type: "done", value: { turn_id: "turn-blocks1", reply: { text: "Here you go." }, source: "model", safety: SAFETY, blocks: [sheet, table] } },
+      ]),
+    );
+    try {
+      const { yields, error } = await collect([fakeUserMessage("show me")]);
+      expect(error).toBeUndefined();
+      // Mid-stream, before any text: both blocks are already in the message.
+      const mid = yields.find((y) => JSON.stringify(y.content ?? []).includes(table!.id));
+      expect(mid?.content?.filter((p) => p.type === "data")).toEqual([blockPart(sheet), blockPart(table)]);
+      const last = yields[yields.length - 1];
+      expect(last?.content?.map((p) => (p.type === "data" ? `data:${(p.data as { id: string }).id}` : p.type))).toEqual(["tool-call", `data:${sheet!.id}`, `data:${table!.id}`, "text"]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("an unknown block kind is dropped and the reply still completes", async () => {
+    const unknown = { ...chart, id: "blk-zzzzzz", kind: "hologram" };
+    const env = stubEnvironment(
+      ndjsonStream([
+        { t: "tool_call", package_id: "energy", args: {}, call_id: "call-1" },
+        { t: "tool_result", call_id: "call-1", package_id: "energy", outcome: { text: "ok" } },
+        { t: "block", call_id: "call-1", block: unknown },
+        { t: "block", call_id: "call-1", block: sheet },
+        { type: "delta", text: "Still answered." },
+        { type: "done", value: { turn_id: "turn-blocks2", reply: { text: "Still answered." }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const { yields, error } = await collect([fakeUserMessage("show me")]);
+      expect(error).toBeUndefined();
+      const last = yields[yields.length - 1];
+      expect(last?.content?.filter((p) => p.type === "data")).toEqual([blockPart(sheet)]);
+      expect(last?.content?.at(-1)).toEqual({ type: "text", text: "Still answered." });
     } finally {
       env.restore();
     }

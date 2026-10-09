@@ -7,6 +7,8 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { owner, teen, child } from "./support/testAuth";
 import { UI_FIXTURES } from "@/lib/uiFixtures";
+import { SHOWCASE_BLOCKS } from "@/lib/uiFixtureBlocks";
+import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 
 beforeEach(() => resetDb());
 
@@ -85,5 +87,18 @@ describe("the web chat's own reader", () => {
       const strip = (e: Record<string, unknown>) => ({ ...e, sequence: undefined });
       expect(read.map(strip), f.id).toEqual(f.events.map((e) => strip(e as unknown as Record<string, unknown>)));
     }
+  });
+});
+
+// GENUI-03b: the answer-blocks scenario shows each v1 kind once, every block a
+// valid AnswerBlock, streamed as tool_call, tool_result, block in that order.
+describe("the answer-blocks scenario", () => {
+  test("one valid block of each of the eight v1 kinds, streamed after its tool result", () => {
+    expect(SHOWCASE_BLOCKS.map((b) => b.kind)).toEqual(["spec_sheet", "data_table", "chart", "timeline", "todo_list", "image_gallery", "schedule_card", "comparison"]);
+    for (const block of SHOWCASE_BLOCKS) expect(AnswerBlock.safeParse(block).success, block.id).toBe(true);
+    const events = UI_FIXTURES.find((f) => f.id === "answer-blocks")!.events as unknown as { t?: string; call_id?: string; block?: { id: string } }[];
+    const toolEvents = events.filter((e) => e.t);
+    expect(toolEvents.map((e) => e.t)).toEqual(SHOWCASE_BLOCKS.flatMap(() => ["tool_call", "tool_result", "block"]));
+    expect(toolEvents.filter((e) => e.t === "block").map((e) => e.block!.id)).toEqual(SHOWCASE_BLOCKS.map((b) => b.id));
   });
 });

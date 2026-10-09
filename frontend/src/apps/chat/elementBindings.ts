@@ -44,6 +44,7 @@ import { ChatDateDivider } from "@/apps/chat/chatDateDivider";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
 import { preprocessChatMarkdown } from "@/apps/chat/chatStreamingMarkdown";
 import { ANSWER_IMAGES_PART, AnswerImagesDataRender } from "@/apps/chat/chatAnswerImages";
+import { ANSWER_BLOCK_PART, AnswerBlockDataRender } from "@/apps/chat/chatAnswerBlocks";
 import { trustedChatLinks } from "@/apps/chat/trustedChatLinks";
 import type { MarkdownLinkContext } from "@maipai/ui/src/elements/markdown-text";
 import { ComposerQuotePreview, SelectionToolbar } from "@maipai/ui/src/elements/quote.aui";
@@ -91,6 +92,8 @@ export type DataBinding = {
 // in the reply (between two text parts), through the shipped Element.
 export const DATA_BINDINGS: readonly DataBinding[] = [
   { name: ANSWER_IMAGES_PART, element: "image-gallery", render: AnswerImagesDataRender },
+  // GENUI-03b: a package's answer block, drawn by the kit dispatcher.
+  { name: ANSWER_BLOCK_PART, element: "answer-block", render: AnswerBlockDataRender },
 ];
 
 export const AdminToolFallback = ToolFallback;

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-08T23:53:46.306Z",
+  "generatedAt": "2026-10-09T00:49:44.089Z",
   "kitTag": "ui-v0.5.182",
   "items": [
     {
@@ -145,7 +145,7 @@
       "group": "answers",
       "verdict": "wire after",
       "verdictReason": "Wire the kit dispatcher into Home in GENUI-03b, after the Home chat data binding and history adapter are implemented.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "approval-card.tsx",

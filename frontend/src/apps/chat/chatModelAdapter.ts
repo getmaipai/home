@@ -9,6 +9,7 @@ import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js"
 import { TurnStreamEvent as ToolTurnStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { messageText } from "@/apps/chat/chatMessageText";
 import { stagedDocumentPayload, clearStagedImageAttachment } from "@/apps/chat/localImageAttachmentAdapter";
+import { answerBlockParts } from "@/apps/chat/chatAnswerBlocks";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import { sourceMessageParts } from "@/apps/chat/chatSources";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
@@ -288,6 +289,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // ANSWER-IMG-04: the hub's picture set, once its `images` event arrives;
       // the reply text is split at its paragraph boundary around it.
       let answerImages: AnswerImageSet | undefined;
+      // GENUI-03b: the answer blocks streamed so far, in arrival (tool-call)
+      // order; the hub already validated them (GENUI-02).
+      const streamedBlocks: unknown[] = [];
 
       // One definition (a review caught this built twice, copy-pasted,
       // between buildContent() and the done handler below): `turnId`
@@ -316,6 +320,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // opposite of sources' "compact card under the reply."
         const timeline = toolTimelinePart(resumeTurnId);
         if (timeline) parts.push(timeline);
+        parts.push(...answerBlockParts(streamedBlocks));
         if (visible || answerImages) parts.push(...textWithAnswerImages(visible, answerImages, `${resumeTurnId ?? "live"}-images`).filter((part) => part.type !== "text" || part.text));
         return parts;
       }
@@ -401,9 +406,15 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // this skips the Zod parse entirely for the overwhelming
           // majority of events that can't possibly match.
           const toolEvent = "t" in event ? ToolTurnStreamEvent.safeParse(event) : undefined;
+          // GENUI-03b: a `t` event this client cannot read (a block of a kind it
+          // does not know, a shape it does not parse) is dropped, never taken
+          // for the stream's error event below; the reply carries on.
+          if (toolEvent && !toolEvent.success) continue;
           if (toolEvent?.success) {
             const e = toolEvent.data;
-            if (e.t === "tool_call") {
+            if (e.t === "block") {
+              streamedBlocks.push(e.block);
+            } else if (e.t === "tool_call") {
               toolCalls.set(e.call_id, { packageId: e.package_id, state: "running" });
             } else if (e.t === "tool_result" || e.t === "tool_error") {
               // tool_result and tool_error both resolve an existing call;
@@ -654,6 +665,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // this never adds a part in the running app until the
                 // backend half lands.
                 ...(timelinePart ? [timelinePart] : []),
+                // GENUI-03b: the answer blocks, where they sat while streaming
+                // (the stored turn's own list when none streamed, as on a resume).
+                ...answerBlockParts(streamedBlocks.length ? streamedBlocks : event.value.blocks),
                 ...textWithAnswerImages(finalText, event.value.answer_images ?? answerImages, `${event.value.turn_id}-images`),
                 // APPROVE-CALM-01 (owner's Row-Bot reference, 2026-10-06): the
                 // approval card sits UNDER the reply that asks, the way the

@@ -1,6 +1,7 @@
 import type { TurnStreamEvent, TurnValue } from "../wire";
 import { FAILURE_ADVICE, SAFETY_REFUSAL_COPY, composerNotice, crisisSupportFor, failureLine, partialReplyNote, promptLimitLine, type ComposerNotice } from "./failureCopy";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
+import { SHOWCASE_BLOCKS } from "./uiFixtureBlocks";
 
 // UI-SHOWCASE: canned turns for the admin's Chat showcase (/dev/ui). A fixture
 // is an array of the same events POST /api/turn/stream releases (turn_meta,
@@ -188,6 +189,15 @@ function failureAdminDetails(): Event[] {
   ];
 }
 
+// GENUI-03b: each block as the hub streams it, a tool call, its result, then the block.
+function blockLead(): Event[] {
+  return SHOWCASE_BLOCKS.flatMap((block, i): Event[] => [
+    { t: "tool_call", call_id: `call-block-${i}`, package_id: block.producer, args: {}, label: `Asking ${block.producer}` },
+    { t: "tool_result", call_id: `call-block-${i}`, package_id: block.producer, outcome: { text: block.alt } },
+    { t: "block", call_id: `call-block-${i}`, block },
+  ]);
+}
+
 export const UI_FIXTURES: UiFixture[] = [
   { id: "table", title: "Table", description: "A markdown table with four columns and a closing line.", events: turn("table", TABLE) },
   { id: "code", title: "Code blocks", description: "Fenced Python and TypeScript blocks, each with its copy button.", events: turn("code", CODE) },
@@ -252,6 +262,10 @@ export const UI_FIXTURES: UiFixture[] = [
   {
     id: "spoken", title: "Spoken-surface turn", description: "A spoken cue first, then short sentences with the speech text carried on done (sentence-gated speech needs the voice engine).",
     events: turn("spoken", "Dinner is at six. Willow is setting the table.", { lead: [{ type: "spoken_cue", text: "One moment." }], value: { reply: { text: "Dinner is at six. Willow is setting the table.", speech: "Dinner is at six. Willow is setting the table." } } }),
+  },
+  {
+    id: "answer-blocks", title: "Answer blocks (every kind)", description: "One block of each v1 kind (spec sheet, table, chart, timeline, to-do list, pictures, schedule, comparison), drawn by the kit dispatcher from the streamed block events, in tool-call order, above the reply.",
+    events: turn("answer-blocks", "Those are the eight kinds of answer block a package can return.", { lead: blockLead(), value: { blocks: [...SHOWCASE_BLOCKS] } }),
   },
   { id: "links", title: "Image and links", description: "A markdown link, a bare URL and a picture served by the hub itself (a data: picture is blocked, so none is used).", events: turn("links", MD_LINKS) },
 ];

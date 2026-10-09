@@ -7,6 +7,7 @@ import { THREAD_SLOTS, TOOL_BINDINGS } from "@/apps/chat/elementBindings";
 import { AdminContext, ChatAgeBandContext, ConnectionStateContext, TemporaryChatContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
 import { EngineStartingLoader } from "@/apps/chat/chatThreadSlots";
+import { SHOWCASE_BLOCKS } from "@maipai/home-backend/src/lib/uiFixtureBlocks";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 
@@ -348,6 +349,30 @@ describe("ChatThread", () => {
     expect(view.container.textContent?.toLowerCase()).toContain("reasoning");
     // Native sources render in the message footer without a synthetic tool card.
     expect(view.container.querySelector('[data-slot="tool-fallback-root"]')).toBeNull();
+  });
+
+  // GENUI-03b: an `answer_block` data part draws through the kit dispatcher, one
+  // Element per v1 kind, in message order, with the text after.
+  test("answer_block data parts render every v1 kind through the dispatcher, in order", async () => {
+    const message: ThreadMessageLike[] = [{
+      role: "assistant",
+      content: [...SHOWCASE_BLOCKS.map((block) => ({ type: "data" as const, name: "answer_block", data: block })), { type: "text", text: "Eight kinds." }],
+      status: { type: "complete", reason: "stop" },
+    }];
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    await waitFor(() => expect(view.container.textContent).toContain("Eight kinds."));
+    const drawn = [...view.container.querySelectorAll('[data-slot="answer-block"]')];
+    expect(drawn.map((el) => el.getAttribute("data-kind"))).toEqual(SHOWCASE_BLOCKS.map((b) => b.kind));
+    expect(drawn.some((el) => el.hasAttribute("data-fallback"))).toBe(false);
+    expect(view.container.textContent).toContain("Pixel 9");
+  });
+
+  test("an answer_block data part the dispatcher cannot read shows its alt sentence and does not break the reply", async () => {
+    const bad = { ...SHOWCASE_BLOCKS[0], kind: "hologram", alt: "A hologram nobody can draw." };
+    const message: ThreadMessageLike[] = [{ role: "assistant", content: [{ type: "data", name: "answer_block", data: bad }, { type: "text", text: "Reply survives." }], status: { type: "complete", reason: "stop" } }];
+    const view = renderWithQueryClient(<MemoryRouter><Harness admin={false} messages={message} /></MemoryRouter>);
+    await waitFor(() => expect(view.container.textContent).toContain("Reply survives."));
+    expect(view.container.textContent).toContain("A hologram nobody can draw.");
   });
 
   test("three newly bound spec-sheet producers render their recorded result rows", async () => {

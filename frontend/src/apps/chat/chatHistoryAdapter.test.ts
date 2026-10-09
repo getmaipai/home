@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test, mock } from "bun:test";
 import { chosenBranchHeadId, createChatHistoryAdapter, rowsToBranchableMessages } from "@/apps/chat/chatHistoryAdapter";
 import type { ConversationTurnWithMemoryIds } from "@/lib/api";
+import { SHOWCASE_BLOCKS } from "@maipai/home-backend/src/lib/uiFixtureBlocks";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 
 const originalFetch = globalThis.fetch;
@@ -257,6 +258,29 @@ describe("rowsToBranchableMessages", () => {
       { type: "text", text: "High tide is at 4pm." },
       { type: "source", sourceType: "url", id: "src-1", url: "https://example.com/a", title: "A page" },
     ]);
+  });
+
+  // GENUI-03b: the stored answer blocks come back as the same `answer_block`
+  // data parts the live stream built, in tool-call order, before the text.
+  test("a row carrying answer blocks reloads them in tool-call order, before the text", () => {
+    const [sheet, table, chart] = SHOWCASE_BLOCKS;
+    const row = { ...makeRow("row-1", "Here you go."), blocks: [table!, sheet!, chart!] };
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([
+      { type: "data", name: "answer_block", data: table },
+      { type: "data", name: "answer_block", data: sheet },
+      { type: "data", name: "answer_block", data: chart },
+      { type: "text", text: "Here you go." },
+    ]);
+  });
+
+  test("a stored block of an unknown kind is dropped on reload and the reply still loads", () => {
+    const [sheet] = SHOWCASE_BLOCKS;
+    const row = { ...makeRow("row-1", "Still here."), blocks: [{ ...sheet!, id: "blk-zzzzzz", kind: "hologram" }, sheet!] } as unknown as ConversationTurnWithMemoryIds;
+    const items = flatten(rowsToBranchableMessages([row], "Nova", "conv-example123"));
+    expect(items[1]!.message.content).toEqual([{ type: "data", name: "answer_block", data: sheet }, { type: "text", text: "Still here." }]);
+    const only = { ...makeRow("row-2", "Plain."), blocks: [{ id: "x", kind: "hologram" }] } as unknown as ConversationTurnWithMemoryIds;
+    expect(flatten(rowsToBranchableMessages([only], "Nova", "conv-example123"))[1]!.message.content).toEqual([{ type: "text", text: "Plain." }]);
   });
 
   test("a row with an empty sources array keeps the plain reply text, unchanged", () => {

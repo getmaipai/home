@@ -4,6 +4,7 @@ import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import { sourceMessageParts } from "@/apps/chat/chatSources";
 import { textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
+import { answerBlockParts } from "@/apps/chat/chatAnswerBlocks";
 
 export type FeedbackVerdict = "positive" | "negative";
 
@@ -184,7 +185,7 @@ export function rowsToBranchableMessages(
       // read-side gate, gated on the READING actor, never even stored for
       // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.sources?.length || row.answer_images
+        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.sources?.length || row.answer_images || row.blocks?.length
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
               ...(row.structured_part ? [toolCallPart(`${row.id}-structured`, row.structured_part.tool_id, row.structured_part)] : []),
@@ -193,6 +194,9 @@ export function rowsToBranchableMessages(
               // with the sources footer, since the reply it's attached to
               // genuinely came first in time.
               ...(row.artifact && row.pluginId !== PROJECT_START_PLUGIN_ID ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
+              // GENUI-03b: the stored answer blocks, in tool-call order, where
+              // the live stream put them (before the text, like the cards above).
+              ...answerBlockParts(row.blocks),
               // APPROVE-CARD-01: `row.confirm` is the reload-path twin of
               // the live "done" event's own `TurnValue.confirm`
               // (chatModelAdapter.ts) - conversationHistory.ts's own
