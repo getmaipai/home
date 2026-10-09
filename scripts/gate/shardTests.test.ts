@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { balance, chooseShardCount, discoverTests, failedTests, FlakeLedger, junitFileSeconds, parseStackBudget, parseSummary, readShardLog, reserveWorkerSlot, run, workerSlotCount } from "./shardTests";
+import { balance, chooseShardCount, discoverTests, failedTests, FlakeLedger, isolatedRerunArgs, isolatedRerunPassed, junitFileSeconds, parseStackBudget, parseSummary, readShardLog, reserveWorkerSlot, run, workerSlotCount } from "./shardTests";
 
 describe("balance", () => {
   test("every file lands in exactly one shard", () => {
@@ -90,6 +90,15 @@ describe("shared worker slots", () => {
 });
 
 describe("parsing", () => {
+  test("nested ledger names fall back to the listed file when Bun selects no tests", () => {
+    expect(isolatedRerunArgs("tests/nested.test.ts", "outer > inner > nested title", 0)).toEqual(["tests/nested.test.ts"]);
+  });
+
+  test("a successful rerun that ran zero tests is not a pass", () => {
+    expect(isolatedRerunPassed(0, 0)).toBe(false);
+    expect(isolatedRerunPassed(0, 1)).toBe(true);
+    expect(isolatedRerunPassed(1, 1)).toBe(false);
+  });
   test("parseSummary reads bun's closing lines", () => {
     const out = " 12 pass\n 1 fail\n 30 expect() calls\nRan 13 tests across 3 files. [1.2s]\n";
     expect(parseSummary(out)).toEqual({ pass: 12, fail: 1, tests: 13, files: 3 });

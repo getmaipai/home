@@ -29,6 +29,14 @@ const TEST_GLOB = "**/*{.test,_test,.spec,_spec}.{ts,tsx,js,jsx,mjs,cjs,mts,cts}
 export type FlakeEntry = { workspace: string; file: string; test: string; owner: string; date_added: string; deadline: string; cause: string; log: string; issue: number };
 export type FlakeLedger = { version: 2; flakes: FlakeEntry[]; serial: Record<string, { file: string; reason: string }[]>; skipped: { workspace: string; file: string }[] };
 
+export function isolatedRerunArgs(file: string, test: string, testsMatched: number): string[] {
+  return testsMatched === 0 ? [file] : [file, "-t", `^${test.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}$`];
+}
+
+export function isolatedRerunPassed(exitCode: number, testsRun: number): boolean {
+  return exitCode === 0 && testsRun > 0;
+}
+
 export function validateLedger(value: unknown, today = new Date().toISOString().slice(0, 10)): FlakeLedger {
   if (!value || typeof value !== "object") throw new Error("flake ledger must be an object");
   const ledger = value as FlakeLedger;
@@ -596,15 +604,24 @@ export async function run(opts: RunOptions): Promise<number> {
   if (!firstFail) for (const { entry, line } of flakyCandidates.values()) {
     const slot = await reserveForSingleWorker();
     const exactName = `^${entry.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
-    const proc = Bun.spawn(["bun", "test", entry.file, "-t", exactName], { cwd: dir, env: process.env, stdout: "pipe", stderr: "pipe" });
-    setSlotOwner(slot, proc.pid);
-    const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
-    const rerunCode = await proc.exited;
+    const runIsolated = async (args: string[]) => {
+      const proc = Bun.spawn(["bun", "test", ...args], { cwd: dir, env: process.env, stdout: "pipe", stderr: "pipe" });
+      setSlotOwner(slot, proc.pid);
+      const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
+      return { proc, stdout, stderr, code: await proc.exited, summary: parseSummary(`${stdout}\n${stderr}`) };
+    };
+    let rerun = await runIsolated([entry.file, "-t", exactName]);
+    if (rerun.code === 0 && rerun.summary.tests === 0) {
+      console.log(`flake rerun matched zero tests by name; retrying listed file ${entry.file}`);
+      rerun = await runIsolated([entry.file]);
+    }
+    const { proc, stdout, stderr, code: rerunCode } = rerun;
     releaseSlot(slot);
-    if (rerunCode !== 0) {
+    if (!isolatedRerunPassed(rerunCode, rerun.summary.tests)) {
       process.stdout.write(stdout);
       process.stderr.write(stderr);
-      firstFail = { shard: { index: plan.length, proc, logPath: "", junit: "", files: [entry.file], done: Promise.resolve(rerunCode) }, code: rerunCode, line };
+      if (rerun.summary.tests === 0) console.error(`flake rerun for ${entry.file} ran zero tests; refusing to treat it as passed`);
+      firstFail = { shard: { index: plan.length, proc, logPath: "", junit: "", files: [entry.file], done: Promise.resolve(rerunCode) }, code: rerunCode || 1, line };
       break;
     }
     console.log(`FLAKY ${entry.workspace}/${entry.file} > ${entry.test} (passed on one isolated rerun)`);
