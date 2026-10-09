@@ -71,47 +71,165 @@ describe("render_stack_binary_name", () => {
 });
 
 describe("fetch_stack_commons", () => {
-  test("lays the pinned, checksummed core workspace beside Stack using an offline mocked download", () => {
-    const root = mkdtempSync(join(tmpdir(), "maipai-stack-commons-layout-"));
-    const archiveRoot = join(root, "archive", "commons-core-v0.1.0", "core");
-    const workspace = join(root, "workspace");
-    const stackDir = join(workspace, "stack");
-    const commonsDir = join(workspace, "commons");
-    const archive = join(root, "commons.tar.gz");
-    mkdirSync(archiveRoot, { recursive: true });
-    mkdirSync(join(stackDir, "backend"), { recursive: true });
-    writeFileSync(join(archiveRoot, "package.json"), JSON.stringify({ name: "@maipai/core", version: "0.1.0" }));
-    const packed = Bun.spawnSync(["tar", "-czf", archive, "-C", join(root, "archive"), "commons-core-v0.1.0"]);
-    expect(packed.exitCode).toBe(0);
-    const digestResult = Bun.spawnSync(["shasum", "-a", "256", archive]);
-    expect(digestResult.exitCode).toBe(0);
-    const digest = digestResult.stdout.toString().split(/\s+/)[0];
-    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; curl() { cp "$FIXTURE_ARCHIVE" "$4"; }; commons_core_sha256() { printf '%s\\n' "$EXPECTED_SHA"; }; fetch_stack_commons "$COMMONS_DEST" no`], {
-      env: { ...process.env, FIXTURE_ARCHIVE: archive, EXPECTED_SHA: digest, COMMONS_DEST: commonsDir },
+  // The Stack at STACK_TAG pins both of these in backend/package.json; the layout must make each path resolve.
+  const STACK_PACKAGE_JSON = JSON.stringify({
+    name: "@maipai/stack-backend",
+    dependencies: {
+      "@hono/zod-openapi": "^1.6.3",
+      "@maipai/core": "file:../../commons-tags/core-core-v0.1.0/core",
+      "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.95/spec",
+      zod: "^4.0.0",
+    },
+  }, null, 2);
+
+  // One fixture archive per Commons tag, shaped like GitHub's: commons-<tag>/<package>/package.json.
+  function commonsFixture(root: string): { digests: Record<string, string>; dir: string } {
+    const digests: Record<string, string> = {};
+    for (const [pkg, tag] of [["core", "core-v0.1.0"], ["spec", "spec-v0.1.95"]] as const) {
+      const pkgDir = join(root, "archive", pkg, `commons-${tag}`, pkg);
+      mkdirSync(pkgDir, { recursive: true });
+      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: `@maipai/${pkg}`, version: "0.0.1" }));
+      const archive = join(root, `${tag}.tar.gz`);
+      expect(Bun.spawnSync(["tar", "-czf", archive, "-C", join(root, "archive", pkg), `commons-${tag}`]).exitCode).toBe(0);
+      const digest = Bun.spawnSync(["shasum", "-a", "256", archive]);
+      expect(digest.exitCode).toBe(0);
+      digests[tag] = digest.stdout.toString().split(/\s+/)[0]!;
+    }
+    return { digests, dir: root };
+  }
+
+  // The offline run: curl copies the fixture for the tag in the URL, the digest table is the fixture's.
+  function runFetch(script: string, root: string, digests: Record<string, string>, workspace: string) {
+    return Bun.spawnSync(["bash", "-c", `source "${script}"; curl() { case "$2" in *core-v0.1.0*) cp "$ROOT/core-v0.1.0.tar.gz" "$4";; *spec-v0.1.95*) cp "$ROOT/spec-v0.1.95.tar.gz" "$4";; *) return 22;; esac; }; commons_archive_sha256() { case "$1" in core-v0.1.0) echo "$CORE_SHA";; spec-v0.1.95) echo "$SPEC_SHA";; *) return 1;; esac; }; fetch_stack_commons "$WORKSPACE" no`], {
+      env: { ...process.env, ROOT: root, CORE_SHA: digests["core-v0.1.0"]!, SPEC_SHA: digests["spec-v0.1.95"]!, WORKSPACE: workspace, TMPDIR: root },
     });
+  }
+
+  test.each([["install.sh", INSTALL_SH], ["maipai-engine update", ENGINE_HELPER]] as const)("%s: lays core and spec where the Stack's file: paths resolve, using an offline mocked download", (_name, script) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-commons-layout-"));
     try {
-      expect(result.exitCode).toBe(0);
-      expect(readFileSync(join(commonsDir, "core", "package.json"), "utf8")).toContain('"version":"0.1.0"');
-      expect(join(stackDir, "backend", "../../commons/core")).toBe(join(commonsDir, "core"));
-      expect(readFileSync(join(commonsDir, "core", "package.json"), "utf8")).toContain('"name":"@maipai/core"');
+      const { digests } = commonsFixture(root);
+      const workspace = join(root, "workspace");
+      mkdirSync(join(workspace, "stack", "backend"), { recursive: true });
+      writeFileSync(join(workspace, "stack", "backend", "package.json"), STACK_PACKAGE_JSON);
+      const result = runFetch(script, root, digests, workspace);
+      expect(result.exitCode, result.stdout.toString() + result.stderr.toString()).toBe(0);
+      // The regression: every @maipai file: dependency in the pinned package.json resolves, from stack/backend, to a folder that holds its package.
+      const deps = (JSON.parse(STACK_PACKAGE_JSON) as { dependencies: Record<string, string> }).dependencies;
+      const filePaths = Object.entries(deps).filter(([name, spec]) => name.startsWith("@maipai/") && spec.startsWith("file:"));
+      expect(filePaths.map(([name]) => name)).toEqual(["@maipai/core", "@maipai/spec"]);
+      for (const [name, spec] of filePaths) {
+        const resolved = join(workspace, "stack", "backend", spec.slice("file:".length));
+        expect(readFileSync(join(resolved, "package.json"), "utf8"), spec).toContain(`"name":"${name}"`);
+      }
+      expect(join(workspace, "stack", "backend", "../../commons-tags/core-core-v0.1.0/core")).toBe(join(workspace, "commons-tags", "core-core-v0.1.0", "core"));
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  test("dry-run prints the pinned Commons tag and verified archive digest without fetching", () => {
-    const result = bashCall('fetch_stack_commons /tmp/maipai-stack/commons yes');
+  test.each([["install.sh", INSTALL_SH], ["maipai-engine update", ENGINE_HELPER]] as const)("%s: a wrong digest refuses, says what to do, and unpacks nothing", (_name, script) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-commons-digest-"));
+    try {
+      const { digests } = commonsFixture(root);
+      const workspace = join(root, "workspace");
+      mkdirSync(join(workspace, "stack", "backend"), { recursive: true });
+      writeFileSync(join(workspace, "stack", "backend", "package.json"), STACK_PACKAGE_JSON);
+      const result = runFetch(script, root, { ...digests, "core-v0.1.0": "0".repeat(64) }, workspace);
+      expect(result.exitCode).not.toBe(0);
+      const said = result.stdout.toString();
+      expect(said).toContain("SHA-256 mismatch");
+      expect(said).toContain("run this again");
+      expect(existsSync(join(workspace, "commons-tags", "core-core-v0.1.0", "core"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([["install.sh", INSTALL_SH], ["maipai-engine update", ENGINE_HELPER]] as const)("%s: a Commons tag with no pinned digest says which digest to add and where", (_name, script) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-commons-newtag-"));
+    try {
+      const workspace = join(root, "workspace");
+      mkdirSync(join(workspace, "stack", "backend"), { recursive: true });
+      writeFileSync(join(workspace, "stack", "backend", "package.json"), STACK_PACKAGE_JSON.replace("core-core-v0.1.0/core", "core-core-v0.1.999/core"));
+      const result = Bun.spawnSync(["bash", "-c", `source "${script}"; curl() { return 22; }; fetch_stack_commons "$WORKSPACE" no`], { env: { ...process.env, WORKSPACE: workspace, TMPDIR: root } });
+      expect(result.exitCode).not.toBe(0);
+      const said = result.stdout.toString();
+      expect(said).toContain("core-v0.1.999");
+      expect(said).toContain("commons_archive_sha256");
+      expect(said).toContain("scripts/install.sh");
+      expect(said).toContain("scripts/engine-computer/maipai-engine");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test.each([["install.sh", INSTALL_SH], ["maipai-engine update", ENGINE_HELPER]] as const)("%s: a package.json that is not there says to fetch the Stack first", (_name, script) => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${script}"; fetch_stack_commons /nonexistent/maipai-work no`]);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stdout.toString()).toContain("Fetch the Stack source");
+  });
+
+  test("the two scripts carry the same pins and the same helpers (a drift between them fails here)", () => {
+    const show = (script: string) =>
+      Bun.spawnSync(["bash", "-c", `source "${script}"; for t in core-v0.1.0 spec-v0.1.95 other; do commons_archive_sha256 $t || echo none; done; declare -f commons_archive_sha256 stack_commons_deps fetch_one_stack_commons fetch_stack_commons`]).stdout.toString();
+    const install = show(INSTALL_SH);
+    const engine = show(ENGINE_HELPER);
+    expect(install).toContain("d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
+    expect(install).toContain("42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903");
+    expect(engine).toBe(install);
+  });
+
+  // The pins are read from the Stack's own package.json, so the digest table must cover whatever the Stack at STACK_TAG
+  // names. Read from the sibling Stack checkout when there is one (the gate runs where it exists; a machine without
+  // it skips this and the fixture above still holds the same two lines).
+  const STACK_DIR = join(import.meta.dir, "..", "..", "stack");
+  test.skipIf(!existsSync(join(STACK_DIR, ".git")))("every Commons package in the Stack at STACK_TAG has a pinned digest and resolves under commons-tags", () => {
+    const tag = /^STACK_TAG="?([0-9a-f]{40})"?$/m.exec(readFileSync(INSTALL_SH, "utf8"))?.[1];
+    expect(tag).toBeDefined();
+    const shown = Bun.spawnSync(["git", "-C", STACK_DIR, "show", `${tag}:backend/package.json`]);
+    if (shown.exitCode !== 0) return; // the sibling checkout has not fetched that commit; nothing to compare here
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-pins-"));
+    try {
+      writeFileSync(join(root, "package.json"), shown.stdout.toString());
+      const out = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; stack_commons_deps "$MANIFEST"`], { env: { ...process.env, MANIFEST: join(root, "package.json") } });
+      expect(out.exitCode, out.stdout.toString()).toBe(0);
+      const rows = out.stdout.toString().trim().split("\n").map((line) => line.split(" "));
+      expect(rows.length).toBeGreaterThan(0);
+      for (const [pkg, dir, ctag] of rows) {
+        expect(dir).toBe(`${pkg}-${ctag}`);
+        expect(Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; commons_archive_sha256 "${ctag}"`]).exitCode, `no pinned digest for ${ctag}`).toBe(0);
+        expect(shown.stdout.toString()).toContain(`"file:../../commons-tags/${dir}/${pkg}"`);
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("dry-run prints the Commons tags and their verified archive digests without fetching", () => {
+    const result = bashCall('fetch_stack_commons /tmp/maipai-stack yes');
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("getmaipai/commons@core-v0.1.0");
-    expect(result.stdout).toContain("d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
-    expect(result.stdout).toContain("/tmp/maipai-stack/commons/core");
+    expect(result.stdout).toContain("core-v0.1.0 sha256 d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
+    expect(result.stdout).toContain("spec-v0.1.95 sha256 42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903");
+    expect(result.stdout).toContain("/tmp/maipai-stack/commons-tags/<package>-<tag>/<package>");
+  });
+
+  test("maipai-engine update --dry-run names the Stack, both Commons packages and the rebuild", () => {
+    const result = Bun.spawnSync(["bash", ENGINE_HELPER, "--dry-run", "update"]);
+    expect(result.exitCode).toBe(0);
+    const said = result.stdout.toString();
+    expect(said).toContain("Would fetch Stack at pinned STACK_TAG");
+    expect(said).toContain("core-v0.1.0 and spec-v0.1.95");
+    expect(said).toContain("pinned SHA-256");
+    expect(said).toContain("Would rebuild and restart maipai-stack");
   });
 
   test("setup_stack dry-run does not create its scratch tree", () => {
     const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; mktemp() { echo "mktemp called during dry-run" >&2; return 1; }; setup_stack /opt/maipai-home /opt/maipai-home/.bun/bin/bun linux x64 yes`]);
     expect(result.exitCode).toBe(0);
     expect(result.stderr.toString()).not.toContain("mktemp called during dry-run");
-    expect(result.stdout.toString()).toContain("would fetch getmaipai/commons@core-v0.1.0");
+    expect(result.stdout.toString()).toContain("would fetch each getmaipai/commons tag named in");
+    expect(result.stdout.toString()).toContain("core-v0.1.0 sha256");
     expect(result.stdout.toString()).toContain("scripts/build-binary.sh");
   });
 });
@@ -239,8 +357,9 @@ describe("--dry-run", () => {
     expect(stdout).toContain("[dry-run] MaiPai Stack install plan for");
     expect(stdout).toContain("STACK_TAG=");
     expect(stdout).toMatch(/would fetch getmaipai\/stack@[0-9a-f]+ into/);
-    expect(stdout).toContain("would fetch getmaipai/commons@core-v0.1.0");
-    expect(stdout).toContain("d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
+    expect(stdout).toContain("would fetch each getmaipai/commons tag named in");
+    expect(stdout).toContain("core-v0.1.0 sha256 d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
+    expect(stdout).toContain("spec-v0.1.95 sha256 42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903");
     expect(stdout).toContain("scripts/build-binary.sh");
     expect(stdout).toContain("OUT_DIR=");
     expect(stdout).toContain("SKIP_VERIFY=1");
@@ -405,15 +524,18 @@ describe("engine computer installer cleanup", () => {
     const root = mkdtempSync(join(tmpdir(), "maipai-engine-install-trap-"));
     const command = [
       `source "${INSTALL_SH}"`,
-      `mktemp() { echo "${root}"; }`,
+      // Each call gets its own scratch folder (the code removes the one it makes), all inside the test's own root.
+      `mktemp() { command mktemp -d "${root}/m.XXXXXX"; }`,
       `curl() { :; }`,
-      `tar() { command mkdir -p "${root}/commons/core"; touch "${root}/commons/core/package.json"; }`,
-      `sha256_file() { echo d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4; }`,
+      // The mocked unpack: the Stack's package.json (read to learn the Commons packages) and each package's folder.
+      `tar() { case "$*" in *commons-core-v0.1.0*) command mkdir -p "$4/core"; touch "$4/core/package.json";; *commons-spec-v0.1.95*) command mkdir -p "$4/spec"; touch "$4/spec/package.json";; *) command mkdir -p "$4/backend"; printf '%s\\n' '"@maipai/core": "file:../../commons-tags/core-core-v0.1.0/core",' '"@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.95/spec",' > "$4/backend/package.json";; esac; }`,
+      `sha256_file() { case "$1" in *commons.tar.gz) echo "FIXTURE";; esac; }`,
+      `commons_archive_sha256() { echo FIXTURE; }`,
       `build_stack_binary() { return 0; }`,
       `install_stack_service() { return 0; }`,
       `mkdir() { command mkdir -p "$@"; }`,
       `fetch_stack_source "${root}/stack" no`,
-      `fetch_stack_commons "${root}/commons" no`,
+      `fetch_stack_commons "${root}" no`,
       `setup_stack "${root}/install" /usr/bin/bun linux x64 no`,
       'echo "engine-computer path complete"',
     ].join("; ");

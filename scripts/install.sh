@@ -30,11 +30,13 @@ STACK_REPO="getmaipai/stack"
 # Home's release carries" paragraph). Today's value adds vision URL
 # binding to the Stack supervisor.
 STACK_TAG="60b887c5704bd94bc742254cce48e4d34b1fd035"
-# The Stack at STACK_TAG pins core-v0.1.0 as file:../../commons/core.
-# Keep the Commons pin and the digest of GitHub's archive together here;
-# the archive digest is verified before anything is extracted.
-COMMONS_CORE_TAG="core-v0.1.0"
-COMMONS_CORE_SHA256="d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4"
+# The Stack at STACK_TAG names its Commons packages in backend/package.json as
+# file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.95 today). Those
+# names are read from that file after the Stack is fetched (stack_commons_deps), so they cannot
+# drift from STACK_TAG. What is pinned here is only the digest of GitHub's archive for each tag
+# (commons_archive_sha256); the digest is verified before anything is extracted. A Stack bump that
+# names a tag with no digest here stops with a message that says which one to add. The same table
+# is in scripts/engine-computer/maipai-engine (its update), and a test keeps the two equal.
 INSTALL_ROOT_LINUX="/opt/maipai-home"
 INSTALL_ROOT_DARWIN="/usr/local/maipai-home"
 SERVICE_USER="maipai"
@@ -292,8 +294,35 @@ fetch_stack_source() {
   rm -rf "$tmp"
 }
 
-commons_core_sha256() {
-  printf '%s\n' "$COMMONS_CORE_SHA256"
+# The SHA-256 of GitHub's archive for one Commons tag (the tags the Stack at STACK_TAG names; see
+# the comment above STACK_TAG). Fails, printing nothing, for a tag with no pinned digest.
+commons_archive_sha256() {
+  case "$1" in
+    core-v0.1.0) printf '%s\n' "d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4" ;;
+    spec-v0.1.95) printf '%s\n' "42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903" ;;
+    *) return 1 ;;
+  esac
+}
+
+# The Commons packages a Stack's backend/package.json names, one per line as "<package> <dir> <tag>":
+# file:../../commons-tags/<dir>/<package> with <dir> = <package>-<tag>. This is the one place the pins
+# come from, so they cannot drift from the Stack at STACK_TAG.
+stack_commons_deps() {
+  local manifest="$1" line pkg dir leaf tag found=0
+  while IFS= read -r line; do
+    pkg=$(printf '%s\n' "$line" | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\([^/"]*\)/\([^/"]*\)".*#\1#p')
+    dir=$(printf '%s\n' "$line" | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\([^/"]*\)/\([^/"]*\)".*#\2#p')
+    leaf=$(printf '%s\n' "$line" | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\([^/"]*\)/\([^/"]*\)".*#\3#p')
+    [ -n "$pkg" ] || continue
+    if [ "$leaf" != "$pkg" ] || [ "${dir#"${pkg}-"}" = "$dir" ]; then
+      log "The Stack's backend/package.json names @maipai/${pkg} as ${dir}/${leaf}, which is not <package>-<tag>/<package>. The Stack was bumped to a layout this script does not know; update stack_commons_deps in scripts/install.sh and scripts/engine-computer/maipai-engine."
+      return 1
+    fi
+    tag="${dir#"${pkg}-"}"
+    printf '%s %s %s\n' "$pkg" "$dir" "$tag"
+    found=1
+  done < "$manifest"
+  [ "$found" = 1 ] || { log "The Stack's backend/package.json names no Commons package under ../../commons-tags/. Check that STACK_TAG points at the Stack commit this installer was written for."; return 1; }
 }
 
 sha256_file() {
@@ -305,56 +334,76 @@ sha256_file() {
   fi
 }
 
-# Stack's backend/package.json resolves file:../../commons/core from
-# <workspace>/stack/backend, so the pinned workspace must live at
-# <workspace>/commons/core beside the fetched Stack source.
-fetch_stack_commons() {
-  local dest="$1" dry_run="$2"
-  local tag="$COMMONS_CORE_TAG" expected
-  expected=$(commons_core_sha256)
-  if [ "$dry_run" = "yes" ]; then
-    log "[dry-run] would fetch getmaipai/commons@${tag} (sha256 ${expected}) into ${dest}/core"
-    return 0
+# One Commons package into <workspace>/commons-tags/<dir>/<package>, the place the Stack's
+# file:../../commons-tags/<dir>/<package> resolves to from <workspace>/stack/backend.
+fetch_one_stack_commons() {
+  local work="$1" pkg="$2" dir="$3" tag="$4" expected actual tmp dest="$1/commons-tags/$3"
+  if ! expected=$(commons_archive_sha256 "$tag"); then
+    log "The Stack needs Commons ${tag}, and this script has no pinned SHA-256 for it. Add the SHA-256 of https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz to commons_archive_sha256 in scripts/install.sh and scripts/engine-computer/maipai-engine, then run this again."
+    return 1
   fi
-  local tmp
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' RETURN
   log "Fetching getmaipai/commons@${tag}..."
   if ! curl -fsSL "https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz" -o "${tmp}/commons.tar.gz"; then
+    log "Could not download Commons ${tag} from https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz. Check that this computer can reach github.com, then run this again."
     trap - RETURN
     rm -rf "$tmp"
     return 1
   fi
-  local actual
   if ! actual=$(sha256_file "${tmp}/commons.tar.gz"); then
+    log "Could not compute the SHA-256 of the Commons ${tag} download. Install sha256sum (or shasum), then run this again."
     trap - RETURN
     rm -rf "$tmp"
     return 1
   fi
   if [ "$actual" != "$expected" ]; then
-    log "Commons ${tag} archive SHA-256 mismatch: expected ${expected}, got ${actual}"
+    log "Commons ${tag} archive SHA-256 mismatch: expected ${expected}, got ${actual}. The download may be damaged: run this again, and if it fails the same way, do not continue and report both digests."
     trap - RETURN
     rm -rf "$tmp"
     return 1
   fi
   if ! mkdir -p "$dest"; then
+    log "Could not create ${dest}. Check that the folder is writable, then run this again."
     trap - RETURN
     rm -rf "$tmp"
     return 1
   fi
-  if ! tar -xzf "${tmp}/commons.tar.gz" -C "$dest" --strip-components=1 "commons-${tag}/core"; then
+  if ! tar -xzf "${tmp}/commons.tar.gz" -C "$dest" --strip-components=1 "commons-${tag}/${pkg}"; then
+    log "Could not unpack ${pkg} from the Commons ${tag} archive. Run this again; if it repeats, the archive no longer has a ${pkg} folder and the Stack pin needs a new tag."
     trap - RETURN
     rm -rf "$tmp"
     return 1
   fi
-  if [ ! -f "${dest}/core/package.json" ]; then
-    log "Commons ${tag} archive is missing core/package.json"
+  if [ ! -f "${dest}/${pkg}/package.json" ]; then
+    log "Commons ${tag} archive is missing ${pkg}/package.json. The Stack pin needs a Commons tag that has it."
     trap - RETURN
     rm -rf "$tmp"
     return 1
   fi
   trap - RETURN
   rm -rf "$tmp"
+}
+
+# Every Commons package the fetched Stack names, laid beside it: <workspace>/stack is the Stack,
+# <workspace>/commons-tags/<package>-<tag>/<package> is each package, so ../../commons-tags/... from
+# <workspace>/stack/backend resolves (core and spec at STACK_TAG). Reads the names from the Stack's
+# own backend/package.json, so call it after fetch_stack_source.
+fetch_stack_commons() {
+  local work="$1" dry_run="$2"
+  if [ "$dry_run" = "yes" ]; then
+    log "[dry-run] would fetch each getmaipai/commons tag named in ${work}/stack/backend/package.json (known: core-v0.1.0 sha256 $(commons_archive_sha256 core-v0.1.0), spec-v0.1.95 sha256 $(commons_archive_sha256 spec-v0.1.95)) into ${work}/commons-tags/<package>-<tag>/<package>"
+    return 0
+  fi
+  local manifest="${work}/stack/backend/package.json" deps pkg dir tag
+  if [ ! -f "$manifest" ]; then
+    log "The Stack's backend/package.json is not at ${manifest}, so its Commons packages cannot be read. Fetch the Stack source into ${work}/stack first, then run this again."
+    return 1
+  fi
+  deps=$(stack_commons_deps "$manifest") || return 1
+  while read -r pkg dir tag; do
+    fetch_one_stack_commons "$work" "$pkg" "$dir" "$tag" || return 1
+  done <<< "$deps"
 }
 
 # Builds via the Stack's own scripts/build-binary.sh (one definition:
@@ -502,7 +551,7 @@ setup_stack() {
   fi
   source_dir="${source_root}/stack"
   fetch_stack_source "$source_dir" "$dry_run" || { log "Could not fetch the Stack's source. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
-  fetch_stack_commons "${source_root}/commons" "$dry_run" || { log "Could not fetch the Stack's pinned Commons dependency. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
+  fetch_stack_commons "$source_root" "$dry_run" || { log "Could not fetch the Commons packages the Stack needs. The MaiPai Stack is required; installation cannot continue. Read the message above, fix what it names, then run this installer again."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
   build_stack_binary "$source_dir" "$stack_dir" "$bun_bin" "$dry_run" || { log "Could not build the Stack binary. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
   [ "$dry_run" = "yes" ] || rm -rf "$source_root"
   install_stack_service "$install_root" "$bun_bin" "$os" "$arch" "$dry_run"
@@ -569,7 +618,7 @@ setup_engine_computer() {
   source_root=$(mktemp -d)
   source_dir="${source_root}/stack"
   fetch_stack_source "$source_dir" no || die "Could not fetch Stack source"
-  fetch_stack_commons "${source_root}/commons" no || die "Could not fetch Stack's pinned Commons dependency"
+  fetch_stack_commons "$source_root" no || die "Could not fetch the Commons packages the Stack needs. Read the message above, fix what it names, then run this installer again"
   local build_dir="${source_root}/output"
   build_stack_binary "$source_dir" "$build_dir" "$bun_bin" no \
     || die "Could not build Stack binary"
