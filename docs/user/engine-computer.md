@@ -21,13 +21,17 @@ MaiPai Home can use a second computer for its AI engines. Home keeps your family
 3. Open **Settings**, then **Devices**. Under **Engine computer link**, select **Pair engine computer**. Copy the one-time code. On the engine computer, run:
 
    ```sh
-   sudo maipai-engine pair 192.0.2.20 ABCD-EFGH-JKLM
+   sudo maipai-engine pair https://home.example ABCD-EFGH-JKLM
    ```
 
-   Replace the sample address with Home's address and use the code shown in Home. The code expires after ten minutes. The engine computer prints a check code. Keep it for the next step.
+   Replace the sample address with Home's secure address, the one that starts with `https://`, and use the code shown in Home. The code expires after ten minutes. The engine computer prints a check code. Keep it for the next step.
 4. In Home, select **Check the engine computer**. Enter the check code, then select **Pin this computer**. Dashes, spaces, and lowercase letters are okay. Home does not pin the computer if the code is wrong. After five wrong tries, start again with a new one-time code.
 
 You'll know it worked when the engine computer shows as ready on the **Status** screen.
+
+## Pairing needs a secure address
+
+Pairing only works when you open Home at a secure address that starts with `https://`. If you open Home at an address that starts with `http://`, Home says pairing only works at a secure address. Open Home through its `https://` address, then select **Pair engine computer** again. On the engine computer, give the pairing command the same `https://` address.
 
 ## If it stopped answering
 

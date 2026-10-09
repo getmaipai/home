@@ -7,7 +7,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { getLinkKeyPaths } from "@/lib/stack/linkKeys";
 import { existsSync } from "node:fs";
 import { __resetStackLinkControlForTests, setStackLinkControl } from "@/lib/remoteStackSettings";
-import { isSecurePairingRequest, pairingSourceAddress } from "@/routes/engineLink";
+import { isSecurePairingRequest, pairingSourceAddress, PAIRING_NEEDS_HTTPS_MESSAGE } from "@/routes/engineLink";
 
 beforeEach(() => { resetDb(); revokeLinkKey(); __setLinkKeyCommandForTests(null); __resetRateLimiterForTests(); __resetStackLinkControlForTests(); });
 async function owner(): Promise<TestClient> { const client = new TestClient("192.168.1.40"); await client.post("/api/auth/setup", { displayName: "Owner", secret: "correcthorse" }); return client; }
@@ -32,8 +32,25 @@ describe("engine link routes", () => {
   test("public GET refuses plain HTTP and non-household source", async () => {
     const client = await owner(); setHouseholdSettingValue("engines.stack.where", "another_computer");
     const { code } = await (await client.post("/api/engine-link/pair")).json() as { code: string };
-    expect((await (await import("@/app")).app.request(`http://localhost/api/engine-link/pair/${derivePairingLookup(code)}`)).status).toBe(400);
+    const plain = await (await import("@/app")).app.request(`http://localhost/api/engine-link/pair/${derivePairingLookup(code)}`);
+    expect(plain.status).toBe(400);
+    expect(((await plain.json()) as { error: string }).error).toBe(PAIRING_NEEDS_HTTPS_MESSAGE);
     expect((await new TestClient("8.8.8.8").get(`/api/engine-link/pair/${derivePairingLookup(code)}`, { "x-real-ip": "192.168.1.40" })).status).toBe(403);
+  });
+  // PAIR-COPY-01: both refusals say what to do, in the same words, and the words name https://.
+  test("starting a pairing over plain HTTP is refused with a message that names the https:// fix", async () => {
+    const client = await owner(); setHouseholdSettingValue("engines.stack.where", "another_computer");
+    // postForm goes to the app by path, which is a plain http://localhost request, with the owner's cookie.
+    const refused = await client.postForm("/api/engine-link/pair", new FormData());
+    expect(refused.status).toBe(400);
+    const message = ((await refused.json()) as { error: string }).error;
+    expect(message).toBe(PAIRING_NEEDS_HTTPS_MESSAGE);
+    expect(message).toContain("https://");
+    expect(message).toContain("http://");
+    expect(message).toContain("Open Home through its https:// address");
+    expect(message).not.toContain("\u2014");
+    // Over https the same call still works.
+    expect((await client.post("/api/engine-link/pair")).status).toBe(200);
   });
   test("source selection trusts the socket and the trusted proxy's rightmost appended hop", () => {
     expect(pairingSourceAddress("192.168.1.40", "8.8.8.8", false)).toBe("192.168.1.40");

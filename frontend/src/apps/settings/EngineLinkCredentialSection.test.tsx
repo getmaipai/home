@@ -58,6 +58,25 @@ describe("EngineLinkCredentialSection check code", () => {
     } finally { globalThis.fetch = original; }
   });
 
+  // PAIR-COPY-01: the panel shows the hub's own words as they are, so the person reads the fix (the https:// address).
+  test("a refused pairing start shows the hub's message as it is, not a generic one", async () => {
+    const original = globalThis.fetch;
+    const message = "Pairing only works when Home is opened at a secure address that starts with https://. Open Home through its https:// address, then try again.";
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
+      if (url.endsWith("/api/engine-link/credentials")) return json({ paired: false });
+      if (url.endsWith("/api/engine-link/pair") && (init?.method ?? "GET") === "POST") return json({ error: message }, 400);
+      return Promise.reject(new Error(`unstubbed fetch: ${url}`));
+    }) as unknown as typeof fetch;
+    try {
+      const { findByText, queryByText } = mount();
+      fireEvent.click(await findByText("Pair engine computer"));
+      expect(await findByText(message)).toBeTruthy();
+      expect(queryByText("Could not update the engine computer link.")).toBeNull();
+    } finally { globalThis.fetch = original; }
+  });
+
   test("a locked pairing (429) returns to the start", async () => {
     const original = globalThis.fetch;
     globalThis.fetch = stubFetch(429, () => {});

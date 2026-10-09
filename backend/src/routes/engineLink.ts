@@ -17,6 +17,11 @@ export const engineLinkRoutes = apiRouter();
 const ErrorResponses = errorResponses({ 400: "Invalid request or pairing code", 401: "Not signed in", 403: "Admin access required" });
 const PairCodeSchema = z.object({ code: z.string().regex(/^[A-Z2-7]{12}$/), expires_at: z.string() });
 const PairPayloadSchema = z.object({ public_key: z.string(), household_id: z.string(), hmac: z.string() });
+// PAIR-COPY-01: what both refusals say (starting a pairing, and the engine computer fetching it), in plain words
+// that name the fix. One constant, so the two can never drift apart. The tests assert the https:// text.
+export const PAIRING_NEEDS_HTTPS_MESSAGE =
+  "Pairing only works when Home is opened at a secure address that starts with https://. This request came in through an address that starts with http://. Open Home through its https:// address, then try again. On the engine computer, give the pairing command the https:// address too.";
+
 export function isSecurePairingRequest(protocol: string, forwardedProto: string | undefined, trustedProxy: boolean): boolean {
   const forwardedProtocol = trustedProxy ? forwardedProto?.split(",").at(-1)?.trim().toLowerCase() : undefined;
   return forwardedProtocol ? forwardedProtocol === "https" : protocol === "https:";
@@ -42,7 +47,7 @@ const issueRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: PairCodeSchema } }, description: "A short lived one-time code" }, ...ErrorResponses },
 });
 engineLinkRoutes.openapi(issueRoute, (c) => {
-  if (!isSecureRequest(c)) return c.json({ error: "Pairing requires a secure Home connection" }, 400);
+  if (!isSecureRequest(c)) return c.json({ error: PAIRING_NEEDS_HTTPS_MESSAGE }, 400);
   if (getHouseholdSettingValue("engines.stack.where") !== "another_computer") return c.json({ error: "Choose another computer for the AI engines first" }, 400);
   return c.json(issuePairingCode(), 200);
 });
@@ -53,7 +58,7 @@ const fetchRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: PairPayloadSchema } }, description: "Public key and code-keyed integrity check" }, 400: { description: "Code expired, exhausted, invalid or already used" } },
 });
 engineLinkRoutes.openapi(fetchRoute, async (c) => {
-  if (!isSecureRequest(c)) return c.json({ error: "Pairing requires a secure Home connection" }, 400);
+  if (!isSecureRequest(c)) return c.json({ error: PAIRING_NEEDS_HTTPS_MESSAGE }, 400);
   let socketAddress: string | undefined;
   try { socketAddress = getConnInfo(c).remote.address; } catch { socketAddress = undefined; }
   const source = pairingSourceAddress(socketAddress, c.req.header("x-forwarded-for"), TRUST_PROXY);
