@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { createHmac } from "node:crypto";
 
 // HOME-STACK-01: install.sh's Stack functions are pure bash, sourced
 // (not executed - see the script's own "am I sourced" guard at the
@@ -10,6 +11,8 @@ import { tmpdir } from "node:os";
 // than a TypeScript reimplementation that could drift from what the
 // script actually does.
 const INSTALL_SH = join(import.meta.dir, "install.sh");
+const ENGINE_HELPER = join(import.meta.dir, "engine-computer", "maipai-engine");
+const PAIR_RESPONSE = join(import.meta.dir, "engine-computer", "pair-response.py");
 
 function bashCall(cmd: string): { stdout: string; stderr: string; exitCode: number } {
   const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${cmd}`]);
@@ -136,6 +139,99 @@ describe("--dry-run", () => {
     const { stdout, exitCode } = runScript(["--dry-run"]);
     expect(exitCode).toBe(0);
     expect(stdout).not.toContain("must run as root");
+  });
+});
+
+describe("REMOTE-STACK-BOX-01 engine computer dry runs", () => {
+  test("installer dry run keeps each printed command on a short line", () => {
+    const { stdout, exitCode } = runScript(["--engine-computer", "--dry-run"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("STACK_TAG=");
+    expect(stdout).toContain("sudo useradd -r -U -s /usr/sbin/nologin maipai-stack");
+    expect(stdout).toContain("sudo loginctl enable-linger maipai-stack");
+    expect(stdout).toContain("sudo apt-get install openssh-server");
+    expect(stdout).toContain("sudo systemctl enable --now ssh");
+    expect(stdout).toContain("Ready to pair.");
+    for (const line of stdout.split("\n")) {
+      if (line.includes("sudo ")) expect(line.length).toBeLessThan(70);
+    }
+  });
+
+  test.each([
+    ["pair", ["pair", "192.0.2.10", "K7Q-M2X-RP4-ZT7"]],
+    ["unpair", ["unpair"]],
+    ["update", ["update"]],
+    ["status", ["status"]],
+  ] as const)("%s dry run is repeatable", (_name, args) => {
+    const first = Bun.spawnSync([ENGINE_HELPER, "--dry-run", ...args]);
+    const second = Bun.spawnSync([ENGINE_HELPER, "--dry-run", ...args]);
+    expect(first.exitCode).toBe(0);
+    expect(second.exitCode).toBe(0);
+    expect(second.stdout.toString()).toBe(first.stdout.toString());
+    for (const line of first.stdout.toString().split("\n")) {
+      if (line.includes("sudo ")) expect(line.length).toBeLessThan(70);
+    }
+  });
+
+  test("pair response fetches the mocked endpoint and verifies the code HMAC", async () => {
+    const code = "K7QM2XRP4ZT7";
+    const publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITest fixture";
+    const householdId = "household-test-01";
+    const signature = createHmac("sha256", code)
+      .update(`${publicKey}\n${householdId}`)
+      .digest("hex");
+    const server = Bun.serve({
+      port: 0,
+      fetch(request) {
+        expect(new URL(request.url).pathname).toBe(`/api/engine-link/pair/${code}`);
+        return Response.json({
+          public_key: publicKey,
+          household_id: householdId,
+          hmac_sha256: signature,
+        });
+      },
+    });
+    try {
+      const process = Bun.spawn(["python3", PAIR_RESPONSE, server.url.href, code], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [exitCode, stdout] = await Promise.all([
+        process.exited,
+        new Response(process.stdout).text(),
+      ]);
+      expect(exitCode).toBe(0);
+      expect(stdout.trim().split("\n")).toEqual([publicKey, householdId]);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("pair response rejects a mocked endpoint with a bad HMAC", async () => {
+    const server = Bun.serve({
+      port: 0,
+      fetch() {
+        return Response.json({
+          public_key: "ssh-ed25519 AAAA fixture",
+          household_id: "household-test-01",
+          hmac_sha256: "bad",
+        });
+      },
+    });
+    try {
+      const process = Bun.spawn(["python3", PAIR_RESPONSE, server.url.href, "K7QM2XRP4ZT7"], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
+      const [exitCode, stderr] = await Promise.all([
+        process.exited,
+        new Response(process.stderr).text(),
+      ]);
+      expect(exitCode).toBe(1);
+      expect(stderr).toContain("did not verify");
+    } finally {
+      server.stop(true);
+    }
   });
 });
 

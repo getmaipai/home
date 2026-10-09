@@ -40,6 +40,9 @@ SERVICE_USER="maipai"
 APP_PORT="${MAIPAI_PORT:-3000}"
 # stack/backend/src/lib/stack/client.ts's own DEFAULT_BASE_URL port.
 STACK_PORT_BASE=8770
+ENGINE_STACK_USER=maipai-stack
+ENGINE_STACK_ROOT=/opt/maipai-stack
+ENGINE_STACK_DATA=/data/stack
 
 log() { printf '%s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
@@ -106,7 +109,7 @@ ensure_bun_system_wide() {
   if [ -x "${bun_home}/bin/bun" ]; then return; fi
   log "Installing the Bun runtime to ${bun_home}..."
   mkdir -p "$bun_home"
-  BUN_INSTALL="$bun_home" curl -fsSL https://bun.sh/install | bash
+  curl -fsSL https://bun.sh/install | BUN_INSTALL="$bun_home" bash
   [ -x "${bun_home}/bin/bun" ] || die "Bun install did not produce ${bun_home}/bin/bun"
 }
 
@@ -400,11 +403,98 @@ setup_stack() {
   install_stack_service "$install_root" "$bun_bin" "$os" "$arch" "$dry_run"
 }
 
+# Dedicated Linux engine computer. Privileged setup is deliberately
+# rendered (never executed) by --dry-run; install-service itself runs
+# under maipai-stack's systemd --user manager.
+setup_engine_computer() {
+  local dry_run="$1" os="$2" arch="$3"
+  if [ "$dry_run" != "yes" ]; then
+    [ "$os" = "linux" ] || die "--engine-computer requires Ubuntu Linux"
+    [ "$(. /etc/os-release && echo "$ID")" = ubuntu ] \
+      || die "--engine-computer is supported on Ubuntu only"
+  fi
+  local bun_bin source_dir
+  if [ "$dry_run" = "yes" ]; then
+    log "[dry-run] Engine computer Stack setup for ${os}/${arch}"
+    log "[dry-run] STACK_TAG=${STACK_TAG}"
+    log "[dry-run] sudo useradd -r -U -s /usr/sbin/nologin maipai-stack"
+    log "[dry-run] If absent, run:"
+    log "[dry-run] sudo groupadd --system maipai-stack"
+    log "[dry-run] sudo usermod -d /home/maipai-stack maipai-stack"
+    log "[dry-run] sudo usermod -g maipai-stack maipai-stack"
+    log "[dry-run] sudo passwd --lock maipai-stack"
+    log "[dry-run] sudo mkdir -p /data/stack"
+    log "[dry-run] sudo chown maipai-stack /data/stack"
+    log "[dry-run] sudo chmod 0700 /data/stack"
+    log "[dry-run] sudo loginctl enable-linger maipai-stack"
+    log "[dry-run] sudo apt-get install openssh-server"
+    log "[dry-run] sudo systemctl enable --now ssh"
+    log "[dry-run] install Stack at ${ENGINE_STACK_ROOT}"
+    log "[dry-run] Stack data directory: ${ENGINE_STACK_DATA}"
+    log "[dry-run] Bun installed under ${ENGINE_STACK_ROOT}/.bun"
+    log "[dry-run] maipai-engine helper installed"
+    log "Ready to pair. On MaiPai Home, open Settings, then Engines."
+    return 0
+  fi
+  if ! id "$ENGINE_STACK_USER" >/dev/null 2>&1; then
+    useradd --system --user-group --shell /usr/sbin/nologin \
+      "$ENGINE_STACK_USER"
+  fi
+  getent group "$ENGINE_STACK_USER" >/dev/null 2>&1 \
+    || groupadd --system "$ENGINE_STACK_USER"
+  usermod --home /home/maipai-stack "$ENGINE_STACK_USER"
+  usermod --shell /usr/sbin/nologin "$ENGINE_STACK_USER"
+  usermod --gid "$ENGINE_STACK_USER" "$ENGINE_STACK_USER"
+  passwd --lock "$ENGINE_STACK_USER" >/dev/null
+  install -d -o "$ENGINE_STACK_USER" -g "$ENGINE_STACK_USER" \
+    -m 0700 /home/maipai-stack "$ENGINE_STACK_DATA" \
+    "$ENGINE_STACK_ROOT"
+  if ! command -v sshd >/dev/null 2>&1; then
+    read -r -p "Install openssh-server? [y/N] " answer
+    case "$answer" in y|Y|yes|YES) apt-get update && apt-get install -y openssh-server ;; *) die "openssh-server is required for pairing" ;; esac
+  fi
+  systemctl enable --now ssh
+  loginctl enable-linger "$ENGINE_STACK_USER"
+  local engine_uid
+  engine_uid=$(id -u "$ENGINE_STACK_USER")
+  local bun_home="${ENGINE_STACK_ROOT}/.bun"
+  ensure_bun_system_wide "$bun_home"
+  bun_bin="${bun_home}/bin/bun"
+  source_dir=$(mktemp -d)
+  fetch_stack_source "$source_dir" no || die "Could not fetch Stack source"
+  build_stack_binary "$source_dir" "$ENGINE_STACK_ROOT" "$bun_bin" no \
+    || die "Could not build Stack binary"
+  rm -rf "$source_dir"
+  chown -R "$ENGINE_STACK_USER:$ENGINE_STACK_USER" "$ENGINE_STACK_ROOT"
+  local binary="$ENGINE_STACK_ROOT/$(render_stack_binary_name "$os" "$arch")"
+  sudo -u "$ENGINE_STACK_USER" env \
+    "XDG_RUNTIME_DIR=/run/user/${engine_uid}" \
+    "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${engine_uid}/bus" \
+    STACK_DATA_DIR="$ENGINE_STACK_DATA" PORT=8770 STACK_BUN_BIN="$bun_bin" \
+    "$binary" install-service
+  local helper_dir="$PWD" helper_tmp=""
+  if [ ! -f "${helper_dir}/scripts/engine-computer/maipai-engine" ]; then
+    helper_tmp=$(mktemp -d)
+    local home_tag
+    home_tag=$(latest_tag)
+    fetch_release_source "$home_tag" "$helper_tmp"
+    helper_dir="$helper_tmp"
+  fi
+  install -D -m 0755 "${helper_dir}/scripts/engine-computer/maipai-engine" \
+    /usr/local/bin/maipai-engine
+  install -D -m 0644 "${helper_dir}/scripts/engine-computer/pair-response.py" \
+    /usr/local/lib/maipai-engine/pair-response.py
+  [ -z "$helper_tmp" ] || rm -rf "$helper_tmp"
+  log "Ready to pair. On MaiPai Home, open Settings, then Engines."
+}
+
 main() {
   local dry_run="no"
+  local engine_computer="no"
   for arg in "$@"; do
     case "$arg" in
       --dry-run) dry_run="yes" ;;
+      --engine-computer) engine_computer="yes" ;;
     esac
   done
 
@@ -412,6 +502,12 @@ main() {
   os=$(detect_os)
   local arch
   arch=$(detect_arch)
+
+  if [ "$engine_computer" = "yes" ]; then
+    [ "$dry_run" = "yes" ] || require_root
+    setup_engine_computer "$dry_run" "$os" "$arch"
+    exit 0
+  fi
 
   if [ "$dry_run" = "yes" ]; then
     # A focused dry run: what the Stack half of this installer would do,
