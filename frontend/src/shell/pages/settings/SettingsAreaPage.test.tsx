@@ -80,7 +80,7 @@ describe("the settings route", () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/home/general"));
     await waitFor(() => expect(rows(view)).toContain("Maintenance"));
-    expect(rows(view)).toEqual(["General", "People", "Search", "Integrations", "Voices", "Commands", "AI", "Storage and backups", "Maintenance", "Privacy"]);
+    expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Maintenance", "Privacy", "Developer tools"]);
     expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
   });
 

@@ -83,12 +83,12 @@ describe("which sections each role sees", () => {
   });
 
   test("Home settings: only an owner or admin has any section; nobody else is shown one", () => {
-    const home = ["general", "people", "search", "integrations", "voices", "commands", "ai", "storage", "maintenance", "privacy"];
+    const home = ["general", "people", "ai", "robot", "search", "integrations", "commands", "voices", "storage", "maintenance", "privacy", "developer"];
     for (const role of ROLES) {
       const sections = sectionIds("home", viewerFor(role, EMPTY_HOME));
       expect(sections).toEqual(role === "owner" || role === "admin" ? home : []);
     }
-    expect(sectionIds("home", viewerFor("admin", FULL_HOME))).toEqual(["general", "people", "search", "integrations", "voices", "commands", "ai", "robot", "storage", "maintenance", "privacy"]);
+    expect(sectionIds("home", viewerFor("admin", FULL_HOME))).toEqual(["general", "people", "ai", "robot", "search", "integrations", "commands", "voices", "storage", "maintenance", "privacy", "developer"]);
   });
 
   test("a teen sees no Robot card and no household or expert card; a child neither", () => {
