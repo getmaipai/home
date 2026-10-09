@@ -1345,6 +1345,7 @@ export const entities = sqliteTable("entities", {
   aliases: text("aliases").notNull().default("[]"), // JSON string[]
   description: text("description"),
   placeKind: text("place_kind"), // "map" | "area" | null
+  geo: text("geo"), // nullable JSON geo object; only map places carry coordinates
   parentId: text("parent_id"),
   accountPersonId: text("account_person_id").references(() => people.id),
   source: text("source").notNull(), // "hub" | "local" | "imported" | "inferred"

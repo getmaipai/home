@@ -30,7 +30,7 @@ import { buildProjectTypeFromManifest } from "@/lib/projects/fromManifest";
 import type { ProjectPlan } from "@/lib/projects/types";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { resolvePlace } from "@/lib/places";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow } from "@/lib/benchSampling";
@@ -627,24 +627,6 @@ function warmActor(): PersonRow | null {
   return people[0]!;
 }
 
-/** Overrides `weather`'s own `place` input with `household.home_place`
- * (backend/src/settings/coreKeys.ts) when the household has set one, so
- * its warm keys and widget default (a manifest literal, "Seattle")
- * answer for the household actually running it instead of the
- * placeholder every install ships with. Scoped to `weather` by package
- * id, not just by the presence of a `place` field (code review,
- * 2026-09-11): a future package could declare its own unrelated `place`
- * input (a travel planner's destination, say) that this must never
- * silently rewrite. Never touches a live chat turn's own explicit place
- * (a user asking "weather in Chicago" reaches `runPlugin()` directly with
- * that place already resolved, never through here). */
-export function withHouseholdPlaceDefault(packageId: string, inputs: Record<string, unknown>): Record<string, unknown> {
-  if (packageId !== "weather" || !("place" in inputs)) return inputs;
-  const place = getHouseholdSettingValue("household.home_place");
-  if (typeof place !== "string" || place.length === 0) return inputs;
-  return { ...inputs, place };
-}
-
 /** Runs one package's own `warm.keys` (each a recipe input object) so its
  * cache holds a fresh answer before anyone asks. Takes the manifest
  * already loaded by the caller (runDueWarmJobs() below) rather than
@@ -662,7 +644,13 @@ export async function warmPackage(id: string, manifest: PackageManifest): Promis
   if (!actor) return;
   for (const key of keys) {
     try {
-      const result = await runPlugin(id, actor, withHouseholdPlaceDefault(id, key as Record<string, unknown>));
+      const inputs = { ...(key as Record<string, unknown>) };
+      if (id === "weather" && "place" in inputs) {
+        const place = await resolvePlace({ person: null, surface: "weather" });
+        if (place.from === "none" || !place.label) continue;
+        inputs.place = place.label;
+      }
+      const result = await runPlugin(id, actor, inputs);
       if (!result.ok) {
         console.error(`[warm] ${id} failed to warm key ${JSON.stringify(key)}: ${result.error}`);
       }

@@ -34,6 +34,15 @@ describe("POST /api/entities", () => {
     expect(res.status).toBe(400);
   });
 
+  test("geo is accepted only for map places and area coordinates have one decimal", async () => {
+    const owner = await ownerSession();
+    const geo = { lat: 47.6, lon: -122.3, precision: "area", area: "Seattle", from: "search" };
+    expect((await owner.post("/api/entities", { kind: "thing", name: "Nope", geo })).status).toBe(400);
+    expect((await owner.post("/api/entities", { kind: "place", name: "Room", place_kind: "area", geo })).status).toBe(400);
+    expect((await owner.post("/api/entities", { kind: "place", name: "Town", place_kind: "map", geo: { ...geo, lat: 47.61 } })).status).toBe(400);
+    expect((await owner.post("/api/entities", { kind: "place", name: "Town", place_kind: "map", geo })).status).toBe(201);
+  });
+
   test("only a person entity may carry account_person_id", async () => {
     const owner = await ownerSession();
     const meRes = await owner.get("/api/auth/me");

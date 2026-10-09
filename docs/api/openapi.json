@@ -4199,7 +4199,8 @@
                           "entity",
                           "area",
                           "person",
-                          "media"
+                          "media",
+                          "location"
                         ],
                         "description": "Home Assistant's selector names (3.2)."
                       },
@@ -4215,6 +4216,12 @@
                           "options_from": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "multiple": {
+                            "type": "boolean"
+                          },
+                          "allow_current": {
+                            "type": "boolean"
                           }
                         },
                         "additionalProperties": {
@@ -21351,6 +21358,69 @@
                         "default": null,
                         "description": "Only meaningful when kind is `place`, required then. `map` is a place on a map (a home, a workplace, a school) - Home Assistant calls this a zone. `area` is a space inside a place (a room) - Home Assistant calls this an area. Keeping both senses in one kind with a subtype, rather than two kinds, is a documented judgment call (home/docs/dev.md): a room and a house are both places you can be, and every relationship that points at one can point at the other. Cross-field rules like this one are enforced by spec/records/ts/validate.ts and its tests, not by this schema: neither generator preserves JSON Schema conditionals, so an if/then here would look enforced and do nothing. Same convention MemoryRecord already follows for its own scope/person rule."
                       },
+                      "geo": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "lat": {
+                                "type": "number",
+                                "minimum": -90,
+                                "maximum": 90
+                              },
+                              "lon": {
+                                "type": "number",
+                                "minimum": -180,
+                                "maximum": 180
+                              },
+                              "precision": {
+                                "type": "string",
+                                "enum": [
+                                  "exact",
+                                  "area"
+                                ]
+                              },
+                              "area": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "maxLength": 200
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ]
+                              },
+                              "from": {
+                                "type": "string",
+                                "enum": [
+                                  "search",
+                                  "browser",
+                                  "typed"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "lat",
+                              "lon",
+                              "precision",
+                              "area",
+                              "from"
+                            ],
+                            "additionalProperties": false,
+                            "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                      },
                       "parent_id": {
                         "anyOf": [
                           {
@@ -21590,6 +21660,49 @@
                       null
                     ]
                   },
+                  "geo": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "lon": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180
+                      },
+                      "precision": {
+                        "type": "string",
+                        "enum": [
+                          "exact",
+                          "area"
+                        ]
+                      },
+                      "area": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 200
+                      },
+                      "from": {
+                        "type": "string",
+                        "enum": [
+                          "search",
+                          "browser",
+                          "typed"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "lat",
+                      "lon",
+                      "precision",
+                      "area",
+                      "from"
+                    ]
+                  },
                   "parent_id": {
                     "type": "string",
                     "nullable": true
@@ -21711,6 +21824,69 @@
                       ],
                       "default": null,
                       "description": "Only meaningful when kind is `place`, required then. `map` is a place on a map (a home, a workplace, a school) - Home Assistant calls this a zone. `area` is a space inside a place (a room) - Home Assistant calls this an area. Keeping both senses in one kind with a subtype, rather than two kinds, is a documented judgment call (home/docs/dev.md): a room and a house are both places you can be, and every relationship that points at one can point at the other. Cross-field rules like this one are enforced by spec/records/ts/validate.ts and its tests, not by this schema: neither generator preserves JSON Schema conditionals, so an if/then here would look enforced and do nothing. Same convention MemoryRecord already follows for its own scope/person rule."
+                    },
+                    "geo": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "lat": {
+                              "type": "number",
+                              "minimum": -90,
+                              "maximum": 90
+                            },
+                            "lon": {
+                              "type": "number",
+                              "minimum": -180,
+                              "maximum": 180
+                            },
+                            "precision": {
+                              "type": "string",
+                              "enum": [
+                                "exact",
+                                "area"
+                              ]
+                            },
+                            "area": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "from": {
+                              "type": "string",
+                              "enum": [
+                                "search",
+                                "browser",
+                                "typed"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "lat",
+                            "lon",
+                            "precision",
+                            "area",
+                            "from"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
                     },
                     "parent_id": {
                       "anyOf": [
@@ -21976,6 +22152,69 @@
                       "default": null,
                       "description": "Only meaningful when kind is `place`, required then. `map` is a place on a map (a home, a workplace, a school) - Home Assistant calls this a zone. `area` is a space inside a place (a room) - Home Assistant calls this an area. Keeping both senses in one kind with a subtype, rather than two kinds, is a documented judgment call (home/docs/dev.md): a room and a house are both places you can be, and every relationship that points at one can point at the other. Cross-field rules like this one are enforced by spec/records/ts/validate.ts and its tests, not by this schema: neither generator preserves JSON Schema conditionals, so an if/then here would look enforced and do nothing. Same convention MemoryRecord already follows for its own scope/person rule."
                     },
+                    "geo": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "lat": {
+                              "type": "number",
+                              "minimum": -90,
+                              "maximum": 90
+                            },
+                            "lon": {
+                              "type": "number",
+                              "minimum": -180,
+                              "maximum": 180
+                            },
+                            "precision": {
+                              "type": "string",
+                              "enum": [
+                                "exact",
+                                "area"
+                              ]
+                            },
+                            "area": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "from": {
+                              "type": "string",
+                              "enum": [
+                                "search",
+                                "browser",
+                                "typed"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "lat",
+                            "lon",
+                            "precision",
+                            "area",
+                            "from"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                    },
                     "parent_id": {
                       "anyOf": [
                         {
@@ -22174,6 +22413,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Cannot create a household place",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -22280,6 +22529,69 @@
                       ],
                       "default": null,
                       "description": "Only meaningful when kind is `place`, required then. `map` is a place on a map (a home, a workplace, a school) - Home Assistant calls this a zone. `area` is a space inside a place (a room) - Home Assistant calls this an area. Keeping both senses in one kind with a subtype, rather than two kinds, is a documented judgment call (home/docs/dev.md): a room and a house are both places you can be, and every relationship that points at one can point at the other. Cross-field rules like this one are enforced by spec/records/ts/validate.ts and its tests, not by this schema: neither generator preserves JSON Schema conditionals, so an if/then here would look enforced and do nothing. Same convention MemoryRecord already follows for its own scope/person rule."
+                    },
+                    "geo": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "lat": {
+                              "type": "number",
+                              "minimum": -90,
+                              "maximum": 90
+                            },
+                            "lon": {
+                              "type": "number",
+                              "minimum": -180,
+                              "maximum": 180
+                            },
+                            "precision": {
+                              "type": "string",
+                              "enum": [
+                                "exact",
+                                "area"
+                              ]
+                            },
+                            "area": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "from": {
+                              "type": "string",
+                              "enum": [
+                                "search",
+                                "browser",
+                                "typed"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "lat",
+                            "lon",
+                            "precision",
+                            "area",
+                            "from"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
                     },
                     "parent_id": {
                       "anyOf": [
@@ -22470,8 +22782,28 @@
               }
             }
           },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "404": {
             "description": "No such entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -22524,6 +22856,49 @@
                   "parent_id": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "geo": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "lon": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180
+                      },
+                      "precision": {
+                        "type": "string",
+                        "enum": [
+                          "exact",
+                          "area"
+                        ]
+                      },
+                      "area": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 200
+                      },
+                      "from": {
+                        "type": "string",
+                        "enum": [
+                          "search",
+                          "browser",
+                          "typed"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "lat",
+                      "lon",
+                      "precision",
+                      "area",
+                      "from"
+                    ]
                   },
                   "sensitive": {
                     "type": "boolean"
@@ -22630,6 +23005,69 @@
                       ],
                       "default": null,
                       "description": "Only meaningful when kind is `place`, required then. `map` is a place on a map (a home, a workplace, a school) - Home Assistant calls this a zone. `area` is a space inside a place (a room) - Home Assistant calls this an area. Keeping both senses in one kind with a subtype, rather than two kinds, is a documented judgment call (home/docs/dev.md): a room and a house are both places you can be, and every relationship that points at one can point at the other. Cross-field rules like this one are enforced by spec/records/ts/validate.ts and its tests, not by this schema: neither generator preserves JSON Schema conditionals, so an if/then here would look enforced and do nothing. Same convention MemoryRecord already follows for its own scope/person rule."
+                    },
+                    "geo": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "lat": {
+                              "type": "number",
+                              "minimum": -90,
+                              "maximum": 90
+                            },
+                            "lon": {
+                              "type": "number",
+                              "minimum": -180,
+                              "maximum": 180
+                            },
+                            "precision": {
+                              "type": "string",
+                              "enum": [
+                                "exact",
+                                "area"
+                              ]
+                            },
+                            "area": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ]
+                            },
+                            "from": {
+                              "type": "string",
+                              "enum": [
+                                "search",
+                                "browser",
+                                "typed"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "lat",
+                            "lon",
+                            "precision",
+                            "area",
+                            "from"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "Optional coordinates for a map place. `area` is a town or region label. `precision: area` coordinates are rounded to at most one decimal place; cross-field constraints are enforced in spec/records/ts/validate.ts and its tests because the generators do not preserve JSON Schema conditionals."
                     },
                     "parent_id": {
                       "anyOf": [
@@ -22907,8 +23345,219 @@
               }
             }
           },
+          "403": {
+            "description": "Not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "404": {
             "description": "No such entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Cannot remove the current household home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/places/resolve": {
+      "post": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Resolve the place for a location surface",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "surface": {
+                    "type": "string",
+                    "enum": [
+                      "weather",
+                      "maps"
+                    ]
+                  },
+                  "named": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 200
+                  },
+                  "current": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "lon": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180
+                      },
+                      "area": {
+                        "type": "string",
+                        "nullable": true,
+                        "maxLength": 200
+                      }
+                    },
+                    "required": [
+                      "lat",
+                      "lon"
+                    ]
+                  }
+                },
+                "required": [
+                  "surface"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolved place; request coordinates are not persisted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "area": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lat": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "lon": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "precision": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "exact",
+                        "area",
+                        null
+                      ]
+                    },
+                    "from": {
+                      "type": "string",
+                      "enum": [
+                        "named",
+                        "saved",
+                        "current",
+                        "household",
+                        "none"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "label",
+                    "area",
+                    "lat",
+                    "lon",
+                    "precision",
+                    "from"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/places/search": {
+      "get": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Search for map places",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Geocoding candidates, coarsened for a child.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "area": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "lat": {
+                        "type": "number"
+                      },
+                      "lon": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "area",
+                      "lat",
+                      "lon"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
             "content": {
               "application/json": {
                 "schema": {

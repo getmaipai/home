@@ -104,6 +104,7 @@ describe("the migration chain (architecture review 4.4)", () => {
       seedRow(old, "conversations", { id: "conv-seeded01", person_id: "person-child01", created_at: now, updated_at: now, hlc: now });
       seedRow(old, "conversation_turns", { id: "turn-seeded01", person_id: "person-child01", conversation_id: "conv-seeded01", user_text: "what do frogs eat", reply_text: "Insects, mostly.", created_at: now });
       seedRow(old, "memory_records", { id: "mem-seeded01", person: "person-child01", scope: "person", text: "Sprout likes frogs", created_at: now, updated_at: now, hlc: now });
+      seedRow(old, "settings_values", { scope: "household", key: "household.home_place", value: JSON.stringify("Portland, OR"), hlc: now, source: "user", updated_at: now });
       const before = Object.fromEntries(["people", "conversations", "conversation_turns", "memory_records"].map((t) => [t, (old.query(`SELECT count(*) AS n FROM "${t}"`).get() as { n: number }).n]));
       old.close();
 
@@ -115,6 +116,9 @@ describe("the migration chain (architecture review 4.4)", () => {
           expect({ table, rows: (upgraded.query(`SELECT count(*) AS n FROM "${table}"`).get() as { n: number }).n }).toEqual({ table, rows: count });
         }
         expect(upgraded.query("SELECT user_text FROM conversation_turns WHERE id = 'turn-seeded01'").get()).toEqual({ user_text: "what do frogs eat" });
+        const migratedHome = upgraded.query("SELECT e.name, e.kind, e.place_kind, e.scope, e.geo, sv.value FROM entities e JOIN settings_values sv ON json_extract(sv.value, '$') = e.id WHERE sv.key = 'household.home'").get() as { name: string; kind: string; place_kind: string; scope: string; geo: string | null; value: string };
+        expect(migratedHome).toMatchObject({ name: "Portland, OR", kind: "place", place_kind: "map", scope: "household", geo: null });
+        expect(JSON.parse(migratedHome.value)).toMatch(/^ent-[a-z0-9]{6,}$/);
         expect(upgraded.query("PRAGMA foreign_key_check").all()).toEqual([]);
         expect(upgraded.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
         // The upgrade ends where a fresh install starts.
@@ -122,6 +126,27 @@ describe("the migration chain (architecture review 4.4)", () => {
       } finally {
         upgraded.close();
       }
+    });
+  }, 60_000);
+
+  test("0095 does not create a household home when the transitional text value is empty", () => {
+    withTempDir((dir) => {
+      const oldFolder = join(dir, "old-migrations");
+      cpSync(MIGRATIONS, oldFolder, { recursive: true });
+      const journal = JSON.parse(readFileSync(join(MIGRATIONS, "meta/_journal.json"), "utf8")) as Journal;
+      const cut = journal.entries.findIndex((e) => e.tag === "0094_kind_ben_parker");
+      writeFileSync(join(oldFolder, "meta/_journal.json"), JSON.stringify({ ...journal, entries: journal.entries.slice(0, cut + 1) }));
+      const path = join(dir, "empty-home.db");
+      const old = openDb(path);
+      migrate(drizzle(old), { migrationsFolder: oldFolder });
+      seedRow(old, "settings_values", { scope: "household", key: "household.home_place", value: JSON.stringify(""), hlc: "2026-09-20T12:00:00.000Z", source: "user", updated_at: "2026-09-20T12:00:00.000Z" });
+      old.close();
+      const upgraded = openDb(path);
+      try {
+        migrate(drizzle(upgraded), { migrationsFolder: MIGRATIONS });
+        expect(upgraded.query("SELECT count(*) AS n FROM entities WHERE kind = 'place' AND scope = 'household'").get()).toEqual({ n: 0 });
+        expect(upgraded.query("SELECT count(*) AS n FROM settings_values WHERE key = 'household.home'").get()).toEqual({ n: 0 });
+      } finally { upgraded.close(); }
     });
   }, 60_000);
 
