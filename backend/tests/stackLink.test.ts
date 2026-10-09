@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { EngineLink, fullJitterDelay, getEngineLink, LINK_BACKOFF_CAP_MS, LINK_OFFLINE_AFTER_MS, LINK_PROBE_INTERVAL_MS, LINK_PROBE_TIMEOUT_MS, LINK_READY_RESET_MS, mapSshFailure, startEngineLink, stopEngineLink, __setEngineLinkForTests, type LinkDependencies } from "@/lib/stack/link";
+import { EngineLink, fullJitterDelay, getEngineLink, LINK_BACKOFF_CAP_MS, LINK_CONNECT_RETRY_MS, LINK_CONNECT_WINDOW_MS, LINK_OFFLINE_AFTER_MS, LINK_PROBE_INTERVAL_MS, LINK_PROBE_TIMEOUT_MS, LINK_READY_RESET_MS, mapSshFailure, startEngineLink, stopEngineLink, __setEngineLinkForTests, type LinkDependencies } from "@/lib/stack/link";
 import { StackError } from "@/lib/stack/errors";
 import { __setLinkKeyCommandForTests, confirmHostKey, derivePairingLookup, getPairingPublicKey, issuePairingCode, revokeLinkKey, scanHostKey } from "@/lib/stack/linkKeys";
 
@@ -104,6 +104,73 @@ describe("engine link state machine", () => {
     expect(link.snapshot().reason).toBe("link_timeout");
     expect(link.snapshot().state).toBe("connecting");
     link.stop();
+  });
+
+  // STACK-LINK-PROBE-01: ssh needs 1 to 2 s to authenticate and open its -L listener. The first probe used to do one fetch, get ECONNREFUSED,
+  // kill the ssh it had just spawned and start over, forever (SPAWN, EXIT null SIGTERM, SPAWN ...).
+  const refused = () => Promise.reject(Object.assign(new TypeError("fetch failed"), { code: "ECONNREFUSED" }));
+
+  test("(a) a refused connection while ssh opens its listener is retried: the link reaches ready and the child is not killed", async () => {
+    let calls = 0;
+    setup(); deps.fetch = async () => { calls++; return calls <= 2 ? refused() : Response.json({ ok: true, contract: 1 }); };
+    const link = new EngineLink(config(), deps); link.start(); await flush();
+    expect(calls).toBe(1); expect(link.snapshot().state).toBe("connecting");
+    await tick(LINK_CONNECT_RETRY_MS); expect(calls).toBe(2); expect(link.snapshot().state).toBe("connecting");
+    await tick(LINK_CONNECT_RETRY_MS); expect(calls).toBe(3);
+    expect(link.snapshot()).toMatchObject({ state: "ready", contract: "1" });
+    expect(children).toHaveLength(1); expect(children[0]!.killed).toBe(0);
+    link.stop();
+  });
+
+  test("(b) a port that refuses until the connect deadline fails as reconnecting with link_timeout, with one kill", async () => {
+    let calls = 0;
+    setup(); deps.fetch = async () => { calls++; return refused(); };
+    const link = new EngineLink(config(), deps); link.start(); await flush();
+    await tick(LINK_CONNECT_WINDOW_MS - 1);
+    expect(link.snapshot().state).toBe("connecting"); expect(children[0]!.killed).toBe(0);
+    expect(calls).toBeGreaterThan(50); expect(calls).toBeLessThanOrEqual(Math.ceil(LINK_CONNECT_WINDOW_MS / LINK_CONNECT_RETRY_MS) + 1);
+    await tick(LINK_CONNECT_RETRY_MS);
+    expect(link.snapshot()).toMatchObject({ state: "reconnecting", reason: "link_timeout" });
+    expect(children).toHaveLength(1); expect(children[0]!.killed).toBe(1);
+    link.stop();
+  });
+
+  test("(c) ssh exiting before the port opens fails at once with the existing mapping and stops the retries", async () => {
+    let calls = 0;
+    setup(); deps.fetch = async () => { calls++; return refused(); };
+    const link = new EngineLink(config(), deps); link.start(); await flush();
+    expect(calls).toBe(1);
+    children[0]!.exit?.(255, null); await flush();
+    expect(link.snapshot().reason).toBe(mapSshFailure(255, null)); expect(link.snapshot().reason).toBe("link_refused");
+    expect(link.snapshot().state).toBe("connecting");
+    // The next attempt is the jittered reconnect (500 ms here), not a 250 ms retry of the dead tunnel.
+    await tick(LINK_CONNECT_RETRY_MS * 2 - 1);
+    expect(calls).toBe(1); expect(children).toHaveLength(1);
+    link.stop();
+  });
+
+  test("(d) a 503 inside the connect window is link_stack_down at once, not retried as a refusal", async () => {
+    let calls = 0;
+    setup(); deps.fetch = async () => { calls++; return new Response("", { status: 503 }); };
+    const link = new EngineLink(config(), deps); link.start(); await flush();
+    expect(link.snapshot()).toMatchObject({ state: "connecting", reason: "link_stack_down" });
+    expect(calls).toBe(1); expect(children[0]!.killed).toBe(1);
+    await tick(LINK_CONNECT_RETRY_MS * 2 - 1); expect(calls).toBe(1); expect(children).toHaveLength(1);
+    link.stop();
+    setup(); deps.fetch = async () => Response.json({ ok: false, contract: 1 });
+    const notOk = new EngineLink(config(), deps); notOk.start(); await flush();
+    expect(notOk.snapshot().reason).toBe("link_stack_down"); expect(children[0]!.killed).toBe(1);
+    notOk.stop();
+  });
+
+  test("stopping the link during the connect window ends the retries", async () => {
+    let calls = 0;
+    setup(); deps.fetch = async () => { calls++; return refused(); };
+    const link = new EngineLink(config(), deps); link.start(); await flush();
+    link.stop(); await flush();
+    const seen = calls;
+    await tick(LINK_CONNECT_WINDOW_MS);
+    expect(calls).toBe(seen); expect(link.snapshot().state).toBe("offline");
   });
 
   test("jitter schedule grows exponentially, caps at a minute and resets after 60 seconds continuously ready", async () => {

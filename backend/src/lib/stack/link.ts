@@ -8,6 +8,11 @@ import { getLinkCredentialStatus, getLinkSshAskpassEnvironment, isCurrentHostKey
 
 export const LINK_PROBE_INTERVAL_MS = 10_000;
 export const LINK_PROBE_TIMEOUT_MS = 3_000;
+// STACK-LINK-PROBE-01: ssh needs one to two seconds after it is spawned to authenticate and open its -L listener. The FIRST probe
+// after a spawn therefore retries a refused connection every LINK_CONNECT_RETRY_MS until the tunnel answers, ssh exits, or
+// LINK_CONNECT_WINDOW_MS has passed; only then is the attempt a failure. LINK_PROBE_TIMEOUT_MS stays the per-request timeout.
+export const LINK_CONNECT_WINDOW_MS = 15_000;
+export const LINK_CONNECT_RETRY_MS = 250;
 export const LINK_BACKOFF_BASE_MS = 1_000;
 export const LINK_BACKOFF_CAP_MS = 60_000;
 export const LINK_READY_RESET_MS = 60_000;
@@ -105,6 +110,7 @@ export class EngineLink {
   private lastGood: { contract: string; rtt_ms: number; last_ok_at: string; path: "home" | "tailnet" } | null = null;
   private recentRtts: number[] = [];
   private rolesDegraded = false;
+  private connectWait: { wake: () => void } | null = null;
 
   constructor(config: LinkConfig, deps: Partial<LinkDependencies> = {}) {
     this.config = { sshPort: 22, localPort: 8771, allowTailnet: false, ...config, env: config.env ?? { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? process.cwd() } };
@@ -156,6 +162,7 @@ export class EngineLink {
   private clearTimers(): void {
     for (const timer of [this.timer, this.offlineTimer, this.roleTimer]) if (timer) this.deps.clearTimeout(timer);
     this.timer = this.offlineTimer = this.roleTimer = null;
+    this.connectWait?.wake();
   }
   private killChild(): void { const child = this.child; this.child = null; if (child) child.kill("SIGTERM"); }
   private invalidate(reason: LinkReason, terminal: boolean): void {
@@ -229,20 +236,56 @@ export class EngineLink {
       this.child = null;
       this.fail(this.structuredReason(error) ?? "link_refused", generation);
     });
-    await this.probe(generation, path);
+    await this.probe(generation, path, true);
   }
-  private async probe(generation: number, path: "home" | "tailnet"): Promise<void> {
+  /** Resolves after LINK_CONNECT_RETRY_MS, or at once when the link is stopped or invalidated (the caller re-checks the generation). */
+  private waitConnectRetry(): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const timer = this.deps.setTimeout(() => { this.connectWait = null; resolve(); }, LINK_CONNECT_RETRY_MS);
+      this.connectWait = { wake: () => { this.deps.clearTimeout(timer); this.connectWait = null; resolve(); } };
+    });
+  }
+  /** A health request that failed to connect at all (refused, reset, "fetch failed"), as opposed to the per-request timeout. */
+  private connectionFailed(error: unknown): boolean {
+    return !(error && typeof error === "object" && (error as NodeJS.ErrnoException).code === "ETIMEDOUT");
+  }
+  /**
+   * `connecting` is true for the first probe after ssh was spawned. ssh takes one to two seconds to authenticate and open its -L
+   * listener, so inside the connect window a refused connection is "still connecting": retry every LINK_CONNECT_RETRY_MS. The attempt
+   * fails only when ssh exits (its exit handler fails it at once, which ends this loop), the health answer is bad, a request times out,
+   * or the window ends with the port still refusing (link_timeout). Later probes, of a link that is up, stay single-shot.
+   */
+  private async probe(generation: number, path: "home" | "tailnet", connecting = false): Promise<void> {
+    const deadline = connecting ? this.deps.now() + LINK_CONNECT_WINDOW_MS : null;
+    for (;;) {
+      if (await this.probeOnce(generation, path, deadline) !== "retry") return;
+      await this.waitConnectRetry();
+      if (!this.current(generation) || !this.child) return;
+    }
+  }
+  private async probeOnce(generation: number, path: "home" | "tailnet", connectDeadline: number | null): Promise<"retry" | void> {
     if (!this.current(generation) || !this.child) return;
     const started = this.deps.now();
     let timeout: ReturnType<typeof setTimeout> | null = null;
     const timeoutPromise = new Promise<never>((_, reject) => { timeout = this.deps.setTimeout(() => reject(Object.assign(new Error("probe timed out"), { code: "ETIMEDOUT" })), LINK_PROBE_TIMEOUT_MS); });
     try {
-      const response = await Promise.race([this.deps.fetch(`http://127.0.0.1:${this.config.localPort}/healthz`), timeoutPromise]);
+      let response: Response;
+      try { response = await Promise.race([this.deps.fetch(`http://127.0.0.1:${this.config.localPort}/healthz`), timeoutPromise]); }
+      catch (error) {
+        if (connectDeadline === null || !this.connectionFailed(error)) throw error;
+        if (!this.current(generation) || !this.child) return;
+        if (this.deps.now() < connectDeadline) return "retry";
+        // The window ended with the port still refusing: report that (not the stale initial reason), as "reconnecting" because a whole
+        // connect attempt has now failed.
+        this.failures = Math.max(this.failures, 2);
+        this.fail("link_timeout", generation);
+        return;
+      }
       if (!this.current(generation) || !this.child) return;
       if (!response.ok) throw Object.assign(new Error("health probe failed"), { code: response.status === 503 ? "STACK_DOWN" : "ECONNREFUSED" });
       const health = await response.json() as { ok?: boolean; contract?: number };
       if (!this.current(generation) || !this.child) return;
-      if (health.ok !== true || !Number.isInteger(health.contract)) throw new Error("stack_down");
+      if (health.ok !== true || !Number.isInteger(health.contract)) throw Object.assign(new Error("stack_down"), { code: "STACK_DOWN" });
       if (health.contract! < STACK_CONTRACT_MIN || health.contract! > STACK_CONTRACT_MAX) { this.fail("link_needs_update", generation, true, String(health.contract)); return; }
       const now = this.deps.now();
       const rtt = Math.max(0, Math.round(now - started));
