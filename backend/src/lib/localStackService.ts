@@ -3,8 +3,6 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 export const HOME_STACK_PORT = 8770;
-export const STACK_LINK_PRIVATE_KEY_PATH = "stack-link/id_ed25519";
-export const STACK_LINK_KNOWN_HOSTS_PATH = "stack-link/known_hosts";
 
 export type StackServiceCommand = "start" | "stop";
 export type StackServiceRunner = (binary: string, command: StackServiceCommand, env: NodeJS.ProcessEnv) => void;

@@ -1,9 +1,8 @@
 import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { getEngineLink, startEngineLink, stopEngineLink, type LinkConfig } from "@/lib/stack/link";
-import { startLocalStackService, stopLocalStackService, STACK_LINK_KNOWN_HOSTS_PATH, STACK_LINK_PRIVATE_KEY_PATH } from "@/lib/localStackService";
-import { dataDir } from "@/lib/paths";
-import { join } from "node:path";
+import { startLocalStackService, stopLocalStackService } from "@/lib/localStackService";
+import { getLinkKeyPaths } from "@/lib/stack/linkKeys";
 import { reportStackLinkState, resetStackLinkRepairs } from "@/lib/stack/linkRepairs";
 
 export const REMOTE_ENGINE_HOST_KEY = "engines.stack.remote.host";
@@ -75,7 +74,9 @@ export async function applyEngineWhere(value: unknown): Promise<void> {
   }
 }
 
-function configuredLink(): LinkConfig | null {
+/** The tunnel's config from the saved settings; the key files are where the pairing wrote them (`getLinkKeyPaths`, the one definition). */
+export function configuredLink(): LinkConfig | null {
+  const { privateKeyPath, knownHostsPath } = getLinkKeyPaths();
   const host = getHouseholdSettingValue(REMOTE_ENGINE_HOST_KEY);
   if (typeof host !== "string" || !host.trim()) return null;
   const numberSetting = (key: string, fallback: number) => {
@@ -87,8 +88,8 @@ function configuredLink(): LinkConfig | null {
     sshPort: numberSetting("engines.stack.remote.ssh_port", 22),
     localPort: numberSetting("engines.stack.remote.local_port", 8771),
     allowTailnet: getHouseholdSettingValue(REMOTE_ALLOW_TAILNET_KEY) === true,
-    privateKeyPath: join(dataDir, STACK_LINK_PRIVATE_KEY_PATH),
-    knownHostsPath: join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH),
+    privateKeyPath,
+    knownHostsPath,
   };
 }
 

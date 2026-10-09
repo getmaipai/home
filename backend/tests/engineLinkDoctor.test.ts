@@ -1,8 +1,11 @@
-import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, describe, expect, test } from "bun:test";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { knownHostsName } from "@/lib/stack/linkKeys";
-import { hostKeyPinned, runEngineLinkDoctor, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
+import { dataDir } from "@/lib/paths";
+import { __resetPairingForTests, __setLinkKeyCommandForTests, confirmHostKey, derivePairingLookup, getLinkKeyPaths, getPairingPublicKey, issuePairingCode, knownHostsName, revokeLinkKey, scanHostKey } from "@/lib/stack/linkKeys";
+import { configuredLink } from "@/lib/remoteStackSettings";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { engineLinkKeyFiles, hostKeyPinned, runEngineLinkDoctor, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
 
 function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = "connected"): EngineLinkDoctorDependencies {
   return {
@@ -101,5 +104,32 @@ describe("doctor hop 4 known_hosts lookup (DOCTOR-HOSTKEY-01)", () => {
     const auth: unknown[][] = [];
     await runEngineLinkDoctor({ ...base, authenticate: async (...args) => { auth.push(args); return true; } });
     expect(auth).toEqual([["engine.home", 22, "192.168.1.20"]]);
+  });
+});
+
+describe("key files are looked for where the pairing writes them (STACK-LINK-KEYPATH-01)", () => {
+  afterEach(() => { revokeLinkKey(); __resetPairingForTests(); __setLinkKeyCommandForTests(null); });
+  const BLOB = "AAAAC3NzaC1lZDI1NTE5AAAAIPoISQD6sKkxbk5FD8YL6LuvYzhXACmFp4cr8oleBk1h";
+
+  test("after a real pairing the doctor sees both files and the tunnel config points at them", async () => {
+    expect(engineLinkKeyFiles()).toEqual({ privateKey: false, knownHosts: false });
+    const issued = issuePairingCode();
+    getPairingPublicKey(derivePairingLookup(issued.code), "household-1");
+    __setLinkKeyCommandForTests(async () => ({ code: 0, stdout: `engine.local ssh-ed25519 ${BLOB} test\n` }));
+    confirmHostKey((await scanHostKey("engine.local", 22)).check_code);
+
+    const { privateKeyPath, knownHostsPath } = getLinkKeyPaths();
+    expect(privateKeyPath).toBe(join(dataDir, "keys", "stack-link", "id_ed25519"));
+    expect(knownHostsPath).toBe(join(dataDir, "keys", "stack-link", "known_hosts"));
+    expect(existsSync(privateKeyPath)).toBe(true);
+    expect(existsSync(knownHostsPath)).toBe(true);
+
+    expect(engineLinkKeyFiles()).toEqual({ privateKey: true, knownHosts: true });
+    setHouseholdSettingValue("engines.stack.remote.host", "engine.local");
+    const config = configuredLink();
+    expect(config?.privateKeyPath).toBe(privateKeyPath);
+    expect(config?.knownHostsPath).toBe(knownHostsPath);
+    expect(existsSync(config!.privateKeyPath)).toBe(true);
+    expect(existsSync(config!.knownHostsPath)).toBe(true);
   });
 });

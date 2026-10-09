@@ -1,13 +1,10 @@
 import { spawn } from "node:child_process";
 import { lookup } from "node:dns/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { isHouseholdNetworkHost } from "@maipai/core/src/net";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { dataDir } from "@/lib/paths";
-import { STACK_LINK_PRIVATE_KEY_PATH, STACK_LINK_KNOWN_HOSTS_PATH } from "@/lib/localStackService";
 import { getTailscaleStatus } from "@/lib/tailscale";
-import { knownHostsName } from "@/lib/stack/linkKeys";
+import { getLinkKeyPaths, knownHostsName } from "@/lib/stack/linkKeys";
 import { createStackClient } from "@/lib/stack/client";
 import { STACK_CONTRACT_MIN, STACK_CONTRACT_MAX } from "@/lib/stack/contract";
 
@@ -45,6 +42,12 @@ export function hostKeyPinned(host: string, port: number, knownHostsFile: string
   });
 }
 
+/** Whether the pairing's key files exist, at the paths the pairing wrote and the tunnel reads (`getLinkKeyPaths`). */
+export function engineLinkKeyFiles(): { privateKey: boolean; knownHosts: boolean } {
+  const { privateKeyPath, knownHostsPath } = getLinkKeyPaths();
+  return { privateKey: existsSync(privateKeyPath), knownHosts: existsSync(knownHostsPath) };
+}
+
 const defaults: DoctorDependencies = {
   settings: () => ({
     selected: getHouseholdSettingValue("engines.stack.where") === "another_computer",
@@ -66,13 +69,11 @@ const defaults: DoctorDependencies = {
   },
   allowed: (address, opts) => isHouseholdNetworkHost(address, opts),
   tailscale: async () => (await getTailscaleStatus()).state === "running",
-  keyFiles: () => ({
-    privateKey: existsSync(join(dataDir, STACK_LINK_PRIVATE_KEY_PATH)),
-    knownHosts: existsSync(join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH)),
-  }),
-  hostKey: (host, port) => hostKeyPinned(host, port, join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH)),
+  keyFiles: engineLinkKeyFiles,
+  hostKey: (host, port) => hostKeyPinned(host, port, getLinkKeyPaths().knownHostsPath),
   authenticate: async (host, port, address = host) => {
-    const child = spawn("ssh", ["-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${join(dataDir, STACK_LINK_KNOWN_HOSTS_PATH)}`, "-o", `HostKeyAlias=${knownHostsName(host, port)}`, "-o", "IdentitiesOnly=yes", "-i", join(dataDir, STACK_LINK_PRIVATE_KEY_PATH), "-p", String(port), `maipai-stack@${address}`, "true"], { stdio: ["ignore", "ignore", "ignore"] });
+    const { privateKeyPath, knownHostsPath } = getLinkKeyPaths();
+    const child = spawn("ssh", ["-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", `UserKnownHostsFile=${knownHostsPath}`, "-o", `HostKeyAlias=${knownHostsName(host, port)}`, "-o", "IdentitiesOnly=yes", "-i", privateKeyPath, "-p", String(port), `maipai-stack@${address}`, "true"], { stdio: ["ignore", "ignore", "ignore"] });
     await new Promise<void>((resolve, reject) => {
       child.once("error", reject);
       child.once("exit", (code) => code === 0 ? resolve() : reject(new Error("ssh check failed")));
