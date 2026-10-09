@@ -22,8 +22,14 @@ type DoctorDependencies = {
   health: (port: number) => Promise<{ ok: boolean; version: string; contract?: number }>;
   roles: (port: number) => Promise<Array<{ id: string; state: { state: string } }>>;
   gpu: (port: number) => Promise<boolean>;
-  completion: (port: number) => Promise<number>;
+  /** Role ids whose `stack.engines.<role>.host_url` is bound to an engine the owner already runs (in effect, not just saved). */
+  boundRoles: (port: number) => Promise<string[]>;
+  /** A real round trip to one role through the Stack; resolves to ms, throws when the engine did not answer. */
+  probeRole: (port: number, role: string) => Promise<number>;
 };
+
+/** Roles Home needs before chat works at all; any other role joins the list only when its engine is bound. */
+export const REQUIRED_ROLES = ["chat", "vision"] as const;
 
 export type EngineLinkDoctorDependencies = DoctorDependencies;
 
@@ -138,19 +144,51 @@ const defaults: DoctorDependencies = {
   health: checkStackHealth,
   roles: async (port) => (await createStackClient({ baseUrl: `http://127.0.0.1:${port}`, timeoutMs: 3000 }).roles()).roles,
   gpu: checkGpu,
-  completion: async (port) => {
-    const start = performance.now();
-    const response = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model: "maipai", messages: [{ role: "user", content: "Reply with one token: OK" }], max_tokens: 1, stream: false }),
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!response.ok) throw new Error("completion failed");
-    const result = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    if (!result.choices?.[0]?.message?.content?.trim()) throw new Error("empty completion");
-    return Math.round(performance.now() - start);
+  boundRoles: async (port) => {
+    const { settings } = await createStackClient({ baseUrl: `http://127.0.0.1:${port}`, timeoutMs: 3000 }).settings();
+    return boundRolesFromSettings(settings);
   },
+  probeRole: probeStackRole,
 };
+
+/** Role ids whose `host_url` setting is in effect (non-empty). */
+export function boundRolesFromSettings(settings: Array<{ key: string; in_effect?: unknown }>): string[] {
+  const roles: string[] = [];
+  for (const item of settings) {
+    const match = /^stack\.engines\.([a-z0-9_-]+)\.host_url$/.exec(item.key);
+    if (match && typeof item.in_effect === "string" && item.in_effect.trim() !== "") roles.push(match[1]!);
+  }
+  return roles;
+}
+
+/** True when a chat completion shows the engine answered: visible text, or reasoning text (thinking on and a small budget leaves `content` empty). */
+export function completionAnswered(body: unknown): boolean {
+  const message = (body as { choices?: Array<{ message?: { content?: unknown; reasoning_content?: unknown } }> } | null)?.choices?.[0]?.message;
+  const text = (value: unknown) => typeof value === "string" && value.trim() !== "";
+  return text(message?.content) || text(message?.reasoning_content);
+}
+
+/** Roles that speak the chat wire answer a one-token completion; the rest are checked by their id appearing in the Stack's model list. */
+const CHAT_WIRE_ROLES = new Set(["chat", "coding", "judge", "router", "vision"]);
+
+export async function probeStackRole(port: number, role: string): Promise<number> {
+  const base = `http://127.0.0.1:${port}`;
+  const start = performance.now();
+  if (CHAT_WIRE_ROLES.has(role)) {
+    const response = await fetch(`${base}/v1/chat/completions`, {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ model: role, messages: [{ role: "user", content: "Reply with one token: OK" }], max_tokens: 8, stream: false }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!response.ok) throw new Error(`completion failed (${response.status})`);
+    if (!completionAnswered(await response.json().catch(() => null))) throw new Error("empty completion");
+  } else {
+    const response = await fetch(`${base}/v1/models`, { signal: AbortSignal.timeout(5000) });
+    const body = await response.json().catch(() => null) as { data?: Array<{ id?: string }> } | null;
+    if (!response.ok || !body?.data?.some((model) => model.id === role)) throw new Error("role not listed");
+  }
+  return Math.round(performance.now() - start);
+}
 
 export async function runEngineLinkDoctor(deps: DoctorDependencies = defaults): Promise<Hop[]> {
   const config = deps.settings();
@@ -207,17 +245,39 @@ export async function runEngineLinkDoctor(deps: DoctorDependencies = defaults): 
     else if (!health) hop7Failure = `The Stack on the engine computer speaks ${reply.contract === undefined ? "an unknown contract" : `contract ${reply.contract}`}, and this Home needs contract ${STACK_CONTRACT_MIN === STACK_CONTRACT_MAX ? STACK_CONTRACT_MIN : `${STACK_CONTRACT_MIN} to ${STACK_CONTRACT_MAX}`}. Update the Stack on the engine computer, then rerun doctor.`;
   } catch { hop7Failure = "The SSH tunnel is up, but what answered on it was not a Stack health reply. Check that the Stack is running on the engine computer, then rerun doctor."; }
   hops.push(fix(7, health, hop7Failure));
+  const probes = new Map<string, Promise<number>>();
+  const probe = (role: string) => { if (!probes.has(role)) probes.set(role, deps.probeRole(config.localPort, role)); return probes.get(role)!; };
   let roleReady = false;
+  let hop8Detail: string | undefined;
+  let hop8Failure = "Install and start the configured engine roles.";
   try {
     const roles = await deps.roles(config.localPort);
-    roleReady = roles.length > 0 && roles.every((role) => role.state.state === "ready");
-  } catch { /* fail this hop */ }
-  hops.push(fix(8, roleReady, "Install and start the configured engine roles."));
+    const bound = await deps.boundRoles(config.localPort).catch(() => null);
+    if (!bound) throw new Error("settings");
+    const needed = [...new Set<string>([...REQUIRED_ROLES, ...bound])];
+    const problems: string[] = [];
+    const notes: string[] = [];
+    for (const id of needed) {
+      const state = roles.find((role) => role.id === id)?.state.state;
+      if (state === "ready") continue;
+      if (bound.includes(id)) {
+        const ok = await probe(id).then(() => true, () => false);
+        if (ok) notes.push(`${id} bound to your own engine, answered a ${CHAT_WIRE_ROLES.has(id) ? "test completion" : "models check"} (the Stack reports ${state ?? "no state"} for a bound engine)`);
+        else problems.push(`${id} is bound to your own engine, which did not answer`);
+      } else problems.push(`${id} is ${state ?? "missing"} and has no engine bound`);
+    }
+    roleReady = problems.length === 0;
+    hop8Detail = (roleReady ? notes : problems).join("; ") || undefined;
+    if (!roleReady) hop8Failure = `Home needs ${problems.join("; ")}. Install the role in the Stack, or start your own engine and check its Server URL setting in the Stack, then rerun doctor.`;
+  } catch (error) {
+    if (error instanceof Error && error.message === "settings") { hop8Failure = "Home could not read which engines the Stack has bound to your own servers. Check that the Stack is running on the engine computer, then rerun doctor."; hop8Detail = "the Stack settings request failed"; }
+  }
+  hops.push(fix(8, roleReady, hop8Failure, "No action needed.", hop8Detail));
   let gpu = false;
   try { gpu = await deps.gpu(config.localPort); } catch { /* fail this hop */ }
   hops.push(fix(9, gpu, "Check the engine computer's NVIDIA driver and GPU."));
-  try { const ms = await deps.completion(config.localPort); hops.push(fix(10, true, "Check the chat engine.", "No action needed.", `round trip ${ms} ms`)); }
-  catch { hops.push(fix(10, false, "Start the chat engine and check its model.")); }
+  try { const ms = await probe("chat"); hops.push(fix(10, true, "", "No action needed.", `round trip ${ms} ms (role chat)`)); }
+  catch (error) { hops.push(fix(10, false, "The chat engine did not answer a test message through the Stack. Check that the engine server on the engine computer is running and that the Stack's chat Server URL points at it, then rerun doctor.", "", error instanceof Error ? error.message : undefined)); }
   return hops;
 }
 

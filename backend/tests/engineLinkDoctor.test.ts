@@ -5,7 +5,7 @@ import { dataDir } from "@/lib/paths";
 import { __resetPairingForTests, __setLinkKeyCommandForTests, confirmHostKey, derivePairingLookup, getLinkKeyPaths, getPairingPublicKey, issuePairingCode, knownHostsName, revokeLinkKey, scanHostKey } from "@/lib/stack/linkKeys";
 import { configuredLink } from "@/lib/remoteStackSettings";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { authenticateSshArgs, checkGpu, checkStackHealth, engineLinkKeyFiles, hasGpu, hostKeyPinned, runEngineLinkDoctor, sshAuthenticated, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
+import { authenticateSshArgs, checkGpu, checkStackHealth, engineLinkKeyFiles, boundRolesFromSettings, completionAnswered, hasGpu, hostKeyPinned, runEngineLinkDoctor, sshAuthenticated, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
 
 function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = "connected"): EngineLinkDoctorDependencies {
   return {
@@ -19,9 +19,10 @@ function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = 
     authenticate: async () => failHop !== 5,
     forward: async () => failHop !== 6,
     health: async () => ({ ok: failHop !== 7, version: "0.1.0", contract: 1 }),
-    roles: async () => [{ id: "chat", state: { state: failHop === 8 ? "offline" : "ready" } }],
+    roles: async () => [{ id: "chat", state: { state: failHop === 8 ? "offline" : "ready" } }, { id: "vision", state: { state: "ready" } }],
     gpu: async () => failHop !== 9,
-    completion: async () => { if (failHop === 10) throw new Error("scripted"); return 123; },
+    boundRoles: async () => [],
+    probeRole: async () => { if (failHop === 10) throw new Error("scripted"); return 123; },
   };
 }
 
@@ -54,6 +55,70 @@ describe("engine-link doctor hop 5 (STACK-LINK-ASKPASS-01)", () => {
     expect(hop.pass).toBe(false);
     expect(hop.fix).toContain("did not accept");
     expect(hop.fix).toContain("Pair this Home");
+  });
+});
+
+const NOT_INSTALLED = ["chat", "coding", "judge", "router", "embed", "rerank", "vision", "stt", "tts", "wakeword", "image", "video", "music"]
+  .map((id) => ({ id, state: { state: "notInstalled" } }));
+
+function boundDeps(answering: { chat: boolean; vision: boolean }): EngineLinkDoctorDependencies {
+  return {
+    ...deps(),
+    roles: async () => NOT_INSTALLED,
+    boundRoles: async () => ["chat", "vision"],
+    probeRole: async (_port, role) => { if (!answering[role as "chat" | "vision"]) throw new Error("engine down"); return 321; },
+  };
+}
+
+describe("engine-link doctor hops 8 and 10 with bound engines (DOCTOR-HOPS-02)", () => {
+  test("every role notInstalled but chat and vision bound and answering: hops 8 and 10 pass, with the round trip", async () => {
+    const hops = await runEngineLinkDoctor(boundDeps({ chat: true, vision: true }));
+    expect(hops[7]).toMatchObject({ pass: true });
+    expect(hops[7]!.detail).toContain("chat bound to your own engine");
+    expect(hops[7]!.detail).toContain("vision bound to your own engine");
+    expect(hops[9]).toMatchObject({ pass: true, detail: "round trip 321 ms (role chat)" });
+  });
+  test("chat bound but not answering: hops 8 and 10 fail and say what to do", async () => {
+    const hops = await runEngineLinkDoctor(boundDeps({ chat: false, vision: true }));
+    expect(hops[7]!.pass).toBe(false);
+    expect(hops[7]!.fix).toContain("chat is bound to your own engine, which did not answer");
+    expect(hops[7]!.fix).toContain("then rerun doctor");
+    expect(hops[9]!.pass).toBe(false);
+    expect(hops[9]!.fix).toContain("did not answer a test message");
+    expect(hops[9]!.fix).toContain("rerun doctor");
+  });
+  test("a required role that is notInstalled and not bound still fails hop 8", async () => {
+    const hops = await runEngineLinkDoctor({ ...boundDeps({ chat: true, vision: true }), boundRoles: async () => ["chat"] });
+    expect(hops[7]!.pass).toBe(false);
+    expect(hops[7]!.fix).toContain("vision is notInstalled and has no engine bound");
+  });
+  test("an unbound notInstalled role Home does not need (tts) does not fail hop 8", async () => {
+    const hops = await runEngineLinkDoctor(boundDeps({ chat: true, vision: true }));
+    expect(hops[7]!.pass).toBe(true);
+  });
+  test("a failed settings read fails hop 8 with its own fix, not an install instruction", async () => {
+    const hops = await runEngineLinkDoctor({ ...boundDeps({ chat: true, vision: true }), boundRoles: async () => { throw new Error("down"); } });
+    expect(hops[7]!.pass).toBe(false);
+    expect(hops[7]!.fix).toContain("could not read which engines");
+    expect(hops[7]!.fix).not.toContain("Install");
+  });
+  test("a bound role the Stack reports ready needs no probe", async () => {
+    const hops = await runEngineLinkDoctor({ ...boundDeps({ chat: false, vision: false }), roles: async () => [{ id: "chat", state: { state: "ready" } }, { id: "vision", state: { state: "ready" } }] });
+    expect(hops[7]!.pass).toBe(true);
+  });
+  test("a completion with only reasoning_content counts as answered; an empty one does not", () => {
+    expect(completionAnswered({ choices: [{ message: { content: "", reasoning_content: "Okay, the user" } }] })).toBe(true);
+    expect(completionAnswered({ choices: [{ message: { content: "OK" } }] })).toBe(true);
+    expect(completionAnswered({ choices: [{ message: { content: "  ", reasoning_content: "" } }] })).toBe(false);
+    expect(completionAnswered(null)).toBe(false);
+  });
+  test("bound roles are the host_url settings in effect", () => {
+    expect(boundRolesFromSettings([
+      { key: "stack.engines.chat.host_url", in_effect: "http://127.0.0.1:8791" },
+      { key: "stack.engines.embed.host_url", in_effect: "" },
+      { key: "stack.engines.vision.host_url", in_effect: "http://127.0.0.1:8791" },
+      { key: "stack.updates.model_host", in_effect: "x" },
+    ])).toEqual(["chat", "vision"]);
   });
 });
 
