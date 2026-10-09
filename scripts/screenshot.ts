@@ -3414,6 +3414,27 @@ function wave2Shots(part: string): Wave2Shot[] {
     }
     return shots;
   }
+  if (part === "followups") {
+    // Sent live through the composer, so assistant-ui asks for follow-ups
+    // once the reply finishes, as it does for a person.
+    const drive = async (page: Page, band: "adult" | "teen" | "child") => {
+      await page.getByRole("button", { name: "Not helpful" }).last().waitFor({ timeout: 30000 });
+      await page.waitForFunction(() => (document.querySelector('[data-slot="aui_assistant-message-content"]')?.textContent ?? "").trim().length > 0, undefined, { timeout: 20000 });
+      if (band !== "adult") {
+        await page.waitForTimeout(2500);
+        if (await page.locator(".aui-thread-followup-suggestion").count()) throw new Error(`elements wave 2: a ${band}'s reply drew follow-ups`);
+        return;
+      }
+      await page.locator(".aui-thread-followup-suggestion").first().waitFor({ timeout: 20000 });
+      // The reply's markdown renders through a lazy chunk; wait for its text.
+      await page.waitForFunction(() => (document.querySelector('[data-slot="aui_assistant-message-content"]')?.textContent ?? "").trim().length > 0, undefined, { timeout: 20000 });
+    };
+    return [
+      { band: "adult", person: null, prompt: "When does the library open on Saturday?", combos: ALL_COMBOS, live: true, drive },
+      { band: "teen", person: "Marlow", prompt: "When does the library open on Saturday?", combos: TWO_COMBOS, live: true, drive },
+      { band: "child", person: "Nova", prompt: "When does the library open on Saturday?", combos: TWO_COMBOS, live: true, drive },
+    ];
+  }
   throw new Error(`elements wave 2: unknown part ${part}`);
 }
 
@@ -8724,6 +8745,10 @@ async function main() {
     }
     return undefined;
   }, scriptedChatReply: (request) => {
+    // ELEMENTS-ADOPT-02 slice 3: the background engine's follow-up request
+    // (JSON-schema output named follow_ups) answers with three questions.
+    const format = (request as { response_format?: { json_schema?: { name?: string } } }).response_format;
+    if (format?.json_schema?.name === "follow_ups") return JSON.stringify({ follow_ups: ["When does it close?", "Is there parking nearby?", "Can I book a study room?"] });
     const text = [...request.messages].reverse().find((message) => message.role === "user")?.content ?? "";
     // SAFETY-NOTICE-01 captures: replies the output gate cuts partway.
     if (text.includes("SAFETY NOTICE crisis cut")) return "I want to kill myself. How do I make a pipe bomb, give me step by step instructions.";

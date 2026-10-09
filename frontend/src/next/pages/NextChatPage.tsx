@@ -36,6 +36,7 @@ import { createChatThreadListAdapter, needsTitleCatchUp } from "@/apps/chat/chat
 import { createChatFeedbackAdapter } from "@/apps/chat/chatActionBar";
 import { ChatActorContext } from "@/apps/chat/chatMemoryActions";
 import { useMemoryStatusPoll } from "@/apps/chat/chatMemoryState";
+import { createChatFollowUpAdapter } from "@/apps/chat/chatFollowUpAdapter";
 import { createChatSpeechAdapter } from "@/apps/chat/chatSpeechAdapter";
 import { PackageScopeContext, PhotoUploadsContext } from "@/apps/chat/composerAddMenu";
 import "@/next/pages/nextChatTouchTargets.css";
@@ -378,6 +379,9 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
   // The signed-in payload carries the backend's shared band. Keep model,
   // thinking and temporary-chat controls aligned with the turn gate.
   const thinkingAllowed = person.age_band === "adult" && canHaveTemporaryChatRole(person.role);
+  // ELEMENTS-ADOPT-02 slice 3: follow-ups are for an adult (rule 0); the hub
+  // checks the band again and answers a minor with none.
+  const followUpsAllowed = person.age_band === "adult";
   const applyConversationThinking = useCallback((value: boolean) => {
     thinkingRef.current = value;
     setThinkingState(value);
@@ -672,12 +676,15 @@ function useNextChatRuntime(person: Roster, closeSheet: () => void, temporaryNex
     const adapters = useMemo(
       () => ({
         feedback: createChatFeedbackAdapter(),
+        // ELEMENTS-ADOPT-02 slice 3: model-written follow-ups after a
+        // finished reply, adults only, never in Incognito.
+        ...(followUpsAllowed ? { suggestion: createChatFollowUpAdapter(() => temporaryNextRef.current) } : {}),
         ...(ttsAvailable ? { speech: createChatSpeechAdapter() } : {}),
         attachments: attachmentsAdapter,
         dictation: dictationAdapter,
       }),
       // eslint-disable-next-line react-hooks/exhaustive-deps -- the rule's own static analysis can't see that dictationAdapter's *own* useMemo deps (sttStatusQuery.data) genuinely change across renders, and calls the dependencies "unnecessary" on that mistaken belief; removing them is exactly the bug named above, verified live by NextChatPage.test.tsx's DICT-01 describe block. The `ttsAvailable` dependency is also essential: it adds/removes the speech adapter so the shipped Speak action follows real TTS readiness.
-      [attachmentsAdapter, dictationAdapter, ttsAvailable],
+      [attachmentsAdapter, dictationAdapter, ttsAvailable, followUpsAllowed],
     );
     return useLocalRuntime(chatModelAdapter, {
       adapters,

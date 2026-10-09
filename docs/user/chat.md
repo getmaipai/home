@@ -90,6 +90,10 @@ When MaiPai saves something from a reply, the saved fact shows as a small chip u
 
 If MaiPai stops a reply partway because it wasn't safe to finish, one short sentence under the reply says so and what to try instead. If the conversation sounds like someone might be in crisis, MaiPai shows **Support is available** beside the reply instead, with links to call, text or chat with the 988 Suicide & Crisis Lifeline. Nothing is hidden or blocked, and everyone in the household sees the same help.
 
+## Suggested follow-ups
+
+After MaiPai finishes a reply, it may suggest up to three questions you could ask next, as small buttons above the message box. Tap one to send it. They are written from that one message and reply only, never from your memories or other chats, and only adults see them.
+
 ## Open the details pane
 
 Some replies come from a lookup, like the weather or a word meaning. Under that reply is a **Details** handle. Tap it and the full answer opens beside the chat, with the sources listed. On a phone the pane slides up from the bottom instead.

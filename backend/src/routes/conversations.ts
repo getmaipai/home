@@ -11,6 +11,8 @@ import { and, eq } from "drizzle-orm";
 import { canAccessPerson } from "@/lib/access";
 import { projectDocument } from "@/lib/composer";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { generateFollowUps } from "@/lib/followUps";
+import { conversationInCrisis } from "@/lib/turnShared";
 import { nextHlc } from "@/lib/hlc";
 import { newReplyFeedbackId } from "@/lib/id";
 import {
@@ -246,6 +248,25 @@ const postFeedbackRoute = createRoute({
   responses: feedbackResponses,
 });
 
+// ELEMENTS-ADOPT-02 slice 3 (CHAT-FOLLOWUPS-01): what to ask next after an
+// adult's finished written reply, for the kit Thread's follow-up row. The
+// client asks only after the reply is done, so this never delays it.
+const followUpsRoute = createRoute({
+  method: "get",
+  path: "/turns/{id}/follow-ups",
+  tags: ["Conversations"],
+  summary: "Suggest what to ask next after an adult's finished reply",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "turn-example123") },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ follow_ups: z.array(z.string()).describe("Up to three questions in the person's own voice; empty when none would help, for a minor, or on any failure.") }) } },
+      description: "Model-written follow-up questions from the visible turn only.",
+    },
+    ...errorResponses({ 401: "Sign in first", 404: "Turn not found or not the person's own" }),
+  },
+});
+
 const documentRoute = createRoute({
   method: "get",
   path: "/turns/{id}/document",
@@ -353,6 +374,31 @@ conversationsRoutes.openapi(postFeedbackRoute, (c) => {
     .where(and(eq(replyFeedback.turnId, id), eq(replyFeedback.personId, actor.id)))
     .get()!;
   return c.json(toReplyFeedback(saved), 200);
+});
+
+conversationsRoutes.openapi(followUpsRoute, async (c) => {
+  const actor = c.get("person");
+  const turn = visibleTurn(actor, c.req.valid("param").id);
+  // Only the person's own turn: an admin reading a household member's
+  // chat never gets suggestions written from it.
+  if (!turn || turn.personId !== actor.id) return c.json({ error: "turn not found" }, 404);
+  // Rule 0: adults only, written chat only, a finished model reply, never
+  // bare mode, never a turn the safety floor flagged or a crisis turn.
+  const eligible =
+    speakerAgeBand(actor, new Date()) === "adult" &&
+    turn.surface === "chat" &&
+    turn.source === "model" &&
+    turn.status === "done" &&
+    !turn.bare &&
+    !turn.safetyFlagged &&
+    !turn.crisisSignal &&
+    // A conversation stays in the crisis state for several turns after any
+    // self-harm signal; no chirpy suggestions under those replies either.
+    (turn.conversationId === null || !conversationInCrisis(turn.conversationId));
+  if (!eligible) return c.json({ follow_ups: [] }, 200);
+  // Nothing is stored: the suggestions are written fresh when asked, so
+  // deleting the turn leaves nothing behind.
+  return c.json({ follow_ups: await generateFollowUps({ userText: turn.userText, replyText: turn.replyText }) }, 200);
 });
 
 conversationsRoutes.openapi(documentRoute, (c) => {

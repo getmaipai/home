@@ -744,6 +744,9 @@ export const api = {
   // `posted_artifact` sibling field).
   project: (id: string) => request<ProjectView>(`/api/projects/${encodeURIComponent(id)}`),
   cancelProject: (id: string) => request<Project>(`/api/projects/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
+  /** ELEMENTS-ADOPT-02 slice 3: follow-up questions for an adult's own
+   * finished reply (empty for anyone else, or on any failure). */
+  followUps: (turnId: string) => request<{ follow_ups: string[] }>(`/api/conversations/turns/${encodeURIComponent(turnId)}/follow-ups`),
   conversationFeedback: (id: string) => request<ReplyFeedback | null>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`),
   submitConversationFeedback: (id: string, verdict: ReplyFeedback["verdict"], reason: ReplyFeedback["reason"] = null, details?: { reasons: NonNullable<ReplyFeedback["reasons"]>; note: string | null }) =>
     request<ReplyFeedback>(`/api/conversations/turns/${encodeURIComponent(id)}/feedback`, {

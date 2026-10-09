@@ -7154,6 +7154,69 @@
         }
       }
     },
+    "/api/conversations/turns/{id}/follow-ups": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "summary": "Suggest what to ask next after an adult's finished reply",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "turn-example123"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model-written follow-up questions from the visible turn only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "follow_ups": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Up to three questions in the person's own voice; empty when none would help, for a minor, or on any failure."
+                    }
+                  },
+                  "required": [
+                    "follow_ups"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Turn not found or not the person's own",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/turns/{id}/document": {
       "get": {
         "tags": [
