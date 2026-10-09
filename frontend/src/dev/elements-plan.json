@@ -1307,6 +1307,23 @@
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
     },
     {
+      "file": "number-ticker.test.tsx",
+      "name": "number-ticker.test",
+      "group": "other",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
+    },
+    {
       "file": "number-ticker.tsx",
       "name": "number-ticker",
       "group": "other",
@@ -2015,6 +2032,23 @@
       "replacesHandBuilt": [],
       "realTurnToday": true,
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature."
+    },
+    {
+      "file": "thread-list.projects.aui.test.tsx",
+      "name": "thread-list.projects.aui.test",
+      "group": "other",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target."
     },
     {
       "file": "thread-list.pin.aui.test.tsx",

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-06T20:53:50.623Z",
-  "kitTag": "ui-v0.5.119",
+  "generatedAt": "2026-10-06T21:28:18.688Z",
+  "kitTag": "ui-v0.5.124",
   "items": [
     {
       "file": "__snapshots__/activity-graph.test.tsx.snap",
@@ -773,6 +773,14 @@
       "implemented": true
     },
     {
+      "file": "number-ticker.test.tsx",
+      "name": "number-ticker.test",
+      "group": "other",
+      "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": false
+    },
+    {
       "file": "number-ticker.tsx",
       "name": "number-ticker",
       "group": "other",
@@ -1155,6 +1163,14 @@
       "file": "thread-list.pin.aui.test.tsx",
       "name": "thread-list.pin.aui.test",
       "group": "thread/list",
+      "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": false
+    },
+    {
+      "file": "thread-list.projects.aui.test.tsx",
+      "name": "thread-list.projects.aui.test",
+      "group": "other",
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
