@@ -40,11 +40,13 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import dataset from "./datasets/answer-images.json";
 import { refuseIfGateRunning, waitForHubQuiet } from "./liveHubQuiet";
+import { fixtureWorld, type FixtureSubject } from "../../tests/answerImagesFixture";
 
 type Label = "V" | "N" | "either" | "n/a";
 type PersonKey = "owner" | "teen" | "childOff" | "childOn";
 type Arm = "OFF" | "ON";
-interface Row { id: string; label: Label; person: PersonKey; text: string; setup?: string; subject?: string; spoken?: boolean; zeroPictures?: boolean }
+type RowClass = "explicit" | "looks_like" | "entity" | "casual" | "nonvisual" | "household" | "ambiguous" | "teen_mode" | "child_mode" | "not_offered";
+interface Row { id: string; label: Label; class: RowClass; person: PersonKey; text: string; setup?: string; subject?: string; spoken?: boolean; temporary?: boolean; zeroPictures?: boolean }
 
 const STACK_URL = (process.env.MAIPAI_SMOKE_STACK_URL ?? "http://127.0.0.1:8770").replace(/\/$/, "");
 const OUT = process.env.MAIPAI_IMG05_OUT ?? join(process.cwd(), "..", "data-scratch", "chat-ab", "img05");
@@ -58,14 +60,16 @@ const ONLY = arg("--only") ? new Set(arg("--only")!.split(",")) : null;
 const ARMS = (arg("--arms") ?? "OFF,ON").split(",") as Arm[];
 const CONVERSATION = process.argv.includes("--conversation");
 const CONVERSATION_ONLY = process.argv.includes("--conversation-only");
-const OUTSIDE_PACE_MS = 20_000;
 const FORCE = process.argv.includes("--force-beside-gate");
+const FIXTURE = process.argv.includes("--fixture");
+const OUTSIDE_PACE_MS = FIXTURE ? 0 : 30_000;
 const SHOW = "show_images";
+const MODEL_ID = process.env.MAIPAI_IMG05_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m";
 
 if (!FORCE) refuseIfGateRunning("answer-images");
 const searxng = process.env.MAIPAI_IMG05_SEARXNG_URL;
-if (!searxng) {
-  console.error("answer-images refused: MAIPAI_IMG05_SEARXNG_URL is not set (the household's own SearXNG).");
+if (!FIXTURE && !searxng) {
+  console.error("answer-images refused: set MAIPAI_IMG05_SEARXNG_URL or use --fixture for local fixture search and image services.");
   process.exit(2);
 }
 mkdirSync(PICS, { recursive: true });
@@ -97,6 +101,7 @@ interface EngineTimings { promptN: number | null; promptMs: number | null; predi
 interface EngineRequest { offered: string[]; toolChoice: unknown; called: { name: string; args: string }[]; contentToolText: boolean; cachedTokens: number | null; promptTokens: number | null; startAt: number; firstByteAt: number | null; endAt: number | null; timings: EngineTimings | null }
 const requests: EngineRequest[] = [];
 let engineHeaders = { engine: "unknown", model: "unknown" };
+let currentLabel = "unassigned";
 
 function parseCompletion(raw: string, record: EngineRequest): void {
   const calls = new Map<number, { name: string; args: string }>();
@@ -149,14 +154,14 @@ const standIn = Bun.serve({
     if (req.method === "POST" && url.pathname === "/v1/chat/completions" && body) {
       const record: EngineRequest = { offered: [], toolChoice: undefined, called: [], contentToolText: false, cachedTokens: null, promptTokens: null, startAt: performance.now(), firstByteAt: null, endAt: null, timings: null };
       try {
-        const parsed = JSON.parse(new TextDecoder().decode(body)) as { tools?: { function?: { name?: string } }[]; tool_choice?: unknown };
+        const parsed = JSON.parse(new TextDecoder().decode(body)) as { tools?: { function?: { name?: string } }[]; tool_choice?: unknown; messages?: { role?: string; content?: unknown }[] };
         record.offered = (parsed.tools ?? []).map((t) => t.function?.name ?? "?");
         record.toolChoice = parsed.tool_choice;
+        if (process.env.MAIPAI_IMG05_DUMP === "1") writeFileSync(join(OUT, `request-${String(requests.length + 1).padStart(4, "0")}.json`), JSON.stringify({ ...parsed, _run: currentLabel }, null, 2));
       } catch { /* not JSON */ }
       requests.push(record);
       // MAIPAI_IMG05_DUMP=1: every engine request body to disk, to read the
       // exact prompt and tool block each band sends.
-      if (process.env.MAIPAI_IMG05_DUMP === "1") writeFileSync(join(OUT, `request-${String(requests.length).padStart(4, "0")}.json`), new TextDecoder().decode(body));
       engineHeaders = { engine: upstream.headers.get("x-maipai-engine") ?? engineHeaders.engine, model: upstream.headers.get("x-maipai-model") ?? engineHeaders.model };
       if (!upstream.body) return upstream;
       const [mine, theirs] = upstream.body.tee();
@@ -179,17 +184,34 @@ const standIn = Bun.serve({
 });
 const standInUrl = standIn.url.toString().replace(/\/$/, "");
 
-// ---- the search tee: forwards, counts, stops on the first block signal ----
+// ---- local fixture services or the search tee ----
 let searches = 0;
 let searchStopped: string | null = null;
+const subjectNames: string[] = [...new Set((dataset.rows as Row[]).flatMap((r): string[] => r.subject ? [r.subject] : r.id === "v-michael-jackson" || r.id === "v-michael-jackson-look" ? ["Michael Jackson"] : r.id === "v-exorcist-poster" ? ["The Exorcist"] : []))];
+const fixtureSubjects: FixtureSubject[] = subjectNames.map((label, i) => ({
+  id: `Q${1000 + i}`, label,
+  human: /Michael Jackson|Corey Feldman|David Blaine/.test(label),
+  birth: /Michael Jackson|Corey Feldman|David Blaine/.test(label) ? "1950-01-01T00:00:00Z" : undefined,
+  image: `${label.replace(/[^a-z0-9]+/gi, "_")}.jpg`, category: `${label} fixtures`,
+  files: Array.from({ length: 8 }, (_, n) => `${label.replace(/[^a-z0-9]+/gi, "_")}_${n + 1}.jpg`),
+  film: /Exorcist|Stranger Things|Jurassic Park/.test(label),
+}));
+const fixture = FIXTURE ? fixtureWorld(fixtureSubjects) : null;
 const tee = Bun.serve({
   port: 0,
   hostname: "127.0.0.1",
   async fetch(req) {
     const url = new URL(req.url);
+    if (FIXTURE) {
+      searches++;
+      const q = url.searchParams.get("q") ?? "";
+      const row = fixtureSubjects.find((s) => q.toLowerCase().includes(s.label.toLowerCase()));
+      const results = row && !row.human ? Array.from({ length: 4 }, (_, i) => ({ title: `${row.label} reference image ${i + 1}`, url: `https://example.com/${i + 1}`, content: `Reference image of ${row.label}.`, image: `https://upload.example/${100 + i}.jpg` })) : [];
+      return Response.json({ query: q, results });
+    }
     if (searchStopped) return new Response("search stopped by the bench", { status: 503 });
     searches++;
-    const upstream = await realFetch(`${searxng.replace(/\/$/, "")}${url.pathname}${url.search}`, { headers: { "user-agent": req.headers.get("user-agent") ?? "MaiPai-Home" }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
+    const upstream = await realFetch(`${searxng!.replace(/\/$/, "")}${url.pathname}${url.search}`, { headers: { "user-agent": req.headers.get("user-agent") ?? "MaiPai-Home" }, signal: AbortSignal.timeout(15_000) }).catch(() => null);
     if (!upstream) return new Response("upstream failed", { status: 502 });
     const text = await upstream.text();
     if (upstream.status === 429 || upstream.status === 403) searchStopped = `${upstream.status} from SearXNG`;
@@ -208,9 +230,15 @@ process.env.MAIPAI_LLAMA_SERVER_URL = standInUrl;
 process.env.MAIPAI_EMBED_URL = standInUrl;
 
 const setup = await import("./setup");
+await setup.startBench();
+if (fixture) {
+  const { __setAnswerImageDepsForTests } = await import("@/lib/answerImages/select");
+  __setAnswerImageDepsForTests(fixture.deps);
+}
 const { setHouseholdSettingValue, setValue } = await import("@/lib/settings");
 const { CATALOG } = await import("@/lib/modelCatalog");
-const { createConversation, outcomesForConversation } = await import("@/lib/conversationHistory");
+const { createConversation, outcomesForConversation, resolveOrCreateConversation } = await import("@/lib/conversationHistory");
+const { deleteEpisodesForPerson } = await import("@/lib/episodes");
 const { runTurnNextStream } = await import("@/lib/turnMachine/turnNext");
 const { streamTurnEvents } = await import("@/routes/turn");
 const { getAnswerImage } = await import("@/lib/answerImages/cache");
@@ -221,13 +249,12 @@ const { newPersonId } = await import("@/lib/id");
 const { nextHlc } = await import("@/lib/hlc");
 const sharp = (await import("sharp")).default;
 
-await setup.startBench();
-setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
+setHouseholdSettingValue("chat.model_id", MODEL_ID);
 const searchSet = setHouseholdSettingValue("search.searxng_url", tee.url.toString().replace(/\/$/, ""));
 if (!searchSet.ok) throw new Error(`search setting: ${searchSet.error}`);
 
-const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m");
-if (!entry?.turn_budget) throw new Error("the 8B has no turn_budget");
+const entry = CATALOG.find((m) => m.id === MODEL_ID);
+if (!entry?.turn_budget) throw new Error(`${MODEL_ID} has no turn_budget`);
 const shipped = entry.turn_budget.tools_offered.filter((id) => id !== SHOW);
 function useArm(arm: Arm): void {
   entry!.turn_budget!.tools_offered = arm === "ON" ? [...shipped, SHOW].sort() : [...shipped];
@@ -248,7 +275,7 @@ if (!turnedOn.ok) throw new Error(`turning pictures on for the child: ${turnedOn
 
 interface Picture { id: string; bytes: number; width: number | null; height: number | null; decoded: boolean; file: string | null; dhash: string | null; site: string; caption: string }
 interface Run {
-  arm: Arm; row: string; label: Label; person: PersonKey; rep: number; text: string;
+  arm: Arm; row: string; label: Label; class: RowClass; person: PersonKey; rep: number; text: string;
   offered: boolean; called: string[]; subjects: string[]; textShapedCall: boolean;
   firstTextMs: number | null; totalMs: number; reply: string; error: string | null;
   images: { visible: number; items: number; afterParagraph: number; badge: number; near: [number, number, number][]; pictures: Picture[]; sheet: string | null } | null;
@@ -314,11 +341,14 @@ const bandOf = (key: PersonKey): "adult" | "teen" | "child" => (key === "owner" 
 
 /** One turn the way routes/turn.ts streams it; the clock starts before the turn begins. */
 async function turn(arm: Arm, row: Row, rep: number, conversationId: string | null, tag: string): Promise<{ run: Run; conversationId: string }> {
+  currentLabel = `${arm} ${row.id} r${rep}`;
   const actor = persons[row.person];
   let convo = conversationId;
   if (!convo) {
-    const created = createConversation(actor as never, { surface: "chat" });
-    if (!created.ok) throw new Error(`createConversation: ${created.error}`);
+    const created = row.temporary
+      ? resolveOrCreateConversation(actor as never, "chat", undefined, { temporary: true })
+      : createConversation(actor as never, { surface: "chat" });
+    if (!created.ok) throw new Error(`create conversation: ${created.error}`);
     convo = created.value.id;
   }
   const reqMark = requests.length;
@@ -379,7 +409,7 @@ async function turn(arm: Arm, row: Row, rep: number, conversationId: string | nu
     images = { visible: imagesEvent.visible, items: imagesEvent.items.length, afterParagraph: imagesEvent.after_paragraph, badge: imagesEvent.items.length - imagesEvent.visible, near, ...saved };
   }
   const run: Run = {
-    arm, row: row.id, label: row.label, person: row.person, rep, text: row.text,
+    arm, row: row.id, label: row.label, class: row.class, person: row.person, rep, text: row.text,
     offered, called, subjects, textShapedCall: mine.some((r) => r.contentToolText),
     firstTextMs, totalMs, reply, error, images, skipped, outbound: out,
     cachedTokens: mine[0]?.cachedTokens ?? null, promptTokens: mine[0]?.promptTokens ?? null,
@@ -426,6 +456,9 @@ try {
           if (arm === "OFF" && (row.label === "n/a" || row.label === "either")) continue;
           if (blockSignal || searchStopped) break;
           await paced();
+          // Each sample gets a fresh conversation and an empty episode store,
+          // so one corpus row cannot become background evidence for another.
+          deleteEpisodesForPerson(persons[row.person].id);
           let convo: string | null = null;
           if (row.setup) {
             const first = await turn(arm, { ...row, text: row.setup }, rep, null, `${row.id}-${arm}-${rep}-setup`);
@@ -446,7 +479,7 @@ try {
     let convo: string | null = null;
     for (const [i, text] of dataset.non_visual_conversation.entries()) {
       await paced();
-      const { run, conversationId } = await turn("ON", { id: `conv-${i + 1}`, label: "N", person: "owner", text }, 1, convo, `conv-${i + 1}`);
+      const { run, conversationId } = await turn("ON", { id: `conv-${i + 1}`, label: "N", class: "nonvisual", person: "owner", text }, 1, convo, `conv-${i + 1}`);
       convo = conversationId;
       conversationRuns.push(run);
       if (run.outsideTouched) lastOutside = Date.now();
